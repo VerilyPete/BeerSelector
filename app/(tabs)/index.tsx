@@ -196,10 +196,16 @@ export default function HomeScreen() {
           Browse our extensive collection and find your next favorite brew.
         </ThemedText>
         <TouchableOpacity 
-          style={[styles.mainButton, { backgroundColor: buttonColor }]}
+          style={[styles.mainButton, { backgroundColor: buttonColor, marginBottom: 16 }]}
           onPress={() => router.navigate('/(tabs)/beerlist')}
         >
           <Text style={[styles.mainButtonText, { color: buttonTextColor }]}>Browse All Beers</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.mainButton, { backgroundColor: buttonColor }]}
+          onPress={() => router.navigate('/(tabs)/mybeers')}
+        >
+          <Text style={[styles.mainButtonText, { color: buttonTextColor }]}>My Beers</Text>
         </TouchableOpacity>
       </View>
     </ThemedView>

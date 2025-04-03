@@ -37,6 +37,25 @@ export const setupDatabase = async (): Promise<void> => {
         brew_description TEXT
       )
     `);
+
+    // Create the table for My Beers (tasted beers)
+    await database.execAsync(`
+      CREATE TABLE IF NOT EXISTS tasted_brew_current_round (
+        id TEXT PRIMARY KEY,
+        roh_lap TEXT,
+        tasted_date TEXT,
+        brew_name TEXT,
+        brewer TEXT,
+        brewer_loc TEXT,
+        brew_style TEXT,
+        brew_container TEXT,
+        review_count TEXT,
+        review_ratings TEXT,
+        brew_description TEXT,
+        chit_code TEXT
+      )
+    `);
+    
     console.log('Database setup complete');
   } catch (error) {
     console.error('Error setting up database:', error);
@@ -118,6 +137,7 @@ export const initializeBeerDatabase = async (): Promise<void> => {
     await setupDatabase();
     const beers = await fetchBeersFromAPI();
     await populateBeersTable(beers);
+    await fetchAndPopulateMyBeers();
   } catch (error) {
     console.error('Error initializing beer database:', error);
     throw error;
@@ -255,6 +275,114 @@ export const getBeersByBrewer = async (brewer: string): Promise<any[]> => {
     );
   } catch (error) {
     console.error('Error getting beers by brewer:', error);
+    throw error;
+  }
+};
+
+// Fetch My Beers from API
+export const fetchMyBeersFromAPI = async (): Promise<any[]> => {
+  try {
+    const response = await fetch('https://fsbs.beerknurd.com/bk-member-json.php?uid=484587');
+    const data = await response.json();
+    
+    // Extract the tasted_brew_current_round array from the response
+    if (data && Array.isArray(data) && data.length >= 2 && data[1] && data[1].tasted_brew_current_round) {
+      return data[1].tasted_brew_current_round;
+    }
+    
+    throw new Error('Invalid response format from My Beers API');
+  } catch (error) {
+    console.error('Error fetching My Beers from API:', error);
+    throw error;
+  }
+};
+
+// Insert My Beers into database
+export const populateMyBeersTable = async (beers: any[]): Promise<void> => {
+  const database = await initDatabase();
+  
+  try {
+    // Clear the existing table data
+    await database.runAsync('DELETE FROM tasted_brew_current_round');
+    
+    console.log(`Starting import of ${beers.length} My Beers...`);
+    
+    // Start a transaction for better performance
+    await database.withTransactionAsync(async () => {
+      // Insert each beer into the database
+      for (const beer of beers) {
+        if (!beer.id) continue; // Skip entries without an ID
+        
+        await database.runAsync(
+          `INSERT OR REPLACE INTO tasted_brew_current_round (
+            id, roh_lap, tasted_date, brew_name, brewer, brewer_loc, 
+            brew_style, brew_container, review_count, review_ratings, 
+            brew_description, chit_code
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            beer.id,
+            beer.roh_lap || '',
+            beer.tasted_date || '',
+            beer.brew_name || '',
+            beer.brewer || '',
+            beer.brewer_loc || '',
+            beer.brew_style || '',
+            beer.brew_container || '',
+            beer.review_count || '',
+            beer.review_ratings || '',
+            beer.brew_description || '',
+            beer.chit_code || ''
+          ]
+        );
+      }
+    });
+    
+    console.log('My Beers import complete!');
+  } catch (error) {
+    console.error('Error populating My Beers database:', error);
+    throw error;
+  }
+};
+
+// Fetch and populate My Beers
+export const fetchAndPopulateMyBeers = async (): Promise<void> => {
+  try {
+    const myBeers = await fetchMyBeersFromAPI();
+    await populateMyBeersTable(myBeers);
+  } catch (error) {
+    console.error('Error fetching and populating My Beers:', error);
+    throw error;
+  }
+};
+
+// Get all My Beers from the database
+export const getMyBeers = async (): Promise<any[]> => {
+  const database = await initDatabase();
+  
+  try {
+    return await database.getAllAsync(
+      'SELECT * FROM tasted_brew_current_round WHERE brew_name IS NOT NULL AND brew_name != "" ORDER BY tasted_date DESC'
+    );
+  } catch (error) {
+    console.error('Error getting My Beers from database:', error);
+    throw error;
+  }
+};
+
+// Get all available beers that are not in My Beers
+export const getBeersNotInMyBeers = async (): Promise<any[]> => {
+  const database = await initDatabase();
+  
+  try {
+    return await database.getAllAsync(`
+      SELECT * FROM allbeers 
+      WHERE brew_name IS NOT NULL 
+      AND brew_name != "" 
+      AND id NOT IN (SELECT id FROM tasted_brew_current_round)
+      ORDER BY added_date DESC
+    `);
+  } catch (error) {
+    console.error('Error getting beers not in My Beers:', error);
     throw error;
   }
 }; 
