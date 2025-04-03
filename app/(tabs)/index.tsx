@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity } from 'react-native';
 import React from 'react';
 import Animated, {
   interpolate,
@@ -6,6 +6,7 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
 } from 'react-native-reanimated';
+import { router } from 'expo-router';
 
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
@@ -15,7 +16,7 @@ import { useThemeColor } from '@/hooks/useThemeColor';
 
 const HEADER_HEIGHT = 250;
 
-export default function HomeScreen() {
+export function BeerListScreen() {
   const colorScheme = useColorScheme() ?? 'light';
   const scrollY = useSharedValue(0);
   const backgroundColor = useThemeColor({}, 'background');
@@ -137,4 +138,70 @@ const styles = StyleSheet.create({
   beerListContainer: {
     flexGrow: 1,
   },
+  homeContainer: {
+    flex: 1,
+  },
+  homeContentContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+    paddingTop: 60,
+  },
+  welcomeTitle: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  welcomeText: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 40,
+    paddingHorizontal: 20,
+  },
+  mainButton: {
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    borderRadius: 30,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    minWidth: 220,
+    alignItems: 'center',
+  },
+  mainButtonText: {
+    color: 'white',
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
 });
+
+export default function HomeScreen() {
+  const backgroundColor = useThemeColor({}, 'background');
+  const buttonColor = useThemeColor({}, 'tint');
+  const colorScheme = useColorScheme() ?? 'light';
+  
+  // Determine the appropriate button text color based on theme
+  const buttonTextColor = colorScheme === 'dark' ? '#000000' : '#FFFFFF';
+  
+  return (
+    <ThemedView style={[styles.homeContainer, { backgroundColor }]}>
+      <View style={styles.homeContentContainer}>
+        <ThemedText type="title" style={styles.welcomeTitle}>Welcome to Beer Selector</ThemedText>
+        <ThemedText style={styles.welcomeText}>
+          Your ultimate guide to discovering great beers. 
+          Browse our extensive collection and find your next favorite brew.
+        </ThemedText>
+        <TouchableOpacity 
+          style={[styles.mainButton, { backgroundColor: buttonColor }]}
+          onPress={() => router.navigate('/(tabs)/beerlist')}
+        >
+          <Text style={[styles.mainButtonText, { color: buttonTextColor }]}>Browse All Beers</Text>
+        </TouchableOpacity>
+      </View>
+    </ThemedView>
+  );
+}
