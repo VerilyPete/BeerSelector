@@ -195,8 +195,7 @@ export default function HomeScreen() {
       <SafeAreaView style={styles.homeContentContainer} edges={['top', 'right', 'left']}>
         <ThemedText type="title" style={styles.welcomeTitle}>Welcome to Beer Selector</ThemedText>
         <ThemedText style={styles.welcomeText}>
-          Your ultimate guide to discovering great beers. 
-          Browse our extensive collection and find your next favorite brew.
+          What are you drinking tonight?
         </ThemedText>
         <TouchableOpacity 
           style={[styles.mainButton, { backgroundColor: buttonColor, marginBottom: 16 }]}

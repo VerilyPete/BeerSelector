@@ -7,6 +7,7 @@ import { LoadingIndicator } from './LoadingIndicator';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { SearchBar } from './SearchBar';
 
 type Beer = {
   id: string;
@@ -34,6 +35,7 @@ export const BeerList = () => {
   const [isHeaviesOnly, setIsHeaviesOnly] = useState(false);
   const [isIpaOnly, setIsIpaOnly] = useState(false);
   const [sortBy, setSortBy] = useState<SortOption>('date');
+  const [searchText, setSearchText] = useState('');
   
   // Theme colors
   const cardColor = useThemeColor({}, 'background');
@@ -117,9 +119,20 @@ export const BeerList = () => {
     setDisplayedBeers(sortedBeers);
   }, [sortBy]);
 
-  // Filter beers when any filter changes
+  // Filter beers when any filter changes or search text changes
   useEffect(() => {
     let filtered = allBeers;
+
+    // Apply text search filter
+    if (searchText.trim() !== '') {
+      const searchLower = searchText.toLowerCase().trim();
+      filtered = filtered.filter(beer => 
+        (beer.brew_name && beer.brew_name.toLowerCase().includes(searchLower)) ||
+        (beer.brewer && beer.brewer.toLowerCase().includes(searchLower)) ||
+        (beer.brew_style && beer.brew_style.toLowerCase().includes(searchLower)) ||
+        (beer.brew_description && beer.brew_description.toLowerCase().includes(searchLower))
+      );
+    }
 
     if (isDraftOnly) {
       filtered = filtered.filter(beer => 
@@ -158,7 +171,7 @@ export const BeerList = () => {
     setDisplayedBeers(filtered);
     // Reset expanded item when filter changes
     setExpandedId(null);
-  }, [isDraftOnly, isHeaviesOnly, isIpaOnly, allBeers, sortBy]);
+  }, [isDraftOnly, isHeaviesOnly, isIpaOnly, allBeers, sortBy, searchText]);
 
   const toggleDraftFilter = () => {
     setIsDraftOnly(!isDraftOnly);
@@ -204,6 +217,14 @@ export const BeerList = () => {
 
   const toggleExpand = (id: string) => {
     setExpandedId(expandedId === id ? null : id);
+  };
+
+  const handleSearchChange = (text: string) => {
+    setSearchText(text);
+  };
+
+  const clearSearch = () => {
+    setSearchText('');
   };
 
   const renderBeerItem = (item: Beer) => {
@@ -254,100 +275,106 @@ export const BeerList = () => {
   const renderFilterButtons = () => {
     return (
       <View style={styles.filtersContainer}>
+        <SearchBar 
+          searchText={searchText}
+          onSearchChange={handleSearchChange}
+          onClear={clearSearch}
+          placeholder="Search beers..."
+        />
         <View style={styles.beerCountContainer}>
           <ThemedText style={styles.beerCount}>
-            {displayedBeers.length} beers found
+            {displayedBeers.length} {displayedBeers.length === 1 ? 'beer' : 'beers'} available
           </ThemedText>
         </View>
         
         <View style={styles.filterContainer}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[
-              styles.filterButton, 
-              { 
+              styles.filterButton,
+              {
                 backgroundColor: isDraftOnly ? activeBgColor : inactiveButtonColor,
-                borderWidth: 1,
-                borderColor: isDraftOnly ? activeBgColor : borderColor,
-              }
+              },
             ]}
             onPress={toggleDraftFilter}
+            activeOpacity={0.7}
           >
-            <ThemedText style={[
-              styles.filterButtonText, 
-              { 
-                color: isDraftOnly ? buttonTextColor : inactiveButtonTextColor 
-              }
-            ]}>
-              {isDraftOnly ? 'Draft: On' : 'Draft Only'}
+            <ThemedText
+              style={[
+                styles.filterButtonText,
+                {
+                  color: isDraftOnly ? buttonTextColor : inactiveButtonTextColor,
+                },
+              ]}
+            >
+              Draft Only
             </ThemedText>
           </TouchableOpacity>
           
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[
-              styles.filterButton, 
-              { 
+              styles.filterButton,
+              {
                 backgroundColor: isHeaviesOnly ? activeBgColor : inactiveButtonColor,
-                borderWidth: 1,
-                borderColor: isHeaviesOnly ? activeBgColor : borderColor,
-                opacity: isIpaOnly ? 0.5 : 1,
-              }
+              },
             ]}
             onPress={toggleHeaviesFilter}
-            disabled={isIpaOnly}
+            activeOpacity={0.7}
           >
-            <ThemedText style={[
-              styles.filterButtonText, 
-              { 
-                color: isHeaviesOnly ? buttonTextColor : inactiveButtonTextColor 
-              }
-            ]}>
-              {isHeaviesOnly ? 'Heavies: On' : 'Heavies'}
+            <ThemedText
+              style={[
+                styles.filterButtonText,
+                {
+                  color: isHeaviesOnly ? buttonTextColor : inactiveButtonTextColor,
+                },
+              ]}
+            >
+              Heavies
             </ThemedText>
           </TouchableOpacity>
-
-          <TouchableOpacity 
+          
+          <TouchableOpacity
             style={[
-              styles.filterButton, 
-              { 
+              styles.filterButton,
+              {
                 backgroundColor: isIpaOnly ? activeBgColor : inactiveButtonColor,
-                borderWidth: 1,
-                borderColor: isIpaOnly ? activeBgColor : borderColor,
-                opacity: isHeaviesOnly ? 0.5 : 1,
-              }
+              },
             ]}
             onPress={toggleIpaFilter}
-            disabled={isHeaviesOnly}
+            activeOpacity={0.7}
           >
-            <ThemedText style={[
-              styles.filterButtonText, 
-              { 
-                color: isIpaOnly ? buttonTextColor : inactiveButtonTextColor 
-              }
-            ]}>
-              {isIpaOnly ? 'IPA: On' : 'IPA'}
+            <ThemedText
+              style={[
+                styles.filterButtonText,
+                {
+                  color: isIpaOnly ? buttonTextColor : inactiveButtonTextColor,
+                },
+              ]}
+            >
+              IPA
             </ThemedText>
           </TouchableOpacity>
         </View>
 
         <View style={styles.sortContainer}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[
-              styles.sortButton, 
-              { 
+              styles.sortButton,
+              {
                 backgroundColor: sortBy === 'name' ? activeBgColor : inactiveButtonColor,
-                borderWidth: 1,
-                borderColor: sortBy === 'name' ? activeBgColor : borderColor,
-              }
+              },
             ]}
             onPress={toggleSortOption}
+            activeOpacity={0.7}
           >
-            <ThemedText style={[
-              styles.filterButtonText, 
-              { 
-                color: sortBy === 'name' ? buttonTextColor : inactiveButtonTextColor 
-              }
-            ]}>
-              Sort: {sortBy === 'date' ? 'Newest First' : 'A-Z'}
+            <ThemedText
+              style={[
+                styles.filterButtonText,
+                {
+                  color: sortBy === 'name' ? buttonTextColor : inactiveButtonTextColor,
+                },
+              ]}
+            >
+              {sortBy === 'name' ? 'Sorting: Name' : 'Sorting: Date'}
             </ThemedText>
           </TouchableOpacity>
 

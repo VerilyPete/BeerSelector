@@ -20,13 +20,21 @@ if (__DEV__) {
       typeof args[0] === 'string' && 
       (args[0].includes('nw_connection') || 
        args[0].includes('quic_conn') || 
-       args[0].includes('8097'))
+       args[0].includes('8097') ||
+       args[0].includes('timestamp_locked_on_nw_queue') ||
+       args[0].includes('Hit maximum timestamp count'))
     ) {
       return;
     }
     originalConsoleError(...args);
   };
-  LogBox.ignoreLogs(['nw_connection', 'nw_socket', 'quic_conn']);
+  LogBox.ignoreLogs([
+    'nw_connection', 
+    'nw_socket', 
+    'quic_conn',
+    'Hit maximum timestamp count',
+    'timestamp_locked_on_nw_queue'
+  ]);
 }
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.

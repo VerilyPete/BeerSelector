@@ -7,6 +7,7 @@ import { LoadingIndicator } from './LoadingIndicator';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { SearchBar } from './SearchBar';
 
 type Beer = {
   id: string;
@@ -34,6 +35,7 @@ export const MyBeerList = () => {
   const [isHeaviesOnly, setIsHeaviesOnly] = useState(false);
   const [isIpaOnly, setIsIpaOnly] = useState(false);
   const [sortBy, setSortBy] = useState<SortOption>('date');
+  const [searchText, setSearchText] = useState('');
   
   // Theme colors
   const cardColor = useThemeColor({}, 'background');
@@ -121,9 +123,20 @@ export const MyBeerList = () => {
     setDisplayedBeers(sortedBeers);
   }, [sortBy]);
 
-  // Filter beers when any filter changes
+  // Filter beers when any filter changes or search text changes
   useEffect(() => {
     let filtered = availableBeers;
+
+    // Apply text search filter
+    if (searchText.trim() !== '') {
+      const searchLower = searchText.toLowerCase().trim();
+      filtered = filtered.filter(beer => 
+        (beer.brew_name && beer.brew_name.toLowerCase().includes(searchLower)) ||
+        (beer.brewer && beer.brewer.toLowerCase().includes(searchLower)) ||
+        (beer.brew_style && beer.brew_style.toLowerCase().includes(searchLower)) ||
+        (beer.brew_description && beer.brew_description.toLowerCase().includes(searchLower))
+      );
+    }
 
     if (isDraftOnly) {
       filtered = filtered.filter(beer => 
@@ -162,7 +175,7 @@ export const MyBeerList = () => {
     setDisplayedBeers(filtered);
     // Reset expanded item when filter changes
     setExpandedId(null);
-  }, [isDraftOnly, isHeaviesOnly, isIpaOnly, availableBeers, sortBy]);
+  }, [isDraftOnly, isHeaviesOnly, isIpaOnly, availableBeers, sortBy, searchText]);
 
   const toggleDraftFilter = () => {
     setIsDraftOnly(!isDraftOnly);
@@ -208,6 +221,14 @@ export const MyBeerList = () => {
 
   const toggleExpand = (id: string) => {
     setExpandedId(expandedId === id ? null : id);
+  };
+
+  const handleSearchChange = (text: string) => {
+    setSearchText(text);
+  };
+
+  const clearSearch = () => {
+    setSearchText('');
   };
 
   const renderBeerItem = (item: Beer) => {
@@ -257,65 +278,79 @@ export const MyBeerList = () => {
 
   const renderFilterButtons = () => {
     return (
-      <View style={styles.filterContainer}>
-        <View style={styles.buttonRow}>
-          <TouchableOpacity 
+      <View style={styles.filtersContainer}>
+        <SearchBar 
+          searchText={searchText}
+          onSearchChange={handleSearchChange}
+          onClear={clearSearch}
+          placeholder="Search my beers..."
+        />
+        <View style={styles.beerCountContainer}>
+          <ThemedText style={styles.beerCount}>
+            {displayedBeers.length} {displayedBeers.length === 1 ? 'beer' : 'beers'} in my collection
+          </ThemedText>
+        </View>
+        <View style={styles.filterContainer}>
+          <TouchableOpacity
             style={[
-              styles.filterButton, 
-              { 
-                backgroundColor: isDraftOnly ? activeBgColor : inactiveButtonColor
-              }
+              styles.filterButton,
+              {
+                backgroundColor: isDraftOnly ? activeBgColor : inactiveButtonColor,
+              },
             ]}
             onPress={toggleDraftFilter}
+            activeOpacity={0.7}
           >
-            <ThemedText 
+            <ThemedText
               style={[
-                styles.filterButtonText, 
-                { 
-                  color: isDraftOnly ? buttonTextColor : inactiveButtonTextColor
-                }
+                styles.filterButtonText,
+                {
+                  color: isDraftOnly ? buttonTextColor : inactiveButtonTextColor,
+                },
               ]}
             >
               Draft Only
             </ThemedText>
           </TouchableOpacity>
           
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[
-              styles.filterButton, 
-              { 
-                backgroundColor: isHeaviesOnly ? activeBgColor : inactiveButtonColor
-              }
+              styles.filterButton,
+              {
+                backgroundColor: isHeaviesOnly ? activeBgColor : inactiveButtonColor,
+              },
             ]}
             onPress={toggleHeaviesFilter}
+            activeOpacity={0.7}
           >
-            <ThemedText 
+            <ThemedText
               style={[
-                styles.filterButtonText, 
-                { 
-                  color: isHeaviesOnly ? buttonTextColor : inactiveButtonTextColor
-                }
+                styles.filterButtonText,
+                {
+                  color: isHeaviesOnly ? buttonTextColor : inactiveButtonTextColor,
+                },
               ]}
             >
               Heavies
             </ThemedText>
           </TouchableOpacity>
           
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[
-              styles.filterButton, 
-              { 
-                backgroundColor: isIpaOnly ? activeBgColor : inactiveButtonColor
-              }
+              styles.filterButton,
+              {
+                backgroundColor: isIpaOnly ? activeBgColor : inactiveButtonColor,
+              },
             ]}
             onPress={toggleIpaFilter}
+            activeOpacity={0.7}
           >
-            <ThemedText 
+            <ThemedText
               style={[
-                styles.filterButtonText, 
-                { 
-                  color: isIpaOnly ? buttonTextColor : inactiveButtonTextColor
-                }
+                styles.filterButtonText,
+                {
+                  color: isIpaOnly ? buttonTextColor : inactiveButtonTextColor,
+                },
               ]}
             >
               IPA
@@ -323,48 +358,26 @@ export const MyBeerList = () => {
           </TouchableOpacity>
         </View>
         
-        <View style={styles.buttonRow}>
-          <TouchableOpacity 
+        <View style={styles.sortContainer}>
+          <TouchableOpacity
             style={[
-              styles.sortButton, 
-              { 
-                backgroundColor: sortBy === 'name' ? activeBgColor : inactiveButtonColor
-              }
+              styles.sortButton,
+              {
+                backgroundColor: sortBy === 'name' ? activeBgColor : inactiveButtonColor,
+              },
             ]}
             onPress={toggleSortOption}
+            activeOpacity={0.7}
           >
-            <ThemedText 
+            <ThemedText
               style={[
-                styles.filterButtonText, 
-                { 
-                  color: sortBy === 'name' ? buttonTextColor : inactiveButtonTextColor 
-                }
+                styles.filterButtonText,
+                {
+                  color: sortBy === 'name' ? buttonTextColor : inactiveButtonTextColor,
+                },
               ]}
             >
-              {sortBy === 'name' ? 'Sorting by Name' : 'Sorting by Date'}
-            </ThemedText>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={[
-              styles.refreshButton, 
-              { 
-                backgroundColor: inactiveButtonColor,
-                opacity: refreshing ? 0.7 : 1 
-              }
-            ]}
-            onPress={handleRefresh}
-            disabled={refreshing}
-          >
-            <ThemedText 
-              style={[
-                styles.filterButtonText, 
-                { 
-                  color: inactiveButtonTextColor
-                }
-              ]}
-            >
-              {refreshing ? 'Refreshing...' : 'Refresh'}
+              {sortBy === 'name' ? 'Sorting: Name' : 'Sorting: Date'}
             </ThemedText>
           </TouchableOpacity>
         </View>
@@ -458,7 +471,8 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   filterContainer: {
-    marginBottom: 16,
+    flexDirection: 'row',
+    marginBottom: 8,
   },
   buttonRow: {
     flexDirection: 'row',
@@ -466,22 +480,23 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   filterButton: {
-    flex: 1,
     paddingVertical: 8,
     paddingHorizontal: 16,
-    borderRadius: 4,
-    marginHorizontal: 4,
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderRadius: 20,
+    marginRight: 8,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
   },
   sortButton: {
-    flex: 2,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 4,
-    marginRight: 4,
-    alignItems: 'center',
-    justifyContent: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
   },
   refreshButton: {
     flex: 1,
@@ -494,7 +509,6 @@ const styles = StyleSheet.create({
   },
   filterButtonText: {
     fontWeight: '600',
-    fontSize: 14,
   },
   listContainer: {
     flex: 1,
@@ -565,5 +579,18 @@ const styles = StyleSheet.create({
   listContent: {
     paddingHorizontal: 16,
     paddingBottom: 16,
+  },
+  filtersContainer: {
+    marginBottom: 16,
+  },
+  beerCountContainer: {
+    marginBottom: 8,
+  },
+  beerCount: {
+    fontWeight: '600',
+  },
+  sortContainer: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
   },
 }); 
