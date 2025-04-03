@@ -48,6 +48,15 @@ export const MyBeerList = () => {
   const loadBeers = async () => {
     try {
       setLoading(true);
+      
+      // Try to fetch My Beers data if it hasn't been loaded yet
+      try {
+        await fetchAndPopulateMyBeers();
+      } catch (err) {
+        console.log('Failed to fetch My Beers data, continuing with local data:', err);
+        // Continue with whatever data we have locally
+      }
+      
       const data = await getBeersNotInMyBeers();
       // Filter out any beers with empty or null brew_name as a second layer of protection
       const filteredData = data.filter(beer => beer.brew_name && beer.brew_name.trim() !== '');
@@ -56,7 +65,7 @@ export const MyBeerList = () => {
       setError(null);
     } catch (err) {
       console.error('Failed to load beers:', err);
-      setError('Failed to load beers. Please try again later.');
+      setError('Failed to load beers. Please check your internet connection and try again.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -374,6 +383,10 @@ export const MyBeerList = () => {
     return (
       <View style={styles.errorContainer}>
         <ThemedText style={styles.errorText}>{error}</ThemedText>
+        <ThemedText style={styles.errorHint}>
+          This could be due to a network issue or database problem. 
+          Make sure you have an internet connection and try again.
+        </ThemedText>
         <TouchableOpacity 
           style={styles.retryButton}
           onPress={loadBeers}
@@ -434,6 +447,13 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     textAlign: 'center',
     fontSize: 16,
+  },
+  errorHint: {
+    marginBottom: 16,
+    textAlign: 'center',
+    fontSize: 14,
+    opacity: 0.7,
+    paddingHorizontal: 20,
   },
   retryButton: {
     backgroundColor: '#FF6B6B',

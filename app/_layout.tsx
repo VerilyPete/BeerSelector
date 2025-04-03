@@ -40,14 +40,29 @@ export default function RootLayout() {
   useEffect(() => {
     async function prepare() {
       try {
-        // Initialize database
-        await initializeBeerDatabase();
+        // Initialize database with retry mechanism
+        try {
+          await initializeBeerDatabase();
+          console.log('Database initialized successfully');
+        } catch (dbError) {
+          console.error('Database initialization failed, retrying once:', dbError);
+          // Wait a moment and try again once
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          try {
+            await initializeBeerDatabase();
+            console.log('Database initialized successfully on retry');
+          } catch (retryError) {
+            console.error('Database initialization failed on retry:', retryError);
+            // Continue anyway - we'll handle database errors in the components
+          }
+        }
         
         if (loaded) {
           await SplashScreen.hideAsync();
         }
       } catch (error) {
         console.error('Error during app initialization:', error);
+        // Continue anyway to allow the app to start
       }
     }
     
