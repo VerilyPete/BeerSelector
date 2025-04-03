@@ -7,6 +7,7 @@ import Animated, {
   useSharedValue,
 } from 'react-native-reanimated';
 import { router } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
@@ -67,11 +68,13 @@ export function BeerListScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <BeerListWithHeader 
-        renderHeader={renderHeader} 
-        onScroll={scrollHandler}
-        backgroundColor={backgroundColor}
-      />
+      <SafeAreaView style={{flex: 1}} edges={['top', 'right', 'left']}>
+        <BeerListWithHeader 
+          renderHeader={renderHeader} 
+          onScroll={scrollHandler}
+          backgroundColor={backgroundColor}
+        />
+      </SafeAreaView>
     </ThemedView>
   );
 }
@@ -189,7 +192,7 @@ export default function HomeScreen() {
   
   return (
     <ThemedView style={[styles.homeContainer, { backgroundColor }]}>
-      <View style={styles.homeContentContainer}>
+      <SafeAreaView style={styles.homeContentContainer} edges={['top', 'right', 'left']}>
         <ThemedText type="title" style={styles.welcomeTitle}>Welcome to Beer Selector</ThemedText>
         <ThemedText style={styles.welcomeText}>
           Your ultimate guide to discovering great beers. 
@@ -207,7 +210,7 @@ export default function HomeScreen() {
         >
           <Text style={[styles.mainButtonText, { color: buttonTextColor }]}>My Beers</Text>
         </TouchableOpacity>
-      </View>
+      </SafeAreaView>
     </ThemedView>
   );
 }
