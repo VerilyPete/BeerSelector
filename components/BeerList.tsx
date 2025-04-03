@@ -26,6 +26,7 @@ export const BeerList = () => {
   const [error, setError] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [isDraftOnly, setIsDraftOnly] = useState(false);
+  const [isHeaviesOnly, setIsHeaviesOnly] = useState(false);
   
   // Theme colors
   const cardColor = useThemeColor({}, 'background');
@@ -35,8 +36,8 @@ export const BeerList = () => {
   const inactiveButtonTextColor = useThemeColor({ light: '#333333', dark: '#EFEFEF' }, 'text');
   
   // Define all derived values outside of hooks and render methods
-  const buttonTextColor = colorScheme === 'dark' && isDraftOnly ? '#000000' : 'white';
-  const activeBgColor = colorScheme === 'dark' && isDraftOnly ? '#FFC107' : activeButtonColor;
+  const buttonTextColor = colorScheme === 'dark' && (isDraftOnly || isHeaviesOnly) ? '#000000' : 'white';
+  const activeBgColor = colorScheme === 'dark' && (isDraftOnly || isHeaviesOnly) ? '#FFC107' : activeButtonColor;
 
   useEffect(() => {
     const loadBeers = async () => {
@@ -59,24 +60,37 @@ export const BeerList = () => {
     loadBeers();
   }, []);
 
-  // Filter beers when the draft filter changes
+  // Filter beers when the draft filter or heavies filter changes
   useEffect(() => {
+    let filtered = allBeers;
+
     if (isDraftOnly) {
-      setDisplayedBeers(
-        allBeers.filter(beer => 
-          beer.brew_container && 
-          beer.brew_container.toLowerCase().includes('draught')
-        )
+      filtered = filtered.filter(beer => 
+        beer.brew_container && 
+        beer.brew_container.toLowerCase().includes('draught')
       );
-    } else {
-      setDisplayedBeers(allBeers);
     }
+
+    if (isHeaviesOnly) {
+      filtered = filtered.filter(beer => 
+        beer.brew_style && 
+        (beer.brew_style.toLowerCase().includes('porter') || 
+         beer.brew_style.toLowerCase().includes('stout') || 
+         beer.brew_style.toLowerCase().includes('barleywine'))
+      );
+    }
+
+    setDisplayedBeers(filtered);
     // Reset expanded item when filter changes
     setExpandedId(null);
-  }, [isDraftOnly, allBeers]);
+  }, [isDraftOnly, isHeaviesOnly, allBeers]);
 
   const toggleDraftFilter = () => {
     setIsDraftOnly(!isDraftOnly);
+  };
+
+  const toggleHeaviesFilter = () => {
+    setIsHeaviesOnly(!isHeaviesOnly);
   };
 
   const toggleExpand = (id: string) => {
@@ -145,7 +159,28 @@ export const BeerList = () => {
               color: isDraftOnly ? buttonTextColor : inactiveButtonTextColor 
             }
           ]}>
-            {isDraftOnly ? 'All Beers' : 'Draft Only'}
+            {isDraftOnly ? 'Draft: On' : 'Draft Only'}
+          </ThemedText>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={[
+            styles.filterButton, 
+            { 
+              backgroundColor: isHeaviesOnly ? activeBgColor : inactiveButtonColor,
+              borderWidth: 1,
+              borderColor: isHeaviesOnly ? activeBgColor : borderColor,
+            }
+          ]}
+          onPress={toggleHeaviesFilter}
+        >
+          <ThemedText style={[
+            styles.filterButtonText, 
+            { 
+              color: isHeaviesOnly ? buttonTextColor : inactiveButtonTextColor 
+            }
+          ]}>
+            {isHeaviesOnly ? 'Heavies: On' : 'Heavies'}
           </ThemedText>
         </TouchableOpacity>
       </View>
@@ -170,10 +205,19 @@ export const BeerList = () => {
         {renderFilterButtons()}
         <View style={styles.centered}>
           <ThemedText>No beers found.</ThemedText>
-          {isDraftOnly && (
-            <TouchableOpacity onPress={toggleDraftFilter} style={styles.resetButton}>
-              <ThemedText style={{ color: activeButtonColor }}>Show all beers</ThemedText>
-            </TouchableOpacity>
+          {(isDraftOnly || isHeaviesOnly) && (
+            <View style={styles.resetButtonsContainer}>
+              {isDraftOnly && (
+                <TouchableOpacity onPress={toggleDraftFilter} style={styles.resetButton}>
+                  <ThemedText style={{ color: activeButtonColor }}>Clear Draft Filter</ThemedText>
+                </TouchableOpacity>
+              )}
+              {isHeaviesOnly && (
+                <TouchableOpacity onPress={toggleHeaviesFilter} style={styles.resetButton}>
+                  <ThemedText style={{ color: activeButtonColor }}>Clear Heavies Filter</ThemedText>
+                </TouchableOpacity>
+              )}
+            </View>
           )}
         </View>
       </View>
@@ -213,7 +257,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   resetButton: {
-    marginTop: 16,
+    marginTop: 8,
     padding: 8,
   },
   beerItem: {
@@ -251,5 +295,10 @@ const styles = StyleSheet.create({
   errorText: {
     color: 'red',
     textAlign: 'center',
+  },
+  resetButtonsContainer: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    marginTop: 16,
   },
 }); 
