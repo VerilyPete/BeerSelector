@@ -5,6 +5,7 @@ import { ThemedText } from './ThemedText';
 import { ThemedView } from './ThemedView';
 import { LoadingIndicator } from './LoadingIndicator';
 import { useThemeColor } from '@/hooks/useThemeColor';
+import { useColorScheme } from '@/hooks/useColorScheme';
 
 type Beer = {
   id: string;
@@ -17,18 +18,25 @@ type Beer = {
 };
 
 export const BeerList = () => {
+  // All hooks must be called at the top level, before any conditional logic
+  const colorScheme = useColorScheme();
   const [allBeers, setAllBeers] = useState<Beer[]>([]);
   const [displayedBeers, setDisplayedBeers] = useState<Beer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [isDraftOnly, setIsDraftOnly] = useState(false);
+  
+  // Theme colors
   const cardColor = useThemeColor({}, 'background');
   const borderColor = useThemeColor({ light: '#e0e0e0', dark: '#333' }, 'text');
   const activeButtonColor = useThemeColor({}, 'tint');
   const inactiveButtonColor = useThemeColor({ light: '#E5E5E5', dark: '#2C2C2E' }, 'background');
-  const activeButtonTextColor = useThemeColor({ light: 'white', dark: 'white' }, 'text');
   const inactiveButtonTextColor = useThemeColor({ light: '#333333', dark: '#EFEFEF' }, 'text');
+  
+  // Define all derived values outside of hooks and render methods
+  const buttonTextColor = colorScheme === 'dark' && isDraftOnly ? '#000000' : 'white';
+  const activeBgColor = colorScheme === 'dark' && isDraftOnly ? '#FFC107' : activeButtonColor;
 
   useEffect(() => {
     const loadBeers = async () => {
@@ -117,30 +125,32 @@ export const BeerList = () => {
     );
   };
 
-  const renderFilterButtons = () => (
-    <View style={styles.filterContainer}>
-      <TouchableOpacity 
-        style={[
-          styles.filterButton, 
-          { 
-            backgroundColor: isDraftOnly ? activeButtonColor : inactiveButtonColor,
-            borderWidth: 1,
-            borderColor: isDraftOnly ? activeButtonColor : borderColor,
-          }
-        ]}
-        onPress={toggleDraftFilter}
-      >
-        <ThemedText style={[
-          styles.filterButtonText, 
-          { 
-            color: isDraftOnly ? activeButtonTextColor : inactiveButtonTextColor 
-          }
-        ]}>
-          {isDraftOnly ? 'All Beers' : 'Draft Only'}
-        </ThemedText>
-      </TouchableOpacity>
-    </View>
-  );
+  const renderFilterButtons = () => {
+    return (
+      <View style={styles.filterContainer}>
+        <TouchableOpacity 
+          style={[
+            styles.filterButton, 
+            { 
+              backgroundColor: isDraftOnly ? activeBgColor : inactiveButtonColor,
+              borderWidth: 1,
+              borderColor: isDraftOnly ? activeBgColor : borderColor,
+            }
+          ]}
+          onPress={toggleDraftFilter}
+        >
+          <ThemedText style={[
+            styles.filterButtonText, 
+            { 
+              color: isDraftOnly ? buttonTextColor : inactiveButtonTextColor 
+            }
+          ]}>
+            {isDraftOnly ? 'All Beers' : 'Draft Only'}
+          </ThemedText>
+        </TouchableOpacity>
+      </View>
+    );
+  };
 
   if (loading) {
     return <LoadingIndicator message="Loading beers..." />;
@@ -154,7 +164,7 @@ export const BeerList = () => {
     );
   }
 
-  if (displayedBeers.length === 0) {
+  if (!displayedBeers || displayedBeers.length === 0) {
     return (
       <View style={styles.container}>
         {renderFilterButtons()}
