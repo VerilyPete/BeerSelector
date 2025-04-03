@@ -71,19 +71,25 @@ export const BeerList = () => {
   const handleRefresh = async () => {
     try {
       setRefreshing(true);
-      Alert.alert('Refreshing', 'Refreshing beer list from server...');
+      
+      // No initial alert, just update the button text to "Refreshing..."
+      
+      // Perform the refresh
       const refreshedBeers = await refreshBeersFromAPI();
       // Filter out any beers with empty or null brew_name as a second layer of protection
       const filteredData = refreshedBeers.filter(beer => beer.brew_name && beer.brew_name.trim() !== '');
       setAllBeers(filteredData);
       setDisplayedBeers(filteredData);
       setError(null);
+      
+      // Show success message
       Alert.alert('Success', `Successfully refreshed ${filteredData.length} beers from server.`);
     } catch (err) {
       console.error('Failed to refresh beers:', err);
       setError('Failed to refresh beers. Please try again later.');
       Alert.alert('Error', 'Failed to refresh beers from server. Please try again later.');
     } finally {
+      // Set refreshing to false at the end, in both success and error cases
       setRefreshing(false);
     }
   };
