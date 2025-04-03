@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, View, TouchableOpacity } from 'react-native';
-import { getAllBeers } from '@/src/database/db';
+import { StyleSheet, View, TouchableOpacity, Alert } from 'react-native';
+import { getAllBeers, refreshBeersFromAPI } from '@/src/database/db';
 import { ThemedText } from './ThemedText';
 import { ThemedView } from './ThemedView';
 import { LoadingIndicator } from './LoadingIndicator';
@@ -15,7 +15,10 @@ type Beer = {
   brew_style: string;
   brew_container: string;
   brew_description: string;
+  added_date: string;
 };
+
+type SortOption = 'date' | 'name';
 
 export const BeerList = () => {
   // All hooks must be called at the top level, before any conditional logic
@@ -23,10 +26,13 @@ export const BeerList = () => {
   const [allBeers, setAllBeers] = useState<Beer[]>([]);
   const [displayedBeers, setDisplayedBeers] = useState<Beer[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [isDraftOnly, setIsDraftOnly] = useState(false);
   const [isHeaviesOnly, setIsHeaviesOnly] = useState(false);
+  const [isIpaOnly, setIsIpaOnly] = useState(false);
+  const [sortBy, setSortBy] = useState<SortOption>('date');
   
   // Theme colors
   const cardColor = useThemeColor({}, 'background');
@@ -36,31 +42,75 @@ export const BeerList = () => {
   const inactiveButtonTextColor = useThemeColor({ light: '#333333', dark: '#EFEFEF' }, 'text');
   
   // Define all derived values outside of hooks and render methods
-  const buttonTextColor = colorScheme === 'dark' && (isDraftOnly || isHeaviesOnly) ? '#000000' : 'white';
-  const activeBgColor = colorScheme === 'dark' && (isDraftOnly || isHeaviesOnly) ? '#FFC107' : activeButtonColor;
+  const buttonTextColor = colorScheme === 'dark' && (isDraftOnly || isHeaviesOnly || isIpaOnly || sortBy === 'name') ? '#000000' : 'white';
+  const activeBgColor = colorScheme === 'dark' && (isDraftOnly || isHeaviesOnly || isIpaOnly || sortBy === 'name') ? '#FFC107' : activeButtonColor;
+
+  const loadBeers = async () => {
+    try {
+      setLoading(true);
+      const data = await getAllBeers();
+      // Filter out any beers with empty or null brew_name as a second layer of protection
+      const filteredData = data.filter(beer => beer.brew_name && beer.brew_name.trim() !== '');
+      setAllBeers(filteredData);
+      setDisplayedBeers(filteredData);
+      setError(null);
+    } catch (err) {
+      console.error('Failed to load beers:', err);
+      setError('Failed to load beers. Please try again later.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
 
   useEffect(() => {
-    const loadBeers = async () => {
-      try {
-        setLoading(true);
-        const data = await getAllBeers();
-        // Filter out any beers with empty or null brew_name as a second layer of protection
-        const filteredData = data.filter(beer => beer.brew_name && beer.brew_name.trim() !== '');
-        setAllBeers(filteredData);
-        setDisplayedBeers(filteredData);
-        setError(null);
-      } catch (err) {
-        console.error('Failed to load beers:', err);
-        setError('Failed to load beers. Please try again later.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
     loadBeers();
   }, []);
 
-  // Filter beers when the draft filter or heavies filter changes
+  // Refresh beers from API
+  const handleRefresh = async () => {
+    try {
+      setRefreshing(true);
+      Alert.alert('Refreshing', 'Refreshing beer list from server...');
+      const refreshedBeers = await refreshBeersFromAPI();
+      // Filter out any beers with empty or null brew_name as a second layer of protection
+      const filteredData = refreshedBeers.filter(beer => beer.brew_name && beer.brew_name.trim() !== '');
+      setAllBeers(filteredData);
+      setDisplayedBeers(filteredData);
+      setError(null);
+      Alert.alert('Success', `Successfully refreshed ${filteredData.length} beers from server.`);
+    } catch (err) {
+      console.error('Failed to refresh beers:', err);
+      setError('Failed to refresh beers. Please try again later.');
+      Alert.alert('Error', 'Failed to refresh beers from server. Please try again later.');
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  // Sort beers when sort option changes
+  useEffect(() => {
+    if (displayedBeers.length === 0) return;
+    
+    const sortedBeers = [...displayedBeers];
+    
+    if (sortBy === 'name') {
+      sortedBeers.sort((a, b) => {
+        return (a.brew_name || '').localeCompare(b.brew_name || '');
+      });
+    } else {
+      // Default sort is by date (already handled by the database query)
+      sortedBeers.sort((a, b) => {
+        const dateA = parseInt(a.added_date || '0', 10);
+        const dateB = parseInt(b.added_date || '0', 10);
+        return dateB - dateA; // Descending order
+      });
+    }
+    
+    setDisplayedBeers(sortedBeers);
+  }, [sortBy]);
+
+  // Filter beers when any filter changes
   useEffect(() => {
     let filtered = allBeers;
 
@@ -80,10 +130,28 @@ export const BeerList = () => {
       );
     }
 
+    if (isIpaOnly) {
+      filtered = filtered.filter(beer => 
+        beer.brew_style && 
+        beer.brew_style.toLowerCase().includes('ipa')
+      );
+    }
+
+    // Apply sorting
+    if (sortBy === 'name') {
+      filtered.sort((a, b) => (a.brew_name || '').localeCompare(b.brew_name || ''));
+    } else {
+      filtered.sort((a, b) => {
+        const dateA = parseInt(a.added_date || '0', 10);
+        const dateB = parseInt(b.added_date || '0', 10);
+        return dateB - dateA; // Descending order
+      });
+    }
+
     setDisplayedBeers(filtered);
     // Reset expanded item when filter changes
     setExpandedId(null);
-  }, [isDraftOnly, isHeaviesOnly, allBeers]);
+  }, [isDraftOnly, isHeaviesOnly, isIpaOnly, allBeers, sortBy]);
 
   const toggleDraftFilter = () => {
     setIsDraftOnly(!isDraftOnly);
@@ -91,6 +159,40 @@ export const BeerList = () => {
 
   const toggleHeaviesFilter = () => {
     setIsHeaviesOnly(!isHeaviesOnly);
+    // If turning on Heavies filter, turn off IPA filter
+    if (!isHeaviesOnly) {
+      setIsIpaOnly(false);
+    }
+  };
+
+  const toggleIpaFilter = () => {
+    setIsIpaOnly(!isIpaOnly);
+    // If turning on IPA filter, turn off Heavies filter
+    if (!isIpaOnly) {
+      setIsHeaviesOnly(false);
+    }
+  };
+
+  const toggleSortOption = () => {
+    setSortBy(sortBy === 'date' ? 'name' : 'date');
+  };
+
+  // Function to format unix timestamp to readable date
+  const formatDate = (timestamp: string): string => {
+    if (!timestamp) return 'Unknown date';
+    
+    try {
+      // Convert unix timestamp (seconds) to milliseconds
+      const date = new Date(parseInt(timestamp, 10) * 1000);
+      return date.toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'short', 
+        day: 'numeric' 
+      });
+    } catch (err) {
+      console.error('Error formatting date:', err);
+      return 'Invalid date';
+    }
   };
 
   const toggleExpand = (id: string) => {
@@ -123,6 +225,9 @@ export const BeerList = () => {
           <ThemedText>
             {item.brew_style} {item.brew_container ? `• ${item.brew_container}` : ''}
           </ThemedText>
+          <ThemedText style={styles.dateAdded}>
+            Date Added: {formatDate(item.added_date)}
+          </ThemedText>
           
           {isExpanded && item.brew_description && (
             <View style={[styles.descriptionContainer, { borderTopColor: borderColor }]}>
@@ -141,48 +246,127 @@ export const BeerList = () => {
 
   const renderFilterButtons = () => {
     return (
-      <View style={styles.filterContainer}>
-        <TouchableOpacity 
-          style={[
-            styles.filterButton, 
-            { 
-              backgroundColor: isDraftOnly ? activeBgColor : inactiveButtonColor,
-              borderWidth: 1,
-              borderColor: isDraftOnly ? activeBgColor : borderColor,
-            }
-          ]}
-          onPress={toggleDraftFilter}
-        >
-          <ThemedText style={[
-            styles.filterButtonText, 
-            { 
-              color: isDraftOnly ? buttonTextColor : inactiveButtonTextColor 
-            }
-          ]}>
-            {isDraftOnly ? 'Draft: On' : 'Draft Only'}
+      <View style={styles.filtersContainer}>
+        <View style={styles.beerCountContainer}>
+          <ThemedText style={styles.beerCount}>
+            {displayedBeers.length} beers found
           </ThemedText>
-        </TouchableOpacity>
+        </View>
         
-        <TouchableOpacity 
-          style={[
-            styles.filterButton, 
-            { 
-              backgroundColor: isHeaviesOnly ? activeBgColor : inactiveButtonColor,
-              borderWidth: 1,
-              borderColor: isHeaviesOnly ? activeBgColor : borderColor,
-            }
-          ]}
-          onPress={toggleHeaviesFilter}
-        >
-          <ThemedText style={[
-            styles.filterButtonText, 
-            { 
-              color: isHeaviesOnly ? buttonTextColor : inactiveButtonTextColor 
-            }
-          ]}>
-            {isHeaviesOnly ? 'Heavies: On' : 'Heavies'}
-          </ThemedText>
-        </TouchableOpacity>
+        <View style={styles.filterContainer}>
+          <TouchableOpacity 
+            style={[
+              styles.filterButton, 
+              { 
+                backgroundColor: isDraftOnly ? activeBgColor : inactiveButtonColor,
+                borderWidth: 1,
+                borderColor: isDraftOnly ? activeBgColor : borderColor,
+              }
+            ]}
+            onPress={toggleDraftFilter}
+          >
+            <ThemedText style={[
+              styles.filterButtonText, 
+              { 
+                color: isDraftOnly ? buttonTextColor : inactiveButtonTextColor 
+              }
+            ]}>
+              {isDraftOnly ? 'Draft: On' : 'Draft Only'}
+            </ThemedText>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={[
+              styles.filterButton, 
+              { 
+                backgroundColor: isHeaviesOnly ? activeBgColor : inactiveButtonColor,
+                borderWidth: 1,
+                borderColor: isHeaviesOnly ? activeBgColor : borderColor,
+                opacity: isIpaOnly ? 0.5 : 1,
+              }
+            ]}
+            onPress={toggleHeaviesFilter}
+            disabled={isIpaOnly}
+          >
+            <ThemedText style={[
+              styles.filterButtonText, 
+              { 
+                color: isHeaviesOnly ? buttonTextColor : inactiveButtonTextColor 
+              }
+            ]}>
+              {isHeaviesOnly ? 'Heavies: On' : 'Heavies'}
+            </ThemedText>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={[
+              styles.filterButton, 
+              { 
+                backgroundColor: isIpaOnly ? activeBgColor : inactiveButtonColor,
+                borderWidth: 1,
+                borderColor: isIpaOnly ? activeBgColor : borderColor,
+                opacity: isHeaviesOnly ? 0.5 : 1,
+              }
+            ]}
+            onPress={toggleIpaFilter}
+            disabled={isHeaviesOnly}
+          >
+            <ThemedText style={[
+              styles.filterButtonText, 
+              { 
+                color: isIpaOnly ? buttonTextColor : inactiveButtonTextColor 
+              }
+            ]}>
+              {isIpaOnly ? 'IPA: On' : 'IPA'}
+            </ThemedText>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.sortContainer}>
+          <TouchableOpacity 
+            style={[
+              styles.sortButton, 
+              { 
+                backgroundColor: sortBy === 'name' ? activeBgColor : inactiveButtonColor,
+                borderWidth: 1,
+                borderColor: sortBy === 'name' ? activeBgColor : borderColor,
+              }
+            ]}
+            onPress={toggleSortOption}
+          >
+            <ThemedText style={[
+              styles.filterButtonText, 
+              { 
+                color: sortBy === 'name' ? buttonTextColor : inactiveButtonTextColor 
+              }
+            ]}>
+              Sort: {sortBy === 'date' ? 'Newest First' : 'A-Z'}
+            </ThemedText>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={[
+              styles.sortButton, 
+              { 
+                backgroundColor: inactiveButtonColor,
+                borderWidth: 1,
+                borderColor: borderColor,
+                marginLeft: 8,
+              }
+            ]}
+            onPress={handleRefresh}
+            disabled={refreshing}
+          >
+            <ThemedText style={[
+              styles.filterButtonText, 
+              { 
+                color: inactiveButtonTextColor 
+              }
+            ]}>
+              {refreshing ? 'Refreshing...' : 'Refresh Data'}
+            </ThemedText>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   };
@@ -191,10 +375,13 @@ export const BeerList = () => {
     return <LoadingIndicator message="Loading beers..." />;
   }
 
-  if (error) {
+  if (error && !refreshing) {
     return (
       <View style={styles.centered}>
         <ThemedText style={styles.errorText}>{error}</ThemedText>
+        <TouchableOpacity onPress={loadBeers} style={styles.resetButton}>
+          <ThemedText style={{ color: activeButtonColor }}>Try Again</ThemedText>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -205,7 +392,7 @@ export const BeerList = () => {
         {renderFilterButtons()}
         <View style={styles.centered}>
           <ThemedText>No beers found.</ThemedText>
-          {(isDraftOnly || isHeaviesOnly) && (
+          {(isDraftOnly || isHeaviesOnly || isIpaOnly) && (
             <View style={styles.resetButtonsContainer}>
               {isDraftOnly && (
                 <TouchableOpacity onPress={toggleDraftFilter} style={styles.resetButton}>
@@ -215,6 +402,11 @@ export const BeerList = () => {
               {isHeaviesOnly && (
                 <TouchableOpacity onPress={toggleHeaviesFilter} style={styles.resetButton}>
                   <ThemedText style={{ color: activeButtonColor }}>Clear Heavies Filter</ThemedText>
+                </TouchableOpacity>
+              )}
+              {isIpaOnly && (
+                <TouchableOpacity onPress={toggleIpaFilter} style={styles.resetButton}>
+                  <ThemedText style={{ color: activeButtonColor }}>Clear IPA Filter</ThemedText>
                 </TouchableOpacity>
               )}
             </View>
@@ -239,15 +431,37 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 16,
   },
+  filtersContainer: {
+    marginBottom: 16,
+  },
+  beerCountContainer: {
+    marginBottom: 8,
+  },
+  beerCount: {
+    fontWeight: '600',
+  },
   filterContainer: {
     flexDirection: 'row',
-    marginBottom: 16,
+    marginBottom: 8,
+  },
+  sortContainer: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
   },
   filterButton: {
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 20,
     marginRight: 8,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  sortButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 16,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.2,
     shadowRadius: 2,
@@ -300,5 +514,10 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
     alignItems: 'center',
     marginTop: 16,
+  },
+  dateAdded: {
+    fontSize: 12,
+    marginTop: 4,
+    opacity: 0.8,
   },
 }); 

@@ -124,13 +124,63 @@ export const initializeBeerDatabase = async (): Promise<void> => {
   }
 };
 
+// Clear database and refresh from API
+export const refreshBeersFromAPI = async (): Promise<any[]> => {
+  const database = await initDatabase();
+  
+  try {
+    console.log('Clearing beer database...');
+    // Delete all records from the table
+    await database.runAsync('DELETE FROM allbeers');
+    
+    // Fetch fresh data from API
+    const beers = await fetchBeersFromAPI();
+    console.log(`Fetched ${beers.length} beers from API. Refreshing database...`);
+    
+    // Start a transaction for better performance
+    await database.withTransactionAsync(async () => {
+      // Insert each beer into the database
+      for (const beer of beers) {
+        if (!beer.id) continue; // Skip entries without an ID
+        
+        await database.runAsync(
+          `INSERT OR REPLACE INTO allbeers (
+            id, added_date, brew_name, brewer, brewer_loc, 
+            brew_style, brew_container, review_count, review_rating, brew_description
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            beer.id,
+            beer.added_date || '',
+            beer.brew_name || '',
+            beer.brewer || '',
+            beer.brewer_loc || '',
+            beer.brew_style || '',
+            beer.brew_container || '',
+            beer.review_count || '',
+            beer.review_rating || '',
+            beer.brew_description || ''
+          ]
+        );
+      }
+    });
+    
+    console.log('Database refresh complete!');
+    
+    // Return the refreshed beers
+    return await getAllBeers();
+  } catch (error) {
+    console.error('Error refreshing beer database:', error);
+    throw error;
+  }
+};
+
 // Get all beers from the database
 export const getAllBeers = async (): Promise<any[]> => {
   const database = await initDatabase();
   
   try {
     return await database.getAllAsync(
-      'SELECT * FROM allbeers WHERE brew_name IS NOT NULL AND brew_name != "" ORDER BY brew_name'
+      'SELECT * FROM allbeers WHERE brew_name IS NOT NULL AND brew_name != "" ORDER BY added_date DESC'
     );
   } catch (error) {
     console.error('Error getting beers from database:', error);
@@ -170,7 +220,7 @@ export const searchBeers = async (query: string): Promise<any[]> => {
        OR brewer LIKE ? 
        OR brew_style LIKE ? 
        OR brew_description LIKE ?)
-       ORDER BY brew_name`,
+       ORDER BY added_date DESC`,
       [searchTerm, searchTerm, searchTerm, searchTerm]
     );
   } catch (error) {
@@ -185,7 +235,7 @@ export const getBeersByStyle = async (style: string): Promise<any[]> => {
   
   try {
     return await database.getAllAsync(
-      'SELECT * FROM allbeers WHERE brew_name IS NOT NULL AND brew_name != "" AND brew_style = ? ORDER BY brew_name',
+      'SELECT * FROM allbeers WHERE brew_name IS NOT NULL AND brew_name != "" AND brew_style = ? ORDER BY added_date DESC',
       [style]
     );
   } catch (error) {
@@ -200,7 +250,7 @@ export const getBeersByBrewer = async (brewer: string): Promise<any[]> => {
   
   try {
     return await database.getAllAsync(
-      'SELECT * FROM allbeers WHERE brew_name IS NOT NULL AND brew_name != "" AND brewer = ? ORDER BY brew_name',
+      'SELECT * FROM allbeers WHERE brew_name IS NOT NULL AND brew_name != "" AND brewer = ? ORDER BY added_date DESC',
       [brewer]
     );
   } catch (error) {
