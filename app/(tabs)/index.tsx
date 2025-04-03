@@ -1,74 +1,140 @@
-import { Image, StyleSheet, Platform } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
+import React from 'react';
+import Animated, {
+  interpolate,
+  useAnimatedScrollHandler,
+  useAnimatedStyle,
+  useSharedValue,
+} from 'react-native-reanimated';
 
-import { HelloWave } from '@/components/HelloWave';
-import ParallaxScrollView from '@/components/ParallaxScrollView';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
+import { BeerList } from '@/components/BeerList';
+import { useColorScheme } from '@/hooks/useColorScheme';
+import { useThemeColor } from '@/hooks/useThemeColor';
+
+const HEADER_HEIGHT = 250;
 
 export default function HomeScreen() {
+  const colorScheme = useColorScheme() ?? 'light';
+  const scrollY = useSharedValue(0);
+  const backgroundColor = useThemeColor({}, 'background');
+
+  const scrollHandler = useAnimatedScrollHandler({
+    onScroll: (event) => {
+      scrollY.value = event.contentOffset.y;
+    },
+  });
+
+  const headerAnimatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [
+        {
+          translateY: interpolate(
+            scrollY.value,
+            [-HEADER_HEIGHT, 0, HEADER_HEIGHT],
+            [-HEADER_HEIGHT / 2, 0, HEADER_HEIGHT * 0.75]
+          ),
+        },
+        {
+          scale: interpolate(scrollY.value, [-HEADER_HEIGHT, 0, HEADER_HEIGHT], [2, 1, 1]),
+        },
+      ],
+    };
+  });
+
+  // Pass this to BeerList to connect the scrolling
+  const renderHeader = () => (
+    <>
+      <Animated.View
+        style={[
+          styles.header,
+          { backgroundColor: colorScheme === 'dark' ? '#1D3D47' : '#A1CEDC' },
+          headerAnimatedStyle,
+        ]}>
+        <View style={styles.headerContainer}>
+          <Text style={styles.headerTitle}>Beer Selector</Text>
+        </View>
+      </Animated.View>
+      <View style={[styles.contentContainer, { backgroundColor }]}>
+        <View style={styles.titleContainer}>
+          <ThemedText type="title" style={styles.title}>Available Beers</ThemedText>
+        </View>
+      </View>
+    </>
+  );
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12'
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-        <ThemedText>
-          Tap the Explore tab to learn more about what's included in this starter app.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          When you're ready, run{' '}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+    <ThemedView style={styles.container}>
+      <BeerListWithHeader 
+        renderHeader={renderHeader} 
+        onScroll={scrollHandler}
+        backgroundColor={backgroundColor}
+      />
+    </ThemedView>
+  );
+}
+
+// Type definition for the BeerListWithHeader props
+interface BeerListWithHeaderProps {
+  renderHeader: () => React.ReactElement;
+  onScroll: any; // Using 'any' for the Animated onScroll function
+  backgroundColor: string;
+}
+
+// This is a wrapper component that adds a header to the BeerList
+// while keeping FlatList as the primary scrollable container
+function BeerListWithHeader({ renderHeader, onScroll, backgroundColor }: BeerListWithHeaderProps) {
+  return (
+    <Animated.FlatList
+      data={[]} // BeerList will handle its own data
+      renderItem={() => null}
+      ListHeaderComponent={renderHeader}
+      ListFooterComponent={() => (
+        <View style={[styles.beerListContainer, { backgroundColor }]}>
+          <BeerList />
+        </View>
+      )}
+      onScroll={onScroll}
+      scrollEventThrottle={16}
+      showsVerticalScrollIndicator={false}
+      style={styles.container}
+    />
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
+  container: {
+    flex: 1,
+  },
+  header: {
+    height: HEADER_HEIGHT,
+    overflow: 'hidden',
+  },
+  headerContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    gap: 8,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  headerTitle: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: 'white',
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: -1, height: 1 },
+    textShadowRadius: 10,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  contentContainer: {
+    flexGrow: 1,
+  },
+  titleContainer: {
+    padding: 16,
+    paddingBottom: 8,
+  },
+  title: {
+    marginBottom: 0,
+  },
+  beerListContainer: {
+    flexGrow: 1,
   },
 });

@@ -1,0 +1,127 @@
+require File.join(File.dirname(`node --print "require.resolve('expo/package.json')"`), "scripts/autolinking")
+require File.join(File.dirname(`node --print "require.resolve('react-native/package.json')"`), "scripts/react_native_pods")
+
+require 'json'
+podfile_properties = JSON.parse(File.read(File.join(__dir__, 'Podfile.properties.json'))) rescue {}
+
+ENV['RCT_NEW_ARCH_ENABLED'] = podfile_properties['newArchEnabled'] == 'true' ? '1' : '0'
+ENV['EX_DEV_CLIENT_NETWORK_INSPECTOR'] = podfile_properties['EX_DEV_CLIENT_NETWORK_INSPECTOR']
+
+platform :ios, podfile_properties['ios.deploymentTarget'] || '18.2'
+install! 'cocoapods',
+  :deterministic_uuids => false
+
+prepare_react_native_project!
+
+target 'BeerSelector' do
+  use_expo_modules!
+
+  if ENV['EXPO_USE_COMMUNITY_AUTOLINKING'] == '1'
+    config_command = ['node', '-e', "process.argv=['', '', 'config'];require('@react-native-community/cli').run()"];
+  else
+    config_command = [
+      'node',
+      '--no-warnings',
+      '--eval',
+      'require(require.resolve(\'expo-modules-autolinking\', { paths: [require.resolve(\'expo/package.json\')] }))(process.argv.slice(1))',
+      'react-native-config',
+      '--json',
+      '--platform',
+      'ios'
+    ]
+  end
+
+  config = use_native_modules!(config_command)
+
+  use_frameworks! :linkage => podfile_properties['ios.useFrameworks'].to_sym if podfile_properties['ios.useFrameworks']
+  use_frameworks! :linkage => ENV['USE_FRAMEWORKS'].to_sym if ENV['USE_FRAMEWORKS']
+
+  use_react_native!(
+    :path => config[:reactNativePath],
+    :hermes_enabled => podfile_properties['expo.jsEngine'] == nil || podfile_properties['expo.jsEngine'] == 'hermes',
+    # An absolute path to your application root.
+    :app_path => "#{Pod::Config.instance.installation_root}/..",
+    :privacy_file_aggregation_enabled => podfile_properties['apple.privacyManifestAggregationEnabled'] != 'false',
+  )
+
+  post_install do |installer|
+    react_native_post_install(
+      installer,
+      config[:reactNativePath],
+      :mac_catalyst_enabled => false,
+      :ccache_enabled => podfile_properties['apple.ccacheEnabled'] == 'true',
+    )
+
+    # This is necessary for Xcode 14, because it signs resource bundles by default
+    # when building for devices.
+    installer.target_installation_results.pod_target_installation_results
+      .each do |pod_name, target_installation_result|
+      target_installation_result.resource_bundle_targets.each do |resource_bundle_target|
+        resource_bundle_target.build_configurations.each do |config|
+          config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
+        end
+      end
+    end
+
+    # First fix any duplicate conditional directives
+    system("cd #{__dir__} && ./fix_json_pointer.sh")
+    
+    # Apply unified patches for char_traits<unsigned char> redefinition issues
+    system("cd #{__dir__} && ./patch_char_traits.sh")
+    
+    # Apply specific patch for the React-jsinspector module
+    system("cd #{__dir__} && ./patch_jsinspector.sh")
+    
+    # Apply specific patch for the FuseboxTracer.cpp file
+    if File.exist?("#{__dir__}/patch_fuseboxtracer.sh")
+      system("cd #{__dir__} && ./patch_fuseboxtracer.sh")
+    else
+      puts "Warning: patch_fuseboxtracer.sh not found, skipping this patch"
+    end
+
+    # Fix for Xcode 16/iOS 18 SDK: RCT-Folly string_view issue
+    installer.pods_project.targets.each do |target|
+      target_name = target.name
+      if target_name == 'RCT-Folly' || 
+         target_name == 'React-rendererdebug' || 
+         target_name == 'React-jsinspector' ||
+         target_name == 'React-perflogger' ||
+         target_name.start_with?('React-') || 
+         target_name.include?('React')
+        target.build_configurations.each do |config|
+          # Add compiler flags to work around the string_view issue
+          config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= ['$(inherited)']
+          config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << '_LIBCPP_ENABLE_CXX17_REMOVED_FEATURES=1'
+          # Add additional flags to fix char_traits<unsigned char> issue
+          config.build_settings['OTHER_CPLUSPLUSFLAGS'] = '$(OTHER_CFLAGS) -Wno-error=c++20-extensions'
+          config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << '_LIBCPP_DISABLE_AVAILABILITY=1'
+          
+          # Disable string_view in Folly for problematic targets
+          if target_name == 'RCT-Folly' || target_name == 'React-rendererdebug' || target_name == 'React-jsi'
+            config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << 'FOLLY_HAS_STRING_VIEW=0'
+            
+            # Apply prefix header for RCT-Folly
+            if target_name == 'RCT-Folly'
+              config.build_settings['GCC_PREFIX_HEADER'] = "#{Dir.pwd}/RCT-Folly-prefix.pch"
+            end
+            
+            # Apply prefix header for React-rendererdebug
+            if target_name == 'React-rendererdebug'
+              config.build_settings['GCC_PREFIX_HEADER'] = "#{Dir.pwd}/React-rendererdebug-prefix.pch"
+            end
+          end
+          
+          # Apply prefix header for React-jsinspector
+          if target_name == 'React-jsinspector'
+            config.build_settings['GCC_PREFIX_HEADER'] = "#{Dir.pwd}/React-jsinspector-prefix.pch"
+          end
+          
+          # Apply prefix header for React-perflogger
+          if target_name == 'React-perflogger'
+            config.build_settings['GCC_PREFIX_HEADER'] = "#{Dir.pwd}/React-fusebox-prefix.pch"
+          end
+        end
+      end
+    end
+  end
+end
