@@ -6,6 +6,7 @@ import { ThemedView } from './ThemedView';
 import { LoadingIndicator } from './LoadingIndicator';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 type Beer = {
   id: string;
@@ -371,61 +372,52 @@ export const MyBeerList = () => {
     );
   };
 
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <LoadingIndicator message="Loading beers..." />
-      </View>
-    );
-  }
-
-  if (error) {
-    return (
-      <View style={styles.errorContainer}>
-        <ThemedText style={styles.errorText}>{error}</ThemedText>
-        <ThemedText style={styles.errorHint}>
-          This could be due to a network issue or database problem. 
-          Make sure you have an internet connection and try again.
-        </ThemedText>
-        <TouchableOpacity 
-          style={styles.retryButton}
-          onPress={loadBeers}
-        >
-          <ThemedText style={styles.retryButtonText}>Retry</ThemedText>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
   return (
-    <ThemedView style={styles.container}>
-      {renderFilterButtons()}
-      
-      <View style={styles.listContainer}>
-        {displayedBeers.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <ThemedText style={styles.emptyText}>
-              No beers available that you haven't tried yet. Try changing the filters or refreshing the list.
+    <SafeAreaView style={styles.container} edges={['top', 'right', 'left']}>
+      {loading ? (
+        <LoadingIndicator />
+      ) : error ? (
+        <View style={styles.centered}>
+          <ThemedText style={styles.errorText}>{error}</ThemedText>
+          <TouchableOpacity 
+            style={[styles.refreshButton, { backgroundColor: activeButtonColor }]} 
+            onPress={loadBeers}
+          >
+            <ThemedText style={[styles.buttonText, { color: 'white' }]}>
+              Try Again
             </ThemedText>
-          </View>
-        ) : (
-          <FlatList
-            data={displayedBeers}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => renderBeerItem(item)}
-            showsVerticalScrollIndicator={true}
-            contentContainerStyle={styles.flatListContent}
-          />
-        )}
-      </View>
-    </ThemedView>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <>
+          {renderFilterButtons()}
+          {displayedBeers.length === 0 ? (
+            <View style={styles.centered}>
+              <ThemedText style={styles.noBeersText}>
+                No beers match your filters
+              </ThemedText>
+            </View>
+          ) : (
+            <FlatList
+              data={displayedBeers}
+              renderItem={({ item }) => renderBeerItem(item)}
+              keyExtractor={item => item.id}
+              contentContainerStyle={styles.listContent}
+              showsVerticalScrollIndicator={false}
+              onRefresh={handleRefresh}
+              refreshing={refreshing}
+            />
+          )}
+        </>
+      )}
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
+    backgroundColor: 'transparent', // Let ThemedView handle the background
   },
   loadingContainer: {
     flex: 1,
@@ -555,5 +547,23 @@ const styles = StyleSheet.create({
   },
   flatListContent: {
     paddingBottom: 20,
+  },
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  noBeersText: {
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  buttonText: {
+    fontWeight: '600',
+  },
+  listContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
   },
 }); 

@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, View, TouchableOpacity, Alert } from 'react-native';
+import { StyleSheet, View, TouchableOpacity, Alert, FlatList } from 'react-native';
 import { getAllBeers, refreshBeersFromAPI } from '@/src/database/db';
 import { ThemedText } from './ThemedText';
 import { ThemedView } from './ThemedView';
 import { LoadingIndicator } from './LoadingIndicator';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 type Beer = {
   id: string;
@@ -377,65 +378,52 @@ export const BeerList = () => {
     );
   };
 
-  if (loading) {
-    return <LoadingIndicator message="Loading beers..." />;
-  }
-
-  if (error && !refreshing) {
-    return (
-      <View style={styles.centered}>
-        <ThemedText style={styles.errorText}>{error}</ThemedText>
-        <TouchableOpacity onPress={loadBeers} style={styles.resetButton}>
-          <ThemedText style={{ color: activeButtonColor }}>Try Again</ThemedText>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
-  if (!displayedBeers || displayedBeers.length === 0) {
-    return (
-      <View style={styles.container}>
-        {renderFilterButtons()}
-        <View style={styles.centered}>
-          <ThemedText>No beers found.</ThemedText>
-          {(isDraftOnly || isHeaviesOnly || isIpaOnly) && (
-            <View style={styles.resetButtonsContainer}>
-              {isDraftOnly && (
-                <TouchableOpacity onPress={toggleDraftFilter} style={styles.resetButton}>
-                  <ThemedText style={{ color: activeButtonColor }}>Clear Draft Filter</ThemedText>
-                </TouchableOpacity>
-              )}
-              {isHeaviesOnly && (
-                <TouchableOpacity onPress={toggleHeaviesFilter} style={styles.resetButton}>
-                  <ThemedText style={{ color: activeButtonColor }}>Clear Heavies Filter</ThemedText>
-                </TouchableOpacity>
-              )}
-              {isIpaOnly && (
-                <TouchableOpacity onPress={toggleIpaFilter} style={styles.resetButton}>
-                  <ThemedText style={{ color: activeButtonColor }}>Clear IPA Filter</ThemedText>
-                </TouchableOpacity>
-              )}
-            </View>
-          )}
-        </View>
-      </View>
-    );
-  }
-
-  // Return the list of beer items directly rather than using a FlatList
   return (
-    <View style={styles.container}>
-      {renderFilterButtons()}
-      {displayedBeers.map(renderBeerItem)}
-    </View>
+    <SafeAreaView style={styles.container} edges={['top', 'right', 'left']}>
+      {loading ? (
+        <LoadingIndicator />
+      ) : error ? (
+        <View style={styles.centered}>
+          <ThemedText style={styles.errorText}>{error}</ThemedText>
+          <TouchableOpacity 
+            style={[styles.refreshButton, { backgroundColor: activeButtonColor }]} 
+            onPress={loadBeers}
+          >
+            <ThemedText style={[styles.buttonText, { color: 'white' }]}>
+              Try Again
+            </ThemedText>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <>
+          {renderFilterButtons()}
+          {displayedBeers.length === 0 ? (
+            <View style={styles.centered}>
+              <ThemedText style={styles.noBeersText}>
+                No beers match your filters
+              </ThemedText>
+            </View>
+          ) : (
+            <FlatList
+              data={displayedBeers}
+              renderItem={({ item }) => renderBeerItem(item)}
+              keyExtractor={item => item.id}
+              contentContainerStyle={styles.listContent}
+              showsVerticalScrollIndicator={false}
+              onRefresh={handleRefresh}
+              refreshing={refreshing}
+            />
+          )}
+        </>
+      )}
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingHorizontal: 16,
-    paddingBottom: 16,
+    backgroundColor: 'transparent', // Let ThemedView handle the background
   },
   filtersContainer: {
     marginBottom: 16,
@@ -525,5 +513,23 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 4,
     opacity: 0.8,
+  },
+  listContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
+  refreshButton: {
+    marginTop: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 24,
+  },
+  buttonText: {
+    fontWeight: '600',
+  },
+  noBeersText: {
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
   },
 }); 
