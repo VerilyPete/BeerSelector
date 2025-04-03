@@ -17,12 +17,18 @@ type Beer = {
 };
 
 export const BeerList = () => {
-  const [beers, setBeers] = useState<Beer[]>([]);
+  const [allBeers, setAllBeers] = useState<Beer[]>([]);
+  const [displayedBeers, setDisplayedBeers] = useState<Beer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [isDraftOnly, setIsDraftOnly] = useState(false);
   const cardColor = useThemeColor({}, 'background');
   const borderColor = useThemeColor({ light: '#e0e0e0', dark: '#333' }, 'text');
+  const activeButtonColor = useThemeColor({}, 'tint');
+  const inactiveButtonColor = useThemeColor({ light: '#E5E5E5', dark: '#2C2C2E' }, 'background');
+  const activeButtonTextColor = useThemeColor({ light: 'white', dark: 'white' }, 'text');
+  const inactiveButtonTextColor = useThemeColor({ light: '#333333', dark: '#EFEFEF' }, 'text');
 
   useEffect(() => {
     const loadBeers = async () => {
@@ -30,7 +36,9 @@ export const BeerList = () => {
         setLoading(true);
         const data = await getAllBeers();
         // Filter out any beers with empty or null brew_name as a second layer of protection
-        setBeers(data.filter(beer => beer.brew_name && beer.brew_name.trim() !== ''));
+        const filteredData = data.filter(beer => beer.brew_name && beer.brew_name.trim() !== '');
+        setAllBeers(filteredData);
+        setDisplayedBeers(filteredData);
         setError(null);
       } catch (err) {
         console.error('Failed to load beers:', err);
@@ -42,6 +50,26 @@ export const BeerList = () => {
 
     loadBeers();
   }, []);
+
+  // Filter beers when the draft filter changes
+  useEffect(() => {
+    if (isDraftOnly) {
+      setDisplayedBeers(
+        allBeers.filter(beer => 
+          beer.brew_container && 
+          beer.brew_container.toLowerCase().includes('draught')
+        )
+      );
+    } else {
+      setDisplayedBeers(allBeers);
+    }
+    // Reset expanded item when filter changes
+    setExpandedId(null);
+  }, [isDraftOnly, allBeers]);
+
+  const toggleDraftFilter = () => {
+    setIsDraftOnly(!isDraftOnly);
+  };
 
   const toggleExpand = (id: string) => {
     setExpandedId(expandedId === id ? null : id);
@@ -89,6 +117,31 @@ export const BeerList = () => {
     );
   };
 
+  const renderFilterButtons = () => (
+    <View style={styles.filterContainer}>
+      <TouchableOpacity 
+        style={[
+          styles.filterButton, 
+          { 
+            backgroundColor: isDraftOnly ? activeButtonColor : inactiveButtonColor,
+            borderWidth: 1,
+            borderColor: isDraftOnly ? activeButtonColor : borderColor,
+          }
+        ]}
+        onPress={toggleDraftFilter}
+      >
+        <ThemedText style={[
+          styles.filterButtonText, 
+          { 
+            color: isDraftOnly ? activeButtonTextColor : inactiveButtonTextColor 
+          }
+        ]}>
+          {isDraftOnly ? 'All Beers' : 'Draft Only'}
+        </ThemedText>
+      </TouchableOpacity>
+    </View>
+  );
+
   if (loading) {
     return <LoadingIndicator message="Loading beers..." />;
   }
@@ -101,10 +154,18 @@ export const BeerList = () => {
     );
   }
 
-  if (beers.length === 0) {
+  if (displayedBeers.length === 0) {
     return (
-      <View style={styles.centered}>
-        <ThemedText>No beers found.</ThemedText>
+      <View style={styles.container}>
+        {renderFilterButtons()}
+        <View style={styles.centered}>
+          <ThemedText>No beers found.</ThemedText>
+          {isDraftOnly && (
+            <TouchableOpacity onPress={toggleDraftFilter} style={styles.resetButton}>
+              <ThemedText style={{ color: activeButtonColor }}>Show all beers</ThemedText>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
     );
   }
@@ -112,7 +173,8 @@ export const BeerList = () => {
   // Return the list of beer items directly rather than using a FlatList
   return (
     <View style={styles.container}>
-      {beers.map(renderBeerItem)}
+      {renderFilterButtons()}
+      {displayedBeers.map(renderBeerItem)}
     </View>
   );
 };
@@ -122,6 +184,27 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 16,
     paddingBottom: 16,
+  },
+  filterContainer: {
+    flexDirection: 'row',
+    marginBottom: 16,
+  },
+  filterButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    marginRight: 8,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  filterButtonText: {
+    fontWeight: '600',
+  },
+  resetButton: {
+    marginTop: 16,
+    padding: 8,
   },
   beerItem: {
     marginBottom: 16,
