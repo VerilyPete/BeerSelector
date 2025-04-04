@@ -356,14 +356,12 @@ export const MyBeerList = () => {
               IPA
             </ThemedText>
           </TouchableOpacity>
-        </View>
-        
-        <View style={styles.sortContainer}>
+
           <TouchableOpacity
             style={[
-              styles.sortButton,
+              styles.filterButton,
               {
-                backgroundColor: sortBy === 'name' ? activeBgColor : inactiveButtonColor,
+                backgroundColor: inactiveButtonColor,
               },
             ]}
             onPress={toggleSortOption}
@@ -373,11 +371,11 @@ export const MyBeerList = () => {
               style={[
                 styles.filterButtonText,
                 {
-                  color: sortBy === 'name' ? buttonTextColor : inactiveButtonTextColor,
+                  color: inactiveButtonTextColor,
                 },
               ]}
             >
-              {sortBy === 'name' ? 'Sorting: Name' : 'Sorting: Date'}
+              {sortBy === 'name' ? 'Sort: Name' : 'Sort: Date'}
             </ThemedText>
           </TouchableOpacity>
         </View>
@@ -489,15 +487,6 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 2,
   },
-  sortButton: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 16,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    elevation: 2,
-  },
   refreshButton: {
     flex: 1,
     paddingVertical: 8,
@@ -588,9 +577,5 @@ const styles = StyleSheet.create({
   },
   beerCount: {
     fontWeight: '600',
-  },
-  sortContainer: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
   },
 }); 

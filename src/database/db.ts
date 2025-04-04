@@ -8,6 +8,9 @@ let db: SQLite.SQLiteDatabase | null = null;
 // Database operation lock to prevent concurrent operations
 let dbOperationInProgress = false;
 
+// Simple database lock to prevent concurrent operations
+let lockTimeoutId: NodeJS.Timeout | null = null;
+
 // Initialize database
 export const initDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
   if (db) return db;
@@ -106,33 +109,50 @@ export const fetchBeersFromAPI = async (): Promise<any[]> => {
 };
 
 // Simple database lock to prevent concurrent operations
-const acquireLock = async (): Promise<boolean> => {
+const acquireLock = async (operationName: string): Promise<boolean> => {
   if (dbOperationInProgress) {
-    console.log('Database operation already in progress, waiting...');
+    console.log(`Database operation already in progress, waiting for lock (${operationName})...`);
     // Wait for operation to complete
     let attempts = 0;
-    while (dbOperationInProgress && attempts < 10) {
-      await new Promise(resolve => setTimeout(resolve, 200));
+    while (dbOperationInProgress && attempts < 15) {
+      await new Promise(resolve => setTimeout(resolve, 300));
       attempts++;
     }
     
     if (dbOperationInProgress) {
-      console.error('Failed to acquire database lock after waiting');
+      console.error(`Failed to acquire database lock after waiting (${operationName})`);
       return false;
     }
   }
   
+  console.log(`Lock acquired for: ${operationName}`);
   dbOperationInProgress = true;
+  
+  // Safety timeout to release lock after 60 seconds in case of any issues
+  if (lockTimeoutId) {
+    clearTimeout(lockTimeoutId);
+  }
+  
+  lockTimeoutId = setTimeout(() => {
+    console.warn('Database lock forcibly released after timeout');
+    dbOperationInProgress = false;
+  }, 60000); // 60 second safety timeout
+  
   return true;
 };
 
-const releaseLock = (): void => {
+const releaseLock = (operationName: string): void => {
+  if (lockTimeoutId) {
+    clearTimeout(lockTimeoutId);
+    lockTimeoutId = null;
+  }
+  console.log(`Lock released for: ${operationName}`);
   dbOperationInProgress = false;
 };
 
 // Insert beers into database WITHOUT using transactions
 export const populateBeersTable = async (beers: any[]): Promise<void> => {
-  if (!await acquireLock()) {
+  if (!await acquireLock('populateBeersTable')) {
     throw new Error('Failed to acquire database lock for populating beers table');
   }
 
@@ -187,7 +207,7 @@ export const populateBeersTable = async (beers: any[]): Promise<void> => {
     console.error('Error populating beer database:', error);
     throw error;
   } finally {
-    releaseLock();
+    releaseLock('populateBeersTable');
   }
 };
 
@@ -239,7 +259,7 @@ export const fetchMyBeersFromAPI = async (): Promise<any[]> => {
 
 // Insert My Beers into database WITHOUT using transactions
 export const populateMyBeersTable = async (beers: any[]): Promise<void> => {
-  if (!await acquireLock()) {
+  if (!await acquireLock('populateMyBeersTable')) {
     throw new Error('Failed to acquire database lock for populating my beers table');
   }
 
@@ -292,27 +312,25 @@ export const populateMyBeersTable = async (beers: any[]): Promise<void> => {
     console.error('Error populating My Beers database:', error);
     throw error;
   } finally {
-    releaseLock();
+    releaseLock('populateMyBeersTable');
   }
 };
 
 // Fetch and populate My Beers
 export const fetchAndPopulateMyBeers = async (): Promise<void> => {
+  if (!await acquireLock('fetchAndPopulateMyBeers')) {
+    throw new Error('Failed to acquire database lock for fetching and populating My Beers');
+  }
+
   try {
-    const myBeers = await fetchMyBeersFromAPI();
-    await populateMyBeersTable(myBeers);
-  } catch (error) {
-    console.error('Error fetching and populating My Beers:', error);
-    throw error;
+    await _refreshMyBeersFromAPIInternal();
+  } finally {
+    releaseLock('fetchAndPopulateMyBeers');
   }
 };
 
-// Clear database and refresh from API
-export const refreshBeersFromAPI = async (): Promise<any[]> => {
-  if (!await acquireLock()) {
-    throw new Error('Failed to acquire database lock for refreshing beers');
-  }
-
+// Internal version of refreshBeersFromAPI that doesn't handle its own locking
+const _refreshBeersFromAPIInternal = async (): Promise<any[]> => {
   const database = await initDatabase();
   
   try {
@@ -364,8 +382,74 @@ export const refreshBeersFromAPI = async (): Promise<any[]> => {
   } catch (error) {
     console.error('Error refreshing beer database:', error);
     throw error;
+  }
+};
+
+// Public version that handles locking
+export const refreshBeersFromAPI = async (): Promise<any[]> => {
+  if (!await acquireLock('refreshBeersFromAPI')) {
+    throw new Error('Failed to acquire database lock for refreshing beers');
+  }
+
+  try {
+    return await _refreshBeersFromAPIInternal();
   } finally {
-    releaseLock();
+    releaseLock('refreshBeersFromAPI');
+  }
+};
+
+// Internal version of fetchAndPopulateMyBeers that doesn't handle its own locking
+const _refreshMyBeersFromAPIInternal = async (): Promise<any[]> => {
+  try {
+    const myBeers = await fetchMyBeersFromAPI();
+    
+    const database = await initDatabase();
+    
+    // Clear existing data
+    await database.runAsync('DELETE FROM tasted_brew_current_round');
+    
+    console.log(`Starting import of ${myBeers.length} My Beers...`);
+    
+    // Process in very small batches
+    const batchSize = 3;
+    for (let i = 0; i < myBeers.length; i += batchSize) {
+      const batch = myBeers.slice(i, i + batchSize);
+      
+      for (const beer of batch) {
+        if (!beer.id) continue; // Skip entries without an ID
+        
+        await database.runAsync(
+          `INSERT OR REPLACE INTO tasted_brew_current_round (
+            id, roh_lap, tasted_date, brew_name, brewer, brewer_loc, 
+            brew_style, brew_container, review_count, review_ratings, 
+            brew_description, chit_code
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            beer.id,
+            beer.roh_lap || '',
+            beer.tasted_date || '',
+            beer.brew_name || '',
+            beer.brewer || '',
+            beer.brewer_loc || '',
+            beer.brew_style || '',
+            beer.brew_container || '',
+            beer.review_count || '',
+            beer.review_ratings || '',
+            beer.brew_description || '',
+            beer.chit_code || ''
+          ]
+        );
+      }
+      
+      // Small delay between batches to avoid locking issues
+      await new Promise(resolve => setTimeout(resolve, 10));
+    }
+    
+    console.log('My Beers import complete!');
+    return myBeers;
+  } catch (error) {
+    console.error('Error refreshing My Beers:', error);
+    throw error;
   }
 };
 
@@ -483,5 +567,39 @@ export const getBeersNotInMyBeers = async (): Promise<any[]> => {
   } catch (error) {
     console.error('Error getting beers not in My Beers:', error);
     throw error;
+  }
+};
+
+// Refresh all data from APIs (both allbeers and tasted_brew_current_round tables)
+export const refreshAllDataFromAPI = async (): Promise<{
+  allBeers: any[],
+  myBeers: any[]
+}> => {
+  if (!await acquireLock('refreshAllDataFromAPI')) {
+    throw new Error('Failed to acquire database lock for refreshing all data');
+  }
+
+  try {
+    console.log('Starting full data refresh...');
+    
+    // Step 1: Refresh All Beers (without separate locking)
+    console.log('Refreshing all beers...');
+    const allBeers = await _refreshBeersFromAPIInternal();
+    
+    // Step 2: Refresh My Beers (without separate locking)
+    console.log('Refreshing my beers...');
+    const myBeers = await _refreshMyBeersFromAPIInternal();
+    
+    console.log('Full data refresh complete!');
+    
+    return {
+      allBeers: allBeers,
+      myBeers: myBeers.filter(beer => beer.brew_name && beer.brew_name.trim() !== '')
+    };
+  } catch (error) {
+    console.error('Error refreshing all data:', error);
+    throw error;
+  } finally {
+    releaseLock('refreshAllDataFromAPI');
   }
 }; 
