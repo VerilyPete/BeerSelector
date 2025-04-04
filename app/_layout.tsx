@@ -1,15 +1,15 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
-import { Stack } from 'expo-router';
+import { Stack, router } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import 'react-native-reanimated';
 import { LogBox } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { useColorScheme } from '@/hooks/useColorScheme';
-import { initializeBeerDatabase } from '@/src/database/db';
+import { initializeBeerDatabase, getPreference, setPreference } from '@/src/database/db';
 
 // Disable react-devtools connection to port 8097
 if (__DEV__) {
@@ -45,6 +45,7 @@ export default function RootLayout() {
   const [loaded] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
+  const [initialRoute, setInitialRoute] = useState<string | null>(null);
 
   useEffect(() => {
     async function prepare() {
@@ -53,6 +54,28 @@ export default function RootLayout() {
         try {
           await initializeBeerDatabase();
           console.log('Database initialized successfully');
+          
+          // Check if API URLs are set
+          const allBeersApiUrl = await getPreference('all_beers_api_url');
+          const myBeersApiUrl = await getPreference('my_beers_api_url');
+          const isFirstLaunch = await getPreference('first_launch');
+          
+          // If API URLs are empty or it's first launch, set initial route to settings
+          if ((!allBeersApiUrl || !myBeersApiUrl || isFirstLaunch === 'true') && loaded) {
+            console.log('API URLs not set or first launch, redirecting to settings page');
+            // Mark that it's no longer the first launch
+            if (isFirstLaunch === 'true') {
+              await setPreference('first_launch', 'false', 'Flag indicating if this is the first app launch');
+            }
+            
+            // Set initial route to settings
+            setInitialRoute('/settings');
+            // Navigate immediately to settings
+            router.replace('/settings');
+          } else {
+            // Normal app startup flow
+            setInitialRoute('(tabs)');
+          }
         } catch (dbError) {
           console.error('Database initialization failed, retrying once:', dbError);
           // Wait a moment and try again once
@@ -60,9 +83,11 @@ export default function RootLayout() {
           try {
             await initializeBeerDatabase();
             console.log('Database initialized successfully on retry');
+            setInitialRoute('(tabs)');
           } catch (retryError) {
             console.error('Database initialization failed on retry:', retryError);
             // Continue anyway - we'll handle database errors in the components
+            setInitialRoute('(tabs)');
           }
         }
         
@@ -72,13 +97,15 @@ export default function RootLayout() {
       } catch (error) {
         console.error('Error during app initialization:', error);
         // Continue anyway to allow the app to start
+        setInitialRoute('(tabs)');
       }
     }
     
     prepare();
   }, [loaded]);
 
-  if (!loaded) {
+  // Wait until we've determined the initial route
+  if (!loaded || !initialRoute) {
     return null;
   }
 

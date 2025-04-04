@@ -1,5 +1,5 @@
-import { StyleSheet, Text, View, TouchableOpacity } from 'react-native';
-import React from 'react';
+import { StyleSheet, Text, View, TouchableOpacity, Alert } from 'react-native';
+import React, { useState, useEffect } from 'react';
 import Animated, {
   interpolate,
   useAnimatedScrollHandler,
@@ -15,6 +15,7 @@ import { ThemedView } from '@/components/ThemedView';
 import { BeerList } from '@/components/BeerList';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useThemeColor } from '@/hooks/useThemeColor';
+import { areApiUrlsConfigured } from '@/src/database/db';
 
 export function BeerListScreen() {
   const colorScheme = useColorScheme() ?? 'light';
@@ -142,16 +143,58 @@ const styles = StyleSheet.create({
     padding: 8,
     zIndex: 1,
   },
+  loginPrompt: {
+    marginBottom: 40,
+    paddingHorizontal: 20,
+    textAlign: 'center',
+  },
 });
 
 export default function HomeScreen() {
   const backgroundColor = useThemeColor({}, 'background');
   const buttonColor = useThemeColor({}, 'tint');
   const colorScheme = useColorScheme() ?? 'light';
+  const [apiUrlsSet, setApiUrlsSet] = useState<boolean | null>(null);
+  
+  // Check if API URLs are configured on component mount
+  useEffect(() => {
+    const checkApiUrls = async () => {
+      const isConfigured = await areApiUrlsConfigured();
+      setApiUrlsSet(isConfigured);
+    };
+    
+    checkApiUrls();
+  }, []);
   
   // Determine the appropriate button text color based on theme
   const buttonTextColor = colorScheme === 'dark' ? '#000000' : '#FFFFFF';
   
+  // If we're still checking API URL status, show nothing
+  if (apiUrlsSet === null) {
+    return null;
+  }
+
+  // If API URLs aren't set, render a login prompt
+  if (!apiUrlsSet) {
+    return (
+      <ThemedView style={[styles.homeContainer, { backgroundColor }]}>
+        <SafeAreaView style={styles.homeContentContainer} edges={['top', 'right', 'left']}>
+          <ThemedText type="title" style={styles.welcomeTitle}>Welcome to Beer Selector</ThemedText>
+          <ThemedText style={[styles.welcomeText, styles.loginPrompt]}>
+            Please log in to your Flying Saucer account to start using the app.
+          </ThemedText>
+          <TouchableOpacity 
+            style={[styles.mainButton, { backgroundColor: buttonColor }]}
+            onPress={() => router.navigate('/settings')}
+          >
+            <Text style={[styles.mainButtonText, { color: buttonTextColor }]}>Go to Settings</Text>
+          </TouchableOpacity>
+        </SafeAreaView>
+      </ThemedView>
+    );
+  }
+  
+  // Normal view when API URLs are set
   return (
     <ThemedView style={[styles.homeContainer, { backgroundColor }]}>
       <SafeAreaView style={styles.homeContentContainer} edges={['top', 'right', 'left']}>
