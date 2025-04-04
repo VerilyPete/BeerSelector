@@ -6,8 +6,10 @@ import { ThemedView } from './ThemedView';
 import { LoadingIndicator } from './LoadingIndicator';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { useColorScheme } from '@/hooks/useColorScheme';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SearchBar } from './SearchBar';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import { useBottomTabOverflow } from '@/components/ui/TabBarBackground';
 
 type Beer = {
   id: string;
@@ -25,6 +27,9 @@ type SortOption = 'date' | 'name';
 export const MyBeerList = () => {
   // All hooks must be called at the top level, before any conditional logic
   const colorScheme = useColorScheme();
+  const insets = useSafeAreaInsets();
+  const tabBarHeight = useBottomTabBarHeight();
+  const tabOverflow = useBottomTabOverflow();
   const [availableBeers, setAvailableBeers] = useState<Beer[]>([]);
   const [displayedBeers, setDisplayedBeers] = useState<Beer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -400,7 +405,7 @@ export const MyBeerList = () => {
           </TouchableOpacity>
         </View>
       ) : (
-        <>
+        <View style={{ flex: 1 }}>
           {renderFilterButtons()}
           {displayedBeers.length === 0 ? (
             <View style={styles.centered}>
@@ -409,17 +414,20 @@ export const MyBeerList = () => {
               </ThemedText>
             </View>
           ) : (
-            <FlatList
-              data={displayedBeers}
-              renderItem={({ item }) => renderBeerItem(item)}
-              keyExtractor={item => item.id}
-              contentContainerStyle={styles.listContent}
-              showsVerticalScrollIndicator={false}
-              onRefresh={handleRefresh}
-              refreshing={refreshing}
-            />
+            <View style={{ flex: 1, paddingBottom: tabBarHeight + 10 }}>
+              <FlatList
+                data={displayedBeers}
+                renderItem={({ item }) => renderBeerItem(item)}
+                keyExtractor={item => item.id}
+                contentContainerStyle={styles.listContent}
+                showsVerticalScrollIndicator={false}
+                onRefresh={handleRefresh}
+                refreshing={refreshing}
+                style={{ flex: 1 }}
+              />
+            </View>
           )}
-        </>
+        </View>
       )}
     </SafeAreaView>
   );
@@ -507,6 +515,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginBottom: 12,
     borderWidth: 1,
+    marginHorizontal: 1, // Add small margin to prevent bleed
   },
   expandedItem: {
     elevation: 3,
@@ -567,7 +576,7 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingHorizontal: 16,
-    paddingBottom: 16,
+    paddingTop: 4,
   },
   filtersContainer: {
     marginBottom: 16,
