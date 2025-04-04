@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { StyleSheet, TouchableOpacity, View, Switch, Alert, TextInput, ScrollView, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { StyleSheet, TouchableOpacity, View, Switch, Alert, TextInput, ScrollView, ActivityIndicator, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { router } from 'expo-router';
 import { IconSymbol } from '@/components/ui/IconSymbol';
+import * as WebBrowser from 'expo-web-browser';
+import { WebView, WebViewNavigation } from 'react-native-webview';
 
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
@@ -31,6 +33,9 @@ export default function SettingsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [preferences, setPreferences] = useState<Preference[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loginLoading, setLoginLoading] = useState(false);
+  const [webviewVisible, setWebviewVisible] = useState(false);
+  const webViewRef = useRef<WebView>(null);
 
   // Load preferences on component mount
   useEffect(() => {
@@ -73,6 +78,176 @@ export default function SettingsScreen() {
     }
   };
 
+  // Function to handle the login process using WebView
+  const handleLogin = async () => {
+    try {
+      setLoginLoading(true);
+      setWebviewVisible(true);
+    } catch (error) {
+      console.error('Login dialog error:', error);
+      Alert.alert('Error', 'Failed to start the login process.');
+      setLoginLoading(false);
+    }
+  };
+
+  // Handle WebView navigation state changes
+  const handleWebViewNavigationStateChange = (navState: WebViewNavigation) => {
+    console.log('WebView URL:', navState.url);
+    
+    // If we're on the member dashboard page
+    if (navState.url.includes('member-dash.php')) {
+      // Inject JavaScript to extract the API URLs
+      if (webViewRef.current) {
+        webViewRef.current.injectJavaScript(`
+          (function() {
+            // Try to find variables in the page
+            let userJsonUrl = null;
+            let storeJsonUrl = null;
+            
+            // Look for PHP variables in script tags
+            const scripts = document.querySelectorAll('script');
+            for (const script of scripts) {
+              const content = script.textContent || script.innerText;
+              
+              // Look for user_json_url
+              const userMatch = content.match(/\\$user_json_url\\s*=\\s*["']([^"']+)["']/);
+              if (userMatch && userMatch[1]) {
+                userJsonUrl = userMatch[1];
+              }
+              
+              // Look for store_json_url
+              const storeMatch = content.match(/\\$store_json_url\\s*=\\s*["']([^"']+)["']/);
+              if (storeMatch && storeMatch[1]) {
+                storeJsonUrl = storeMatch[1];
+              }
+            }
+            
+            // Also look for URLs in the page source
+            const html = document.documentElement.outerHTML;
+            
+            if (!userJsonUrl) {
+              const memberJsonMatch = html.match(/https:\\/\\/[^"'\\s]+bk-member-json\\.php\\?uid=\\d+/i);
+              if (memberJsonMatch) {
+                userJsonUrl = memberJsonMatch[0];
+              }
+            }
+            
+            if (!storeJsonUrl) {
+              const storeJsonMatch = html.match(/https:\\/\\/[^"'\\s]+bk-store-json\\.php\\?sid=\\d+/i);
+              if (storeJsonMatch) {
+                storeJsonUrl = storeJsonMatch[0];
+              }
+            }
+            
+            // Send the results back to React Native
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'URLs',
+              userJsonUrl,
+              storeJsonUrl,
+              html: html.substring(0, 1000) // Send a portion of HTML for debugging
+            }));
+            
+            true; // Return statement needed for Android
+          })();
+        `);
+      }
+    }
+  };
+
+  // Handle messages from WebView
+  const handleWebViewMessage = async (event: {nativeEvent: {data: string}}) => {
+    try {
+      const data = JSON.parse(event.nativeEvent.data);
+      console.log('Received message from WebView:', data.type);
+      
+      if (data.type === 'URLs') {
+        const { userJsonUrl, storeJsonUrl, html } = data;
+        console.log('Extracted User JSON URL:', userJsonUrl);
+        console.log('Extracted Store JSON URL:', storeJsonUrl);
+        console.log('Sample HTML:', html);
+        
+        if (userJsonUrl && storeJsonUrl) {
+          // Found the URLs, can close the WebView
+          setWebviewVisible(false);
+          setLoginLoading(false);
+          
+          // Update the preferences with the new URLs
+          await setPreference('my_beers_api_url', userJsonUrl, 'API endpoint for fetching my beers');
+          await setPreference('all_beers_api_url', storeJsonUrl, 'API endpoint for fetching all beers');
+          
+          // Save the login timestamp
+          const loginTimestamp = new Date().toISOString();
+          await setPreference('last_login_timestamp', loginTimestamp, 'Last successful login timestamp');
+          
+          // Reload the preferences to show updated values
+          await loadPreferences();
+          
+          // Refresh the data with the new URLs
+          await handleRefresh();
+          
+          Alert.alert(
+            'Success', 
+            'Login successful. API URLs have been updated and beer data has been refreshed.'
+          );
+        } else {
+          console.log('URLs not found in injected JavaScript');
+          // Continue browsing - user may need to complete login
+        }
+      }
+    } catch (error) {
+      console.error('Error handling WebView message:', error);
+      // Reset loading state in case of error
+      setLoginLoading(false);
+    }
+  };
+
+  // Function to close the WebView and cancel login
+  const closeWebView = () => {
+    setWebviewVisible(false);
+    setLoginLoading(false);
+    Alert.alert('Login Cancelled', 'The login process was cancelled.');
+  };
+
+  // Function to reset API URLs
+  const handleResetApiUrls = async () => {
+    try {
+      Alert.alert(
+        'Reset API URLs',
+        'Are you sure you want to reset the API URLs? This will clear the current endpoints.',
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel'
+          },
+          {
+            text: 'Reset',
+            style: 'destructive',
+            onPress: async () => {
+              // Clear the API URL preferences
+              await setPreference('all_beers_api_url', '', 'API endpoint for fetching all beers');
+              await setPreference('my_beers_api_url', '', 'API endpoint for fetching my beers');
+              
+              // Also clear the login timestamp if it exists
+              try {
+                await setPreference('last_login_timestamp', '', 'Last successful login timestamp');
+              } catch (err) {
+                // Ignore if this preference doesn't exist
+              }
+              
+              // Reload preferences to reflect changes
+              await loadPreferences();
+              
+              Alert.alert('Success', 'API URL preferences have been reset.');
+            }
+          }
+        ]
+      );
+    } catch (error) {
+      console.error('Error resetting API URLs:', error);
+      Alert.alert('Error', 'Failed to reset API URLs. Please try again.');
+    }
+  };
+
   // Render a preference item - simplified to just display
   const renderPreferenceItem = (preference: Preference) => {
     return (
@@ -89,6 +264,34 @@ export default function SettingsScreen() {
   return (
     <ThemedView style={styles.container}>
       <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
+      
+      {/* WebView Modal */}
+      <Modal
+        visible={webviewVisible}
+        animationType="slide"
+        onRequestClose={closeWebView}
+      >
+        <SafeAreaView style={{ flex: 1 }}>
+          <View style={styles.webViewHeader}>
+            <TouchableOpacity onPress={closeWebView} style={styles.closeButton}>
+              <IconSymbol name="xmark" size={22} color={tintColor} />
+            </TouchableOpacity>
+            <ThemedText style={styles.webViewTitle}>Flying Saucer Login</ThemedText>
+          </View>
+          
+          <WebView
+            ref={webViewRef}
+            source={{ uri: 'https://tapthatapp.beerknurd.com/kiosk.php' }}
+            onNavigationStateChange={handleWebViewNavigationStateChange}
+            onMessage={handleWebViewMessage}
+            style={{ flex: 1 }}
+            javaScriptEnabled={true}
+            domStorageEnabled={true}
+            sharedCookiesEnabled={true}
+          />
+        </SafeAreaView>
+      </Modal>
+      
       <SafeAreaView style={styles.safeArea} edges={['top', 'right', 'left']}>
         {/* Back button */}
         <TouchableOpacity
@@ -153,6 +356,41 @@ export default function SettingsScreen() {
                 >
                   <ThemedText style={styles.dataButtonText}>
                     {refreshing ? 'Refreshing data...' : 'Refresh All Beer Data'}
+                  </ThemedText>
+                </TouchableOpacity>
+
+                {/* Login Button */}
+                <TouchableOpacity 
+                  style={[
+                    styles.dataButton, 
+                    styles.loginButton,
+                    { 
+                      backgroundColor: loginLoading ? '#88AAFF' : '#007AFF',
+                      borderColor: borderColor
+                    }
+                  ]}
+                  onPress={handleLogin}
+                  disabled={loginLoading || refreshing}
+                >
+                  <ThemedText style={styles.dataButtonText}>
+                    {loginLoading ? 'Logging in...' : 'Login to Flying Saucer'}
+                  </ThemedText>
+                </TouchableOpacity>
+
+                {/* Reset API URLs Button */}
+                <TouchableOpacity 
+                  style={[
+                    styles.dataButton, 
+                    styles.resetButton,
+                    { 
+                      backgroundColor: '#8E8E93',
+                      borderColor: borderColor
+                    }
+                  ]}
+                  onPress={handleResetApiUrls}
+                >
+                  <ThemedText style={styles.dataButtonText}>
+                    Reset API URLs
                   </ThemedText>
                 </TouchableOpacity>
               </View>
@@ -249,19 +487,18 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   loadingContainer: {
-    padding: 20,
+    padding: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
   preferenceItem: {
-    paddingHorizontal: 12,
-    paddingVertical: 12,
+    padding: 12,
     borderTopWidth: 0.5,
     borderTopColor: '#CCCCCC',
   },
   preferenceKey: {
-    fontWeight: '600',
-    fontSize: 14,
+    fontWeight: 'bold',
+    marginBottom: 4,
   },
   preferenceDescription: {
     fontSize: 12,
@@ -270,7 +507,32 @@ const styles = StyleSheet.create({
   },
   preferenceValue: {
     fontSize: 12,
-    opacity: 0.9,
-    marginVertical: 4,
+  },
+  loginButton: {
+    marginTop: 12,
+  },
+  resetButton: {
+    marginTop: 12,
+    backgroundColor: '#8E8E93',
+  },
+  webViewHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#ccc',
+    backgroundColor: '#f9f9f9',
+  },
+  closeButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(200, 200, 200, 0.3)',
+  },
+  webViewTitle: {
+    flex: 1,
+    fontSize: 18,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginRight: 40, // To balance the close button
   },
 }); 
