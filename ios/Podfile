@@ -7,7 +7,7 @@ podfile_properties = JSON.parse(File.read(File.join(__dir__, 'Podfile.properties
 ENV['RCT_NEW_ARCH_ENABLED'] = podfile_properties['newArchEnabled'] == 'true' ? '1' : '0'
 ENV['EX_DEV_CLIENT_NETWORK_INSPECTOR'] = podfile_properties['EX_DEV_CLIENT_NETWORK_INSPECTOR']
 
-platform :ios, podfile_properties['ios.deploymentTarget'] || '18.2'
+platform :ios, podfile_properties['ios.deploymentTarget'] || '15.1'
 install! 'cocoapods',
   :deterministic_uuids => false
 
@@ -62,64 +62,13 @@ target 'BeerSelector' do
         end
       end
     end
-
-    # First fix any duplicate conditional directives
-    system("cd #{__dir__} && ./fix_json_pointer.sh")
     
-    # Apply unified patches for char_traits<unsigned char> redefinition issues
-    system("cd #{__dir__} && ./patch_char_traits.sh")
-    
-    # Apply specific patch for the React-jsinspector module
-    system("cd #{__dir__} && ./patch_jsinspector.sh")
-    
-    # Apply specific patch for the FuseboxTracer.cpp file
-    if File.exist?("#{__dir__}/patch_fuseboxtracer.sh")
-      system("cd #{__dir__} && ./patch_fuseboxtracer.sh")
-    else
-      puts "Warning: patch_fuseboxtracer.sh not found, skipping this patch"
-    end
-
-    # Fix for Xcode 16/iOS 18 SDK: RCT-Folly string_view issue
+    # Fix for RCT-Folly missing Coroutine.h header file
     installer.pods_project.targets.each do |target|
-      target_name = target.name
-      if target_name == 'RCT-Folly' || 
-         target_name == 'React-rendererdebug' || 
-         target_name == 'React-jsinspector' ||
-         target_name == 'React-perflogger' ||
-         target_name.start_with?('React-') || 
-         target_name.include?('React')
+      if target.name == 'RCT-Folly'
         target.build_configurations.each do |config|
-          # Add compiler flags to work around the string_view issue
           config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= ['$(inherited)']
-          config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << '_LIBCPP_ENABLE_CXX17_REMOVED_FEATURES=1'
-          # Add additional flags to fix char_traits<unsigned char> issue
-          config.build_settings['OTHER_CPLUSPLUSFLAGS'] = '$(OTHER_CFLAGS) -Wno-error=c++20-extensions'
-          config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << '_LIBCPP_DISABLE_AVAILABILITY=1'
-          
-          # Disable string_view in Folly for problematic targets
-          if target_name == 'RCT-Folly' || target_name == 'React-rendererdebug' || target_name == 'React-jsi'
-            config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << 'FOLLY_HAS_STRING_VIEW=0'
-            
-            # Apply prefix header for RCT-Folly
-            if target_name == 'RCT-Folly'
-              config.build_settings['GCC_PREFIX_HEADER'] = "#{Dir.pwd}/RCT-Folly-prefix.pch"
-            end
-            
-            # Apply prefix header for React-rendererdebug
-            if target_name == 'React-rendererdebug'
-              config.build_settings['GCC_PREFIX_HEADER'] = "#{Dir.pwd}/React-rendererdebug-prefix.pch"
-            end
-          end
-          
-          # Apply prefix header for React-jsinspector
-          if target_name == 'React-jsinspector'
-            config.build_settings['GCC_PREFIX_HEADER'] = "#{Dir.pwd}/React-jsinspector-prefix.pch"
-          end
-          
-          # Apply prefix header for React-perflogger
-          if target_name == 'React-perflogger'
-            config.build_settings['GCC_PREFIX_HEADER'] = "#{Dir.pwd}/React-fusebox-prefix.pch"
-          end
+          config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << 'FOLLY_HAVE_COROUTINE=0'
         end
       end
     end
