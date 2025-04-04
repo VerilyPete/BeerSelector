@@ -8,6 +8,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { IconSymbol } from '@/components/ui/IconSymbol';
 
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
@@ -134,6 +135,13 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
   },
+  settingsButton: {
+    position: 'absolute',
+    top: 20,
+    right: 20,
+    padding: 8,
+    zIndex: 1,
+  },
 });
 
 export default function HomeScreen() {
@@ -147,6 +155,14 @@ export default function HomeScreen() {
   return (
     <ThemedView style={[styles.homeContainer, { backgroundColor }]}>
       <SafeAreaView style={styles.homeContentContainer} edges={['top', 'right', 'left']}>
+        {/* Settings button in top right */}
+        <TouchableOpacity 
+          style={styles.settingsButton}
+          onPress={() => router.navigate('/settings')}
+        >
+          <IconSymbol name="gear" size={24} color={buttonColor} />
+        </TouchableOpacity>
+        
         <ThemedText type="title" style={styles.welcomeTitle}>Welcome to Beer Selector</ThemedText>
         <ThemedText style={styles.welcomeText}>
           What are you drinking tonight?
