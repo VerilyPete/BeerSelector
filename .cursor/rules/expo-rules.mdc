@@ -43,6 +43,7 @@ const additionalInstructions = `
 7. Use Expo's OTA updates for quick deployments
 8. Use expo-sqlite 15.1.3 for the database.
 9. Use the expo-sqlite 15.1.3 API
-10. For expo-sqlite transactions, use withTransactionAsync() instead of the old transaction() method 
+10. For expo-sqlite transactions, use withTransactionAsync() instead of the old transaction() method
+11. Ensure that any buttons we add don't end up being white on white or otherwise unviewable on a device running in dark mode
 `;
 
