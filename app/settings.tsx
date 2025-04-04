@@ -36,10 +36,21 @@ export default function SettingsScreen() {
   const [loginLoading, setLoginLoading] = useState(false);
   const [webviewVisible, setWebviewVisible] = useState(false);
   const webViewRef = useRef<WebView>(null);
+  const [apiUrlsConfigured, setApiUrlsConfigured] = useState(false);
+  const [isFirstLogin, setIsFirstLogin] = useState(false);
+  const [canGoBack, setCanGoBack] = useState(false);
 
-  // Load preferences on component mount
+  // Load preferences on component mount and check if we can go back
   useEffect(() => {
     loadPreferences();
+    
+    // Check if this is the initial route or if we can go back
+    try {
+      setCanGoBack(router.canGoBack());
+    } catch (error) {
+      // If router.canGoBack() throws, we can't go back
+      setCanGoBack(false);
+    }
   }, []);
 
   // Function to load preferences from the database
@@ -48,6 +59,15 @@ export default function SettingsScreen() {
       setLoading(true);
       const prefs = await getAllPreferences();
       setPreferences(prefs);
+      
+      // Check if API URLs are set
+      const allBeersApiUrl = prefs.find(p => p.key === 'all_beers_api_url')?.value;
+      const myBeersApiUrl = prefs.find(p => p.key === 'my_beers_api_url')?.value;
+      const isFirstLaunch = prefs.find(p => p.key === 'first_launch')?.value === 'true';
+      
+      // Set state based on whether URLs are configured
+      setApiUrlsConfigured(!!allBeersApiUrl && !!myBeersApiUrl);
+      setIsFirstLogin(!allBeersApiUrl || !myBeersApiUrl);
     } catch (error) {
       console.error('Failed to load preferences:', error);
       Alert.alert('Error', 'Failed to load preferences.');
@@ -185,9 +205,24 @@ export default function SettingsScreen() {
           // Refresh the data with the new URLs
           await handleRefresh();
           
+          // Get the previous value of isFirstLogin to determine navigation behavior
+          const wasFirstLogin = isFirstLogin;
+          
+          // Show success message
           Alert.alert(
             'Success', 
-            'Login successful. API URLs have been updated and beer data has been refreshed.'
+            'Login successful. API URLs have been updated and beer data has been refreshed.',
+            [
+              {
+                text: 'OK',
+                onPress: () => {
+                  // If this was the first login, navigate to the main tab screen
+                  if (wasFirstLogin) {
+                    router.replace('/(tabs)');
+                  }
+                }
+              }
+            ]
           );
         } else {
           console.log('URLs not found in injected JavaScript');
@@ -293,13 +328,15 @@ export default function SettingsScreen() {
       </Modal>
       
       <SafeAreaView style={styles.safeArea} edges={['top', 'right', 'left']}>
-        {/* Back button */}
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <IconSymbol name="xmark" size={22} color={tintColor} />
-        </TouchableOpacity>
+        {/* Back button - only show if not first login and we can go back */}
+        {!isFirstLogin && canGoBack && (
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.back()}
+          >
+            <IconSymbol name="xmark" size={22} color={tintColor} />
+          </TouchableOpacity>
+        )}
 
         <ScrollView style={styles.scrollView}>
           <View style={styles.content}>
@@ -308,10 +345,35 @@ export default function SettingsScreen() {
               <ThemedText type="title" style={styles.pageTitle}>Settings</ThemedText>
             </View>
             
-            {/* Removed Filter Preferences Section */}
+            {/* First Login Message */}
+            {isFirstLogin && (
+              <View style={[styles.section, { backgroundColor: cardColor, marginBottom: 20 }]}>
+                <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>Welcome to Beer Selector</ThemedText>
+                <View style={styles.welcomeMessage}>
+                  <ThemedText style={styles.welcomeText}>
+                    Please log in to your Flying Saucer account to start using the app. This will allow us to fetch your beer data.
+                  </ThemedText>
+                  <TouchableOpacity 
+                    style={[
+                      styles.dataButton, 
+                      styles.loginButton,
+                      { 
+                        backgroundColor: loginLoading ? '#88AAFF' : '#007AFF',
+                        borderColor: borderColor,
+                        marginTop: 16
+                      }
+                    ]}
+                    onPress={handleLogin}
+                    disabled={loginLoading || refreshing}
+                  >
+                    <ThemedText style={styles.dataButtonText}>
+                      {loginLoading ? 'Logging in...' : 'Login to Flying Saucer'}
+                    </ThemedText>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
             
-            {/* Removed Notifications Section */}
-
             {/* API Endpoints Section */}
             <View style={[styles.section, { backgroundColor: cardColor }]}>
               <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>API Endpoints</ThemedText>
@@ -343,21 +405,24 @@ export default function SettingsScreen() {
               <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>Data Management</ThemedText>
               
               <View style={styles.buttonContainer}>
-                <TouchableOpacity 
-                  style={[
-                    styles.dataButton, 
-                    { 
-                      backgroundColor: refreshing ? '#FF8888' : '#FF3B30',
-                      borderColor: borderColor
-                    }
-                  ]}
-                  onPress={handleRefresh}
-                  disabled={refreshing}
-                >
-                  <ThemedText style={styles.dataButtonText}>
-                    {refreshing ? 'Refreshing data...' : 'Refresh All Beer Data'}
-                  </ThemedText>
-                </TouchableOpacity>
+                {/* Only show refresh button if API URLs are configured */}
+                {apiUrlsConfigured && (
+                  <TouchableOpacity 
+                    style={[
+                      styles.dataButton, 
+                      { 
+                        backgroundColor: refreshing ? '#FF8888' : '#FF3B30',
+                        borderColor: borderColor
+                      }
+                    ]}
+                    onPress={handleRefresh}
+                    disabled={refreshing}
+                  >
+                    <ThemedText style={styles.dataButtonText}>
+                      {refreshing ? 'Refreshing data...' : 'Refresh All Beer Data'}
+                    </ThemedText>
+                  </TouchableOpacity>
+                )}
 
                 {/* Login Button */}
                 <TouchableOpacity 
@@ -366,7 +431,8 @@ export default function SettingsScreen() {
                     styles.loginButton,
                     { 
                       backgroundColor: loginLoading ? '#88AAFF' : '#007AFF',
-                      borderColor: borderColor
+                      borderColor: borderColor,
+                      marginTop: apiUrlsConfigured ? 12 : 0
                     }
                   ]}
                   onPress={handleLogin}
@@ -377,22 +443,43 @@ export default function SettingsScreen() {
                   </ThemedText>
                 </TouchableOpacity>
 
-                {/* Reset API URLs Button */}
-                <TouchableOpacity 
-                  style={[
-                    styles.dataButton, 
-                    styles.resetButton,
-                    { 
-                      backgroundColor: '#8E8E93',
-                      borderColor: borderColor
-                    }
-                  ]}
-                  onPress={handleResetApiUrls}
-                >
-                  <ThemedText style={styles.dataButtonText}>
-                    Reset API URLs
-                  </ThemedText>
-                </TouchableOpacity>
+                {/* Only show Reset API URLs button if they are configured */}
+                {apiUrlsConfigured && (
+                  <TouchableOpacity 
+                    style={[
+                      styles.dataButton, 
+                      styles.resetButton,
+                      { borderColor: borderColor }
+                    ]}
+                    onPress={handleResetApiUrls}
+                    disabled={refreshing || loginLoading}
+                  >
+                    <ThemedText style={styles.resetButtonText}>
+                      Reset API URLs
+                    </ThemedText>
+                  </TouchableOpacity>
+                )}
+                
+                {/* Return to Home button - show when API URLs are configured but we're on first launch */}
+                {apiUrlsConfigured && !canGoBack && (
+                  <TouchableOpacity 
+                    style={[
+                      styles.dataButton, 
+                      styles.homeButton,
+                      { 
+                        backgroundColor: '#34C759',
+                        borderColor: borderColor,
+                        marginTop: 12
+                      }
+                    ]}
+                    onPress={() => router.replace('/(tabs)')}
+                    disabled={refreshing || loginLoading}
+                  >
+                    <ThemedText style={styles.dataButtonText}>
+                      Go to Home Screen
+                    </ThemedText>
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
           </View>
@@ -513,7 +600,11 @@ const styles = StyleSheet.create({
   },
   resetButton: {
     marginTop: 12,
-    backgroundColor: '#8E8E93',
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+  },
+  resetButtonText: {
+    color: '#FF3B30',
   },
   webViewHeader: {
     flexDirection: 'row',
@@ -534,5 +625,18 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     textAlign: 'center',
     marginRight: 40, // To balance the close button
+  },
+  welcomeMessage: {
+    padding: 16,
+    alignItems: 'center',
+  },
+  welcomeText: {
+    textAlign: 'center',
+    marginBottom: 8,
+    lineHeight: 20,
+  },
+  homeButton: {
+    marginTop: 12,
+    backgroundColor: '#34C759',
   },
 }); 

@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { StyleSheet, View, TouchableOpacity, Alert, FlatList } from 'react-native';
-import { getAllBeers, refreshBeersFromAPI } from '@/src/database/db';
+import { getAllBeers, refreshBeersFromAPI, areApiUrlsConfigured } from '@/src/database/db';
 import { ThemedText } from './ThemedText';
 import { ThemedView } from './ThemedView';
 import { LoadingIndicator } from './LoadingIndicator';
@@ -75,32 +75,33 @@ export const BeerList = () => {
     loadBeers();
   }, []);
 
-  // Refresh beers from API
-  const handleRefresh = async () => {
+  const handleRefresh = useCallback(async () => {
     try {
       setRefreshing(true);
+      // First check if API URLs are configured
+      const apiUrlsConfigured = await areApiUrlsConfigured();
+      if (!apiUrlsConfigured) {
+        Alert.alert(
+          'API URLs Not Configured',
+          'Please log in via the Settings screen to configure API URLs before refreshing.'
+        );
+        setRefreshing(false);
+        return;
+      }
       
-      // No initial alert, just update the button text to "Refreshing..."
-      
-      // Perform the refresh
-      const refreshedBeers = await refreshBeersFromAPI();
-      // Filter out any beers with empty or null brew_name as a second layer of protection
-      const filteredData = refreshedBeers.filter(beer => beer.brew_name && beer.brew_name.trim() !== '');
-      setAllBeers(filteredData);
-      setDisplayedBeers(filteredData);
+      // If API URLs are configured, proceed with refresh
+      await refreshBeersFromAPI();
+      const freshBeers = await getAllBeers();
+      setAllBeers(freshBeers);
+      setDisplayedBeers(freshBeers);
       setError(null);
-      
-      // Show success message
-      Alert.alert('Success', `Successfully refreshed ${filteredData.length} beers from server.`);
-    } catch (err) {
-      console.error('Failed to refresh beers:', err);
-      setError('Failed to refresh beers. Please try again later.');
-      Alert.alert('Error', 'Failed to refresh beers from server. Please try again later.');
+    } catch (error) {
+      console.error('Error refreshing beers:', error);
+      Alert.alert('Error', 'Failed to refresh beer list. Please try again later.');
     } finally {
-      // Set refreshing to false at the end, in both success and error cases
       setRefreshing(false);
     }
-  };
+  }, []);
 
   // Sort beers when sort option changes
   useEffect(() => {

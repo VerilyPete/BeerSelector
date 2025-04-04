@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { StyleSheet, View, TouchableOpacity, Alert, FlatList } from 'react-native';
-import { getBeersNotInMyBeers, fetchAndPopulateMyBeers } from '@/src/database/db';
+import { getBeersNotInMyBeers, fetchAndPopulateMyBeers, getMyBeers, areApiUrlsConfigured } from '@/src/database/db';
 import { ThemedText } from './ThemedText';
 import { ThemedView } from './ThemedView';
 import { LoadingIndicator } from './LoadingIndicator';
@@ -84,27 +84,32 @@ export const MyBeerList = () => {
     loadBeers();
   }, []);
 
-  // Refresh beers from API
-  const handleRefresh = async () => {
+  const handleRefresh = useCallback(async () => {
     try {
       setRefreshing(true);
+      // First check if API URLs are configured
+      const apiUrlsConfigured = await areApiUrlsConfigured();
+      if (!apiUrlsConfigured) {
+        Alert.alert(
+          'API URLs Not Configured',
+          'Please log in via the Settings screen to configure API URLs before refreshing.'
+        );
+        setRefreshing(false);
+        return;
+      }
       
-      // Perform the refresh
+      // If API URLs are configured, proceed with refresh
       await fetchAndPopulateMyBeers();
-      await loadBeers();
-      setError(null);
-      
-      // Show success message
-      Alert.alert('Success', `Successfully refreshed My Beers data from server.`);
-    } catch (err) {
-      console.error('Failed to refresh beers:', err);
-      setError('Failed to refresh My Beers. Please try again later.');
-      Alert.alert('Error', 'Failed to refresh My Beers from server. Please try again later.');
+      const freshBeers = await getMyBeers();
+      setAvailableBeers(freshBeers);
+      setDisplayedBeers(freshBeers);
+    } catch (error) {
+      console.error('Error refreshing my beers:', error);
+      Alert.alert('Error', 'Failed to refresh my beer list. Please try again later.');
     } finally {
-      // Set refreshing to false at the end, in both success and error cases
       setRefreshing(false);
     }
-  };
+  }, []);
 
   // Sort beers when sort option changes
   useEffect(() => {

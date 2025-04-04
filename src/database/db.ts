@@ -92,13 +92,18 @@ const initializePreferences = async (database: SQLite.SQLiteDatabase): Promise<v
       const preferences = [
         {
           key: 'all_beers_api_url',
-          value: 'https://fsbs.beerknurd.com/bk-store-json.php?sid=13879',
+          value: '',
           description: 'API endpoint for fetching all beers'
         },
         {
           key: 'my_beers_api_url',
-          value: 'https://fsbs.beerknurd.com/bk-member-json.php?uid=484587',
+          value: '',
           description: 'API endpoint for fetching my beers'
+        },
+        {
+          key: 'first_launch',
+          value: 'true',
+          description: 'Flag indicating if this is the first app launch'
         }
       ];
       
@@ -207,7 +212,8 @@ export const fetchBeersFromAPI = async (): Promise<any[]> => {
     const apiUrl = await getPreference('all_beers_api_url');
     
     if (!apiUrl) {
-      throw new Error('All beers API URL not found in preferences');
+      console.log('All beers API URL not found in preferences');
+      return []; // Return empty array instead of throwing an error
     }
     
     const data = await fetchWithRetry(apiUrl);
@@ -333,24 +339,39 @@ export const initializeBeerDatabase = async (): Promise<void> => {
   try {
     await setupDatabase();
     
-    try {
-      // Populate allbeers table
-      const beers = await fetchBeersFromAPI();
-      await populateBeersTable(beers);
-    } catch (error) {
-      console.error('Error initializing beer list:', error);
-      // Continue anyway to allow partial functionality
+    // Check if API URLs are set
+    const allBeersApiUrl = await getPreference('all_beers_api_url');
+    const myBeersApiUrl = await getPreference('my_beers_api_url');
+    
+    // Only try to populate data if we have API URLs
+    if (allBeersApiUrl) {
+      try {
+        // Populate allbeers table
+        const beers = await fetchBeersFromAPI();
+        if (beers.length > 0) {
+          await populateBeersTable(beers);
+        }
+      } catch (error) {
+        console.error('Error initializing beer list:', error);
+        // Continue anyway to allow partial functionality
+      }
+    } else {
+      console.log('Skipping beer list initialization - API URL not set');
     }
     
-    // Run this after a short delay
-    setTimeout(async () => {
-      try {
-        await fetchAndPopulateMyBeers();
-      } catch (error) {
-        console.error('Error loading My Beers data:', error);
-        // Continue anyway
-      }
-    }, 1000);
+    // Run this after a short delay only if we have the My Beers API URL
+    if (myBeersApiUrl) {
+      setTimeout(async () => {
+        try {
+          await fetchAndPopulateMyBeers();
+        } catch (error) {
+          console.error('Error loading My Beers data:', error);
+          // Continue anyway
+        }
+      }, 1000);
+    } else {
+      console.log('Skipping My Beers initialization - API URL not set');
+    }
   } catch (error) {
     console.error('Error initializing beer database:', error);
     throw error;
@@ -364,7 +385,8 @@ export const fetchMyBeersFromAPI = async (): Promise<any[]> => {
     const apiUrl = await getPreference('my_beers_api_url');
     
     if (!apiUrl) {
-      throw new Error('My beers API URL not found in preferences');
+      console.log('My beers API URL not found in preferences');
+      return []; // Return empty array instead of throwing an error
     }
     
     const data = await fetchWithRetry(apiUrl);
@@ -662,16 +684,17 @@ export const getBeersByBrewer = async (brewer: string): Promise<any[]> => {
   }
 };
 
-// Get all My Beers from the database
+// Get all tasted beers (my beers)
 export const getMyBeers = async (): Promise<any[]> => {
   const database = await initDatabase();
   
   try {
-    return await database.getAllAsync(
-      'SELECT * FROM tasted_brew_current_round WHERE brew_name IS NOT NULL AND brew_name != "" ORDER BY tasted_date DESC'
+    const beers = await database.getAllAsync<any>(
+      'SELECT * FROM tasted_brew_current_round ORDER BY id'
     );
+    return beers;
   } catch (error) {
-    console.error('Error getting My Beers from database:', error);
+    console.error('Error getting my beers:', error);
     throw error;
   }
 };
@@ -694,36 +717,76 @@ export const getBeersNotInMyBeers = async (): Promise<any[]> => {
   }
 };
 
-// Refresh all data from APIs (both allbeers and tasted_brew_current_round tables)
-export const refreshAllDataFromAPI = async (): Promise<{
-  allBeers: any[],
-  myBeers: any[]
-}> => {
+// Refresh all data from APIs (both all beers and my beers)
+export const refreshAllDataFromAPI = async (): Promise<{ allBeers: any[], myBeers: any[] }> => {
   if (!await acquireLock('refreshAllDataFromAPI')) {
     throw new Error('Failed to acquire database lock for refreshing all data');
   }
-
+  
   try {
+    let allBeers: any[] = [];
+    let myBeers: any[] = [];
+    
+    // Check if API URLs are set
+    const allBeersApiUrl = await getPreference('all_beers_api_url');
+    const myBeersApiUrl = await getPreference('my_beers_api_url');
+    
     console.log('Starting full data refresh...');
     
-    // Step 1: Refresh All Beers (without separate locking)
-    console.log('Refreshing all beers...');
-    const allBeers = await _refreshBeersFromAPIInternal();
+    // Only fetch if API URLs are available
+    if (allBeersApiUrl) {
+      console.log('Refreshing all beers...');
+      try {
+        allBeers = await _refreshBeersFromAPIInternal();
+      } catch (error) {
+        console.error('Error refreshing all beers:', error);
+        throw error;
+      }
+    } else {
+      console.log('Cannot refresh all beers - API URL not set');
+    }
     
-    // Step 2: Refresh My Beers (without separate locking)
-    console.log('Refreshing my beers...');
-    const myBeers = await _refreshMyBeersFromAPIInternal();
+    // Only fetch if API URL is available
+    if (myBeersApiUrl) {
+      console.log('Refreshing my beers...');
+      try {
+        myBeers = await _refreshMyBeersFromAPIInternal();
+      } catch (error) {
+        console.error('Error refreshing my beers:', error);
+        throw error;
+      }
+    } else {
+      console.log('Cannot refresh my beers - API URL not set');
+    }
+    
+    // If both API URLs are missing, throw an error
+    if (!allBeersApiUrl && !myBeersApiUrl) {
+      throw new Error('API URLs not configured. Please log in first.');
+    }
     
     console.log('Full data refresh complete!');
     
     return {
-      allBeers: allBeers,
+      allBeers,
       myBeers: myBeers.filter(beer => beer.brew_name && beer.brew_name.trim() !== '')
     };
   } catch (error) {
-    console.error('Error refreshing all data:', error);
+    console.error('Error in refreshAllDataFromAPI:', error);
     throw error;
   } finally {
     releaseLock('refreshAllDataFromAPI');
+  }
+};
+
+// Check if API URLs are configured
+export const areApiUrlsConfigured = async (): Promise<boolean> => {
+  try {
+    const allBeersApiUrl = await getPreference('all_beers_api_url');
+    const myBeersApiUrl = await getPreference('my_beers_api_url');
+    
+    return !!allBeersApiUrl && !!myBeersApiUrl;
+  } catch (error) {
+    console.error('Error checking API URLs:', error);
+    return false;
   }
 }; 
