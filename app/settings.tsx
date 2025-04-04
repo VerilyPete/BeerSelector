@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { StyleSheet, TouchableOpacity, View, Switch, Alert } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, TouchableOpacity, View, Switch, Alert, TextInput, ScrollView, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { router } from 'expo-router';
@@ -9,7 +9,15 @@ import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { useColorScheme } from '@/hooks/useColorScheme';
-import { refreshAllDataFromAPI } from '@/src/database/db';
+import { refreshAllDataFromAPI, getAllPreferences, setPreference } from '@/src/database/db';
+
+// Define a Preference type for typechecking
+interface Preference {
+  key: string;
+  value: string;
+  description: string;
+  editable?: boolean;
+}
 
 export default function SettingsScreen() {
   const backgroundColor = useThemeColor({}, 'background');
@@ -19,10 +27,29 @@ export default function SettingsScreen() {
   const borderColor = useThemeColor({ light: '#e0e0e0', dark: '#333' }, 'text');
   const colorScheme = useColorScheme() ?? 'light';
 
-  // Example state for settings
-  const [draftFilterEnabled, setDraftFilterEnabled] = React.useState(false);
-  const [notificationsEnabled, setNotificationsEnabled] = React.useState(true);
+  // Removed the filter preferences and notifications state variables
   const [refreshing, setRefreshing] = useState(false);
+  const [preferences, setPreferences] = useState<Preference[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Load preferences on component mount
+  useEffect(() => {
+    loadPreferences();
+  }, []);
+
+  // Function to load preferences from the database
+  const loadPreferences = async () => {
+    try {
+      setLoading(true);
+      const prefs = await getAllPreferences();
+      setPreferences(prefs);
+    } catch (error) {
+      console.error('Failed to load preferences:', error);
+      Alert.alert('Error', 'Failed to load preferences.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Function to handle refreshing all data from APIs
   const handleRefresh = async () => {
@@ -46,6 +73,19 @@ export default function SettingsScreen() {
     }
   };
 
+  // Render a preference item - simplified to just display
+  const renderPreferenceItem = (preference: Preference) => {
+    return (
+      <View key={preference.key} style={styles.preferenceItem}>
+        <ThemedText style={styles.preferenceKey}>{preference.key}</ThemedText>
+        <ThemedText style={styles.preferenceDescription}>{preference.description}</ThemedText>
+        <ThemedText style={styles.preferenceValue} numberOfLines={2} ellipsizeMode="middle">
+          {preference.value}
+        </ThemedText>
+      </View>
+    );
+  };
+
   return (
     <ThemedView style={styles.container}>
       <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
@@ -58,77 +98,67 @@ export default function SettingsScreen() {
           <IconSymbol name="xmark" size={22} color={tintColor} />
         </TouchableOpacity>
 
-        <View style={styles.content}>
-          {/* Title Section */}
-          <View style={styles.titleSection}>
-            <ThemedText type="title" style={styles.pageTitle}>Settings</ThemedText>
-          </View>
-          
-          {/* Filter Preferences Section */}
-          <View style={[styles.section, { backgroundColor: cardColor }]}>
-            <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>Filter Preferences</ThemedText>
-            
-            <View style={styles.settingRow}>
-              <ThemedText>Default to Draft Filter</ThemedText>
-              <Switch
-                value={draftFilterEnabled}
-                onValueChange={setDraftFilterEnabled}
-                trackColor={{ false: '#767577', true: tintColor }}
-                thumbColor={'#f4f3f4'}
-                ios_backgroundColor="#3e3e3e"
-              />
+        <ScrollView style={styles.scrollView}>
+          <View style={styles.content}>
+            {/* Title Section */}
+            <View style={styles.titleSection}>
+              <ThemedText type="title" style={styles.pageTitle}>Settings</ThemedText>
             </View>
-          </View>
+            
+            {/* Removed Filter Preferences Section */}
+            
+            {/* Removed Notifications Section */}
 
-          {/* Notifications Section */}
-          <View style={[styles.section, { backgroundColor: cardColor }]}>
-            <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>Notifications</ThemedText>
-            
-            <View style={styles.settingRow}>
-              <ThemedText>Enable Notifications</ThemedText>
-              <Switch
-                value={notificationsEnabled}
-                onValueChange={setNotificationsEnabled}
-                trackColor={{ false: '#767577', true: tintColor }}
-                thumbColor={'#f4f3f4'}
-                ios_backgroundColor="#3e3e3e"
-              />
+            {/* API Endpoints Section */}
+            <View style={[styles.section, { backgroundColor: cardColor }]}>
+              <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>API Endpoints</ThemedText>
+              
+              {loading ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="small" color={tintColor} />
+                  <ThemedText>Loading preferences...</ThemedText>
+                </View>
+              ) : (
+                preferences
+                  .filter(pref => pref.key.includes('api_url'))
+                  .map(pref => renderPreferenceItem(pref))
+              )}
             </View>
-          </View>
 
-          {/* About Section */}
-          <View style={[styles.section, { backgroundColor: cardColor }]}>
-            <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>About</ThemedText>
-            
-            <View style={styles.aboutInfo}>
-              <ThemedText>Beer Selector</ThemedText>
-              <ThemedText style={styles.versionText}>Version 1.0.0</ThemedText>
+            {/* About Section */}
+            <View style={[styles.section, { backgroundColor: cardColor }]}>
+              <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>About</ThemedText>
+              
+              <View style={styles.aboutInfo}>
+                <ThemedText>Beer Selector</ThemedText>
+                <ThemedText style={styles.versionText}>Version 1.0.0 (Build 2)</ThemedText>
+              </View>
             </View>
-          </View>
 
-          {/* Data Management Section */}
-          <View style={[styles.section, { backgroundColor: cardColor }]}>
-            <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>Data Management</ThemedText>
-            
-            <View style={styles.buttonContainer}>
-              <TouchableOpacity 
-                style={[
-                  styles.dataButton, 
-                  { 
-                    backgroundColor: refreshing ? '#FF8888' : '#FF3B30',
-                    borderColor: borderColor
-                  }
-                ]}
-                onPress={handleRefresh}
-                disabled={refreshing}
-              >
-                <ThemedText style={styles.dataButtonText}>
-                  {refreshing ? 'Refreshing data...' : 'Refresh All Beer Data'}
-                </ThemedText>
-              </TouchableOpacity>
+            {/* Data Management Section */}
+            <View style={[styles.section, { backgroundColor: cardColor }]}>
+              <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>Data Management</ThemedText>
+              
+              <View style={styles.buttonContainer}>
+                <TouchableOpacity 
+                  style={[
+                    styles.dataButton, 
+                    { 
+                      backgroundColor: refreshing ? '#FF8888' : '#FF3B30',
+                      borderColor: borderColor
+                    }
+                  ]}
+                  onPress={handleRefresh}
+                  disabled={refreshing}
+                >
+                  <ThemedText style={styles.dataButtonText}>
+                    {refreshing ? 'Refreshing data...' : 'Refresh All Beer Data'}
+                  </ThemedText>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-        </View>
+        </ScrollView>
       </SafeAreaView>
     </ThemedView>
   );
@@ -139,6 +169,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   safeArea: {
+    flex: 1,
+  },
+  scrollView: {
     flex: 1,
   },
   backButton: {
@@ -157,6 +190,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 16,
     paddingTop: 16,
+    paddingBottom: 30,
   },
   titleSection: {
     marginBottom: 20,
@@ -213,5 +247,30 @@ const styles = StyleSheet.create({
   dataButtonText: {
     color: 'white',
     fontWeight: '600',
+  },
+  loadingContainer: {
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  preferenceItem: {
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderTopWidth: 0.5,
+    borderTopColor: '#CCCCCC',
+  },
+  preferenceKey: {
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  preferenceDescription: {
+    fontSize: 12,
+    opacity: 0.7,
+    marginBottom: 4,
+  },
+  preferenceValue: {
+    fontSize: 12,
+    opacity: 0.9,
+    marginVertical: 4,
   },
 }); 

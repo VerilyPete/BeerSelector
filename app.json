@@ -10,7 +10,7 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.yourcompany.beerselector",
+      "bundleIdentifier": "org.verily.FSbeerselector",
       "deploymentTarget": "18.2",
       "buildNumber": "2",
       "infoPlist": {

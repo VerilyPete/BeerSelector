@@ -62,10 +62,120 @@ export const setupDatabase = async (): Promise<void> => {
       )
     `);
     
+    // Create preferences table to store API endpoints and other preferences
+    await database.execAsync(`
+      CREATE TABLE IF NOT EXISTS preferences (
+        key TEXT PRIMARY KEY,
+        value TEXT,
+        description TEXT
+      )
+    `);
+    
+    // Initialize preferences with API endpoints if they don't exist
+    await initializePreferences(database);
+    
     console.log('Database setup complete');
   } catch (error) {
     console.error('Error setting up database:', error);
     throw error;
+  }
+};
+
+// Initialize preferences with default values
+const initializePreferences = async (database: SQLite.SQLiteDatabase): Promise<void> => {
+  try {
+    // Check if preferences already exist
+    const count = await database.getFirstAsync<{ count: number }>('SELECT COUNT(*) as count FROM preferences');
+    
+    // Only add default preferences if the table is empty
+    if (!count || count.count === 0) {
+      const preferences = [
+        {
+          key: 'all_beers_api_url',
+          value: 'https://fsbs.beerknurd.com/bk-store-json.php?sid=13879',
+          description: 'API endpoint for fetching all beers'
+        },
+        {
+          key: 'my_beers_api_url',
+          value: 'https://fsbs.beerknurd.com/bk-member-json.php?uid=484587',
+          description: 'API endpoint for fetching my beers'
+        }
+      ];
+      
+      // Insert default preferences
+      for (const pref of preferences) {
+        await database.runAsync(
+          'INSERT OR IGNORE INTO preferences (key, value, description) VALUES (?, ?, ?)',
+          [pref.key, pref.value, pref.description]
+        );
+      }
+      
+      console.log('Default preferences initialized');
+    }
+  } catch (error) {
+    console.error('Error initializing preferences:', error);
+    throw error;
+  }
+};
+
+// Helper functions to get and set preferences
+export const getPreference = async (key: string): Promise<string | null> => {
+  const database = await initDatabase();
+  
+  try {
+    const result = await database.getFirstAsync<{ value: string }>(
+      'SELECT value FROM preferences WHERE key = ?',
+      [key]
+    );
+    
+    return result ? result.value : null;
+  } catch (error) {
+    console.error(`Error getting preference ${key}:`, error);
+    return null;
+  }
+};
+
+export const setPreference = async (key: string, value: string, description?: string): Promise<void> => {
+  const database = await initDatabase();
+  
+  try {
+    // If description is provided, update it; otherwise just update the value
+    if (description) {
+      await database.runAsync(
+        'INSERT OR REPLACE INTO preferences (key, value, description) VALUES (?, ?, ?)',
+        [key, value, description]
+      );
+    } else {
+      // Get the existing description if available
+      const existing = await database.getFirstAsync<{ description: string }>(
+        'SELECT description FROM preferences WHERE key = ?',
+        [key]
+      );
+      
+      await database.runAsync(
+        'INSERT OR REPLACE INTO preferences (key, value, description) VALUES (?, ?, ?)',
+        [key, value, existing?.description || '']
+      );
+    }
+  } catch (error) {
+    console.error(`Error setting preference ${key}:`, error);
+    throw error;
+  }
+};
+
+// Get all preferences from the database
+export const getAllPreferences = async (): Promise<Array<{ key: string, value: string, description: string }>> => {
+  const database = await initDatabase();
+  
+  try {
+    const preferences = await database.getAllAsync<{ key: string, value: string, description: string }>(
+      'SELECT key, value, description FROM preferences ORDER BY key'
+    );
+    
+    return preferences || [];
+  } catch (error) {
+    console.error('Error getting all preferences:', error);
+    return [];
   }
 };
 
@@ -93,7 +203,14 @@ const fetchWithRetry = async (url: string, retries = 3, delay = 1000): Promise<a
 // Fetch beers from API
 export const fetchBeersFromAPI = async (): Promise<any[]> => {
   try {
-    const data = await fetchWithRetry('https://fsbs.beerknurd.com/bk-store-json.php?sid=13879');
+    // Get the API endpoint from preferences
+    const apiUrl = await getPreference('all_beers_api_url');
+    
+    if (!apiUrl) {
+      throw new Error('All beers API URL not found in preferences');
+    }
+    
+    const data = await fetchWithRetry(apiUrl);
     
     // Extract the brewInStock array from the response
     // The API returns an array where the second element contains the brewInStock array
@@ -243,7 +360,14 @@ export const initializeBeerDatabase = async (): Promise<void> => {
 // Fetch My Beers from API
 export const fetchMyBeersFromAPI = async (): Promise<any[]> => {
   try {
-    const data = await fetchWithRetry('https://fsbs.beerknurd.com/bk-member-json.php?uid=484587');
+    // Get the API endpoint from preferences
+    const apiUrl = await getPreference('my_beers_api_url');
+    
+    if (!apiUrl) {
+      throw new Error('My beers API URL not found in preferences');
+    }
+    
+    const data = await fetchWithRetry(apiUrl);
     
     // Extract the tasted_brew_current_round array from the response
     if (data && Array.isArray(data) && data.length >= 2 && data[1] && data[1].tasted_brew_current_round) {
