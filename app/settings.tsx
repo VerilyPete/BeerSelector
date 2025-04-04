@@ -1,5 +1,5 @@
-import React from 'react';
-import { StyleSheet, TouchableOpacity, View, Switch } from 'react-native';
+import React, { useState } from 'react';
+import { StyleSheet, TouchableOpacity, View, Switch, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { router } from 'expo-router';
@@ -9,17 +9,42 @@ import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { refreshAllDataFromAPI } from '@/src/database/db';
 
 export default function SettingsScreen() {
   const backgroundColor = useThemeColor({}, 'background');
   const cardColor = useThemeColor({ light: '#F5F5F5', dark: '#1C1C1E' }, 'background');
   const tintColor = useThemeColor({}, 'tint');
   const textColor = useThemeColor({}, 'text');
+  const borderColor = useThemeColor({ light: '#e0e0e0', dark: '#333' }, 'text');
   const colorScheme = useColorScheme() ?? 'light';
 
   // Example state for settings
   const [draftFilterEnabled, setDraftFilterEnabled] = React.useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = React.useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Function to handle refreshing all data from APIs
+  const handleRefresh = async () => {
+    try {
+      setRefreshing(true);
+      
+      // Perform the refresh of both tables
+      const refreshResult = await refreshAllDataFromAPI();
+      
+      // Show success message
+      Alert.alert(
+        'Success', 
+        `Successfully refreshed:\n- ${refreshResult.allBeers.length} beers\n- ${refreshResult.myBeers.length} tasted beers`
+      );
+    } catch (err) {
+      console.error('Failed to refresh data:', err);
+      Alert.alert('Error', 'Failed to refresh data from server. Please try again later.');
+    } finally {
+      // Set refreshing to false at the end, in both success and error cases
+      setRefreshing(false);
+    }
+  };
 
   return (
     <ThemedView style={styles.container}>
@@ -78,6 +103,29 @@ export default function SettingsScreen() {
             <View style={styles.aboutInfo}>
               <ThemedText>Beer Selector</ThemedText>
               <ThemedText style={styles.versionText}>Version 1.0.0</ThemedText>
+            </View>
+          </View>
+
+          {/* Data Management Section */}
+          <View style={[styles.section, { backgroundColor: cardColor }]}>
+            <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>Data Management</ThemedText>
+            
+            <View style={styles.buttonContainer}>
+              <TouchableOpacity 
+                style={[
+                  styles.dataButton, 
+                  { 
+                    backgroundColor: refreshing ? '#FF8888' : '#FF3B30',
+                    borderColor: borderColor
+                  }
+                ]}
+                onPress={handleRefresh}
+                disabled={refreshing}
+              >
+                <ThemedText style={styles.dataButtonText}>
+                  {refreshing ? 'Refreshing data...' : 'Refresh All Beer Data'}
+                </ThemedText>
+              </TouchableOpacity>
             </View>
           </View>
         </View>
@@ -143,5 +191,27 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontSize: 12,
     opacity: 0.7,
+  },
+  buttonContainer: {
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderTopWidth: 0.5,
+    borderTopColor: '#CCCCCC',
+  },
+  dataButton: {
+    padding: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 8,
+    width: '60%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  dataButtonText: {
+    color: 'white',
+    fontWeight: '600',
   },
 }); 

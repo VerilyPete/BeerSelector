@@ -146,7 +146,9 @@ export const BeerList = () => {
         beer.brew_style && 
         (beer.brew_style.toLowerCase().includes('porter') || 
          beer.brew_style.toLowerCase().includes('stout') || 
-         beer.brew_style.toLowerCase().includes('barleywine'))
+         beer.brew_style.toLowerCase().includes('barleywine') ||
+         beer.brew_style.toLowerCase().includes('quad') ||
+         beer.brew_style.toLowerCase().includes('tripel'))
       );
     }
 
@@ -353,14 +355,12 @@ export const BeerList = () => {
               IPA
             </ThemedText>
           </TouchableOpacity>
-        </View>
-
-        <View style={styles.sortContainer}>
+          
           <TouchableOpacity
             style={[
-              styles.sortButton,
+              styles.filterButton,
               {
-                backgroundColor: sortBy === 'name' ? activeBgColor : inactiveButtonColor,
+                backgroundColor: inactiveButtonColor,
               },
             ]}
             onPress={toggleSortOption}
@@ -370,34 +370,11 @@ export const BeerList = () => {
               style={[
                 styles.filterButtonText,
                 {
-                  color: sortBy === 'name' ? buttonTextColor : inactiveButtonTextColor,
+                  color: inactiveButtonTextColor,
                 },
               ]}
             >
-              {sortBy === 'name' ? 'Sorting: Name' : 'Sorting: Date'}
-            </ThemedText>
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={[
-              styles.sortButton, 
-              { 
-                backgroundColor: inactiveButtonColor,
-                borderWidth: 1,
-                borderColor: borderColor,
-                marginLeft: 8,
-              }
-            ]}
-            onPress={handleRefresh}
-            disabled={refreshing}
-          >
-            <ThemedText style={[
-              styles.filterButtonText, 
-              { 
-                color: inactiveButtonTextColor 
-              }
-            ]}>
-              {refreshing ? 'Refreshing...' : 'Refresh Data'}
+              {sortBy === 'name' ? 'Sort: Name' : 'Sort: Date'}
             </ThemedText>
           </TouchableOpacity>
         </View>
@@ -465,24 +442,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginBottom: 8,
   },
-  sortContainer: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-  },
   filterButton: {
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 20,
     marginRight: 8,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  sortButton: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 16,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.2,
     shadowRadius: 2,
