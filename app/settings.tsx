@@ -374,22 +374,8 @@ export default function SettingsScreen() {
               </View>
             )}
             
-            {/* API Endpoints Section */}
-            <View style={[styles.section, { backgroundColor: cardColor }]}>
-              <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>API Endpoints</ThemedText>
-              
-              {loading ? (
-                <View style={styles.loadingContainer}>
-                  <ActivityIndicator size="small" color={tintColor} />
-                  <ThemedText>Loading preferences...</ThemedText>
-                </View>
-              ) : (
-                preferences
-                  .filter(pref => pref.key.includes('api_url'))
-                  .map(pref => renderPreferenceItem(pref))
-              )}
-            </View>
-
+            {/* API Endpoints Section - Removed from the UI */}
+            
             {/* About Section */}
             <View style={[styles.section, { backgroundColor: cardColor }]}>
               <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>About</ThemedText>
