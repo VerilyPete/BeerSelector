@@ -138,10 +138,12 @@ const styles = StyleSheet.create({
   },
   settingsButton: {
     position: 'absolute',
-    top: 20,
+    top: 50,
     right: 20,
-    padding: 8,
+    padding: 12,
     zIndex: 1,
+    backgroundColor: 'rgba(200, 200, 200, 0.3)',
+    borderRadius: 30,
   },
   loginPrompt: {
     marginBottom: 40,
@@ -203,7 +205,7 @@ export default function HomeScreen() {
           style={styles.settingsButton}
           onPress={() => router.navigate('/settings')}
         >
-          <IconSymbol name="gear" size={24} color={buttonColor} />
+          <IconSymbol name="gear" size={28} color={buttonColor} />
         </TouchableOpacity>
         
         <ThemedText type="title" style={styles.welcomeTitle}>Welcome to Beer Selector</ThemedText>
