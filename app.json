@@ -11,7 +11,11 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.yourcompany.beerselector",
-      "deploymentTarget": "18.2"
+      "deploymentTarget": "18.2",
+      "buildNumber": "2",
+      "infoPlist": {
+        "UIBackgroundModes": []
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -45,7 +49,8 @@
         "expo-sqlite",
         {
           "databaseName": "beers.db",
-          "migrationMode": "compatibility"
+          "migrationMode": "compatibility",
+          "useSystemImplementation": false
         }
       ],
       [

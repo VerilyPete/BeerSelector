@@ -283,11 +283,11 @@ export const MyBeerList = () => {
           searchText={searchText}
           onSearchChange={handleSearchChange}
           onClear={clearSearch}
-          placeholder="Search my beers..."
+          placeholder="Search available beers..."
         />
         <View style={styles.beerCountContainer}>
           <ThemedText style={styles.beerCount}>
-            {displayedBeers.length} {displayedBeers.length === 1 ? 'beer' : 'beers'} in my collection
+            {displayedBeers.length} {displayedBeers.length === 1 ? 'beer' : 'beers'} available
           </ThemedText>
         </View>
         <View style={styles.filterContainer}>
