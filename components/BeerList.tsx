@@ -143,7 +143,8 @@ export const BeerList = () => {
     if (isDraftOnly) {
       filtered = filtered.filter(beer => 
         beer.brew_container && 
-        beer.brew_container.toLowerCase().includes('draught')
+        (beer.brew_container.toLowerCase().includes('draught') ||
+        beer.brew_container.toLowerCase().includes('draft'))
       );
     }
 
