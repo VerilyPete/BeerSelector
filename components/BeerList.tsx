@@ -10,6 +10,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { SearchBar } from './SearchBar';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useBottomTabOverflow } from '@/components/ui/TabBarBackground';
+import { IconSymbol } from './ui/IconSymbol';
 
 type Beer = {
   id: string;
@@ -48,6 +49,7 @@ export const BeerList = () => {
   const activeButtonColor = useThemeColor({}, 'tint');
   const inactiveButtonColor = useThemeColor({ light: '#E5E5E5', dark: '#2C2C2E' }, 'background');
   const inactiveButtonTextColor = useThemeColor({ light: '#333333', dark: '#EFEFEF' }, 'text');
+  const textColor = useThemeColor({}, 'text');
   
   // Define all derived values outside of hooks and render methods
   const buttonTextColor = colorScheme === 'dark' && (isDraftOnly || isHeaviesOnly || isIpaOnly || sortBy === 'name') ? '#000000' : 'white';
@@ -123,7 +125,7 @@ export const BeerList = () => {
     }
     
     setDisplayedBeers(sortedBeers);
-  }, [sortBy]);
+  }, [sortBy, allBeers]);
 
   // Filter beers when any filter changes or search text changes
   useEffect(() => {
@@ -166,21 +168,10 @@ export const BeerList = () => {
       );
     }
 
-    // Apply sorting
-    if (sortBy === 'name') {
-      filtered.sort((a, b) => (a.brew_name || '').localeCompare(b.brew_name || ''));
-    } else {
-      filtered.sort((a, b) => {
-        const dateA = parseInt(a.added_date || '0', 10);
-        const dateB = parseInt(b.added_date || '0', 10);
-        return dateB - dateA; // Descending order
-      });
-    }
-
     setDisplayedBeers(filtered);
     // Reset expanded item when filter changes
     setExpandedId(null);
-  }, [isDraftOnly, isHeaviesOnly, isIpaOnly, allBeers, sortBy, searchText]);
+  }, [isDraftOnly, isHeaviesOnly, isIpaOnly, allBeers, searchText]);
 
   const toggleDraftFilter = () => {
     setIsDraftOnly(!isDraftOnly);
@@ -364,25 +355,19 @@ export const BeerList = () => {
           </TouchableOpacity>
           
           <TouchableOpacity
-            style={[
-              styles.filterButton,
-              {
-                backgroundColor: inactiveButtonColor,
-              },
-            ]}
+            style={styles.sortButton}
             onPress={toggleSortOption}
             activeOpacity={0.7}
           >
-            <ThemedText
-              style={[
-                styles.filterButtonText,
-                {
-                  color: inactiveButtonTextColor,
-                },
-              ]}
-            >
-              {sortBy === 'name' ? 'Sort: Name' : 'Sort: Date'}
+            <ThemedText style={styles.sortButtonText}>
+              Sort by: {sortBy === 'date' ? 'Name' : 'Date'}
             </ThemedText>
+            <IconSymbol
+              name={sortBy === 'date' ? 'textformat' : 'calendar'}
+              size={16}
+              color={textColor}
+              style={styles.sortIcon}
+            />
           </TouchableOpacity>
         </View>
       </View>
@@ -533,5 +518,20 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     textAlign: 'center',
+  },
+  sortButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(150, 150, 150, 0.1)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  sortButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  sortIcon: {
+    marginLeft: 8,
   },
 }); 
