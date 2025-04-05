@@ -11,6 +11,22 @@ let dbOperationInProgress = false;
 // Simple database lock to prevent concurrent operations
 let lockTimeoutId: NodeJS.Timeout | null = null;
 
+// Track if database has been initialized
+let databaseInitialized = false;
+
+// Track if database setup has been completed
+let databaseSetupComplete = false;
+
+// Track if My Beers import has been scheduled
+let myBeersImportScheduled = false;
+
+// Track if My Beers fetch/import is in progress or complete
+let myBeersImportInProgress = false;
+let myBeersImportComplete = false;
+
+// Track if setupDatabase is in progress
+let setupDatabaseInProgress = false;
+
 // Initialize database
 export const initDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
   if (db) return db;
@@ -26,58 +42,85 @@ export const initDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
 
 // Create tables if they don't exist
 export const setupDatabase = async (): Promise<void> => {
-  const database = await initDatabase();
+  // Prevent multiple simultaneous calls
+  if (setupDatabaseInProgress) {
+    console.log('Database setup already in progress, waiting...');
+    // Wait for the setup to complete
+    let attempts = 0;
+    while (setupDatabaseInProgress && attempts < 10) {
+      await new Promise(resolve => setTimeout(resolve, 200));
+      attempts++;
+    }
+    
+    if (databaseSetupComplete) {
+      console.log('Database setup completed while waiting');
+      return;
+    }
+    
+    if (setupDatabaseInProgress) {
+      console.warn('Timed out waiting for database setup to complete');
+    }
+  }
+  
+  setupDatabaseInProgress = true;
   
   try {
-    await database.execAsync(`
-      CREATE TABLE IF NOT EXISTS allbeers (
-        id TEXT PRIMARY KEY,
-        added_date TEXT,
-        brew_name TEXT,
-        brewer TEXT,
-        brewer_loc TEXT,
-        brew_style TEXT,
-        brew_container TEXT,
-        review_count TEXT,
-        review_rating TEXT,
-        brew_description TEXT
-      )
-    `);
+    const database = await initDatabase();
+    
+    try {
+      await database.execAsync(`
+        CREATE TABLE IF NOT EXISTS allbeers (
+          id TEXT PRIMARY KEY,
+          added_date TEXT,
+          brew_name TEXT,
+          brewer TEXT,
+          brewer_loc TEXT,
+          brew_style TEXT,
+          brew_container TEXT,
+          review_count TEXT,
+          review_rating TEXT,
+          brew_description TEXT
+        )
+      `);
 
-    // Create the table for My Beers (tasted beers)
-    await database.execAsync(`
-      CREATE TABLE IF NOT EXISTS tasted_brew_current_round (
-        id TEXT PRIMARY KEY,
-        roh_lap TEXT,
-        tasted_date TEXT,
-        brew_name TEXT,
-        brewer TEXT,
-        brewer_loc TEXT,
-        brew_style TEXT,
-        brew_container TEXT,
-        review_count TEXT,
-        review_ratings TEXT,
-        brew_description TEXT,
-        chit_code TEXT
-      )
-    `);
-    
-    // Create preferences table to store API endpoints and other preferences
-    await database.execAsync(`
-      CREATE TABLE IF NOT EXISTS preferences (
-        key TEXT PRIMARY KEY,
-        value TEXT,
-        description TEXT
-      )
-    `);
-    
-    // Initialize preferences with API endpoints if they don't exist
-    await initializePreferences(database);
-    
-    console.log('Database setup complete');
-  } catch (error) {
-    console.error('Error setting up database:', error);
-    throw error;
+      // Create the table for My Beers (tasted beers)
+      await database.execAsync(`
+        CREATE TABLE IF NOT EXISTS tasted_brew_current_round (
+          id TEXT PRIMARY KEY,
+          roh_lap TEXT,
+          tasted_date TEXT,
+          brew_name TEXT,
+          brewer TEXT,
+          brewer_loc TEXT,
+          brew_style TEXT,
+          brew_container TEXT,
+          review_count TEXT,
+          review_ratings TEXT,
+          brew_description TEXT,
+          chit_code TEXT
+        )
+      `);
+      
+      // Create preferences table to store API endpoints and other preferences
+      await database.execAsync(`
+        CREATE TABLE IF NOT EXISTS preferences (
+          key TEXT PRIMARY KEY,
+          value TEXT,
+          description TEXT
+        )
+      `);
+      
+      // Initialize preferences with API endpoints if they don't exist
+      await initializePreferences(database);
+      
+      console.log('Database setup complete');
+      databaseSetupComplete = true;
+    } catch (error) {
+      console.error('Error setting up database:', error);
+      throw error;
+    }
+  } finally {
+    setupDatabaseInProgress = false;
   }
 };
 
@@ -336,8 +379,20 @@ export const populateBeersTable = async (beers: any[]): Promise<void> => {
 
 // Initialize the database on app startup
 export const initializeBeerDatabase = async (): Promise<void> => {
+  // Skip if already initialized
+  if (databaseInitialized) {
+    console.log('Database already initialized, skipping');
+    return;
+  }
+
   try {
-    await setupDatabase();
+    // Only run setupDatabase if it hasn't been completed
+    if (!databaseSetupComplete) {
+      await setupDatabase();
+      databaseSetupComplete = true;
+    } else {
+      console.log('Database setup already completed, skipping');
+    }
     
     // Check if API URLs are set
     const allBeersApiUrl = await getPreference('all_beers_api_url');
@@ -360,7 +415,8 @@ export const initializeBeerDatabase = async (): Promise<void> => {
     }
     
     // Run this after a short delay only if we have the My Beers API URL
-    if (myBeersApiUrl) {
+    if (myBeersApiUrl && !myBeersImportScheduled) {
+      myBeersImportScheduled = true;
       setTimeout(async () => {
         try {
           await fetchAndPopulateMyBeers();
@@ -370,8 +426,11 @@ export const initializeBeerDatabase = async (): Promise<void> => {
         }
       }, 1000);
     } else {
-      console.log('Skipping My Beers initialization - API URL not set');
+      console.log('Skipping My Beers initialization - API URL not set or import already scheduled');
     }
+    
+    // Mark database as initialized
+    databaseInitialized = true;
   } catch (error) {
     console.error('Error initializing beer database:', error);
     throw error;
@@ -464,13 +523,28 @@ export const populateMyBeersTable = async (beers: any[]): Promise<void> => {
 
 // Fetch and populate My Beers
 export const fetchAndPopulateMyBeers = async (): Promise<void> => {
+  // Skip if we're already doing this operation or it's already complete
+  if (myBeersImportInProgress) {
+    console.log('My Beers import already in progress, skipping duplicate request');
+    return;
+  }
+  
+  if (myBeersImportComplete) {
+    console.log('My Beers import already completed, skipping duplicate request');
+    return;
+  }
+  
   if (!await acquireLock('fetchAndPopulateMyBeers')) {
     throw new Error('Failed to acquire database lock for fetching and populating My Beers');
   }
 
+  myBeersImportInProgress = true;
+  
   try {
     await _refreshMyBeersFromAPIInternal();
+    myBeersImportComplete = true;
   } finally {
+    myBeersImportInProgress = false;
     releaseLock('fetchAndPopulateMyBeers');
   }
 };
@@ -717,8 +791,22 @@ export const getBeersNotInMyBeers = async (): Promise<any[]> => {
   }
 };
 
+// Reset database initialization state (for manual refresh)
+export const resetDatabaseState = (): void => {
+  databaseInitialized = false;
+  databaseSetupComplete = false;
+  myBeersImportScheduled = false;
+  myBeersImportInProgress = false;
+  myBeersImportComplete = false;
+  setupDatabaseInProgress = false;
+  console.log('Database state flags reset');
+};
+
 // Refresh all data from APIs (both all beers and my beers)
 export const refreshAllDataFromAPI = async (): Promise<{ allBeers: any[], myBeers: any[] }> => {
+  // Reset database state to allow full refresh
+  resetDatabaseState();
+  
   if (!await acquireLock('refreshAllDataFromAPI')) {
     throw new Error('Failed to acquire database lock for refreshing all data');
   }
