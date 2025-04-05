@@ -326,9 +326,7 @@ export const TastedBrewList = () => {
   };
 
   return (
-    <ThemedView style={styles.container}>
-      {renderFilterButtons()}
-      
+    <View style={styles.container}>
       {loading ? (
         <LoadingIndicator />
       ) : error ? (
@@ -338,37 +336,43 @@ export const TastedBrewList = () => {
             <ThemedText>Retry</ThemedText>
           </TouchableOpacity>
         </View>
-      ) : displayedBeers.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <ThemedText style={styles.emptyText}>
-            {searchText
-              ? "No tasted beers match your search criteria."
-              : "No tasted beers found. Please check your connection and try again."}
-          </ThemedText>
-        </View>
       ) : (
-        <FlatList
-          data={displayedBeers}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => renderBeerItem(item)}
-          contentContainerStyle={[
-            styles.listContent,
-            { paddingBottom: tabBarHeight + insets.bottom + tabOverflow }
-          ]}
-          refreshing={refreshing}
-          onRefresh={handleRefresh}
-          initialNumToRender={10}
-          maxToRenderPerBatch={10}
-          windowSize={10}
-        />
+        <View style={{ flex: 1 }}>
+          {renderFilterButtons()}
+          
+          {displayedBeers.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <ThemedText style={styles.emptyText}>
+                {searchText
+                  ? "No tasted beers match your search criteria."
+                  : "No tasted beers found. Please check your connection and try again."}
+              </ThemedText>
+            </View>
+          ) : (
+            <View style={{ flex: 1, paddingBottom: tabBarHeight + 10 }}>
+              <FlatList
+                data={displayedBeers}
+                keyExtractor={(item) => item.id}
+                renderItem={({ item }) => renderBeerItem(item)}
+                contentContainerStyle={styles.listContent}
+                refreshing={refreshing}
+                onRefresh={handleRefresh}
+                initialNumToRender={10}
+                maxToRenderPerBatch={10}
+                windowSize={10}
+              />
+            </View>
+          )}
+        </View>
       )}
-    </ThemedView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: 'transparent',
   },
   listContent: {
     paddingHorizontal: 16,
@@ -411,10 +415,10 @@ const styles = StyleSheet.create({
   },
   filtersContainer: {
     marginBottom: 16,
-    paddingHorizontal: 16,
   },
   beerCountContainer: {
     marginBottom: 8,
+    paddingHorizontal: 16,
   },
   beerCount: {
     fontWeight: '600',
@@ -423,6 +427,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'flex-start',
     marginBottom: 8,
+    paddingHorizontal: 16,
   },
   sortButton: {
     flexDirection: 'row',

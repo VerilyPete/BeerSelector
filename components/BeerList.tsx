@@ -375,7 +375,7 @@ export const BeerList = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'right', 'left']}>
+    <View style={styles.container}>
       {loading ? (
         <LoadingIndicator />
       ) : error ? (
@@ -393,6 +393,7 @@ export const BeerList = () => {
       ) : (
         <View style={{ flex: 1 }}>
           {renderFilterButtons()}
+          
           {displayedBeers.length === 0 ? (
             <View style={styles.centered}>
               <ThemedText style={styles.noBeersText}>
@@ -415,7 +416,7 @@ export const BeerList = () => {
           )}
         </View>
       )}
-    </SafeAreaView>
+    </View>
   );
 };
 
@@ -429,6 +430,7 @@ const styles = StyleSheet.create({
   },
   beerCountContainer: {
     marginBottom: 8,
+    paddingHorizontal: 16,
   },
   beerCount: {
     fontWeight: '600',
@@ -436,6 +438,7 @@ const styles = StyleSheet.create({
   filterContainer: {
     flexDirection: 'row',
     marginBottom: 8,
+    paddingHorizontal: 16,
   },
   filterButton: {
     paddingVertical: 8,
