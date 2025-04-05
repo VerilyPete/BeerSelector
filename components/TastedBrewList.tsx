@@ -292,11 +292,23 @@ export const TastedBrewList = () => {
 
   const renderFilterButtons = () => {
     return (
-      <View style={styles.filterContainer}>
-        <View style={styles.filterRow}>
+      <View style={styles.filtersContainer}>
+        <SearchBar 
+          searchText={searchText}
+          onSearchChange={handleSearchChange}
+          onClear={clearSearch}
+          placeholder="Search tasted beers..."
+        />
+        <View style={styles.beerCountContainer}>
+          <ThemedText style={styles.beerCount}>
+            {displayedBeers.length} {displayedBeers.length === 1 ? 'beer' : 'beers'} tasted
+          </ThemedText>
+        </View>
+        <View style={styles.filterContainer}>
           <TouchableOpacity
             style={styles.sortButton}
             onPress={toggleSortOption}
+            activeOpacity={0.7}
           >
             <ThemedText style={styles.sortButtonText}>
               Sort by: {sortBy === 'date' ? 'Name' : 'Date'}
@@ -313,33 +325,25 @@ export const TastedBrewList = () => {
     );
   };
 
-  if (loading) {
-    return <LoadingIndicator />;
-  }
-
-  if (error) {
-    return (
-      <View style={styles.errorContainer}>
-        <ThemedText style={styles.errorText}>{error}</ThemedText>
-      </View>
-    );
-  }
-
   return (
     <ThemedView style={styles.container}>
-      <SearchBar 
-        searchText={searchText}
-        onSearchChange={handleSearchChange}
-        onClear={clearSearch}
-        placeholder="Search tasted brews..." 
-      />
-      
       {renderFilterButtons()}
       
-      {displayedBeers.length === 0 ? (
+      {loading ? (
+        <LoadingIndicator />
+      ) : error ? (
+        <View style={styles.errorContainer}>
+          <ThemedText style={styles.errorText}>{error}</ThemedText>
+          <TouchableOpacity onPress={loadBeers}>
+            <ThemedText>Retry</ThemedText>
+          </TouchableOpacity>
+        </View>
+      ) : displayedBeers.length === 0 ? (
         <View style={styles.emptyContainer}>
           <ThemedText style={styles.emptyText}>
-            No tasted brews found. Pull down to refresh.
+            {searchText
+              ? "No tasted beers match your search criteria."
+              : "No tasted beers found. Please check your connection and try again."}
           </ThemedText>
         </View>
       ) : (
@@ -405,15 +409,20 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
   },
-  filterContainer: {
+  filtersContainer: {
+    marginBottom: 16,
     paddingHorizontal: 16,
-    paddingBottom: 8,
   },
-  filterRow: {
-    flexDirection: 'row',
+  beerCountContainer: {
     marginBottom: 8,
-    justifyContent: 'flex-end',
-    alignItems: 'center',
+  },
+  beerCount: {
+    fontWeight: '600',
+  },
+  filterContainer: {
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
+    marginBottom: 8,
   },
   sortButton: {
     flexDirection: 'row',
