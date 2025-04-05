@@ -19,64 +19,17 @@ import { areApiUrlsConfigured } from '@/src/database/db';
 
 export function BeerListScreen() {
   const colorScheme = useColorScheme() ?? 'light';
-  const scrollY = useSharedValue(0);
   const backgroundColor = useThemeColor({}, 'background');
-
-  const scrollHandler = useAnimatedScrollHandler({
-    onScroll: (event) => {
-      scrollY.value = event.contentOffset.y;
-    },
-  });
-
-  // Pass this to BeerList to connect the scrolling
-  const renderHeader = () => (
-    <>
-      <View style={[styles.contentContainer, { backgroundColor }]}>
-        <View style={styles.titleContainer}>
-          <ThemedText type="title" style={styles.title}>All Beers</ThemedText>
-        </View>
-      </View>
-    </>
-  );
 
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={{flex: 1}} edges={['top', 'right', 'left']}>
-        <BeerListWithHeader 
-          renderHeader={renderHeader} 
-          onScroll={scrollHandler}
-          backgroundColor={backgroundColor}
-        />
-      </SafeAreaView>
-    </ThemedView>
-  );
-}
-
-// Type definition for the BeerListWithHeader props
-interface BeerListWithHeaderProps {
-  renderHeader: () => React.ReactElement;
-  onScroll: any; // Using 'any' for the Animated onScroll function
-  backgroundColor: string;
-}
-
-// This is a wrapper component that adds a header to the BeerList
-// while keeping FlatList as the primary scrollable container
-function BeerListWithHeader({ renderHeader, onScroll, backgroundColor }: BeerListWithHeaderProps) {
-  return (
-    <Animated.FlatList
-      data={[]} // BeerList will handle its own data
-      renderItem={() => null}
-      ListHeaderComponent={renderHeader}
-      ListFooterComponent={() => (
-        <View style={[styles.beerListContainer, { backgroundColor }]}>
+        <ThemedText type="title" style={styles.title}>All Beers</ThemedText>
+        <View style={{flex: 1}}>
           <BeerList />
         </View>
-      )}
-      onScroll={onScroll}
-      scrollEventThrottle={16}
-      showsVerticalScrollIndicator={false}
-      style={styles.container}
-    />
+      </SafeAreaView>
+    </ThemedView>
   );
 }
 
@@ -92,7 +45,11 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   title: {
-    marginBottom: 0,
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 16,
+    marginTop: 8,
+    marginLeft: 16,
   },
   beerListContainer: {
     flexGrow: 1,

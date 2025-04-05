@@ -380,7 +380,7 @@ export const MyBeerList = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'right', 'left']}>
+    <View style={styles.container}>
       {loading ? (
         <LoadingIndicator />
       ) : error ? (
@@ -420,7 +420,7 @@ export const MyBeerList = () => {
           )}
         </View>
       )}
-    </SafeAreaView>
+    </View>
   );
 };
 
@@ -470,6 +470,7 @@ const styles = StyleSheet.create({
   filterContainer: {
     flexDirection: 'row',
     marginBottom: 8,
+    paddingHorizontal: 16,
   },
   buttonRow: {
     flexDirection: 'row',
@@ -574,6 +575,7 @@ const styles = StyleSheet.create({
   },
   beerCountContainer: {
     marginBottom: 8,
+    paddingHorizontal: 16,
   },
   beerCount: {
     fontWeight: '600',
