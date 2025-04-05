@@ -33,7 +33,7 @@ export function BeerListScreen() {
     <>
       <View style={[styles.contentContainer, { backgroundColor }]}>
         <View style={styles.titleContainer}>
-          <ThemedText type="title" style={styles.title}>Available Beers</ThemedText>
+          <ThemedText type="title" style={styles.title}>All Beers</ThemedText>
         </View>
       </View>
     </>
@@ -216,13 +216,19 @@ export default function HomeScreen() {
           style={[styles.mainButton, { backgroundColor: buttonColor, marginBottom: 16 }]}
           onPress={() => router.navigate('/(tabs)/beerlist')}
         >
-          <Text style={[styles.mainButtonText, { color: buttonTextColor }]}>Browse All Beers</Text>
+          <Text style={[styles.mainButtonText, { color: buttonTextColor }]}>All Beers</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.mainButton, { backgroundColor: buttonColor, marginBottom: 16 }]}
+          onPress={() => router.navigate('/(tabs)/mybeers')}
+        >
+          <Text style={[styles.mainButtonText, { color: buttonTextColor }]}>Beerfinder</Text>
         </TouchableOpacity>
         <TouchableOpacity 
           style={[styles.mainButton, { backgroundColor: buttonColor }]}
-          onPress={() => router.navigate('/(tabs)/mybeers')}
+          onPress={() => router.navigate('/(tabs)/tastedbrews')}
         >
-          <Text style={[styles.mainButtonText, { color: buttonTextColor }]}>My Beers</Text>
+          <Text style={[styles.mainButtonText, { color: buttonTextColor }]}>Tasted Brews</Text>
         </TouchableOpacity>
       </SafeAreaView>
     </ThemedView>
