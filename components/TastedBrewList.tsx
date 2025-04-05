@@ -251,37 +251,39 @@ export const TastedBrewList = () => {
     return (
       <TouchableOpacity 
         key={item.id} 
-        style={styles.card} 
         onPress={() => toggleExpand(item.id)}
-        activeOpacity={0.7}
+        activeOpacity={0.8}
       >
-        <View style={styles.cardHeader}>
-          <ThemedText type="subtitle" style={styles.beerName}>
-            {item.brew_name}
+        <View style={[
+          styles.beerItem, 
+          { 
+            backgroundColor: cardColor,
+            borderColor: borderColor 
+          },
+          isExpanded && styles.expandedItem
+        ]}>
+          <ThemedText type="defaultSemiBold" style={styles.beerName}>
+            {item.brew_name || 'Unnamed Beer'}
           </ThemedText>
-          <ThemedText type="default" style={styles.brewerInfo}>
-            {item.brewer}{item.brewer_loc ? `, ${item.brewer_loc}` : ''}
+          <ThemedText>
+            {item.brewer} {item.brewer_loc ? `• ${item.brewer_loc}` : ''}
           </ThemedText>
-        </View>
-        
-        <View style={styles.cardContent}>
-          <View style={styles.metaInfo}>
-            <ThemedText type="default" style={styles.styleInfo}>
-              {item.brew_style}
-            </ThemedText>
-            <ThemedText type="default" style={styles.containerInfo}>
-              {item.brew_container}
-            </ThemedText>
-          </View>
-          
-          <ThemedText type="default" style={styles.dateInfo}>
+          <ThemedText>
+            {item.brew_style} {item.brew_container ? `• ${item.brew_container}` : ''}
+          </ThemedText>
+          <ThemedText style={styles.dateAdded}>
             Tasted: {formatDate(item.tasted_date)}
           </ThemedText>
           
           {isExpanded && item.brew_description && (
-            <ThemedText type="default" style={styles.description}>
-              {item.brew_description.replace(/<\/?p>/g, '').replace(/<\/?br ?\/?>/, '\n')}
-            </ThemedText>
+            <View style={[styles.descriptionContainer, { borderTopColor: borderColor }]}>
+              <ThemedText type="defaultSemiBold" style={styles.descriptionTitle}>
+                Description:
+              </ThemedText>
+              <ThemedText style={styles.description}>
+                {item.brew_description.replace(/<\/?p>/g, '').replace(/<\/?br ?\/?>/, '\n')}
+              </ThemedText>
+            </View>
           )}
         </View>
       </TouchableOpacity>
@@ -297,10 +299,10 @@ export const TastedBrewList = () => {
             onPress={toggleSortOption}
           >
             <ThemedText style={styles.sortButtonText}>
-              Sort by: {sortBy === 'date' ? 'Date' : 'Name'}
+              Sort by: {sortBy === 'date' ? 'Name' : 'Date'}
             </ThemedText>
             <IconSymbol
-              name={sortBy === 'date' ? 'calendar' : 'textformat'}
+              name={sortBy === 'date' ? 'textformat' : 'calendar'}
               size={16}
               color={textColor}
               style={styles.sortIcon}
@@ -368,53 +370,39 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 8,
   },
-  card: {
-    borderRadius: 12,
-    marginBottom: 16,
+  beerItem: {
     padding: 16,
+    borderRadius: 8,
+    marginBottom: 12,
+    borderWidth: 1,
+    marginHorizontal: 1, // Add small margin to prevent bleed
+  },
+  expandedItem: {
+    elevation: 3,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 2,
-  },
-  cardHeader: {
-    marginBottom: 8,
   },
   beerName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 4,
+    marginBottom: 6,
+    fontSize: 16,
   },
-  brewerInfo: {
-    fontSize: 14,
-    marginBottom: 4,
-  },
-  cardContent: {
-    flex: 1,
-  },
-  metaInfo: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 4,
-  },
-  styleInfo: {
-    fontSize: 14,
-    flex: 2,
-  },
-  containerInfo: {
-    fontSize: 14,
-    flex: 1,
-    textAlign: 'right',
-  },
-  dateInfo: {
-    fontSize: 14,
+  dateAdded: {
     marginTop: 8,
-    fontStyle: 'italic',
+    fontSize: 12,
+    opacity: 0.8,
+  },
+  descriptionContainer: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+  },
+  descriptionTitle: {
+    marginBottom: 6,
   },
   description: {
     fontSize: 14,
-    marginTop: 12,
     lineHeight: 20,
   },
   filterContainer: {

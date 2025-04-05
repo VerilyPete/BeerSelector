@@ -133,7 +133,7 @@ export const MyBeerList = () => {
     }
     
     setDisplayedBeers(sortedBeers);
-  }, [sortBy]);
+  }, [sortBy, availableBeers]);
 
   // Filter beers when any filter changes or search text changes
   useEffect(() => {
@@ -174,21 +174,10 @@ export const MyBeerList = () => {
       );
     }
 
-    // Apply sorting
-    if (sortBy === 'name') {
-      filtered.sort((a, b) => (a.brew_name || '').localeCompare(b.brew_name || ''));
-    } else {
-      filtered.sort((a, b) => {
-        const dateA = parseInt(a.added_date || '0', 10);
-        const dateB = parseInt(b.added_date || '0', 10);
-        return dateB - dateA; // Descending order
-      });
-    }
-
     setDisplayedBeers(filtered);
     // Reset expanded item when filter changes
     setExpandedId(null);
-  }, [isDraftOnly, isHeaviesOnly, isIpaOnly, availableBeers, sortBy, searchText]);
+  }, [isDraftOnly, isHeaviesOnly, isIpaOnly, availableBeers, searchText]);
 
   const toggleDraftFilter = () => {
     setIsDraftOnly(!isDraftOnly);
@@ -376,10 +365,10 @@ export const MyBeerList = () => {
             activeOpacity={0.7}
           >
             <ThemedText style={styles.sortButtonText}>
-              Sort by: {sortBy === 'date' ? 'Date' : 'Name'}
+              Sort by: {sortBy === 'date' ? 'Name' : 'Date'}
             </ThemedText>
             <IconSymbol
-              name={sortBy === 'date' ? 'calendar' : 'textformat'}
+              name={sortBy === 'date' ? 'textformat' : 'calendar'}
               size={16}
               color={textColor}
               style={styles.sortIcon}
