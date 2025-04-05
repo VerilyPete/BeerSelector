@@ -11,6 +11,9 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { initializeBeerDatabase, getPreference, setPreference } from '@/src/database/db';
 
+// Track if database initialization has been started to prevent multiple calls
+let dbInitStarted = false;
+
 // Disable react-devtools connection to port 8097
 if (__DEV__) {
   const originalConsoleError = console.error;
@@ -51,44 +54,64 @@ export default function RootLayout() {
     async function prepare() {
       try {
         // Initialize database with retry mechanism
-        try {
-          await initializeBeerDatabase();
-          console.log('Database initialized successfully');
+        let dbInitialized = false;
+        
+        // Only attempt database initialization if not already started
+        if (!dbInitStarted) {
+          dbInitStarted = true; // Mark as started immediately
           
-          // Check if API URLs are set
-          const allBeersApiUrl = await getPreference('all_beers_api_url');
-          const myBeersApiUrl = await getPreference('my_beers_api_url');
-          const isFirstLaunch = await getPreference('first_launch');
-          
-          // If API URLs are empty or it's first launch, set initial route to settings
-          if ((!allBeersApiUrl || !myBeersApiUrl || isFirstLaunch === 'true') && loaded) {
-            console.log('API URLs not set or first launch, redirecting to settings page');
-            // Mark that it's no longer the first launch
-            if (isFirstLaunch === 'true') {
-              await setPreference('first_launch', 'false', 'Flag indicating if this is the first app launch');
-            }
-            
-            // Set initial route to settings
-            setInitialRoute('/settings');
-            // Navigate immediately to settings
-            router.replace('/settings');
-          } else {
-            // Normal app startup flow
-            setInitialRoute('(tabs)');
-          }
-        } catch (dbError) {
-          console.error('Database initialization failed, retrying once:', dbError);
-          // Wait a moment and try again once
-          await new Promise(resolve => setTimeout(resolve, 1000));
           try {
+            console.log('Initializing database first attempt...');
             await initializeBeerDatabase();
-            console.log('Database initialized successfully on retry');
-            setInitialRoute('(tabs)');
-          } catch (retryError) {
-            console.error('Database initialization failed on retry:', retryError);
-            // Continue anyway - we'll handle database errors in the components
-            setInitialRoute('(tabs)');
+            dbInitialized = true;
+            console.log('Database initialized successfully');
+            
+            // Check if API URLs are set
+            const allBeersApiUrl = await getPreference('all_beers_api_url');
+            const myBeersApiUrl = await getPreference('my_beers_api_url');
+            const isFirstLaunch = await getPreference('first_launch');
+            
+            // If API URLs are empty or it's first launch, set initial route to settings
+            if ((!allBeersApiUrl || !myBeersApiUrl || isFirstLaunch === 'true') && loaded) {
+              console.log('API URLs not set or first launch, redirecting to settings page');
+              // Mark that it's no longer the first launch
+              if (isFirstLaunch === 'true') {
+                await setPreference('first_launch', 'false', 'Flag indicating if this is the first app launch');
+              }
+              
+              // Set initial route to settings
+              setInitialRoute('/settings');
+              // Navigate immediately to settings
+              router.replace('/settings');
+            } else {
+              // Normal app startup flow
+              setInitialRoute('(tabs)');
+            }
+          } catch (dbError) {
+            console.error('Database initialization failed, retrying once:', dbError);
+            
+            if (!dbInitialized) {
+              // Wait a moment and try again once
+              await new Promise(resolve => setTimeout(resolve, 1000));
+              try {
+                console.log('Attempting database initialization retry...');
+                await initializeBeerDatabase();
+                console.log('Database initialized successfully on retry');
+                setInitialRoute('(tabs)');
+              } catch (retryError) {
+                console.error('Database initialization failed on retry:', retryError);
+                // Continue anyway - we'll handle database errors in the components
+                setInitialRoute('(tabs)');
+              }
+            } else {
+              console.log('Database was already initialized but another error occurred');
+              // Database was initialized but something else failed
+              setInitialRoute('(tabs)');
+            }
           }
+        } else {
+          console.log('Database initialization already in progress in another effect, skipping');
+          setInitialRoute('(tabs)');
         }
         
         if (loaded) {
