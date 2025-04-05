@@ -3,14 +3,12 @@ import { StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 
-import { MyBeerList } from '@/components/MyBeerList';
+import { TastedBrewList } from '@/components/TastedBrewList';
 import { ThemedView } from '@/components/ThemedView';
 import { ThemedText } from '@/components/ThemedText';
-import { useThemeColor } from '@/hooks/useThemeColor';
 import { areApiUrlsConfigured } from '@/src/database/db';
 
-export default function MyBeersScreen() {
-  const backgroundColor = useThemeColor({}, 'background');
+export default function TastedBrewsScreen() {
   const [apiUrlsSet, setApiUrlsSet] = useState<boolean | null>(null);
   
   // Check if API URLs are configured on component mount
@@ -42,8 +40,8 @@ export default function MyBeersScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea} edges={['top', 'right', 'left']}>
-        <ThemedText type="title" style={styles.title}>Beerfinder</ThemedText>
-        <MyBeerList />
+        <ThemedText type="title" style={styles.title}>Tasted Brews</ThemedText>
+        <TastedBrewList />
       </SafeAreaView>
     </ThemedView>
   );

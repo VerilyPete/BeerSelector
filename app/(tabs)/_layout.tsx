@@ -36,15 +36,22 @@ export default function TabLayout() {
       <Tabs.Screen
         name="beerlist"
         options={{
-          title: 'Beers',
+          title: 'All Beers',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="mug.fill" color={color} />,
         }}
       />
       <Tabs.Screen
         name="mybeers"
         options={{
-          title: 'My Beers',
+          title: 'Beerfinder',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="star.fill" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="tastedbrews"
+        options={{
+          title: 'Tasted Brews',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="checkmark.circle.fill" color={color} />,
         }}
       />
     </Tabs>
