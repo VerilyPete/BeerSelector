@@ -5,13 +5,16 @@ import { StatusBar } from 'expo-status-bar';
 import { router } from 'expo-router';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import * as WebBrowser from 'expo-web-browser';
-import { WebView, WebViewNavigation } from 'react-native-webview';
+import { WebView, WebViewNavigation, WebViewMessageEvent } from 'react-native-webview';
 
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { refreshAllDataFromAPI, getAllPreferences, setPreference } from '@/src/database/db';
+import { LoadingIndicator } from '@/components/LoadingIndicator';
+import Constants from 'expo-constants';
+import { createMockSession } from '@/src/api/mockSession';
 
 // Define a Preference type for typechecking
 interface Preference {
@@ -116,7 +119,7 @@ export default function SettingsScreen() {
     
     // If we're on the member dashboard page
     if (navState.url.includes('member-dash.php')) {
-      // Inject JavaScript to extract the API URLs
+      // Inject JavaScript to extract the API URLs and cookies
       if (webViewRef.current) {
         webViewRef.current.injectJavaScript(`
           (function() {
@@ -158,13 +161,21 @@ export default function SettingsScreen() {
                 storeJsonUrl = storeJsonMatch[0];
               }
             }
+
+            // Get all cookies
+            const cookies = document.cookie.split(';').reduce((acc, cookie) => {
+              const [key, value] = cookie.trim().split('=');
+              acc[key] = value;
+              return acc;
+            }, {});
             
             // Send the results back to React Native
             window.ReactNativeWebView.postMessage(JSON.stringify({
               type: 'URLs',
               userJsonUrl,
               storeJsonUrl,
-              html: html.substring(0, 1000) // Send a portion of HTML for debugging
+              html: html.substring(0, 1000), // Send a portion of HTML for debugging
+              cookies: cookies
             }));
             
             true; // Return statement needed for Android
@@ -175,64 +186,43 @@ export default function SettingsScreen() {
   };
 
   // Handle messages from WebView
-  const handleWebViewMessage = async (event: {nativeEvent: {data: string}}) => {
+  const handleWebViewMessage = (event: WebViewMessageEvent) => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
-      console.log('Received message from WebView:', data.type);
+      console.log('Received WebView message:', data);
       
       if (data.type === 'URLs') {
-        const { userJsonUrl, storeJsonUrl, html } = data;
-        console.log('Extracted User JSON URL:', userJsonUrl);
-        console.log('Extracted Store JSON URL:', storeJsonUrl);
-        console.log('Sample HTML:', html);
+        const { userJsonUrl, storeJsonUrl, cookies } = data;
         
         if (userJsonUrl && storeJsonUrl) {
-          // Found the URLs, can close the WebView
-          setWebviewVisible(false);
-          setLoginLoading(false);
+          // Update preferences with new API endpoints
+          setPreference('user_json_url', userJsonUrl, 'API endpoint for user data');
+          setPreference('store_json_url', storeJsonUrl, 'API endpoint for store data');
           
-          // Update the preferences with the new URLs
-          await setPreference('my_beers_api_url', userJsonUrl, 'API endpoint for fetching my beers');
-          await setPreference('all_beers_api_url', storeJsonUrl, 'API endpoint for fetching all beers');
+          // Save login timestamp
+          setPreference('last_login_timestamp', new Date().toISOString(), 'Last successful login timestamp');
           
-          // Save the login timestamp
-          const loginTimestamp = new Date().toISOString();
-          await setPreference('last_login_timestamp', loginTimestamp, 'Last successful login timestamp');
+          // Save cookies
+          setPreference('auth_cookies', JSON.stringify(cookies), 'Authentication cookies');
           
-          // Reload the preferences to show updated values
-          await loadPreferences();
+          // Refresh the data
+          handleRefresh();
           
-          // Refresh the data with the new URLs
-          await handleRefresh();
-          
-          // Get the previous value of isFirstLogin to determine navigation behavior
-          const wasFirstLogin = isFirstLogin;
+          // Reload preferences to update the UI
+          loadPreferences();
           
           // Show success message
           Alert.alert(
-            'Success', 
-            'Login successful. API URLs have been updated and beer data has been refreshed.',
-            [
-              {
-                text: 'OK',
-                onPress: () => {
-                  // If this was the first login, navigate to the main tab screen
-                  if (wasFirstLogin) {
-                    router.replace('/(tabs)');
-                  }
-                }
-              }
-            ]
+            'Login Successful',
+            'API URLs have been updated and beer data refreshed.'
           );
-        } else {
-          console.log('URLs not found in injected JavaScript');
-          // Continue browsing - user may need to complete login
+          
+          // Close the WebView
+          setWebviewVisible(false);
         }
       }
     } catch (error) {
       console.error('Error handling WebView message:', error);
-      // Reset loading state in case of error
-      setLoginLoading(false);
     }
   };
 
@@ -280,6 +270,17 @@ export default function SettingsScreen() {
     } catch (error) {
       console.error('Error resetting API URLs:', error);
       Alert.alert('Error', 'Failed to reset API URLs. Please try again.');
+    }
+  };
+
+  // Function to create a mock session for testing (dev only)
+  const handleCreateMockSession = async () => {
+    try {
+      await createMockSession();
+      Alert.alert('Success', 'Mock session created successfully!');
+    } catch (error) {
+      console.error('Failed to create mock session:', error);
+      Alert.alert('Error', 'Failed to create mock session.');
     }
   };
 
@@ -468,6 +469,39 @@ export default function SettingsScreen() {
                 )}
               </View>
             </View>
+
+            {/* Debug Section */}
+            <View style={[styles.section, { backgroundColor: cardColor }]}>
+              <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>Debug Information</ThemedText>
+              
+              <View style={styles.debugContainer}>
+                <ThemedText style={styles.debugTitle}>Authentication Cookies:</ThemedText>
+                {preferences.find(p => p.key === 'auth_cookies')?.value ? (
+                  <View style={styles.cookieContainer}>
+                    <ThemedText style={styles.cookieText}>
+                      {JSON.stringify(JSON.parse(preferences.find(p => p.key === 'auth_cookies')?.value || '{}'), null, 2)}
+                    </ThemedText>
+                  </View>
+                ) : (
+                  <ThemedText style={styles.noCookiesText}>No cookies stored</ThemedText>
+                )}
+              </View>
+            </View>
+
+            {/* Development features - only shown in development */}
+            {Constants.expoConfig?.extra?.NODE_ENV === 'development' && (
+              <View style={styles.section}>
+                <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>Development</ThemedText>
+                
+                <View style={styles.infoContainer}>
+                  <TouchableOpacity style={styles.devButton} onPress={handleCreateMockSession}>
+                    <ThemedText style={styles.buttonText}>
+                      Create Mock Session
+                    </ThemedText>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
           </View>
         </ScrollView>
       </SafeAreaView>
@@ -624,5 +658,51 @@ const styles = StyleSheet.create({
   homeButton: {
     marginTop: 12,
     backgroundColor: '#34C759',
+  },
+  debugContainer: {
+    padding: 12,
+  },
+  debugTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  cookieContainer: {
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    borderRadius: 8,
+    padding: 8,
+  },
+  cookieText: {
+    fontSize: 12,
+    fontFamily: 'SpaceMono',
+  },
+  noCookiesText: {
+    fontSize: 12,
+    fontStyle: 'italic',
+    opacity: 0.7,
+  },
+  devButton: {
+    backgroundColor: '#E91E63',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginVertical: 8,
+  },
+  buttonText: {
+    color: 'white',
+    fontWeight: '600',
+  },
+  infoContainer: {
+    padding: 12,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  button: {
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: '#007AFF',
   },
 }); 

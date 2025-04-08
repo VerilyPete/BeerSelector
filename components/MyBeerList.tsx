@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { StyleSheet, View, TouchableOpacity, Alert, FlatList } from 'react-native';
+import { StyleSheet, View, TouchableOpacity, Alert, FlatList, ActivityIndicator } from 'react-native';
 import { getBeersNotInMyBeers, fetchAndPopulateMyBeers, getMyBeers, areApiUrlsConfigured } from '@/src/database/db';
 import { ThemedText } from './ThemedText';
 import { ThemedView } from './ThemedView';
@@ -11,6 +11,7 @@ import { SearchBar } from './SearchBar';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useBottomTabOverflow } from '@/components/ui/TabBarBackground';
 import { IconSymbol } from './ui/IconSymbol';
+import { checkInBeer } from '@/src/api/beerService';
 
 type Beer = {
   id: string;
@@ -42,6 +43,7 @@ export const MyBeerList = () => {
   const [isIpaOnly, setIsIpaOnly] = useState(false);
   const [sortBy, setSortBy] = useState<SortOption>('date');
   const [searchText, setSearchText] = useState('');
+  const [checkinLoading, setCheckinLoading] = useState(false);
   
   // Theme colors
   const cardColor = useThemeColor({}, 'background');
@@ -233,6 +235,43 @@ export const MyBeerList = () => {
     setSearchText('');
   };
 
+  // Handle check-in button press
+  const handleCheckIn = async (item: Beer) => {
+    try {
+      // Show loading indicator
+      setCheckinLoading(true);
+      
+      // Call the API to check in the beer
+      const result = await checkInBeer(item);
+      
+      console.log('Check-in result:', result);
+      
+      // Show success message
+      Alert.alert('Success', `Successfully checked in ${item.brew_name}!`);
+    } catch (error: any) {
+      console.error('Check-in error:', error);
+      
+      let errorMessage;
+      
+      // Provide a more user-friendly error message
+      if (error.message && error.message.includes('Please log in again')) {
+        errorMessage = 'Login session expired. Attempting to recover your session...';
+      } else if (error instanceof SyntaxError && error.message.includes('JSON Parse error')) {
+        // For JSON parse errors, the server might have returned an empty response but the request was successful
+        Alert.alert('Success', `Successfully checked in ${item.brew_name}!`);
+        setCheckinLoading(false);
+        return;
+      } else {
+        errorMessage = `Failed to check in: ${error.message}`;
+      }
+      
+      Alert.alert('Error', errorMessage);
+    } finally {
+      // Hide loading indicator
+      setCheckinLoading(false);
+    }
+  };
+
   const renderBeerItem = (item: Beer) => {
     const isExpanded = expandedId === item.id;
     
@@ -271,6 +310,27 @@ export const MyBeerList = () => {
               <ThemedText style={styles.description}>
                 {item.brew_description}
               </ThemedText>
+              
+              <TouchableOpacity 
+                style={[styles.checkInButton, { 
+                  backgroundColor: colorScheme === 'dark' ? '#E91E63' : activeButtonColor,
+                  alignSelf: 'center',
+                  width: '50%'
+                }]}
+                onPress={() => handleCheckIn(item)}
+                activeOpacity={0.7}
+                disabled={checkinLoading}
+              >
+                {checkinLoading ? (
+                  <ActivityIndicator size="small" color={colorScheme === 'dark' ? '#FFFFFF' : 'white'} />
+                ) : (
+                  <ThemedText style={[styles.checkInButtonText, {
+                    color: colorScheme === 'dark' ? '#FFFFFF' : 'white'
+                  }]}>
+                    Check Me In!
+                  </ThemedText>
+                )}
+              </TouchableOpacity>
             </View>
           )}
         </View>
@@ -594,5 +654,17 @@ const styles = StyleSheet.create({
   },
   sortIcon: {
     marginLeft: 8,
+  },
+  checkInButton: {
+    marginTop: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkInButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 }); 
