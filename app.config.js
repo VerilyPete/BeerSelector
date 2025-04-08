@@ -10,4 +10,7 @@ module.exports = {
     // Disable React DevTools connection
     reactNativeDevTools: false,
   },
+  plugins: [
+    "expo-secure-store"
+  ]
 }; 
