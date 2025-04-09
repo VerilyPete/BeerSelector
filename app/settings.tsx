@@ -199,6 +199,10 @@ export default function SettingsScreen() {
           setPreference('user_json_url', userJsonUrl, 'API endpoint for user data');
           setPreference('store_json_url', storeJsonUrl, 'API endpoint for store data');
           
+          // Also set the API URLs that are used by the rest of the app
+          setPreference('my_beers_api_url', userJsonUrl, 'API endpoint for fetching my beers');
+          setPreference('all_beers_api_url', storeJsonUrl, 'API endpoint for fetching all beers');
+          
           // Save login timestamp
           setPreference('last_login_timestamp', new Date().toISOString(), 'Last successful login timestamp');
           
@@ -217,12 +221,16 @@ export default function SettingsScreen() {
             'API URLs have been updated and beer data refreshed.'
           );
           
+          // Reset login loading state
+          setLoginLoading(false);
+          
           // Close the WebView
           setWebviewVisible(false);
         }
       }
     } catch (error) {
       console.error('Error handling WebView message:', error);
+      setLoginLoading(false);
     }
   };
 
