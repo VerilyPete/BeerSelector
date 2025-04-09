@@ -218,14 +218,25 @@ export default function SettingsScreen() {
           // Show success message
           Alert.alert(
             'Login Successful',
-            'API URLs have been updated and beer data refreshed.'
+            'API URLs have been updated and beer data refreshed.',
+            [
+              {
+                text: 'OK',
+                onPress: () => {
+                  // Reset login loading state
+                  setLoginLoading(false);
+                  
+                  // Close the WebView
+                  setWebviewVisible(false);
+                  
+                  // Navigate to the main tabs interface
+                  setTimeout(() => {
+                    router.replace('/(tabs)');
+                  }, 300);
+                }
+              }
+            ]
           );
-          
-          // Reset login loading state
-          setLoginLoading(false);
-          
-          // Close the WebView
-          setWebviewVisible(false);
         }
       }
     } catch (error) {
