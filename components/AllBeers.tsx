@@ -312,7 +312,7 @@ export const AllBeers = () => {
                 },
               ]}
             >
-              Draft Only
+              Draft
             </ThemedText>
           </TouchableOpacity>
           
