@@ -13,6 +13,7 @@ import { useBottomTabOverflow } from '@/components/ui/TabBarBackground';
 import { IconSymbol } from './ui/IconSymbol';
 import { checkInBeer } from '@/src/api/beerService';
 import { getSessionData } from '@/src/api/sessionManager';
+import { router } from 'expo-router';
 
 type Beer = {
   id: string;
@@ -660,10 +661,11 @@ export const Beerfinder = () => {
   const renderFilterButtons = () => {
     return (
       <View style={styles.filtersContainer}>
-        <View style={styles.viewQueuesContainer}>
+        <View style={styles.buttonsContainer}>
           <TouchableOpacity
-            style={[styles.viewQueuesButton, { 
+            style={[styles.actionButton, { 
               backgroundColor: colorScheme === 'dark' ? '#E91E63' : activeButtonColor,
+              marginRight: 8
             }]}
             onPress={viewQueues}
             disabled={loadingQueues}
@@ -671,12 +673,25 @@ export const Beerfinder = () => {
             {loadingQueues ? (
               <ActivityIndicator size="small" color={colorScheme === 'dark' ? '#FFFFFF' : 'white'} />
             ) : (
-              <ThemedText style={[styles.viewQueuesText, {
+              <ThemedText style={[styles.actionButtonText, {
                 color: colorScheme === 'dark' ? '#FFFFFF' : 'white'
               }]}>
                 View Queues
               </ThemedText>
             )}
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={[styles.actionButton, { 
+              backgroundColor: colorScheme === 'dark' ? '#E91E63' : activeButtonColor 
+            }]}
+            onPress={() => router.push("/screens/rewards" as any)}
+          >
+            <ThemedText style={[styles.actionButtonText, {
+              color: colorScheme === 'dark' ? '#FFFFFF' : 'white'
+            }]}>
+              Rewards
+            </ThemedText>
           </TouchableOpacity>
         </View>
         
@@ -1043,7 +1058,10 @@ const styles = StyleSheet.create({
     paddingTop: 4,
   },
   filtersContainer: {
-    marginBottom: 16,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 8,
+    backgroundColor: 'transparent',
   },
   beerCountContainer: {
     marginBottom: 8,
@@ -1078,21 +1096,6 @@ const styles = StyleSheet.create({
   checkInButtonText: {
     fontSize: 16,
     fontWeight: 'bold',
-  },
-  viewQueuesContainer: {
-    alignItems: 'flex-start',
-    marginBottom: 12,
-    paddingHorizontal: 16,
-  },
-  viewQueuesButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 20,
-    alignSelf: 'flex-start',
-  },
-  viewQueuesText: {
-    fontWeight: '600',
-    fontSize: 14,
   },
   modalOverlay: {
     flex: 1,
@@ -1166,5 +1169,23 @@ const styles = StyleSheet.create({
   closeButtonText: {
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  buttonsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+    justifyContent: 'center',
+  },
+  actionButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    flex: 0.5,
+    maxWidth: '45%',
+  },
+  actionButtonText: {
+    fontWeight: '600',
+    fontSize: 14,
+    textAlign: 'center',
   },
 }); 

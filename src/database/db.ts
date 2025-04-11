@@ -101,6 +101,15 @@ export const setupDatabase = async (): Promise<void> => {
         )
       `);
       
+      // Create rewards table to store user rewards
+      await database.execAsync(`
+        CREATE TABLE IF NOT EXISTS rewards (
+          reward_id TEXT PRIMARY KEY,
+          redeemed TEXT,
+          reward_type TEXT
+        )
+      `);
+      
       // Create preferences table to store API endpoints and other preferences
       await database.execAsync(`
         CREATE TABLE IF NOT EXISTS preferences (
@@ -379,58 +388,54 @@ export const populateBeersTable = async (beers: any[]): Promise<void> => {
 
 // Initialize the database on app startup
 export const initializeBeerDatabase = async (): Promise<void> => {
-  // Skip if already initialized
-  if (databaseInitialized) {
-    console.log('Database already initialized, skipping');
-    return;
-  }
-
+  console.log('Initializing beer database...');
+  
   try {
-    // Only run setupDatabase if it hasn't been completed
-    if (!databaseSetupComplete) {
-      await setupDatabase();
-      databaseSetupComplete = true;
-    } else {
-      console.log('Database setup already completed, skipping');
+    // First, make sure the database schema is set up
+    await setupDatabase();
+    
+    // Check if API URLs are configured
+    const apiUrlsConfigured = await areApiUrlsConfigured();
+    if (!apiUrlsConfigured) {
+      console.log('API URLs not configured, database initialization will be limited');
+      return;
     }
     
-    // Check if API URLs are set
-    const allBeersApiUrl = await getPreference('all_beers_api_url');
-    const myBeersApiUrl = await getPreference('my_beers_api_url');
-    
-    // Only try to populate data if we have API URLs
-    if (allBeersApiUrl) {
-      try {
-        // Populate allbeers table
-        const beers = await fetchBeersFromAPI();
-        if (beers.length > 0) {
-          await populateBeersTable(beers);
-        }
-      } catch (error) {
-        console.error('Error initializing beer list:', error);
-        // Continue anyway to allow partial functionality
-      }
-    } else {
-      console.log('Skipping beer list initialization - API URL not set');
-    }
-    
-    // Run this after a short delay only if we have the My Beers API URL
-    if (myBeersApiUrl && !myBeersImportScheduled) {
+    // If we haven't already scheduled My Beers import, do it now
+    if (!myBeersImportScheduled) {
       myBeersImportScheduled = true;
+      
+      // Use setTimeout to make My Beers import non-blocking
       setTimeout(async () => {
         try {
           await fetchAndPopulateMyBeers();
+          myBeersImportComplete = true;
         } catch (error) {
-          console.error('Error loading My Beers data:', error);
-          // Continue anyway
+          console.error('Error in scheduled My Beers import:', error);
+        } finally {
+          myBeersImportInProgress = false;
         }
-      }, 1000);
-    } else {
-      console.log('Skipping My Beers initialization - API URL not set or import already scheduled');
+      }, 100);
+    }
+
+    // Schedule rewards import
+    setTimeout(async () => {
+      try {
+        await fetchAndPopulateRewards();
+      } catch (error) {
+        console.error('Error in scheduled Rewards import:', error);
+      }
+    }, 200);
+    
+    // Fetch all beers (this is blocking because we need it immediately)
+    try {
+      const beers = await fetchBeersFromAPI();
+      await populateBeersTable(beers);
+    } catch (error) {
+      console.error('Error fetching and populating all beers:', error);
     }
     
-    // Mark database as initialized
-    databaseInitialized = true;
+    console.log('Beer database initialization completed');
   } catch (error) {
     console.error('Error initializing beer database:', error);
     throw error;
@@ -803,66 +808,42 @@ export const resetDatabaseState = (): void => {
 };
 
 // Refresh all data from APIs (both all beers and my beers)
-export const refreshAllDataFromAPI = async (): Promise<{ allBeers: any[], myBeers: any[] }> => {
-  // Reset database state to allow full refresh
-  resetDatabaseState();
+export const refreshAllDataFromAPI = async (): Promise<{ allBeers: any[], myBeers: any[], rewards: any[] }> => {
+  console.log('Refreshing all data from API...');
   
-  if (!await acquireLock('refreshAllDataFromAPI')) {
-    throw new Error('Failed to acquire database lock for refreshing all data');
+  // Check if API URLs are configured
+  const apiUrlsConfigured = await areApiUrlsConfigured();
+  if (!apiUrlsConfigured) {
+    console.log('API URLs not configured, cannot refresh data');
+    throw new Error('API URLs not configured. Please log in to set up API URLs.');
   }
   
   try {
-    let allBeers: any[] = [];
-    let myBeers: any[] = [];
-    
-    // Check if API URLs are set
+    // Get preferences to check API URLs
     const allBeersApiUrl = await getPreference('all_beers_api_url');
     const myBeersApiUrl = await getPreference('my_beers_api_url');
     
-    console.log('Starting full data refresh...');
-    
-    // Only fetch if API URLs are available
-    if (allBeersApiUrl) {
-      console.log('Refreshing all beers...');
-      try {
-        allBeers = await _refreshBeersFromAPIInternal();
-      } catch (error) {
-        console.error('Error refreshing all beers:', error);
-        throw error;
-      }
-    } else {
-      console.log('Cannot refresh all beers - API URL not set');
+    if (!allBeersApiUrl || !myBeersApiUrl) {
+      console.log('API URLs not found in preferences');
+      throw new Error('API URLs not found. Please log in to set up API URLs.');
     }
     
-    // Only fetch if API URL is available
-    if (myBeersApiUrl) {
-      console.log('Refreshing my beers...');
-      try {
-        myBeers = await _refreshMyBeersFromAPIInternal();
-      } catch (error) {
-        console.error('Error refreshing my beers:', error);
-        throw error;
-      }
-    } else {
-      console.log('Cannot refresh my beers - API URL not set');
-    }
+    // Refresh all data sources in parallel
+    const [allBeers, myBeers, rewards] = await Promise.all([
+      _refreshBeersFromAPIInternal(),
+      _refreshMyBeersFromAPIInternal(),
+      fetchRewardsFromAPI().then(data => {
+        populateRewardsTable(data);
+        return data;
+      })
+    ]);
     
-    // If both API URLs are missing, throw an error
-    if (!allBeersApiUrl && !myBeersApiUrl) {
-      throw new Error('API URLs not configured. Please log in first.');
-    }
+    console.log(`Successfully refreshed all data: ${allBeers.length} beers, ${myBeers.length} tasted beers, ${rewards.length} rewards`);
     
-    console.log('Full data refresh complete!');
-    
-    return {
-      allBeers,
-      myBeers: myBeers.filter(beer => beer.brew_name && beer.brew_name.trim() !== '')
-    };
+    return { allBeers, myBeers, rewards };
   } catch (error) {
-    console.error('Error in refreshAllDataFromAPI:', error);
+    console.error('Error refreshing all data from API:', error);
     throw error;
-  } finally {
-    releaseLock('refreshAllDataFromAPI');
   }
 };
 
@@ -876,5 +857,123 @@ export const areApiUrlsConfigured = async (): Promise<boolean> => {
   } catch (error) {
     console.error('Error checking API URLs:', error);
     return false;
+  }
+};
+
+// Fetch rewards from API
+export const fetchRewardsFromAPI = async (): Promise<any[]> => {
+  try {
+    // Get the API endpoint from preferences
+    const apiUrl = await getPreference('my_beers_api_url');
+    
+    if (!apiUrl) {
+      console.log('My beers API URL not found in preferences');
+      return []; // Return empty array instead of throwing an error
+    }
+    
+    const data = await fetchWithRetry(apiUrl);
+    
+    // Extract the reward array from the response
+    if (data && Array.isArray(data) && data.length >= 3 && data[2] && data[2].reward) {
+      return data[2].reward;
+    }
+    
+    throw new Error('Invalid response format from Rewards API');
+  } catch (error) {
+    console.error('Error fetching Rewards from API:', error);
+    throw error;
+  }
+};
+
+// Populate the rewards table
+export const populateRewardsTable = async (rewards: any[]): Promise<void> => {
+  if (!rewards || rewards.length === 0) {
+    console.log('No rewards to populate');
+    return;
+  }
+  
+  try {
+    const database = await initDatabase();
+    const acquired = await acquireLock('populate_rewards_table');
+    
+    if (!acquired) {
+      console.log('Could not acquire lock for rewards table population');
+      return;
+    }
+    
+    try {
+      // Clear existing rewards
+      await database.runAsync('DELETE FROM rewards');
+      console.log('Cleared existing rewards from the table');
+      
+      // Batch insert new rewards
+      const batchSize = 100;
+      for (let i = 0; i < rewards.length; i += batchSize) {
+        const batch = rewards.slice(i, i + batchSize);
+        
+        const placeholders = batch.map(() => '(?, ?, ?)').join(',');
+        const values: any[] = [];
+        
+        batch.forEach(reward => {
+          values.push(
+            reward.reward_id || '',
+            reward.redeemed || '0',
+            reward.reward_type || ''
+          );
+        });
+        
+        await database.runAsync(
+          `INSERT OR REPLACE INTO rewards (
+            reward_id,
+            redeemed,
+            reward_type
+          ) VALUES ${placeholders}`,
+          values
+        );
+      }
+      
+      console.log(`Successfully populated rewards table with ${rewards.length} rewards`);
+    } finally {
+      releaseLock('populate_rewards_table');
+    }
+  } catch (error) {
+    console.error('Error populating rewards table:', error);
+    throw error;
+  }
+};
+
+// Fetch and populate rewards
+export const fetchAndPopulateRewards = async (): Promise<void> => {
+  try {
+    // Check if API URL is configured
+    const apiUrlsConfigured = await areApiUrlsConfigured();
+    if (!apiUrlsConfigured) {
+      console.log('API URLs not configured, skipping rewards fetch');
+      return;
+    }
+    
+    // Fetch rewards from API
+    const rewards = await fetchRewardsFromAPI();
+    
+    // Populate rewards table
+    await populateRewardsTable(rewards);
+    
+    console.log('Rewards fetch and populate completed successfully');
+  } catch (error) {
+    console.error('Error fetching and populating rewards:', error);
+    throw error;
+  }
+};
+
+// Get all rewards
+export const getAllRewards = async (): Promise<any[]> => {
+  const database = await initDatabase();
+  try {
+    return await database.getAllAsync(
+      'SELECT * FROM rewards ORDER BY reward_id'
+    );
+  } catch (error) {
+    console.error('Error getting rewards:', error);
+    return [];
   }
 }; 

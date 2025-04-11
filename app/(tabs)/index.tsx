@@ -182,10 +182,16 @@ export default function HomeScreen() {
           <Text style={[styles.mainButtonText, { color: buttonTextColor }]}>Beerfinder</Text>
         </TouchableOpacity>
         <TouchableOpacity 
-          style={[styles.mainButton, { backgroundColor: buttonColor }]}
+          style={[styles.mainButton, { backgroundColor: buttonColor, marginBottom: 16 }]}
           onPress={() => router.navigate('/(tabs)/tastedbrews')}
         >
           <Text style={[styles.mainButtonText, { color: buttonTextColor }]}>Tasted Brews</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.mainButton, { backgroundColor: buttonColor }]}
+          onPress={() => router.push("/screens/rewards" as any)}
+        >
+          <Text style={[styles.mainButtonText, { color: buttonTextColor }]}>Rewards</Text>
         </TouchableOpacity>
       </SafeAreaView>
     </ThemedView>
