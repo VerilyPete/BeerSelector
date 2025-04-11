@@ -725,7 +725,7 @@ export const Beerfinder = () => {
                 },
               ]}
             >
-              Draft Only
+              Draft
             </ThemedText>
           </TouchableOpacity>
           
