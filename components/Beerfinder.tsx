@@ -33,7 +33,7 @@ type QueuedBeer = {
   id: string;
 };
 
-export const MyBeerList = () => {
+export const Beerfinder = () => {
   // All hooks must be called at the top level, before any conditional logic
   const colorScheme = useColorScheme();
   const insets = useSafeAreaInsets();
@@ -115,16 +115,35 @@ export const MyBeerList = () => {
       
       // If API URLs are configured, proceed with refresh
       await fetchAndPopulateMyBeers();
-      const freshBeers = await getMyBeers();
-      setAvailableBeers(freshBeers);
-      setDisplayedBeers(freshBeers);
+      // Use getBeersNotInMyBeers to get available beers, not tasted beers
+      const freshBeers = await getBeersNotInMyBeers();
+      // Filter any empty beer names
+      const filteredData = freshBeers.filter(beer => beer.brew_name && beer.brew_name.trim() !== '');
+      
+      // Set the available beers
+      setAvailableBeers(filteredData);
+      
+      // Sort the beers based on current sort order before setting them
+      let sortedBeers = [...filteredData];
+      if (sortBy === 'name') {
+        sortedBeers.sort((a, b) => (a.brew_name || '').localeCompare(b.brew_name || ''));
+      } else {
+        sortedBeers.sort((a, b) => {
+          const dateA = parseInt(a.added_date || '0', 10);
+          const dateB = parseInt(b.added_date || '0', 10);
+          return dateB - dateA; // Descending order
+        });
+      }
+      
+      // Set the sorted and filtered beers
+      setDisplayedBeers(sortedBeers);
     } catch (error) {
       console.error('Error refreshing my beers:', error);
-      Alert.alert('Error', 'Failed to refresh my beer list. Please try again later.');
+      Alert.alert('Error', 'Failed to refresh beer list. Please try again later.');
     } finally {
       setRefreshing(false);
     }
-  }, []);
+  }, [sortBy]);
 
   // Sort beers when sort option changes
   useEffect(() => {

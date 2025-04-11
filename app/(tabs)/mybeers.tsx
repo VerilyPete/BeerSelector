@@ -3,7 +3,7 @@ import { StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 
-import { MyBeerList } from '@/components/MyBeerList';
+import { Beerfinder } from '@/components/Beerfinder';
 import { ThemedView } from '@/components/ThemedView';
 import { ThemedText } from '@/components/ThemedText';
 import { useThemeColor } from '@/hooks/useThemeColor';
@@ -43,7 +43,7 @@ export default function MyBeersScreen() {
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea} edges={['top', 'right', 'left']}>
         <ThemedText type="title" style={styles.title}>Beerfinder</ThemedText>
-        <MyBeerList />
+        <Beerfinder />
       </SafeAreaView>
     </ThemedView>
   );
