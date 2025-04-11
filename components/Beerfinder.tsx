@@ -14,6 +14,7 @@ import { IconSymbol } from './ui/IconSymbol';
 import { checkInBeer } from '@/src/api/beerService';
 import { getSessionData } from '@/src/api/sessionManager';
 import { router } from 'expo-router';
+import { UntappdWebView } from './UntappdWebView';
 
 type Beer = {
   id: string;
@@ -56,6 +57,8 @@ export const Beerfinder = () => {
   const [queuedBeers, setQueuedBeers] = useState<QueuedBeer[]>([]);
   const [loadingQueues, setLoadingQueues] = useState(false);
   const [deletingBeerId, setDeletingBeerId] = useState<string | null>(null);
+  const [untappdModalVisible, setUntappdModalVisible] = useState(false);
+  const [selectedBeerName, setSelectedBeerName] = useState('');
   
   // Theme colors
   const cardColor = useThemeColor({}, 'background');
@@ -592,6 +595,11 @@ export const Beerfinder = () => {
     return beers;
   };
 
+  const handleUntappdSearch = (beerName: string) => {
+    setSelectedBeerName(beerName);
+    setUntappdModalVisible(true);
+  };
+
   const renderBeerItem = (item: Beer) => {
     const isExpanded = expandedId === item.id;
     
@@ -631,26 +639,42 @@ export const Beerfinder = () => {
                 {item.brew_description}
               </ThemedText>
               
-              <TouchableOpacity 
-                style={[styles.checkInButton, { 
-                  backgroundColor: colorScheme === 'dark' ? '#E91E63' : activeButtonColor,
-                  alignSelf: 'flex-start',
-                  width: '50%'
-                }]}
-                onPress={() => handleCheckIn(item)}
-                activeOpacity={0.7}
-                disabled={checkinLoading}
-              >
-                {checkinLoading ? (
-                  <ActivityIndicator size="small" color={colorScheme === 'dark' ? '#FFFFFF' : 'white'} />
-                ) : (
+              <View style={styles.buttonContainer}>
+                <TouchableOpacity 
+                  style={[styles.checkInButton, { 
+                    backgroundColor: colorScheme === 'dark' ? '#E91E63' : activeButtonColor,
+                    width: '48%'
+                  }]}
+                  onPress={() => handleCheckIn(item)}
+                  activeOpacity={0.7}
+                  disabled={checkinLoading}
+                >
+                  {checkinLoading ? (
+                    <ActivityIndicator size="small" color={colorScheme === 'dark' ? '#FFFFFF' : 'white'} />
+                  ) : (
+                    <ThemedText style={[styles.checkInButtonText, {
+                      color: colorScheme === 'dark' ? '#FFFFFF' : 'white'
+                    }]}>
+                      Check Me In!
+                    </ThemedText>
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={[styles.checkInButton, { 
+                    backgroundColor: colorScheme === 'dark' ? '#E91E63' : activeButtonColor,
+                    width: '48%'
+                  }]}
+                  onPress={() => handleUntappdSearch(item.brew_name)}
+                  activeOpacity={0.7}
+                >
                   <ThemedText style={[styles.checkInButtonText, {
                     color: colorScheme === 'dark' ? '#FFFFFF' : 'white'
                   }]}>
-                    Check Me In!
+                    Check Untappd
                   </ThemedText>
-                )}
-              </TouchableOpacity>
+                </TouchableOpacity>
+              </View>
             </View>
           )}
         </View>
@@ -882,30 +906,30 @@ export const Beerfinder = () => {
           </TouchableOpacity>
         </View>
       ) : (
-        <View style={{ flex: 1 }}>
+        <>
           {renderFilterButtons()}
+          <FlatList
+            data={displayedBeers}
+            renderItem={({ item }) => renderBeerItem(item)}
+            keyExtractor={item => item.id}
+            contentContainerStyle={styles.listContent}
+            onRefresh={handleRefresh}
+            refreshing={refreshing}
+            ListEmptyComponent={
+              <View style={styles.emptyContainer}>
+                <ThemedText style={styles.emptyText}>
+                  No beers found
+                </ThemedText>
+              </View>
+            }
+          />
           {renderQueueModal()}
-          {displayedBeers.length === 0 ? (
-            <View style={styles.centered}>
-              <ThemedText style={styles.noBeersText}>
-                No beers match your filters
-              </ThemedText>
-            </View>
-          ) : (
-            <View style={{ flex: 1, paddingBottom: tabBarHeight + 10 }}>
-              <FlatList
-                data={displayedBeers}
-                renderItem={({ item }) => renderBeerItem(item)}
-                keyExtractor={item => item.id}
-                contentContainerStyle={styles.listContent}
-                showsVerticalScrollIndicator={false}
-                onRefresh={handleRefresh}
-                refreshing={refreshing}
-                style={{ flex: 1 }}
-              />
-            </View>
-          )}
-        </View>
+          <UntappdWebView
+            visible={untappdModalVisible}
+            onClose={() => setUntappdModalVisible(false)}
+            beerName={selectedBeerName}
+          />
+        </>
       )}
     </View>
   );
@@ -1187,5 +1211,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 14,
     textAlign: 'center',
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 16,
   },
 }); 

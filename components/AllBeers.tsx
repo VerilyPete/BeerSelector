@@ -11,6 +11,7 @@ import { SearchBar } from './SearchBar';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useBottomTabOverflow } from '@/components/ui/TabBarBackground';
 import { IconSymbol } from './ui/IconSymbol';
+import { UntappdWebView } from './UntappdWebView';
 
 type Beer = {
   id: string;
@@ -42,6 +43,8 @@ export const AllBeers = () => {
   const [isIpaOnly, setIsIpaOnly] = useState(false);
   const [sortBy, setSortBy] = useState<SortOption>('date');
   const [searchText, setSearchText] = useState('');
+  const [untappdModalVisible, setUntappdModalVisible] = useState(false);
+  const [selectedBeerName, setSelectedBeerName] = useState('');
   
   // Theme colors
   const cardColor = useThemeColor({}, 'background');
@@ -233,6 +236,11 @@ export const AllBeers = () => {
     setSearchText('');
   };
 
+  const handleUntappdSearch = (beerName: string) => {
+    setSelectedBeerName(beerName);
+    setUntappdModalVisible(true);
+  };
+
   const renderBeerItem = (item: Beer) => {
     const isExpanded = expandedId === item.id;
     
@@ -271,6 +279,22 @@ export const AllBeers = () => {
               <ThemedText style={styles.description}>
                 {item.brew_description}
               </ThemedText>
+              
+              <TouchableOpacity 
+                style={[styles.checkInButton, { 
+                  backgroundColor: colorScheme === 'dark' ? '#E91E63' : activeButtonColor,
+                  alignSelf: 'flex-start',
+                  width: '48%'
+                }]}
+                onPress={() => handleUntappdSearch(item.brew_name)}
+                activeOpacity={0.7}
+              >
+                <ThemedText style={[styles.checkInButtonText, {
+                  color: colorScheme === 'dark' ? '#FFFFFF' : 'white'
+                }]}>
+                  Check Untappd
+                </ThemedText>
+              </TouchableOpacity>
             </View>
           )}
         </View>
@@ -397,30 +421,29 @@ export const AllBeers = () => {
           </TouchableOpacity>
         </View>
       ) : (
-        <View style={{ flex: 1 }}>
+        <>
           {renderFilterButtons()}
-          
-          {displayedBeers.length === 0 ? (
-            <View style={styles.centered}>
-              <ThemedText style={styles.noBeersText}>
-                No beers match your filters
-              </ThemedText>
-            </View>
-          ) : (
-            <View style={{ flex: 1, paddingBottom: tabBarHeight + 10 }}>
-              <FlatList
-                data={displayedBeers}
-                renderItem={({ item }) => renderBeerItem(item)}
-                keyExtractor={item => item.id}
-                contentContainerStyle={styles.listContent}
-                showsVerticalScrollIndicator={false}
-                onRefresh={handleRefresh}
-                refreshing={refreshing}
-                style={{ flex: 1 }}
-              />
-            </View>
-          )}
-        </View>
+          <FlatList
+            data={displayedBeers}
+            renderItem={({ item }) => renderBeerItem(item)}
+            keyExtractor={item => item.id}
+            contentContainerStyle={styles.listContent}
+            onRefresh={handleRefresh}
+            refreshing={refreshing}
+            ListEmptyComponent={
+              <View style={styles.emptyContainer}>
+                <ThemedText style={styles.emptyText}>
+                  No beers found
+                </ThemedText>
+              </View>
+            }
+          />
+          <UntappdWebView
+            visible={untappdModalVisible}
+            onClose={() => setUntappdModalVisible(false)}
+            beerName={selectedBeerName}
+          />
+        </>
       )}
     </View>
   );
@@ -542,5 +565,26 @@ const styles = StyleSheet.create({
   },
   sortIcon: {
     marginLeft: 8,
+  },
+  checkInButton: {
+    marginTop: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkInButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyText: {
+    fontSize: 16,
+    fontWeight: '600',
   },
 }); 
