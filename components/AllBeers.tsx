@@ -25,7 +25,7 @@ type Beer = {
 
 type SortOption = 'date' | 'name';
 
-export const BeerList = () => {
+export const AllBeers = () => {
   // All hooks must be called at the top level, before any conditional logic
   const colorScheme = useColorScheme();
   const insets = useSafeAreaInsets();
@@ -94,8 +94,24 @@ export const BeerList = () => {
       // If API URLs are configured, proceed with refresh
       await refreshBeersFromAPI();
       const freshBeers = await getAllBeers();
+      
+      // Set the base beers
       setAllBeers(freshBeers);
-      setDisplayedBeers(freshBeers);
+      
+      // Sort the beers based on current sort order before setting them
+      let sortedBeers = [...freshBeers];
+      if (sortBy === 'name') {
+        sortedBeers.sort((a, b) => (a.brew_name || '').localeCompare(b.brew_name || ''));
+      } else {
+        sortedBeers.sort((a, b) => {
+          const dateA = parseInt(a.added_date || '0', 10);
+          const dateB = parseInt(b.added_date || '0', 10);
+          return dateB - dateA; // Descending order
+        });
+      }
+      
+      // Apply the sorted beers
+      setDisplayedBeers(sortedBeers);
       setError(null);
     } catch (error) {
       console.error('Error refreshing beers:', error);
@@ -103,29 +119,7 @@ export const BeerList = () => {
     } finally {
       setRefreshing(false);
     }
-  }, []);
-
-  // Sort beers when sort option changes
-  useEffect(() => {
-    if (displayedBeers.length === 0) return;
-    
-    const sortedBeers = [...displayedBeers];
-    
-    if (sortBy === 'name') {
-      sortedBeers.sort((a, b) => {
-        return (a.brew_name || '').localeCompare(b.brew_name || '');
-      });
-    } else {
-      // Default sort is by date (already handled by the database query)
-      sortedBeers.sort((a, b) => {
-        const dateA = parseInt(a.added_date || '0', 10);
-        const dateB = parseInt(b.added_date || '0', 10);
-        return dateB - dateA; // Descending order
-      });
-    }
-    
-    setDisplayedBeers(sortedBeers);
-  }, [sortBy, allBeers]);
+  }, [sortBy]);
 
   // Filter beers when any filter changes or search text changes
   useEffect(() => {
@@ -168,10 +162,22 @@ export const BeerList = () => {
       );
     }
 
-    setDisplayedBeers(filtered);
+    // Apply the current sort order to the filtered results
+    let sortedAndFiltered = [...filtered];
+    if (sortBy === 'name') {
+      sortedAndFiltered.sort((a, b) => (a.brew_name || '').localeCompare(b.brew_name || ''));
+    } else {
+      sortedAndFiltered.sort((a, b) => {
+        const dateA = parseInt(a.added_date || '0', 10);
+        const dateB = parseInt(b.added_date || '0', 10);
+        return dateB - dateA; // Descending order
+      });
+    }
+
+    setDisplayedBeers(sortedAndFiltered);
     // Reset expanded item when filter changes
     setExpandedId(null);
-  }, [isDraftOnly, isHeaviesOnly, isIpaOnly, allBeers, searchText]);
+  }, [isDraftOnly, isHeaviesOnly, isIpaOnly, allBeers, searchText, sortBy]);
 
   const toggleDraftFilter = () => {
     setIsDraftOnly(!isDraftOnly);

@@ -145,28 +145,6 @@ export const Beerfinder = () => {
     }
   }, [sortBy]);
 
-  // Sort beers when sort option changes
-  useEffect(() => {
-    if (displayedBeers.length === 0) return;
-    
-    const sortedBeers = [...displayedBeers];
-    
-    if (sortBy === 'name') {
-      sortedBeers.sort((a, b) => {
-        return (a.brew_name || '').localeCompare(b.brew_name || '');
-      });
-    } else {
-      // Default sort is by date (already handled by the database query)
-      sortedBeers.sort((a, b) => {
-        const dateA = parseInt(a.added_date || '0', 10);
-        const dateB = parseInt(b.added_date || '0', 10);
-        return dateB - dateA; // Descending order
-      });
-    }
-    
-    setDisplayedBeers(sortedBeers);
-  }, [sortBy, availableBeers]);
-
   // Filter beers when any filter changes or search text changes
   useEffect(() => {
     let filtered = availableBeers;
@@ -206,10 +184,22 @@ export const Beerfinder = () => {
       );
     }
 
-    setDisplayedBeers(filtered);
+    // Apply the current sort order to the filtered results
+    let sortedAndFiltered = [...filtered];
+    if (sortBy === 'name') {
+      sortedAndFiltered.sort((a, b) => (a.brew_name || '').localeCompare(b.brew_name || ''));
+    } else {
+      sortedAndFiltered.sort((a, b) => {
+        const dateA = parseInt(a.added_date || '0', 10);
+        const dateB = parseInt(b.added_date || '0', 10);
+        return dateB - dateA; // Descending order
+      });
+    }
+
+    setDisplayedBeers(sortedAndFiltered);
     // Reset expanded item when filter changes
     setExpandedId(null);
-  }, [isDraftOnly, isHeaviesOnly, isIpaOnly, availableBeers, searchText]);
+  }, [isDraftOnly, isHeaviesOnly, isIpaOnly, availableBeers, searchText, sortBy]);
 
   const toggleDraftFilter = () => {
     setIsDraftOnly(!isDraftOnly);

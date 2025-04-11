@@ -100,57 +100,52 @@ export const TastedBrewList = () => {
       // If API URLs are configured, proceed with refresh
       await fetchAndPopulateMyBeers();
       const freshBeers = await getMyBeers();
+      
+      // Set the base beers
       setTastedBeers(freshBeers);
-      setDisplayedBeers(freshBeers);
+      
+      // Sort the beers based on current sort order before setting them
+      let sortedBeers = [...freshBeers];
+      if (sortBy === 'name') {
+        sortedBeers.sort((a, b) => (a.brew_name || '').localeCompare(b.brew_name || ''));
+      } else {
+        // Sort by tasted_date
+        sortedBeers.sort((a, b) => {
+          // Parse dates in format MM/DD/YYYY
+          const partsA = (a.tasted_date || '').split('/');
+          const partsB = (b.tasted_date || '').split('/');
+          
+          if (partsA.length === 3 && partsB.length === 3) {
+            // Create Date objects with year, month (0-based), day
+            const dateA = new Date(
+              parseInt(partsA[2], 10), 
+              parseInt(partsA[0], 10) - 1, 
+              parseInt(partsA[1], 10)
+            ).getTime();
+            
+            const dateB = new Date(
+              parseInt(partsB[2], 10), 
+              parseInt(partsB[0], 10) - 1, 
+              parseInt(partsB[1], 10)
+            ).getTime();
+            
+            return dateB - dateA; // Descending order
+          }
+          
+          // Fallback if date parsing fails
+          return 0;
+        });
+      }
+      
+      // Apply the sorted beers
+      setDisplayedBeers(sortedBeers);
     } catch (error) {
       console.error('Error refreshing tasted beers:', error);
       Alert.alert('Error', 'Failed to refresh tasted beer list. Please try again later.');
     } finally {
       setRefreshing(false);
     }
-  }, []);
-
-  // Sort beers when sort option changes
-  useEffect(() => {
-    if (displayedBeers.length === 0) return;
-    
-    const sortedBeers = [...displayedBeers];
-    
-    if (sortBy === 'name') {
-      sortedBeers.sort((a, b) => {
-        return (a.brew_name || '').localeCompare(b.brew_name || '');
-      });
-    } else {
-      // Sort by tasted_date
-      sortedBeers.sort((a, b) => {
-        // Parse dates in format MM/DD/YYYY
-        const partsA = (a.tasted_date || '').split('/');
-        const partsB = (b.tasted_date || '').split('/');
-        
-        if (partsA.length === 3 && partsB.length === 3) {
-          // Create Date objects with year, month (0-based), day
-          const dateA = new Date(
-            parseInt(partsA[2], 10), 
-            parseInt(partsA[0], 10) - 1, 
-            parseInt(partsA[1], 10)
-          ).getTime();
-          
-          const dateB = new Date(
-            parseInt(partsB[2], 10), 
-            parseInt(partsB[0], 10) - 1, 
-            parseInt(partsB[1], 10)
-          ).getTime();
-          
-          return dateB - dateA; // Descending order
-        }
-        
-        // Fallback if date parsing fails
-        return 0;
-      });
-    }
-    
-    setDisplayedBeers(sortedBeers);
-  }, [sortBy, tastedBeers]);
+  }, [sortBy]);
 
   // Filter beers when search text changes
   useEffect(() => {
@@ -168,11 +163,12 @@ export const TastedBrewList = () => {
     }
 
     // Apply sorting
+    let sortedAndFiltered = [...filtered];
     if (sortBy === 'name') {
-      filtered.sort((a, b) => (a.brew_name || '').localeCompare(b.brew_name || ''));
+      sortedAndFiltered.sort((a, b) => (a.brew_name || '').localeCompare(b.brew_name || ''));
     } else {
       // Parse dates in format MM/DD/YYYY
-      filtered.sort((a, b) => {
+      sortedAndFiltered.sort((a, b) => {
         const partsA = (a.tasted_date || '').split('/');
         const partsB = (b.tasted_date || '').split('/');
         
@@ -198,10 +194,10 @@ export const TastedBrewList = () => {
       });
     }
 
-    setDisplayedBeers(filtered);
+    setDisplayedBeers(sortedAndFiltered);
     // Reset expanded item when filter changes
     setExpandedId(null);
-  }, [tastedBeers, searchText]);
+  }, [tastedBeers, searchText, sortBy]);
 
   const toggleSortOption = () => {
     setSortBy(sortBy === 'date' ? 'name' : 'date');

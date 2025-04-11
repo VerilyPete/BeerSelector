@@ -12,7 +12,7 @@ import { IconSymbol } from '@/components/ui/IconSymbol';
 
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
-import { BeerList } from '@/components/BeerList';
+import { AllBeers } from '@/components/AllBeers';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { areApiUrlsConfigured } from '@/src/database/db';
@@ -26,7 +26,7 @@ export function BeerListScreen() {
       <SafeAreaView style={{flex: 1}} edges={['top', 'right', 'left']}>
         <ThemedText type="title" style={styles.title}>All Beers</ThemedText>
         <View style={{flex: 1}}>
-          <BeerList />
+          <AllBeers />
         </View>
       </SafeAreaView>
     </ThemedView>
