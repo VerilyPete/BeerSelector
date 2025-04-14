@@ -78,10 +78,16 @@ export const Rewards = () => {
       }
       
       // Parse the stored cookies and format them for the Cookie header
-      const authCookies = JSON.parse(authCookiesStr);
+      const authCookies = JSON.parse(authCookiesStr) as Record<string, string>;
       const cookieHeader = Object.entries(authCookies)
-        .map(([name, value]) => `${name}=${value}`)
+        .filter(([name]) => name.trim() !== '') // Filter out empty cookie names
+        .map(([name, value]) => `${name.trim()}=${value.trim()}`)
         .join('; ');
+      
+      if (!cookieHeader) {
+        Alert.alert('Error', 'No valid authentication cookies found. Please log in again.');
+        return;
+      }
       
       // Prepare form data from session
       const formData = new URLSearchParams({
@@ -91,6 +97,8 @@ export const Rewards = () => {
         'chitUserId': sessionData.memberId
       }).toString();
       
+      console.log('Making API call with cookies:', cookieHeader);
+      
       // Make the API call
       const response = await fetch('https://tapthatapp.beerknurd.com/addToRewardQueue.php', {
         method: 'POST',
@@ -98,18 +106,20 @@ export const Rewards = () => {
           'Accept': '*/*',
           'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
           'X-Requested-With': 'XMLHttpRequest',
-          'Cookie': cookieHeader, // Use the properly formatted cookie header
+          'Cookie': cookieHeader,
         },
         body: formData,
       });
       
       const responseData = await response.text();
+      console.log('API Response:', responseData);
       
       if (response.ok) {
         Alert.alert('Success', `${rewardType} has been added to your queue!`);
         // Refresh the data to reflect the change
         handleRefresh();
       } else {
+        console.error('Failed to queue reward:', responseData);
         Alert.alert('Error', `Failed to queue the reward: ${responseData}`);
       }
     } catch (err: any) {
