@@ -1,6 +1,7 @@
 import * as SecureStore from 'expo-secure-store';
 import { getSessionData, SessionData } from './sessionManager';
 import { autoLogin } from './authService';
+import { ApiClient } from './apiClient';
 
 interface CheckInRequestData {
   chitCode: string;
@@ -8,6 +9,8 @@ interface CheckInRequestData {
   chitBrewName: string;
   chitStoreName: string;
 }
+
+const apiClient = ApiClient.getInstance();
 
 /**
  * Checks in a beer by making an API request to tapthatapp.beerknurd.com
@@ -114,4 +117,38 @@ export const checkInBeer = async (beer: {
     console.error('Error checking in beer:', error);
     throw error;
   }
-}; 
+};
+
+export async function getBeerDetails(beerId: string) {
+  try {
+    const response = await apiClient.get(`/beer-details.php?id=${beerId}`);
+    const data = await response.json();
+    return {
+      success: true,
+      data
+    };
+  } catch (error) {
+    console.error('Error getting beer details:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error occurred'
+    };
+  }
+}
+
+export async function searchBeers(query: string) {
+  try {
+    const response = await apiClient.get(`/search-beers.php?q=${encodeURIComponent(query)}`);
+    const data = await response.json();
+    return {
+      success: true,
+      data
+    };
+  } catch (error) {
+    console.error('Error searching beers:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error occurred'
+    };
+  }
+} 

@@ -1,9 +1,13 @@
+import { ApiClient } from './apiClient';
 import { saveSessionData, clearSessionData, SessionData } from './sessionManager';
 import { getPreference } from '../database/db';
+
+const apiClient = ApiClient.getInstance();
 
 interface LoginResult {
   success: boolean;
   error?: string;
+  data?: any;
   sessionData?: SessionData;
 }
 
@@ -11,31 +15,31 @@ interface LoginResult {
  * Attempts to automatically login using stored cookies
  * @returns The result of the login process
  */
-export const autoLogin = async (): Promise<LoginResult> => {
+export async function autoLogin(): Promise<LoginResult> {
   try {
-    // Get stored auth cookies from preferences
-    const authCookiesStr = await getPreference('auth_cookies');
+    const response = await apiClient.post('/auto-login.php', {});
+    const data = await response.json();
     
-    if (!authCookiesStr) {
+    if (data.success) {
+      await saveSessionData(data.session);
+      return {
+        success: true,
+        data
+      };
+    } else {
       return {
         success: false,
-        error: 'No stored authentication cookies found'
+        error: data.error || 'Auto-login failed'
       };
     }
-    
-    // Parse stored cookies
-    const authCookies = JSON.parse(authCookiesStr);
-    
-    // Use the stored cookies to log in
-    return await handleTapThatAppLogin(authCookies);
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error during auto-login:', error);
     return {
       success: false,
-      error: error.message || 'Unknown error during auto-login'
+      error: error instanceof Error ? error.message : 'Unknown error occurred'
     };
   }
-};
+}
 
 /**
  * Handles the login process to Flying Saucer
@@ -94,15 +98,16 @@ export const handleTapThatAppLogin = async (
  * Logs out the user by clearing the session data
  * @returns True if logout was successful, false otherwise
  */
-export const logout = async (): Promise<boolean> => {
+export async function logout(): Promise<boolean> {
   try {
+    await apiClient.post('/logout.php', {});
     await clearSessionData();
     return true;
   } catch (error) {
     console.error('Error during logout:', error);
     return false;
   }
-};
+}
 
 /**
  * Parses cookies from a cookie string
