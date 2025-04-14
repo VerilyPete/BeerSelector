@@ -115,8 +115,6 @@ export default function SettingsScreen() {
 
   // Handle WebView navigation state changes
   const handleWebViewNavigationStateChange = (navState: WebViewNavigation) => {
-    console.log('WebView URL:', navState.url);
-    
     // If we're on the member dashboard page
     if (navState.url.includes('member-dash.php')) {
       // Inject JavaScript to extract the API URLs and cookies
@@ -200,7 +198,6 @@ export default function SettingsScreen() {
   const handleWebViewMessage = (event: WebViewMessageEvent) => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
-      console.log('Received WebView message:', data);
       
       if (data.type === 'URLs') {
         const { userJsonUrl, storeJsonUrl, cookies } = data;
