@@ -370,77 +370,81 @@ export default function SettingsScreen() {
               
               <View style={styles.aboutInfo}>
                 <ThemedText>Beer Selector</ThemedText>
-                <ThemedText style={styles.versionText}>Version 1.0.0 (Build 2)</ThemedText>
+                <ThemedText style={styles.versionText}>
+                  Version {Constants.expoConfig?.version || '1.0.0'} (Build {Constants.expoConfig?.ios?.buildNumber || Constants.expoConfig?.android?.versionCode || '2'})
+                </ThemedText>
               </View>
             </View>
 
-            {/* Data Management Section */}
-            <View style={[styles.section, { backgroundColor: cardColor }]}>
-              <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>Data Management</ThemedText>
-              
-              <View style={styles.buttonContainer}>
-                {/* Only show refresh button if API URLs are configured */}
-                {apiUrlsConfigured && (
-                  <TouchableOpacity 
-                    style={[
-                      styles.dataButton, 
-                      { 
-                        backgroundColor: refreshing ? '#FF8888' : '#FF3B30',
-                        borderColor: borderColor
-                      }
-                    ]}
-                    onPress={handleRefresh}
-                    disabled={refreshing}
-                  >
-                    <ThemedText style={styles.dataButtonText}>
-                      {refreshing ? 'Refreshing data...' : 'Refresh All Beer Data'}
-                    </ThemedText>
-                  </TouchableOpacity>
-                )}
+            {/* Data Management Section - Only show if NOT on first login or if API URLs are configured */}
+            {(!isFirstLogin || apiUrlsConfigured) && (
+              <View style={[styles.section, { backgroundColor: cardColor }]}>
+                <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>Data Management</ThemedText>
+                
+                <View style={styles.buttonContainer}>
+                  {/* Only show refresh button if API URLs are configured */}
+                  {apiUrlsConfigured && (
+                    <TouchableOpacity 
+                      style={[
+                        styles.dataButton, 
+                        { 
+                          backgroundColor: refreshing ? '#FF8888' : '#FF3B30',
+                          borderColor: borderColor
+                        }
+                      ]}
+                      onPress={handleRefresh}
+                      disabled={refreshing}
+                    >
+                      <ThemedText style={styles.dataButtonText}>
+                        {refreshing ? 'Refreshing data...' : 'Refresh All Beer Data'}
+                      </ThemedText>
+                    </TouchableOpacity>
+                  )}
 
-                {/* Login Button - Only show if NOT on first login */}
-                {!isFirstLogin && (
-                  <TouchableOpacity 
-                    style={[
-                      styles.dataButton, 
-                      styles.loginButton,
-                      { 
-                        backgroundColor: loginLoading ? '#88AAFF' : '#007AFF',
-                        borderColor: borderColor,
-                        marginTop: apiUrlsConfigured ? 12 : 0
-                      }
-                    ]}
-                    onPress={handleLogin}
-                    disabled={loginLoading || refreshing}
-                  >
-                    <ThemedText style={styles.dataButtonText}>
-                      {loginLoading ? 'Logging in...' : 'Login to Flying Saucer'}
-                    </ThemedText>
-                  </TouchableOpacity>
-                )}
+                  {/* Login Button - Only show if NOT on first login */}
+                  {!isFirstLogin && (
+                    <TouchableOpacity 
+                      style={[
+                        styles.dataButton, 
+                        styles.loginButton,
+                        { 
+                          backgroundColor: loginLoading ? '#88AAFF' : '#007AFF',
+                          borderColor: borderColor,
+                          marginTop: apiUrlsConfigured ? 12 : 0
+                        }
+                      ]}
+                      onPress={handleLogin}
+                      disabled={loginLoading || refreshing}
+                    >
+                      <ThemedText style={styles.dataButtonText}>
+                        {loginLoading ? 'Logging in...' : 'Login to Flying Saucer'}
+                      </ThemedText>
+                    </TouchableOpacity>
+                  )}
 
-                {/* Return to Home button - show when API URLs are configured but we're on first launch */}
-                {apiUrlsConfigured && !canGoBack && (
-                  <TouchableOpacity 
-                    style={[
-                      styles.dataButton, 
-                      styles.homeButton,
-                      { 
-                        backgroundColor: '#34C759',
-                        borderColor: borderColor,
-                        marginTop: 12
-                      }
-                    ]}
-                    onPress={() => router.replace('/(tabs)')}
-                    disabled={refreshing || loginLoading}
-                  >
-                    <ThemedText style={styles.dataButtonText}>
-                      Go to Home Screen
-                    </ThemedText>
-                  </TouchableOpacity>
-                )}
+                  {/* Return to Home button - show when API URLs are configured but we're on first launch */}
+                  {apiUrlsConfigured && !canGoBack && (
+                    <TouchableOpacity 
+                      style={[
+                        styles.dataButton, 
+                        styles.homeButton,
+                        { 
+                          backgroundColor: '#34C759',
+                          borderColor: borderColor,
+                          marginTop: 12
+                        }
+                      ]}
+                      onPress={() => router.replace('/(tabs)')}
+                      disabled={refreshing || loginLoading}
+                    >
+                      <ThemedText style={styles.dataButtonText}>
+                        Go to Home Screen
+                      </ThemedText>
+                    </TouchableOpacity>
+                  )}
+                </View>
               </View>
-            </View>
+            )}
 
             {/* Development features - only shown in development */}
             {Constants.expoConfig?.extra?.NODE_ENV === 'development' && (
