@@ -371,7 +371,7 @@ export default function SettingsScreen() {
               <View style={styles.aboutInfo}>
                 <ThemedText>Beer Selector</ThemedText>
                 <ThemedText style={styles.versionText}>
-                  Version {Constants.expoConfig?.version || '1.0.0'} (Build {Constants.expoConfig?.ios?.buildNumber || Constants.expoConfig?.android?.versionCode || '2'})
+                  Version {Constants.expoConfig?.version || '1.0.0'} (Build {Constants.expoConfig?.ios?.buildNumber || Constants.expoConfig?.android?.versionCode})
                 </ThemedText>
               </View>
             </View>
