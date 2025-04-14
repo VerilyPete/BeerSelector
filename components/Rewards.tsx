@@ -77,6 +77,12 @@ export const Rewards = () => {
         return;
       }
       
+      // Parse the stored cookies and format them for the Cookie header
+      const authCookies = JSON.parse(authCookiesStr);
+      const cookieHeader = Object.entries(authCookies)
+        .map(([name, value]) => `${name}=${value}`)
+        .join('; ');
+      
       // Prepare form data from session
       const formData = new URLSearchParams({
         'chitCode': rewardId,
@@ -92,7 +98,7 @@ export const Rewards = () => {
           'Accept': '*/*',
           'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
           'X-Requested-With': 'XMLHttpRequest',
-          'Cookie': authCookiesStr, // Include the authentication cookies
+          'Cookie': cookieHeader, // Use the properly formatted cookie header
         },
         body: formData,
       });
