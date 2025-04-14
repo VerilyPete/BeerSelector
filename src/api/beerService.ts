@@ -2,6 +2,8 @@ import * as SecureStore from 'expo-secure-store';
 import { getSessionData, SessionData } from './sessionManager';
 import { autoLogin } from './authService';
 import { ApiClient } from './apiClient';
+import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 
 interface CheckInRequestData {
   chitCode: string;
@@ -58,6 +60,11 @@ export const checkInBeer = async (beer: {
       .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
       .join('&');
     
+    // Get the device's native user agent or use a fallback
+    const userAgent = Platform.OS === 'web' 
+      ? window.navigator.userAgent 
+      : `BeerSelector/${Constants.expoConfig?.version || '1.0.0'} (${Platform.OS}; ${Platform.Version})`;
+    
     // Set up request headers
     const headers = {
       'accept': '*/*',
@@ -71,7 +78,7 @@ export const checkInBeer = async (beer: {
       'sec-fetch-dest': 'empty',
       'sec-fetch-mode': 'cors',
       'sec-fetch-site': 'same-origin',
-      'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36',
+      'user-agent': userAgent,
       'x-requested-with': 'XMLHttpRequest',
       'Cookie': `store__id=${storeId}; PHPSESSID=${sessionId}; store_name=${encodeURIComponent(storeName)}; member_id=${memberId}; username=${encodeURIComponent(username || '')}; first_name=${encodeURIComponent(firstName || '')}; last_name=${encodeURIComponent(lastName || '')}; email=${encodeURIComponent(email || '')}; cardNum=${cardNum || ''}`
     };

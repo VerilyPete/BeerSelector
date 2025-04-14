@@ -1,11 +1,12 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { StyleSheet, View, FlatList, RefreshControl, ActivityIndicator, Text, TouchableOpacity, Alert } from 'react-native';
+import { StyleSheet, View, FlatList, RefreshControl, ActivityIndicator, Text, TouchableOpacity, Alert, Platform } from 'react-native';
 import { getAllRewards, fetchAndPopulateRewards, getPreference } from '@/src/database/db';
 import { ThemedText } from './ThemedText';
 import { ThemedView } from './ThemedView';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getSessionData } from '@/src/api/sessionManager';
+import Constants from 'expo-constants';
 
 type Reward = {
   reward_id: string;
@@ -73,6 +74,11 @@ export const Rewards = () => {
       // Extract required data for the request
       const { memberId, storeId, storeName, sessionId, username, firstName, lastName, email, cardNum } = sessionData;
       
+      // Get the device's native user agent or use a fallback
+      const userAgent = Platform.OS === 'web' 
+        ? window.navigator.userAgent 
+        : `BeerSelector/${Constants.expoConfig?.version || '1.0.0'} (${Platform.OS}; ${Platform.Version})`;
+      
       // Prepare form data
       const formData = new URLSearchParams({
         'chitCode': rewardId,
@@ -94,7 +100,7 @@ export const Rewards = () => {
         'sec-fetch-dest': 'empty',
         'sec-fetch-mode': 'cors',
         'sec-fetch-site': 'same-origin',
-        'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36',
+        'user-agent': userAgent,
         'x-requested-with': 'XMLHttpRequest',
         'Cookie': `store__id=${storeId}; PHPSESSID=${sessionId}; store_name=${encodeURIComponent(storeName)}; member_id=${memberId}; username=${encodeURIComponent(username || '')}; first_name=${encodeURIComponent(firstName || '')}; last_name=${encodeURIComponent(lastName || '')}; email=${encodeURIComponent(email || '')}; cardNum=${cardNum || ''}`
       };
