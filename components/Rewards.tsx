@@ -70,44 +70,43 @@ export const Rewards = () => {
         return;
       }
       
-      // Get stored auth cookies
-      const authCookiesStr = await getPreference('auth_cookies');
-      if (!authCookiesStr) {
-        Alert.alert('Error', 'Authentication information not found. Please log in again.');
-        return;
-      }
+      // Extract required data for the request
+      const { memberId, storeId, storeName, sessionId, username, firstName, lastName, email, cardNum } = sessionData;
       
-      // Parse the stored cookies and format them for the Cookie header
-      const authCookies = JSON.parse(authCookiesStr) as Record<string, string>;
-      const cookieHeader = Object.entries(authCookies)
-        .filter(([name]) => name.trim() !== '') // Filter out empty cookie names
-        .map(([name, value]) => `${name.trim()}=${value.trim()}`)
-        .join('; ');
-      
-      if (!cookieHeader) {
-        Alert.alert('Error', 'No valid authentication cookies found. Please log in again.');
-        return;
-      }
-      
-      // Prepare form data from session
+      // Prepare form data
       const formData = new URLSearchParams({
         'chitCode': rewardId,
         'chitRewardType': encodeURIComponent(rewardType),
-        'chitStoreName': encodeURIComponent(sessionData.storeName),
-        'chitUserId': sessionData.memberId
+        'chitStoreName': encodeURIComponent(storeName),
+        'chitUserId': memberId
       }).toString();
       
-      console.log('Making API call with cookies:', cookieHeader);
+      // Set up request headers with proper cookie formatting
+      const headers = {
+        'accept': '*/*',
+        'accept-language': 'en-US,en;q=0.9',
+        'content-type': 'application/x-www-form-urlencoded; charset=UTF-8',
+        'origin': 'https://tapthatapp.beerknurd.com',
+        'referer': 'https://tapthatapp.beerknurd.com/member-dash.php',
+        'sec-ch-ua': '"Chromium";v="134", "Not:A-Brand";v="24", "Google Chrome";v="134"',
+        'sec-ch-ua-mobile': '?0',
+        'sec-ch-ua-platform': '"macOS"',
+        'sec-fetch-dest': 'empty',
+        'sec-fetch-mode': 'cors',
+        'sec-fetch-site': 'same-origin',
+        'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36',
+        'x-requested-with': 'XMLHttpRequest',
+        'Cookie': `store__id=${storeId}; PHPSESSID=${sessionId}; store_name=${encodeURIComponent(storeName)}; member_id=${memberId}; username=${encodeURIComponent(username || '')}; first_name=${encodeURIComponent(firstName || '')}; last_name=${encodeURIComponent(lastName || '')}; email=${encodeURIComponent(email || '')}; cardNum=${cardNum || ''}`
+      };
+      
+      console.log('Making API call with session data:', {
+        memberId, storeId, storeName, sessionId: sessionId.substring(0, 5) + '...'
+      });
       
       // Make the API call
       const response = await fetch('https://tapthatapp.beerknurd.com/addToRewardQueue.php', {
         method: 'POST',
-        headers: {
-          'Accept': '*/*',
-          'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-          'X-Requested-With': 'XMLHttpRequest',
-          'Cookie': cookieHeader,
-        },
+        headers: headers,
         body: formData,
       });
       
