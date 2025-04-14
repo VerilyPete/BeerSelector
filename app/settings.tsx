@@ -556,54 +556,12 @@ export default function SettingsScreen() {
             thirdPartyCookiesEnabled={true}
             originWhitelist={['*']}
             allowsInlineMediaPlayback={true}
-            userAgent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36"
+            applicationNameForUserAgent="Untappd"
+            incognito={false}
+            mediaPlaybackRequiresUserAction={false}
             onLoadStart={() => setUntappdWebViewLoading(true)}
             onLoadEnd={() => {
               setUntappdWebViewLoading(false);
-              
-              // Inject JavaScript to enhance the login form for password autofill
-              if (untappdWebViewRef.current && untappdWebViewRef.current.injectJavaScript) {
-                untappdWebViewRef.current.injectJavaScript(`
-                  (function() {
-                    try {
-                      // Wait a moment for the form to fully load
-                      setTimeout(() => {
-                        // Find the login form
-                        const loginForm = document.querySelector('form');
-                        
-                        if (loginForm) {
-                          // Add autofill attributes to the form
-                          loginForm.setAttribute('data-1password-ignore', 'false');
-                          
-                          // Find username and password fields
-                          const usernameField = document.querySelector('input[type="text"], input[name="username"], input[name="user"], input[name="email"]');
-                          const passwordField = document.querySelector('input[type="password"]');
-                          
-                          if (usernameField) {
-                            // Add iOS autofill attributes to username field
-                            usernameField.setAttribute('autocomplete', 'username');
-                            usernameField.setAttribute('data-1password-ignore', 'false');
-                          }
-                          
-                          if (passwordField) {
-                            // Add iOS autofill attributes to password field
-                            passwordField.setAttribute('autocomplete', 'current-password');
-                            passwordField.setAttribute('data-1password-ignore', 'false');
-                          }
-                          
-                          console.log('Enhanced login form with password autofill attributes');
-                        } else {
-                          console.log('Login form not found');
-                        }
-                      }, 1000); // Wait 1 second for the form to be fully loaded
-                    } catch (err) {
-                      console.error('Error enhancing login form:', err);
-                    }
-                    
-                    return true;
-                  })();
-                `);
-              }
             }}
             renderLoading={() => (
               <View style={styles.webViewLoadingContainer}>
