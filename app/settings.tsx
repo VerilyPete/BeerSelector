@@ -263,46 +263,6 @@ export default function SettingsScreen() {
     Alert.alert('Login Cancelled', 'The login process was cancelled.');
   };
 
-  // Function to reset API URLs
-  const handleResetApiUrls = async () => {
-    try {
-      Alert.alert(
-        'Reset API URLs',
-        'Are you sure you want to reset the API URLs? This will clear the current endpoints.',
-        [
-          {
-            text: 'Cancel',
-            style: 'cancel'
-          },
-          {
-            text: 'Reset',
-            style: 'destructive',
-            onPress: async () => {
-              // Clear the API URL preferences
-              await setPreference('all_beers_api_url', '', 'API endpoint for fetching all beers');
-              await setPreference('my_beers_api_url', '', 'API endpoint for fetching my beers');
-              
-              // Also clear the login timestamp if it exists
-              try {
-                await setPreference('last_login_timestamp', '', 'Last successful login timestamp');
-              } catch (err) {
-                // Ignore if this preference doesn't exist
-              }
-              
-              // Reload preferences to reflect changes
-              await loadPreferences();
-              
-              Alert.alert('Success', 'API URL preferences have been reset.');
-            }
-          }
-        ]
-      );
-    } catch (error) {
-      console.error('Error resetting API URLs:', error);
-      Alert.alert('Error', 'Failed to reset API URLs. Please try again.');
-    }
-  };
-
   // Function to create a mock session for testing (dev only)
   const handleCreateMockSession = async () => {
     try {
@@ -460,23 +420,6 @@ export default function SettingsScreen() {
                   </ThemedText>
                 </TouchableOpacity>
 
-                {/* Only show Reset API URLs button if they are configured */}
-                {apiUrlsConfigured && (
-                  <TouchableOpacity 
-                    style={[
-                      styles.dataButton, 
-                      styles.resetButton,
-                      { borderColor: borderColor }
-                    ]}
-                    onPress={handleResetApiUrls}
-                    disabled={refreshing || loginLoading}
-                  >
-                    <ThemedText style={styles.resetButtonText}>
-                      Reset API URLs
-                    </ThemedText>
-                  </TouchableOpacity>
-                )}
-                
                 {/* Return to Home button - show when API URLs are configured but we're on first launch */}
                 {apiUrlsConfigured && !canGoBack && (
                   <TouchableOpacity 
@@ -496,24 +439,6 @@ export default function SettingsScreen() {
                       Go to Home Screen
                     </ThemedText>
                   </TouchableOpacity>
-                )}
-              </View>
-            </View>
-
-            {/* Debug Section */}
-            <View style={[styles.section, { backgroundColor: cardColor }]}>
-              <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>Debug Information</ThemedText>
-              
-              <View style={styles.debugContainer}>
-                <ThemedText style={styles.debugTitle}>Authentication Cookies:</ThemedText>
-                {preferences.find(p => p.key === 'auth_cookies')?.value ? (
-                  <View style={styles.cookieContainer}>
-                    <ThemedText style={styles.cookieText}>
-                      {JSON.stringify(JSON.parse(preferences.find(p => p.key === 'auth_cookies')?.value || '{}'), null, 2)}
-                    </ThemedText>
-                  </View>
-                ) : (
-                  <ThemedText style={styles.noCookiesText}>No cookies stored</ThemedText>
                 )}
               </View>
             </View>
@@ -688,28 +613,6 @@ const styles = StyleSheet.create({
   homeButton: {
     marginTop: 12,
     backgroundColor: '#34C759',
-  },
-  debugContainer: {
-    padding: 12,
-  },
-  debugTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  cookieContainer: {
-    backgroundColor: 'rgba(0, 0, 0, 0.05)',
-    borderRadius: 8,
-    padding: 8,
-  },
-  cookieText: {
-    fontSize: 12,
-    fontFamily: 'SpaceMono',
-  },
-  noCookiesText: {
-    fontSize: 12,
-    fontStyle: 'italic',
-    opacity: 0.7,
   },
   devButton: {
     backgroundColor: '#E91E63',
