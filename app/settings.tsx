@@ -401,24 +401,26 @@ export default function SettingsScreen() {
                   </TouchableOpacity>
                 )}
 
-                {/* Login Button */}
-                <TouchableOpacity 
-                  style={[
-                    styles.dataButton, 
-                    styles.loginButton,
-                    { 
-                      backgroundColor: loginLoading ? '#88AAFF' : '#007AFF',
-                      borderColor: borderColor,
-                      marginTop: apiUrlsConfigured ? 12 : 0
-                    }
-                  ]}
-                  onPress={handleLogin}
-                  disabled={loginLoading || refreshing}
-                >
-                  <ThemedText style={styles.dataButtonText}>
-                    {loginLoading ? 'Logging in...' : 'Login to Flying Saucer'}
-                  </ThemedText>
-                </TouchableOpacity>
+                {/* Login Button - Only show if NOT on first login */}
+                {!isFirstLogin && (
+                  <TouchableOpacity 
+                    style={[
+                      styles.dataButton, 
+                      styles.loginButton,
+                      { 
+                        backgroundColor: loginLoading ? '#88AAFF' : '#007AFF',
+                        borderColor: borderColor,
+                        marginTop: apiUrlsConfigured ? 12 : 0
+                      }
+                    ]}
+                    onPress={handleLogin}
+                    disabled={loginLoading || refreshing}
+                  >
+                    <ThemedText style={styles.dataButtonText}>
+                      {loginLoading ? 'Logging in...' : 'Login to Flying Saucer'}
+                    </ThemedText>
+                  </TouchableOpacity>
+                )}
 
                 {/* Return to Home button - show when API URLs are configured but we're on first launch */}
                 {apiUrlsConfigured && !canGoBack && (
