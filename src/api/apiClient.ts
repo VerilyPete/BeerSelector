@@ -1,5 +1,5 @@
 import { getSessionData } from './sessionManager';
-import { autoLogin } from './authService';
+import { getCurrentSession } from './sessionValidator';
 
 interface ApiClientOptions {
   baseUrl?: string;
@@ -37,21 +37,10 @@ export class ApiClient {
     // Create a new session promise
     this.sessionPromise = (async () => {
       try {
-        // Try to get existing session
-        let sessionData = await getSessionData();
-        
-        // If no session or invalid session, try auto-login
-        if (!sessionData || !sessionData.memberId || !sessionData.storeId || !sessionData.storeName || !sessionData.sessionId) {
-          console.log('Session invalid or missing, attempting auto-login');
-          const loginResult = await autoLogin();
-          
-          if (!loginResult.success) {
-            throw new Error('No valid session available');
-          }
-          
-          sessionData = loginResult.sessionData!;
+        const sessionData = await getCurrentSession();
+        if (!sessionData) {
+          throw new Error('No valid session available');
         }
-        
         this.sessionData = sessionData;
         return sessionData;
       } catch (error) {

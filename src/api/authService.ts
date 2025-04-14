@@ -1,8 +1,6 @@
-import { ApiClient } from './apiClient';
 import { saveSessionData, clearSessionData, SessionData } from './sessionManager';
+import { getApiClient } from './apiClientInstance';
 import { getPreference } from '../database/db';
-
-const apiClient = ApiClient.getInstance();
 
 interface LoginResult {
   success: boolean;
@@ -17,6 +15,7 @@ interface LoginResult {
  */
 export async function autoLogin(): Promise<LoginResult> {
   try {
+    const apiClient = getApiClient();
     const response = await apiClient.post('/auto-login.php', {});
     const data = await response.json();
     
@@ -100,6 +99,7 @@ export const handleTapThatAppLogin = async (
  */
 export async function logout(): Promise<boolean> {
   try {
+    const apiClient = getApiClient();
     await apiClient.post('/logout.php', {});
     await clearSessionData();
     return true;
@@ -128,4 +128,35 @@ const parseCookiesString = (cookiesString: string): Record<string, string> => {
   });
   
   return cookies;
-}; 
+};
+
+export async function login(username: string, password: string): Promise<LoginResult> {
+  try {
+    const apiClient = getApiClient();
+    const response = await apiClient.post('/login.php', {
+      username,
+      password
+    });
+
+    const data = await response.json();
+    
+    if (data.success) {
+      await saveSessionData(data.session);
+      return {
+        success: true,
+        data
+      };
+    } else {
+      return {
+        success: false,
+        error: data.error || 'Login failed'
+      };
+    }
+  } catch (error) {
+    console.error('Error during login:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error occurred'
+    };
+  }
+} 

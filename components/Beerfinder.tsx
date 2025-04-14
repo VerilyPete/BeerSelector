@@ -354,12 +354,14 @@ export const Beerfinder = () => {
       
       // Uncomment to log the full HTML for debugging
       // Split into chunks to avoid console truncation
+      /*
       console.log('=== FULL HTML START ===');
       const chunkSize = 1000;
       for (let i = 0; i < html.length; i += chunkSize) {
         console.log(html.substring(i, i + chunkSize));
       }
       console.log('=== FULL HTML END ===');
+      */
       
       if (brewListMatch) {
         console.log('brewList content sample:', brewListMatch[1].substring(0, 150));
