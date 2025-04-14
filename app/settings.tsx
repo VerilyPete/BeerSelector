@@ -11,7 +11,7 @@ import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { useColorScheme } from '@/hooks/useColorScheme';
-import { refreshAllDataFromAPI, getAllPreferences, setPreference } from '@/src/database/db';
+import { refreshAllDataFromAPI, getAllPreferences, setPreference, setUntappdCookie, isUntappdLoggedIn } from '@/src/database/db';
 import { LoadingIndicator } from '@/components/LoadingIndicator';
 import Constants from 'expo-constants';
 import { createMockSession } from '@/src/api/mockSession';
@@ -37,15 +37,20 @@ export default function SettingsScreen() {
   const [preferences, setPreferences] = useState<Preference[]>([]);
   const [loading, setLoading] = useState(true);
   const [loginLoading, setLoginLoading] = useState(false);
+  const [untappdLoginLoading, setUntappdLoginLoading] = useState(false);
   const [webviewVisible, setWebviewVisible] = useState(false);
+  const [untappdWebviewVisible, setUntappdWebviewVisible] = useState(false);
   const webViewRef = useRef<WebView>(null);
+  const untappdWebViewRef = useRef<WebView>(null);
   const [apiUrlsConfigured, setApiUrlsConfigured] = useState(false);
   const [isFirstLogin, setIsFirstLogin] = useState(false);
   const [canGoBack, setCanGoBack] = useState(false);
+  const [untappdLoggedInStatus, setUntappdLoggedInStatus] = useState(false);
 
   // Load preferences on component mount and check if we can go back
   useEffect(() => {
     loadPreferences();
+    checkUntappdLoginStatus();
     
     // Check if this is the initial route or if we can go back
     try {
@@ -55,6 +60,17 @@ export default function SettingsScreen() {
       setCanGoBack(false);
     }
   }, []);
+  
+  // Function to check Untappd login status
+  const checkUntappdLoginStatus = async () => {
+    try {
+      const loggedIn = await isUntappdLoggedIn();
+      setUntappdLoggedInStatus(loggedIn);
+    } catch (error) {
+      console.error('Error checking Untappd login status:', error);
+      setUntappdLoggedInStatus(false);
+    }
+  };
 
   // Function to load preferences from the database
   const loadPreferences = async () => {
@@ -110,6 +126,18 @@ export default function SettingsScreen() {
       console.error('Login dialog error:', error);
       Alert.alert('Error', 'Failed to start the login process.');
       setLoginLoading(false);
+    }
+  };
+
+  // Function to handle the Untappd login process using WebView
+  const handleUntappdLogin = async () => {
+    try {
+      setUntappdLoginLoading(true);
+      setUntappdWebviewVisible(true);
+    } catch (error) {
+      console.error('Untappd login dialog error:', error);
+      Alert.alert('Error', 'Failed to start the Untappd login process.');
+      setUntappdLoginLoading(false);
     }
   };
 
@@ -194,6 +222,57 @@ export default function SettingsScreen() {
     }
   };
 
+  // Handle Untappd WebView navigation state changes
+  const handleUntappdWebViewNavigationStateChange = (navState: WebViewNavigation) => {
+    // Check if we're successfully logged in
+    if (navState.url.includes('untappd.com') && !navState.url.includes('login')) {
+      // If we're on a page after login, we can extract cookies
+      if (untappdWebViewRef.current) {
+        untappdWebViewRef.current.injectJavaScript(`
+          (function() {
+            try {
+              // Get all cookies
+              const cookies = document.cookie.split(';').reduce((acc, cookie) => {
+                const [name, value] = cookie.trim().split('=');
+                if (name && value) {
+                  acc[name] = value;
+                }
+                return acc;
+              }, {});
+              
+              // Send cookies back to React Native
+              window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'UNTAPPD_COOKIES',
+                cookies
+              }));
+              
+              // Also try to get any HTTP-only cookies via headers by making a fetch request
+              fetch(window.location.href, {
+                method: 'GET',
+                credentials: 'include'
+              })
+              .then(response => {
+                // Unfortunately, we can't directly access Set-Cookie headers due to browser restrictions
+                // But we'll try to capture what we can from the response
+                window.ReactNativeWebView.postMessage(JSON.stringify({
+                  type: 'UNTAPPD_LOGGED_IN',
+                  url: window.location.href
+                }));
+              })
+              .catch(err => {
+                console.error('Error fetching:', err);
+              });
+            } catch (err) {
+              console.error('Error in cookie extraction:', err);
+            }
+            
+            true; // Return statement needed for Android
+          })();
+        `);
+      }
+    }
+  };
+
   // Handle messages from WebView
   const handleWebViewMessage = (event: WebViewMessageEvent) => {
     try {
@@ -253,11 +332,63 @@ export default function SettingsScreen() {
     }
   };
 
+  // Handle messages from Untappd WebView
+  const handleUntappdWebViewMessage = (event: WebViewMessageEvent) => {
+    try {
+      const data = JSON.parse(event.nativeEvent.data);
+      
+      if (data.type === 'UNTAPPD_COOKIES') {
+        const { cookies } = data;
+        
+        // Save each cookie to the database
+        Object.entries(cookies).forEach(([name, value]) => {
+          setUntappdCookie(name, value as string, `Untappd cookie: ${name}`);
+        });
+        
+        // Save login timestamp
+        setUntappdCookie('last_login_timestamp', new Date().toISOString(), 'Last successful Untappd login timestamp');
+      }
+      
+      if (data.type === 'UNTAPPD_LOGGED_IN') {
+        // Update login status
+        setUntappdLoggedInStatus(true);
+        
+        // Show success message and close WebView
+        Alert.alert(
+          'Untappd Login Successful',
+          'You are now logged in to Untappd.',
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                // Reset login loading state
+                setUntappdLoginLoading(false);
+                
+                // Close the WebView
+                setUntappdWebviewVisible(false);
+              }
+            }
+          ]
+        );
+      }
+    } catch (error) {
+      console.error('Error handling Untappd WebView message:', error);
+      setUntappdLoginLoading(false);
+    }
+  };
+
   // Function to close the WebView and cancel login
   const closeWebView = () => {
     setWebviewVisible(false);
     setLoginLoading(false);
     Alert.alert('Login Cancelled', 'The login process was cancelled.');
+  };
+
+  // Function to close the Untappd WebView and cancel login
+  const closeUntappdWebView = () => {
+    setUntappdWebviewVisible(false);
+    setUntappdLoginLoading(false);
+    Alert.alert('Untappd Login Cancelled', 'The Untappd login process was cancelled.');
   };
 
   // Function to create a mock session for testing (dev only)
@@ -307,6 +438,33 @@ export default function SettingsScreen() {
             source={{ uri: 'https://tapthatapp.beerknurd.com/kiosk.php' }}
             onNavigationStateChange={handleWebViewNavigationStateChange}
             onMessage={handleWebViewMessage}
+            style={{ flex: 1 }}
+            javaScriptEnabled={true}
+            domStorageEnabled={true}
+            sharedCookiesEnabled={true}
+          />
+        </SafeAreaView>
+      </Modal>
+      
+      {/* Untappd WebView Modal */}
+      <Modal
+        visible={untappdWebviewVisible}
+        animationType="slide"
+        onRequestClose={closeUntappdWebView}
+      >
+        <SafeAreaView style={{ flex: 1 }}>
+          <View style={styles.webViewHeader}>
+            <TouchableOpacity onPress={closeUntappdWebView} style={styles.closeButton}>
+              <IconSymbol name="xmark" size={22} color={tintColor} />
+            </TouchableOpacity>
+            <ThemedText style={styles.webViewTitle}>Untappd Login</ThemedText>
+          </View>
+          
+          <WebView
+            ref={untappdWebViewRef}
+            source={{ uri: 'https://untappd.com/login' }}
+            onNavigationStateChange={handleUntappdWebViewNavigationStateChange}
+            onMessage={handleUntappdWebViewMessage}
             style={{ flex: 1 }}
             javaScriptEnabled={true}
             domStorageEnabled={true}
@@ -421,6 +579,29 @@ export default function SettingsScreen() {
                       </ThemedText>
                     </TouchableOpacity>
                   )}
+
+                  {/* Untappd Login Button - Always show */}
+                  <TouchableOpacity 
+                    style={[
+                      styles.dataButton, 
+                      styles.untappdButton,
+                      { 
+                        backgroundColor: untappdLoginLoading ? '#F8A34A' : '#FFAC33',
+                        borderColor: borderColor,
+                        marginTop: 12
+                      }
+                    ]}
+                    onPress={handleUntappdLogin}
+                    disabled={untappdLoginLoading || refreshing}
+                  >
+                    <ThemedText style={styles.dataButtonText}>
+                      {untappdLoginLoading 
+                        ? 'Logging in...' 
+                        : untappdLoggedInStatus 
+                          ? 'Reconnect to Untappd' 
+                          : 'Login to Untappd'}
+                    </ThemedText>
+                  </TouchableOpacity>
 
                   {/* Return to Home button - show when API URLs are configured but we're on first launch */}
                   {apiUrlsConfigured && !canGoBack && (
@@ -640,5 +821,9 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 8,
     backgroundColor: '#007AFF',
+  },
+  untappdButton: {
+    marginTop: 12,
+    backgroundColor: '#FFAC33',
   },
 }); 

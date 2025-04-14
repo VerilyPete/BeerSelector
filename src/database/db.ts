@@ -119,6 +119,15 @@ export const setupDatabase = async (): Promise<void> => {
         )
       `);
       
+      // Create untappd table to store untappd session cookies
+      await database.execAsync(`
+        CREATE TABLE IF NOT EXISTS untappd (
+          key TEXT PRIMARY KEY,
+          value TEXT,
+          description TEXT
+        )
+      `);
+      
       // Initialize preferences with API endpoints if they don't exist
       await initializePreferences(database);
       
@@ -234,6 +243,73 @@ export const getAllPreferences = async (): Promise<Array<{ key: string, value: s
     console.error('Error getting all preferences:', error);
     return [];
   }
+};
+
+// Helper functions for Untappd cookies
+export const getUntappdCookie = async (key: string): Promise<string | null> => {
+  const database = await initDatabase();
+  
+  try {
+    const result = await database.getFirstAsync<{ value: string }>(
+      'SELECT value FROM untappd WHERE key = ?',
+      [key]
+    );
+    
+    return result ? result.value : null;
+  } catch (error) {
+    console.error(`Error getting Untappd cookie ${key}:`, error);
+    return null;
+  }
+};
+
+export const setUntappdCookie = async (key: string, value: string, description?: string): Promise<void> => {
+  const database = await initDatabase();
+  
+  try {
+    // If description is provided, update it; otherwise just update the value
+    if (description) {
+      await database.runAsync(
+        'INSERT OR REPLACE INTO untappd (key, value, description) VALUES (?, ?, ?)',
+        [key, value, description]
+      );
+    } else {
+      // Get the existing description if available
+      const existing = await database.getFirstAsync<{ description: string }>(
+        'SELECT description FROM untappd WHERE key = ?',
+        [key]
+      );
+      
+      await database.runAsync(
+        'INSERT OR REPLACE INTO untappd (key, value, description) VALUES (?, ?, ?)',
+        [key, value, existing?.description || '']
+      );
+    }
+  } catch (error) {
+    console.error(`Error setting Untappd cookie ${key}:`, error);
+    throw error;
+  }
+};
+
+export const getAllUntappdCookies = async (): Promise<Array<{ key: string, value: string, description: string }>> => {
+  const database = await initDatabase();
+  
+  try {
+    const cookies = await database.getAllAsync<{ key: string, value: string, description: string }>(
+      'SELECT key, value, description FROM untappd ORDER BY key'
+    );
+    
+    return cookies || [];
+  } catch (error) {
+    console.error('Error getting all Untappd cookies:', error);
+    return [];
+  }
+};
+
+export const isUntappdLoggedIn = async (): Promise<boolean> => {
+  const cookies = await getAllUntappdCookies();
+  // Check if we have the necessary cookies for an active session
+  // At minimum, we need the untappd_session_t cookie
+  return cookies.some(cookie => cookie.key === 'untappd_session_t' && cookie.value);
 };
 
 // Helper function to retry fetch operations
