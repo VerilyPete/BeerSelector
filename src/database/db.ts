@@ -307,9 +307,24 @@ export const getAllUntappdCookies = async (): Promise<Array<{ key: string, value
 
 export const isUntappdLoggedIn = async (): Promise<boolean> => {
   const cookies = await getAllUntappdCookies();
+  
+  // First check for our custom detection flag which indicates we've detected login via UI elements
+  const loginDetectedViaUI = cookies.some(cookie => cookie.key === 'login_detected_via_ui' && cookie.value === 'true');
+  
+  // Also check for our explicit login detection flag
+  const loginDetectedByApp = cookies.some(cookie => cookie.key === 'untappd_logged_in_detected' && cookie.value === 'true');
+  
   // Check if we have the necessary cookies for an active session
-  // At minimum, we need the untappd_session_t cookie
-  return cookies.some(cookie => cookie.key === 'untappd_session_t' && cookie.value);
+  // At minimum, we would need the untappd_session_t cookie, but we may not have access to it if it's HttpOnly
+  const sessionCookiePresent = cookies.some(cookie => 
+    (cookie.key === 'untappd_session_t' || cookie.key === 'ut_session') && cookie.value
+  );
+  
+  // Consider logged in if we have either:
+  // 1. Detected login via UI elements
+  // 2. Explicitly detected login via navigation or page content
+  // 3. Have a session cookie (which is rare since most are HttpOnly)
+  return loginDetectedViaUI || loginDetectedByApp || sessionCookiePresent;
 };
 
 // Helper function to retry fetch operations

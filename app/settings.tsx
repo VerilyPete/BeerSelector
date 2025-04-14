@@ -38,6 +38,7 @@ export default function SettingsScreen() {
   const [loading, setLoading] = useState(true);
   const [loginLoading, setLoginLoading] = useState(false);
   const [untappdLoginLoading, setUntappdLoginLoading] = useState(false);
+  const [untappdWebViewLoading, setUntappdWebViewLoading] = useState(true);
   const [webviewVisible, setWebviewVisible] = useState(false);
   const [untappdWebviewVisible, setUntappdWebviewVisible] = useState(false);
   const webViewRef = useRef<WebView>(null);
@@ -224,51 +225,88 @@ export default function SettingsScreen() {
 
   // Handle Untappd WebView navigation state changes
   const handleUntappdWebViewNavigationStateChange = (navState: WebViewNavigation) => {
-    // Check if we're successfully logged in
-    if (navState.url.includes('untappd.com') && !navState.url.includes('login')) {
-      // If we're on a page after login, we can extract cookies
-      if (untappdWebViewRef.current) {
-        untappdWebViewRef.current.injectJavaScript(`
-          (function() {
-            try {
-              // Get all cookies
-              const cookies = document.cookie.split(';').reduce((acc, cookie) => {
-                const [name, value] = cookie.trim().split('=');
-                if (name && value) {
-                  acc[name] = value;
-                }
-                return acc;
-              }, {});
-              
-              // Send cookies back to React Native
-              window.ReactNativeWebView.postMessage(JSON.stringify({
-                type: 'UNTAPPD_COOKIES',
-                cookies
-              }));
-              
-              // Also try to get any HTTP-only cookies via headers by making a fetch request
-              fetch(window.location.href, {
-                method: 'GET',
-                credentials: 'include'
-              })
-              .then(response => {
-                // Unfortunately, we can't directly access Set-Cookie headers due to browser restrictions
-                // But we'll try to capture what we can from the response
+    // Log navigation for debugging
+    console.log('Untappd WebView navigating to:', navState.url);
+    
+    // Check if we're on Untappd pages
+    if (navState.url.includes('untappd.com')) {
+      // If we're on the login page, don't do anything special
+      if (navState.url.includes('/login')) {
+        console.log('On Untappd login page');
+      } 
+      // Check if user has navigated to a profile page, dashboard, or home page, which indicates successful login
+      else if (!navState.loading && 
+              (navState.url.includes('/user/') || 
+               navState.url.includes('/dashboard') || 
+               navState.url.includes('/profile') ||
+               navState.url.includes('/home'))) {
+        
+        console.log('User appears to be logged in - on profile/dashboard/home page');
+        
+        // Inject JavaScript to check for logged-in state and extract visible cookies
+        if (untappdWebViewRef.current) {
+          untappdWebViewRef.current.injectJavaScript(`
+            (function() {
+              try {
+                console.log('Checking login state on page');
+                
+                // Check for elements that indicate logged-in state
+                const userMenuElement = document.querySelector('.user-menu') || 
+                                       document.querySelector('.profile-area') || 
+                                       document.querySelector('.user-actions');
+                
+                const isLoggedInElement = document.querySelector('.notifications') || 
+                                         document.querySelector('.account-action') ||
+                                         document.querySelector('.user-profile-area');
+                
+                // Check if logout link exists, which definitely indicates logged in state
+                const logoutLink = Array.from(document.querySelectorAll('a')).find(
+                  a => a.textContent && (a.textContent.includes('Logout') || a.textContent.includes('Sign Out'))
+                );
+                
+                // Get any visible cookies we can access
+                const cookieString = document.cookie;
+                const cookies = cookieString.split(';').reduce((acc, cookie) => {
+                  const [name, value] = cookie.trim().split('=');
+                  if (name && value) {
+                    acc[name] = value;
+                  }
+                  return acc;
+                }, {});
+                
+                // Send results back to React Native
                 window.ReactNativeWebView.postMessage(JSON.stringify({
-                  type: 'UNTAPPD_LOGGED_IN',
-                  url: window.location.href
+                  type: 'UNTAPPD_LOGIN_CHECK',
+                  userMenuExists: !!userMenuElement,
+                  isLoggedInElementExists: !!isLoggedInElement,
+                  logoutLinkExists: !!logoutLink,
+                  cookiesAvailable: Object.keys(cookies),
+                  url: window.location.href,
+                  pageTitle: document.title
                 }));
-              })
-              .catch(err => {
-                console.error('Error fetching:', err);
-              });
-            } catch (err) {
-              console.error('Error in cookie extraction:', err);
-            }
-            
-            true; // Return statement needed for Android
-          })();
-        `);
+                
+                // If we have evidence the user is logged in, notify the app
+                if (userMenuElement || isLoggedInElement || logoutLink) {
+                  window.ReactNativeWebView.postMessage(JSON.stringify({
+                    type: 'UNTAPPD_LOGGED_IN',
+                    url: window.location.href,
+                    method: 'page_element_detection'
+                  }));
+                  
+                  // Also send any non-HttpOnly cookies we can access
+                  window.ReactNativeWebView.postMessage(JSON.stringify({
+                    type: 'UNTAPPD_COOKIES',
+                    cookies
+                  }));
+                }
+              } catch (err) {
+                console.error('Error in login detection:', err);
+              }
+              
+              true; // Return statement needed for Android
+            })();
+          `);
+        }
       }
     }
   };
@@ -335,41 +373,87 @@ export default function SettingsScreen() {
   // Handle messages from Untappd WebView
   const handleUntappdWebViewMessage = (event: WebViewMessageEvent) => {
     try {
+      console.log('Received message from Untappd WebView');
       const data = JSON.parse(event.nativeEvent.data);
+      console.log('Message type:', data.type);
       
+      // Process detailed login check results
+      if (data.type === 'UNTAPPD_LOGIN_CHECK') {
+        console.log('Login check details:', {
+          userMenuExists: data.userMenuExists,
+          isLoggedInElementExists: data.isLoggedInElementExists,
+          logoutLinkExists: data.logoutLinkExists,
+          cookiesAvailable: data.cookiesAvailable,
+          url: data.url,
+          pageTitle: data.pageTitle
+        });
+        
+        // Store this information for debugging but don't take action yet
+        setUntappdCookie('login_check_result', JSON.stringify(data), 'Login check results from page');
+      }
+      
+      // Process cookies received from WebView
       if (data.type === 'UNTAPPD_COOKIES') {
         const { cookies } = data;
+        console.log('Received cookies keys:', Object.keys(cookies));
+        
+        if (Object.keys(cookies).length === 0) {
+          console.log('No cookies received, user probably not logged in yet');
+          return;
+        }
+        
+        // We don't have access to HttpOnly cookies, but we'll still save the visible ones
+        // and mark the user as logged in based on the UI detection
         
         // Save each cookie to the database
         Object.entries(cookies).forEach(([name, value]) => {
+          console.log(`Saving cookie: ${name}`);
           setUntappdCookie(name, value as string, `Untappd cookie: ${name}`);
         });
         
         // Save login timestamp
         setUntappdCookie('last_login_timestamp', new Date().toISOString(), 'Last successful Untappd login timestamp');
+        
+        // Save that we had a successful login detection via UI elements
+        setUntappdCookie('login_detected_via_ui', 'true', 'Login was detected via UI elements');
       }
       
+      // Explicit login confirmation message
       if (data.type === 'UNTAPPD_LOGGED_IN') {
-        // Update login status
-        setUntappdLoggedInStatus(true);
+        console.log('Login confirmed via:', data.method || 'url navigation');
         
-        // Show success message and close WebView
-        Alert.alert(
-          'Untappd Login Successful',
-          'You are now logged in to Untappd.',
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                // Reset login loading state
-                setUntappdLoginLoading(false);
-                
-                // Close the WebView
-                setUntappdWebviewVisible(false);
+        // Only consider the login successful if we're on a user profile, dashboard or home page
+        if (data.url && (data.url.includes('/user/') || 
+                         data.url.includes('/dashboard') || 
+                         data.url.includes('/profile') ||
+                         data.url.includes('/home'))) {
+          
+          // Update login status
+          setUntappdLoggedInStatus(true);
+          
+          // Set a special cookie to mark that we've detected login
+          setUntappdCookie('untappd_logged_in_detected', 'true', 'Login was detected by app');
+          
+          // Show success message and close WebView
+          Alert.alert(
+            'Untappd Login Successful',
+            'You are now logged in to Untappd.',
+            [
+              {
+                text: 'OK',
+                onPress: () => {
+                  // Reset login loading state
+                  setUntappdLoginLoading(false);
+                  
+                  // Close the WebView
+                  setUntappdWebviewVisible(false);
+                }
               }
-            }
-          ]
-        );
+            ]
+          );
+        } else {
+          console.log('Login message received but not from a profile/home page, ignoring');
+        }
       }
     } catch (error) {
       console.error('Error handling Untappd WebView message:', error);
@@ -469,6 +553,65 @@ export default function SettingsScreen() {
             javaScriptEnabled={true}
             domStorageEnabled={true}
             sharedCookiesEnabled={true}
+            thirdPartyCookiesEnabled={true}
+            originWhitelist={['*']}
+            allowsInlineMediaPlayback={true}
+            userAgent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36"
+            onLoadStart={() => setUntappdWebViewLoading(true)}
+            onLoadEnd={() => {
+              setUntappdWebViewLoading(false);
+              
+              // Inject JavaScript to enhance the login form for password autofill
+              if (untappdWebViewRef.current && untappdWebViewRef.current.injectJavaScript) {
+                untappdWebViewRef.current.injectJavaScript(`
+                  (function() {
+                    try {
+                      // Wait a moment for the form to fully load
+                      setTimeout(() => {
+                        // Find the login form
+                        const loginForm = document.querySelector('form');
+                        
+                        if (loginForm) {
+                          // Add autofill attributes to the form
+                          loginForm.setAttribute('data-1password-ignore', 'false');
+                          
+                          // Find username and password fields
+                          const usernameField = document.querySelector('input[type="text"], input[name="username"], input[name="user"], input[name="email"]');
+                          const passwordField = document.querySelector('input[type="password"]');
+                          
+                          if (usernameField) {
+                            // Add iOS autofill attributes to username field
+                            usernameField.setAttribute('autocomplete', 'username');
+                            usernameField.setAttribute('data-1password-ignore', 'false');
+                          }
+                          
+                          if (passwordField) {
+                            // Add iOS autofill attributes to password field
+                            passwordField.setAttribute('autocomplete', 'current-password');
+                            passwordField.setAttribute('data-1password-ignore', 'false');
+                          }
+                          
+                          console.log('Enhanced login form with password autofill attributes');
+                        } else {
+                          console.log('Login form not found');
+                        }
+                      }, 1000); // Wait 1 second for the form to be fully loaded
+                    } catch (err) {
+                      console.error('Error enhancing login form:', err);
+                    }
+                    
+                    return true;
+                  })();
+                `);
+              }
+            }}
+            renderLoading={() => (
+              <View style={styles.webViewLoadingContainer}>
+                <ActivityIndicator size="large" color="#FFAC33" />
+                <ThemedText style={styles.webViewLoadingText}>Loading Untappd...</ThemedText>
+              </View>
+            )}
+            startInLoadingState={true}
           />
         </SafeAreaView>
       </Modal>
@@ -825,5 +968,28 @@ const styles = StyleSheet.create({
   untappdButton: {
     marginTop: 12,
     backgroundColor: '#FFAC33',
+  },
+  loginPageButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(200, 200, 200, 0.3)',
+  },
+  loginPageButtonText: {
+    color: '#FF3B30',
+    fontWeight: 'bold',
+  },
+  webViewLoadingContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+  },
+  webViewLoadingText: {
+    marginTop: 10,
+    fontSize: 16,
   },
 }); 
