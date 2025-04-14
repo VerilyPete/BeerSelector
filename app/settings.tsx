@@ -162,21 +162,32 @@ export default function SettingsScreen() {
               }
             }
 
-            // Get all cookies
-            const cookies = document.cookie.split(';').reduce((acc, cookie) => {
-              const [key, value] = cookie.trim().split('=');
-              acc[key] = value;
-              return acc;
-            }, {});
-            
-            // Send the results back to React Native
-            window.ReactNativeWebView.postMessage(JSON.stringify({
-              type: 'URLs',
-              userJsonUrl,
-              storeJsonUrl,
-              html: html.substring(0, 1000), // Send a portion of HTML for debugging
-              cookies: cookies
-            }));
+            // Make a fetch request to the current page to get cookies from headers
+            fetch(window.location.href, {
+              credentials: 'include'
+            }).then(response => {
+              // Get cookies from response headers
+              const cookies = {};
+              const cookieHeader = response.headers.get('set-cookie');
+              if (cookieHeader) {
+                cookieHeader.split(',').forEach(cookie => {
+                  const [cookiePart] = cookie.split(';');
+                  const [name, value] = cookiePart.split('=');
+                  if (name && value) {
+                    cookies[name.trim()] = value.trim();
+                  }
+                });
+              }
+
+              // Send the results back to React Native
+              window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'URLs',
+                userJsonUrl,
+                storeJsonUrl,
+                html: html.substring(0, 1000), // Send a portion of HTML for debugging
+                cookies: cookies
+              }));
+            });
             
             true; // Return statement needed for Android
           })();
