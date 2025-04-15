@@ -1,0 +1,6 @@
+module Pods_BeerSelector {
+  umbrella header "Pods-BeerSelector-umbrella.h"
+
+  export *
+  module * { export * }
+}
