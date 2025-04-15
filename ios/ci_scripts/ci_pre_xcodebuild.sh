@@ -4,6 +4,11 @@ set -e
 echo "====================== CI PRE-BUILD SCRIPT ======================"
 echo "Starting pre-build process at $(date)"
 
+# Set CI environment variable to indicate we're running in a CI environment
+export CI="true"
+export RUNNING_IN_CI="true"
+echo "Set CI environment variables: CI=true, RUNNING_IN_CI=true"
+
 # Function to handle errors
 handle_error() {
   echo "ERROR: An error occurred on line $1"
@@ -127,6 +132,95 @@ echo "Final verification of critical build components..."
 if [ ! -d "Pods/Headers" ]; then
   echo "WARNING: Pods/Headers directory not found, CocoaPods installation may have issues"
 fi
+
+# Fix for React-hermes directory issue
+HERMES_DIR="${DERIVED_DATA_PATH}/Build/Intermediates.noindex/ArchiveIntermediates/BeerSelector/BuildProductsPath/Release-iphoneos/React-hermes"
+if [ -d "$HERMES_DIR" ]; then
+  echo "Found React-hermes directory, creating dummy .a file..."
+  mkdir -p "$HERMES_DIR"
+  touch "$HERMES_DIR/libReact-hermes.a"
+  echo "Created $HERMES_DIR/libReact-hermes.a"
+fi
+
+# For Xcode Cloud, also try this path pattern
+WORKSPACE_HERMES_DIR="/Volumes/workspace/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/BeerSelector/BuildProductsPath/Release-iphoneos/React-hermes"
+if [ -d "$WORKSPACE_HERMES_DIR" ]; then
+  echo "Found Xcode Cloud React-hermes directory, creating dummy .a file..."
+  mkdir -p "$WORKSPACE_HERMES_DIR"
+  touch "$WORKSPACE_HERMES_DIR/libReact-hermes.a"
+  echo "Created $WORKSPACE_HERMES_DIR/libReact-hermes.a"
+fi
+
+# Fix for multiple output files issue in Pods-BeerSelector
+# Create a wrapper for libtool
+LIBTOOL_WRAPPER="/tmp/libtool-wrapper.sh"
+cat > "$LIBTOOL_WRAPPER" << 'EOF'
+#!/bin/bash
+# Wrapper for libtool to handle multiple output files
+
+ORIGINAL_LIBTOOL=/usr/bin/libtool
+ARGS=("$@")
+
+# Check if this is the problematic case (-o flag with multiple .o files)
+HAS_O_FLAG=0
+O_INDEX=-1
+INPUT_FILES=0
+
+for i in "${!ARGS[@]}"; do
+  if [[ "${ARGS[$i]}" == "-o" ]]; then
+    HAS_O_FLAG=1
+    O_INDEX=$i
+  fi
+  
+  if [[ "${ARGS[$i]}" == *".o" ]]; then
+    INPUT_FILES=$((INPUT_FILES+1))
+  fi
+done
+
+# If problematic case detected, handle it specially
+if [ $HAS_O_FLAG -eq 1 ] && [ $INPUT_FILES -gt 1 ]; then
+  echo "Fixing libtool call with multiple inputs..."
+  
+  # Get output file
+  OUTPUT_FILE="${ARGS[$O_INDEX+1]}"
+  
+  # Create temp dir
+  TMP_DIR=$(mktemp -d)
+  
+  # Process each input separately
+  SEPARATE_OUTPUTS=()
+  INPUT_INDEX=0
+  
+  for i in "${!ARGS[@]}"; do
+    if [[ "${ARGS[$i]}" == *".o" ]]; then
+      INPUT_FILE="${ARGS[$i]}"
+      TEMP_OUTPUT="$TMP_DIR/out_$INPUT_INDEX.a"
+      
+      # Create separate library
+      "$ORIGINAL_LIBTOOL" -static -o "$TEMP_OUTPUT" "$INPUT_FILE"
+      SEPARATE_OUTPUTS+=("$TEMP_OUTPUT")
+      INPUT_INDEX=$((INPUT_INDEX+1))
+    fi
+  done
+  
+  # Combine all outputs
+  "$ORIGINAL_LIBTOOL" -static -o "$OUTPUT_FILE" "${SEPARATE_OUTPUTS[@]}"
+  
+  # Clean up
+  rm -rf "$TMP_DIR"
+  exit 0
+fi
+
+# Otherwise, pass through to original libtool
+exec "$ORIGINAL_LIBTOOL" "$@"
+EOF
+
+chmod +x "$LIBTOOL_WRAPPER"
+echo "Created libtool wrapper at $LIBTOOL_WRAPPER"
+
+# Export the wrapper to be used during build
+export LIBTOOL="$LIBTOOL_WRAPPER"
+echo "LIBTOOL environment variable set to $LIBTOOL_WRAPPER"
 
 echo "Setup completed successfully at $(date)"
 echo "====================== END OF PRE-BUILD SCRIPT ======================"
