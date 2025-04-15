@@ -79,13 +79,11 @@ export const Rewards = () => {
         ? window.navigator.userAgent 
         : `BeerSelector/${Constants.expoConfig?.version || '1.0.0'} (${Platform.OS}; ${Platform.Version})`;
       
-      // Prepare form data
-      const formData = new URLSearchParams({
-        'chitCode': rewardId,
-        'chitRewardType': encodeURIComponent(rewardType),
-        'chitStoreName': encodeURIComponent(storeName),
-        'chitUserId': memberId
-      }).toString();
+      // Prepare the raw form data string exactly as shown in the curl example
+      // This is critical - using the raw rewardId directly as chitCode, not a compound ID
+      const formData = `chitCode=${rewardId}&chitRewardType=${encodeURIComponent(rewardType)}&chitStoreName=${encodeURIComponent(storeName)}&chitUserId=${memberId}`;
+      
+      console.log('Sending form data:', formData);
       
       // Set up request headers with proper cookie formatting
       const headers = {
@@ -93,7 +91,7 @@ export const Rewards = () => {
         'accept-language': 'en-US,en;q=0.9',
         'content-type': 'application/x-www-form-urlencoded; charset=UTF-8',
         'origin': 'https://tapthatapp.beerknurd.com',
-        'referer': 'https://tapthatapp.beerknurd.com/member-dash.php',
+        'referer': 'https://tapthatapp.beerknurd.com/memberRewards.php', // Changed to match the curl example
         'sec-ch-ua': '"Chromium";v="134", "Not:A-Brand";v="24", "Google Chrome";v="134"',
         'sec-ch-ua-mobile': '?0',
         'sec-ch-ua-platform': '"macOS"',
@@ -116,16 +114,35 @@ export const Rewards = () => {
         body: formData,
       });
       
-      const responseData = await response.text();
-      console.log('API Response:', responseData);
+      const responseText = await response.text();
+      console.log('API Response:', responseText);
       
+      // Handle response similar to checkInBeer method
       if (response.ok) {
-        Alert.alert('Success', `${rewardType} has been added to your queue!`);
+        // If response is empty or too short, still consider it a success
+        if (!responseText || responseText.trim().length < 2) {
+          console.log('Empty response received from server, considering reward queue successful');
+          Alert.alert('Success', `${rewardType} has been added to your queue!`);
+          handleRefresh();
+          return;
+        }
+        
+        try {
+          // Try to parse as JSON if possible
+          const jsonResult = JSON.parse(responseText);
+          console.log('Parsed JSON result:', jsonResult);
+          Alert.alert('Success', `${rewardType} has been added to your queue!`);
+        } catch (parseError) {
+          // If not valid JSON but we got a 200 OK, assume success
+          console.log('Invalid JSON response, but got HTTP 200 OK');
+          Alert.alert('Success', `${rewardType} has been added to your queue!`);
+        }
+        
         // Refresh the data to reflect the change
         handleRefresh();
       } else {
-        console.error('Failed to queue reward:', responseData);
-        Alert.alert('Error', `Failed to queue the reward: ${responseData}`);
+        console.error('Failed to queue reward:', responseText);
+        Alert.alert('Error', `Failed to queue the reward. Status: ${response.status}`);
       }
     } catch (err: any) {
       console.error('Error queuing reward:', err);
