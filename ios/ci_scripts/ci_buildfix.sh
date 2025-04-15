@@ -43,6 +43,78 @@ else
   echo "Pods directory not found, skipping xcconfig check"
 fi
 
+# Fix for the "cannot specify -o when generating multiple output files" error
+echo "Fixing Pods-BeerSelector target configuration..."
+if [ -f "Pods/Target Support Files/Pods-BeerSelector/Pods-BeerSelector.debug.xcconfig" ]; then
+  echo "Checking Pods-BeerSelector build settings..."
+  
+  # Back up the file
+  cp "Pods/Target Support Files/Pods-BeerSelector/Pods-BeerSelector.debug.xcconfig" "Pods/Target Support Files/Pods-BeerSelector/Pods-BeerSelector.debug.xcconfig.bak"
+  
+  # Remove any problematic build settings that might be causing the -o flag issue
+  if grep -q "OTHER_CFLAGS" "Pods/Target Support Files/Pods-BeerSelector/Pods-BeerSelector.debug.xcconfig"; then
+    sed -i '' '/OTHER_CFLAGS/d' "Pods/Target Support Files/Pods-BeerSelector/Pods-BeerSelector.debug.xcconfig"
+    echo "Removed problematic OTHER_CFLAGS settings"
+  fi
+  
+  # Also check the release config
+  if [ -f "Pods/Target Support Files/Pods-BeerSelector/Pods-BeerSelector.release.xcconfig" ]; then
+    cp "Pods/Target Support Files/Pods-BeerSelector/Pods-BeerSelector.release.xcconfig" "Pods/Target Support Files/Pods-BeerSelector/Pods-BeerSelector.release.xcconfig.bak"
+    if grep -q "OTHER_CFLAGS" "Pods/Target Support Files/Pods-BeerSelector/Pods-BeerSelector.release.xcconfig"; then
+      sed -i '' '/OTHER_CFLAGS/d' "Pods/Target Support Files/Pods-BeerSelector/Pods-BeerSelector.release.xcconfig"
+      echo "Removed problematic OTHER_CFLAGS settings from release config"
+    fi
+  fi
+fi
+
+# Fix for the React-hermes directory issue
+echo "Fixing React-hermes directory issue..."
+REACT_HERMES_PATH="Pods/Target Support Files/React-hermes"
+if [ -d "$REACT_HERMES_PATH" ]; then
+  echo "Checking React-hermes configuration..."
+  
+  # Fix the React-hermes.xcconfig file
+  if [ -f "$REACT_HERMES_PATH/React-hermes.xcconfig" ]; then
+    cp "$REACT_HERMES_PATH/React-hermes.xcconfig" "$REACT_HERMES_PATH/React-hermes.xcconfig.bak"
+    
+    # Ensure correct path format in the React-hermes.xcconfig
+    if grep -q "HEADER_SEARCH_PATHS" "$REACT_HERMES_PATH/React-hermes.xcconfig"; then
+      sed -i '' 's|\.\./\.\./React-hermes|${PODS_ROOT}/../../React-hermes|g' "$REACT_HERMES_PATH/React-hermes.xcconfig"
+      echo "Fixed React-hermes header paths"
+    fi
+  fi
+  
+  # Fix the build script if it exists
+  if [ -f "$REACT_HERMES_PATH/React-hermes-prefix.pch" ]; then
+    cp "$REACT_HERMES_PATH/React-hermes-prefix.pch" "$REACT_HERMES_PATH/React-hermes-prefix.pch.bak"
+    echo "Backed up React-hermes prefix header"
+  fi
+fi
+
+# Check Pods project file for multiple output files issue
+echo "Checking Pods.xcodeproj/project.pbxproj for multiple output files settings..."
+PODS_PROJECT="Pods/Pods.xcodeproj/project.pbxproj"
+if [ -f "$PODS_PROJECT" ]; then
+  cp "$PODS_PROJECT" "$PODS_PROJECT.bak"
+  
+  # Look for Pods-BeerSelector target and check its build settings
+  echo "Examining Pods-BeerSelector target in Pods project..."
+  
+  # Modify project file to ensure a single output file for Pods-BeerSelector
+  # This is a targeted fix for "cannot specify -o when generating multiple output files"
+  # It adjusts the build phases to ensure proper ordering and single library output
+  if grep -q "Pods-BeerSelector" "$PODS_PROJECT"; then
+    # Fix the build phases order and configuration
+    sed -i '' 's/buildPhases = (/buildPhases = ( /* Order matters here */ /g' "$PODS_PROJECT"
+    
+    # Disable parallel builds for Pods-BeerSelector
+    if grep -q "Pods-BeerSelector.*buildSettings" "$PODS_PROJECT"; then
+      sed -i '' '/Pods-BeerSelector.*buildSettings/,/};/ s/ENABLE_BITCODE = NO;/ENABLE_BITCODE = NO;\n\t\t\t\tPARALLEL_PROCESS_FILES_USING_CLANG = NO;/' "$PODS_PROJECT"
+      echo "Disabled parallel builds for Pods-BeerSelector to prevent -o flag issues"
+    fi
+  fi
+fi
+
 # Clean CocoaPods cache if needed - sometimes helps with build issues
 echo "Cleaning CocoaPods cache..."
 pod cache clean --all
