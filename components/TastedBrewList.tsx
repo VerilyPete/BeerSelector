@@ -158,7 +158,8 @@ export const TastedBrewList = () => {
         (beer.brew_name && beer.brew_name.toLowerCase().includes(searchLower)) ||
         (beer.brewer && beer.brewer.toLowerCase().includes(searchLower)) ||
         (beer.brew_style && beer.brew_style.toLowerCase().includes(searchLower)) ||
-        (beer.brew_description && beer.brew_description.toLowerCase().includes(searchLower))
+        (beer.brew_description && beer.brew_description.toLowerCase().includes(searchLower)) ||
+        (beer.brewer_loc && beer.brewer_loc.toLowerCase().includes(searchLower))
       );
     }
 
