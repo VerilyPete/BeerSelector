@@ -8,6 +8,14 @@ echo "Starting build fix process at $(date)"
 cd "$(dirname "$0")/.."
 echo "Current directory: $(pwd)"
 
+# Clean CocoaPods cache if needed - sometimes helps with build issues
+echo "Cleaning CocoaPods cache..."
+pod cache clean --all
+
+# Reinstall pods to apply Podfile changes
+echo "Reinstalling CocoaPods..."
+pod install --verbose
+
 # Check xcconfig files for potential issues
 find . -name "*.xcconfig" -exec grep -l "LIBRARY_SEARCH_PATHS" {} \; | while read -r file; do
   echo "Checking $file for potential build issues..."

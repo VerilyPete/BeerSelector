@@ -17,13 +17,12 @@ trap 'handle_error $LINENO' ERR
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 echo "Script directory: $SCRIPT_DIR"
 
-# Check if post-clone script has already run
-# Look in multiple possible locations for the marker file
-POST_CLONE_MARKER="$SCRIPT_DIR/.post_clone_completed"
-if [ ! -f "$POST_CLONE_MARKER" ] && [ -d "$SCRIPT_DIR/../.." ]; then
-  # Try in the iOS directory
-  POST_CLONE_MARKER="$SCRIPT_DIR/../ci_scripts/.post_clone_completed"
-fi
+# Find project root
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+echo "Project root: $PROJECT_ROOT"
+
+# Check if post-clone script has already run - use the well-known location
+POST_CLONE_MARKER="$PROJECT_ROOT/ios/ci_scripts/.post_clone_completed"
 
 POST_CLONE_COMPLETED=false
 if [ -f "$POST_CLONE_MARKER" ]; then
@@ -31,6 +30,12 @@ if [ -f "$POST_CLONE_MARKER" ]; then
   POST_CLONE_COMPLETED=true
 else
   echo "No post-clone marker file found at $POST_CLONE_MARKER"
+  # Try alternate locations as fallback
+  ALTERNATE_MARKER="$SCRIPT_DIR/.post_clone_completed"
+  if [ -f "$ALTERNATE_MARKER" ]; then
+    echo "Found marker file at alternate location: $ALTERNATE_MARKER"
+    POST_CLONE_COMPLETED=true
+  fi
 fi
 
 # Only set up Node.js environment if post-clone hasn't done it

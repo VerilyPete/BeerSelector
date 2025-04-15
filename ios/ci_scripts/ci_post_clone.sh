@@ -22,7 +22,8 @@ else
   # If we're in ios/ci_scripts, go up two levels to reach the project root
   cd "$SCRIPT_DIR/../.."
 fi
-echo "Project root directory: $(pwd)"
+PROJECT_ROOT="$(pwd)"
+echo "Project root directory: $PROJECT_ROOT"
 
 echo "Setting up Node.js environment..."
 export NVM_DIR="${HOME}/.nvm"
@@ -49,16 +50,17 @@ if [ -d "ios" ]; then
   cd ios
   pod install
 else
-  echo "ERROR: iOS directory not found in $(pwd)"
+  echo "ERROR: iOS directory not found in $PROJECT_ROOT"
   echo "Directory contents:"
   ls -la
   exit 1
 fi
 
-# Create a marker file to indicate post-clone has completed
-mkdir -p "$(pwd)/ci_scripts"
-echo "$(date)" > "$(pwd)/ci_scripts/.post_clone_completed"
-echo "Created marker file: $(pwd)/ci_scripts/.post_clone_completed"
+# Create a marker file to indicate post-clone has completed - using absolute path
+mkdir -p "$PROJECT_ROOT/ios/ci_scripts"
+MARKER_FILE="$PROJECT_ROOT/ios/ci_scripts/.post_clone_completed"
+echo "$(date)" > "$MARKER_FILE"
+echo "Created marker file: $MARKER_FILE"
 
 echo "Post-clone setup completed successfully!"
 echo "====================== END OF POST-CLONE SCRIPT ======================" 
