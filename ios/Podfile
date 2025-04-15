@@ -36,6 +36,14 @@ target 'BeerSelector' do
   use_frameworks! :linkage => podfile_properties['ios.useFrameworks'].to_sym if podfile_properties['ios.useFrameworks']
   use_frameworks! :linkage => ENV['USE_FRAMEWORKS'].to_sym if ENV['USE_FRAMEWORKS']
 
+  # Fix for React-hermes directory issue - customize its build settings
+  pod 'React-hermes', :path => '../node_modules/react-native/sdks/hermes' do |hermes|
+    hermes.build_settings['MACH_O_TYPE'] = 'staticlib'
+    hermes.build_settings['EXECUTABLE_EXTENSION'] = 'a'
+    hermes.build_settings['PRODUCT_NAME'] = 'libReact-hermes'
+    hermes.build_settings['INSTALL_PATH'] = '$(LOCAL_LIBRARY_DIR)/Frameworks'
+  end
+
   use_react_native!(
     :path => config[:reactNativePath],
     :hermes_enabled => podfile_properties['expo.jsEngine'] == nil || podfile_properties['expo.jsEngine'] == 'hermes',
@@ -77,6 +85,30 @@ target 'BeerSelector' do
       if ['expo-dev-menu', 'Main', 'ReactNativeCompatibles', 'SafeAreaView', 'Vendored'].include?(target.name)
         target.build_configurations.each do |config|
           config.build_settings['DEFINES_MODULE'] = 'YES'
+        end
+      end
+      
+      # Fix for React-hermes directory issue and -o multiple output files error
+      if target.name == 'React-hermes'
+        target.build_configurations.each do |config|
+          # Ensure React-hermes is treated as a static library to avoid directory issues
+          config.build_settings['MACH_O_TYPE'] = 'staticlib'
+          # Set the product name to the expected static library name
+          config.build_settings['PRODUCT_NAME'] = 'libReact-hermes'
+          # Ensure proper extension
+          config.build_settings['EXECUTABLE_EXTENSION'] = 'a'
+        end
+      end
+      
+      # Fix for Pods-BeerSelector target (multiple output files error)
+      if target.name == 'Pods-BeerSelector'
+        target.build_configurations.each do |config|
+          # Disable parallel processing to avoid -o flag issues
+          config.build_settings['PARALLEL_PROCESS_FILES_USING_CLANG'] = 'NO'
+          # Add custom libtool flags to avoid warnings
+          config.build_settings['OTHER_LIBTOOLFLAGS'] = '-no_warning_for_no_symbols'
+          # Force specific linking behavior
+          config.build_settings['OTHER_LDFLAGS'] = '$(inherited) -ObjC'
         end
       end
     end
