@@ -12,9 +12,33 @@ echo "Current directory: $(pwd)"
 echo "Cleaning CocoaPods cache..."
 pod cache clean --all
 
+# Check if the problematic targets exist and what their DEFINES_MODULE settings are
+echo "Checking for problematic targets in Pods project..."
+XCODEPROJ_PATH="Pods/Pods.xcodeproj"
+if [ -d "$XCODEPROJ_PATH" ]; then
+  echo "Found Pods.xcodeproj, checking for targets with DEFINES_MODULE conflicts..."
+  
+  # Extract build settings for problematic targets using xcodebuild (if available)
+  for TARGET in "expo-dev-menu" "Main" "ReactNativeCompatibles" "SafeAreaView" "Vendored"; do
+    echo "Checking target: $TARGET"
+    xcodebuild -project "$XCODEPROJ_PATH" -target "$TARGET" -showBuildSettings 2>/dev/null | grep DEFINES_MODULE || echo "Target $TARGET not found or DEFINES_MODULE not set"
+  done
+else
+  echo "Pods.xcodeproj not found, skipping target check"
+fi
+
 # Reinstall pods to apply Podfile changes
 echo "Reinstalling CocoaPods..."
 pod install --verbose
+
+# Verify the fix after reinstallation
+echo "Verifying DEFINES_MODULE fixes..."
+if [ -d "$XCODEPROJ_PATH" ]; then
+  for TARGET in "expo-dev-menu" "Main" "ReactNativeCompatibles" "SafeAreaView" "Vendored"; do
+    echo "Checking target: $TARGET after fix"
+    xcodebuild -project "$XCODEPROJ_PATH" -target "$TARGET" -showBuildSettings 2>/dev/null | grep DEFINES_MODULE || echo "Target $TARGET not found or DEFINES_MODULE not set after fix"
+  done
+fi
 
 # Check xcconfig files for potential issues
 find . -name "*.xcconfig" -exec grep -l "LIBRARY_SEARCH_PATHS" {} \; | while read -r file; do
