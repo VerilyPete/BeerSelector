@@ -105,7 +105,7 @@ if [ -f "$PODS_PROJECT" ]; then
   # It adjusts the build phases to ensure proper ordering and single library output
   if grep -q "Pods-BeerSelector" "$PODS_PROJECT"; then
     # Fix the build phases order and configuration
-    sed -i '' 's/buildPhases = (/buildPhases = ( /* Order matters here */ /g' "$PODS_PROJECT"
+    sed -i '' 's/buildPhases = (/buildPhases = ( \/\/ Order matters here /' "$PODS_PROJECT"
     
     # Disable parallel builds for Pods-BeerSelector
     if grep -q "Pods-BeerSelector.*buildSettings" "$PODS_PROJECT"; then
