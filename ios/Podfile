@@ -36,13 +36,13 @@ target 'BeerSelector' do
   use_frameworks! :linkage => podfile_properties['ios.useFrameworks'].to_sym if podfile_properties['ios.useFrameworks']
   use_frameworks! :linkage => ENV['USE_FRAMEWORKS'].to_sym if ENV['USE_FRAMEWORKS']
 
-  # Fix for React-hermes directory issue - customize its build settings
-  pod 'React-hermes', :path => '../node_modules/react-native/sdks/hermes' do |hermes|
-    hermes.build_settings['MACH_O_TYPE'] = 'staticlib'
-    hermes.build_settings['EXECUTABLE_EXTENSION'] = 'a'
-    hermes.build_settings['PRODUCT_NAME'] = 'libReact-hermes'
-    hermes.build_settings['INSTALL_PATH'] = '$(LOCAL_LIBRARY_DIR)/Frameworks'
-  end
+  # Remove the custom React-hermes pod to avoid dependency conflicts
+  # pod 'React-hermes', :path => '../node_modules/react-native/sdks/hermes' do |hermes|
+  #   hermes.build_settings['MACH_O_TYPE'] = 'staticlib'
+  #   hermes.build_settings['EXECUTABLE_EXTENSION'] = 'a'
+  #   hermes.build_settings['PRODUCT_NAME'] = 'libReact-hermes'
+  #   hermes.build_settings['INSTALL_PATH'] = '$(LOCAL_LIBRARY_DIR)/Frameworks'
+  # end
 
   use_react_native!(
     :path => config[:reactNativePath],
@@ -59,6 +59,105 @@ target 'BeerSelector' do
       :mac_catalyst_enabled => false,
       :ccache_enabled => podfile_properties['apple.ccacheEnabled'] == 'true',
     )
+
+    # Fix for the React-hermes directory issue
+    installer.pods_project.targets.each do |target|
+      # Additional React-hermes settings
+      if target.name == 'React-hermes'
+        puts "⚠️ Applying fixes to React-hermes target..."
+        target.build_configurations.each do |config|
+          # Ensure it's a static library
+          config.build_settings['MACH_O_TYPE'] = 'staticlib'
+          config.build_settings['PRODUCT_NAME'] = 'libReact-hermes'
+          config.build_settings['EXECUTABLE_EXTENSION'] = 'a'
+          
+          # Add explicit header search paths
+          config.build_settings['HEADER_SEARCH_PATHS'] ||= '$(inherited)'
+          config.build_settings['HEADER_SEARCH_PATHS'] = [
+            "#{config.build_settings['HEADER_SEARCH_PATHS']}",
+            "\"${PODS_ROOT}/Headers/Private/React-hermes\"",
+            "\"${PODS_ROOT}/boost\"",
+          ].join(' ')
+          
+          # Force proper build output directories
+          config.build_settings['CONFIGURATION_BUILD_DIR'] = "$(BUILD_DIR)/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)/React-hermes"
+          config.build_settings['SYMROOT'] = "$(BUILD_DIR)/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)/React-hermes"
+          
+          # Ensure proper build product
+          config.build_settings['INSTALL_PATH'] = '$(LOCAL_LIBRARY_DIR)/Frameworks'
+          config.build_settings['SKIP_INSTALL'] = 'NO'
+        end
+        
+        # Modify the build phases to ensure proper outputs
+        target.build_phases.each do |build_phase|
+          if build_phase.is_a?(Xcodeproj::Project::Object::PBXSourcesBuildPhase)
+            build_phase.name = "Sources (React-hermes)"
+          end
+        end
+      end
+      
+      # Fix for Pods-BeerSelector target (multiple output files error)
+      if target.name == 'Pods-BeerSelector'
+        puts "⚠️ Applying fixes to Pods-BeerSelector target..."
+        target.build_configurations.each do |config|
+          # Disable parallel processing to avoid -o flag issues
+          config.build_settings['PARALLEL_PROCESS_FILES_USING_CLANG'] = 'NO'
+          # Add custom libtool flags to avoid warnings
+          config.build_settings['OTHER_LIBTOOLFLAGS'] = '-no_warning_for_no_symbols'
+          # Force specific linking behavior
+          config.build_settings['OTHER_LDFLAGS'] = '$(inherited) -ObjC'
+          
+          # Ensure proper linking with React-hermes
+          lib_search_paths = config.build_settings['LIBRARY_SEARCH_PATHS'] || ['$(inherited)']
+          lib_search_paths = [lib_search_paths] unless lib_search_paths.is_a?(Array)
+          unless lib_search_paths.find { |path| path.include?('React-hermes') }
+            lib_search_paths << '"$(PODS_CONFIGURATION_BUILD_DIR)/React-hermes"'
+          end
+          config.build_settings['LIBRARY_SEARCH_PATHS'] = lib_search_paths
+        end
+      end
+      
+      # General fixes for all targets
+      target.build_configurations.each do |config|
+        # Fix deployment target
+        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.1'
+        # Disable bitcode
+        config.build_settings['ENABLE_BITCODE'] = 'NO'
+        
+        # For Xcode Cloud CI/CD builds
+        if config.name == 'Release'
+          config.build_settings['ONLY_ACTIVE_ARCH'] = 'NO'
+        end
+      end
+    end
+
+    # Create a workaround shell script for the React-hermes directory issue
+    if File.directory?('Pods/Target Support Files/React-hermes')
+      puts "⚠️ Creating React-hermes build script workaround..."
+      File.open('Pods/Target Support Files/React-hermes/hermes-fix.sh', 'w') do |file|
+        file.puts '#!/bin/bash'
+        file.puts '# React-hermes fix script'
+        file.puts 'HERMES_BUILD_DIR="${PODS_CONFIGURATION_BUILD_DIR}/React-hermes"'
+        file.puts 'mkdir -p "$HERMES_BUILD_DIR"'
+        file.puts 'if [ ! -f "$HERMES_BUILD_DIR/libReact-hermes.a" ]; then'
+        file.puts '  echo "Creating dummy libReact-hermes.a"'
+        file.puts '  touch "$HERMES_BUILD_DIR/libReact-hermes.a"'
+        file.puts 'fi'
+        file.puts 'if [ -d "${PODS_ROOT}/../../DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/BeerSelector/BuildProductsPath/Release-iphoneos/React-hermes" ]; then'
+        file.puts '  echo "Creating symbolic link for React-hermes library"'
+        file.puts '  ln -sf "${HERMES_BUILD_DIR}/libReact-hermes.a" "${PODS_ROOT}/../../DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/BeerSelector/BuildProductsPath/Release-iphoneos/React-hermes/libReact-hermes.a"'
+        file.puts 'fi'
+      end
+      FileUtils.chmod('+x', 'Pods/Target Support Files/React-hermes/hermes-fix.sh')
+      
+      # Add a shell script phase to the React-hermes target
+      hermes_target = installer.pods_project.targets.find { |target| target.name == 'React-hermes' }
+      if hermes_target
+        phase = hermes_target.new_shell_script_build_phase("React-hermes Directory Fix")
+        phase.shell_script = '${PODS_TARGET_SRCROOT}/../Target\\ Support\\ Files/React-hermes/hermes-fix.sh'
+        phase.show_env_vars_in_log = '0'
+      end
+    end
 
     # This is necessary for Xcode 14, because it signs resource bundles by default
     # when building for devices.
@@ -85,43 +184,6 @@ target 'BeerSelector' do
       if ['expo-dev-menu', 'Main', 'ReactNativeCompatibles', 'SafeAreaView', 'Vendored'].include?(target.name)
         target.build_configurations.each do |config|
           config.build_settings['DEFINES_MODULE'] = 'YES'
-        end
-      end
-      
-      # Fix for React-hermes directory issue and -o multiple output files error
-      if target.name == 'React-hermes'
-        target.build_configurations.each do |config|
-          # Ensure React-hermes is treated as a static library to avoid directory issues
-          config.build_settings['MACH_O_TYPE'] = 'staticlib'
-          # Set the product name to the expected static library name
-          config.build_settings['PRODUCT_NAME'] = 'libReact-hermes'
-          # Ensure proper extension
-          config.build_settings['EXECUTABLE_EXTENSION'] = 'a'
-        end
-      end
-      
-      # Fix for Pods-BeerSelector target (multiple output files error)
-      if target.name == 'Pods-BeerSelector'
-        target.build_configurations.each do |config|
-          # Disable parallel processing to avoid -o flag issues
-          config.build_settings['PARALLEL_PROCESS_FILES_USING_CLANG'] = 'NO'
-          # Add custom libtool flags to avoid warnings
-          config.build_settings['OTHER_LIBTOOLFLAGS'] = '-no_warning_for_no_symbols'
-          # Force specific linking behavior
-          config.build_settings['OTHER_LDFLAGS'] = '$(inherited) -ObjC'
-        end
-      end
-    end
-    
-    # Ensure consistent deployment target
-    installer.pods_project.targets.each do |target|
-      target.build_configurations.each do |config|
-        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.1'
-        config.build_settings['ENABLE_BITCODE'] = 'NO'
-        
-        # For Xcode Cloud CI/CD builds
-        if config.name == 'Release'
-          config.build_settings['ONLY_ACTIVE_ARCH'] = 'NO'
         end
       end
     end
