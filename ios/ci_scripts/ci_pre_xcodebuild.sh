@@ -13,12 +13,24 @@ handle_error() {
 # Set up error handling
 trap 'handle_error $LINENO' ERR
 
+# First determine our location
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+echo "Script directory: $SCRIPT_DIR"
+
 # Check if post-clone script has already run
-POST_CLONE_MARKER="$(dirname "$0")/.post_clone_completed"
+# Look in multiple possible locations for the marker file
+POST_CLONE_MARKER="$SCRIPT_DIR/.post_clone_completed"
+if [ ! -f "$POST_CLONE_MARKER" ] && [ -d "$SCRIPT_DIR/../.." ]; then
+  # Try in the iOS directory
+  POST_CLONE_MARKER="$SCRIPT_DIR/../ci_scripts/.post_clone_completed"
+fi
+
 POST_CLONE_COMPLETED=false
 if [ -f "$POST_CLONE_MARKER" ]; then
-  echo "Detected that post-clone script has already run at: $(cat $POST_CLONE_MARKER)"
+  echo "Detected that post-clone script has already run at: $(cat "$POST_CLONE_MARKER")"
   POST_CLONE_COMPLETED=true
+else
+  echo "No post-clone marker file found at $POST_CLONE_MARKER"
 fi
 
 # Only set up Node.js environment if post-clone hasn't done it
@@ -37,7 +49,7 @@ else
 fi
 
 echo "Current directory: $(pwd)"
-cd "$(dirname "$0")/.."
+cd "$SCRIPT_DIR/.."
 echo "Changed to iOS directory: $(pwd)"
 cd ..
 echo "Changed to project root: $(pwd)"
