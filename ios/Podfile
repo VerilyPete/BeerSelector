@@ -71,6 +71,27 @@ target 'BeerSelector' do
           config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << 'FOLLY_HAVE_COROUTINE=0'
         end
       end
+      
+      # Fix DEFINES_MODULE conflicts
+      # Set DEFINES_MODULE to YES for all targets that might conflict
+      if ['expo-dev-menu', 'Main', 'ReactNativeCompatibles', 'SafeAreaView', 'Vendored'].include?(target.name)
+        target.build_configurations.each do |config|
+          config.build_settings['DEFINES_MODULE'] = 'YES'
+        end
+      end
+    end
+    
+    # Ensure consistent deployment target
+    installer.pods_project.targets.each do |target|
+      target.build_configurations.each do |config|
+        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.1'
+        config.build_settings['ENABLE_BITCODE'] = 'NO'
+        
+        # For Xcode Cloud CI/CD builds
+        if config.name == 'Release'
+          config.build_settings['ONLY_ACTIVE_ARCH'] = 'NO'
+        end
+      end
     end
   end
 end
