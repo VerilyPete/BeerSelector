@@ -13,12 +13,28 @@ handle_error() {
 # Set up error handling
 trap 'handle_error $LINENO' ERR
 
-echo "Setting up Node.js environment..."
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
-export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-nvm install 18
-nvm use 18
+# Check if post-clone script has already run
+POST_CLONE_MARKER="$(dirname "$0")/.post_clone_completed"
+POST_CLONE_COMPLETED=false
+if [ -f "$POST_CLONE_MARKER" ]; then
+  echo "Detected that post-clone script has already run at: $(cat $POST_CLONE_MARKER)"
+  POST_CLONE_COMPLETED=true
+fi
+
+# Only set up Node.js environment if post-clone hasn't done it
+if [ "$POST_CLONE_COMPLETED" = false ]; then
+  echo "Setting up Node.js environment..."
+  curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+  export NVM_DIR="$HOME/.nvm"
+  [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+  nvm install 18
+  nvm use 18
+else
+  echo "Skipping Node.js setup as it was done in post-clone script"
+  export NVM_DIR="$HOME/.nvm"
+  [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+  nvm use 18
+fi
 
 echo "Current directory: $(pwd)"
 cd "$(dirname "$0")/.."
@@ -39,9 +55,13 @@ fi
 echo "Project root contents:"
 ls -la
 
-# Install project dependencies with detailed logging
-echo "Installing npm dependencies..."
-npm install --verbose
+# Only install npm dependencies if post-clone hasn't done it
+if [ "$POST_CLONE_COMPLETED" = false ]; then
+  echo "Installing npm dependencies..."
+  npm install --verbose
+else
+  echo "Skipping npm install as it was done in post-clone script"
+fi
 
 # Verify expo package is installed
 if [ ! -d "node_modules/expo" ]; then
@@ -66,8 +86,13 @@ if [ ! -f "Podfile" ]; then
   exit 1
 fi
 
-echo "Installing CocoaPods..."
-pod install --verbose
+# Only install CocoaPods if post-clone hasn't done it
+if [ "$POST_CLONE_COMPLETED" = false ]; then
+  echo "Installing CocoaPods..."
+  pod install --verbose
+else
+  echo "Skipping pod install as it was done in post-clone script"
+fi
 
 echo "Pods directory after installation:"
 ls -la Pods || echo "WARNING: Pods directory not found or accessible"

@@ -41,5 +41,9 @@ echo "Installing CocoaPods dependencies..."
 cd ios
 pod install
 
+# Create a marker file to indicate post-clone has completed
+echo "$(date)" > "${CI_WORKSPACE}/ios/ci_scripts/.post_clone_completed"
+echo "Created marker file: ${CI_WORKSPACE}/ios/ci_scripts/.post_clone_completed"
+
 echo "Post-clone setup completed successfully!"
 echo "====================== END OF POST-CLONE SCRIPT ======================" 
