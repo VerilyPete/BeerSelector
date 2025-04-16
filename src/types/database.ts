@@ -44,9 +44,9 @@ export interface DatabaseLock {
  * @returns True if the object is a Preference, false otherwise
  */
 export function isPreference(obj: any): obj is Preference {
-  return obj && 
-    typeof obj.key === 'string' && 
-    typeof obj.value === 'string' && 
+  if (!obj) return false;
+  return typeof obj.key === 'string' &&
+    typeof obj.value === 'string' &&
     typeof obj.description === 'string';
 }
 
@@ -56,9 +56,9 @@ export function isPreference(obj: any): obj is Preference {
  * @returns True if the object is a Reward, false otherwise
  */
 export function isReward(obj: any): obj is Reward {
-  return obj && 
-    typeof obj.reward_id === 'string' && 
-    typeof obj.redeemed === 'string' && 
+  if (!obj) return false;
+  return typeof obj.reward_id === 'string' &&
+    typeof obj.redeemed === 'string' &&
     typeof obj.reward_type === 'string';
 }
 
@@ -68,8 +68,8 @@ export function isReward(obj: any): obj is Reward {
  * @returns True if the object is an UntappdCookie, false otherwise
  */
 export function isUntappdCookie(obj: any): obj is UntappdCookie {
-  return obj && 
-    typeof obj.key === 'string' && 
-    typeof obj.value === 'string' && 
+  if (!obj) return false;
+  return typeof obj.key === 'string' &&
+    typeof obj.value === 'string' &&
     typeof obj.description === 'string';
 }

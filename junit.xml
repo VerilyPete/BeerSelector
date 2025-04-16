@@ -1,9 +1,36 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuites name="jest tests" tests="3" failures="3" errors="0" time="0.778">
-  <testsuite name="ApiError" errors="0" failures="3" skipped="0" timestamp="2025-04-16T15:41:27" time="0.465" tests="3">
-    <testcase classname="ApiError should create an ApiError with correct properties" name="ApiError should create an ApiError with correct properties" time="0.001">
+<testsuites name="jest tests" tests="65" failures="9" errors="0" time="0.85">
+  <testsuite name="beerService" errors="0" failures="4" skipped="0" timestamp="2025-04-16T16:23:17" time="0.221" tests="7">
+    <testcase classname="beerService checkInBeer should successfully check in a beer" name="beerService checkInBeer should successfully check in a beer" time="0.004">
+      <failure>Error: expect(received).toEqual(expected) // deep equality
+
+- Expected  - 2
++ Received  + 3
+
+  Object {
+-   &quot;message&quot;: &quot;Check-in successful&quot;,
+-   &quot;success&quot;: true,
++   &quot;error&quot;: &quot;Cannot read properties of undefined (reading &apos;post&apos;)&quot;,
++   &quot;message&quot;: &quot;Check-in failed due to unexpected error&quot;,
++   &quot;success&quot;: false,
+  }
+    at Object.toEqual (/Users/pete/BeerSelector/src/api/__tests__/beerService.test.ts:62:22)
+    at Generator.next (&lt;anonymous&gt;)
+    at asyncGeneratorStep (/Users/pete/BeerSelector/node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+    at _next (/Users/pete/BeerSelector/node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)</failure>
+    </testcase>
+    <testcase classname="beerService checkInBeer should attempt auto-login if session data is missing" name="beerService checkInBeer should attempt auto-login if session data is missing" time="0">
+    </testcase>
+    <testcase classname="beerService checkInBeer should handle API errors gracefully" name="beerService checkInBeer should handle API errors gracefully" time="0.001">
       <failure>TypeError: _apiClient.ApiError is not a constructor
-    at Object.&lt;anonymous&gt; (/Users/pete/BeerSelector/src/api/__tests__/simple-api.test.ts:5:19)
+    at Object.&lt;anonymous&gt; (/Users/pete/BeerSelector/src/api/__tests__/beerService.test.ts:103:9)
+    at Generator.next (&lt;anonymous&gt;)
+    at asyncGeneratorStep (/Users/pete/BeerSelector/node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+    at _next (/Users/pete/BeerSelector/node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+    at /Users/pete/BeerSelector/node_modules/@babel/runtime/helpers/asyncToGenerator.js:22:7
+    at new Promise (&lt;anonymous&gt;)
+    at Object.&lt;anonymous&gt; (/Users/pete/BeerSelector/node_modules/@babel/runtime/helpers/asyncToGenerator.js:14:12)
     at Promise.then.completed (/Users/pete/BeerSelector/node_modules/jest-circus/build/utils.js:298:28)
     at new Promise (&lt;anonymous&gt;)
     at callAsyncCircusFn (/Users/pete/BeerSelector/node_modules/jest-circus/build/utils.js:231:10)
@@ -12,45 +39,229 @@
     at _runTest (/Users/pete/BeerSelector/node_modules/jest-circus/build/run.js:252:3)
     at _runTestsForDescribeBlock (/Users/pete/BeerSelector/node_modules/jest-circus/build/run.js:126:9)
     at _runTestsForDescribeBlock (/Users/pete/BeerSelector/node_modules/jest-circus/build/run.js:121:9)
+    at _runTestsForDescribeBlock (/Users/pete/BeerSelector/node_modules/jest-circus/build/run.js:121:9)
     at run (/Users/pete/BeerSelector/node_modules/jest-circus/build/run.js:71:3)
     at runAndTransformResultsToJestFormat (/Users/pete/BeerSelector/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapterInit.js:122:21)
     at jestAdapter (/Users/pete/BeerSelector/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:79:19)
     at runTestInternal (/Users/pete/BeerSelector/node_modules/jest-runner/build/runTest.js:367:16)
     at runTest (/Users/pete/BeerSelector/node_modules/jest-runner/build/runTest.js:444:34)</failure>
+    </testcase>
+    <testcase classname="beerService getBeerDetails should return beer details for a valid ID" name="beerService getBeerDetails should return beer details for a valid ID" time="0.001">
+      <failure>Error: expect(received).toBe(expected) // Object.is equality
+
+Expected: true
+Received: false
+    at Object.toBe (/Users/pete/BeerSelector/src/api/__tests__/beerService.test.ts:136:30)
+    at Generator.next (&lt;anonymous&gt;)
+    at asyncGeneratorStep (/Users/pete/BeerSelector/node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+    at _next (/Users/pete/BeerSelector/node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)</failure>
+    </testcase>
+    <testcase classname="beerService getBeerDetails should handle empty beer ID" name="beerService getBeerDetails should handle empty beer ID" time="0">
+    </testcase>
+    <testcase classname="beerService searchBeers should search beers with a valid query" name="beerService searchBeers should search beers with a valid query" time="0">
+      <failure>Error: expect(received).toBe(expected) // Object.is equality
+
+Expected: true
+Received: false
+    at Object.toBe (/Users/pete/BeerSelector/src/api/__tests__/beerService.test.ts:168:30)
+    at Generator.next (&lt;anonymous&gt;)
+    at asyncGeneratorStep (/Users/pete/BeerSelector/node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+    at _next (/Users/pete/BeerSelector/node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)</failure>
+    </testcase>
+    <testcase classname="beerService searchBeers should handle empty search query" name="beerService searchBeers should handle empty search query" time="0">
+    </testcase>
+  </testsuite>
+  <testsuite name="ApiClient" errors="0" failures="5" skipped="0" timestamp="2025-04-16T16:23:17" time="0.245" tests="8">
+    <testcase classname="ApiClient get should make a GET request and return data" name="ApiClient get should make a GET request and return data" time="0.006">
+      <failure>Error: expect(received).toEqual(expected) // deep equality
+
+- Expected  - 0
++ Received  + 3
+
+  Object {
+    &quot;data&quot;: Object {
++     &quot;data&quot;: Object {
+        &quot;test&quot;: &quot;data&quot;,
++     },
++     &quot;success&quot;: true,
+    },
+    &quot;statusCode&quot;: 200,
+    &quot;success&quot;: true,
+  }
+    at Object.toEqual (/Users/pete/BeerSelector/src/api/__tests__/apiClient.test.ts:63:24)
+    at Generator.next (&lt;anonymous&gt;)
+    at asyncGeneratorStep (/Users/pete/BeerSelector/node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+    at _next (/Users/pete/BeerSelector/node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)</failure>
+    </testcase>
+    <testcase classname="ApiClient get should handle query parameters correctly" name="ApiClient get should handle query parameters correctly" time="0.001">
+      <failure>Error: expect(jest.fn()).toHaveBeenCalledWith(...expected)
+
+Expected: &quot;https://test-api.example.com/test-endpoint?param1=value1&amp;param2=value2&quot;, Any&lt;Object&gt;
+Received: &quot;https://test-api.example.com/test-endpoint&quot;, {&quot;headers&quot;: {&quot;Cookie&quot;: &quot;store__id=test-store-id; PHPSESSID=test-session-id; store_name=Test%20Store; member_id=test-member-id&quot;, &quot;accept&quot;: &quot;*/*&quot;, &quot;accept-language&quot;: &quot;en-US,en;q=0.9&quot;, &quot;content-type&quot;: &quot;application/x-www-form-urlencoded; charset=UTF-8&quot;, &quot;origin&quot;: &quot;https://test-api.example.com&quot;, &quot;referer&quot;: &quot;https://test-api.example.com/member-dash.php&quot;, &quot;sec-ch-ua&quot;: &quot;\&quot;Chromium\&quot;;v=\&quot;134\&quot;, \&quot;Not:A-Brand\&quot;;v=\&quot;24\&quot;, \&quot;Google Chrome\&quot;;v=\&quot;134\&quot;&quot;, &quot;sec-ch-ua-mobile&quot;: &quot;?0&quot;, &quot;sec-ch-ua-platform&quot;: &quot;\&quot;macOS\&quot;&quot;, &quot;sec-fetch-dest&quot;: &quot;empty&quot;, &quot;sec-fetch-mode&quot;: &quot;cors&quot;, &quot;sec-fetch-site&quot;: &quot;same-origin&quot;, &quot;user-agent&quot;: &quot;BeerSelector/1.0.0 (ios; undefined)&quot;, &quot;x-requested-with&quot;: &quot;XMLHttpRequest&quot;}, &quot;method&quot;: &quot;GET&quot;, &quot;signal&quot;: &quot;mock-signal&quot;}
+
+Number of calls: 1
+    at Object.toHaveBeenCalledWith (/Users/pete/BeerSelector/src/api/__tests__/apiClient.test.ts:73:28)
+    at Generator.next (&lt;anonymous&gt;)
+    at asyncGeneratorStep (/Users/pete/BeerSelector/node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+    at _next (/Users/pete/BeerSelector/node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)</failure>
+    </testcase>
+    <testcase classname="ApiClient get should handle errors correctly" name="ApiClient get should handle errors correctly" time="0.001">
+      <failure>Error: expect(received).toEqual(expected) // deep equality
+
+- Expected  - 1
++ Received  + 1
+
+  Object {
+    &quot;data&quot;: null,
+-   &quot;error&quot;: &quot;Resource not found&quot;,
++   &quot;error&quot;: &quot;HTTP error! status: 404 Not Found&quot;,
+    &quot;statusCode&quot;: 404,
+    &quot;success&quot;: false,
+  }
+    at Object.toEqual (/Users/pete/BeerSelector/src/api/__tests__/apiClient.test.ts:92:24)
+    at Generator.next (&lt;anonymous&gt;)
+    at asyncGeneratorStep (/Users/pete/BeerSelector/node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+    at _next (/Users/pete/BeerSelector/node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)</failure>
+    </testcase>
+    <testcase classname="ApiClient get should retry on network errors" name="ApiClient get should retry on network errors" time="0">
+      <failure>Error: expect(jest.fn()).toHaveBeenCalledTimes(expected)
+
+Expected number of calls: 2
+Received number of calls: 1
+    at Object.toHaveBeenCalledTimes (/Users/pete/BeerSelector/src/api/__tests__/apiClient.test.ts:115:28)
+    at Generator.next (&lt;anonymous&gt;)
+    at asyncGeneratorStep (/Users/pete/BeerSelector/node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+    at _next (/Users/pete/BeerSelector/node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)</failure>
+    </testcase>
+    <testcase classname="ApiClient post should make a POST request with correct body" name="ApiClient post should make a POST request with correct body" time="0.013">
+      <failure>Error: expect(jest.fn()).toHaveBeenCalledWith(...expected)
+
+Expected: &quot;https://test-api.example.com/test-endpoint&quot;, ObjectContaining {&quot;body&quot;: &quot;{\&quot;name\&quot;:\&quot;Test\&quot;,\&quot;value\&quot;:123}&quot;, &quot;headers&quot;: ObjectContaining {&quot;Content-Type&quot;: &quot;application/json&quot;}, &quot;method&quot;: &quot;POST&quot;}
+Received: &quot;https://test-api.example.com/test-endpoint&quot;, {&quot;body&quot;: &quot;name=Test&amp;value=123&quot;, &quot;headers&quot;: {&quot;Cookie&quot;: &quot;store__id=test-store-id; PHPSESSID=test-session-id; store_name=Test%20Store; member_id=test-member-id&quot;, &quot;accept&quot;: &quot;*/*&quot;, &quot;accept-language&quot;: &quot;en-US,en;q=0.9&quot;, &quot;content-type&quot;: &quot;application/x-www-form-urlencoded; charset=UTF-8&quot;, &quot;origin&quot;: &quot;https://test-api.example.com&quot;, &quot;referer&quot;: &quot;https://test-api.example.com/member-dash.php&quot;, &quot;sec-ch-ua&quot;: &quot;\&quot;Chromium\&quot;;v=\&quot;134\&quot;, \&quot;Not:A-Brand\&quot;;v=\&quot;24\&quot;, \&quot;Google Chrome\&quot;;v=\&quot;134\&quot;&quot;, &quot;sec-ch-ua-mobile&quot;: &quot;?0&quot;, &quot;sec-ch-ua-platform&quot;: &quot;\&quot;macOS\&quot;&quot;, &quot;sec-fetch-dest&quot;: &quot;empty&quot;, &quot;sec-fetch-mode&quot;: &quot;cors&quot;, &quot;sec-fetch-site&quot;: &quot;same-origin&quot;, &quot;user-agent&quot;: &quot;BeerSelector/1.0.0 (ios; undefined)&quot;, &quot;x-requested-with&quot;: &quot;XMLHttpRequest&quot;}, &quot;method&quot;: &quot;POST&quot;, &quot;signal&quot;: &quot;mock-signal&quot;}
+
+Number of calls: 1
+    at Object.toHaveBeenCalledWith (/Users/pete/BeerSelector/src/api/__tests__/apiClient.test.ts:130:28)
+    at Generator.next (&lt;anonymous&gt;)
+    at asyncGeneratorStep (/Users/pete/BeerSelector/node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+    at _next (/Users/pete/BeerSelector/node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)</failure>
+    </testcase>
+    <testcase classname="ApiClient ApiError should create an ApiError with correct properties" name="ApiClient ApiError should create an ApiError with correct properties" time="0">
+    </testcase>
+    <testcase classname="ApiClient ApiError should mark 5xx errors as retryable" name="ApiClient ApiError should mark 5xx errors as retryable" time="0">
+    </testcase>
+    <testcase classname="ApiClient ApiError should mark 4xx errors as non-retryable (except 408 and 429)" name="ApiClient ApiError should mark 4xx errors as non-retryable (except 408 and 429)" time="0.001">
+    </testcase>
+  </testsuite>
+  <testsuite name="sessionService" errors="0" failures="0" skipped="0" timestamp="2025-04-16T16:23:17" time="0.025" tests="7">
+    <testcase classname="sessionService refreshSession should refresh session successfully" name="sessionService refreshSession should refresh session successfully" time="0.001">
+    </testcase>
+    <testcase classname="sessionService refreshSession should return null when refresh fails" name="sessionService refreshSession should return null when refresh fails" time="0">
+    </testcase>
+    <testcase classname="sessionService refreshSession should handle API errors" name="sessionService refreshSession should handle API errors" time="0">
+    </testcase>
+    <testcase classname="sessionService getValidSession should return valid session when session exists" name="sessionService getValidSession should return valid session when session exists" time="0.001">
+    </testcase>
+    <testcase classname="sessionService getValidSession should attempt refresh when session is invalid" name="sessionService getValidSession should attempt refresh when session is invalid" time="0">
+    </testcase>
+    <testcase classname="sessionService getValidSession should return null when session is invalid and refresh fails" name="sessionService getValidSession should return null when session is invalid and refresh fails" time="0">
+    </testcase>
+    <testcase classname="sessionService getValidSession should handle errors" name="sessionService getValidSession should handle errors" time="0">
+    </testcase>
+  </testsuite>
+  <testsuite name="authService" errors="0" failures="0" skipped="0" timestamp="2025-04-16T16:23:17" time="0.026" tests="13">
+    <testcase classname="authService autoLogin should return success when auto-login is successful" name="authService autoLogin should return success when auto-login is successful" time="0.001">
+    </testcase>
+    <testcase classname="authService autoLogin should return failure when auto-login fails" name="authService autoLogin should return failure when auto-login fails" time="0">
+    </testcase>
+    <testcase classname="authService autoLogin should handle API errors" name="authService autoLogin should handle API errors" time="0.001">
+    </testcase>
+    <testcase classname="authService autoLogin should handle unknown errors" name="authService autoLogin should handle unknown errors" time="0">
+    </testcase>
+    <testcase classname="authService login should return success when login is successful" name="authService login should return success when login is successful" time="0">
+    </testcase>
+    <testcase classname="authService login should return failure when login fails" name="authService login should return failure when login fails" time="0">
+    </testcase>
+    <testcase classname="authService login should validate input parameters" name="authService login should validate input parameters" time="0.001">
+    </testcase>
+    <testcase classname="authService logout should return success when logout is successful" name="authService logout should return success when logout is successful" time="0">
+    </testcase>
+    <testcase classname="authService logout should handle API errors during logout" name="authService logout should handle API errors during logout" time="0">
+    </testcase>
+    <testcase classname="authService handleTapThatAppLogin should parse cookies string and save session data" name="authService handleTapThatAppLogin should parse cookies string and save session data" time="0.001">
+    </testcase>
+    <testcase classname="authService handleTapThatAppLogin should handle cookies object" name="authService handleTapThatAppLogin should handle cookies object" time="0">
+    </testcase>
+    <testcase classname="authService handleTapThatAppLogin should return failure when required cookies are missing" name="authService handleTapThatAppLogin should return failure when required cookies are missing" time="0">
+    </testcase>
+    <testcase classname="authService handleTapThatAppLogin should handle malformed cookie values gracefully" name="authService handleTapThatAppLogin should handle malformed cookie values gracefully" time="0.001">
+    </testcase>
+  </testsuite>
+  <testsuite name="sessionManager" errors="0" failures="0" skipped="0" timestamp="2025-04-16T16:23:17" time="0.032" tests="17">
+    <testcase classname="sessionManager saveSessionData should save session data to secure storage" name="sessionManager saveSessionData should save session data to secure storage" time="0.001">
+    </testcase>
+    <testcase classname="sessionManager saveSessionData should throw error when saving session data fails" name="sessionManager saveSessionData should throw error when saving session data fails" time="0.003">
+    </testcase>
+    <testcase classname="sessionManager getSessionData should return session data from secure storage" name="sessionManager getSessionData should return session data from secure storage" time="0.001">
+    </testcase>
+    <testcase classname="sessionManager getSessionData should return null when no session data exists" name="sessionManager getSessionData should return null when no session data exists" time="0">
+    </testcase>
+    <testcase classname="sessionManager getSessionData should return null when session data is invalid" name="sessionManager getSessionData should return null when session data is invalid" time="0">
+    </testcase>
+    <testcase classname="sessionManager getSessionData should return null when there is an error getting session data" name="sessionManager getSessionData should return null when there is an error getting session data" time="0">
+    </testcase>
+    <testcase classname="sessionManager clearSessionData should clear session data from secure storage" name="sessionManager clearSessionData should clear session data from secure storage" time="0">
+    </testcase>
+    <testcase classname="sessionManager clearSessionData should throw error when clearing session data fails" name="sessionManager clearSessionData should throw error when clearing session data fails" time="0.001">
+    </testcase>
+    <testcase classname="sessionManager hasSession should return true when session data exists" name="sessionManager hasSession should return true when session data exists" time="0">
+    </testcase>
+    <testcase classname="sessionManager hasSession should return false when no session data exists" name="sessionManager hasSession should return false when no session data exists" time="0">
+    </testcase>
+    <testcase classname="sessionManager hasSession should return false when there is an error checking session" name="sessionManager hasSession should return false when there is an error checking session" time="0">
+    </testcase>
+    <testcase classname="sessionManager parseCookies should parse cookies from set-cookie header" name="sessionManager parseCookies should parse cookies from set-cookie header" time="0.002">
+    </testcase>
+    <testcase classname="sessionManager parseCookies should handle empty cookie header" name="sessionManager parseCookies should handle empty cookie header" time="0">
+    </testcase>
+    <testcase classname="sessionManager parseCookies should handle malformed cookie header" name="sessionManager parseCookies should handle malformed cookie header" time="0.001">
+    </testcase>
+    <testcase classname="sessionManager extractSessionDataFromResponse should extract session data from response headers and cookies" name="sessionManager extractSessionDataFromResponse should extract session data from response headers and cookies" time="0">
+    </testcase>
+    <testcase classname="sessionManager extractSessionDataFromResponse should handle missing cookies" name="sessionManager extractSessionDataFromResponse should handle missing cookies" time="0">
+    </testcase>
+    <testcase classname="sessionManager extractSessionDataFromResponse should handle malformed URI components" name="sessionManager extractSessionDataFromResponse should handle malformed URI components" time="0">
+    </testcase>
+  </testsuite>
+  <testsuite name="sessionValidator" errors="0" failures="0" skipped="0" timestamp="2025-04-16T16:23:17" time="0.027" tests="10">
+    <testcase classname="sessionValidator validateSession should return session data when valid" name="sessionValidator validateSession should return session data when valid" time="0">
+    </testcase>
+    <testcase classname="sessionValidator validateSession should return null when session data is null" name="sessionValidator validateSession should return null when session data is null" time="0">
+    </testcase>
+    <testcase classname="sessionValidator validateSession should return null when session data fails type guard validation" name="sessionValidator validateSession should return null when session data fails type guard validation" time="0">
+    </testcase>
+    <testcase classname="sessionValidator validateSession should return null when session data is missing required fields" name="sessionValidator validateSession should return null when session data is missing required fields" time="0">
+    </testcase>
+    <testcase classname="sessionValidator validateSession should return null when session data has empty required fields" name="sessionValidator validateSession should return null when session data has empty required fields" time="0">
+    </testcase>
+    <testcase classname="sessionValidator getCurrentSession should return validated session data" name="sessionValidator getCurrentSession should return validated session data" time="0.001">
+    </testcase>
+    <testcase classname="sessionValidator getCurrentSession should return null when no session data exists" name="sessionValidator getCurrentSession should return null when no session data exists" time="0">
+    </testcase>
+    <testcase classname="sessionValidator getCurrentSession should return null when session data is invalid" name="sessionValidator getCurrentSession should return null when session data is invalid" time="0">
+    </testcase>
+    <testcase classname="sessionValidator getCurrentSession should throw ApiError when getSessionData throws an error" name="sessionValidator getCurrentSession should throw ApiError when getSessionData throws an error" time="0.003">
+    </testcase>
+    <testcase classname="sessionValidator getCurrentSession should rethrow ApiError when getSessionData throws an ApiError" name="sessionValidator getCurrentSession should rethrow ApiError when getSessionData throws an ApiError" time="0.001">
+    </testcase>
+  </testsuite>
+  <testsuite name="ApiError" errors="0" failures="0" skipped="0" timestamp="2025-04-16T16:23:17" time="0.021" tests="3">
+    <testcase classname="ApiError should create an ApiError with correct properties" name="ApiError should create an ApiError with correct properties" time="0">
     </testcase>
     <testcase classname="ApiError should mark 5xx errors as retryable" name="ApiError should mark 5xx errors as retryable" time="0">
-      <failure>TypeError: _apiClient.ApiError is not a constructor
-    at Object.&lt;anonymous&gt; (/Users/pete/BeerSelector/src/api/__tests__/simple-api.test.ts:15:19)
-    at Promise.then.completed (/Users/pete/BeerSelector/node_modules/jest-circus/build/utils.js:298:28)
-    at new Promise (&lt;anonymous&gt;)
-    at callAsyncCircusFn (/Users/pete/BeerSelector/node_modules/jest-circus/build/utils.js:231:10)
-    at _callCircusTest (/Users/pete/BeerSelector/node_modules/jest-circus/build/run.js:316:40)
-    at processTicksAndRejections (node:internal/process/task_queues:105:5)
-    at _runTest (/Users/pete/BeerSelector/node_modules/jest-circus/build/run.js:252:3)
-    at _runTestsForDescribeBlock (/Users/pete/BeerSelector/node_modules/jest-circus/build/run.js:126:9)
-    at _runTestsForDescribeBlock (/Users/pete/BeerSelector/node_modules/jest-circus/build/run.js:121:9)
-    at run (/Users/pete/BeerSelector/node_modules/jest-circus/build/run.js:71:3)
-    at runAndTransformResultsToJestFormat (/Users/pete/BeerSelector/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapterInit.js:122:21)
-    at jestAdapter (/Users/pete/BeerSelector/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:79:19)
-    at runTestInternal (/Users/pete/BeerSelector/node_modules/jest-runner/build/runTest.js:367:16)
-    at runTest (/Users/pete/BeerSelector/node_modules/jest-runner/build/runTest.js:444:34)</failure>
     </testcase>
-    <testcase classname="ApiError should mark 4xx errors as non-retryable (except 408 and 429)" name="ApiError should mark 4xx errors as non-retryable (except 408 and 429)" time="0.001">
-      <failure>TypeError: _apiClient.ApiError is not a constructor
-    at Object.&lt;anonymous&gt; (/Users/pete/BeerSelector/src/api/__tests__/simple-api.test.ts:20:22)
-    at Promise.then.completed (/Users/pete/BeerSelector/node_modules/jest-circus/build/utils.js:298:28)
-    at new Promise (&lt;anonymous&gt;)
-    at callAsyncCircusFn (/Users/pete/BeerSelector/node_modules/jest-circus/build/utils.js:231:10)
-    at _callCircusTest (/Users/pete/BeerSelector/node_modules/jest-circus/build/run.js:316:40)
-    at processTicksAndRejections (node:internal/process/task_queues:105:5)
-    at _runTest (/Users/pete/BeerSelector/node_modules/jest-circus/build/run.js:252:3)
-    at _runTestsForDescribeBlock (/Users/pete/BeerSelector/node_modules/jest-circus/build/run.js:126:9)
-    at _runTestsForDescribeBlock (/Users/pete/BeerSelector/node_modules/jest-circus/build/run.js:121:9)
-    at run (/Users/pete/BeerSelector/node_modules/jest-circus/build/run.js:71:3)
-    at runAndTransformResultsToJestFormat (/Users/pete/BeerSelector/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapterInit.js:122:21)
-    at jestAdapter (/Users/pete/BeerSelector/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:79:19)
-    at runTestInternal (/Users/pete/BeerSelector/node_modules/jest-runner/build/runTest.js:367:16)
-    at runTest (/Users/pete/BeerSelector/node_modules/jest-runner/build/runTest.js:444:34)</failure>
+    <testcase classname="ApiError should mark 4xx errors as non-retryable (except 408 and 429)" name="ApiError should mark 4xx errors as non-retryable (except 408 and 429)" time="0">
     </testcase>
   </testsuite>
 </testsuites>
