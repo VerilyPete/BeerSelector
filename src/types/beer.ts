@@ -67,8 +67,8 @@ export interface CheckInResponse {
  * @returns True if the object is a Beer, false otherwise
  */
 export function isBeer(obj: any): obj is Beer {
-  return obj &&
-    typeof obj.id === 'string' &&
+  if (!obj) return false;
+  return typeof obj.id === 'string' &&
     typeof obj.brew_name === 'string';
 }
 
@@ -78,6 +78,7 @@ export function isBeer(obj: any): obj is Beer {
  * @returns True if the object is a Beerfinder, false otherwise
  */
 export function isBeerfinder(obj: any): obj is Beerfinder {
+  if (!obj) return false;
   return isBeer(obj) && (
     obj.roh_lap !== undefined ||
     obj.tasted_date !== undefined ||
@@ -92,6 +93,7 @@ export function isBeerfinder(obj: any): obj is Beerfinder {
  * @returns True if the object is a BeerDetails, false otherwise
  */
 export function isBeerDetails(obj: any): obj is BeerDetails {
+  if (!obj) return false;
   return isBeer(obj) && (
     obj.abv !== undefined ||
     obj.ibu !== undefined ||
@@ -109,6 +111,6 @@ export function isBeerDetails(obj: any): obj is BeerDetails {
  * @returns True if the object is a CheckInResponse, false otherwise
  */
 export function isCheckInResponse(obj: any): obj is CheckInResponse {
-  return obj &&
-    typeof obj.success === 'boolean';
+  if (!obj) return false;
+  return typeof obj.success === 'boolean';
 }

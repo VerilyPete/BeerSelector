@@ -8,16 +8,30 @@ module.exports = {
     '**/*.{js,jsx,ts,tsx}',
     '!**/coverage/**',
     '!**/node_modules/**',
+    '!**/.cursor/**',
     '!**/babel.config.js',
     '!**/jest.setup.js',
     '!**/metro.config.js',
     '!**/app.config.js',
     '!**/ios/**',
-    '!**/android/**'
+    '!**/android/**',
+    '!**/assets/**',
+    '!**/*.json',
+    '!**/__mocks__/**',
+    '!**/scripts/**'
   ],
   setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
   testMatch: ['**/__tests__/**/*.test.[jt]s?(x)', '**/?(*.)+(spec|test).[jt]s?(x)'],
-  testPathIgnorePatterns: ['/node_modules/', '/ios/', '/android/', '/.cursor/'],
+  testPathIgnorePatterns: [
+    '/node_modules/',
+    '/ios/',
+    '/android/',
+    '/.cursor/',
+    '/assets/',
+    '/scripts/',
+    '/reports/',
+    '/__mocks__/'
+  ],
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
   verbose: true,
   reporters: ['default', 'jest-junit'],
@@ -26,5 +40,14 @@ module.exports = {
     '\\.svg': '<rootDir>/__mocks__/svgMock.js',
     '\\.(jpg|jpeg|png|gif|eot|otf|webp|ttf|woff|woff2|mp4|webm|wav|mp3|m4a|aac|oga)$': '<rootDir>/__mocks__/fileMock.js'
   },
-  testTimeout: 30000 // Increase default timeout to 30 seconds
+  testTimeout: 30000, // Increase default timeout to 30 seconds
+  transform: {
+    '^.+\\.(js|jsx|ts|tsx)$': ['babel-jest', {
+      presets: ['babel-preset-expo'],
+      plugins: [
+        '@babel/plugin-transform-modules-commonjs',
+        '@babel/plugin-transform-class-static-block'
+      ]
+    }]
+  }
 };

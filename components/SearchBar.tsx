@@ -35,7 +35,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
         clearButtonMode="never"
       />
       {searchText.length > 0 && (
-        <TouchableOpacity onPress={onClear} style={styles.clearButton}>
+        <TouchableOpacity onPress={onClear} style={styles.clearButton} testID="clear-button">
           <IconSymbol name="xmark.circle.fill" size={20} color={iconColor} />
         </TouchableOpacity>
       )}
@@ -66,4 +66,4 @@ const styles = StyleSheet.create({
   clearButton: {
     padding: 4,
   },
-}); 
+});

@@ -45,14 +45,14 @@ export class ApiError extends Error {
   isNetworkError: boolean;
   isTimeout: boolean;
   retryable: boolean;
-  
+
   constructor(message: string, statusCode = 0, isNetworkError = false, isTimeout = false) {
     super(message);
     this.name = 'ApiError';
     this.statusCode = statusCode;
     this.isNetworkError = isNetworkError;
     this.isTimeout = isTimeout;
-    
+
     // Determine if the error is retryable
     this.retryable = isNetworkError || isTimeout || (
       statusCode >= 500 || // Server errors
@@ -80,10 +80,10 @@ export interface LoginResult {
  * @returns True if the object is a SessionData, false otherwise
  */
 export function isSessionData(obj: any): obj is SessionData {
-  return obj && 
-    typeof obj.memberId === 'string' && 
-    typeof obj.storeId === 'string' && 
-    typeof obj.storeName === 'string' && 
+  if (!obj) return false;
+  return typeof obj.memberId === 'string' &&
+    typeof obj.storeId === 'string' &&
+    typeof obj.storeName === 'string' &&
     typeof obj.sessionId === 'string';
 }
 
@@ -93,9 +93,9 @@ export function isSessionData(obj: any): obj is SessionData {
  * @returns True if the object is an ApiResponse, false otherwise
  */
 export function isApiResponse<T>(obj: any): obj is ApiResponse<T> {
-  return obj && 
-    typeof obj.success === 'boolean' && 
-    typeof obj.statusCode === 'number' && 
+  if (!obj) return false;
+  return typeof obj.success === 'boolean' &&
+    typeof obj.statusCode === 'number' &&
     'data' in obj;
 }
 
@@ -105,6 +105,6 @@ export function isApiResponse<T>(obj: any): obj is ApiResponse<T> {
  * @returns True if the object is a LoginResult, false otherwise
  */
 export function isLoginResult(obj: any): obj is LoginResult {
-  return obj && 
-    typeof obj.success === 'boolean';
+  if (!obj) return false;
+  return typeof obj.success === 'boolean';
 }
