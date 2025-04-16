@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/12</span>
+                <span class='fraction'>12/12</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/23</span>
+                <span class='fraction'>23/23</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/4</span>
+                <span class='fraction'>4/4</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/8</span>
+                <span class='fraction'>8/8</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line low'></div>
+    <div class='status-line high'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -248,8 +248,8 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">23x</span>
+<span class="cline-any cline-yes">21x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -259,23 +259,8 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">7x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -289,11 +274,26 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">12x</span>
+<span class="cline-any cline-yes">10x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">5x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">/**
  * Types related to beer data in the application
@@ -363,9 +363,9 @@ export interface CheckInResponse {
  * @param obj The object to check
  * @returns True if the object is a Beer, false otherwise
  */
-export function <span class="fstat-no" title="function not covered" >isBeer(</span>obj: any): obj is Beer {
-<span class="cstat-no" title="statement not covered" >  if (!obj) <span class="cstat-no" title="statement not covered" >return false;</span></span>
-<span class="cstat-no" title="statement not covered" >  return typeof obj.id === 'string' &amp;&amp;</span>
+export function isBeer(obj: any): obj is Beer {
+  if (!obj) return false;
+  return typeof obj.id === 'string' &amp;&amp;
     typeof obj.brew_name === 'string';
 }
 &nbsp;
@@ -374,9 +374,9 @@ export function <span class="fstat-no" title="function not covered" >isBeer(</sp
  * @param obj The object to check
  * @returns True if the object is a Beerfinder, false otherwise
  */
-export function <span class="fstat-no" title="function not covered" >isBeerfinder(</span>obj: any): obj is Beerfinder {
-<span class="cstat-no" title="statement not covered" >  if (!obj) <span class="cstat-no" title="statement not covered" >return false;</span></span>
-<span class="cstat-no" title="statement not covered" >  return isBeer(obj) &amp;&amp; (</span>
+export function isBeerfinder(obj: any): obj is Beerfinder {
+  if (!obj) return false;
+  return isBeer(obj) &amp;&amp; (
     obj.roh_lap !== undefined ||
     obj.tasted_date !== undefined ||
     obj.review_ratings !== undefined ||
@@ -389,9 +389,9 @@ export function <span class="fstat-no" title="function not covered" >isBeerfinde
  * @param obj The object to check
  * @returns True if the object is a BeerDetails, false otherwise
  */
-export function <span class="fstat-no" title="function not covered" >isBeerDetails(</span>obj: any): obj is BeerDetails {
-<span class="cstat-no" title="statement not covered" >  if (!obj) <span class="cstat-no" title="statement not covered" >return false;</span></span>
-<span class="cstat-no" title="statement not covered" >  return isBeer(obj) &amp;&amp; (</span>
+export function isBeerDetails(obj: any): obj is BeerDetails {
+  if (!obj) return false;
+  return isBeer(obj) &amp;&amp; (
     obj.abv !== undefined ||
     obj.ibu !== undefined ||
     obj.availability !== undefined ||
@@ -407,9 +407,9 @@ export function <span class="fstat-no" title="function not covered" >isBeerDetai
  * @param obj The object to check
  * @returns True if the object is a CheckInResponse, false otherwise
  */
-export function <span class="fstat-no" title="function not covered" >isCheckInResponse(</span>obj: any): obj is CheckInResponse {
-<span class="cstat-no" title="statement not covered" >  if (!obj) <span class="cstat-no" title="statement not covered" >return false;</span></span>
-<span class="cstat-no" title="statement not covered" >  return typeof obj.success === 'boolean';</span>
+export function isCheckInResponse(obj: any): obj is CheckInResponse {
+  if (!obj) return false;
+  return typeof obj.success === 'boolean';
 }
 &nbsp;</pre></td></tr></table></pre>
 
@@ -418,7 +418,7 @@ export function <span class="fstat-no" title="function not covered" >isCheckInRe
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-04-16T16:23:18.409Z
+                at 2025-04-16T16:46:14.218Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>

@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">53.33% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>8/15</span>
+                <span class='fraction'>0/15</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">47.61% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>10/21</span>
+                <span class='fraction'>0/21</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">50% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>2/4</span>
+                <span class='fraction'>0/4</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">66.66% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>8/12</span>
+                <span class='fraction'>0/12</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line medium'></div>
+    <div class='status-line low'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -222,17 +222,14 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">16x</span>
-<span class="cline-any cline-yes">16x</span>
-<span class="cline-any cline-yes">16x</span>
-<span class="cline-any cline-yes">16x</span>
-<span class="cline-any cline-yes">16x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">16x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -255,8 +252,11 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">9x</span>
-<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -331,15 +331,15 @@ export class ApiError extends Error {
   isTimeout: boolean;
   retryable: boolean;
 &nbsp;
-  constructor(message: string, statusCode = <span class="branch-0 cbranch-no" title="branch not covered" >0,</span> isNetworkError = <span class="branch-0 cbranch-no" title="branch not covered" >false,</span> isTimeout = <span class="branch-0 cbranch-no" title="branch not covered" >false)</span> {
-    super(message);
-    this.name = 'ApiError';
-    this.statusCode = statusCode;
-    this.isNetworkError = isNetworkError;
-    this.isTimeout = isTimeout;
+<span class="fstat-no" title="function not covered" >  co</span>nstructor(message: string, statusCode = <span class="branch-0 cbranch-no" title="branch not covered" >0,</span> isNetworkError = <span class="branch-0 cbranch-no" title="branch not covered" >false,</span> isTimeout = <span class="branch-0 cbranch-no" title="branch not covered" >false)</span> {
+<span class="cstat-no" title="statement not covered" >    super(message);</span>
+<span class="cstat-no" title="statement not covered" >    this.name = 'ApiError';</span>
+<span class="cstat-no" title="statement not covered" >    this.statusCode = statusCode;</span>
+<span class="cstat-no" title="statement not covered" >    this.isNetworkError = isNetworkError;</span>
+<span class="cstat-no" title="statement not covered" >    this.isTimeout = isTimeout;</span>
 &nbsp;
     // Determine if the error is retryable
-    this.retryable = isNetworkError || isTimeout || (
+<span class="cstat-no" title="statement not covered" >    this.retryable = isNetworkError || isTimeout || (</span>
       statusCode &gt;= 500 || // Server errors
       statusCode === 429 || // Rate limiting
       statusCode === 408    // Request timeout
@@ -364,9 +364,9 @@ export interface LoginResult {
  * @param obj The object to check
  * @returns True if the object is a SessionData, false otherwise
  */
-export function isSessionData(obj: any): obj is SessionData {
-  <span class="missing-if-branch" title="if path not taken" >I</span>if (!obj) <span class="cstat-no" title="statement not covered" >return false;</span>
-  return typeof obj.memberId === 'string' &amp;&amp;
+export function <span class="fstat-no" title="function not covered" >isSessionData(</span>obj: any): obj is SessionData {
+<span class="cstat-no" title="statement not covered" >  if (!obj) <span class="cstat-no" title="statement not covered" >return false;</span></span>
+<span class="cstat-no" title="statement not covered" >  return typeof obj.memberId === 'string' &amp;&amp;</span>
     typeof obj.storeId === 'string' &amp;&amp;
     typeof obj.storeName === 'string' &amp;&amp;
     typeof obj.sessionId === 'string';
@@ -400,7 +400,7 @@ export function <span class="fstat-no" title="function not covered" >isLoginResu
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-04-16T16:23:18.409Z
+                at 2025-04-16T16:46:14.218Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>
