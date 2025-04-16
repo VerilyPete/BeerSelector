@@ -1,17 +1,7 @@
 import * as SecureStore from 'expo-secure-store';
+import { SessionData, isSessionData } from '../types/api';
 
-export interface SessionData {
-  storeId: string;
-  storeName: string;
-  memberId: string;
-  username: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  cardNum: string;
-  sessionId: string;
-}
-
+// Session storage key
 const SESSION_STORAGE_KEY = 'beerknurd_session';
 
 /**
@@ -38,7 +28,16 @@ export const getSessionData = async (): Promise<SessionData | null> => {
     if (!sessionDataStr) {
       return null;
     }
-    return JSON.parse(sessionDataStr);
+
+    const parsedData = JSON.parse(sessionDataStr);
+
+    // Validate the session data using the type guard
+    if (isSessionData(parsedData)) {
+      return parsedData;
+    } else {
+      console.warn('Invalid session data format in storage');
+      return null;
+    }
   } catch (error) {
     console.error('Error getting session data:', error);
     return null;
@@ -79,17 +78,42 @@ export const hasSession = async (): Promise<boolean> => {
  */
 export const parseCookies = (setCookieHeader: string): Record<string, string> => {
   const cookies: Record<string, string> = {};
-  
-  const cookieList = setCookieHeader.split(';');
-  const mainCookie = cookieList[0];
-  
-  if (mainCookie) {
-    const [name, value] = mainCookie.split('=');
-    if (name && value) {
-      cookies[name.trim()] = value.trim();
+
+  try {
+    if (!setCookieHeader) {
+      return cookies;
     }
+
+    const cookieList = setCookieHeader.split(';');
+    const mainCookie = cookieList[0];
+
+    if (mainCookie) {
+      const equalsIndex = mainCookie.indexOf('=');
+      if (equalsIndex > 0) {
+        const name = mainCookie.substring(0, equalsIndex).trim();
+        const value = mainCookie.substring(equalsIndex + 1).trim();
+        if (name && value) {
+          cookies[name] = value;
+        }
+      }
+    }
+
+    // Also parse additional cookies in the header
+    for (let i = 1; i < cookieList.length; i++) {
+      const cookie = cookieList[i];
+      const equalsIndex = cookie.indexOf('=');
+      if (equalsIndex > 0) {
+        const name = cookie.substring(0, equalsIndex).trim();
+        const value = cookie.substring(equalsIndex + 1).trim();
+        if (name && value) {
+          cookies[name] = value;
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Error parsing cookies:', error);
   }
-  
+
   return cookies;
 };
 
@@ -100,25 +124,72 @@ export const parseCookies = (setCookieHeader: string): Record<string, string> =>
  * @returns The extracted session data
  */
 export const extractSessionDataFromResponse = (
-  headers: Headers, 
+  headers: Headers,
   cookies: Record<string, string>
 ): Partial<SessionData> => {
   const sessionData: Partial<SessionData> = {};
-  
-  // Extract PHPSESSID
-  if (cookies.PHPSESSID) {
-    sessionData.sessionId = cookies.PHPSESSID;
+
+  try {
+    // Extract PHPSESSID
+    if (cookies.PHPSESSID) {
+      sessionData.sessionId = cookies.PHPSESSID;
+    }
+
+    // Extract other cookie values if they exist
+    if (cookies.store__id) sessionData.storeId = cookies.store__id;
+
+    // Safely decode URI components with error handling
+    if (cookies.store_name) {
+      try {
+        sessionData.storeName = decodeURIComponent(cookies.store_name);
+      } catch (e) {
+        sessionData.storeName = cookies.store_name;
+        console.warn('Failed to decode store_name cookie:', e);
+      }
+    }
+
+    if (cookies.member_id) sessionData.memberId = cookies.member_id;
+
+    if (cookies.username) {
+      try {
+        sessionData.username = decodeURIComponent(cookies.username);
+      } catch (e) {
+        sessionData.username = cookies.username;
+        console.warn('Failed to decode username cookie:', e);
+      }
+    }
+
+    if (cookies.first_name) {
+      try {
+        sessionData.firstName = decodeURIComponent(cookies.first_name);
+      } catch (e) {
+        sessionData.firstName = cookies.first_name;
+        console.warn('Failed to decode first_name cookie:', e);
+      }
+    }
+
+    if (cookies.last_name) {
+      try {
+        sessionData.lastName = decodeURIComponent(cookies.last_name);
+      } catch (e) {
+        sessionData.lastName = cookies.last_name;
+        console.warn('Failed to decode last_name cookie:', e);
+      }
+    }
+
+    if (cookies.email) {
+      try {
+        sessionData.email = decodeURIComponent(cookies.email);
+      } catch (e) {
+        sessionData.email = cookies.email;
+        console.warn('Failed to decode email cookie:', e);
+      }
+    }
+
+    if (cookies.cardNum) sessionData.cardNum = cookies.cardNum;
+  } catch (error) {
+    console.error('Error extracting session data from cookies:', error);
   }
-  
-  // Extract other cookie values if they exist
-  if (cookies.store__id) sessionData.storeId = cookies.store__id;
-  if (cookies.store_name) sessionData.storeName = decodeURIComponent(cookies.store_name);
-  if (cookies.member_id) sessionData.memberId = cookies.member_id;
-  if (cookies.username) sessionData.username = decodeURIComponent(cookies.username);
-  if (cookies.first_name) sessionData.firstName = decodeURIComponent(cookies.first_name);
-  if (cookies.last_name) sessionData.lastName = decodeURIComponent(cookies.last_name);
-  if (cookies.email) sessionData.email = decodeURIComponent(cookies.email);
-  if (cookies.cardNum) sessionData.cardNum = cookies.cardNum;
-  
+
   return sessionData;
-}; 
+};

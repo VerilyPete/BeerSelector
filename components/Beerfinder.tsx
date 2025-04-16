@@ -59,7 +59,7 @@ export const Beerfinder = () => {
   const [deletingBeerId, setDeletingBeerId] = useState<string | null>(null);
   const [untappdModalVisible, setUntappdModalVisible] = useState(false);
   const [selectedBeerName, setSelectedBeerName] = useState('');
-  
+
   // Theme colors
   const cardColor = useThemeColor({}, 'background');
   const borderColor = useThemeColor({ light: '#e0e0e0', dark: '#333' }, 'text');
@@ -67,7 +67,7 @@ export const Beerfinder = () => {
   const inactiveButtonColor = useThemeColor({ light: '#E5E5E5', dark: '#2C2C2E' }, 'background');
   const inactiveButtonTextColor = useThemeColor({ light: '#333333', dark: '#EFEFEF' }, 'text');
   const textColor = useThemeColor({}, 'text');
-  
+
   // Define all derived values outside of hooks and render methods
   const buttonTextColor = colorScheme === 'dark' && (isDraftOnly || isHeaviesOnly || isIpaOnly || sortBy === 'name') ? '#000000' : 'white';
   const activeBgColor = colorScheme === 'dark' && (isDraftOnly || isHeaviesOnly || isIpaOnly || sortBy === 'name') ? '#FFC107' : activeButtonColor;
@@ -75,7 +75,7 @@ export const Beerfinder = () => {
   const loadBeers = async () => {
     try {
       setLoading(true);
-      
+
       // Try to fetch My Beers data if it hasn't been loaded yet
       try {
         await fetchAndPopulateMyBeers();
@@ -83,7 +83,7 @@ export const Beerfinder = () => {
         console.log('Failed to fetch My Beers data, continuing with local data:', err);
         // Continue with whatever data we have locally
       }
-      
+
       const data = await getBeersNotInMyBeers();
       // Filter out any beers with empty or null brew_name as a second layer of protection
       const filteredData = data.filter(beer => beer.brew_name && beer.brew_name.trim() !== '');
@@ -116,17 +116,17 @@ export const Beerfinder = () => {
         setRefreshing(false);
         return;
       }
-      
+
       // If API URLs are configured, proceed with refresh
       await fetchAndPopulateMyBeers();
       // Use getBeersNotInMyBeers to get available beers, not tasted beers
       const freshBeers = await getBeersNotInMyBeers();
       // Filter any empty beer names
       const filteredData = freshBeers.filter(beer => beer.brew_name && beer.brew_name.trim() !== '');
-      
+
       // Set the available beers
       setAvailableBeers(filteredData);
-      
+
       // Sort the beers based on current sort order before setting them
       let sortedBeers = [...filteredData];
       if (sortBy === 'name') {
@@ -138,11 +138,11 @@ export const Beerfinder = () => {
           return dateB - dateA; // Descending order
         });
       }
-      
+
       // Set the sorted and filtered beers
       setDisplayedBeers(sortedBeers);
     } catch (error) {
-      console.error('Error refreshing my beers:', error);
+      console.error('Error refreshing Beerfinder beers:', error);
       Alert.alert('Error', 'Failed to refresh beer list. Please try again later.');
     } finally {
       setRefreshing(false);
@@ -156,7 +156,7 @@ export const Beerfinder = () => {
     // Apply text search filter
     if (searchText.trim() !== '') {
       const searchLower = searchText.toLowerCase().trim();
-      filtered = filtered.filter(beer => 
+      filtered = filtered.filter(beer =>
         (beer.brew_name && beer.brew_name.toLowerCase().includes(searchLower)) ||
         (beer.brewer && beer.brewer.toLowerCase().includes(searchLower)) ||
         (beer.brew_style && beer.brew_style.toLowerCase().includes(searchLower)) ||
@@ -166,25 +166,25 @@ export const Beerfinder = () => {
     }
 
     if (isDraftOnly) {
-      filtered = filtered.filter(beer => 
-        beer.brew_container && 
+      filtered = filtered.filter(beer =>
+        beer.brew_container &&
         (beer.brew_container.toLowerCase().includes('draught') ||
         beer.brew_container.toLowerCase().includes('draft'))
       );
     }
 
     if (isHeaviesOnly) {
-      filtered = filtered.filter(beer => 
-        beer.brew_style && 
-        (beer.brew_style.toLowerCase().includes('porter') || 
-         beer.brew_style.toLowerCase().includes('stout') || 
+      filtered = filtered.filter(beer =>
+        beer.brew_style &&
+        (beer.brew_style.toLowerCase().includes('porter') ||
+         beer.brew_style.toLowerCase().includes('stout') ||
          beer.brew_style.toLowerCase().includes('barleywine'))
       );
     }
 
     if (isIpaOnly) {
-      filtered = filtered.filter(beer => 
-        beer.brew_style && 
+      filtered = filtered.filter(beer =>
+        beer.brew_style &&
         beer.brew_style.toLowerCase().includes('ipa')
       );
     }
@@ -233,14 +233,14 @@ export const Beerfinder = () => {
   // Function to format unix timestamp to readable date
   const formatDate = (timestamp: string): string => {
     if (!timestamp) return 'Unknown date';
-    
+
     try {
       // Convert unix timestamp (seconds) to milliseconds
       const date = new Date(parseInt(timestamp, 10) * 1000);
-      return date.toLocaleDateString('en-US', { 
-        year: 'numeric', 
-        month: 'short', 
-        day: 'numeric' 
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
       });
     } catch (err) {
       console.error('Error formatting date:', err);
@@ -265,19 +265,19 @@ export const Beerfinder = () => {
     try {
       // Show loading indicator
       setCheckinLoading(true);
-      
+
       // Call the API to check in the beer
       const result = await checkInBeer(item);
-      
+
       console.log('Check-in result:', result);
-      
+
       // Show success message
       Alert.alert('Success', `Successfully checked in ${item.brew_name}!`);
     } catch (error: any) {
       console.error('Check-in error:', error);
-      
+
       let errorMessage;
-      
+
       // Provide a more user-friendly error message
       if (error.message && error.message.includes('Please log in again')) {
         errorMessage = 'Login session expired. Attempting to recover your session...';
@@ -289,7 +289,7 @@ export const Beerfinder = () => {
       } else {
         errorMessage = `Failed to check in: ${error.message}`;
       }
-      
+
       Alert.alert('Error', errorMessage);
     } finally {
       // Hide loading indicator
@@ -301,10 +301,10 @@ export const Beerfinder = () => {
   const viewQueues = async () => {
     try {
       setLoadingQueues(true);
-      
+
       // Get session data from secure storage
       let sessionData = await getSessionData();
-      
+
       // If no session data or session is missing required fields, try auto-login
       if (!sessionData || !sessionData.memberId || !sessionData.storeId || !sessionData.storeName || !sessionData.sessionId) {
         console.log('Session data invalid or missing, attempting auto-login');
@@ -312,14 +312,14 @@ export const Beerfinder = () => {
         setLoadingQueues(false);
         return;
       }
-      
+
       // Extract required data for the request
       const { memberId, storeId, storeName, sessionId, username, firstName, lastName, email, cardNum } = sessionData;
-      
+
       console.log('Making API request with session data:', {
         memberId, storeId, storeName, sessionId: sessionId.substring(0, 5) + '...'
       });
-      
+
       // Set up request headers
       const headers = {
         'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
@@ -342,17 +342,17 @@ export const Beerfinder = () => {
 
       // Get the response text
       const html = await response.text();
-      
+
       // Log relevant parts of the HTML for debugging
       console.log('HTML response length:', html.length);
-      
+
       // Log specific HTML sections for debugging
       const brewListContainerMatch = html.match(/<div class="brewListContainer">([\s\S]*?)<\/div>/);
       console.log('brewListContainer found:', !!brewListContainerMatch);
-      
+
       const brewListMatch = html.match(/<div class="brewList">([\s\S]*?)<\/div>/);
       console.log('brewList found:', !!brewListMatch);
-      
+
       // Uncomment to log the full HTML for debugging
       // Split into chunks to avoid console truncation
       /*
@@ -363,20 +363,20 @@ export const Beerfinder = () => {
       }
       console.log('=== FULL HTML END ===');
       */
-      
+
       if (brewListMatch) {
         console.log('brewList content sample:', brewListMatch[1].substring(0, 150));
       }
-      
+
       // Direct check for beer names in the HTML
       const beerNames = html.match(/Firestone Walker Parabola|<h3 class="brewName">(.*?)<\/h3>/g);
       if (beerNames) {
         console.log('Direct beer name matches:', beerNames);
       }
-      
+
       // Parse the HTML to extract queued beers
       const parsedBeers = parseQueuedBeersFromHtml(html);
-      
+
       // If we didn't find any beers but the sample data suggests there should be one
       if (parsedBeers.length === 0 && html.includes('Firestone Walker Parabola')) {
         console.log('Adding hardcoded beer from example');
@@ -386,7 +386,7 @@ export const Beerfinder = () => {
           id: '1885490'
         });
       }
-      
+
       setQueuedBeers(parsedBeers);
       setQueueModalVisible(true);
     } catch (error: any) {
@@ -413,10 +413,10 @@ export const Beerfinder = () => {
             text: "Delete",
             onPress: async () => {
               setDeletingBeerId(beerId);
-              
+
               // Get session data from secure storage
               let sessionData = await getSessionData();
-              
+
               // If no session data or session is missing required fields, show error
               if (!sessionData || !sessionData.memberId || !sessionData.storeId || !sessionData.storeName || !sessionData.sessionId) {
                 console.log('Session data invalid or missing');
@@ -424,12 +424,12 @@ export const Beerfinder = () => {
                 setDeletingBeerId(null);
                 return;
               }
-              
+
               // Extract required data for the request
               const { memberId, storeId, storeName, sessionId, username, firstName, lastName, email, cardNum } = sessionData;
-              
+
               console.log(`Deleting queued beer ID: ${beerId}`);
-              
+
               // Set up request headers
               const headers = {
                 'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
@@ -449,10 +449,10 @@ export const Beerfinder = () => {
                 if (!response.ok) {
                   throw new Error(`Failed to delete beer with status: ${response.status}`);
                 }
-                
+
                 // Refresh the queues list
                 await viewQueues();
-                
+
                 // Show success message
                 Alert.alert('Success', `Successfully removed ${beerName} from your queue!`);
               } catch (error: any) {
@@ -476,96 +476,96 @@ export const Beerfinder = () => {
   // Function to parse queued beers from HTML
   const parseQueuedBeersFromHtml = (html: string): QueuedBeer[] => {
     const beers: QueuedBeer[] = [];
-    
+
     try {
       console.log('Parsing HTML for queued beers');
-      
+
       // Direct extraction approach - look for the specific pattern in the full HTML
       const beerEntryRegex = /<h3 class="brewName">(.*?)<div class="brew_added_date">(.*?)<\/div><\/h3>[\s\S]*?<a href="deleteQueuedBrew\.php\?cid=(\d+)"/g;
       let directMatch;
-      
+
       while ((directMatch = beerEntryRegex.exec(html)) !== null) {
         const fullName = directMatch[1].trim();
         const date = directMatch[2].trim();
         const id = directMatch[3];
-        
+
         console.log(`Direct match - Found queued beer: ${fullName}, ${date}, ID: ${id}`);
         beers.push({ name: fullName, date, id });
       }
-      
+
       // If direct extraction failed, try alternative approaches
       if (beers.length === 0) {
         // Try to find specific beer sections in the HTML
         const beerSectionRegex = /<h3 class="brewName">([\s\S]*?)<\/div><\/h3>([\s\S]*?)<a href="deleteQueuedBrew\.php\?cid=(\d+)"/g;
         let sectionMatch;
-        
+
         while ((sectionMatch = beerSectionRegex.exec(html)) !== null) {
           let nameSection = sectionMatch[1];
           const id = sectionMatch[3];
-          
+
           // Extract name and date from the name section
           const dateMatch = nameSection.match(/<div class="brew_added_date">(.*?)<\/div>/);
           let date = dateMatch ? dateMatch[1].trim() : 'Date unavailable';
-          
+
           // Remove the date div to get the clean name
           const name = nameSection.replace(/<div class="brew_added_date">.*?<\/div>/, '').trim();
-          
+
           console.log(`Section match - Found queued beer: ${name}, ${date}, ID: ${id}`);
           beers.push({ name, date, id });
         }
       }
-      
+
       // If still no beers found, try looser pattern matching
       if (beers.length === 0) {
         // Look for any h3 with brewName class
         const brewNameHeadings = html.match(/<h3 class="brewName">([\s\S]*?)<\/h3>/g);
-        
+
         if (brewNameHeadings) {
           brewNameHeadings.forEach((heading, index) => {
             // Extract the content inside the h3 tag
             const innerContent = heading.replace(/<h3 class="brewName">/, '').replace(/<\/h3>/, '');
-            
+
             // Try to extract the date if present
             const dateMatch = innerContent.match(/<div class="brew_added_date">(.*?)<\/div>/);
             let date = dateMatch ? dateMatch[1].trim() : 'Date unavailable';
-            
+
             // Extract the name by removing the date div
             let name = innerContent.replace(/<div class="brew_added_date">.*?<\/div>/, '').trim();
-            
+
             // Clean any HTML tags from the name
             name = name.replace(/<[^>]*>/g, '').trim();
-            
+
             // Look for a delete link near this beer to get the ID
             const afterHeading = html.substring(html.indexOf(heading) + heading.length, html.indexOf(heading) + heading.length + 200);
             const idMatch = afterHeading.match(/deleteQueuedBrew\.php\?cid=(\d+)/);
             const id = idMatch ? idMatch[1] : `fallback-${Date.now()}-${index}`;
-            
+
             console.log(`Loose match - Found queued beer: ${name}, ${date}, ID: ${id}`);
             beers.push({ name, date, id });
           });
         }
       }
-      
+
       // Special case for "Stone Hazy IPA" - check if it's in the HTML but not parsed correctly
       if (beers.length === 0 && html.includes('Stone Hazy IPA')) {
         console.log('Special case: Found Stone Hazy IPA in HTML');
-        
+
         // Try to extract the date for Stone Hazy IPA
         const stoneSection = html.substring(html.indexOf('Stone Hazy IPA') - 100, html.indexOf('Stone Hazy IPA') + 200);
         const dateMatch = stoneSection.match(/<div class="brew_added_date">(.*?)<\/div>/);
         const date = dateMatch ? dateMatch[1].trim() : 'Date unavailable';
-        
+
         // Try to extract the ID
         const idMatch = stoneSection.match(/deleteQueuedBrew\.php\?cid=(\d+)/);
         const id = idMatch ? idMatch[1] : `stone-${Date.now()}`;
-        
-        beers.push({ 
-          name: 'Stone Hazy IPA', 
-          date, 
-          id 
+
+        beers.push({
+          name: 'Stone Hazy IPA',
+          date,
+          id
         });
       }
-      
+
       // Last resort fallback for listed beers
       if (beers.length === 0) {
         // Common beer names to look for directly in the HTML
@@ -577,7 +577,7 @@ export const Beerfinder = () => {
           'Stout',
           'Porter'
         ];
-        
+
         for (const beer of commonBeers) {
           if (html.includes(beer)) {
             console.log(`Found common beer name in HTML: ${beer}`);
@@ -589,12 +589,12 @@ export const Beerfinder = () => {
           }
         }
       }
-      
+
       console.log(`Total queued beers found: ${beers.length}`);
     } catch (error) {
       console.error('Error parsing HTML for queued beers:', error);
     }
-    
+
     return beers;
   };
 
@@ -605,18 +605,18 @@ export const Beerfinder = () => {
 
   const renderBeerItem = (item: Beer) => {
     const isExpanded = expandedId === item.id;
-    
+
     return (
-      <TouchableOpacity 
-        key={item.id} 
+      <TouchableOpacity
+        key={item.id}
         onPress={() => toggleExpand(item.id)}
         activeOpacity={0.8}
       >
         <View style={[
-          styles.beerItem, 
-          { 
+          styles.beerItem,
+          {
             backgroundColor: cardColor,
-            borderColor: borderColor 
+            borderColor: borderColor
           },
           isExpanded && styles.expandedItem
         ]}>
@@ -632,7 +632,7 @@ export const Beerfinder = () => {
           <ThemedText style={styles.dateAdded}>
             Date Added: {formatDate(item.added_date)}
           </ThemedText>
-          
+
           {isExpanded && item.brew_description && (
             <View style={[styles.descriptionContainer, { borderTopColor: borderColor }]}>
               <ThemedText type="defaultSemiBold" style={styles.descriptionTitle}>
@@ -641,10 +641,10 @@ export const Beerfinder = () => {
               <ThemedText style={styles.description}>
                 {item.brew_description}
               </ThemedText>
-              
+
               <View style={styles.buttonContainer}>
-                <TouchableOpacity 
-                  style={[styles.checkInButton, { 
+                <TouchableOpacity
+                  style={[styles.checkInButton, {
                     backgroundColor: colorScheme === 'dark' ? '#E91E63' : activeButtonColor,
                     width: '48%'
                   }]}
@@ -663,8 +663,8 @@ export const Beerfinder = () => {
                   )}
                 </TouchableOpacity>
 
-                <TouchableOpacity 
-                  style={[styles.checkInButton, { 
+                <TouchableOpacity
+                  style={[styles.checkInButton, {
                     backgroundColor: colorScheme === 'dark' ? '#E91E63' : activeButtonColor,
                     width: '48%'
                   }]}
@@ -690,7 +690,7 @@ export const Beerfinder = () => {
       <View style={styles.filtersContainer}>
         <View style={styles.buttonsContainer}>
           <TouchableOpacity
-            style={[styles.actionButton, { 
+            style={[styles.actionButton, {
               backgroundColor: colorScheme === 'dark' ? '#E91E63' : activeButtonColor,
               marginRight: 8
             }]}
@@ -707,10 +707,10 @@ export const Beerfinder = () => {
               </ThemedText>
             )}
           </TouchableOpacity>
-          
+
           <TouchableOpacity
-            style={[styles.actionButton, { 
-              backgroundColor: colorScheme === 'dark' ? '#E91E63' : activeButtonColor 
+            style={[styles.actionButton, {
+              backgroundColor: colorScheme === 'dark' ? '#E91E63' : activeButtonColor
             }]}
             onPress={() => router.push("/screens/rewards" as any)}
           >
@@ -721,8 +721,8 @@ export const Beerfinder = () => {
             </ThemedText>
           </TouchableOpacity>
         </View>
-        
-        <SearchBar 
+
+        <SearchBar
           searchText={searchText}
           onSearchChange={handleSearchChange}
           onClear={clearSearch}
@@ -755,7 +755,7 @@ export const Beerfinder = () => {
               Draft
             </ThemedText>
           </TouchableOpacity>
-          
+
           <TouchableOpacity
             style={[
               styles.filterButton,
@@ -777,7 +777,7 @@ export const Beerfinder = () => {
               Heavies
             </ThemedText>
           </TouchableOpacity>
-          
+
           <TouchableOpacity
             style={[
               styles.filterButton,
@@ -832,7 +832,7 @@ export const Beerfinder = () => {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: cardColor, borderColor }]}>
             <ThemedText style={styles.modalTitle}>Queued Brews</ThemedText>
-            
+
             {queuedBeers.length === 0 ? (
               <ThemedText style={styles.noQueuesText}>
                 No beers currently in queue
@@ -852,7 +852,7 @@ export const Beerfinder = () => {
                       </ThemedText>
                     </View>
                     <TouchableOpacity
-                      style={[styles.deleteButton, { 
+                      style={[styles.deleteButton, {
                         backgroundColor: colorScheme === 'dark' ? '#ff4d4f' : '#fff0f0',
                         borderColor: colorScheme === 'dark' ? '#ff7875' : '#ffa39e'
                       }]}
@@ -875,10 +875,10 @@ export const Beerfinder = () => {
                 contentContainerStyle={{ paddingBottom: 10 }}
               />
             )}
-            
+
             <TouchableOpacity
-              style={[styles.closeButton, { 
-                backgroundColor: colorScheme === 'dark' ? '#E91E63' : activeButtonColor 
+              style={[styles.closeButton, {
+                backgroundColor: colorScheme === 'dark' ? '#E91E63' : activeButtonColor
               }]}
               onPress={() => setQueueModalVisible(false)}
             >
@@ -899,8 +899,8 @@ export const Beerfinder = () => {
       ) : error ? (
         <View style={styles.centered}>
           <ThemedText style={styles.errorText}>{error}</ThemedText>
-          <TouchableOpacity 
-            style={[styles.refreshButton, { backgroundColor: activeButtonColor }]} 
+          <TouchableOpacity
+            style={[styles.refreshButton, { backgroundColor: activeButtonColor }]}
             onPress={loadBeers}
           >
             <ThemedText style={[styles.buttonText, { color: 'white' }]}>
@@ -1220,4 +1220,4 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: 16,
   },
-}); 
+});

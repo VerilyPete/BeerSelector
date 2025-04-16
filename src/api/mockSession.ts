@@ -1,4 +1,5 @@
-import { saveSessionData, SessionData } from './sessionManager';
+import { saveSessionData } from './sessionManager';
+import { SessionData } from '../types/api';
 
 /**
  * Creates and saves a mock session for testing
@@ -21,4 +22,4 @@ export const createMockSession = async (): Promise<void> => {
   // Save the mock session
   await saveSessionData(mockSession);
   console.log('Mock session created and saved');
-}; 
+};
