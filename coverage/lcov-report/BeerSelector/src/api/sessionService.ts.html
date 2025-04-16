@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">100% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>20/20</span>
+                <span class='fraction'>0/20</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">100% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>4/4</span>
+                <span class='fraction'>0/4</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">100% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>2/2</span>
+                <span class='fraction'>0/2</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">100% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>20/20</span>
+                <span class='fraction'>0/20</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line high'></div>
+    <div class='status-line low'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -105,74 +105,74 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">5x</span>
-<span class="cline-any cline-yes">5x</span>
-<span class="cline-any cline-yes">5x</span>
-<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">4x</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">4x</span>
-<span class="cline-any cline-yes">4x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { getSessionData, saveSessionData, clearSessionData, SessionData } from './sessionManager';
 import { getApiClient } from './apiClientInstance';
 import { validateSession } from './sessionValidator';
 &nbsp;
-export async function refreshSession(): Promise&lt;SessionData | null&gt; {
-  try {
-    const apiClient = getApiClient();
-    const response = await apiClient.post('/auto-login.php', {});
-    const data = await response.json();
+export async function <span class="fstat-no" title="function not covered" >refreshSession(</span>): Promise&lt;SessionData | null&gt; {
+<span class="cstat-no" title="statement not covered" >  try {</span>
+    const apiClient = <span class="cstat-no" title="statement not covered" >getApiClient();</span>
+    const response = <span class="cstat-no" title="statement not covered" >await apiClient.post('/auto-login.php', {});</span>
+    const data = <span class="cstat-no" title="statement not covered" >await response.json();</span>
     
-    if (data.success) {
-      const sessionData = data.session;
-      await saveSessionData(sessionData);
-      return await validateSession(sessionData);
+<span class="cstat-no" title="statement not covered" >    if (data.success) {</span>
+      const sessionData = <span class="cstat-no" title="statement not covered" >data.session;</span>
+<span class="cstat-no" title="statement not covered" >      await saveSessionData(sessionData);</span>
+<span class="cstat-no" title="statement not covered" >      return await validateSession(sessionData);</span>
     }
-    return null;
+<span class="cstat-no" title="statement not covered" >    return null;</span>
   } catch (error) {
-    console.error('Error refreshing session:', error);
-    return null;
+<span class="cstat-no" title="statement not covered" >    console.error('Error refreshing session:', error);</span>
+<span class="cstat-no" title="statement not covered" >    return null;</span>
   }
 }
 &nbsp;
-export async function getValidSession(): Promise&lt;SessionData | null&gt; {
-  try {
-    const sessionData = await getSessionData();
-    const validatedSession = await validateSession(sessionData);
+export async function <span class="fstat-no" title="function not covered" >getValidSession(</span>): Promise&lt;SessionData | null&gt; {
+<span class="cstat-no" title="statement not covered" >  try {</span>
+    const sessionData = <span class="cstat-no" title="statement not covered" >await getSessionData();</span>
+    const validatedSession = <span class="cstat-no" title="statement not covered" >await validateSession(sessionData);</span>
     
-    if (!validatedSession) {
-      console.log('Session invalid or missing, attempting refresh');
-      return await refreshSession();
+<span class="cstat-no" title="statement not covered" >    if (!validatedSession) {</span>
+<span class="cstat-no" title="statement not covered" >      console.log('Session invalid or missing, attempting refresh');</span>
+<span class="cstat-no" title="statement not covered" >      return await refreshSession();</span>
     }
     
-    return validatedSession;
+<span class="cstat-no" title="statement not covered" >    return validatedSession;</span>
   } catch (error) {
-    console.error('Error getting valid session:', error);
-    return null;
+<span class="cstat-no" title="statement not covered" >    console.error('Error getting valid session:', error);</span>
+<span class="cstat-no" title="statement not covered" >    return null;</span>
   }
 } </pre></td></tr></table></pre>
 
@@ -181,7 +181,7 @@ export async function getValidSession(): Promise&lt;SessionData | null&gt; {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-04-16T16:23:18.409Z
+                at 2025-04-16T16:46:14.218Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>

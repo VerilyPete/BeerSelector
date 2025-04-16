@@ -279,8 +279,21 @@ export class ApiClient {
     });
   }
 
-  public async get<T = any>(endpoint: string): Promise<ApiResponse<T>> {
-    return this.request<T>(endpoint, {
+  public async get<T = any>(endpoint: string, queryParams?: Record<string, any>): Promise<ApiResponse<T>> {
+    let url = endpoint;
+
+    // Add query parameters if provided
+    if (queryParams && Object.keys(queryParams).length > 0) {
+      const params = new URLSearchParams();
+      for (const [key, value] of Object.entries(queryParams)) {
+        if (value !== undefined && value !== null) {
+          params.append(key, value.toString());
+        }
+      }
+      url = `${endpoint}?${params.toString()}`;
+    }
+
+    return this.request<T>(url, {
       method: 'GET',
     });
   }
