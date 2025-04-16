@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="jest tests" tests="3" failures="3" errors="0" time="0.778">
+  <testsuite name="ApiError" errors="0" failures="3" skipped="0" timestamp="2025-04-16T15:41:27" time="0.465" tests="3">
+    <testcase classname="ApiError should create an ApiError with correct properties" name="ApiError should create an ApiError with correct properties" time="0.001">
+      <failure>TypeError: _apiClient.ApiError is not a constructor
+    at Object.&lt;anonymous&gt; (/Users/pete/BeerSelector/src/api/__tests__/simple-api.test.ts:5:19)
+    at Promise.then.completed (/Users/pete/BeerSelector/node_modules/jest-circus/build/utils.js:298:28)
+    at new Promise (&lt;anonymous&gt;)
+    at callAsyncCircusFn (/Users/pete/BeerSelector/node_modules/jest-circus/build/utils.js:231:10)
+    at _callCircusTest (/Users/pete/BeerSelector/node_modules/jest-circus/build/run.js:316:40)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at _runTest (/Users/pete/BeerSelector/node_modules/jest-circus/build/run.js:252:3)
+    at _runTestsForDescribeBlock (/Users/pete/BeerSelector/node_modules/jest-circus/build/run.js:126:9)
+    at _runTestsForDescribeBlock (/Users/pete/BeerSelector/node_modules/jest-circus/build/run.js:121:9)
+    at run (/Users/pete/BeerSelector/node_modules/jest-circus/build/run.js:71:3)
+    at runAndTransformResultsToJestFormat (/Users/pete/BeerSelector/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapterInit.js:122:21)
+    at jestAdapter (/Users/pete/BeerSelector/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:79:19)
+    at runTestInternal (/Users/pete/BeerSelector/node_modules/jest-runner/build/runTest.js:367:16)
+    at runTest (/Users/pete/BeerSelector/node_modules/jest-runner/build/runTest.js:444:34)</failure>
+    </testcase>
+    <testcase classname="ApiError should mark 5xx errors as retryable" name="ApiError should mark 5xx errors as retryable" time="0">
+      <failure>TypeError: _apiClient.ApiError is not a constructor
+    at Object.&lt;anonymous&gt; (/Users/pete/BeerSelector/src/api/__tests__/simple-api.test.ts:15:19)
+    at Promise.then.completed (/Users/pete/BeerSelector/node_modules/jest-circus/build/utils.js:298:28)
+    at new Promise (&lt;anonymous&gt;)
+    at callAsyncCircusFn (/Users/pete/BeerSelector/node_modules/jest-circus/build/utils.js:231:10)
+    at _callCircusTest (/Users/pete/BeerSelector/node_modules/jest-circus/build/run.js:316:40)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at _runTest (/Users/pete/BeerSelector/node_modules/jest-circus/build/run.js:252:3)
+    at _runTestsForDescribeBlock (/Users/pete/BeerSelector/node_modules/jest-circus/build/run.js:126:9)
+    at _runTestsForDescribeBlock (/Users/pete/BeerSelector/node_modules/jest-circus/build/run.js:121:9)
+    at run (/Users/pete/BeerSelector/node_modules/jest-circus/build/run.js:71:3)
+    at runAndTransformResultsToJestFormat (/Users/pete/BeerSelector/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapterInit.js:122:21)
+    at jestAdapter (/Users/pete/BeerSelector/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:79:19)
+    at runTestInternal (/Users/pete/BeerSelector/node_modules/jest-runner/build/runTest.js:367:16)
+    at runTest (/Users/pete/BeerSelector/node_modules/jest-runner/build/runTest.js:444:34)</failure>
+    </testcase>
+    <testcase classname="ApiError should mark 4xx errors as non-retryable (except 408 and 429)" name="ApiError should mark 4xx errors as non-retryable (except 408 and 429)" time="0.001">
+      <failure>TypeError: _apiClient.ApiError is not a constructor
+    at Object.&lt;anonymous&gt; (/Users/pete/BeerSelector/src/api/__tests__/simple-api.test.ts:20:22)
+    at Promise.then.completed (/Users/pete/BeerSelector/node_modules/jest-circus/build/utils.js:298:28)
+    at new Promise (&lt;anonymous&gt;)
+    at callAsyncCircusFn (/Users/pete/BeerSelector/node_modules/jest-circus/build/utils.js:231:10)
+    at _callCircusTest (/Users/pete/BeerSelector/node_modules/jest-circus/build/run.js:316:40)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at _runTest (/Users/pete/BeerSelector/node_modules/jest-circus/build/run.js:252:3)
+    at _runTestsForDescribeBlock (/Users/pete/BeerSelector/node_modules/jest-circus/build/run.js:126:9)
+    at _runTestsForDescribeBlock (/Users/pete/BeerSelector/node_modules/jest-circus/build/run.js:121:9)
+    at run (/Users/pete/BeerSelector/node_modules/jest-circus/build/run.js:71:3)
+    at runAndTransformResultsToJestFormat (/Users/pete/BeerSelector/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapterInit.js:122:21)
+    at jestAdapter (/Users/pete/BeerSelector/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:79:19)
+    at runTestInternal (/Users/pete/BeerSelector/node_modules/jest-runner/build/runTest.js:367:16)
+    at runTest (/Users/pete/BeerSelector/node_modules/jest-runner/build/runTest.js:444:34)</failure>
+    </testcase>
+  </testsuite>
+</testsuites>

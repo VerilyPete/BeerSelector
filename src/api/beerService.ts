@@ -1,16 +1,11 @@
 import * as SecureStore from 'expo-secure-store';
-import { getSessionData, SessionData } from './sessionManager';
+import { getSessionData } from './sessionManager';
 import { autoLogin } from './authService';
 import { ApiClient } from './apiClient';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
-
-interface CheckInRequestData {
-  chitCode: string;
-  chitBrewId: string;
-  chitBrewName: string;
-  chitStoreName: string;
-}
+import { ApiResponse, ApiError, SessionData } from '../types/api';
+import { Beer, Beerfinder, CheckInRequestData, CheckInResponse, isBeer, isBeerfinder } from '../types/beer';
 
 const apiClient = ApiClient.getInstance();
 
@@ -19,143 +14,221 @@ const apiClient = ApiClient.getInstance();
  * @param beer The beer to check in
  * @returns A promise that resolves to the response data
  */
-export const checkInBeer = async (beer: { 
-  id: string; 
-  brew_name: string;
-}): Promise<any> => {
+export const checkInBeer = async (beer: Beer): Promise<CheckInResponse> => {
   try {
     // Get session data from secure storage
     let sessionData = await getSessionData();
-    
+
     // If no session data or session is missing required fields, try auto-login
     if (!sessionData || !sessionData.memberId || !sessionData.storeId || !sessionData.storeName || !sessionData.sessionId) {
       console.log('Session data invalid or missing, attempting auto-login');
       const loginResult = await autoLogin();
-      
+
       if (!loginResult.success) {
-        throw new Error('No session data found. Please log in again.');
+        throw new ApiError('No session data found. Please log in again.', 401, false, false);
       }
-      
+
       // Use the new session data from auto-login
       sessionData = loginResult.sessionData!;
       console.log('Auto-login successful, continuing with check-in');
     }
 
-    // Extract required data for the request
-    const { memberId, storeId, storeName, sessionId, username, firstName, lastName, email, cardNum } = sessionData;
-    
     // Create the chitCode
-    const chitCode = `${beer.id}-${storeId}-${memberId}`;
-    
+    const chitCode = `${beer.id}-${sessionData.storeId}-${sessionData.memberId}`;
+
     // Prepare the request data
     const requestData: CheckInRequestData = {
       chitCode: chitCode,
       chitBrewId: beer.id,
       chitBrewName: beer.brew_name,
-      chitStoreName: storeName
-    };
-    
-    // Convert to URL encoded form data
-    const formData = Object.entries(requestData)
-      .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
-      .join('&');
-    
-    // Get the device's native user agent or use a fallback
-    const userAgent = Platform.OS === 'web' 
-      ? window.navigator.userAgent 
-      : `BeerSelector/${Constants.expoConfig?.version || '1.0.0'} (${Platform.OS}; ${Platform.Version})`;
-    
-    // Set up request headers
-    const headers = {
-      'accept': '*/*',
-      'accept-language': 'en-US,en;q=0.9',
-      'content-type': 'application/x-www-form-urlencoded; charset=UTF-8',
-      'origin': 'https://tapthatapp.beerknurd.com',
-      'referer': 'https://tapthatapp.beerknurd.com/memberBeerfinder.php',
-      'sec-ch-ua': '"Chromium";v="134", "Not:A-Brand";v="24", "Google Chrome";v="134"',
-      'sec-ch-ua-mobile': '?0',
-      'sec-ch-ua-platform': '"macOS"',
-      'sec-fetch-dest': 'empty',
-      'sec-fetch-mode': 'cors',
-      'sec-fetch-site': 'same-origin',
-      'user-agent': userAgent,
-      'x-requested-with': 'XMLHttpRequest',
-      'Cookie': `store__id=${storeId}; PHPSESSID=${sessionId}; store_name=${encodeURIComponent(storeName)}; member_id=${memberId}; username=${encodeURIComponent(username || '')}; first_name=${encodeURIComponent(firstName || '')}; last_name=${encodeURIComponent(lastName || '')}; email=${encodeURIComponent(email || '')}; cardNum=${cardNum || ''}`
+      chitStoreName: sessionData.storeName
     };
 
-    // Make the API request
-    const response = await fetch('https://tapthatapp.beerknurd.com/addToQueue.php', {
-      method: 'POST',
-      headers: headers,
-      body: formData
-    });
+    // Use the ApiClient to make the request
+    const response = await apiClient.post<any>('/addToQueue.php', requestData);
 
-    // Check if the response is ok
-    if (!response.ok) {
-      throw new Error(`Check-in failed with status: ${response.status}`);
-    }
-
-    // Get the response text
-    const responseText = await response.text();
-    
-    // Check if the response is empty or too short to be valid JSON
-    if (!responseText || responseText.trim().length < 2) {
-      // If empty, assume success but return an empty object
+    // If the request was successful but returned no data
+    if (response.success && (!response.data || Object.keys(response.data).length === 0)) {
       console.log('Empty response received from server, considering check-in successful');
-      return { success: true, message: 'Check-in processed successfully (empty response)' };
-    }
-    
-    try {
-      // Try to parse the response as JSON
-      const jsonResult = JSON.parse(responseText);
-      return jsonResult;
-    } catch (parseError) {
-      // If parsing fails but we got a 200 OK, assume success
-      console.log('Invalid JSON response, but got HTTP 200 OK. Response text:', responseText);
-      
-      // Don't throw the error, just return a success object
-      return { 
-        success: true, 
-        message: 'Check-in processed with non-JSON response', 
-        rawResponse: responseText.substring(0, 100) // Include part of the raw response for debugging
+      return {
+        success: true,
+        message: 'Check-in processed successfully (empty response)'
       };
     }
+
+    // If the request was successful and returned data
+    if (response.success) {
+      return {
+        success: true,
+        message: 'Check-in successful',
+        ...response.data
+      };
+    }
+
+    // If the request failed
+    return {
+      success: false,
+      error: response.error || 'Unknown error occurred during check-in',
+      message: 'Check-in failed'
+    };
   } catch (error) {
     console.error('Error checking in beer:', error);
-    throw error;
+
+    // Format the error response
+    if (error instanceof ApiError) {
+      return {
+        success: false,
+        error: error.message,
+        message: 'Check-in failed due to API error'
+      };
+    }
+
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error occurred',
+      message: 'Check-in failed due to unexpected error'
+    };
   }
 };
 
-export async function getBeerDetails(beerId: string) {
+/**
+ * Get details for a specific beer by ID
+ * @param beerId The ID of the beer to get details for
+ * @returns A promise that resolves to the beer details
+ */
+export async function getBeerDetails(beerId: string): Promise<ApiResponse<Beer>> {
   try {
-    const response = await apiClient.get(`/beer-details.php?id=${beerId}`);
-    const data = await response.json();
-    return {
-      success: true,
-      data
-    };
+    // Validate input
+    if (!beerId) {
+      return {
+        success: false,
+        data: null as unknown as Beer,
+        error: 'Beer ID is required',
+        statusCode: 400
+      };
+    }
+
+    // Make the API request
+    return await apiClient.get<Beer>(`/beer-details.php?id=${encodeURIComponent(beerId)}`);
   } catch (error) {
     console.error('Error getting beer details:', error);
+
+    // Format the error response
+    if (error instanceof ApiError) {
+      return {
+        success: false,
+        data: null as unknown as Beer,
+        error: error.message,
+        statusCode: error.statusCode
+      };
+    }
+
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error occurred'
+      data: null as unknown as Beer,
+      error: error instanceof Error ? error.message : 'Unknown error occurred',
+      statusCode: 500
     };
   }
 }
 
-export async function searchBeers(query: string) {
+/**
+ * Search for beers by name, brewer, or style
+ * @param query The search query
+ * @returns A promise that resolves to the search results
+ */
+export async function searchBeers(query: string): Promise<ApiResponse<Beer[]>> {
   try {
-    const response = await apiClient.get(`/search-beers.php?q=${encodeURIComponent(query)}`);
-    const data = await response.json();
-    return {
-      success: true,
-      data
-    };
+    // Validate input
+    if (!query || query.trim().length === 0) {
+      return {
+        success: false,
+        data: [] as Beer[],
+        error: 'Search query is required',
+        statusCode: 400
+      };
+    }
+
+    // Make the API request
+    return await apiClient.get<Beer[]>(`/search-beers.php?q=${encodeURIComponent(query)}`);
   } catch (error) {
     console.error('Error searching beers:', error);
+
+    // Format the error response
+    if (error instanceof ApiError) {
+      return {
+        success: false,
+        data: [] as Beer[],
+        error: error.message,
+        statusCode: error.statusCode
+      };
+    }
+
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error occurred'
+      data: [] as Beer[],
+      error: error instanceof Error ? error.message : 'Unknown error occurred',
+      statusCode: 500
     };
   }
-} 
+}
+
+/**
+ * Get all beers from the API
+ * @returns A promise that resolves to all beers
+ */
+export async function getAllBeers(): Promise<ApiResponse<Beer[]>> {
+  try {
+    // Make the API request
+    return await apiClient.get<Beer[]>('/get-all-beers.php');
+  } catch (error) {
+    console.error('Error getting all beers:', error);
+
+    // Format the error response
+    if (error instanceof ApiError) {
+      return {
+        success: false,
+        data: [] as Beer[],
+        error: error.message,
+        statusCode: error.statusCode
+      };
+    }
+
+    return {
+      success: false,
+      data: [] as Beer[],
+      error: error instanceof Error ? error.message : 'Unknown error occurred',
+      statusCode: 500
+    };
+  }
+}
+
+/**
+ * Get all Beerfinder beers (tasted beers) from the API
+ * @returns A promise that resolves to all Beerfinder beers
+ */
+export async function getMyBeers(): Promise<ApiResponse<Beerfinder[]>> {
+  try {
+    // Make the API request
+    return await apiClient.get<Beerfinder[]>('/get-my-beers.php');
+  } catch (error) {
+    console.error('Error getting Beerfinder beers:', error);
+
+    // Format the error response
+    if (error instanceof ApiError) {
+      return {
+        success: false,
+        data: [] as Beerfinder[],
+        error: error.message,
+        statusCode: error.statusCode
+      };
+    }
+
+    return {
+      success: false,
+      data: [] as Beerfinder[],
+      error: error instanceof Error ? error.message : 'Unknown error occurred',
+      statusCode: 500
+    };
+  }
+}

@@ -1,6 +1,8 @@
 import * as SQLite from 'expo-sqlite';
 import { Asset } from 'expo-asset';
 import * as FileSystem from 'expo-file-system';
+import { Beer, Beerfinder, isBeer, isBeerfinder } from './types';
+import { Preference, Reward, UntappdCookie, isPreference, isReward, isUntappdCookie } from './types';
 
 // Database connection instance
 let db: SQLite.SQLiteDatabase | null = null;
@@ -30,7 +32,7 @@ let setupDatabaseInProgress = false;
 // Initialize database
 export const initDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
   if (db) return db;
-  
+
   try {
     db = await SQLite.openDatabaseAsync('beers.db');
     return db;
@@ -51,86 +53,89 @@ export const setupDatabase = async (): Promise<void> => {
       await new Promise(resolve => setTimeout(resolve, 200));
       attempts++;
     }
-    
+
     if (databaseSetupComplete) {
       console.log('Database setup completed while waiting');
       return;
     }
-    
+
     if (setupDatabaseInProgress) {
       console.warn('Timed out waiting for database setup to complete');
     }
   }
-  
+
   setupDatabaseInProgress = true;
-  
+
   try {
     const database = await initDatabase();
-    
-    try {
-      await database.execAsync(`
-        CREATE TABLE IF NOT EXISTS allbeers (
-          id TEXT PRIMARY KEY,
-          added_date TEXT,
-          brew_name TEXT,
-          brewer TEXT,
-          brewer_loc TEXT,
-          brew_style TEXT,
-          brew_container TEXT,
-          review_count TEXT,
-          review_rating TEXT,
-          brew_description TEXT
-        )
-      `);
 
-      // Create the table for My Beers (tasted beers)
-      await database.execAsync(`
-        CREATE TABLE IF NOT EXISTS tasted_brew_current_round (
-          id TEXT PRIMARY KEY,
-          roh_lap TEXT,
-          tasted_date TEXT,
-          brew_name TEXT,
-          brewer TEXT,
-          brewer_loc TEXT,
-          brew_style TEXT,
-          brew_container TEXT,
-          review_count TEXT,
-          review_ratings TEXT,
-          brew_description TEXT,
-          chit_code TEXT
-        )
-      `);
-      
-      // Create rewards table to store user rewards
-      await database.execAsync(`
-        CREATE TABLE IF NOT EXISTS rewards (
-          reward_id TEXT PRIMARY KEY,
-          redeemed TEXT,
-          reward_type TEXT
-        )
-      `);
-      
-      // Create preferences table to store API endpoints and other preferences
-      await database.execAsync(`
-        CREATE TABLE IF NOT EXISTS preferences (
-          key TEXT PRIMARY KEY,
-          value TEXT,
-          description TEXT
-        )
-      `);
-      
-      // Create untappd table to store untappd session cookies
-      await database.execAsync(`
-        CREATE TABLE IF NOT EXISTS untappd (
-          key TEXT PRIMARY KEY,
-          value TEXT,
-          description TEXT
-        )
-      `);
-      
+    try {
+      // Use a transaction for creating all tables
+      await database.withTransactionAsync(async () => {
+        await database.execAsync(`
+          CREATE TABLE IF NOT EXISTS allbeers (
+            id TEXT PRIMARY KEY,
+            added_date TEXT,
+            brew_name TEXT,
+            brewer TEXT,
+            brewer_loc TEXT,
+            brew_style TEXT,
+            brew_container TEXT,
+            review_count TEXT,
+            review_rating TEXT,
+            brew_description TEXT
+          )
+        `);
+
+        // Create the table for My Beers (tasted beers)
+        await database.execAsync(`
+          CREATE TABLE IF NOT EXISTS tasted_brew_current_round (
+            id TEXT PRIMARY KEY,
+            roh_lap TEXT,
+            tasted_date TEXT,
+            brew_name TEXT,
+            brewer TEXT,
+            brewer_loc TEXT,
+            brew_style TEXT,
+            brew_container TEXT,
+            review_count TEXT,
+            review_ratings TEXT,
+            brew_description TEXT,
+            chit_code TEXT
+          )
+        `);
+
+        // Create rewards table to store user rewards
+        await database.execAsync(`
+          CREATE TABLE IF NOT EXISTS rewards (
+            reward_id TEXT PRIMARY KEY,
+            redeemed TEXT,
+            reward_type TEXT
+          )
+        `);
+
+        // Create preferences table to store API endpoints and other preferences
+        await database.execAsync(`
+          CREATE TABLE IF NOT EXISTS preferences (
+            key TEXT PRIMARY KEY,
+            value TEXT,
+            description TEXT
+          )
+        `);
+
+        // Create untappd table to store untappd session cookies
+        await database.execAsync(`
+          CREATE TABLE IF NOT EXISTS untappd (
+            key TEXT PRIMARY KEY,
+            value TEXT,
+            description TEXT
+          )
+        `);
+      });
+
       // Initialize preferences with API endpoints if they don't exist
       await initializePreferences(database);
-      
+
       console.log('Database setup complete');
       databaseSetupComplete = true;
     } catch (error) {
@@ -147,10 +152,10 @@ const initializePreferences = async (database: SQLite.SQLiteDatabase): Promise<v
   try {
     // Check if preferences already exist
     const count = await database.getFirstAsync<{ count: number }>('SELECT COUNT(*) as count FROM preferences');
-    
+
     // Only add default preferences if the table is empty
     if (!count || count.count === 0) {
-      const preferences = [
+      const preferences: Preference[] = [
         {
           key: 'all_beers_api_url',
           value: '',
@@ -159,7 +164,7 @@ const initializePreferences = async (database: SQLite.SQLiteDatabase): Promise<v
         {
           key: 'my_beers_api_url',
           value: '',
-          description: 'API endpoint for fetching my beers'
+          description: 'API endpoint for fetching Beerfinder beers'
         },
         {
           key: 'first_launch',
@@ -167,15 +172,18 @@ const initializePreferences = async (database: SQLite.SQLiteDatabase): Promise<v
           description: 'Flag indicating if this is the first app launch'
         }
       ];
-      
-      // Insert default preferences
-      for (const pref of preferences) {
-        await database.runAsync(
-          'INSERT OR IGNORE INTO preferences (key, value, description) VALUES (?, ?, ?)',
-          [pref.key, pref.value, pref.description]
-        );
-      }
-      
+
+      // Use a transaction for inserting all preferences
+      await database.withTransactionAsync(async () => {
+        // Insert default preferences
+        for (const pref of preferences) {
+          await database.runAsync(
+            'INSERT OR IGNORE INTO preferences (key, value, description) VALUES (?, ?, ?)',
+            [pref.key, pref.value, pref.description]
+          );
+        }
+      });
+
       console.log('Default preferences initialized');
     }
   } catch (error) {
@@ -187,13 +195,13 @@ const initializePreferences = async (database: SQLite.SQLiteDatabase): Promise<v
 // Helper functions to get and set preferences
 export const getPreference = async (key: string): Promise<string | null> => {
   const database = await initDatabase();
-  
+
   try {
     const result = await database.getFirstAsync<{ value: string }>(
       'SELECT value FROM preferences WHERE key = ?',
       [key]
     );
-    
+
     return result ? result.value : null;
   } catch (error) {
     console.error(`Error getting preference ${key}:`, error);
@@ -203,7 +211,7 @@ export const getPreference = async (key: string): Promise<string | null> => {
 
 export const setPreference = async (key: string, value: string, description?: string): Promise<void> => {
   const database = await initDatabase();
-  
+
   try {
     // If description is provided, update it; otherwise just update the value
     if (description) {
@@ -217,7 +225,7 @@ export const setPreference = async (key: string, value: string, description?: st
         'SELECT description FROM preferences WHERE key = ?',
         [key]
       );
-      
+
       await database.runAsync(
         'INSERT OR REPLACE INTO preferences (key, value, description) VALUES (?, ?, ?)',
         [key, value, existing?.description || '']
@@ -230,14 +238,14 @@ export const setPreference = async (key: string, value: string, description?: st
 };
 
 // Get all preferences from the database
-export const getAllPreferences = async (): Promise<Array<{ key: string, value: string, description: string }>> => {
+export const getAllPreferences = async (): Promise<Preference[]> => {
   const database = await initDatabase();
-  
+
   try {
     const preferences = await database.getAllAsync<{ key: string, value: string, description: string }>(
       'SELECT key, value, description FROM preferences ORDER BY key'
     );
-    
+
     return preferences || [];
   } catch (error) {
     console.error('Error getting all preferences:', error);
@@ -248,13 +256,13 @@ export const getAllPreferences = async (): Promise<Array<{ key: string, value: s
 // Helper functions for Untappd cookies
 export const getUntappdCookie = async (key: string): Promise<string | null> => {
   const database = await initDatabase();
-  
+
   try {
     const result = await database.getFirstAsync<{ value: string }>(
       'SELECT value FROM untappd WHERE key = ?',
       [key]
     );
-    
+
     return result ? result.value : null;
   } catch (error) {
     console.error(`Error getting Untappd cookie ${key}:`, error);
@@ -264,7 +272,7 @@ export const getUntappdCookie = async (key: string): Promise<string | null> => {
 
 export const setUntappdCookie = async (key: string, value: string, description?: string): Promise<void> => {
   const database = await initDatabase();
-  
+
   try {
     // If description is provided, update it; otherwise just update the value
     if (description) {
@@ -278,7 +286,7 @@ export const setUntappdCookie = async (key: string, value: string, description?:
         'SELECT description FROM untappd WHERE key = ?',
         [key]
       );
-      
+
       await database.runAsync(
         'INSERT OR REPLACE INTO untappd (key, value, description) VALUES (?, ?, ?)',
         [key, value, existing?.description || '']
@@ -290,14 +298,14 @@ export const setUntappdCookie = async (key: string, value: string, description?:
   }
 };
 
-export const getAllUntappdCookies = async (): Promise<Array<{ key: string, value: string, description: string }>> => {
+export const getAllUntappdCookies = async (): Promise<UntappdCookie[]> => {
   const database = await initDatabase();
-  
+
   try {
     const cookies = await database.getAllAsync<{ key: string, value: string, description: string }>(
       'SELECT key, value, description FROM untappd ORDER BY key'
     );
-    
+
     return cookies || [];
   } catch (error) {
     console.error('Error getting all Untappd cookies:', error);
@@ -307,19 +315,19 @@ export const getAllUntappdCookies = async (): Promise<Array<{ key: string, value
 
 export const isUntappdLoggedIn = async (): Promise<boolean> => {
   const cookies = await getAllUntappdCookies();
-  
+
   // First check for our custom detection flag which indicates we've detected login via UI elements
   const loginDetectedViaUI = cookies.some(cookie => cookie.key === 'login_detected_via_ui' && cookie.value === 'true');
-  
+
   // Also check for our explicit login detection flag
   const loginDetectedByApp = cookies.some(cookie => cookie.key === 'untappd_logged_in_detected' && cookie.value === 'true');
-  
+
   // Check if we have the necessary cookies for an active session
   // At minimum, we would need the untappd_session_t cookie, but we may not have access to it if it's HttpOnly
-  const sessionCookiePresent = cookies.some(cookie => 
+  const sessionCookiePresent = cookies.some(cookie =>
     (cookie.key === 'untappd_session_t' || cookie.key === 'ut_session') && cookie.value
   );
-  
+
   // Consider logged in if we have either:
   // 1. Detected login via UI elements
   // 2. Explicitly detected login via navigation or page content
@@ -331,17 +339,17 @@ export const isUntappdLoggedIn = async (): Promise<boolean> => {
 const fetchWithRetry = async (url: string, retries = 3, delay = 1000): Promise<any> => {
   try {
     const response = await fetch(url);
-    
+
     if (!response.ok) {
       throw new Error(`Failed to fetch: ${response.status} ${response.statusText}`);
     }
-    
+
     return await response.json();
   } catch (error) {
     if (retries <= 1) {
       throw error;
     }
-    
+
     console.log(`Fetch failed, retrying in ${delay}ms... (${retries-1} retries left)`);
     await new Promise(resolve => setTimeout(resolve, delay));
     return fetchWithRetry(url, retries - 1, delay * 1.5);
@@ -349,24 +357,24 @@ const fetchWithRetry = async (url: string, retries = 3, delay = 1000): Promise<a
 };
 
 // Fetch beers from API
-export const fetchBeersFromAPI = async (): Promise<any[]> => {
+export const fetchBeersFromAPI = async (): Promise<Beer[]> => {
   try {
     // Get the API endpoint from preferences
     const apiUrl = await getPreference('all_beers_api_url');
-    
+
     if (!apiUrl) {
       console.log('All beers API URL not found in preferences');
       return []; // Return empty array instead of throwing an error
     }
-    
+
     const data = await fetchWithRetry(apiUrl);
-    
+
     // Extract the brewInStock array from the response
     // The API returns an array where the second element contains the brewInStock array
     if (data && Array.isArray(data) && data.length >= 2 && data[1] && data[1].brewInStock) {
       return data[1].brewInStock;
     }
-    
+
     throw new Error('Invalid response format from API');
   } catch (error) {
     console.error('Error fetching beers from API:', error);
@@ -384,26 +392,26 @@ const acquireLock = async (operationName: string): Promise<boolean> => {
       await new Promise(resolve => setTimeout(resolve, 300));
       attempts++;
     }
-    
+
     if (dbOperationInProgress) {
       console.error(`Failed to acquire database lock after waiting (${operationName})`);
       return false;
     }
   }
-  
+
   console.log(`Lock acquired for: ${operationName}`);
   dbOperationInProgress = true;
-  
+
   // Safety timeout to release lock after 60 seconds in case of any issues
   if (lockTimeoutId) {
     clearTimeout(lockTimeoutId);
   }
-  
+
   lockTimeoutId = setTimeout(() => {
     console.warn('Database lock forcibly released after timeout');
     dbOperationInProgress = false;
   }, 60000); // 60 second safety timeout
-  
+
   return true;
 };
 
@@ -416,58 +424,63 @@ const releaseLock = (operationName: string): void => {
   dbOperationInProgress = false;
 };
 
-// Insert beers into database WITHOUT using transactions
-export const populateBeersTable = async (beers: any[]): Promise<void> => {
+// Insert beers into database using transactions
+export const populateBeersTable = async (beers: Beer[]): Promise<void> => {
   if (!await acquireLock('populateBeersTable')) {
     throw new Error('Failed to acquire database lock for populating beers table');
   }
 
   const database = await initDatabase();
-  
+
   try {
     // Check if table is already populated
     const count = await database.getFirstAsync<{ count: number }>('SELECT COUNT(*) as count FROM allbeers');
-    
+
     if (count && count.count > 0) {
       console.log(`Database already contains ${count.count} beers. Skipping import.`);
       return;
     }
-    
+
     console.log(`Starting import of ${beers.length} beers...`);
-    
-    // Process in small batches without using transactions
-    const batchSize = 5;
+
+    // Process in larger batches using transactions
+    const batchSize = 50;
+
     for (let i = 0; i < beers.length; i += batchSize) {
       const batch = beers.slice(i, i + batchSize);
-      
-      // Insert each beer individually without a transaction
-      for (const beer of batch) {
-        if (!beer.id) continue; // Skip entries without an ID
-        
-        await database.runAsync(
-          `INSERT OR REPLACE INTO allbeers (
-            id, added_date, brew_name, brewer, brewer_loc, 
-            brew_style, brew_container, review_count, review_rating, brew_description
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [
-            beer.id,
-            beer.added_date || '',
-            beer.brew_name || '',
-            beer.brewer || '',
-            beer.brewer_loc || '',
-            beer.brew_style || '',
-            beer.brew_container || '',
-            beer.review_count || '',
-            beer.review_rating || '',
-            beer.brew_description || ''
-          ]
-        );
+
+      // Use withTransactionAsync for each batch
+      await database.withTransactionAsync(async () => {
+        for (const beer of batch) {
+          if (!beer.id) continue; // Skip entries without an ID
+
+          await database.runAsync(
+            `INSERT OR REPLACE INTO allbeers (
+              id, added_date, brew_name, brewer, brewer_loc,
+              brew_style, brew_container, review_count, review_rating, brew_description
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+              beer.id,
+              beer.added_date || '',
+              beer.brew_name || '',
+              beer.brewer || '',
+              beer.brewer_loc || '',
+              beer.brew_style || '',
+              beer.brew_container || '',
+              beer.review_count || '',
+              beer.review_rating || '',
+              beer.brew_description || ''
+            ]
+          );
+        }
+      });
+
+      // Log progress for larger batches
+      if ((i + batchSize) % 200 === 0 || i + batchSize >= beers.length) {
+        console.log(`Imported ${Math.min(i + batchSize, beers.length)} of ${beers.length} beers...`);
       }
-      
-      // Small delay between batches to avoid locking issues
-      await new Promise(resolve => setTimeout(resolve, 10));
     }
-    
+
     console.log('Beer import complete!');
   } catch (error) {
     console.error('Error populating beer database:', error);
@@ -480,22 +493,22 @@ export const populateBeersTable = async (beers: any[]): Promise<void> => {
 // Initialize the database on app startup
 export const initializeBeerDatabase = async (): Promise<void> => {
   console.log('Initializing beer database...');
-  
+
   try {
     // First, make sure the database schema is set up
     await setupDatabase();
-    
+
     // Check if API URLs are configured
     const apiUrlsConfigured = await areApiUrlsConfigured();
     if (!apiUrlsConfigured) {
       console.log('API URLs not configured, database initialization will be limited');
       return;
     }
-    
+
     // If we haven't already scheduled My Beers import, do it now
     if (!myBeersImportScheduled) {
       myBeersImportScheduled = true;
-      
+
       // Use setTimeout to make My Beers import non-blocking
       setTimeout(async () => {
         try {
@@ -517,7 +530,7 @@ export const initializeBeerDatabase = async (): Promise<void> => {
         console.error('Error in scheduled Rewards import:', error);
       }
     }, 200);
-    
+
     // Fetch all beers (this is blocking because we need it immediately)
     try {
       const beers = await fetchBeersFromAPI();
@@ -525,7 +538,7 @@ export const initializeBeerDatabase = async (): Promise<void> => {
     } catch (error) {
       console.error('Error fetching and populating all beers:', error);
     }
-    
+
     console.log('Beer database initialization completed');
   } catch (error) {
     console.error('Error initializing beer database:', error);
@@ -533,24 +546,24 @@ export const initializeBeerDatabase = async (): Promise<void> => {
   }
 };
 
-// Fetch My Beers from API
-export const fetchMyBeersFromAPI = async (): Promise<any[]> => {
+// Fetch Beerfinder beers from API
+export const fetchMyBeersFromAPI = async (): Promise<Beerfinder[]> => {
   try {
     // Get the API endpoint from preferences
     const apiUrl = await getPreference('my_beers_api_url');
-    
+
     if (!apiUrl) {
       console.log('My beers API URL not found in preferences');
       return []; // Return empty array instead of throwing an error
     }
-    
+
     const data = await fetchWithRetry(apiUrl);
-    
+
     // Extract the tasted_brew_current_round array from the response
     if (data && Array.isArray(data) && data.length >= 2 && data[1] && data[1].tasted_brew_current_round) {
       return data[1].tasted_brew_current_round;
     }
-    
+
     throw new Error('Invalid response format from My Beers API');
   } catch (error) {
     console.error('Error fetching My Beers from API:', error);
@@ -558,56 +571,61 @@ export const fetchMyBeersFromAPI = async (): Promise<any[]> => {
   }
 };
 
-// Insert My Beers into database WITHOUT using transactions
-export const populateMyBeersTable = async (beers: any[]): Promise<void> => {
+// Insert Beerfinder beers into database using transactions
+export const populateMyBeersTable = async (beers: Beerfinder[]): Promise<void> => {
   if (!await acquireLock('populateMyBeersTable')) {
-    throw new Error('Failed to acquire database lock for populating my beers table');
+    throw new Error('Failed to acquire database lock for populating Beerfinder beers table');
   }
 
   const database = await initDatabase();
-  
+
   try {
-    // Clear the existing table data first
-    await database.runAsync('DELETE FROM tasted_brew_current_round');
-    
-    console.log(`Starting import of ${beers.length} My Beers...`);
-    
-    // Process in very small batches without using transactions
-    const batchSize = 3;
-    for (let i = 0; i < beers.length; i += batchSize) {
-      const batch = beers.slice(i, i + batchSize);
-      
-      // Insert each beer individually without a transaction
-      for (const beer of batch) {
-        if (!beer.id) continue; // Skip entries without an ID
-        
-        await database.runAsync(
-          `INSERT OR REPLACE INTO tasted_brew_current_round (
-            id, roh_lap, tasted_date, brew_name, brewer, brewer_loc, 
-            brew_style, brew_container, review_count, review_ratings, 
-            brew_description, chit_code
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [
-            beer.id,
-            beer.roh_lap || '',
-            beer.tasted_date || '',
-            beer.brew_name || '',
-            beer.brewer || '',
-            beer.brewer_loc || '',
-            beer.brew_style || '',
-            beer.brew_container || '',
-            beer.review_count || '',
-            beer.review_ratings || '',
-            beer.brew_description || '',
-            beer.chit_code || ''
-          ]
-        );
+    // Use a transaction for clearing and inserting data
+    await database.withTransactionAsync(async () => {
+      // Clear the existing table data first
+      await database.runAsync('DELETE FROM tasted_brew_current_round');
+
+      console.log(`Starting import of ${beers.length} My Beers...`);
+
+      // Process in larger batches using transactions
+      const batchSize = 20;
+      for (let i = 0; i < beers.length; i += batchSize) {
+        const batch = beers.slice(i, i + batchSize);
+
+        // Insert each beer within the transaction
+        for (const beer of batch) {
+          if (!beer.id) continue; // Skip entries without an ID
+
+          await database.runAsync(
+            `INSERT OR REPLACE INTO tasted_brew_current_round (
+              id, roh_lap, tasted_date, brew_name, brewer, brewer_loc,
+              brew_style, brew_container, review_count, review_ratings,
+              brew_description, chit_code
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+              beer.id,
+              beer.roh_lap || '',
+              beer.tasted_date || '',
+              beer.brew_name || '',
+              beer.brewer || '',
+              beer.brewer_loc || '',
+              beer.brew_style || '',
+              beer.brew_container || '',
+              beer.review_count || '',
+              beer.review_ratings || '',
+              beer.brew_description || '',
+              beer.chit_code || ''
+            ]
+          );
+        }
+
+        // Log progress for larger batches
+        if ((i + batchSize) % 100 === 0 || i + batchSize >= beers.length) {
+          console.log(`Imported ${Math.min(i + batchSize, beers.length)} of ${beers.length} My Beers...`);
+        }
       }
-      
-      // Small delay between batches to avoid locking issues
-      await new Promise(resolve => setTimeout(resolve, 10));
-    }
-    
+    });
+
     console.log('My Beers import complete!');
   } catch (error) {
     console.error('Error populating My Beers database:', error);
@@ -624,18 +642,18 @@ export const fetchAndPopulateMyBeers = async (): Promise<void> => {
     console.log('My Beers import already in progress, skipping duplicate request');
     return;
   }
-  
+
   if (myBeersImportComplete) {
     console.log('My Beers import already completed, skipping duplicate request');
     return;
   }
-  
+
   if (!await acquireLock('fetchAndPopulateMyBeers')) {
     throw new Error('Failed to acquire database lock for fetching and populating My Beers');
   }
 
   myBeersImportInProgress = true;
-  
+
   try {
     await _refreshMyBeersFromAPIInternal();
     myBeersImportComplete = true;
@@ -646,53 +664,58 @@ export const fetchAndPopulateMyBeers = async (): Promise<void> => {
 };
 
 // Internal version of refreshBeersFromAPI that doesn't handle its own locking
-const _refreshBeersFromAPIInternal = async (): Promise<any[]> => {
+const _refreshBeersFromAPIInternal = async (): Promise<Beer[]> => {
   const database = await initDatabase();
-  
+
   try {
-    console.log('Clearing beer database...');
-    // Delete all records from the table
-    await database.runAsync('DELETE FROM allbeers');
-    
-    // Fetch fresh data from API
-    const beers = await fetchBeersFromAPI();
-    console.log(`Fetched ${beers.length} beers from API. Refreshing database...`);
-    
-    // Process in small batches without using transactions
-    const batchSize = 5;
-    for (let i = 0; i < beers.length; i += batchSize) {
-      const batch = beers.slice(i, i + batchSize);
-      
-      // Insert each beer individually without a transaction
-      for (const beer of batch) {
-        if (!beer.id) continue; // Skip entries without an ID
-        
-        await database.runAsync(
-          `INSERT OR REPLACE INTO allbeers (
-            id, added_date, brew_name, brewer, brewer_loc, 
-            brew_style, brew_container, review_count, review_rating, brew_description
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [
-            beer.id,
-            beer.added_date || '',
-            beer.brew_name || '',
-            beer.brewer || '',
-            beer.brewer_loc || '',
-            beer.brew_style || '',
-            beer.brew_container || '',
-            beer.review_count || '',
-            beer.review_rating || '',
-            beer.brew_description || ''
-          ]
-        );
+    // Use a transaction for the entire refresh operation
+    await database.withTransactionAsync(async () => {
+      console.log('Clearing beer database...');
+      // Delete all records from the table
+      await database.runAsync('DELETE FROM allbeers');
+
+      // Fetch fresh data from API
+      const beers = await fetchBeersFromAPI();
+      console.log(`Fetched ${beers.length} beers from API. Refreshing database...`);
+
+      // Process in larger batches using transactions
+      const batchSize = 50;
+      for (let i = 0; i < beers.length; i += batchSize) {
+        const batch = beers.slice(i, i + batchSize);
+
+        // Insert each beer within the transaction
+        for (const beer of batch) {
+          if (!beer.id) continue; // Skip entries without an ID
+
+          await database.runAsync(
+            `INSERT OR REPLACE INTO allbeers (
+              id, added_date, brew_name, brewer, brewer_loc,
+              brew_style, brew_container, review_count, review_rating, brew_description
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+              beer.id,
+              beer.added_date || '',
+              beer.brew_name || '',
+              beer.brewer || '',
+              beer.brewer_loc || '',
+              beer.brew_style || '',
+              beer.brew_container || '',
+              beer.review_count || '',
+              beer.review_rating || '',
+              beer.brew_description || ''
+            ]
+          );
+        }
+
+        // Log progress for larger batches
+        if ((i + batchSize) % 200 === 0 || i + batchSize >= beers.length) {
+          console.log(`Refreshed ${Math.min(i + batchSize, beers.length)} of ${beers.length} beers...`);
+        }
       }
-      
-      // Small delay between batches to avoid locking issues
-      await new Promise(resolve => setTimeout(resolve, 10));
-    }
-    
+    });
+
     console.log('Database refresh complete!');
-    
+
     // Return the refreshed beers
     return await getAllBeers();
   } catch (error) {
@@ -702,7 +725,7 @@ const _refreshBeersFromAPIInternal = async (): Promise<any[]> => {
 };
 
 // Public version that handles locking
-export const refreshBeersFromAPI = async (): Promise<any[]> => {
+export const refreshBeersFromAPI = async (): Promise<Beer[]> => {
   if (!await acquireLock('refreshBeersFromAPI')) {
     throw new Error('Failed to acquire database lock for refreshing beers');
   }
@@ -715,52 +738,57 @@ export const refreshBeersFromAPI = async (): Promise<any[]> => {
 };
 
 // Internal version of fetchAndPopulateMyBeers that doesn't handle its own locking
-const _refreshMyBeersFromAPIInternal = async (): Promise<any[]> => {
+const _refreshMyBeersFromAPIInternal = async (): Promise<Beerfinder[]> => {
   try {
     const myBeers = await fetchMyBeersFromAPI();
-    
+
     const database = await initDatabase();
-    
-    // Clear existing data
-    await database.runAsync('DELETE FROM tasted_brew_current_round');
-    
-    console.log(`Starting import of ${myBeers.length} My Beers...`);
-    
-    // Process in very small batches
-    const batchSize = 3;
-    for (let i = 0; i < myBeers.length; i += batchSize) {
-      const batch = myBeers.slice(i, i + batchSize);
-      
-      for (const beer of batch) {
-        if (!beer.id) continue; // Skip entries without an ID
-        
-        await database.runAsync(
-          `INSERT OR REPLACE INTO tasted_brew_current_round (
-            id, roh_lap, tasted_date, brew_name, brewer, brewer_loc, 
-            brew_style, brew_container, review_count, review_ratings, 
-            brew_description, chit_code
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [
-            beer.id,
-            beer.roh_lap || '',
-            beer.tasted_date || '',
-            beer.brew_name || '',
-            beer.brewer || '',
-            beer.brewer_loc || '',
-            beer.brew_style || '',
-            beer.brew_container || '',
-            beer.review_count || '',
-            beer.review_ratings || '',
-            beer.brew_description || '',
-            beer.chit_code || ''
-          ]
-        );
+
+    // Use a transaction for the entire refresh operation
+    await database.withTransactionAsync(async () => {
+      // Clear existing data
+      await database.runAsync('DELETE FROM tasted_brew_current_round');
+
+      console.log(`Starting import of ${myBeers.length} My Beers...`);
+
+      // Process in larger batches
+      const batchSize = 20;
+      for (let i = 0; i < myBeers.length; i += batchSize) {
+        const batch = myBeers.slice(i, i + batchSize);
+
+        for (const beer of batch) {
+          if (!beer.id) continue; // Skip entries without an ID
+
+          await database.runAsync(
+            `INSERT OR REPLACE INTO tasted_brew_current_round (
+              id, roh_lap, tasted_date, brew_name, brewer, brewer_loc,
+              brew_style, brew_container, review_count, review_ratings,
+              brew_description, chit_code
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+              beer.id,
+              beer.roh_lap || '',
+              beer.tasted_date || '',
+              beer.brew_name || '',
+              beer.brewer || '',
+              beer.brewer_loc || '',
+              beer.brew_style || '',
+              beer.brew_container || '',
+              beer.review_count || '',
+              beer.review_ratings || '',
+              beer.brew_description || '',
+              beer.chit_code || ''
+            ]
+          );
+        }
+
+        // Log progress for larger batches
+        if ((i + batchSize) % 100 === 0 || i + batchSize >= myBeers.length) {
+          console.log(`Imported ${Math.min(i + batchSize, myBeers.length)} of ${myBeers.length} My Beers...`);
+        }
       }
-      
-      // Small delay between batches to avoid locking issues
-      await new Promise(resolve => setTimeout(resolve, 10));
-    }
-    
+    });
+
     console.log('My Beers import complete!');
     return myBeers;
   } catch (error) {
@@ -770,9 +798,9 @@ const _refreshMyBeersFromAPIInternal = async (): Promise<any[]> => {
 };
 
 // Get all beers from the database
-export const getAllBeers = async (): Promise<any[]> => {
+export const getAllBeers = async (): Promise<Beer[]> => {
   const database = await initDatabase();
-  
+
   try {
     return await database.getAllAsync(
       'SELECT * FROM allbeers WHERE brew_name IS NOT NULL AND brew_name != "" ORDER BY added_date DESC'
@@ -784,9 +812,9 @@ export const getAllBeers = async (): Promise<any[]> => {
 };
 
 // Get beer by ID
-export const getBeerById = async (id: string): Promise<any> => {
+export const getBeerById = async (id: string): Promise<Beer | null> => {
   const database = await initDatabase();
-  
+
   try {
     return await database.getFirstAsync(
       'SELECT * FROM allbeers WHERE id = ?',
@@ -799,21 +827,21 @@ export const getBeerById = async (id: string): Promise<any> => {
 };
 
 // Search beers by name, brewer, style, or description
-export const searchBeers = async (query: string): Promise<any[]> => {
+export const searchBeers = async (query: string): Promise<Beer[]> => {
   if (!query.trim()) {
     return getAllBeers();
   }
-  
+
   const database = await initDatabase();
   const searchTerm = `%${query.trim()}%`;
-  
+
   try {
     return await database.getAllAsync(
-      `SELECT * FROM allbeers 
+      `SELECT * FROM allbeers
        WHERE brew_name IS NOT NULL AND brew_name != "" AND
-       (brew_name LIKE ? 
-       OR brewer LIKE ? 
-       OR brew_style LIKE ? 
+       (brew_name LIKE ?
+       OR brewer LIKE ?
+       OR brew_style LIKE ?
        OR brew_description LIKE ?)
        ORDER BY added_date DESC`,
       [searchTerm, searchTerm, searchTerm, searchTerm]
@@ -825,9 +853,9 @@ export const searchBeers = async (query: string): Promise<any[]> => {
 };
 
 // Get beers by style
-export const getBeersByStyle = async (style: string): Promise<any[]> => {
+export const getBeersByStyle = async (style: string): Promise<Beer[]> => {
   const database = await initDatabase();
-  
+
   try {
     return await database.getAllAsync(
       'SELECT * FROM allbeers WHERE brew_name IS NOT NULL AND brew_name != "" AND brew_style = ? ORDER BY added_date DESC',
@@ -840,9 +868,9 @@ export const getBeersByStyle = async (style: string): Promise<any[]> => {
 };
 
 // Get beers by brewer
-export const getBeersByBrewer = async (brewer: string): Promise<any[]> => {
+export const getBeersByBrewer = async (brewer: string): Promise<Beer[]> => {
   const database = await initDatabase();
-  
+
   try {
     return await database.getAllAsync(
       'SELECT * FROM allbeers WHERE brew_name IS NOT NULL AND brew_name != "" AND brewer = ? ORDER BY added_date DESC',
@@ -854,30 +882,30 @@ export const getBeersByBrewer = async (brewer: string): Promise<any[]> => {
   }
 };
 
-// Get all tasted beers (my beers)
-export const getMyBeers = async (): Promise<any[]> => {
+// Get all tasted beers (Beerfinder beers)
+export const getMyBeers = async (): Promise<Beerfinder[]> => {
   const database = await initDatabase();
-  
+
   try {
     const beers = await database.getAllAsync<any>(
       'SELECT * FROM tasted_brew_current_round ORDER BY id'
     );
     return beers;
   } catch (error) {
-    console.error('Error getting my beers:', error);
+    console.error('Error getting Beerfinder beers:', error);
     throw error;
   }
 };
 
 // Get all available beers that are not in My Beers
-export const getBeersNotInMyBeers = async (): Promise<any[]> => {
+export const getBeersNotInMyBeers = async (): Promise<Beer[]> => {
   const database = await initDatabase();
-  
+
   try {
     return await database.getAllAsync(`
-      SELECT * FROM allbeers 
-      WHERE brew_name IS NOT NULL 
-      AND brew_name != "" 
+      SELECT * FROM allbeers
+      WHERE brew_name IS NOT NULL
+      AND brew_name != ""
       AND id NOT IN (SELECT id FROM tasted_brew_current_round)
       ORDER BY added_date DESC
     `);
@@ -898,27 +926,27 @@ export const resetDatabaseState = (): void => {
   console.log('Database state flags reset');
 };
 
-// Refresh all data from APIs (both all beers and my beers)
-export const refreshAllDataFromAPI = async (): Promise<{ allBeers: any[], myBeers: any[], rewards: any[] }> => {
+// Refresh all data from APIs (both all beers and Beerfinder beers)
+export const refreshAllDataFromAPI = async (): Promise<{ allBeers: Beer[], myBeers: Beerfinder[], rewards: Reward[] }> => {
   console.log('Refreshing all data from API...');
-  
+
   // Check if API URLs are configured
   const apiUrlsConfigured = await areApiUrlsConfigured();
   if (!apiUrlsConfigured) {
     console.log('API URLs not configured, cannot refresh data');
     throw new Error('API URLs not configured. Please log in to set up API URLs.');
   }
-  
+
   try {
     // Get preferences to check API URLs
     const allBeersApiUrl = await getPreference('all_beers_api_url');
     const myBeersApiUrl = await getPreference('my_beers_api_url');
-    
+
     if (!allBeersApiUrl || !myBeersApiUrl) {
       console.log('API URLs not found in preferences');
       throw new Error('API URLs not found. Please log in to set up API URLs.');
     }
-    
+
     // Refresh all data sources in parallel
     const [allBeers, myBeers, rewards] = await Promise.all([
       _refreshBeersFromAPIInternal(),
@@ -928,9 +956,9 @@ export const refreshAllDataFromAPI = async (): Promise<{ allBeers: any[], myBeer
         return data;
       })
     ]);
-    
+
     console.log(`Successfully refreshed all data: ${allBeers.length} beers, ${myBeers.length} tasted beers, ${rewards.length} rewards`);
-    
+
     return { allBeers, myBeers, rewards };
   } catch (error) {
     console.error('Error refreshing all data from API:', error);
@@ -943,7 +971,7 @@ export const areApiUrlsConfigured = async (): Promise<boolean> => {
   try {
     const allBeersApiUrl = await getPreference('all_beers_api_url');
     const myBeersApiUrl = await getPreference('my_beers_api_url');
-    
+
     return !!allBeersApiUrl && !!myBeersApiUrl;
   } catch (error) {
     console.error('Error checking API URLs:', error);
@@ -952,23 +980,23 @@ export const areApiUrlsConfigured = async (): Promise<boolean> => {
 };
 
 // Fetch rewards from API
-export const fetchRewardsFromAPI = async (): Promise<any[]> => {
+export const fetchRewardsFromAPI = async (): Promise<Reward[]> => {
   try {
     // Get the API endpoint from preferences
     const apiUrl = await getPreference('my_beers_api_url');
-    
+
     if (!apiUrl) {
       console.log('My beers API URL not found in preferences');
       return []; // Return empty array instead of throwing an error
     }
-    
+
     const data = await fetchWithRetry(apiUrl);
-    
+
     // Extract the reward array from the response
     if (data && Array.isArray(data) && data.length >= 3 && data[2] && data[2].reward) {
       return data[2].reward;
     }
-    
+
     throw new Error('Invalid response format from Rewards API');
   } catch (error) {
     console.error('Error fetching Rewards from API:', error);
@@ -977,52 +1005,55 @@ export const fetchRewardsFromAPI = async (): Promise<any[]> => {
 };
 
 // Populate the rewards table
-export const populateRewardsTable = async (rewards: any[]): Promise<void> => {
+export const populateRewardsTable = async (rewards: Reward[]): Promise<void> => {
   if (!rewards || rewards.length === 0) {
     console.log('No rewards to populate');
     return;
   }
-  
+
   try {
     const database = await initDatabase();
     const acquired = await acquireLock('populate_rewards_table');
-    
+
     if (!acquired) {
       console.log('Could not acquire lock for rewards table population');
       return;
     }
-    
+
     try {
-      // Clear existing rewards
-      await database.runAsync('DELETE FROM rewards');
-      console.log('Cleared existing rewards from the table');
-      
-      // Batch insert new rewards
-      const batchSize = 100;
-      for (let i = 0; i < rewards.length; i += batchSize) {
-        const batch = rewards.slice(i, i + batchSize);
-        
-        const placeholders = batch.map(() => '(?, ?, ?)').join(',');
-        const values: any[] = [];
-        
-        batch.forEach(reward => {
-          values.push(
-            reward.reward_id || '',
-            reward.redeemed || '0',
-            reward.reward_type || ''
+      // Use a transaction for the entire operation
+      await database.withTransactionAsync(async () => {
+        // Clear existing rewards
+        await database.runAsync('DELETE FROM rewards');
+        console.log('Cleared existing rewards from the table');
+
+        // Batch insert new rewards
+        const batchSize = 100;
+        for (let i = 0; i < rewards.length; i += batchSize) {
+          const batch = rewards.slice(i, i + batchSize);
+
+          const placeholders = batch.map(() => '(?, ?, ?)').join(',');
+          const values: any[] = [];
+
+          batch.forEach(reward => {
+            values.push(
+              reward.reward_id || '',
+              reward.redeemed || '0',
+              reward.reward_type || ''
+            );
+          });
+
+          await database.runAsync(
+            `INSERT OR REPLACE INTO rewards (
+              reward_id,
+              redeemed,
+              reward_type
+            ) VALUES ${placeholders}`,
+            values
           );
-        });
-        
-        await database.runAsync(
-          `INSERT OR REPLACE INTO rewards (
-            reward_id,
-            redeemed,
-            reward_type
-          ) VALUES ${placeholders}`,
-          values
-        );
-      }
-      
+        }
+      });
+
       console.log(`Successfully populated rewards table with ${rewards.length} rewards`);
     } finally {
       releaseLock('populate_rewards_table');
@@ -1042,13 +1073,13 @@ export const fetchAndPopulateRewards = async (): Promise<void> => {
       console.log('API URLs not configured, skipping rewards fetch');
       return;
     }
-    
+
     // Fetch rewards from API
     const rewards = await fetchRewardsFromAPI();
-    
+
     // Populate rewards table
     await populateRewardsTable(rewards);
-    
+
     console.log('Rewards fetch and populate completed successfully');
   } catch (error) {
     console.error('Error fetching and populating rewards:', error);
@@ -1067,4 +1098,4 @@ export const getAllRewards = async (): Promise<any[]> => {
     console.error('Error getting rewards:', error);
     return [];
   }
-}; 
+};

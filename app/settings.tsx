@@ -52,7 +52,7 @@ export default function SettingsScreen() {
   useEffect(() => {
     loadPreferences();
     checkUntappdLoginStatus();
-    
+
     // Check if this is the initial route or if we can go back
     try {
       setCanGoBack(router.canGoBack());
@@ -61,7 +61,7 @@ export default function SettingsScreen() {
       setCanGoBack(false);
     }
   }, []);
-  
+
   // Function to check Untappd login status
   const checkUntappdLoginStatus = async () => {
     try {
@@ -79,12 +79,12 @@ export default function SettingsScreen() {
       setLoading(true);
       const prefs = await getAllPreferences();
       setPreferences(prefs);
-      
+
       // Check if API URLs are set
       const allBeersApiUrl = prefs.find(p => p.key === 'all_beers_api_url')?.value;
       const myBeersApiUrl = prefs.find(p => p.key === 'my_beers_api_url')?.value;
       const isFirstLaunch = prefs.find(p => p.key === 'first_launch')?.value === 'true';
-      
+
       // Set state based on whether URLs are configured
       setApiUrlsConfigured(!!allBeersApiUrl && !!myBeersApiUrl);
       setIsFirstLogin(!allBeersApiUrl || !myBeersApiUrl);
@@ -100,13 +100,13 @@ export default function SettingsScreen() {
   const handleRefresh = async () => {
     try {
       setRefreshing(true);
-      
+
       // Perform the refresh of both tables
       const refreshResult = await refreshAllDataFromAPI();
-      
+
       // Show success message
       Alert.alert(
-        'Success', 
+        'Success',
         `Successfully refreshed:\n- ${refreshResult.allBeers.length} beers\n- ${refreshResult.myBeers.length} tasted beers`
       );
     } catch (err) {
@@ -153,35 +153,35 @@ export default function SettingsScreen() {
             // Try to find variables in the page
             let userJsonUrl = null;
             let storeJsonUrl = null;
-            
+
             // Look for PHP variables in script tags
             const scripts = document.querySelectorAll('script');
             for (const script of scripts) {
               const content = script.textContent || script.innerText;
-              
+
               // Look for user_json_url
               const userMatch = content.match(/\\$user_json_url\\s*=\\s*["']([^"']+)["']/);
               if (userMatch && userMatch[1]) {
                 userJsonUrl = userMatch[1];
               }
-              
+
               // Look for store_json_url
               const storeMatch = content.match(/\\$store_json_url\\s*=\\s*["']([^"']+)["']/);
               if (storeMatch && storeMatch[1]) {
                 storeJsonUrl = storeMatch[1];
               }
             }
-            
+
             // Also look for URLs in the page source
             const html = document.documentElement.outerHTML;
-            
+
             if (!userJsonUrl) {
               const memberJsonMatch = html.match(/https:\\/\\/[^"'\\s]+bk-member-json\\.php\\?uid=\\d+/i);
               if (memberJsonMatch) {
                 userJsonUrl = memberJsonMatch[0];
               }
             }
-            
+
             if (!storeJsonUrl) {
               const storeJsonMatch = html.match(/https:\\/\\/[^"'\\s]+bk-store-json\\.php\\?sid=\\d+/i);
               if (storeJsonMatch) {
@@ -215,7 +215,7 @@ export default function SettingsScreen() {
                 cookies: cookies
               }));
             });
-            
+
             true; // Return statement needed for Android
           })();
         `);
@@ -227,43 +227,43 @@ export default function SettingsScreen() {
   const handleUntappdWebViewNavigationStateChange = (navState: WebViewNavigation) => {
     // Log navigation for debugging
     console.log('Untappd WebView navigating to:', navState.url);
-    
+
     // Check if we're on Untappd pages
     if (navState.url.includes('untappd.com')) {
       // If we're on the login page, don't do anything special
       if (navState.url.includes('/login')) {
         console.log('On Untappd login page');
-      } 
+      }
       // Check if user has navigated to a profile page, dashboard, or home page, which indicates successful login
-      else if (!navState.loading && 
-              (navState.url.includes('/user/') || 
-               navState.url.includes('/dashboard') || 
+      else if (!navState.loading &&
+              (navState.url.includes('/user/') ||
+               navState.url.includes('/dashboard') ||
                navState.url.includes('/profile') ||
                navState.url.includes('/home'))) {
-        
+
         console.log('User appears to be logged in - on profile/dashboard/home page');
-        
+
         // Inject JavaScript to check for logged-in state and extract visible cookies
         if (untappdWebViewRef.current) {
           untappdWebViewRef.current.injectJavaScript(`
             (function() {
               try {
                 console.log('Checking login state on page');
-                
+
                 // Check for elements that indicate logged-in state
-                const userMenuElement = document.querySelector('.user-menu') || 
-                                       document.querySelector('.profile-area') || 
+                const userMenuElement = document.querySelector('.user-menu') ||
+                                       document.querySelector('.profile-area') ||
                                        document.querySelector('.user-actions');
-                
-                const isLoggedInElement = document.querySelector('.notifications') || 
+
+                const isLoggedInElement = document.querySelector('.notifications') ||
                                          document.querySelector('.account-action') ||
                                          document.querySelector('.user-profile-area');
-                
+
                 // Check if logout link exists, which definitely indicates logged in state
                 const logoutLink = Array.from(document.querySelectorAll('a')).find(
                   a => a.textContent && (a.textContent.includes('Logout') || a.textContent.includes('Sign Out'))
                 );
-                
+
                 // Get any visible cookies we can access
                 const cookieString = document.cookie;
                 const cookies = cookieString.split(';').reduce((acc, cookie) => {
@@ -273,7 +273,7 @@ export default function SettingsScreen() {
                   }
                   return acc;
                 }, {});
-                
+
                 // Send results back to React Native
                 window.ReactNativeWebView.postMessage(JSON.stringify({
                   type: 'UNTAPPD_LOGIN_CHECK',
@@ -284,7 +284,7 @@ export default function SettingsScreen() {
                   url: window.location.href,
                   pageTitle: document.title
                 }));
-                
+
                 // If we have evidence the user is logged in, notify the app
                 if (userMenuElement || isLoggedInElement || logoutLink) {
                   window.ReactNativeWebView.postMessage(JSON.stringify({
@@ -292,7 +292,7 @@ export default function SettingsScreen() {
                     url: window.location.href,
                     method: 'page_element_detection'
                   }));
-                  
+
                   // Also send any non-HttpOnly cookies we can access
                   window.ReactNativeWebView.postMessage(JSON.stringify({
                     type: 'UNTAPPD_COOKIES',
@@ -302,7 +302,7 @@ export default function SettingsScreen() {
               } catch (err) {
                 console.error('Error in login detection:', err);
               }
-              
+
               true; // Return statement needed for Android
             })();
           `);
@@ -315,31 +315,31 @@ export default function SettingsScreen() {
   const handleWebViewMessage = (event: WebViewMessageEvent) => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
-      
+
       if (data.type === 'URLs') {
         const { userJsonUrl, storeJsonUrl, cookies } = data;
-        
+
         if (userJsonUrl && storeJsonUrl) {
           // Update preferences with new API endpoints
           setPreference('user_json_url', userJsonUrl, 'API endpoint for user data');
           setPreference('store_json_url', storeJsonUrl, 'API endpoint for store data');
-          
+
           // Also set the API URLs that are used by the rest of the app
-          setPreference('my_beers_api_url', userJsonUrl, 'API endpoint for fetching my beers');
+          setPreference('my_beers_api_url', userJsonUrl, 'API endpoint for fetching Beerfinder beers');
           setPreference('all_beers_api_url', storeJsonUrl, 'API endpoint for fetching all beers');
-          
+
           // Save login timestamp
           setPreference('last_login_timestamp', new Date().toISOString(), 'Last successful login timestamp');
-          
+
           // Save cookies
           setPreference('auth_cookies', JSON.stringify(cookies), 'Authentication cookies');
-          
+
           // Refresh the data
           handleRefresh();
-          
+
           // Reload preferences to update the UI
           loadPreferences();
-          
+
           // Show success message
           Alert.alert(
             'Login Successful',
@@ -350,10 +350,10 @@ export default function SettingsScreen() {
                 onPress: () => {
                   // Reset login loading state
                   setLoginLoading(false);
-                  
+
                   // Close the WebView
                   setWebviewVisible(false);
-                  
+
                   // Navigate to the main tabs interface
                   setTimeout(() => {
                     router.replace('/(tabs)');
@@ -376,7 +376,7 @@ export default function SettingsScreen() {
       console.log('Received message from Untappd WebView');
       const data = JSON.parse(event.nativeEvent.data);
       console.log('Message type:', data.type);
-      
+
       // Process detailed login check results
       if (data.type === 'UNTAPPD_LOGIN_CHECK') {
         console.log('Login check details:', {
@@ -387,53 +387,53 @@ export default function SettingsScreen() {
           url: data.url,
           pageTitle: data.pageTitle
         });
-        
+
         // Store this information for debugging but don't take action yet
         setUntappdCookie('login_check_result', JSON.stringify(data), 'Login check results from page');
       }
-      
+
       // Process cookies received from WebView
       if (data.type === 'UNTAPPD_COOKIES') {
         const { cookies } = data;
         console.log('Received cookies keys:', Object.keys(cookies));
-        
+
         if (Object.keys(cookies).length === 0) {
           console.log('No cookies received, user probably not logged in yet');
           return;
         }
-        
+
         // We don't have access to HttpOnly cookies, but we'll still save the visible ones
         // and mark the user as logged in based on the UI detection
-        
+
         // Save each cookie to the database
         Object.entries(cookies).forEach(([name, value]) => {
           console.log(`Saving cookie: ${name}`);
           setUntappdCookie(name, value as string, `Untappd cookie: ${name}`);
         });
-        
+
         // Save login timestamp
         setUntappdCookie('last_login_timestamp', new Date().toISOString(), 'Last successful Untappd login timestamp');
-        
+
         // Save that we had a successful login detection via UI elements
         setUntappdCookie('login_detected_via_ui', 'true', 'Login was detected via UI elements');
       }
-      
+
       // Explicit login confirmation message
       if (data.type === 'UNTAPPD_LOGGED_IN') {
         console.log('Login confirmed via:', data.method || 'url navigation');
-        
+
         // Only consider the login successful if we're on a user profile, dashboard or home page
-        if (data.url && (data.url.includes('/user/') || 
-                         data.url.includes('/dashboard') || 
+        if (data.url && (data.url.includes('/user/') ||
+                         data.url.includes('/dashboard') ||
                          data.url.includes('/profile') ||
                          data.url.includes('/home'))) {
-          
+
           // Update login status
           setUntappdLoggedInStatus(true);
-          
+
           // Set a special cookie to mark that we've detected login
           setUntappdCookie('untappd_logged_in_detected', 'true', 'Login was detected by app');
-          
+
           // Show success message and close WebView
           Alert.alert(
             'Untappd Login Successful',
@@ -444,7 +444,7 @@ export default function SettingsScreen() {
                 onPress: () => {
                   // Reset login loading state
                   setUntappdLoginLoading(false);
-                  
+
                   // Close the WebView
                   setUntappdWebviewVisible(false);
                 }
@@ -502,7 +502,7 @@ export default function SettingsScreen() {
   return (
     <ThemedView style={styles.container}>
       <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
-      
+
       {/* WebView Modal */}
       <Modal
         visible={webviewVisible}
@@ -516,7 +516,7 @@ export default function SettingsScreen() {
             </TouchableOpacity>
             <ThemedText style={styles.webViewTitle}>Flying Saucer Login</ThemedText>
           </View>
-          
+
           <WebView
             ref={webViewRef}
             source={{ uri: 'https://tapthatapp.beerknurd.com/kiosk.php' }}
@@ -529,7 +529,7 @@ export default function SettingsScreen() {
           />
         </SafeAreaView>
       </Modal>
-      
+
       {/* Untappd WebView Modal */}
       <Modal
         visible={untappdWebviewVisible}
@@ -543,7 +543,7 @@ export default function SettingsScreen() {
             </TouchableOpacity>
             <ThemedText style={styles.webViewTitle}>Untappd Login</ThemedText>
           </View>
-          
+
           <WebView
             ref={untappdWebViewRef}
             source={{ uri: 'https://untappd.com/login' }}
@@ -573,7 +573,7 @@ export default function SettingsScreen() {
           />
         </SafeAreaView>
       </Modal>
-      
+
       <SafeAreaView style={styles.safeArea} edges={['top', 'right', 'left']}>
         {/* Back button - only show if not first login and we can go back */}
         {!isFirstLogin && canGoBack && (
@@ -591,7 +591,7 @@ export default function SettingsScreen() {
             <View style={styles.titleSection}>
               <ThemedText type="title" style={styles.pageTitle}>Settings</ThemedText>
             </View>
-            
+
             {/* First Login Message */}
             {isFirstLogin && (
               <View style={[styles.section, { backgroundColor: cardColor, marginBottom: 20 }]}>
@@ -600,11 +600,11 @@ export default function SettingsScreen() {
                   <ThemedText style={styles.welcomeText}>
                     Please log in to your Flying Saucer account to start using the app. This will allow us to fetch your beer data.
                   </ThemedText>
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={[
-                      styles.dataButton, 
+                      styles.dataButton,
                       styles.loginButton,
-                      { 
+                      {
                         backgroundColor: loginLoading ? '#88AAFF' : '#007AFF',
                         borderColor: borderColor,
                         marginTop: 16
@@ -620,13 +620,13 @@ export default function SettingsScreen() {
                 </View>
               </View>
             )}
-            
+
             {/* API Endpoints Section - Removed from the UI */}
-            
+
             {/* About Section */}
             <View style={[styles.section, { backgroundColor: cardColor }]}>
               <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>About</ThemedText>
-              
+
               <View style={styles.aboutInfo}>
                 <ThemedText>Beer Selector</ThemedText>
                 <ThemedText style={styles.versionText}>
@@ -639,14 +639,14 @@ export default function SettingsScreen() {
             {(!isFirstLogin || apiUrlsConfigured) && (
               <View style={[styles.section, { backgroundColor: cardColor }]}>
                 <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>Data Management</ThemedText>
-                
+
                 <View style={styles.buttonContainer}>
                   {/* Only show refresh button if API URLs are configured */}
                   {apiUrlsConfigured && (
-                    <TouchableOpacity 
+                    <TouchableOpacity
                       style={[
-                        styles.dataButton, 
-                        { 
+                        styles.dataButton,
+                        {
                           backgroundColor: refreshing ? '#FF8888' : '#FF3B30',
                           borderColor: borderColor
                         }
@@ -662,11 +662,11 @@ export default function SettingsScreen() {
 
                   {/* Login Button - Only show if NOT on first login */}
                   {!isFirstLogin && (
-                    <TouchableOpacity 
+                    <TouchableOpacity
                       style={[
-                        styles.dataButton, 
+                        styles.dataButton,
                         styles.loginButton,
-                        { 
+                        {
                           backgroundColor: loginLoading ? '#88AAFF' : '#007AFF',
                           borderColor: borderColor,
                           marginTop: apiUrlsConfigured ? 12 : 0
@@ -682,11 +682,11 @@ export default function SettingsScreen() {
                   )}
 
                   {/* Untappd Login Button - Always show */}
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={[
-                      styles.dataButton, 
+                      styles.dataButton,
                       styles.untappdButton,
-                      { 
+                      {
                         backgroundColor: untappdLoginLoading ? '#F8A34A' : '#FFAC33',
                         borderColor: borderColor,
                         marginTop: 12
@@ -696,21 +696,21 @@ export default function SettingsScreen() {
                     disabled={untappdLoginLoading || refreshing}
                   >
                     <ThemedText style={styles.dataButtonText}>
-                      {untappdLoginLoading 
-                        ? 'Logging in...' 
-                        : untappdLoggedInStatus 
-                          ? 'Reconnect to Untappd' 
+                      {untappdLoginLoading
+                        ? 'Logging in...'
+                        : untappdLoggedInStatus
+                          ? 'Reconnect to Untappd'
                           : 'Login to Untappd'}
                     </ThemedText>
                   </TouchableOpacity>
 
                   {/* Return to Home button - show when API URLs are configured but we're on first launch */}
                   {apiUrlsConfigured && !canGoBack && (
-                    <TouchableOpacity 
+                    <TouchableOpacity
                       style={[
-                        styles.dataButton, 
+                        styles.dataButton,
                         styles.homeButton,
-                        { 
+                        {
                           backgroundColor: '#34C759',
                           borderColor: borderColor,
                           marginTop: 12
@@ -732,7 +732,7 @@ export default function SettingsScreen() {
             {Constants.expoConfig?.extra?.NODE_ENV === 'development' && (
               <View style={styles.section}>
                 <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>Development</ThemedText>
-                
+
                 <View style={styles.infoContainer}>
                   <TouchableOpacity style={styles.devButton} onPress={handleCreateMockSession}>
                     <ThemedText style={styles.buttonText}>
@@ -950,4 +950,4 @@ const styles = StyleSheet.create({
     marginTop: 10,
     fontSize: 16,
   },
-}); 
+});
