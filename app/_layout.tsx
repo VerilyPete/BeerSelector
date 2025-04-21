@@ -10,6 +10,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { initializeBeerDatabase, getPreference, setPreference } from '@/src/database/db';
+import { checkAndRefreshOnAppOpen } from '@/src/services/dataUpdateService';
 
 // Track if database initialization has been started to prevent multiple calls
 let dbInitStarted = false;
@@ -19,10 +20,10 @@ if (__DEV__) {
   const originalConsoleError = console.error;
   console.error = (...args) => {
     if (
-      args[0] && 
-      typeof args[0] === 'string' && 
-      (args[0].includes('nw_connection') || 
-       args[0].includes('quic_conn') || 
+      args[0] &&
+      typeof args[0] === 'string' &&
+      (args[0].includes('nw_connection') ||
+       args[0].includes('quic_conn') ||
        args[0].includes('8097') ||
        args[0].includes('timestamp_locked_on_nw_queue') ||
        args[0].includes('Hit maximum timestamp count'))
@@ -32,8 +33,8 @@ if (__DEV__) {
     originalConsoleError(...args);
   };
   LogBox.ignoreLogs([
-    'nw_connection', 
-    'nw_socket', 
+    'nw_connection',
+    'nw_socket',
     'quic_conn',
     'Hit maximum timestamp count',
     'timestamp_locked_on_nw_queue'
@@ -55,22 +56,22 @@ export default function RootLayout() {
       try {
         // Initialize database with retry mechanism
         let dbInitialized = false;
-        
+
         // Only attempt database initialization if not already started
         if (!dbInitStarted) {
           dbInitStarted = true; // Mark as started immediately
-          
+
           try {
             console.log('Initializing database first attempt...');
             await initializeBeerDatabase();
             dbInitialized = true;
             console.log('Database initialized successfully');
-            
+
             // Check if API URLs are set
             const allBeersApiUrl = await getPreference('all_beers_api_url');
             const myBeersApiUrl = await getPreference('my_beers_api_url');
             const isFirstLaunch = await getPreference('first_launch');
-            
+
             // If API URLs are empty or it's first launch, set initial route to settings
             if ((!allBeersApiUrl || !myBeersApiUrl || isFirstLaunch === 'true') && loaded) {
               console.log('API URLs not set or first launch, redirecting to settings page');
@@ -78,7 +79,7 @@ export default function RootLayout() {
               if (isFirstLaunch === 'true') {
                 await setPreference('first_launch', 'false', 'Flag indicating if this is the first app launch');
               }
-              
+
               // Set initial route to settings
               setInitialRoute('/settings');
               // Navigate immediately to settings
@@ -86,10 +87,19 @@ export default function RootLayout() {
             } else {
               // Normal app startup flow
               setInitialRoute('(tabs)');
+
+              // Check for updates on app open (if it's been at least 12 hours since last check)
+              checkAndRefreshOnAppOpen(12).then(updated => {
+                if (updated) {
+                  console.log('Data was updated on app open');
+                }
+              }).catch(error => {
+                console.error('Error checking for updates on app open:', error);
+              });
             }
           } catch (dbError) {
             console.error('Database initialization failed, retrying once:', dbError);
-            
+
             if (!dbInitialized) {
               // Wait a moment and try again once
               await new Promise(resolve => setTimeout(resolve, 1000));
@@ -113,7 +123,7 @@ export default function RootLayout() {
           console.log('Database initialization already in progress in another effect, skipping');
           setInitialRoute('(tabs)');
         }
-        
+
         if (loaded) {
           await SplashScreen.hideAsync();
         }
@@ -123,7 +133,7 @@ export default function RootLayout() {
         setInitialRoute('(tabs)');
       }
     }
-    
+
     prepare();
   }, [loaded]);
 
