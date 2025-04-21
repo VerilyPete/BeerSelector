@@ -11,7 +11,8 @@ import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { useColorScheme } from '@/hooks/useColorScheme';
-import { refreshAllDataFromAPI, getAllPreferences, setPreference, setUntappdCookie, isUntappdLoggedIn } from '@/src/database/db';
+import { refreshAllDataFromAPI, getAllPreferences, getPreference, setPreference, setUntappdCookie, isUntappdLoggedIn } from '@/src/database/db';
+import { manualRefreshAllData } from '@/src/services/dataUpdateService';
 import { LoadingIndicator } from '@/components/LoadingIndicator';
 import Constants from 'expo-constants';
 import { createMockSession } from '@/src/api/mockSession';
@@ -101,14 +102,17 @@ export default function SettingsScreen() {
     try {
       setRefreshing(true);
 
-      // Perform the refresh of both tables
-      const refreshResult = await refreshAllDataFromAPI();
+      // Perform the refresh of both tables using the conditional update function
+      const { allBeersUpdated, myBeersUpdated } = await manualRefreshAllData();
 
-      // Show success message
-      Alert.alert(
-        'Success',
-        `Successfully refreshed:\n- ${refreshResult.allBeers.length} beers\n- ${refreshResult.myBeers.length} tasted beers`
-      );
+      if (allBeersUpdated || myBeersUpdated) {
+        Alert.alert(
+          'Success',
+          'Beer data refreshed successfully!'
+        );
+      } else {
+        Alert.alert('Info', 'No new beer data available.');
+      }
     } catch (err) {
       console.error('Failed to refresh data:', err);
       Alert.alert('Error', 'Failed to refresh data from server. Please try again later.');
