@@ -585,7 +585,7 @@ export default function SettingsScreen() {
             style={styles.backButton}
             onPress={() => router.back()}
           >
-            <IconSymbol name="xmark" size={22} color={tintColor} />
+            <IconSymbol name="xmark" size={26} color={tintColor} />
           </TouchableOpacity>
         )}
 
@@ -765,13 +765,13 @@ const styles = StyleSheet.create({
   },
   backButton: {
     position: 'absolute',
-    top: 30,
-    right: 16,
+    top: 60,
+    right: 20,
     zIndex: 10,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(200, 200, 200, 0.3)',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(200, 200, 200, 0.5)',
     alignItems: 'center',
     justifyContent: 'center',
   },
