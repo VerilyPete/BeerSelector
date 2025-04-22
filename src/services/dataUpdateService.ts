@@ -27,20 +27,30 @@ export async function fetchAndUpdateAllBeers(): Promise<boolean> {
     // Parse the response
     const data = await response.json();
 
-    // Validate the data
-    if (!Array.isArray(data)) {
-      console.error('Invalid all beers data format: not an array');
+    // Log the structure of the response for debugging
+    console.log('All beers API response structure:', typeof data);
+    if (Array.isArray(data)) {
+      console.log(`All beers API response is an array with ${data.length} items`);
+    }
+
+    // Extract the brewInStock array from the response
+    let allBeers: Beer[] = [];
+    if (data && Array.isArray(data) && data.length >= 2 && data[1] && data[1].brewInStock) {
+      allBeers = data[1].brewInStock;
+      console.log(`Found brewInStock with ${allBeers.length} beers`);
+    } else {
+      console.error('Invalid all beers data format: missing brewInStock');
       return false;
     }
 
     // Update the database
-    await populateBeersTable(data as Beer[]);
+    await populateBeersTable(allBeers);
 
     // Update the last update timestamp
     await setPreference('all_beers_last_update', new Date().toISOString());
     await setPreference('all_beers_last_check', new Date().toISOString());
 
-    console.log(`Updated all beers data with ${data.length} beers`);
+    console.log(`Updated all beers data with ${allBeers.length} beers`);
     return true;
   } catch (error) {
     console.error('Error updating all beers data:', error);
@@ -74,20 +84,39 @@ export async function fetchAndUpdateMyBeers(): Promise<boolean> {
     // Parse the response
     const data = await response.json();
 
-    // Validate the data
-    if (!Array.isArray(data)) {
-      console.error('Invalid my beers data format: not an array');
+    // Log the structure of the response for debugging
+    console.log('API response structure:', typeof data);
+    if (Array.isArray(data)) {
+      console.log(`API response is an array with ${data.length} items`);
+    }
+
+    // Extract the tasted_brew_current_round array from the response
+    let myBeers: Beerfinder[] = [];
+    if (data && Array.isArray(data) && data.length >= 2 && data[1] && data[1].tasted_brew_current_round) {
+      myBeers = data[1].tasted_brew_current_round;
+      console.log(`Found tasted_brew_current_round with ${myBeers.length} beers`);
+    } else {
+      console.error('Invalid my beers data format: missing tasted_brew_current_round');
       return false;
     }
 
-    // Update the database
-    await populateMyBeersTable(data as Beerfinder[]);
+    // Validate that we have beers with IDs
+    const validBeers = myBeers.filter(beer => beer && beer.id);
+    console.log(`Found ${validBeers.length} valid beers with IDs out of ${myBeers.length} total beers`);
+
+    if (validBeers.length === 0) {
+      console.error('No valid beers with IDs found, aborting database update');
+      return false;
+    }
+
+    // Update the database with the valid beers
+    await populateMyBeersTable(validBeers);
 
     // Update the last update timestamp
     await setPreference('my_beers_last_update', new Date().toISOString());
     await setPreference('my_beers_last_check', new Date().toISOString());
 
-    console.log(`Updated my beers data with ${data.length} beers`);
+    console.log(`Updated my beers data with ${validBeers.length} valid beers`);
     return true;
   } catch (error) {
     console.error('Error updating my beers data:', error);
