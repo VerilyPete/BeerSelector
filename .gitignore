@@ -17,6 +17,44 @@ expo-env.d.ts
 *.key
 *.mobileprovision
 
+# Xcode
+ios/build/
+ios/Pods/
+ios/Podfile.lock
+ios/*.xcworkspace
+ios/*.xcodeproj/*
+!ios/*.xcodeproj/project.pbxproj
+!ios/*.xcodeproj/xcshareddata/
+!ios/*.xcworkspace/contents.xcworkspacedata
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+*.pbxuser
+*.xcuserstate
+project.xcworkspace/
+xcuserdata/
+DerivedData/
+*.hmap
+*.ipa
+
+# Hermes
+ios/hermes-engine/
+ios/hermesc/
+ios/**/Info.plist
+ios/**/.last_build_configuration
+
+# Android
+android/app/build/
+android/build/
+android/.gradle/
+android/local.properties
+android/app/src/main/assets/index.android.bundle
+android/app/src/main/assets/index.android.bundle.meta
+android/app/src/main/res/drawable-*/
+android/app/src/main/res/raw/
+android/keystore.properties
+android/app/release/
+
 # Metro
 .metro-health-check*
 
