@@ -551,72 +551,112 @@ export const fetchMyBeersFromAPI = async (): Promise<Beerfinder[]> => {
   try {
     // Get the API endpoint from preferences
     const apiUrl = await getPreference('my_beers_api_url');
+    console.log('DB: Fetching My Beers from API URL:', apiUrl);
 
     if (!apiUrl) {
-      console.log('My beers API URL not found in preferences');
+      console.log('DB: My beers API URL not found in preferences');
       return []; // Return empty array instead of throwing an error
     }
 
+    console.log('DB: Making API request to fetch My Beers data...');
     const data = await fetchWithRetry(apiUrl);
+    console.log('DB: Received response from My Beers API');
+
+    // Log the structure of the response
+    if (data) {
+      console.log('DB: API response type:', typeof data);
+      if (Array.isArray(data)) {
+        console.log(`DB: API response is an array with ${data.length} items`);
+        for (let i = 0; i < data.length; i++) {
+          console.log(`DB: data[${i}] type:`, typeof data[i]);
+          if (data[i] && typeof data[i] === 'object') {
+            console.log(`DB: data[${i}] keys:`, Object.keys(data[i]));
+          }
+        }
+      } else if (typeof data === 'object') {
+        console.log('DB: API response keys:', Object.keys(data));
+      }
+    } else {
+      console.log('DB: API response is null or undefined');
+    }
 
     // Extract the tasted_brew_current_round array from the response
     if (data && Array.isArray(data) && data.length >= 2 && data[1] && data[1].tasted_brew_current_round) {
+      console.log(`DB: Found tasted_brew_current_round with ${data[1].tasted_brew_current_round.length} beers`);
       return data[1].tasted_brew_current_round;
     }
 
+    console.error('DB: Invalid response format from My Beers API');
     throw new Error('Invalid response format from My Beers API');
   } catch (error) {
-    console.error('Error fetching My Beers from API:', error);
+    console.error('DB: Error fetching My Beers from API:', error);
     throw error;
   }
 };
 
 // Insert Beerfinder beers into database using transactions
 export const populateMyBeersTable = async (beers: Beerfinder[]): Promise<void> => {
+  console.log(`DB: Populating My Beers table with ${beers.length} beers`);
+
   if (!await acquireLock('populateMyBeersTable')) {
+    console.error('DB: Failed to acquire database lock for populating Beerfinder beers table');
     throw new Error('Failed to acquire database lock for populating Beerfinder beers table');
   }
 
   const database = await initDatabase();
+  console.log('DB: Database initialized for populating My Beers table');
 
   try {
     // Use a transaction for clearing and inserting data
+    console.log('DB: Starting transaction for populating My Beers table');
     await database.withTransactionAsync(async () => {
       // Clear the existing table data first
+      console.log('DB: Clearing existing data from tasted_brew_current_round table');
       await database.runAsync('DELETE FROM tasted_brew_current_round');
 
-      console.log(`Starting import of ${beers.length} My Beers...`);
+      console.log(`DB: Starting import of ${beers.length} My Beers...`);
 
       // Process in larger batches using transactions
       const batchSize = 20;
+      console.log(`DB: Processing My Beers in batches of ${batchSize}`);
+
       for (let i = 0; i < beers.length; i += batchSize) {
         const batch = beers.slice(i, i + batchSize);
+        console.log(`DB: Processing batch ${Math.floor(i/batchSize) + 1} of ${Math.ceil(beers.length/batchSize)} (${batch.length} beers)`);
 
         // Insert each beer within the transaction
         for (const beer of batch) {
-          if (!beer.id) continue; // Skip entries without an ID
+          if (!beer.id) {
+            console.log('DB: Skipping beer without ID');
+            continue; // Skip entries without an ID
+          }
 
-          await database.runAsync(
-            `INSERT OR REPLACE INTO tasted_brew_current_round (
-              id, roh_lap, tasted_date, brew_name, brewer, brewer_loc,
-              brew_style, brew_container, review_count, review_ratings,
-              brew_description, chit_code
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [
-              beer.id,
-              beer.roh_lap || '',
-              beer.tasted_date || '',
-              beer.brew_name || '',
-              beer.brewer || '',
-              beer.brewer_loc || '',
-              beer.brew_style || '',
-              beer.brew_container || '',
-              beer.review_count || '',
-              beer.review_ratings || '',
-              beer.brew_description || '',
-              beer.chit_code || ''
-            ]
-          );
+          try {
+            await database.runAsync(
+              `INSERT OR REPLACE INTO tasted_brew_current_round (
+                id, roh_lap, tasted_date, brew_name, brewer, brewer_loc,
+                brew_style, brew_container, review_count, review_ratings,
+                brew_description, chit_code
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              [
+                beer.id,
+                beer.roh_lap || '',
+                beer.tasted_date || '',
+                beer.brew_name || '',
+                beer.brewer || '',
+                beer.brewer_loc || '',
+                beer.brew_style || '',
+                beer.brew_container || '',
+                beer.review_count || '',
+                beer.review_ratings || '',
+                beer.brew_description || '',
+                beer.chit_code || ''
+              ]
+            );
+          } catch (err) {
+            console.error(`DB: Error inserting beer ${beer.id}:`, err);
+            throw err;
+          }
         }
 
         // Log progress for larger batches
@@ -887,9 +927,32 @@ export const getMyBeers = async (): Promise<Beerfinder[]> => {
   const database = await initDatabase();
 
   try {
+    console.log('DB: Executing query to get tasted beers from tasted_brew_current_round table');
     const beers = await database.getAllAsync<any>(
       'SELECT * FROM tasted_brew_current_round ORDER BY id'
     );
+    console.log(`DB: Retrieved ${beers.length} tasted beers from database`);
+
+    // Check if we have any beers
+    if (beers.length === 0) {
+      console.log('DB: No tasted beers found in the database. Checking table existence...');
+
+      // Check if the table exists and has the expected structure
+      const tableInfo = await database.getAllAsync<any>(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='tasted_brew_current_round'"
+      );
+
+      if (tableInfo.length === 0) {
+        console.log('DB: Table tasted_brew_current_round does not exist!');
+      } else {
+        console.log('DB: Table tasted_brew_current_round exists. Checking column structure...');
+        const columnInfo = await database.getAllAsync<any>(
+          "PRAGMA table_info(tasted_brew_current_round)"
+        );
+        console.log('DB: Table structure:', JSON.stringify(columnInfo));
+      }
+    }
+
     return beers;
   } catch (error) {
     console.error('Error getting Beerfinder beers:', error);

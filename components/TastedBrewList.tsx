@@ -39,7 +39,7 @@ export const TastedBrewList = () => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<SortOption>('date');
   const [searchText, setSearchText] = useState('');
-  
+
   // Theme colors
   const cardColor = useThemeColor({}, 'background');
   const borderColor = useThemeColor({ light: '#e0e0e0', dark: '#333' }, 'text');
@@ -47,7 +47,7 @@ export const TastedBrewList = () => {
   const inactiveButtonColor = useThemeColor({ light: '#E5E5E5', dark: '#2C2C2E' }, 'background');
   const inactiveButtonTextColor = useThemeColor({ light: '#333333', dark: '#EFEFEF' }, 'text');
   const textColor = useThemeColor({}, 'text');
-  
+
   // Define all derived values outside of hooks and render methods
   const buttonTextColor = colorScheme === 'dark' && sortBy === 'name' ? '#000000' : 'white';
   const activeBgColor = colorScheme === 'dark' && sortBy === 'name' ? '#FFC107' : activeButtonColor;
@@ -55,23 +55,37 @@ export const TastedBrewList = () => {
   const loadBeers = async () => {
     try {
       setLoading(true);
-      
+      console.log('TastedBrewList: Loading tasted beers...');
+
       // Try to fetch My Beers data if it hasn't been loaded yet
       try {
+        console.log('TastedBrewList: Attempting to fetch and populate My Beers data...');
         await fetchAndPopulateMyBeers();
+        console.log('TastedBrewList: Successfully fetched and populated My Beers data');
       } catch (err) {
-        console.log('Failed to fetch My Beers data, continuing with local data:', err);
+        console.log('TastedBrewList: Failed to fetch My Beers data, continuing with local data:', err);
         // Continue with whatever data we have locally
       }
-      
+
+      console.log('TastedBrewList: Retrieving tasted beers from database...');
       const data = await getMyBeers();
+      console.log(`TastedBrewList: Retrieved ${data.length} tasted beers from database`);
+
       // Filter out any beers with empty or null brew_name as a second layer of protection
       const filteredData = data.filter(beer => beer.brew_name && beer.brew_name.trim() !== '');
+      console.log(`TastedBrewList: After filtering, ${filteredData.length} valid tasted beers remain`);
+
+      if (filteredData.length > 0) {
+        console.log('TastedBrewList: Sample beer:', JSON.stringify(filteredData[0]));
+      } else {
+        console.log('TastedBrewList: No tasted beers found after filtering');
+      }
+
       setTastedBeers(filteredData);
       setDisplayedBeers(filteredData);
       setError(null);
     } catch (err) {
-      console.error('Failed to load tasted beers:', err);
+      console.error('TastedBrewList: Failed to load tasted beers:', err);
       setError('Failed to load tasted beers. Please check your internet connection and try again.');
     } finally {
       setLoading(false);
@@ -86,6 +100,8 @@ export const TastedBrewList = () => {
   const handleRefresh = useCallback(async () => {
     try {
       setRefreshing(true);
+      console.log('Manual refresh initiated by user');
+
       // First check if API URLs are configured
       const apiUrlsConfigured = await areApiUrlsConfigured();
       if (!apiUrlsConfigured) {
@@ -96,14 +112,21 @@ export const TastedBrewList = () => {
         setRefreshing(false);
         return;
       }
-      
+
+      // For manual refresh, we should always fetch new data regardless of timestamp
+      // Clear any stored timestamps to force a fresh fetch
+      console.log('Clearing timestamp checks for manual refresh');
+      await setPreference('my_beers_last_update', '');
+      await setPreference('my_beers_last_check', '');
+
       // If API URLs are configured, proceed with refresh
+      console.log('Forcing fresh data fetch for manual refresh');
       await fetchAndPopulateMyBeers();
       const freshBeers = await getMyBeers();
-      
+
       // Set the base beers
       setTastedBeers(freshBeers);
-      
+
       // Sort the beers based on current sort order before setting them
       let sortedBeers = [...freshBeers];
       if (sortBy === 'name') {
@@ -114,29 +137,29 @@ export const TastedBrewList = () => {
           // Parse dates in format MM/DD/YYYY
           const partsA = (a.tasted_date || '').split('/');
           const partsB = (b.tasted_date || '').split('/');
-          
+
           if (partsA.length === 3 && partsB.length === 3) {
             // Create Date objects with year, month (0-based), day
             const dateA = new Date(
-              parseInt(partsA[2], 10), 
-              parseInt(partsA[0], 10) - 1, 
+              parseInt(partsA[2], 10),
+              parseInt(partsA[0], 10) - 1,
               parseInt(partsA[1], 10)
             ).getTime();
-            
+
             const dateB = new Date(
-              parseInt(partsB[2], 10), 
-              parseInt(partsB[0], 10) - 1, 
+              parseInt(partsB[2], 10),
+              parseInt(partsB[0], 10) - 1,
               parseInt(partsB[1], 10)
             ).getTime();
-            
+
             return dateB - dateA; // Descending order
           }
-          
+
           // Fallback if date parsing fails
           return 0;
         });
       }
-      
+
       // Apply the sorted beers
       setDisplayedBeers(sortedBeers);
     } catch (error) {
@@ -154,7 +177,7 @@ export const TastedBrewList = () => {
     // Apply text search filter
     if (searchText.trim() !== '') {
       const searchLower = searchText.toLowerCase().trim();
-      filtered = filtered.filter(beer => 
+      filtered = filtered.filter(beer =>
         (beer.brew_name && beer.brew_name.toLowerCase().includes(searchLower)) ||
         (beer.brewer && beer.brewer.toLowerCase().includes(searchLower)) ||
         (beer.brew_style && beer.brew_style.toLowerCase().includes(searchLower)) ||
@@ -172,24 +195,24 @@ export const TastedBrewList = () => {
       sortedAndFiltered.sort((a, b) => {
         const partsA = (a.tasted_date || '').split('/');
         const partsB = (b.tasted_date || '').split('/');
-        
+
         if (partsA.length === 3 && partsB.length === 3) {
           // Create Date objects with year, month (0-based), day
           const dateA = new Date(
-            parseInt(partsA[2], 10), 
-            parseInt(partsA[0], 10) - 1, 
+            parseInt(partsA[2], 10),
+            parseInt(partsA[0], 10) - 1,
             parseInt(partsA[1], 10)
           ).getTime();
-          
+
           const dateB = new Date(
-            parseInt(partsB[2], 10), 
-            parseInt(partsB[0], 10) - 1, 
+            parseInt(partsB[2], 10),
+            parseInt(partsB[0], 10) - 1,
             parseInt(partsB[1], 10)
           ).getTime();
-          
+
           return dateB - dateA; // Descending order
         }
-        
+
         // Fallback if date parsing fails
         return 0;
       });
@@ -207,7 +230,7 @@ export const TastedBrewList = () => {
   // Function to format date to readable format
   const formatDate = (dateStr: string): string => {
     if (!dateStr) return 'Unknown date';
-    
+
     try {
       // Parse date string in format MM/DD/YYYY
       const parts = dateStr.split('/');
@@ -215,12 +238,12 @@ export const TastedBrewList = () => {
         const month = parseInt(parts[0], 10) - 1; // JS months are 0-based
         const day = parseInt(parts[1], 10);
         const year = parseInt(parts[2], 10);
-        
+
         const date = new Date(year, month, day);
-        return date.toLocaleDateString('en-US', { 
-          year: 'numeric', 
-          month: 'short', 
-          day: 'numeric' 
+        return date.toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric'
         });
       }
       return dateStr; // Return as-is if not in expected format
@@ -244,18 +267,18 @@ export const TastedBrewList = () => {
 
   const renderBeerItem = (item: Beer) => {
     const isExpanded = expandedId === item.id;
-    
+
     return (
-      <TouchableOpacity 
-        key={item.id} 
+      <TouchableOpacity
+        key={item.id}
         onPress={() => toggleExpand(item.id)}
         activeOpacity={0.8}
       >
         <View style={[
-          styles.beerItem, 
-          { 
+          styles.beerItem,
+          {
             backgroundColor: cardColor,
-            borderColor: borderColor 
+            borderColor: borderColor
           },
           isExpanded && styles.expandedItem
         ]}>
@@ -271,7 +294,7 @@ export const TastedBrewList = () => {
           <ThemedText style={styles.dateAdded}>
             Tasted: {formatDate(item.tasted_date)}
           </ThemedText>
-          
+
           {isExpanded && item.brew_description && (
             <View style={[styles.descriptionContainer, { borderTopColor: borderColor }]}>
               <ThemedText type="defaultSemiBold" style={styles.descriptionTitle}>
@@ -290,7 +313,7 @@ export const TastedBrewList = () => {
   const renderFilterButtons = () => {
     return (
       <View style={styles.filtersContainer}>
-        <SearchBar 
+        <SearchBar
           searchText={searchText}
           onSearchChange={handleSearchChange}
           onClear={clearSearch}
@@ -336,7 +359,7 @@ export const TastedBrewList = () => {
       ) : (
         <View style={{ flex: 1 }}>
           {renderFilterButtons()}
-          
+
           {displayedBeers.length === 0 ? (
             <View style={styles.emptyContainer}>
               <ThemedText style={styles.emptyText}>
@@ -460,4 +483,4 @@ const styles = StyleSheet.create({
   emptyText: {
     textAlign: 'center',
   },
-}); 
+});
