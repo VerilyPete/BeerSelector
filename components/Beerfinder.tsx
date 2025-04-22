@@ -106,6 +106,8 @@ export const Beerfinder = () => {
   const handleRefresh = useCallback(async () => {
     try {
       setRefreshing(true);
+      console.log('Manual refresh initiated by user in Beerfinder');
+
       // First check if API URLs are configured
       const apiUrlsConfigured = await areApiUrlsConfigured();
       if (!apiUrlsConfigured) {
@@ -117,7 +119,16 @@ export const Beerfinder = () => {
         return;
       }
 
+      // For manual refresh, we should always fetch new data regardless of timestamp
+      // Clear any stored timestamps to force a fresh fetch
+      console.log('Clearing timestamp checks for manual refresh');
+      await setPreference('all_beers_last_update', '');
+      await setPreference('all_beers_last_check', '');
+      await setPreference('my_beers_last_update', '');
+      await setPreference('my_beers_last_check', '');
+
       // If API URLs are configured, proceed with refresh
+      console.log('Forcing fresh data fetch for manual refresh');
       await fetchAndPopulateMyBeers();
       // Use getBeersNotInMyBeers to get available beers, not tasted beers
       const freshBeers = await getBeersNotInMyBeers();

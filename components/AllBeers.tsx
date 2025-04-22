@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { StyleSheet, View, TouchableOpacity, Alert, FlatList, Text, ActivityIndicator } from 'react-native';
-import { getAllBeers, refreshBeersFromAPI, areApiUrlsConfigured, getMyBeers } from '@/src/database/db';
+import { getAllBeers, refreshBeersFromAPI, areApiUrlsConfigured, getMyBeers, setPreference } from '@/src/database/db';
 import { ThemedText } from './ThemedText';
 import { ThemedView } from './ThemedView';
 import { LoadingIndicator } from './LoadingIndicator';
@@ -45,7 +45,7 @@ export const AllBeers = () => {
   const [searchText, setSearchText] = useState('');
   const [untappdModalVisible, setUntappdModalVisible] = useState(false);
   const [selectedBeerName, setSelectedBeerName] = useState('');
-  
+
   // Theme colors
   const cardColor = useThemeColor({}, 'background');
   const borderColor = useThemeColor({ light: '#e0e0e0', dark: '#333' }, 'text');
@@ -53,7 +53,7 @@ export const AllBeers = () => {
   const inactiveButtonColor = useThemeColor({ light: '#E5E5E5', dark: '#2C2C2E' }, 'background');
   const inactiveButtonTextColor = useThemeColor({ light: '#333333', dark: '#EFEFEF' }, 'text');
   const textColor = useThemeColor({}, 'text');
-  
+
   // Define all derived values outside of hooks and render methods
   const buttonTextColor = colorScheme === 'dark' && (isDraftOnly || isHeaviesOnly || isIpaOnly || sortBy === 'name') ? '#000000' : 'white';
   const activeBgColor = colorScheme === 'dark' && (isDraftOnly || isHeaviesOnly || isIpaOnly || sortBy === 'name') ? '#FFC107' : activeButtonColor;
@@ -83,6 +83,8 @@ export const AllBeers = () => {
   const handleRefresh = useCallback(async () => {
     try {
       setRefreshing(true);
+      console.log('Manual refresh initiated by user in AllBeers');
+
       // First check if API URLs are configured
       const apiUrlsConfigured = await areApiUrlsConfigured();
       if (!apiUrlsConfigured) {
@@ -93,14 +95,21 @@ export const AllBeers = () => {
         setRefreshing(false);
         return;
       }
-      
+
+      // For manual refresh, we should always fetch new data regardless of timestamp
+      // Clear any stored timestamps to force a fresh fetch
+      console.log('Clearing timestamp checks for manual refresh');
+      await setPreference('all_beers_last_update', '');
+      await setPreference('all_beers_last_check', '');
+
       // If API URLs are configured, proceed with refresh
+      console.log('Forcing fresh data fetch for manual refresh');
       await refreshBeersFromAPI();
       const freshBeers = await getAllBeers();
-      
+
       // Set the base beers
       setAllBeers(freshBeers);
-      
+
       // Sort the beers based on current sort order before setting them
       let sortedBeers = [...freshBeers];
       if (sortBy === 'name') {
@@ -112,7 +121,7 @@ export const AllBeers = () => {
           return dateB - dateA; // Descending order
         });
       }
-      
+
       // Apply the sorted beers
       setDisplayedBeers(sortedBeers);
       setError(null);
@@ -131,7 +140,7 @@ export const AllBeers = () => {
     // Apply text search filter
     if (searchText.trim() !== '') {
       const searchLower = searchText.toLowerCase().trim();
-      filtered = filtered.filter(beer => 
+      filtered = filtered.filter(beer =>
         (beer.brew_name && beer.brew_name.toLowerCase().includes(searchLower)) ||
         (beer.brewer && beer.brewer.toLowerCase().includes(searchLower)) ||
         (beer.brew_style && beer.brew_style.toLowerCase().includes(searchLower)) ||
@@ -141,18 +150,18 @@ export const AllBeers = () => {
     }
 
     if (isDraftOnly) {
-      filtered = filtered.filter(beer => 
-        beer.brew_container && 
+      filtered = filtered.filter(beer =>
+        beer.brew_container &&
         (beer.brew_container.toLowerCase().includes('draught') ||
         beer.brew_container.toLowerCase().includes('draft'))
       );
     }
 
     if (isHeaviesOnly) {
-      filtered = filtered.filter(beer => 
-        beer.brew_style && 
-        (beer.brew_style.toLowerCase().includes('porter') || 
-         beer.brew_style.toLowerCase().includes('stout') || 
+      filtered = filtered.filter(beer =>
+        beer.brew_style &&
+        (beer.brew_style.toLowerCase().includes('porter') ||
+         beer.brew_style.toLowerCase().includes('stout') ||
          beer.brew_style.toLowerCase().includes('barleywine') ||
          beer.brew_style.toLowerCase().includes('quad') ||
          beer.brew_style.toLowerCase().includes('tripel'))
@@ -160,8 +169,8 @@ export const AllBeers = () => {
     }
 
     if (isIpaOnly) {
-      filtered = filtered.filter(beer => 
-        beer.brew_style && 
+      filtered = filtered.filter(beer =>
+        beer.brew_style &&
         beer.brew_style.toLowerCase().includes('ipa')
       );
     }
@@ -210,14 +219,14 @@ export const AllBeers = () => {
   // Function to format unix timestamp to readable date
   const formatDate = (timestamp: string): string => {
     if (!timestamp) return 'Unknown date';
-    
+
     try {
       // Convert unix timestamp (seconds) to milliseconds
       const date = new Date(parseInt(timestamp, 10) * 1000);
-      return date.toLocaleDateString('en-US', { 
-        year: 'numeric', 
-        month: 'short', 
-        day: 'numeric' 
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
       });
     } catch (err) {
       console.error('Error formatting date:', err);
@@ -244,18 +253,18 @@ export const AllBeers = () => {
 
   const renderBeerItem = (item: Beer) => {
     const isExpanded = expandedId === item.id;
-    
+
     return (
-      <TouchableOpacity 
-        key={item.id} 
+      <TouchableOpacity
+        key={item.id}
         onPress={() => toggleExpand(item.id)}
         activeOpacity={0.8}
       >
         <View style={[
-          styles.beerItem, 
-          { 
+          styles.beerItem,
+          {
             backgroundColor: cardColor,
-            borderColor: borderColor 
+            borderColor: borderColor
           },
           isExpanded && styles.expandedItem
         ]}>
@@ -271,7 +280,7 @@ export const AllBeers = () => {
           <ThemedText style={styles.dateAdded}>
             Date Added: {formatDate(item.added_date)}
           </ThemedText>
-          
+
           {isExpanded && item.brew_description && (
             <View style={[styles.descriptionContainer, { borderTopColor: borderColor }]}>
               <ThemedText type="defaultSemiBold" style={styles.descriptionTitle}>
@@ -280,9 +289,9 @@ export const AllBeers = () => {
               <ThemedText style={styles.description}>
                 {item.brew_description}
               </ThemedText>
-              
-              <TouchableOpacity 
-                style={[styles.checkInButton, { 
+
+              <TouchableOpacity
+                style={[styles.checkInButton, {
                   backgroundColor: colorScheme === 'dark' ? '#E91E63' : activeButtonColor,
                   alignSelf: 'flex-start',
                   width: '48%'
@@ -306,7 +315,7 @@ export const AllBeers = () => {
   const renderFilterButtons = () => {
     return (
       <View style={styles.filtersContainer}>
-        <SearchBar 
+        <SearchBar
           searchText={searchText}
           onSearchChange={handleSearchChange}
           onClear={clearSearch}
@@ -317,7 +326,7 @@ export const AllBeers = () => {
             {displayedBeers.length} {displayedBeers.length === 1 ? 'beer' : 'beers'} available
           </ThemedText>
         </View>
-        
+
         <View style={styles.filterContainer}>
           <TouchableOpacity
             style={[
@@ -340,7 +349,7 @@ export const AllBeers = () => {
               Draft
             </ThemedText>
           </TouchableOpacity>
-          
+
           <TouchableOpacity
             style={[
               styles.filterButton,
@@ -362,7 +371,7 @@ export const AllBeers = () => {
               Heavies
             </ThemedText>
           </TouchableOpacity>
-          
+
           <TouchableOpacity
             style={[
               styles.filterButton,
@@ -384,7 +393,7 @@ export const AllBeers = () => {
               IPA
             </ThemedText>
           </TouchableOpacity>
-          
+
           <TouchableOpacity
             style={styles.sortButton}
             onPress={toggleSortOption}
@@ -412,8 +421,8 @@ export const AllBeers = () => {
       ) : error ? (
         <View style={styles.centered}>
           <ThemedText style={styles.errorText}>{error}</ThemedText>
-          <TouchableOpacity 
-            style={[styles.refreshButton, { backgroundColor: activeButtonColor }]} 
+          <TouchableOpacity
+            style={[styles.refreshButton, { backgroundColor: activeButtonColor }]}
             onPress={loadBeers}
           >
             <ThemedText style={[styles.buttonText, { color: 'white' }]}>
@@ -588,4 +597,4 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-}); 
+});
