@@ -1,131 +1,31 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuites name="jest tests" tests="57" failures="0" errors="0" time="0.451">
-  <testsuite name="Database Operations" errors="0" failures="0" skipped="8" timestamp="2025-04-16T16:46:13" time="0.177" tests="37">
-    <testcase classname="Database Operations initDatabase should initialize the database" name="Database Operations initDatabase should initialize the database" time="0.002">
+<testsuites name="jest tests" tests="13" failures="0" errors="0" time="0.796">
+  <testsuite name="dataUpdateService" errors="0" failures="0" skipped="0" timestamp="2025-04-22T17:37:45" time="0.579" tests="13">
+    <testcase classname="dataUpdateService fetchAndUpdateAllBeers should return false if API URL is not set" name="dataUpdateService fetchAndUpdateAllBeers should return false if API URL is not set" time="0.002">
     </testcase>
-    <testcase classname="Database Operations initDatabase should return existing database instance if already initialized" name="Database Operations initDatabase should return existing database instance if already initialized" time="0">
-      <skipped/>
+    <testcase classname="dataUpdateService fetchAndUpdateAllBeers should return false if fetch fails" name="dataUpdateService fetchAndUpdateAllBeers should return false if fetch fails" time="0.001">
     </testcase>
-    <testcase classname="Database Operations initDatabase should handle errors when opening the database" name="Database Operations initDatabase should handle errors when opening the database" time="0">
-      <skipped/>
+    <testcase classname="dataUpdateService fetchAndUpdateAllBeers should return false if response is not an array" name="dataUpdateService fetchAndUpdateAllBeers should return false if response is not an array" time="0.003">
     </testcase>
-    <testcase classname="Database Operations setupDatabase should create tables if they do not exist" name="Database Operations setupDatabase should create tables if they do not exist" time="0.001">
+    <testcase classname="dataUpdateService fetchAndUpdateAllBeers should return false if response does not contain brewInStock" name="dataUpdateService fetchAndUpdateAllBeers should return false if response does not contain brewInStock" time="0">
     </testcase>
-    <testcase classname="Database Operations setupDatabase should initialize default preferences if preferences table is empty" name="Database Operations setupDatabase should initialize default preferences if preferences table is empty" time="0.001">
+    <testcase classname="dataUpdateService fetchAndUpdateAllBeers should successfully update all beers" name="dataUpdateService fetchAndUpdateAllBeers should successfully update all beers" time="0.001">
     </testcase>
-    <testcase classname="Database Operations setupDatabase should not initialize preferences if they already exist" name="Database Operations setupDatabase should not initialize preferences if they already exist" time="0">
+    <testcase classname="dataUpdateService fetchAndUpdateAllBeers should handle errors during update" name="dataUpdateService fetchAndUpdateAllBeers should handle errors during update" time="0.001">
     </testcase>
-    <testcase classname="Database Operations setupDatabase should handle errors during setup" name="Database Operations setupDatabase should handle errors during setup" time="0.006">
+    <testcase classname="dataUpdateService fetchAndUpdateMyBeers should return false if API URL is not set" name="dataUpdateService fetchAndUpdateMyBeers should return false if API URL is not set" time="0">
     </testcase>
-    <testcase classname="Database Operations getAllBeers should return all beers from the database" name="Database Operations getAllBeers should return all beers from the database" time="0">
+    <testcase classname="dataUpdateService fetchAndUpdateMyBeers should return false if fetch fails" name="dataUpdateService fetchAndUpdateMyBeers should return false if fetch fails" time="0.001">
     </testcase>
-    <testcase classname="Database Operations getAllBeers should handle errors when getting beers" name="Database Operations getAllBeers should handle errors when getting beers" time="0">
+    <testcase classname="dataUpdateService fetchAndUpdateMyBeers should return false if response is not an array" name="dataUpdateService fetchAndUpdateMyBeers should return false if response is not an array" time="0">
     </testcase>
-    <testcase classname="Database Operations getMyBeers should return all tasted beers from the database" name="Database Operations getMyBeers should return all tasted beers from the database" time="0">
+    <testcase classname="dataUpdateService fetchAndUpdateMyBeers should return false if response does not contain tasted_brew_current_round" name="dataUpdateService fetchAndUpdateMyBeers should return false if response does not contain tasted_brew_current_round" time="0">
     </testcase>
-    <testcase classname="Database Operations getMyBeers should handle errors when getting tasted beers" name="Database Operations getMyBeers should handle errors when getting tasted beers" time="0">
+    <testcase classname="dataUpdateService fetchAndUpdateMyBeers should return false if no valid beers with IDs are found" name="dataUpdateService fetchAndUpdateMyBeers should return false if no valid beers with IDs are found" time="0.001">
     </testcase>
-    <testcase classname="Database Operations getBeerById should return a beer by ID" name="Database Operations getBeerById should return a beer by ID" time="0">
+    <testcase classname="dataUpdateService fetchAndUpdateMyBeers should successfully update my beers" name="dataUpdateService fetchAndUpdateMyBeers should successfully update my beers" time="0">
     </testcase>
-    <testcase classname="Database Operations getBeerById should return null if beer not found" name="Database Operations getBeerById should return null if beer not found" time="0">
-    </testcase>
-    <testcase classname="Database Operations getBeerById should handle errors when getting beer by ID" name="Database Operations getBeerById should handle errors when getting beer by ID" time="0.001">
-    </testcase>
-    <testcase classname="Database Operations searchBeers should search beers by query" name="Database Operations searchBeers should search beers by query" time="0">
-    </testcase>
-    <testcase classname="Database Operations searchBeers should return all beers if query is empty" name="Database Operations searchBeers should return all beers if query is empty" time="0">
-    </testcase>
-    <testcase classname="Database Operations searchBeers should handle errors when searching beers" name="Database Operations searchBeers should handle errors when searching beers" time="0.001">
-    </testcase>
-    <testcase classname="Database Operations getBeersNotInMyBeers should return beers not in my beers" name="Database Operations getBeersNotInMyBeers should return beers not in my beers" time="0">
-    </testcase>
-    <testcase classname="Database Operations getBeersNotInMyBeers should handle errors when getting beers not in my beers" name="Database Operations getBeersNotInMyBeers should handle errors when getting beers not in my beers" time="0">
-    </testcase>
-    <testcase classname="Database Operations populateBeersTable should populate the beers table with provided beers" name="Database Operations populateBeersTable should populate the beers table with provided beers" time="0">
-      <skipped/>
-    </testcase>
-    <testcase classname="Database Operations populateBeersTable should handle empty beer array" name="Database Operations populateBeersTable should handle empty beer array" time="0">
-      <skipped/>
-    </testcase>
-    <testcase classname="Database Operations populateBeersTable should handle errors when populating beers table" name="Database Operations populateBeersTable should handle errors when populating beers table" time="0">
-      <skipped/>
-    </testcase>
-    <testcase classname="Database Operations populateMyBeersTable should populate the my beers table with provided beers" name="Database Operations populateMyBeersTable should populate the my beers table with provided beers" time="0">
-      <skipped/>
-    </testcase>
-    <testcase classname="Database Operations populateMyBeersTable should handle empty beer array" name="Database Operations populateMyBeersTable should handle empty beer array" time="0">
-      <skipped/>
-    </testcase>
-    <testcase classname="Database Operations populateMyBeersTable should handle errors when populating my beers table" name="Database Operations populateMyBeersTable should handle errors when populating my beers table" time="0">
-      <skipped/>
-    </testcase>
-    <testcase classname="Database Operations getPreference should return preference value by key" name="Database Operations getPreference should return preference value by key" time="0.001">
-    </testcase>
-    <testcase classname="Database Operations getPreference should return null if preference not found" name="Database Operations getPreference should return null if preference not found" time="0">
-    </testcase>
-    <testcase classname="Database Operations getPreference should handle errors when getting preference" name="Database Operations getPreference should handle errors when getting preference" time="0.002">
-    </testcase>
-    <testcase classname="Database Operations setPreference should set preference value by key" name="Database Operations setPreference should set preference value by key" time="0">
-    </testcase>
-    <testcase classname="Database Operations setPreference should use empty string for description if not provided" name="Database Operations setPreference should use empty string for description if not provided" time="0">
-    </testcase>
-    <testcase classname="Database Operations setPreference should handle errors when setting preference" name="Database Operations setPreference should handle errors when setting preference" time="0.001">
-    </testcase>
-    <testcase classname="Database Operations getUntappdCookie should return untappd cookie value by key" name="Database Operations getUntappdCookie should return untappd cookie value by key" time="0">
-    </testcase>
-    <testcase classname="Database Operations getUntappdCookie should return null if untappd cookie not found" name="Database Operations getUntappdCookie should return null if untappd cookie not found" time="0">
-    </testcase>
-    <testcase classname="Database Operations getUntappdCookie should handle errors when getting untappd cookie" name="Database Operations getUntappdCookie should handle errors when getting untappd cookie" time="0">
-    </testcase>
-    <testcase classname="Database Operations setUntappdCookie should set untappd cookie value by key" name="Database Operations setUntappdCookie should set untappd cookie value by key" time="0">
-    </testcase>
-    <testcase classname="Database Operations setUntappdCookie should use empty string for description if not provided" name="Database Operations setUntappdCookie should use empty string for description if not provided" time="0">
-    </testcase>
-    <testcase classname="Database Operations setUntappdCookie should handle errors when setting untappd cookie" name="Database Operations setUntappdCookie should handle errors when setting untappd cookie" time="0.001">
-    </testcase>
-  </testsuite>
-  <testsuite name="Beer Type Guards" errors="0" failures="0" skipped="0" timestamp="2025-04-16T16:46:13" time="0.027" tests="14">
-    <testcase classname="Beer Type Guards isBeer should return true for valid Beer objects" name="Beer Type Guards isBeer should return true for valid Beer objects" time="0">
-    </testcase>
-    <testcase classname="Beer Type Guards isBeer should return false for invalid Beer objects" name="Beer Type Guards isBeer should return false for invalid Beer objects" time="0">
-    </testcase>
-    <testcase classname="Beer Type Guards isBeerfinder should return true for valid Beerfinder objects" name="Beer Type Guards isBeerfinder should return true for valid Beerfinder objects" time="0">
-    </testcase>
-    <testcase classname="Beer Type Guards isBeerfinder should return true for Beer objects with at least one Beerfinder property" name="Beer Type Guards isBeerfinder should return true for Beer objects with at least one Beerfinder property" time="0">
-    </testcase>
-    <testcase classname="Beer Type Guards isBeerfinder should return false for regular Beer objects without Beerfinder properties" name="Beer Type Guards isBeerfinder should return false for regular Beer objects without Beerfinder properties" time="0">
-    </testcase>
-    <testcase classname="Beer Type Guards isBeerfinder should return false for invalid objects" name="Beer Type Guards isBeerfinder should return false for invalid objects" time="0.001">
-    </testcase>
-    <testcase classname="Beer Type Guards isBeerDetails should return true for valid BeerDetails objects" name="Beer Type Guards isBeerDetails should return true for valid BeerDetails objects" time="0">
-    </testcase>
-    <testcase classname="Beer Type Guards isBeerDetails should return true for Beer objects with at least one BeerDetails property" name="Beer Type Guards isBeerDetails should return true for Beer objects with at least one BeerDetails property" time="0">
-    </testcase>
-    <testcase classname="Beer Type Guards isBeerDetails should return false for regular Beer objects without BeerDetails properties" name="Beer Type Guards isBeerDetails should return false for regular Beer objects without BeerDetails properties" time="0">
-    </testcase>
-    <testcase classname="Beer Type Guards isBeerDetails should return false for invalid objects" name="Beer Type Guards isBeerDetails should return false for invalid objects" time="0">
-    </testcase>
-    <testcase classname="Beer Type Guards isCheckInResponse should return true for valid CheckInResponse objects" name="Beer Type Guards isCheckInResponse should return true for valid CheckInResponse objects" time="0">
-    </testcase>
-    <testcase classname="Beer Type Guards isCheckInResponse should return false for objects without success property" name="Beer Type Guards isCheckInResponse should return false for objects without success property" time="0">
-    </testcase>
-    <testcase classname="Beer Type Guards isCheckInResponse should return false for objects with wrong type for success property" name="Beer Type Guards isCheckInResponse should return false for objects with wrong type for success property" time="0">
-    </testcase>
-    <testcase classname="Beer Type Guards isCheckInResponse should return false for invalid objects" name="Beer Type Guards isCheckInResponse should return false for invalid objects" time="0">
-    </testcase>
-  </testsuite>
-  <testsuite name="Database Type Guards" errors="0" failures="0" skipped="0" timestamp="2025-04-16T16:46:13" time="0.023" tests="6">
-    <testcase classname="Database Type Guards isPreference should return true for valid Preference objects" name="Database Type Guards isPreference should return true for valid Preference objects" time="0">
-    </testcase>
-    <testcase classname="Database Type Guards isPreference should return false for invalid Preference objects" name="Database Type Guards isPreference should return false for invalid Preference objects" time="0">
-    </testcase>
-    <testcase classname="Database Type Guards isReward should return true for valid Reward objects" name="Database Type Guards isReward should return true for valid Reward objects" time="0.001">
-    </testcase>
-    <testcase classname="Database Type Guards isReward should return false for invalid Reward objects" name="Database Type Guards isReward should return false for invalid Reward objects" time="0">
-    </testcase>
-    <testcase classname="Database Type Guards isUntappdCookie should return true for valid UntappdCookie objects" name="Database Type Guards isUntappdCookie should return true for valid UntappdCookie objects" time="0">
-    </testcase>
-    <testcase classname="Database Type Guards isUntappdCookie should return false for invalid UntappdCookie objects" name="Database Type Guards isUntappdCookie should return false for invalid UntappdCookie objects" time="0">
+    <testcase classname="dataUpdateService fetchAndUpdateMyBeers should handle errors during update" name="dataUpdateService fetchAndUpdateMyBeers should handle errors during update" time="0">
     </testcase>
   </testsuite>
 </testsuites>

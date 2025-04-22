@@ -25,7 +25,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/277</span>
+                <span class='fraction'>0/284</span>
             </div>
         
             
@@ -46,7 +46,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/272</span>
+                <span class='fraction'>0/279</span>
             </div>
         
             
@@ -1285,7 +1285,18 @@
 <a name='L1220'></a><a href='#L1220'>1220</a>
 <a name='L1221'></a><a href='#L1221'>1221</a>
 <a name='L1222'></a><a href='#L1222'>1222</a>
-<a name='L1223'></a><a href='#L1223'>1223</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L1223'></a><a href='#L1223'>1223</a>
+<a name='L1224'></a><a href='#L1224'>1224</a>
+<a name='L1225'></a><a href='#L1225'>1225</a>
+<a name='L1226'></a><a href='#L1226'>1226</a>
+<a name='L1227'></a><a href='#L1227'>1227</a>
+<a name='L1228'></a><a href='#L1228'>1228</a>
+<a name='L1229'></a><a href='#L1229'>1229</a>
+<a name='L1230'></a><a href='#L1230'>1230</a>
+<a name='L1231'></a><a href='#L1231'>1231</a>
+<a name='L1232'></a><a href='#L1232'>1232</a>
+<a name='L1233'></a><a href='#L1233'>1233</a>
+<a name='L1234'></a><a href='#L1234'>1234</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -1393,6 +1404,8 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -1405,6 +1418,15 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -2509,7 +2531,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import React, { useEffect, useState, useCallback } from 'react';
 import { StyleSheet, View, TouchableOpacity, Alert, FlatList, ActivityIndicator, Modal } from 'react-native';
-import { getBeersNotInMyBeers, fetchAndPopulateMyBeers, getMyBeers, areApiUrlsConfigured } from '@/src/database/db';
+import { getBeersNotInMyBeers, fetchAndPopulateMyBeers, getMyBeers, areApiUrlsConfigured, setPreference } from '@/src/database/db';
 import { ThemedText } from './ThemedText';
 import { ThemedView } from './ThemedView';
 import { LoadingIndicator } from './LoadingIndicator';
@@ -2615,6 +2637,8 @@ export const Beerfinder = <span class="cstat-no" title="statement not covered" >
   const handleRefresh = <span class="cstat-no" title="statement not covered" >useCallback(<span class="fstat-no" title="function not covered" >as</span>ync () =&gt; {</span>
 <span class="cstat-no" title="statement not covered" >    try {</span>
 <span class="cstat-no" title="statement not covered" >      setRefreshing(true);</span>
+<span class="cstat-no" title="statement not covered" >      console.log('Manual refresh initiated by user in Beerfinder');</span>
+&nbsp;
       // First check if API URLs are configured
       const apiUrlsConfigured = <span class="cstat-no" title="statement not covered" >await areApiUrlsConfigured();</span>
 <span class="cstat-no" title="statement not covered" >      if (!apiUrlsConfigured) {</span>
@@ -2626,7 +2650,16 @@ export const Beerfinder = <span class="cstat-no" title="statement not covered" >
 <span class="cstat-no" title="statement not covered" >        return;</span>
       }
 &nbsp;
+      // For manual refresh, we should always fetch new data regardless of timestamp
+      // Clear any stored timestamps to force a fresh fetch
+<span class="cstat-no" title="statement not covered" >      console.log('Clearing timestamp checks for manual refresh');</span>
+<span class="cstat-no" title="statement not covered" >      await setPreference('all_beers_last_update', '');</span>
+<span class="cstat-no" title="statement not covered" >      await setPreference('all_beers_last_check', '');</span>
+<span class="cstat-no" title="statement not covered" >      await setPreference('my_beers_last_update', '');</span>
+<span class="cstat-no" title="statement not covered" >      await setPreference('my_beers_last_check', '');</span>
+&nbsp;
       // If API URLs are configured, proceed with refresh
+<span class="cstat-no" title="statement not covered" >      console.log('Forcing fresh data fetch for manual refresh');</span>
 <span class="cstat-no" title="statement not covered" >      await fetchAndPopulateMyBeers();</span>
       // Use getBeersNotInMyBeers to get available beers, not tasted beers
       const freshBeers = <span class="cstat-no" title="statement not covered" >await getBeersNotInMyBeers();</span>
@@ -3736,7 +3769,7 @@ const styles = <span class="cstat-no" title="statement not covered" >StyleSheet.
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-04-16T16:46:14.218Z
+                at 2025-04-22T17:37:31.419Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

@@ -25,7 +25,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/131</span>
+                <span class='fraction'>0/136</span>
             </div>
         
             
@@ -46,7 +46,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/127</span>
+                <span class='fraction'>0/132</span>
             </div>
         
             
@@ -653,7 +653,16 @@
 <a name='L588'></a><a href='#L588'>588</a>
 <a name='L589'></a><a href='#L589'>589</a>
 <a name='L590'></a><a href='#L590'>590</a>
-<a name='L591'></a><a href='#L591'>591</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L591'></a><a href='#L591'>591</a>
+<a name='L592'></a><a href='#L592'>592</a>
+<a name='L593'></a><a href='#L593'>593</a>
+<a name='L594'></a><a href='#L594'>594</a>
+<a name='L595'></a><a href='#L595'>595</a>
+<a name='L596'></a><a href='#L596'>596</a>
+<a name='L597'></a><a href='#L597'>597</a>
+<a name='L598'></a><a href='#L598'>598</a>
+<a name='L599'></a><a href='#L599'>599</a>
+<a name='L600'></a><a href='#L600'>600</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -738,6 +747,8 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -750,6 +761,13 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -1245,7 +1263,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import React, { useEffect, useState, useCallback } from 'react';
 import { StyleSheet, View, TouchableOpacity, Alert, FlatList, Text, ActivityIndicator } from 'react-native';
-import { getAllBeers, refreshBeersFromAPI, areApiUrlsConfigured, getMyBeers } from '@/src/database/db';
+import { getAllBeers, refreshBeersFromAPI, areApiUrlsConfigured, getMyBeers, setPreference } from '@/src/database/db';
 import { ThemedText } from './ThemedText';
 import { ThemedView } from './ThemedView';
 import { LoadingIndicator } from './LoadingIndicator';
@@ -1290,7 +1308,7 @@ export const AllBeers = <span class="cstat-no" title="statement not covered" ><s
   const [searchText, setSearchText] = <span class="cstat-no" title="statement not covered" >useState('');</span>
   const [untappdModalVisible, setUntappdModalVisible] = <span class="cstat-no" title="statement not covered" >useState(false);</span>
   const [selectedBeerName, setSelectedBeerName] = <span class="cstat-no" title="statement not covered" >useState('');</span>
-  
+&nbsp;
   // Theme colors
   const cardColor = <span class="cstat-no" title="statement not covered" >useThemeColor({}, 'background');</span>
   const borderColor = <span class="cstat-no" title="statement not covered" >useThemeColor({ light: '#e0e0e0', dark: '#333' }, 'text');</span>
@@ -1298,7 +1316,7 @@ export const AllBeers = <span class="cstat-no" title="statement not covered" ><s
   const inactiveButtonColor = <span class="cstat-no" title="statement not covered" >useThemeColor({ light: '#E5E5E5', dark: '#2C2C2E' }, 'background');</span>
   const inactiveButtonTextColor = <span class="cstat-no" title="statement not covered" >useThemeColor({ light: '#333333', dark: '#EFEFEF' }, 'text');</span>
   const textColor = <span class="cstat-no" title="statement not covered" >useThemeColor({}, 'text');</span>
-  
+&nbsp;
   // Define all derived values outside of hooks and render methods
   const buttonTextColor = <span class="cstat-no" title="statement not covered" >colorScheme === 'dark' &amp;&amp; (isDraftOnly || isHeaviesOnly || isIpaOnly || sortBy === 'name') ? '#000000' : 'white';</span>
   const activeBgColor = <span class="cstat-no" title="statement not covered" >colorScheme === 'dark' &amp;&amp; (isDraftOnly || isHeaviesOnly || isIpaOnly || sortBy === 'name') ? '#FFC107' : activeButtonColor;</span>
@@ -1328,6 +1346,8 @@ export const AllBeers = <span class="cstat-no" title="statement not covered" ><s
   const handleRefresh = <span class="cstat-no" title="statement not covered" >useCallback(<span class="fstat-no" title="function not covered" >as</span>ync () =&gt; {</span>
 <span class="cstat-no" title="statement not covered" >    try {</span>
 <span class="cstat-no" title="statement not covered" >      setRefreshing(true);</span>
+<span class="cstat-no" title="statement not covered" >      console.log('Manual refresh initiated by user in AllBeers');</span>
+&nbsp;
       // First check if API URLs are configured
       const apiUrlsConfigured = <span class="cstat-no" title="statement not covered" >await areApiUrlsConfigured();</span>
 <span class="cstat-no" title="statement not covered" >      if (!apiUrlsConfigured) {</span>
@@ -1338,14 +1358,21 @@ export const AllBeers = <span class="cstat-no" title="statement not covered" ><s
 <span class="cstat-no" title="statement not covered" >        setRefreshing(false);</span>
 <span class="cstat-no" title="statement not covered" >        return;</span>
       }
-      
+&nbsp;
+      // For manual refresh, we should always fetch new data regardless of timestamp
+      // Clear any stored timestamps to force a fresh fetch
+<span class="cstat-no" title="statement not covered" >      console.log('Clearing timestamp checks for manual refresh');</span>
+<span class="cstat-no" title="statement not covered" >      await setPreference('all_beers_last_update', '');</span>
+<span class="cstat-no" title="statement not covered" >      await setPreference('all_beers_last_check', '');</span>
+&nbsp;
       // If API URLs are configured, proceed with refresh
+<span class="cstat-no" title="statement not covered" >      console.log('Forcing fresh data fetch for manual refresh');</span>
 <span class="cstat-no" title="statement not covered" >      await refreshBeersFromAPI();</span>
       const freshBeers = <span class="cstat-no" title="statement not covered" >await getAllBeers();</span>
-      
+&nbsp;
       // Set the base beers
 <span class="cstat-no" title="statement not covered" >      setAllBeers(freshBeers);</span>
-      
+&nbsp;
       // Sort the beers based on current sort order before setting them
       let sortedBeers = <span class="cstat-no" title="statement not covered" >[...freshBeers];</span>
 <span class="cstat-no" title="statement not covered" >      if (sortBy === 'name') {</span>
@@ -1357,7 +1384,7 @@ export const AllBeers = <span class="cstat-no" title="statement not covered" ><s
 <span class="cstat-no" title="statement not covered" >          return dateB - dateA; </span>// Descending order
         });
       }
-      
+&nbsp;
       // Apply the sorted beers
 <span class="cstat-no" title="statement not covered" >      setDisplayedBeers(sortedBeers);</span>
 <span class="cstat-no" title="statement not covered" >      setError(null);</span>
@@ -1376,7 +1403,7 @@ export const AllBeers = <span class="cstat-no" title="statement not covered" ><s
     // Apply text search filter
 <span class="cstat-no" title="statement not covered" >    if (searchText.trim() !== '') {</span>
       const searchLower = <span class="cstat-no" title="statement not covered" >searchText.toLowerCase().trim();</span>
-<span class="cstat-no" title="statement not covered" >      filtered = filtered.filter(<span class="fstat-no" title="function not covered" >be</span>er =&gt; </span>
+<span class="cstat-no" title="statement not covered" >      filtered = filtered.filter(<span class="fstat-no" title="function not covered" >be</span>er =&gt;</span>
 <span class="cstat-no" title="statement not covered" >        (beer.brew_name &amp;&amp; beer.brew_name.toLowerCase().includes(searchLower)) ||</span>
         (beer.brewer &amp;&amp; beer.brewer.toLowerCase().includes(searchLower)) ||
         (beer.brew_style &amp;&amp; beer.brew_style.toLowerCase().includes(searchLower)) ||
@@ -1386,18 +1413,18 @@ export const AllBeers = <span class="cstat-no" title="statement not covered" ><s
     }
 &nbsp;
 <span class="cstat-no" title="statement not covered" >    if (isDraftOnly) {</span>
-<span class="cstat-no" title="statement not covered" >      filtered = filtered.filter(<span class="fstat-no" title="function not covered" >be</span>er =&gt; </span>
-<span class="cstat-no" title="statement not covered" >        beer.brew_container &amp;&amp; </span>
+<span class="cstat-no" title="statement not covered" >      filtered = filtered.filter(<span class="fstat-no" title="function not covered" >be</span>er =&gt;</span>
+<span class="cstat-no" title="statement not covered" >        beer.brew_container &amp;&amp;</span>
         (beer.brew_container.toLowerCase().includes('draught') ||
         beer.brew_container.toLowerCase().includes('draft'))
       );
     }
 &nbsp;
 <span class="cstat-no" title="statement not covered" >    if (isHeaviesOnly) {</span>
-<span class="cstat-no" title="statement not covered" >      filtered = filtered.filter(<span class="fstat-no" title="function not covered" >be</span>er =&gt; </span>
-<span class="cstat-no" title="statement not covered" >        beer.brew_style &amp;&amp; </span>
-        (beer.brew_style.toLowerCase().includes('porter') || 
-         beer.brew_style.toLowerCase().includes('stout') || 
+<span class="cstat-no" title="statement not covered" >      filtered = filtered.filter(<span class="fstat-no" title="function not covered" >be</span>er =&gt;</span>
+<span class="cstat-no" title="statement not covered" >        beer.brew_style &amp;&amp;</span>
+        (beer.brew_style.toLowerCase().includes('porter') ||
+         beer.brew_style.toLowerCase().includes('stout') ||
          beer.brew_style.toLowerCase().includes('barleywine') ||
          beer.brew_style.toLowerCase().includes('quad') ||
          beer.brew_style.toLowerCase().includes('tripel'))
@@ -1405,8 +1432,8 @@ export const AllBeers = <span class="cstat-no" title="statement not covered" ><s
     }
 &nbsp;
 <span class="cstat-no" title="statement not covered" >    if (isIpaOnly) {</span>
-<span class="cstat-no" title="statement not covered" >      filtered = filtered.filter(<span class="fstat-no" title="function not covered" >be</span>er =&gt; </span>
-<span class="cstat-no" title="statement not covered" >        beer.brew_style &amp;&amp; </span>
+<span class="cstat-no" title="statement not covered" >      filtered = filtered.filter(<span class="fstat-no" title="function not covered" >be</span>er =&gt;</span>
+<span class="cstat-no" title="statement not covered" >        beer.brew_style &amp;&amp;</span>
         beer.brew_style.toLowerCase().includes('ipa')
       );
     }
@@ -1455,14 +1482,14 @@ export const AllBeers = <span class="cstat-no" title="statement not covered" ><s
   // Function to format unix timestamp to readable date
   const formatDate = <span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >(t</span>imestamp: string): string =&gt; {</span>
 <span class="cstat-no" title="statement not covered" >    if (!timestamp) <span class="cstat-no" title="statement not covered" >return 'Unknown date';</span></span>
-    
+&nbsp;
 <span class="cstat-no" title="statement not covered" >    try {</span>
       // Convert unix timestamp (seconds) to milliseconds
       const date = <span class="cstat-no" title="statement not covered" >new Date(parseInt(timestamp, 10) * 1000);</span>
-<span class="cstat-no" title="statement not covered" >      return date.toLocaleDateString('en-US', { </span>
-        year: 'numeric', 
-        month: 'short', 
-        day: 'numeric' 
+<span class="cstat-no" title="statement not covered" >      return date.toLocaleDateString('en-US', {</span>
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
       });
     } catch (err) {
 <span class="cstat-no" title="statement not covered" >      console.error('Error formatting date:', err);</span>
@@ -1489,18 +1516,18 @@ export const AllBeers = <span class="cstat-no" title="statement not covered" ><s
 &nbsp;
   const renderBeerItem = <span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >(i</span>tem: Beer) =&gt; {</span>
     const isExpanded = <span class="cstat-no" title="statement not covered" >expandedId === item.id;</span>
-    
+&nbsp;
 <span class="cstat-no" title="statement not covered" >    return (</span>
-      &lt;TouchableOpacity 
-        key={item.id} 
+      &lt;TouchableOpacity
+        key={item.id}
         onPress={<span class="fstat-no" title="function not covered" >()</span> =&gt; <span class="cstat-no" title="statement not covered" >toggleExpand(item.id)}</span>
         activeOpacity={0.8}
       &gt;
         &lt;View style={[
-          styles.beerItem, 
-          { 
+          styles.beerItem,
+          {
             backgroundColor: cardColor,
-            borderColor: borderColor 
+            borderColor: borderColor
           },
           isExpanded &amp;&amp; styles.expandedItem
         ]}&gt;
@@ -1516,7 +1543,7 @@ export const AllBeers = <span class="cstat-no" title="statement not covered" ><s
           &lt;ThemedText style={styles.dateAdded}&gt;
             Date Added: {formatDate(item.added_date)}
           &lt;/ThemedText&gt;
-          
+&nbsp;
           {isExpanded &amp;&amp; item.brew_description &amp;&amp; (
             &lt;View style={[styles.descriptionContainer, { borderTopColor: borderColor }]}&gt;
               &lt;ThemedText type="defaultSemiBold" style={styles.descriptionTitle}&gt;
@@ -1525,9 +1552,9 @@ export const AllBeers = <span class="cstat-no" title="statement not covered" ><s
               &lt;ThemedText style={styles.description}&gt;
                 {item.brew_description}
               &lt;/ThemedText&gt;
-              
-              &lt;TouchableOpacity 
-                style={[styles.checkInButton, { 
+&nbsp;
+              &lt;TouchableOpacity
+                style={[styles.checkInButton, {
                   backgroundColor: colorScheme === 'dark' ? '#E91E63' : activeButtonColor,
                   alignSelf: 'flex-start',
                   width: '48%'
@@ -1551,7 +1578,7 @@ export const AllBeers = <span class="cstat-no" title="statement not covered" ><s
   const renderFilterButtons = <span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >()</span> =&gt; {</span>
 <span class="cstat-no" title="statement not covered" >    return (</span>
       &lt;View style={styles.filtersContainer}&gt;
-        &lt;SearchBar 
+        &lt;SearchBar
           searchText={searchText}
           onSearchChange={handleSearchChange}
           onClear={clearSearch}
@@ -1562,7 +1589,7 @@ export const AllBeers = <span class="cstat-no" title="statement not covered" ><s
             {displayedBeers.length} {displayedBeers.length === 1 ? 'beer' : 'beers'} available
           &lt;/ThemedText&gt;
         &lt;/View&gt;
-        
+&nbsp;
         &lt;View style={styles.filterContainer}&gt;
           &lt;TouchableOpacity
             style={[
@@ -1585,7 +1612,7 @@ export const AllBeers = <span class="cstat-no" title="statement not covered" ><s
               Draft
             &lt;/ThemedText&gt;
           &lt;/TouchableOpacity&gt;
-          
+&nbsp;
           &lt;TouchableOpacity
             style={[
               styles.filterButton,
@@ -1607,7 +1634,7 @@ export const AllBeers = <span class="cstat-no" title="statement not covered" ><s
               Heavies
             &lt;/ThemedText&gt;
           &lt;/TouchableOpacity&gt;
-          
+&nbsp;
           &lt;TouchableOpacity
             style={[
               styles.filterButton,
@@ -1629,7 +1656,7 @@ export const AllBeers = <span class="cstat-no" title="statement not covered" ><s
               IPA
             &lt;/ThemedText&gt;
           &lt;/TouchableOpacity&gt;
-          
+&nbsp;
           &lt;TouchableOpacity
             style={styles.sortButton}
             onPress={toggleSortOption}
@@ -1657,8 +1684,8 @@ export const AllBeers = <span class="cstat-no" title="statement not covered" ><s
       ) : error ? (
         &lt;View style={styles.centered}&gt;
           &lt;ThemedText style={styles.errorText}&gt;{error}&lt;/ThemedText&gt;
-          &lt;TouchableOpacity 
-            style={[styles.refreshButton, { backgroundColor: activeButtonColor }]} 
+          &lt;TouchableOpacity
+            style={[styles.refreshButton, { backgroundColor: activeButtonColor }]}
             onPress={loadBeers}
           &gt;
             &lt;ThemedText style={[styles.buttonText, { color: 'white' }]}&gt;
@@ -1833,14 +1860,14 @@ const styles = <span class="cstat-no" title="statement not covered" >StyleSheet.
     fontSize: 16,
     fontWeight: '600',
   },
-}); </pre></td></tr></table></pre>
+});</pre></td></tr></table></pre>
 
                 <div class='push'></div><!-- for sticky footer -->
             </div><!-- /wrapper -->
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-04-16T16:46:14.218Z
+                at 2025-04-22T17:37:31.419Z
             </div>
         <script src="../../prettify.js"></script>
         <script>
