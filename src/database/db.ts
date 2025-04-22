@@ -582,8 +582,30 @@ export const fetchMyBeersFromAPI = async (): Promise<Beerfinder[]> => {
 
     // Extract the tasted_brew_current_round array from the response
     if (data && Array.isArray(data) && data.length >= 2 && data[1] && data[1].tasted_brew_current_round) {
-      console.log(`DB: Found tasted_brew_current_round with ${data[1].tasted_brew_current_round.length} beers`);
-      return data[1].tasted_brew_current_round;
+      const beers = data[1].tasted_brew_current_round;
+      console.log(`DB: Found tasted_brew_current_round with ${beers.length} beers`);
+
+      // Validate the beers array - check for missing IDs
+      const validBeers = beers.filter(beer => beer && beer.id);
+      const invalidBeers = beers.filter(beer => !beer || !beer.id);
+
+      console.log(`DB: Found ${validBeers.length} valid beers with IDs and ${invalidBeers.length} invalid beers without IDs`);
+
+      // Log details about invalid beers for debugging
+      if (invalidBeers.length > 0) {
+        console.log('DB: Invalid beers details:');
+        invalidBeers.forEach((beer, index) => {
+          console.log(`DB: Invalid beer ${index}:`, JSON.stringify(beer));
+        });
+      }
+
+      // Only return valid beers with IDs
+      if (validBeers.length > 0) {
+        return validBeers;
+      } else {
+        console.error('DB: No valid beers with IDs found in the response');
+        throw new Error('No valid beers with IDs found in the response');
+      }
     }
 
     console.error('DB: Invalid response format from My Beers API');
@@ -598,6 +620,21 @@ export const fetchMyBeersFromAPI = async (): Promise<Beerfinder[]> => {
 export const populateMyBeersTable = async (beers: Beerfinder[]): Promise<void> => {
   console.log(`DB: Populating My Beers table with ${beers.length} beers`);
 
+  // Validate that we have beers with IDs before proceeding
+  if (!beers || beers.length === 0) {
+    console.error('DB: No beers provided to populate the table');
+    throw new Error('No beers provided to populate the table');
+  }
+
+  // Count beers with valid IDs
+  const validBeers = beers.filter(beer => beer && beer.id);
+  console.log(`DB: Found ${validBeers.length} valid beers with IDs out of ${beers.length} total beers`);
+
+  if (validBeers.length === 0) {
+    console.error('DB: No valid beers with IDs found, aborting table update');
+    throw new Error('No valid beers with IDs found, aborting table update');
+  }
+
   if (!await acquireLock('populateMyBeersTable')) {
     console.error('DB: Failed to acquire database lock for populating Beerfinder beers table');
     throw new Error('Failed to acquire database lock for populating Beerfinder beers table');
@@ -610,22 +647,23 @@ export const populateMyBeersTable = async (beers: Beerfinder[]): Promise<void> =
     // Use a transaction for clearing and inserting data
     console.log('DB: Starting transaction for populating My Beers table');
     await database.withTransactionAsync(async () => {
-      // Clear the existing table data first
+      // Only clear the table if we have valid beers to insert
       console.log('DB: Clearing existing data from tasted_brew_current_round table');
       await database.runAsync('DELETE FROM tasted_brew_current_round');
 
-      console.log(`DB: Starting import of ${beers.length} My Beers...`);
+      console.log(`DB: Starting import of ${validBeers.length} valid My Beers...`);
 
       // Process in larger batches using transactions
       const batchSize = 20;
       console.log(`DB: Processing My Beers in batches of ${batchSize}`);
 
-      for (let i = 0; i < beers.length; i += batchSize) {
-        const batch = beers.slice(i, i + batchSize);
-        console.log(`DB: Processing batch ${Math.floor(i/batchSize) + 1} of ${Math.ceil(beers.length/batchSize)} (${batch.length} beers)`);
+      for (let i = 0; i < validBeers.length; i += batchSize) {
+        const batch = validBeers.slice(i, i + batchSize);
+        console.log(`DB: Processing batch ${Math.floor(i/batchSize) + 1} of ${Math.ceil(validBeers.length/batchSize)} (${batch.length} beers)`);
 
         // Insert each beer within the transaction
         for (const beer of batch) {
+          // Double-check that the beer has an ID (should always be true due to our filtering)
           if (!beer.id) {
             console.log('DB: Skipping beer without ID');
             continue; // Skip entries without an ID
@@ -660,8 +698,8 @@ export const populateMyBeersTable = async (beers: Beerfinder[]): Promise<void> =
         }
 
         // Log progress for larger batches
-        if ((i + batchSize) % 100 === 0 || i + batchSize >= beers.length) {
-          console.log(`Imported ${Math.min(i + batchSize, beers.length)} of ${beers.length} My Beers...`);
+        if ((i + batchSize) % 100 === 0 || i + batchSize >= validBeers.length) {
+          console.log(`Imported ${Math.min(i + batchSize, validBeers.length)} of ${validBeers.length} valid My Beers...`);
         }
       }
     });
@@ -781,6 +819,16 @@ export const refreshBeersFromAPI = async (): Promise<Beer[]> => {
 const _refreshMyBeersFromAPIInternal = async (): Promise<Beerfinder[]> => {
   try {
     const myBeers = await fetchMyBeersFromAPI();
+    console.log(`DB: _refreshMyBeersFromAPIInternal received ${myBeers.length} beers from API`);
+
+    // Validate beers have IDs
+    const validBeers = myBeers.filter(beer => beer && beer.id);
+    console.log(`DB: Found ${validBeers.length} valid beers with IDs out of ${myBeers.length} total beers`);
+
+    if (validBeers.length === 0) {
+      console.error('DB: No valid beers with IDs found, aborting database update');
+      throw new Error('No valid beers with IDs found, aborting database update');
+    }
 
     const database = await initDatabase();
 
@@ -789,15 +837,20 @@ const _refreshMyBeersFromAPIInternal = async (): Promise<Beerfinder[]> => {
       // Clear existing data
       await database.runAsync('DELETE FROM tasted_brew_current_round');
 
-      console.log(`Starting import of ${myBeers.length} My Beers...`);
+      console.log(`DB: Starting import of ${validBeers.length} valid My Beers...`);
 
       // Process in larger batches
       const batchSize = 20;
-      for (let i = 0; i < myBeers.length; i += batchSize) {
-        const batch = myBeers.slice(i, i + batchSize);
+      for (let i = 0; i < validBeers.length; i += batchSize) {
+        const batch = validBeers.slice(i, i + batchSize);
+        console.log(`DB: Processing batch ${Math.floor(i/batchSize) + 1} of ${Math.ceil(validBeers.length/batchSize)} (${batch.length} beers)`);
 
         for (const beer of batch) {
-          if (!beer.id) continue; // Skip entries without an ID
+          // Double-check that beer has an ID (should always be true due to our filtering)
+          if (!beer.id) {
+            console.log('DB: Skipping beer without ID');
+            continue; // Skip entries without an ID
+          }
 
           await database.runAsync(
             `INSERT OR REPLACE INTO tasted_brew_current_round (
@@ -823,14 +876,14 @@ const _refreshMyBeersFromAPIInternal = async (): Promise<Beerfinder[]> => {
         }
 
         // Log progress for larger batches
-        if ((i + batchSize) % 100 === 0 || i + batchSize >= myBeers.length) {
-          console.log(`Imported ${Math.min(i + batchSize, myBeers.length)} of ${myBeers.length} My Beers...`);
+        if ((i + batchSize) % 100 === 0 || i + batchSize >= validBeers.length) {
+          console.log(`DB: Imported ${Math.min(i + batchSize, validBeers.length)} of ${validBeers.length} valid My Beers...`);
         }
       }
     });
 
-    console.log('My Beers import complete!');
-    return myBeers;
+    console.log('DB: My Beers import complete!');
+    return validBeers;
   } catch (error) {
     console.error('Error refreshing My Beers:', error);
     throw error;
