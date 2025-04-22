@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { StyleSheet, View, TouchableOpacity, Alert, FlatList, ActivityIndicator } from 'react-native';
-import { getMyBeers, fetchAndPopulateMyBeers, areApiUrlsConfigured } from '@/src/database/db';
+import { getMyBeers, fetchAndPopulateMyBeers, areApiUrlsConfigured, setPreference } from '@/src/database/db';
 import { ThemedText } from './ThemedText';
 import { ThemedView } from './ThemedView';
 import { LoadingIndicator } from './LoadingIndicator';
