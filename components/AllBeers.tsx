@@ -12,6 +12,7 @@ import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useBottomTabOverflow } from '@/components/ui/TabBarBackground';
 import { IconSymbol } from './ui/IconSymbol';
 import { UntappdWebView } from './UntappdWebView';
+import { getUserFriendlyErrorMessage } from '@/src/utils/notificationUtils';
 
 type Beer = {
   id: string;
@@ -104,30 +105,61 @@ export const AllBeers = () => {
 
       // If API URLs are configured, proceed with refresh
       console.log('Forcing fresh data fetch for manual refresh');
-      await refreshBeersFromAPI();
-      const freshBeers = await getAllBeers();
+      try {
+        // Attempt to refresh the beers from the API
+        await refreshBeersFromAPI();
+        const freshBeers = await getAllBeers();
 
-      // Set the base beers
-      setAllBeers(freshBeers);
+        // Set the base beers
+        setAllBeers(freshBeers);
 
-      // Sort the beers based on current sort order before setting them
-      let sortedBeers = [...freshBeers];
-      if (sortBy === 'name') {
-        sortedBeers.sort((a, b) => (a.brew_name || '').localeCompare(b.brew_name || ''));
-      } else {
-        sortedBeers.sort((a, b) => {
-          const dateA = parseInt(a.added_date || '0', 10);
-          const dateB = parseInt(b.added_date || '0', 10);
-          return dateB - dateA; // Descending order
-        });
+        // Sort the beers based on current sort order before setting them
+        let sortedBeers = [...freshBeers];
+        if (sortBy === 'name') {
+          sortedBeers.sort((a, b) => (a.brew_name || '').localeCompare(b.brew_name || ''));
+        } else {
+          sortedBeers.sort((a, b) => {
+            const dateA = parseInt(a.added_date || '0', 10);
+            const dateB = parseInt(b.added_date || '0', 10);
+            return dateB - dateA; // Descending order
+          });
+        }
+
+        // Apply the sorted beers
+        setDisplayedBeers(sortedBeers);
+        setError(null);
+      } catch (apiError: any) {
+        console.error('API error refreshing beers:', apiError);
+
+        // Set a user-friendly error message
+        const errorMessage = apiError.message
+          ? getUserFriendlyErrorMessage({
+              type: apiError.isNetworkError ? 'NETWORK_ERROR' : 'SERVER_ERROR',
+              message: apiError.message,
+              statusCode: apiError.statusCode || 0,
+              originalError: apiError
+            })
+          : 'Failed to connect to the server. Please check your internet connection and try again.';
+
+        setError(errorMessage);
+
+        // Also show an alert for immediate feedback
+        Alert.alert(
+          'Data Refresh Error',
+          errorMessage,
+          [{ text: 'OK' }]
+        );
       }
-
-      // Apply the sorted beers
-      setDisplayedBeers(sortedBeers);
-      setError(null);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error refreshing beers:', error);
-      Alert.alert('Error', 'Failed to refresh beer list. Please try again later.');
+
+      // Set a user-friendly error message
+      const errorMessage = error.message
+        ? `Failed to refresh beer list: ${error.message}`
+        : 'Failed to refresh beer list. Please try again later.';
+
+      setError(errorMessage);
+      Alert.alert('Error', errorMessage);
     } finally {
       setRefreshing(false);
     }

@@ -11,6 +11,7 @@ import { SearchBar } from './SearchBar';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useBottomTabOverflow } from '@/components/ui/TabBarBackground';
 import { IconSymbol } from './ui/IconSymbol';
+import { getUserFriendlyErrorMessage } from '@/src/utils/notificationUtils';
 
 type Beer = {
   id: string;
@@ -121,50 +122,82 @@ export const TastedBrewList = () => {
 
       // If API URLs are configured, proceed with refresh
       console.log('Forcing fresh data fetch for manual refresh');
-      await fetchAndPopulateMyBeers();
-      const freshBeers = await getMyBeers();
+      try {
+        // Attempt to refresh the beers from the API
+        await fetchAndPopulateMyBeers();
+        const freshBeers = await getMyBeers();
 
-      // Set the base beers
-      setTastedBeers(freshBeers);
+        // Set the base beers
+        setTastedBeers(freshBeers);
 
-      // Sort the beers based on current sort order before setting them
-      let sortedBeers = [...freshBeers];
-      if (sortBy === 'name') {
-        sortedBeers.sort((a, b) => (a.brew_name || '').localeCompare(b.brew_name || ''));
-      } else {
-        // Sort by tasted_date
-        sortedBeers.sort((a, b) => {
-          // Parse dates in format MM/DD/YYYY
-          const partsA = (a.tasted_date || '').split('/');
-          const partsB = (b.tasted_date || '').split('/');
+        // Sort the beers based on current sort order before setting them
+        let sortedBeers = [...freshBeers];
+        if (sortBy === 'name') {
+          sortedBeers.sort((a, b) => (a.brew_name || '').localeCompare(b.brew_name || ''));
+        } else {
+          // Sort by tasted_date
+          sortedBeers.sort((a, b) => {
+            // Parse dates in format MM/DD/YYYY
+            const partsA = (a.tasted_date || '').split('/');
+            const partsB = (b.tasted_date || '').split('/');
 
-          if (partsA.length === 3 && partsB.length === 3) {
-            // Create Date objects with year, month (0-based), day
-            const dateA = new Date(
-              parseInt(partsA[2], 10),
-              parseInt(partsA[0], 10) - 1,
-              parseInt(partsA[1], 10)
-            ).getTime();
+            if (partsA.length === 3 && partsB.length === 3) {
+              // Create Date objects with year, month (0-based), day
+              const dateA = new Date(
+                parseInt(partsA[2], 10),
+                parseInt(partsA[0], 10) - 1,
+                parseInt(partsA[1], 10)
+              ).getTime();
 
-            const dateB = new Date(
-              parseInt(partsB[2], 10),
-              parseInt(partsB[0], 10) - 1,
-              parseInt(partsB[1], 10)
-            ).getTime();
+              const dateB = new Date(
+                parseInt(partsB[2], 10),
+                parseInt(partsB[0], 10) - 1,
+                parseInt(partsB[1], 10)
+              ).getTime();
 
-            return dateB - dateA; // Descending order
-          }
+              return dateB - dateA; // Descending order
+            }
 
-          // Fallback if date parsing fails
-          return 0;
-        });
+            // Fallback if date parsing fails
+            return 0;
+          });
+        }
+
+        // Apply the sorted beers
+        setDisplayedBeers(sortedBeers);
+        setError(null);
+      } catch (apiError: any) {
+        console.error('API error refreshing tasted beers:', apiError);
+
+        // Set a user-friendly error message
+        const errorMessage = apiError.message
+          ? getUserFriendlyErrorMessage({
+              type: apiError.isNetworkError ? 'NETWORK_ERROR' : 'SERVER_ERROR',
+              message: apiError.message,
+              statusCode: apiError.statusCode || 0,
+              originalError: apiError
+            })
+          : 'Failed to connect to the server. Please check your internet connection and try again.';
+
+        setError(errorMessage);
+
+        // Also show an alert for immediate feedback
+        Alert.alert(
+          'Data Refresh Error',
+          errorMessage,
+          [{ text: 'OK' }]
+        );
       }
-
-      // Apply the sorted beers
-      setDisplayedBeers(sortedBeers);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error refreshing tasted beers:', error);
-      Alert.alert('Error', 'Failed to refresh tasted beer list. Please try again later.');
+
+      // Set a user-friendly error message
+      const errorMessage = error.message
+        ? `Failed to refresh tasted beer list: ${error.message}`
+        : 'Failed to refresh tasted beer list. Please try again later.';
+
+      setError(errorMessage);
+      Alert.alert('Error', errorMessage);
     } finally {
       setRefreshing(false);
     }
