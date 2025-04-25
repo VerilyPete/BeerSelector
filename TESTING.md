@@ -174,13 +174,42 @@ describe('dataUpdateService', () => {
   });
 });
 
+## Integration Tests
+
+Integration tests verify that different parts of the application work together correctly. These tests use real data structures from the API to ensure proper data handling.
+
+### Data Update Service Integration Tests
+
+The `dataUpdateService.integration.test.ts` file contains integration tests for the data update service. These tests use the actual JSON data structures from the API to verify that the data processing functions work correctly with real-world data.
+
+To run these integration tests:
+
+```bash
+npx jest src/services/__tests__/dataUpdateService.integration.test.ts
+```
+
+These tests specifically:
+
+1. Use the actual JSON data structures from `allbeers.json` and `mybeers.json` files
+2. Verify that the data extraction logic correctly processes the API response format
+3. Test error handling for various failure scenarios (missing API URL, network errors, invalid data)
+4. Ensure that only valid beers with IDs are processed and stored in the database
+
+### Running Integration Tests with Sample Data
+
+The integration tests use the sample data files in the project root:
+- `allbeers.json` - Sample data for all available beers
+- `mybeers.json` - Sample data for tasted beers
+
+These files provide realistic test data that matches the actual API response format, allowing the tests to verify that the data processing logic works correctly with real-world data.
+
 ## Test Coverage
 
 Test coverage reports are generated when running `npm run test:ci`. The coverage report can be found in the `coverage/` directory.
 
 ### Data Update Service Coverage
 
-The `dataUpdateService.ts` file has the following test coverage:
+The `dataUpdateService.ts` file has the following test coverage when running both unit and integration tests:
 
 - Statement coverage: 66.66%
 - Branch coverage: 71.42%
@@ -194,16 +223,22 @@ The tests specifically cover the `fetchAndUpdateAllBeers` and `fetchAndUpdateMyB
 3. Only valid beers with IDs are used to update the database
 4. Error cases are handled gracefully
 
-To run these tests specifically:
+To run the unit tests specifically:
 
 ```bash
 npx jest src/services/__tests__/dataUpdateService.test.ts --coverage
 ```
 
-To see coverage for just the dataUpdateService.ts file:
+To run the integration tests specifically:
 
 ```bash
-npx jest src/services/__tests__/dataUpdateService.test.ts --coverage --collectCoverageFrom=src/services/dataUpdateService.ts
+npx jest src/services/__tests__/dataUpdateService.integration.test.ts --coverage
+```
+
+To run both unit and integration tests together:
+
+```bash
+npx jest src/services/__tests__/dataUpdateService --coverage --collectCoverageFrom=src/services/dataUpdateService.ts
 ```
 
 ## Continuous Integration
