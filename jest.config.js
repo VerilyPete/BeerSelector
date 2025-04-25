@@ -17,6 +17,8 @@ module.exports = {
     '!**/android/**',
     '!**/assets/**',
     '!**/*.json',
+    '!**/allbeers.json',
+    '!**/mybeers.json',
     '!**/__mocks__/**',
     '!**/scripts/**'
   ],
