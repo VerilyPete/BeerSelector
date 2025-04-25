@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="jest tests" tests="11" failures="0" errors="0" time="0.35">
+  <testsuite name="dataUpdateService integration tests" errors="0" failures="0" skipped="0" timestamp="2025-04-25T02:53:09" time="0.159" tests="11">
+    <testcase classname="dataUpdateService integration tests fetchAndUpdateAllBeers should process valid allbeers.json data correctly" name="dataUpdateService integration tests fetchAndUpdateAllBeers should process valid allbeers.json data correctly" time="0.003">
+    </testcase>
+    <testcase classname="dataUpdateService integration tests fetchAndUpdateAllBeers should handle missing API URL" name="dataUpdateService integration tests fetchAndUpdateAllBeers should handle missing API URL" time="0">
+    </testcase>
+    <testcase classname="dataUpdateService integration tests fetchAndUpdateAllBeers should handle failed fetch" name="dataUpdateService integration tests fetchAndUpdateAllBeers should handle failed fetch" time="0.001">
+    </testcase>
+    <testcase classname="dataUpdateService integration tests fetchAndUpdateAllBeers should handle invalid data format" name="dataUpdateService integration tests fetchAndUpdateAllBeers should handle invalid data format" time="0">
+    </testcase>
+    <testcase classname="dataUpdateService integration tests fetchAndUpdateAllBeers should handle fetch throwing an exception" name="dataUpdateService integration tests fetchAndUpdateAllBeers should handle fetch throwing an exception" time="0.001">
+    </testcase>
+    <testcase classname="dataUpdateService integration tests fetchAndUpdateMyBeers should process valid mybeers.json data correctly" name="dataUpdateService integration tests fetchAndUpdateMyBeers should process valid mybeers.json data correctly" time="0.001">
+    </testcase>
+    <testcase classname="dataUpdateService integration tests fetchAndUpdateMyBeers should handle missing API URL" name="dataUpdateService integration tests fetchAndUpdateMyBeers should handle missing API URL" time="0.002">
+    </testcase>
+    <testcase classname="dataUpdateService integration tests fetchAndUpdateMyBeers should handle failed fetch" name="dataUpdateService integration tests fetchAndUpdateMyBeers should handle failed fetch" time="0.001">
+    </testcase>
+    <testcase classname="dataUpdateService integration tests fetchAndUpdateMyBeers should handle invalid data format" name="dataUpdateService integration tests fetchAndUpdateMyBeers should handle invalid data format" time="0">
+    </testcase>
+    <testcase classname="dataUpdateService integration tests fetchAndUpdateMyBeers should handle data with no valid beers" name="dataUpdateService integration tests fetchAndUpdateMyBeers should handle data with no valid beers" time="0">
+    </testcase>
+    <testcase classname="dataUpdateService integration tests fetchAndUpdateMyBeers should handle fetch throwing an exception" name="dataUpdateService integration tests fetchAndUpdateMyBeers should handle fetch throwing an exception" time="0">
+    </testcase>
+  </testsuite>
+</testsuites>
