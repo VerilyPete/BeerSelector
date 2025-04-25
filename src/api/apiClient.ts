@@ -4,13 +4,8 @@ import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { ApiClientOptions, SessionData, ApiResponse, ApiError } from '../types/api';
 
-// Import expo-network with error handling
-let Network: any = null;
-try {
-  Network = require('expo-network');
-} catch (error) {
-  console.warn('expo-network package not available, network status checks will be disabled');
-}
+// Network detection is handled through fetch API error handling
+// No external network detection module is used
 
 export class ApiClient {
   private static instance: ApiClient;
@@ -33,23 +28,32 @@ export class ApiClient {
   }
 
   private async initNetworkMonitoring(): Promise<void> {
-    try {
-      // Check if Network is available
-      if (Network && Network.getNetworkStateAsync) {
-        const networkState = await Network.getNetworkStateAsync();
-        this.networkStatus = {
-          isConnected: networkState.isConnected,
-          type: networkState.type
-        };
+    // Initialize with default values
+    // Network connectivity will be detected through fetch errors
+    this.networkStatus = {
+      isConnected: true,
+      type: 'unknown'
+    };
 
-        // We could add event listeners for network changes here if needed
-      } else {
-        // If Network is not available, assume we're connected
-        this.networkStatus = { isConnected: true, type: 'unknown' };
-      }
+    // Make a lightweight request to check connectivity
+    try {
+      // Use a simple HEAD request to a reliable endpoint
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+
+      const response = await fetch('https://tapthatapp.beerknurd.com', {
+        method: 'HEAD',
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      // If we get here, we're online
+      this.networkStatus.isConnected = true;
     } catch (error) {
-      console.warn('Failed to initialize network monitoring:', error);
-      this.networkStatus = { isConnected: true, type: 'unknown' };
+      // If fetch fails, we might be offline
+      // But don't assume offline just from one failed request
+      console.log('Network check request failed, but still assuming online:', error);
     }
   }
 
@@ -140,10 +144,8 @@ export class ApiClient {
   }
 
   private async fetchWithRetry(url: string, options: RequestInit, retries = this.retries): Promise<Response> {
-    // Check network connectivity first if we have network status
-    if (this.networkStatus && this.networkStatus.isConnected === false) {
-      throw new ApiError('No network connection available', 0, true, false);
-    }
+    // Network connectivity will be detected through fetch errors
+    // No pre-check needed
 
     // Add timeout to fetch request
     const controller = new AbortController();
@@ -301,22 +303,31 @@ export class ApiClient {
   // Check if the device is online
   public async isOnline(): Promise<boolean> {
     try {
-      // Check if Network is available
-      if (Network && Network.getNetworkStateAsync) {
-        // Update network status
-        const networkState = await Network.getNetworkStateAsync();
-        this.networkStatus = {
-          isConnected: networkState.isConnected,
-          type: networkState.type
-        };
-        return this.networkStatus.isConnected;
-      } else {
-        // If Network is not available, assume we're connected
-        return true;
-      }
+      // Make a lightweight request to check connectivity
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+
+      const response = await fetch('https://tapthatapp.beerknurd.com', {
+        method: 'HEAD',
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      // If we get here, we're online
+      this.networkStatus = {
+        isConnected: true,
+        type: 'unknown'
+      };
+      return true;
     } catch (error) {
-      console.warn('Failed to check network status:', error);
-      return true; // Assume online if we can't check
+      // If fetch fails, we're likely offline
+      this.networkStatus = {
+        isConnected: false,
+        type: 'unknown'
+      };
+      console.log('Network connectivity check failed:', error);
+      return false;
     }
   }
 }

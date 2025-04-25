@@ -108,25 +108,36 @@ export default function SettingsScreen() {
 
       // Check if there were any errors
       if (result.hasErrors) {
-        // Collect error messages
-        const errorMessages: string[] = [];
-
-        if (!result.allBeersResult.success && result.allBeersResult.error) {
-          const allBeersError = getUserFriendlyErrorMessage(result.allBeersResult.error);
-          errorMessages.push(`All Beer data: ${allBeersError}`);
+        // If all errors are network-related, show a single consolidated message
+        if (result.allNetworkErrors) {
+          Alert.alert(
+            'Server Connection Error',
+            'Unable to connect to the server. Please check your internet connection and try again later.',
+            [{ text: 'OK' }]
+          );
         }
+        // Otherwise, show individual error messages for each endpoint
+        else {
+          // Collect error messages
+          const errorMessages: string[] = [];
 
-        if (!result.myBeersResult.success && result.myBeersResult.error) {
-          const myBeersError = getUserFriendlyErrorMessage(result.myBeersResult.error);
-          errorMessages.push(`Beerfinder data: ${myBeersError}`);
+          if (!result.allBeersResult.success && result.allBeersResult.error) {
+            const allBeersError = getUserFriendlyErrorMessage(result.allBeersResult.error);
+            errorMessages.push(`All Beer data: ${allBeersError}`);
+          }
+
+          if (!result.myBeersResult.success && result.myBeersResult.error) {
+            const myBeersError = getUserFriendlyErrorMessage(result.myBeersResult.error);
+            errorMessages.push(`Beerfinder data: ${myBeersError}`);
+          }
+
+          // Show error alert with all error messages
+          Alert.alert(
+            'Data Refresh Error',
+            `There were problems refreshing beer data:\n\n${errorMessages.join('\n\n')}`,
+            [{ text: 'OK' }]
+          );
         }
-
-        // Show error alert with all error messages
-        Alert.alert(
-          'Data Refresh Error',
-          `There were problems refreshing beer data:\n\n${errorMessages.join('\n\n')}`,
-          [{ text: 'OK' }]
-        );
       }
       // If no errors but data was updated
       else if (result.allBeersResult.dataUpdated || result.myBeersResult.dataUpdated) {

@@ -56,13 +56,7 @@ jest.mock('expo-constants', () => ({
   },
 }));
 
-// Mock the expo-network module
-jest.mock('expo-network', () => ({
-  getNetworkStateAsync: jest.fn().mockResolvedValue({
-    isConnected: true,
-    type: 'wifi',
-  }),
-}));
+// No expo-network mock needed as we're not using it anymore
 
 // Mock fetch
 global.fetch = jest.fn().mockImplementation(() =>
