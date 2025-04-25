@@ -5,12 +5,13 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import 'react-native-reanimated';
-import { LogBox } from 'react-native';
+import { LogBox, Alert } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { initializeBeerDatabase, getPreference, setPreference } from '@/src/database/db';
 import { checkAndRefreshOnAppOpen } from '@/src/services/dataUpdateService';
+import { getUserFriendlyErrorMessage } from '@/src/utils/notificationUtils';
 
 // Track if database initialization has been started to prevent multiple calls
 let dbInitStarted = false;
@@ -89,9 +90,27 @@ export default function RootLayout() {
               setInitialRoute('(tabs)');
 
               // Check for updates on app open (if it's been at least 12 hours since last check)
-              checkAndRefreshOnAppOpen(12).then(updated => {
-                if (updated) {
+              checkAndRefreshOnAppOpen(12).then(result => {
+                if (result.updated) {
                   console.log('Data was updated on app open');
+                }
+
+                // If there were errors during the refresh, notify the user
+                if (result.errors && result.errors.length > 0) {
+                  console.error('Errors during automatic data refresh:', result.errors);
+
+                  // Only show an alert for the first error to avoid overwhelming the user
+                  const firstError = result.errors[0];
+                  const errorMessage = getUserFriendlyErrorMessage(firstError);
+
+                  // Show the error alert after a short delay to ensure the app is fully loaded
+                  setTimeout(() => {
+                    Alert.alert(
+                      'Data Refresh Error',
+                      `There was a problem refreshing beer data: ${errorMessage}`,
+                      [{ text: 'OK' }]
+                    );
+                  }, 1000);
                 }
               }).catch(error => {
                 console.error('Error checking for updates on app open:', error);

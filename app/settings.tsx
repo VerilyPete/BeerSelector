@@ -16,6 +16,7 @@ import { manualRefreshAllData } from '@/src/services/dataUpdateService';
 import { LoadingIndicator } from '@/components/LoadingIndicator';
 import Constants from 'expo-constants';
 import { createMockSession } from '@/src/api/mockSession';
+import { getUserFriendlyErrorMessage } from '@/src/utils/notificationUtils';
 
 // Define a Preference type for typechecking
 interface Preference {
@@ -103,14 +104,43 @@ export default function SettingsScreen() {
       setRefreshing(true);
 
       // Perform the refresh of both tables using the conditional update function
-      const { allBeersUpdated, myBeersUpdated } = await manualRefreshAllData();
+      const result = await manualRefreshAllData();
 
-      if (allBeersUpdated || myBeersUpdated) {
+      // Check if there were any errors
+      if (result.hasErrors) {
+        // Collect error messages
+        const errorMessages: string[] = [];
+
+        if (!result.allBeersResult.success && result.allBeersResult.error) {
+          const allBeersError = getUserFriendlyErrorMessage(result.allBeersResult.error);
+          errorMessages.push(`All Beer data: ${allBeersError}`);
+        }
+
+        if (!result.myBeersResult.success && result.myBeersResult.error) {
+          const myBeersError = getUserFriendlyErrorMessage(result.myBeersResult.error);
+          errorMessages.push(`Beerfinder data: ${myBeersError}`);
+        }
+
+        // Show error alert with all error messages
+        Alert.alert(
+          'Data Refresh Error',
+          `There were problems refreshing beer data:\n\n${errorMessages.join('\n\n')}`,
+          [{ text: 'OK' }]
+        );
+      }
+      // If no errors but data was updated
+      else if (result.allBeersResult.dataUpdated || result.myBeersResult.dataUpdated) {
+        // Show success message with counts
+        const allBeersCount = result.allBeersResult.itemCount || 0;
+        const myBeersCount = result.myBeersResult.itemCount || 0;
+
         Alert.alert(
           'Success',
-          'Beer data refreshed successfully!'
+          `Beer data refreshed successfully!\n\nAll Beer: ${allBeersCount} beers\nBeerfinder: ${myBeersCount} beers`
         );
-      } else {
+      }
+      // If no errors and no data was updated
+      else {
         Alert.alert('Info', 'No new beer data available.');
       }
     } catch (err) {

@@ -1,31 +1,101 @@
 import { getPreference, setPreference, populateBeersTable, populateMyBeersTable } from '../database/db';
 import { Beer, Beerfinder } from '../types/beer';
+import { ApiErrorType, ErrorResponse, createErrorResponse } from '../utils/notificationUtils';
+
+/**
+ * Result of a data update operation
+ */
+export interface DataUpdateResult {
+  success: boolean;
+  error?: ErrorResponse;
+  dataUpdated: boolean;
+  itemCount?: number;
+}
 
 /**
  * Fetch and update all beers data
- * @returns true if data was updated, false otherwise
+ * @returns DataUpdateResult with success status and error information if applicable
  */
-export async function fetchAndUpdateAllBeers(): Promise<boolean> {
+export async function fetchAndUpdateAllBeers(): Promise<DataUpdateResult> {
   try {
     // Get the API URL from preferences
     const apiUrl = await getPreference('all_beers_api_url');
     if (!apiUrl) {
       console.error('All beers API URL not set');
-      return false;
+      return {
+        success: false,
+        dataUpdated: false,
+        error: {
+          type: ApiErrorType.VALIDATION_ERROR,
+          message: 'All beers API URL not set. Please log in to configure API URLs.'
+        }
+      };
     }
 
     // Make the request
     console.log('Fetching all beers data...');
-    const response = await fetch(apiUrl);
+    let response;
+    try {
+      // Set a timeout for the fetch request
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+
+      response = await fetch(apiUrl, { signal: controller.signal });
+      clearTimeout(timeoutId);
+    } catch (fetchError) {
+      console.error('Network error fetching all beers data:', fetchError);
+
+      // Check if it's an abort error (timeout)
+      if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+        return {
+          success: false,
+          dataUpdated: false,
+          error: {
+            type: ApiErrorType.TIMEOUT_ERROR,
+            message: 'Request timed out while fetching beer data.',
+            originalError: fetchError
+          }
+        };
+      }
+
+      // Handle other network errors
+      return {
+        success: false,
+        dataUpdated: false,
+        error: createErrorResponse(fetchError)
+      };
+    }
 
     // If the response is not OK, something went wrong
     if (!response.ok) {
       console.error(`Failed to fetch all beers data: ${response.status} ${response.statusText}`);
-      return false;
+      return {
+        success: false,
+        dataUpdated: false,
+        error: {
+          type: ApiErrorType.SERVER_ERROR,
+          message: `Server error: ${response.statusText || 'Unknown error'}`,
+          statusCode: response.status
+        }
+      };
     }
 
     // Parse the response
-    const data = await response.json();
+    let data;
+    try {
+      data = await response.json();
+    } catch (parseError) {
+      console.error('Error parsing all beers data:', parseError);
+      return {
+        success: false,
+        dataUpdated: false,
+        error: {
+          type: ApiErrorType.PARSE_ERROR,
+          message: 'Failed to parse server response',
+          originalError: parseError
+        }
+      };
+    }
 
     // Log the structure of the response for debugging
     console.log('All beers API response structure:', typeof data);
@@ -40,7 +110,14 @@ export async function fetchAndUpdateAllBeers(): Promise<boolean> {
       console.log(`Found brewInStock with ${allBeers.length} beers`);
     } else {
       console.error('Invalid all beers data format: missing brewInStock');
-      return false;
+      return {
+        success: false,
+        dataUpdated: false,
+        error: {
+          type: ApiErrorType.VALIDATION_ERROR,
+          message: 'Invalid data format received from server: missing beer data'
+        }
+      };
     }
 
     // Update the database
@@ -51,38 +128,105 @@ export async function fetchAndUpdateAllBeers(): Promise<boolean> {
     await setPreference('all_beers_last_check', new Date().toISOString());
 
     console.log(`Updated all beers data with ${allBeers.length} beers`);
-    return true;
+    return {
+      success: true,
+      dataUpdated: true,
+      itemCount: allBeers.length
+    };
   } catch (error) {
     console.error('Error updating all beers data:', error);
-    return false;
+    return {
+      success: false,
+      dataUpdated: false,
+      error: createErrorResponse(error)
+    };
   }
 }
 
 /**
  * Fetch and update my beers data
- * @returns true if data was updated, false otherwise
+ * @returns DataUpdateResult with success status and error information if applicable
  */
-export async function fetchAndUpdateMyBeers(): Promise<boolean> {
+export async function fetchAndUpdateMyBeers(): Promise<DataUpdateResult> {
   try {
     // Get the API URL from preferences
     const apiUrl = await getPreference('my_beers_api_url');
     if (!apiUrl) {
       console.error('My beers API URL not set');
-      return false;
+      return {
+        success: false,
+        dataUpdated: false,
+        error: {
+          type: ApiErrorType.VALIDATION_ERROR,
+          message: 'My beers API URL not set. Please log in to configure API URLs.'
+        }
+      };
     }
 
     // Make the request
     console.log('Fetching my beers data...');
-    const response = await fetch(apiUrl);
+    let response;
+    try {
+      // Set a timeout for the fetch request
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+
+      response = await fetch(apiUrl, { signal: controller.signal });
+      clearTimeout(timeoutId);
+    } catch (fetchError) {
+      console.error('Network error fetching my beers data:', fetchError);
+
+      // Check if it's an abort error (timeout)
+      if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+        return {
+          success: false,
+          dataUpdated: false,
+          error: {
+            type: ApiErrorType.TIMEOUT_ERROR,
+            message: 'Request timed out while fetching tasted beer data.',
+            originalError: fetchError
+          }
+        };
+      }
+
+      // Handle other network errors
+      return {
+        success: false,
+        dataUpdated: false,
+        error: createErrorResponse(fetchError)
+      };
+    }
 
     // If the response is not OK, something went wrong
     if (!response.ok) {
       console.error(`Failed to fetch my beers data: ${response.status} ${response.statusText}`);
-      return false;
+      return {
+        success: false,
+        dataUpdated: false,
+        error: {
+          type: ApiErrorType.SERVER_ERROR,
+          message: `Server error: ${response.statusText || 'Unknown error'}`,
+          statusCode: response.status
+        }
+      };
     }
 
     // Parse the response
-    const data = await response.json();
+    let data;
+    try {
+      data = await response.json();
+    } catch (parseError) {
+      console.error('Error parsing my beers data:', parseError);
+      return {
+        success: false,
+        dataUpdated: false,
+        error: {
+          type: ApiErrorType.PARSE_ERROR,
+          message: 'Failed to parse server response',
+          originalError: parseError
+        }
+      };
+    }
 
     // Log the structure of the response for debugging
     console.log('API response structure:', typeof data);
@@ -97,7 +241,14 @@ export async function fetchAndUpdateMyBeers(): Promise<boolean> {
       console.log(`Found tasted_brew_current_round with ${myBeers.length} beers`);
     } else {
       console.error('Invalid my beers data format: missing tasted_brew_current_round');
-      return false;
+      return {
+        success: false,
+        dataUpdated: false,
+        error: {
+          type: ApiErrorType.VALIDATION_ERROR,
+          message: 'Invalid data format received from server: missing tasted beer data'
+        }
+      };
     }
 
     // Validate that we have beers with IDs
@@ -106,7 +257,14 @@ export async function fetchAndUpdateMyBeers(): Promise<boolean> {
 
     if (validBeers.length === 0) {
       console.error('No valid beers with IDs found, aborting database update');
-      return false;
+      return {
+        success: false,
+        dataUpdated: false,
+        error: {
+          type: ApiErrorType.VALIDATION_ERROR,
+          message: 'No valid tasted beers found in server response'
+        }
+      };
     }
 
     // Update the database with the valid beers
@@ -117,10 +275,18 @@ export async function fetchAndUpdateMyBeers(): Promise<boolean> {
     await setPreference('my_beers_last_check', new Date().toISOString());
 
     console.log(`Updated my beers data with ${validBeers.length} valid beers`);
-    return true;
+    return {
+      success: true,
+      dataUpdated: true,
+      itemCount: validBeers.length
+    };
   } catch (error) {
     console.error('Error updating my beers data:', error);
-    return false;
+    return {
+      success: false,
+      dataUpdated: false,
+      error: createErrorResponse(error)
+    };
   }
 }
 
@@ -149,50 +315,89 @@ export async function shouldRefreshData(lastCheckKey: string, intervalHours: num
 }
 
 /**
- * Perform a manual refresh of all beer data
- * @returns Object with update status for both data types
+ * Result of a manual refresh operation
  */
-export async function manualRefreshAllData(): Promise<{
-  allBeersUpdated: boolean;
-  myBeersUpdated: boolean;
-}> {
-  // Fetch and update both data sources
-  const allBeersUpdated = await fetchAndUpdateAllBeers();
-  const myBeersUpdated = await fetchAndUpdateMyBeers();
+export interface ManualRefreshResult {
+  allBeersResult: DataUpdateResult;
+  myBeersResult: DataUpdateResult;
+  hasErrors: boolean;
+}
 
-  return { allBeersUpdated, myBeersUpdated };
+/**
+ * Perform a manual refresh of all beer data
+ * @returns Object with update status and error information for both data types
+ */
+export async function manualRefreshAllData(): Promise<ManualRefreshResult> {
+  // Fetch and update both data sources
+  const allBeersResult = await fetchAndUpdateAllBeers();
+  const myBeersResult = await fetchAndUpdateMyBeers();
+
+  // Check if either operation had errors
+  const hasErrors = !allBeersResult.success || !myBeersResult.success;
+
+  return {
+    allBeersResult,
+    myBeersResult,
+    hasErrors
+  };
+}
+
+/**
+ * Result of an automatic refresh operation
+ */
+export interface AutoRefreshResult {
+  updated: boolean;
+  errors: ErrorResponse[];
 }
 
 /**
  * Check and refresh data on app open if needed
  * @param minIntervalHours Minimum hours between checks (default: 12)
+ * @returns Object with update status and any errors encountered
  */
-export async function checkAndRefreshOnAppOpen(minIntervalHours: number = 12): Promise<boolean> {
+export async function checkAndRefreshOnAppOpen(minIntervalHours: number = 12): Promise<AutoRefreshResult> {
   try {
     const shouldRefreshAllBeers = await shouldRefreshData('all_beers_last_check', minIntervalHours);
     const shouldRefreshMyBeers = await shouldRefreshData('my_beers_last_check', minIntervalHours);
 
     let updated = false;
+    const errors: ErrorResponse[] = [];
 
     if (shouldRefreshAllBeers) {
       console.log(`More than ${minIntervalHours} hours since last all beers check, refreshing data`);
-      const allBeersUpdated = await fetchAndUpdateAllBeers();
-      updated = updated || allBeersUpdated;
+      const allBeersResult = await fetchAndUpdateAllBeers();
+
+      updated = updated || allBeersResult.dataUpdated;
+
+      if (!allBeersResult.success && allBeersResult.error) {
+        console.error('Error refreshing all beers data:', allBeersResult.error);
+        errors.push(allBeersResult.error);
+      }
     } else {
       console.log(`All beers data is less than ${minIntervalHours} hours old, skipping refresh`);
     }
 
     if (shouldRefreshMyBeers) {
       console.log(`More than ${minIntervalHours} hours since last my beers check, refreshing data`);
-      const myBeersUpdated = await fetchAndUpdateMyBeers();
-      updated = updated || myBeersUpdated;
+      const myBeersResult = await fetchAndUpdateMyBeers();
+
+      updated = updated || myBeersResult.dataUpdated;
+
+      if (!myBeersResult.success && myBeersResult.error) {
+        console.error('Error refreshing my beers data:', myBeersResult.error);
+        errors.push(myBeersResult.error);
+      }
     } else {
       console.log(`My beers data is less than ${minIntervalHours} hours old, skipping refresh`);
     }
 
-    return updated;
+    return { updated, errors };
   } catch (error) {
     console.error('Error checking for refresh on app open:', error);
-    return false;
+    const errorResponse = createErrorResponse(error);
+    return {
+      updated: false,
+      errors: [errorResponse]
+    };
   }
 }
