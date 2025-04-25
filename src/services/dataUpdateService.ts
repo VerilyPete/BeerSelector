@@ -45,14 +45,14 @@ export async function fetchAndUpdateAllBeers(): Promise<DataUpdateResult> {
     } catch (fetchError) {
       console.error('Network error fetching all beers data:', fetchError);
 
-      // Check if it's an abort error (timeout)
+      // Check if it's an abort error (timeout) - treat as network error for consolidated messaging
       if (fetchError instanceof Error && fetchError.name === 'AbortError') {
         return {
           success: false,
           dataUpdated: false,
           error: {
-            type: ApiErrorType.TIMEOUT_ERROR,
-            message: 'Request timed out while fetching beer data.',
+            type: ApiErrorType.NETWORK_ERROR, // Changed from TIMEOUT_ERROR to NETWORK_ERROR
+            message: 'Network connection error: request timed out while fetching beer data.',
             originalError: fetchError
           }
         };
@@ -176,14 +176,14 @@ export async function fetchAndUpdateMyBeers(): Promise<DataUpdateResult> {
     } catch (fetchError) {
       console.error('Network error fetching my beers data:', fetchError);
 
-      // Check if it's an abort error (timeout)
+      // Check if it's an abort error (timeout) - treat as network error for consolidated messaging
       if (fetchError instanceof Error && fetchError.name === 'AbortError') {
         return {
           success: false,
           dataUpdated: false,
           error: {
-            type: ApiErrorType.TIMEOUT_ERROR,
-            message: 'Request timed out while fetching tasted beer data.',
+            type: ApiErrorType.NETWORK_ERROR, // Changed from TIMEOUT_ERROR to NETWORK_ERROR
+            message: 'Network connection error: request timed out while fetching tasted beer data.',
             originalError: fetchError
           }
         };
@@ -321,6 +321,7 @@ export interface ManualRefreshResult {
   allBeersResult: DataUpdateResult;
   myBeersResult: DataUpdateResult;
   hasErrors: boolean;
+  allNetworkErrors: boolean;
 }
 
 /**
@@ -335,10 +336,28 @@ export async function manualRefreshAllData(): Promise<ManualRefreshResult> {
   // Check if either operation had errors
   const hasErrors = !allBeersResult.success || !myBeersResult.success;
 
+  // Check if all errors are network-related
+  const allNetworkErrors = (
+    // Both endpoints failed
+    (!allBeersResult.success && !myBeersResult.success) &&
+    // Both failures are network-related
+    allBeersResult.error?.type === 'NETWORK_ERROR' &&
+    myBeersResult.error?.type === 'NETWORK_ERROR'
+  ) || (
+    // Only All Beers failed with network error
+    (!allBeersResult.success && myBeersResult.success) &&
+    allBeersResult.error?.type === 'NETWORK_ERROR'
+  ) || (
+    // Only My Beers failed with network error
+    (allBeersResult.success && !myBeersResult.success) &&
+    myBeersResult.error?.type === 'NETWORK_ERROR'
+  );
+
   return {
     allBeersResult,
     myBeersResult,
-    hasErrors
+    hasErrors,
+    allNetworkErrors
   };
 }
 

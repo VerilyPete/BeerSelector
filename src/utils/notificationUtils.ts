@@ -78,17 +78,17 @@ export function formatApiErrorForUser(error: any): string {
   // If it's an Error object with a message
   if (error instanceof Error) {
     // Check for network errors
-    if (error.message.includes('Network request failed') || 
+    if (error.message.includes('Network request failed') ||
         error.message.includes('Failed to fetch') ||
         error.message.includes('Network error')) {
       return 'Unable to connect to the server. Please check your internet connection and try again.';
     }
-    
+
     // Check for timeout errors
     if (error.message.includes('timeout') || error.message.includes('Timed out')) {
       return 'The server is taking too long to respond. Please try again later.';
     }
-    
+
     // For other errors, return the message
     return error.message;
   }
@@ -118,16 +118,17 @@ export function createErrorResponse(error: any): ErrorResponse {
   // If it's already an Error object
   if (error instanceof Error) {
     // Check for network errors
-    if (error.message.includes('Network request failed') || 
+    if (error.message.includes('Network request failed') ||
         error.message.includes('Failed to fetch') ||
         error.message.includes('Network error')) {
       errorResponse.type = ApiErrorType.NETWORK_ERROR;
       errorResponse.message = 'Network connection error';
     }
-    // Check for timeout errors
-    else if (error.message.includes('timeout') || error.message.includes('Timed out')) {
-      errorResponse.type = ApiErrorType.TIMEOUT_ERROR;
-      errorResponse.message = 'Request timed out';
+    // Check for timeout errors - also treat as network errors for consolidated messaging
+    else if (error.message.includes('timeout') || error.message.includes('Timed out') ||
+             error.name === 'AbortError') {
+      errorResponse.type = ApiErrorType.NETWORK_ERROR; // Changed from TIMEOUT_ERROR to NETWORK_ERROR
+      errorResponse.message = 'Network connection error: request timed out';
     }
     // Check for JSON parse errors
     else if (error instanceof SyntaxError && error.message.includes('JSON')) {
@@ -138,11 +139,11 @@ export function createErrorResponse(error: any): ErrorResponse {
       errorResponse.message = error.message;
     }
   }
-  
+
   // If it has a status code, it might be a server error
   if (error && typeof error === 'object' && 'statusCode' in error) {
     errorResponse.statusCode = error.statusCode as number;
-    
+
     // Server errors (5xx)
     if (errorResponse.statusCode >= 500) {
       errorResponse.type = ApiErrorType.SERVER_ERROR;
@@ -167,19 +168,19 @@ export function getUserFriendlyErrorMessage(error: ErrorResponse): string {
   switch (error.type) {
     case ApiErrorType.NETWORK_ERROR:
       return 'Unable to connect to the server. Please check your internet connection and try again.';
-    
+
     case ApiErrorType.TIMEOUT_ERROR:
       return 'The server is taking too long to respond. Please try again later.';
-    
+
     case ApiErrorType.SERVER_ERROR:
       return 'The server encountered an error. Please try again later.';
-    
+
     case ApiErrorType.PARSE_ERROR:
       return 'There was a problem processing the server response. Please try again.';
-    
+
     case ApiErrorType.VALIDATION_ERROR:
       return error.message || 'There was a problem with your request. Please try again.';
-    
+
     case ApiErrorType.UNKNOWN_ERROR:
     default:
       return error.message || 'An unexpected error occurred. Please try again later.';
