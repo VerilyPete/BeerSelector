@@ -176,7 +176,7 @@ describe('dataUpdateService', () => {
 
 ## Integration Tests
 
-Integration tests verify that different parts of the application work together correctly. These tests use real data structures from the API to ensure proper data handling.
+Integration tests verify that different parts of the application work together correctly. These tests use real data structures and simulate interactions between components to ensure proper functionality.
 
 ### Data Update Service Integration Tests
 
@@ -194,6 +194,14 @@ These tests specifically:
 2. Verify that the data extraction logic correctly processes the API response format
 3. Test error handling for various failure scenarios (missing API URL, network errors, invalid data)
 4. Ensure that only valid beers with IDs are processed and stored in the database
+
+### Component Integration Tests
+
+Note: Component integration tests have been removed due to issues with the React Native testing environment. These tests were intended to verify the interaction between components, navigation, and the database, but they were consistently timing out or getting stuck during execution.
+
+Instead, we focus on service-level integration tests (like the Data Update Service tests) and unit tests for individual components. This approach provides better reliability while still ensuring good test coverage of critical functionality.
+
+For future component integration testing, consider using end-to-end testing tools like Detox or Appium, which are specifically designed for testing React Native applications in a more realistic environment.
 
 ### Running Integration Tests with Sample Data
 
