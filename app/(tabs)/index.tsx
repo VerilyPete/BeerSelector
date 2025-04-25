@@ -24,7 +24,7 @@ export function BeerListScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={{flex: 1}} edges={['top', 'right', 'left']}>
-        <ThemedText type="title" style={styles.title}>All Beers</ThemedText>
+        <ThemedText type="title" style={styles.title}>All Beer</ThemedText>
         <View style={{flex: 1}}>
           <AllBeers />
         </View>
@@ -114,20 +114,20 @@ export default function HomeScreen() {
   const buttonColor = useThemeColor({}, 'tint');
   const colorScheme = useColorScheme() ?? 'light';
   const [apiUrlsSet, setApiUrlsSet] = useState<boolean | null>(null);
-  
+
   // Check if API URLs are configured on component mount
   useEffect(() => {
     const checkApiUrls = async () => {
       const isConfigured = await areApiUrlsConfigured();
       setApiUrlsSet(isConfigured);
     };
-    
+
     checkApiUrls();
   }, []);
-  
+
   // Determine the appropriate button text color based on theme
   const buttonTextColor = colorScheme === 'dark' ? '#000000' : '#FFFFFF';
-  
+
   // If we're still checking API URL status, show nothing
   if (apiUrlsSet === null) {
     return null;
@@ -142,7 +142,7 @@ export default function HomeScreen() {
           <ThemedText style={[styles.welcomeText, styles.loginPrompt]}>
             Please log in to your Flying Saucer account to start using the app.
           </ThemedText>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.mainButton, { backgroundColor: buttonColor }]}
             onPress={() => router.navigate('/settings')}
           >
@@ -152,42 +152,42 @@ export default function HomeScreen() {
       </ThemedView>
     );
   }
-  
+
   // Normal view when API URLs are set
   return (
     <ThemedView style={[styles.homeContainer, { backgroundColor }]}>
       <SafeAreaView style={styles.homeContentContainer} edges={['top', 'right', 'left']}>
         {/* Settings button in top right */}
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.settingsButton}
           onPress={() => router.navigate('/settings')}
         >
           <IconSymbol name="gear" size={28} color={buttonColor} />
         </TouchableOpacity>
-        
+
         <ThemedText type="title" style={styles.welcomeTitle}>Welcome to Beer Selector</ThemedText>
         <ThemedText style={styles.welcomeText}>
           What are you drinking tonight?
         </ThemedText>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.mainButton, { backgroundColor: buttonColor, marginBottom: 16 }]}
           onPress={() => router.navigate('/(tabs)/beerlist')}
         >
-          <Text style={[styles.mainButtonText, { color: buttonTextColor }]}>All Beers</Text>
+          <Text style={[styles.mainButtonText, { color: buttonTextColor }]}>All Beer</Text>
         </TouchableOpacity>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.mainButton, { backgroundColor: buttonColor, marginBottom: 16 }]}
           onPress={() => router.navigate('/(tabs)/mybeers')}
         >
           <Text style={[styles.mainButtonText, { color: buttonTextColor }]}>Beerfinder</Text>
         </TouchableOpacity>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.mainButton, { backgroundColor: buttonColor, marginBottom: 16 }]}
           onPress={() => router.navigate('/(tabs)/tastedbrews')}
         >
           <Text style={[styles.mainButtonText, { color: buttonTextColor }]}>Tasted Brews</Text>
         </TouchableOpacity>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.mainButton, { backgroundColor: buttonColor }]}
           onPress={() => router.push("/screens/rewards" as any)}
         >

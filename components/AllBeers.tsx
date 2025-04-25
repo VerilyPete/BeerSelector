@@ -319,11 +319,11 @@ export const AllBeers = () => {
           searchText={searchText}
           onSearchChange={handleSearchChange}
           onClear={clearSearch}
-          placeholder="Search beers..."
+          placeholder="Search beer..."
         />
         <View style={styles.beerCountContainer}>
           <ThemedText style={styles.beerCount}>
-            {displayedBeers.length} {displayedBeers.length === 1 ? 'beer' : 'beers'} available
+            {displayedBeers.length} {displayedBeers.length === 1 ? 'beer' : 'beer'} available
           </ThemedText>
         </View>
 
@@ -443,7 +443,7 @@ export const AllBeers = () => {
             ListEmptyComponent={
               <View style={styles.emptyContainer}>
                 <ThemedText style={styles.emptyText}>
-                  No beers found
+                  No beer found
                 </ThemedText>
               </View>
             }

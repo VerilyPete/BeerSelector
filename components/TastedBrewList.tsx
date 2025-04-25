@@ -317,11 +317,11 @@ export const TastedBrewList = () => {
           searchText={searchText}
           onSearchChange={handleSearchChange}
           onClear={clearSearch}
-          placeholder="Search tasted beers..."
+          placeholder="Search tasted beer..."
         />
         <View style={styles.beerCountContainer}>
           <ThemedText style={styles.beerCount}>
-            {displayedBeers.length} {displayedBeers.length === 1 ? 'beer' : 'beers'} tasted
+            {displayedBeers.length} {displayedBeers.length === 1 ? 'beer' : 'beer'} tasted
           </ThemedText>
         </View>
         <View style={styles.filterContainer}>
@@ -364,8 +364,8 @@ export const TastedBrewList = () => {
             <View style={styles.emptyContainer}>
               <ThemedText style={styles.emptyText}>
                 {searchText
-                  ? "No tasted beers match your search criteria."
-                  : "No tasted beers found. Please check your connection and try again."}
+                  ? "No tasted beer matches your search criteria."
+                  : "No tasted beer found. Please check your connection and try again."}
               </ThemedText>
             </View>
           ) : (

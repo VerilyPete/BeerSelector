@@ -737,11 +737,11 @@ export const Beerfinder = () => {
           searchText={searchText}
           onSearchChange={handleSearchChange}
           onClear={clearSearch}
-          placeholder="Search available beers..."
+          placeholder="Search available beer..."
         />
         <View style={styles.beerCountContainer}>
           <ThemedText style={styles.beerCount}>
-            {displayedBeers.length} {displayedBeers.length === 1 ? 'beer' : 'beers'} available
+            {displayedBeers.length} {displayedBeers.length === 1 ? 'beer' : 'beer'} available
           </ThemedText>
         </View>
         <View style={styles.filterContainer}>
@@ -846,7 +846,7 @@ export const Beerfinder = () => {
 
             {queuedBeers.length === 0 ? (
               <ThemedText style={styles.noQueuesText}>
-                No beers currently in queue
+                No beer currently in queue
               </ThemedText>
             ) : (
               <FlatList
@@ -932,7 +932,7 @@ export const Beerfinder = () => {
             ListEmptyComponent={
               <View style={styles.emptyContainer}>
                 <ThemedText style={styles.emptyText}>
-                  No beers found
+                  No beer found
                 </ThemedText>
               </View>
             }
