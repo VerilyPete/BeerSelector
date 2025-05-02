@@ -9,7 +9,8 @@ export enum ApiErrorType {
   SERVER_ERROR = 'SERVER_ERROR',
   PARSE_ERROR = 'PARSE_ERROR',
   VALIDATION_ERROR = 'VALIDATION_ERROR',
-  UNKNOWN_ERROR = 'UNKNOWN_ERROR'
+  UNKNOWN_ERROR = 'UNKNOWN_ERROR',
+  INFO = 'INFO'
 }
 
 /**
@@ -180,6 +181,9 @@ export function getUserFriendlyErrorMessage(error: ErrorResponse): string {
 
     case ApiErrorType.VALIDATION_ERROR:
       return error.message || 'There was a problem with your request. Please try again.';
+      
+    case ApiErrorType.INFO:
+      return error.message || 'Information notice.';
 
     case ApiErrorType.UNKNOWN_ERROR:
     default:

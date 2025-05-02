@@ -367,14 +367,67 @@ export const fetchBeersFromAPI = async (): Promise<Beer[]> => {
       return []; // Return empty array instead of throwing an error
     }
 
+    console.log('Fetching beers from API URL:', apiUrl);
     const data = await fetchWithRetry(apiUrl);
-
-    // Extract the brewInStock array from the response
-    // The API returns an array where the second element contains the brewInStock array
-    if (data && Array.isArray(data) && data.length >= 2 && data[1] && data[1].brewInStock) {
-      return data[1].brewInStock;
+    
+    // Log the structure to help debug
+    console.log('API response type:', typeof data);
+    if (typeof data === 'object') {
+      console.log('API response keys:', Object.keys(data));
     }
 
+    // Handle different response formats based on API endpoint
+    // 1. Regular format: Array with brewInStock in second element
+    if (data && Array.isArray(data) && data.length >= 2 && data[1] && data[1].brewInStock) {
+      console.log(`Found regular format with brewInStock array (${data[1].brewInStock.length} beers)`);
+      return data[1].brewInStock;
+    }
+    
+    // 2. Visitor API format: may have different structure
+    // Check for common beer properties in the response at different levels
+    if (data) {
+      // Try to find any array that looks like it contains beer objects
+      const findBeersArray = (obj: any): Beer[] | null => {
+        // If we have an array, check if it looks like beers
+        if (Array.isArray(obj)) {
+          // Check if this looks like an array of beers
+          if (obj.length > 0 && obj[0] && typeof obj[0] === 'object' && 
+              ('brew_name' in obj[0] || 'id' in obj[0] || 'brewer' in obj[0])) {
+            console.log(`Found potential beer array with ${obj.length} items`);
+            return obj as Beer[];
+          }
+          
+          // If not, check each element if it's an object that might contain beers
+          for (const item of obj) {
+            const result = findBeersArray(item);
+            if (result) return result;
+          }
+        } 
+        // If we have an object, check each property
+        else if (typeof obj === 'object' && obj !== null) {
+          // Check direct properties first
+          for (const key of Object.keys(obj)) {
+            if (key === 'brewInStock' || key === 'beers' || key === 'beer_list') {
+              console.log(`Found beer array at key "${key}" with ${obj[key].length} items`);
+              return obj[key] as Beer[];
+            }
+            
+            // Then recursively check nested objects
+            const result = findBeersArray(obj[key]);
+            if (result) return result;
+          }
+        }
+        
+        return null;
+      };
+      
+      const beersArray = findBeersArray(data);
+      if (beersArray && beersArray.length > 0) {
+        return beersArray;
+      }
+    }
+
+    console.error('Could not find beer data in API response');
     throw new Error('Invalid response format from API');
   } catch (error) {
     console.error('Error fetching beers from API:', error);
@@ -1085,9 +1138,19 @@ export const refreshAllDataFromAPI = async (): Promise<{ allBeers: Beer[], myBee
 // Check if API URLs are configured
 export const areApiUrlsConfigured = async (): Promise<boolean> => {
   try {
+    // Check if we're in visitor mode
+    const isVisitor = await getPreference('is_visitor_mode') === 'true';
+    
+    // Get API URLs
     const allBeersApiUrl = await getPreference('all_beers_api_url');
     const myBeersApiUrl = await getPreference('my_beers_api_url');
 
+    // In visitor mode, we only need the all_beers_api_url to be set
+    if (isVisitor) {
+      return !!allBeersApiUrl; // Just need the all beers URL
+    }
+    
+    // For normal mode, both URLs must be set
     return !!allBeersApiUrl && !!myBeersApiUrl;
   } catch (error) {
     console.error('Error checking API URLs:', error);

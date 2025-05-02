@@ -72,6 +72,7 @@ export interface LoginResult {
   data?: any;
   sessionData?: SessionData;
   statusCode?: number;
+  isVisitorMode?: boolean; // Indicates if the user is in visitor mode
 }
 
 /**

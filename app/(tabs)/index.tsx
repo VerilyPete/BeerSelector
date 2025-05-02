@@ -1,14 +1,15 @@
 import { StyleSheet, Text, View, TouchableOpacity, Alert } from 'react-native';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Animated, {
   interpolate,
   useAnimatedScrollHandler,
   useAnimatedStyle,
   useSharedValue,
 } from 'react-native-reanimated';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { IconSymbol } from '@/components/ui/IconSymbol';
+import { StatusBar } from 'expo-status-bar';
 
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
@@ -16,15 +17,47 @@ import { AllBeers } from '@/components/AllBeers';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { areApiUrlsConfigured } from '@/src/database/db';
+import { isVisitorMode } from '@/src/api/authService';
+import { getPreference } from '@/src/database/db';
 
 export function BeerListScreen() {
   const colorScheme = useColorScheme() ?? 'light';
   const backgroundColor = useThemeColor({}, 'background');
+  const [visitorMode, setVisitorMode] = useState(false);
+  
+  // Function to check visitor mode
+  const checkVisitorMode = useCallback(async () => {
+    const isVisitor = await isVisitorMode(true);
+    setVisitorMode(isVisitor);
+  }, []);
+  
+  // Check for visitor mode on mount
+  useEffect(() => {
+    checkVisitorMode();
+  }, [checkVisitorMode]);
+  
+  // Recheck when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      console.log('Beer list screen focused, checking visitor mode');
+      checkVisitorMode();
+      return () => {
+        // cleanup if needed
+      };
+    }, [checkVisitorMode])
+  );
 
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={{flex: 1}} edges={['top', 'right', 'left']}>
-        <ThemedText type="title" style={styles.title}>All Beer</ThemedText>
+        <View style={styles.headerContainer}>
+          <ThemedText type="title" style={styles.title}>All Beer</ThemedText>
+          {visitorMode && (
+            <View style={styles.visitorBadge}>
+              <ThemedText style={styles.visitorText}>Guest</ThemedText>
+            </View>
+          )}
+        </View>
         <View style={{flex: 1}}>
           <AllBeers />
         </View>
@@ -107,6 +140,29 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     textAlign: 'center',
   },
+  visitorNote: {
+    marginTop: 16,
+    fontStyle: 'italic',
+  },
+  headerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 16,
+  },
+  visitorBadge: {
+    backgroundColor: '#FFB74D',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginLeft: 8,
+  },
+  visitorText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#000',
+  },
 });
 
 export default function HomeScreen() {
@@ -114,16 +170,67 @@ export default function HomeScreen() {
   const buttonColor = useThemeColor({}, 'tint');
   const colorScheme = useColorScheme() ?? 'light';
   const [apiUrlsSet, setApiUrlsSet] = useState<boolean | null>(null);
+  const [inVisitorMode, setInVisitorMode] = useState(false);
 
-  // Check if API URLs are configured on component mount
-  useEffect(() => {
-    const checkApiUrls = async () => {
-      const isConfigured = await areApiUrlsConfigured();
+  // Function to check settings
+  const checkSettings = useCallback(async () => {
+    try {
+      // First check if we're in visitor mode - force refresh to ensure we have latest value
+      const visitorMode = await isVisitorMode(true);
+      setInVisitorMode(visitorMode);
+      
+      // Then check API URLs, but handle visitor mode specially
+      const allBeersUrl = await getPreference('all_beers_api_url');
+      const myBeersUrl = await getPreference('my_beers_api_url');
+      
+      // For visitor mode, we only need all_beers_api_url to be set
+      // The my_beers_api_url can be a dummy value
+      const isConfigured = visitorMode 
+        ? !!allBeersUrl // In visitor mode, only need all_beers_api_url
+        : !!allBeersUrl && !!myBeersUrl; // Regular mode needs both URLs
+      
       setApiUrlsSet(isConfigured);
-    };
-
-    checkApiUrls();
+      
+      if (!isConfigured) {
+        // Log different messages depending on mode
+        if (visitorMode) {
+          console.log('Warning: All beers API URL not configured in visitor mode');
+        } else {
+          console.log('API URLs not configured, redirecting to settings');
+        }
+      }
+    } catch (error) {
+      console.error('Error checking settings:', error);
+      setApiUrlsSet(false);
+      setInVisitorMode(false);
+    }
   }, []);
+
+  // Initial settings check on mount
+  useEffect(() => {
+    console.log('HomeScreen mounted, checking settings');
+    checkSettings();
+  }, [checkSettings]);
+  
+  // Reduce the frequency of rechecks on focus - only do it if something changes
+  useFocusEffect(
+    useCallback(() => {
+      // Always check settings when the home screen is focused to ensure we have the most recent visitor mode status
+      console.log('HomeScreen focused, checking settings');
+      checkSettings();
+      return () => {
+        // cleanup if needed
+      };
+    }, [checkSettings])
+  );
+
+  // If in visitor mode and API URLs are configured, redirect to beer list tab
+  useEffect(() => {
+    if (inVisitorMode && apiUrlsSet) {
+      console.log('In visitor mode with API URLs configured - showing visitor home screen');
+      // No longer auto-redirecting to beer list
+    }
+  }, [inVisitorMode, apiUrlsSet]);
 
   // Determine the appropriate button text color based on theme
   const buttonTextColor = colorScheme === 'dark' ? '#000000' : '#FFFFFF';
@@ -140,7 +247,9 @@ export default function HomeScreen() {
         <SafeAreaView style={styles.homeContentContainer} edges={['top', 'right', 'left']}>
           <ThemedText type="title" style={styles.welcomeTitle}>Welcome to Beer Selector</ThemedText>
           <ThemedText style={[styles.welcomeText, styles.loginPrompt]}>
-            Please log in to your Flying Saucer account to start using the app.
+            {inVisitorMode ? 
+              'Unable to load beer data. Please try logging in again as a visitor.' : 
+              'Please log in to your Flying Saucer account to start using the app.'}
           </ThemedText>
           <TouchableOpacity
             style={[styles.mainButton, { backgroundColor: buttonColor }]}
@@ -153,7 +262,35 @@ export default function HomeScreen() {
     );
   }
 
-  // Normal view when API URLs are set
+  // Modified: Show a visitor-specific home screen instead of redirecting or returning null
+  if (inVisitorMode) {
+    return (
+      <ThemedView style={[styles.homeContainer, { backgroundColor }]}>
+        <SafeAreaView style={styles.homeContentContainer} edges={['top', 'right', 'left']}>
+          {/* Settings button in top right */}
+          <TouchableOpacity
+            style={styles.settingsButton}
+            onPress={() => router.navigate('/settings')}
+          >
+            <IconSymbol name="gear" size={28} color={buttonColor} />
+          </TouchableOpacity>
+
+          <ThemedText type="title" style={styles.welcomeTitle}>Welcome to Beer Selector</ThemedText>
+          <ThemedText style={styles.welcomeText}>
+            You're logged in as a visitor. Please login with your UFO Club account to view the Beerfinder, Tasted Brews, and Rewards.
+          </ThemedText>
+          <TouchableOpacity
+            style={[styles.mainButton, { backgroundColor: buttonColor, marginBottom: 16 }]}
+            onPress={() => router.navigate('/(tabs)/beerlist')}
+          >
+            <Text style={[styles.mainButtonText, { color: buttonTextColor }]}>All Beer</Text>
+          </TouchableOpacity>
+        </SafeAreaView>
+      </ThemedView>
+    );
+  }
+
+  // Normal view when API URLs are set and not in visitor mode
   return (
     <ThemedView style={[styles.homeContainer, { backgroundColor }]}>
       <SafeAreaView style={styles.homeContentContainer} edges={['top', 'right', 'left']}>
@@ -175,18 +312,22 @@ export default function HomeScreen() {
         >
           <Text style={[styles.mainButtonText, { color: buttonTextColor }]}>All Beer</Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.mainButton, { backgroundColor: buttonColor, marginBottom: 16 }]}
-          onPress={() => router.navigate('/(tabs)/mybeers')}
-        >
-          <Text style={[styles.mainButtonText, { color: buttonTextColor }]}>Beerfinder</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.mainButton, { backgroundColor: buttonColor, marginBottom: 16 }]}
-          onPress={() => router.navigate('/(tabs)/tastedbrews')}
-        >
-          <Text style={[styles.mainButtonText, { color: buttonTextColor }]}>Tasted Brews</Text>
-        </TouchableOpacity>
+        {!inVisitorMode && (
+          <>
+            <TouchableOpacity
+              style={[styles.mainButton, { backgroundColor: buttonColor, marginBottom: 16 }]}
+              onPress={() => router.navigate('/(tabs)/mybeers')}
+            >
+              <Text style={[styles.mainButtonText, { color: buttonTextColor }]}>Beerfinder</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.mainButton, { backgroundColor: buttonColor, marginBottom: 16 }]}
+              onPress={() => router.navigate('/(tabs)/tastedbrews')}
+            >
+              <Text style={[styles.mainButtonText, { color: buttonTextColor }]}>Tasted Brews</Text>
+            </TouchableOpacity>
+          </>
+        )}
         <TouchableOpacity
           style={[styles.mainButton, { backgroundColor: buttonColor }]}
           onPress={() => router.push("/screens/rewards" as any)}
