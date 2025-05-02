@@ -1,6 +1,6 @@
 import { saveSessionData, clearSessionData } from './sessionManager';
 import { getApiClient } from './apiClientInstance';
-import { getPreference } from '../database/db';
+import { getPreference, setPreference } from '../database/db';
 import { SessionData, ApiError, ApiResponse, LoginResult, isSessionData } from '../types/api';
 
 // Using LoginResult interface from ../types/api
@@ -18,12 +18,16 @@ export async function autoLogin(): Promise<LoginResult> {
       // Save the session data
       await saveSessionData(response.data.session);
 
+      // Check if user is in visitor mode
+      const isVisitor = await getPreference('is_visitor_mode');
+
       return {
         success: true,
         message: 'Auto-login successful',
         data: response.data,
         sessionData: response.data.session,
-        statusCode: response.statusCode
+        statusCode: response.statusCode,
+        isVisitorMode: isVisitor === 'true'
       };
     } else {
       return {
@@ -50,6 +54,94 @@ export async function autoLogin(): Promise<LoginResult> {
     };
   }
 }
+
+/**
+ * Handles a visitor login process to Flying Saucer
+ * @param cookies The cookies received from the visitor login process
+ * @returns The result of the login process
+ */
+export const handleVisitorLogin = async (
+  cookies: string | Record<string, string>
+): Promise<LoginResult> => {
+  try {
+    // Parse cookies if they're in string format
+    const parsedCookies = typeof cookies === 'string'
+      ? parseCookiesString(cookies)
+      : cookies;
+
+    console.log('Visitor login - parsing cookies:', JSON.stringify(parsedCookies));
+
+    // For visitor mode, we ONLY need the store ID from cookies
+    const storeId = parsedCookies.store__id || parsedCookies.store || '';
+    
+    // Validate that we have a store ID (the only required field)
+    if (!storeId) {
+      console.error('Missing store ID in cookies for visitor mode');
+      return {
+        success: false,
+        error: 'Missing store ID required for visitor mode',
+        statusCode: 401
+      };
+    }
+    
+    // Create minimal session data for visitor mode
+    const sessionData: Partial<SessionData> = {
+      sessionId: parsedCookies.PHPSESSID || 'visitor_session', // Use placeholder if missing
+      storeId: storeId,
+      memberId: 'visitor', // Setting a placeholder member ID for visitor
+      storeName: 'Flying Saucer' // Default store name
+    };
+
+    // Try to get the store name if available
+    try {
+      if (parsedCookies.store_name) {
+        sessionData.storeName = decodeURIComponent(parsedCookies.store_name);
+      }
+    } catch (e) {
+      console.warn('Failed to decode store_name cookie:', e);
+    }
+
+    // Store information about visitor mode
+    await setPreference('is_visitor_mode', 'true', 'Flag indicating whether the user is in visitor mode');
+    
+    // Store additional information if available
+    if (parsedCookies.store_code) {
+      await setPreference('store_code', parsedCookies.store_code, 'Store code for visitor');
+    }
+    
+    if (parsedCookies.store__state) {
+      await setPreference('store_state', parsedCookies.store__state, 'Store state for visitor');
+    }
+
+    // Save the session data
+    console.log('Saving visitor session data:', JSON.stringify(sessionData));
+    await saveSessionData(sessionData as SessionData);
+
+    return {
+      success: true,
+      message: 'Visitor login successful',
+      sessionData: sessionData as SessionData,
+      statusCode: 200,
+      isVisitorMode: true
+    };
+  } catch (error) {
+    console.error('Error handling visitor login:', error);
+
+    if (error instanceof ApiError) {
+      return {
+        success: false,
+        error: error.message,
+        statusCode: error.statusCode
+      };
+    }
+
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error during visitor login',
+      statusCode: 500
+    };
+  }
+};
 
 /**
  * Handles the login process to Flying Saucer
@@ -124,6 +216,9 @@ export const handleTapThatAppLogin = async (
       sessionData.cardNum = parsedCookies.cardNum;
     }
 
+    // This is a regular login, not a visitor login
+    await setPreference('is_visitor_mode', 'false', 'Flag indicating whether the user is in visitor mode');
+
     // Validate that we have the minimum required data
     if (!sessionData.sessionId || !sessionData.memberId || !sessionData.storeId) {
       return {
@@ -140,7 +235,8 @@ export const handleTapThatAppLogin = async (
       success: true,
       message: 'Login successful',
       sessionData: sessionData as SessionData,
-      statusCode: 200
+      statusCode: 200,
+      isVisitorMode: false
     };
   } catch (error) {
     console.error('Error handling login:', error);
@@ -170,6 +266,9 @@ export async function logout(): Promise<LoginResult> {
     const apiClient = getApiClient();
     const response = await apiClient.post('/logout.php', {});
     await clearSessionData();
+    
+    // Clear visitor mode flag on logout
+    await setPreference('is_visitor_mode', 'false', 'Flag indicating whether the user is in visitor mode');
 
     return {
       success: true,
@@ -257,13 +356,17 @@ export async function login(username: string, password: string): Promise<LoginRe
     if (response.success && response.data && response.data.session) {
       // Save the session data
       await saveSessionData(response.data.session);
+      
+      // Clear visitor mode flag on regular login
+      await setPreference('is_visitor_mode', 'false', 'Flag indicating whether the user is in visitor mode');
 
       return {
         success: true,
         message: 'Login successful',
         data: response.data,
         sessionData: response.data.session,
-        statusCode: response.statusCode
+        statusCode: response.statusCode,
+        isVisitorMode: false
       };
     } else {
       return {
@@ -288,5 +391,42 @@ export async function login(username: string, password: string): Promise<LoginRe
       error: error instanceof Error ? error.message : 'Unknown error occurred',
       statusCode: 500
     };
+  }
+}
+
+// Cache for visitor mode to reduce database access
+let visitorModeCache: { value: boolean | null; timestamp: number } = {
+  value: null,
+  timestamp: 0
+};
+
+/**
+ * Checks if the user is currently in visitor mode
+ * @param forceRefresh If true, ignores the cache and fetches fresh data
+ * @returns Promise<boolean> indicating if visitor mode is active
+ */
+export async function isVisitorMode(forceRefresh = false): Promise<boolean> {
+  const now = Date.now();
+  const cacheExpiryMs = 1000; // Cache expires after 1 second (reduced from 5 seconds)
+  
+  // Use cached value if available and not expired, unless forceRefresh is true
+  if (!forceRefresh && visitorModeCache.value !== null && now - visitorModeCache.timestamp < cacheExpiryMs) {
+    return visitorModeCache.value;
+  }
+  
+  try {
+    const mode = await getPreference('is_visitor_mode');
+    const isVisitor = mode === 'true';
+    
+    // Update cache
+    visitorModeCache = {
+      value: isVisitor,
+      timestamp: now
+    };
+    
+    return isVisitor;
+  } catch (error) {
+    console.error('Error checking visitor mode:', error);
+    return false;
   }
 }

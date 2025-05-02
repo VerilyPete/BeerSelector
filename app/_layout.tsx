@@ -89,46 +89,51 @@ export default function RootLayout() {
               // Normal app startup flow
               setInitialRoute('(tabs)');
 
-              // Check for updates on app open (if it's been at least 12 hours since last check)
-              checkAndRefreshOnAppOpen(12).then(result => {
-                if (result.updated) {
-                  console.log('Data was updated on app open');
-                }
+              // Only check for updates if API URLs are configured
+              if (allBeersApiUrl || myBeersApiUrl) {
+                // Check for updates on app open (if it's been at least 12 hours since last check)
+                checkAndRefreshOnAppOpen(12).then(result => {
+                  if (result.updated) {
+                    console.log('Data was updated on app open');
+                  }
 
-                // If there were errors during the refresh, notify the user
-                if (result.errors && result.errors.length > 0) {
-                  console.error('Errors during automatic data refresh:', result.errors);
+                  // If there were errors during the refresh, notify the user
+                  if (result.errors && result.errors.length > 0) {
+                    console.error('Errors during automatic data refresh:', result.errors);
 
-                  // Check if all errors are network-related
-                  const allNetworkErrors = result.errors.every(error =>
-                    error.type === 'NETWORK_ERROR' || error.type === 'TIMEOUT_ERROR'
-                  );
+                    // Check if all errors are network-related
+                    const allNetworkErrors = result.errors.every(error =>
+                      error.type === 'NETWORK_ERROR' || error.type === 'TIMEOUT_ERROR'
+                    );
 
-                  // Show the error alert after a short delay to ensure the app is fully loaded
-                  setTimeout(() => {
-                    if (allNetworkErrors && result.errors.length > 1) {
-                      // If all errors are network-related, show a single consolidated message
-                      Alert.alert(
-                        'Server Connection Error',
-                        'Unable to connect to the server. Please check your internet connection and try again later.',
-                        [{ text: 'OK' }]
-                      );
-                    } else {
-                      // Otherwise, show the first error
-                      const firstError = result.errors[0];
-                      const errorMessage = getUserFriendlyErrorMessage(firstError);
+                    // Show the error alert after a short delay to ensure the app is fully loaded
+                    setTimeout(() => {
+                      if (allNetworkErrors && result.errors.length > 1) {
+                        // If all errors are network-related, show a single consolidated message
+                        Alert.alert(
+                          'Server Connection Error',
+                          'Unable to connect to the server. Please check your internet connection and try again later.',
+                          [{ text: 'OK' }]
+                        );
+                      } else {
+                        // Otherwise, show the first error
+                        const firstError = result.errors[0];
+                        const errorMessage = getUserFriendlyErrorMessage(firstError);
 
-                      Alert.alert(
-                        'Data Refresh Error',
-                        `There was a problem refreshing beer data: ${errorMessage}`,
-                        [{ text: 'OK' }]
-                      );
-                    }
-                  }, 1000);
-                }
-              }).catch(error => {
-                console.error('Error checking for updates on app open:', error);
-              });
+                        Alert.alert(
+                          'Data Refresh Error',
+                          `There was a problem refreshing beer data: ${errorMessage}`,
+                          [{ text: 'OK' }]
+                        );
+                      }
+                    }, 1000);
+                  }
+                }).catch(error => {
+                  console.error('Error checking for updates on app open:', error);
+                });
+              } else {
+                console.log('API URLs not configured, skipping automatic data refresh');
+              }
             }
           } catch (dbError) {
             console.error('Database initialization failed, retrying once:', dbError);

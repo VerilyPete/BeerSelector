@@ -2,9 +2,11 @@ import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { BeerListScreen } from './index';
 import { areApiUrlsConfigured } from '@/src/database/db';
+import { isVisitorMode } from '@/src/api/authService';
 
 export default function TabOneScreen() {
   const [apiUrlsSet, setApiUrlsSet] = useState<boolean | null>(null);
+  const [visitorMode, setVisitorMode] = useState(false);
   
   // Check if API URLs are configured on component mount
   useEffect(() => {
@@ -20,6 +22,16 @@ export default function TabOneScreen() {
     };
     
     checkApiUrls();
+  }, []);
+  
+  // Add effect to check visitor mode
+  useEffect(() => {
+    const checkVisitorMode = async () => {
+      const visitor = await isVisitorMode(true); // Force refresh
+      setVisitorMode(visitor);
+    };
+    
+    checkVisitorMode();
   }, []);
   
   // Don't render anything until we've checked API URL status

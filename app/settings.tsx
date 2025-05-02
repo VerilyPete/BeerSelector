@@ -17,6 +17,7 @@ import { LoadingIndicator } from '@/components/LoadingIndicator';
 import Constants from 'expo-constants';
 import { createMockSession } from '@/src/api/mockSession';
 import { getUserFriendlyErrorMessage } from '@/src/utils/notificationUtils';
+import { handleVisitorLogin } from '@/src/api/authService';
 
 // Define a Preference type for typechecking
 interface Preference {
@@ -266,6 +267,47 @@ export default function SettingsScreen() {
         `);
       }
     }
+    // Check if user selected visitor mode
+    else if (navState.url.includes('visitor.php')) {
+      console.log('Visitor mode detected in WebView at URL:', navState.url);
+      
+      // Extract cookies and store information for visitor mode
+      if (webViewRef.current) {
+        webViewRef.current.injectJavaScript(`
+          (function() {
+            // Extract cookies for visitor mode, focus on getting the store ID
+            try {
+              const cookies = document.cookie.split(';').reduce((acc, cookie) => {
+                const [name, value] = cookie.trim().split('=');
+                if (name && value) {
+                  acc[name] = value;
+                }
+                return acc;
+              }, {});
+              
+              console.log('In WebView - Cookies found:', document.cookie);
+
+              // Send the data back to React Native
+              window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'VISITOR_LOGIN',
+                cookies: cookies,
+                url: window.location.href,
+                rawCookies: document.cookie
+              }));
+            } catch (error) {
+              console.error('Error in visitor cookie extraction:', error);
+              // Send error back to React Native
+              window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'VISITOR_LOGIN_ERROR',
+                error: error.toString()
+              }));
+            }
+
+            true; // Return statement needed for Android
+          })();
+        `);
+      }
+    }
   };
 
   // Handle Untappd WebView navigation state changes
@@ -357,7 +399,7 @@ export default function SettingsScreen() {
   };
 
   // Handle messages from WebView
-  const handleWebViewMessage = (event: WebViewMessageEvent) => {
+  const handleWebViewMessage = async (event: WebViewMessageEvent) => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
 
@@ -365,6 +407,9 @@ export default function SettingsScreen() {
         const { userJsonUrl, storeJsonUrl, cookies } = data;
 
         if (userJsonUrl && storeJsonUrl) {
+          // Explicitly clear visitor mode flag for regular login
+          await setPreference('is_visitor_mode', 'false', 'Flag indicating whether the user is in visitor mode');
+          
           // Update preferences with new API endpoints
           setPreference('user_json_url', userJsonUrl, 'API endpoint for user data');
           setPreference('store_json_url', storeJsonUrl, 'API endpoint for store data');
@@ -388,7 +433,7 @@ export default function SettingsScreen() {
           // Show success message
           Alert.alert(
             'Login Successful',
-            'API URLs have been updated and beer data refreshed.',
+            'API URLs have been updated and beer data refreshed. You now have access to the full Beer Selector experience.',
             [
               {
                 text: 'OK',
@@ -407,6 +452,105 @@ export default function SettingsScreen() {
               }
             ]
           );
+        }
+      }
+      else if (data.type === 'VISITOR_LOGIN_ERROR') {
+        console.error('Error extracting visitor login data in WebView:', data.error);
+        Alert.alert(
+          'Visitor Login Failed',
+          'Could not extract the store information needed for visitor mode. Please try again.',
+          [{ text: 'OK' }]
+        );
+        setLoginLoading(false);
+        setWebviewVisible(false);
+      }
+      else if (data.type === 'VISITOR_LOGIN') {
+        const { cookies, rawCookies, url } = data;
+        console.log('Received visitor login data', cookies);
+        console.log('Raw cookies from WebView:', rawCookies);
+        console.log('URL at login time:', url);
+        
+        // Only process if this is the first visitor login attempt
+        // Prevent duplicate processing by checking the webview visibility
+        if (!webviewVisible) {
+          console.log('Ignoring duplicate visitor login event');
+          return;
+        }
+        
+        // Immediately set webview as invisible to prevent duplicate processing
+        setWebviewVisible(false);
+        
+        // Verify we have a store ID in the cookies
+        const storeId = cookies.store__id || cookies.store;
+        if (!storeId) {
+          console.error('No store ID found in visitor cookies. Cookies received:', JSON.stringify(cookies));
+          Alert.alert(
+            'Visitor Login Failed',
+            'Could not find store ID in cookies. Please try again or contact support.',
+            [{ text: 'OK' }]
+          );
+          setLoginLoading(false);
+          return;
+        }
+        
+        // Handle visitor login using the API
+        try {
+          const loginResult = await handleVisitorLogin(cookies);
+          console.log('Visitor login result:', loginResult);
+          
+          if (loginResult.success) {
+            // Ensure visitor mode preference is explicitly set to true
+            await setPreference('is_visitor_mode', 'true', 'Flag indicating whether the user is in visitor mode');
+            
+            // Fetch only the store data URL for visitor mode
+            // Use the cookies from the data object instead of document.cookie
+            const storeJsonUrl = `https://fsbs.beerknurd.com/bk-store-json.php?sid=${storeId}`;
+            console.log('Setting all_beers_api_url to:', storeJsonUrl);
+            await setPreference('all_beers_api_url', storeJsonUrl, 'API endpoint for fetching all beers');
+            
+            // For visitor mode, set a dummy my_beers_api_url to avoid "not configured" message
+            await setPreference('my_beers_api_url', 'visitor_mode', 'Dummy URL for visitor mode');
+            
+            // Reset login loading state
+            setLoginLoading(false);
+            
+            // Refresh the data
+            handleRefresh();
+            
+            // Reload preferences to update the UI
+            loadPreferences();
+            
+            // Show success message
+            Alert.alert(
+              'Visitor Mode Active',
+              'You are now browsing as a visitor. Only the All Beer list will be available.',
+              [
+                {
+                  text: 'OK',
+                  onPress: () => {
+                    // Navigate to the home tab instead of directly to beer list
+                    router.replace('/(tabs)');
+                  }
+                }
+              ]
+            );
+          } else {
+            // Show error message
+            Alert.alert(
+              'Visitor Login Failed',
+              loginResult.error || 'Could not log in as visitor. Please try again.',
+              [{ text: 'OK' }]
+            );
+            setLoginLoading(false);
+          }
+        } catch (error) {
+          console.error('Error during visitor login:', error);
+          Alert.alert(
+            'Error',
+            'An error occurred during visitor login. Please try again.',
+            [{ text: 'OK' }]
+          );
+          setLoginLoading(false);
         }
       }
     } catch (error) {

@@ -149,6 +149,20 @@ export async function fetchAndUpdateAllBeers(): Promise<DataUpdateResult> {
  */
 export async function fetchAndUpdateMyBeers(): Promise<DataUpdateResult> {
   try {
+    // Check if in visitor mode
+    const isVisitor = await getPreference('is_visitor_mode') === 'true';
+    if (isVisitor) {
+      console.log('In visitor mode, my beers functionality not available');
+      return {
+        success: true,
+        dataUpdated: false,
+        error: {
+          type: ApiErrorType.INFO,
+          message: 'My beers not available in visitor mode.'
+        }
+      };
+    }
+    
     // Get the API URL from preferences
     const apiUrl = await getPreference('my_beers_api_url');
     if (!apiUrl) {
@@ -376,13 +390,24 @@ export interface AutoRefreshResult {
  */
 export async function checkAndRefreshOnAppOpen(minIntervalHours: number = 12): Promise<AutoRefreshResult> {
   try {
+    // First check if API URLs are actually configured
+    const allBeersApiUrl = await getPreference('all_beers_api_url');
+    const myBeersApiUrl = await getPreference('my_beers_api_url');
+    const isVisitor = await getPreference('is_visitor_mode') === 'true';
+    
+    // If URLs are not set yet, skip the refresh entirely without treating it as an error
+    if (!allBeersApiUrl && !myBeersApiUrl) {
+      console.log('API URLs not configured yet, skipping automatic data refresh');
+      return { updated: false, errors: [] };
+    }
+
     const shouldRefreshAllBeers = await shouldRefreshData('all_beers_last_check', minIntervalHours);
     const shouldRefreshMyBeers = await shouldRefreshData('my_beers_last_check', minIntervalHours);
 
     let updated = false;
     const errors: ErrorResponse[] = [];
 
-    if (shouldRefreshAllBeers) {
+    if (shouldRefreshAllBeers && allBeersApiUrl) {
       console.log(`More than ${minIntervalHours} hours since last all beers check, refreshing data`);
       const allBeersResult = await fetchAndUpdateAllBeers();
 
@@ -393,10 +418,11 @@ export async function checkAndRefreshOnAppOpen(minIntervalHours: number = 12): P
         errors.push(allBeersResult.error);
       }
     } else {
-      console.log(`All beers data is less than ${minIntervalHours} hours old, skipping refresh`);
+      console.log(`All beers data is less than ${minIntervalHours} hours old or API URL not set, skipping refresh`);
     }
 
-    if (shouldRefreshMyBeers) {
+    // Only try to refresh my beers if not in visitor mode and the URL is configured
+    if (shouldRefreshMyBeers && myBeersApiUrl && !isVisitor) {
       console.log(`More than ${minIntervalHours} hours since last my beers check, refreshing data`);
       const myBeersResult = await fetchAndUpdateMyBeers();
 
@@ -407,7 +433,15 @@ export async function checkAndRefreshOnAppOpen(minIntervalHours: number = 12): P
         errors.push(myBeersResult.error);
       }
     } else {
-      console.log(`My beers data is less than ${minIntervalHours} hours old, skipping refresh`);
+      if (isVisitor) {
+        console.log('In visitor mode, skipping my beers refresh');
+      } else {
+        console.log(`My beers data is less than ${minIntervalHours} hours old or API URL not set, skipping refresh`);
+      }
+    }
+
+    if (errors.length > 0) {
+      console.error('Errors during automatic data refresh:', errors);
     }
 
     return { updated, errors };
