@@ -508,8 +508,8 @@ export default function SettingsScreen() {
             console.log('Setting all_beers_api_url to:', storeJsonUrl);
             await setPreference('all_beers_api_url', storeJsonUrl, 'API endpoint for fetching all beers');
             
-            // For visitor mode, set a dummy my_beers_api_url to avoid "not configured" message
-            await setPreference('my_beers_api_url', 'visitor_mode', 'Dummy URL for visitor mode');
+            // For visitor mode, use empty data placeholder instead of dummy URL to prevent network errors
+            await setPreference('my_beers_api_url', 'none://visitor_mode', 'Placeholder URL for visitor mode (not a real endpoint)');
             
             // Reset login loading state
             setLoginLoading(false);

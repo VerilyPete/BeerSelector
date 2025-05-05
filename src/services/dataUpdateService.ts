@@ -153,6 +153,10 @@ export async function fetchAndUpdateMyBeers(): Promise<DataUpdateResult> {
     const isVisitor = await getPreference('is_visitor_mode') === 'true';
     if (isVisitor) {
       console.log('In visitor mode, my beers functionality not available');
+      
+      // Update the last check timestamp still to prevent repeated checks
+      await setPreference('my_beers_last_check', new Date().toISOString());
+      
       return {
         success: true,
         dataUpdated: false,
