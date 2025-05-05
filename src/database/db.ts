@@ -337,6 +337,13 @@ export const isUntappdLoggedIn = async (): Promise<boolean> => {
 
 // Helper function to retry fetch operations
 const fetchWithRetry = async (url: string, retries = 3, delay = 1000): Promise<any> => {
+  // Special handling for none:// protocol which is used as a placeholder in visitor mode
+  if (url.startsWith('none://')) {
+    console.log(`Detected none:// protocol URL: ${url}. Returning empty data instead of making network request.`);
+    // Return an empty array structure that matches the expected format
+    return [null, { tasted_brew_current_round: [] }];
+  }
+  
   try {
     const response = await fetch(url);
 
@@ -558,8 +565,11 @@ export const initializeBeerDatabase = async (): Promise<void> => {
       return;
     }
 
-    // If we haven't already scheduled My Beers import, do it now
-    if (!myBeersImportScheduled) {
+    // Check for visitor mode to handle differently
+    const isVisitorMode = await getPreference('is_visitor_mode') === 'true';
+    
+    // If we haven't already scheduled My Beers import and not in visitor mode, do it now
+    if (!myBeersImportScheduled && !isVisitorMode) {
       myBeersImportScheduled = true;
 
       // Use setTimeout to make My Beers import non-blocking
@@ -573,16 +583,23 @@ export const initializeBeerDatabase = async (): Promise<void> => {
           myBeersImportInProgress = false;
         }
       }, 100);
+    } else if (isVisitorMode) {
+      console.log('In visitor mode - skipping scheduled My Beers import');
+      myBeersImportComplete = true;
     }
 
-    // Schedule rewards import
-    setTimeout(async () => {
-      try {
-        await fetchAndPopulateRewards();
-      } catch (error) {
-        console.error('Error in scheduled Rewards import:', error);
-      }
-    }, 200);
+    // Schedule rewards import - only if not in visitor mode
+    if (!isVisitorMode) {
+      setTimeout(async () => {
+        try {
+          await fetchAndPopulateRewards();
+        } catch (error) {
+          console.error('Error in scheduled Rewards import:', error);
+        }
+      }, 200);
+    } else {
+      console.log('In visitor mode - skipping scheduled Rewards import');
+    }
 
     // Fetch all beers (this is blocking because we need it immediately)
     try {
@@ -602,6 +619,13 @@ export const initializeBeerDatabase = async (): Promise<void> => {
 // Fetch Beerfinder beers from API
 export const fetchMyBeersFromAPI = async (): Promise<Beerfinder[]> => {
   try {
+    // First check if in visitor mode to immediately return empty array
+    const isVisitorMode = await getPreference('is_visitor_mode') === 'true';
+    if (isVisitorMode) {
+      console.log('DB: In visitor mode - fetchMyBeersFromAPI returning empty array without making network request');
+      return [];
+    }
+    
     // Get the API endpoint from preferences
     const apiUrl = await getPreference('my_beers_api_url');
     console.log('DB: Fetching My Beers from API URL:', apiUrl);
@@ -609,6 +633,12 @@ export const fetchMyBeersFromAPI = async (): Promise<Beerfinder[]> => {
     if (!apiUrl) {
       console.log('DB: My beers API URL not found in preferences');
       return []; // Return empty array instead of throwing an error
+    }
+
+    // Special handling for none:// protocol to avoid network errors
+    if (apiUrl.startsWith('none://')) {
+      console.log('DB: Detected none:// protocol in my_beers_api_url, returning empty array');
+      return [];
     }
 
     console.log('DB: Making API request to fetch My Beers data...');
@@ -639,15 +669,15 @@ export const fetchMyBeersFromAPI = async (): Promise<Beerfinder[]> => {
       console.log(`DB: Found tasted_brew_current_round with ${beers.length} beers`);
 
       // Validate the beers array - check for missing IDs
-      const validBeers = beers.filter(beer => beer && beer.id);
-      const invalidBeers = beers.filter(beer => !beer || !beer.id);
+      const validBeers = beers.filter((beer: any) => beer && beer.id);
+      const invalidBeers = beers.filter((beer: any) => !beer || !beer.id);
 
       console.log(`DB: Found ${validBeers.length} valid beers with IDs and ${invalidBeers.length} invalid beers without IDs`);
 
       // Log details about invalid beers for debugging
       if (invalidBeers.length > 0) {
         console.log('DB: Invalid beers details:');
-        invalidBeers.forEach((beer, index) => {
+        invalidBeers.forEach((beer: any, index: number) => {
           console.log(`DB: Invalid beer ${index}:`, JSON.stringify(beer));
         });
       }
@@ -768,6 +798,14 @@ export const populateMyBeersTable = async (beers: Beerfinder[]): Promise<void> =
 
 // Fetch and populate My Beers
 export const fetchAndPopulateMyBeers = async (): Promise<void> => {
+  // Check for visitor mode first and exit early without acquiring lock
+  const isVisitorMode = await getPreference('is_visitor_mode') === 'true';
+  if (isVisitorMode) {
+    console.log('In visitor mode - skipping fetchAndPopulateMyBeers');
+    myBeersImportComplete = true;
+    return;
+  }
+
   // Skip if we're already doing this operation or it's already complete
   if (myBeersImportInProgress) {
     console.log('My Beers import already in progress, skipping duplicate request');
@@ -871,11 +909,18 @@ export const refreshBeersFromAPI = async (): Promise<Beer[]> => {
 // Internal version of fetchAndPopulateMyBeers that doesn't handle its own locking
 const _refreshMyBeersFromAPIInternal = async (): Promise<Beerfinder[]> => {
   try {
+    // Check for visitor mode first
+    const isVisitorMode = await getPreference('is_visitor_mode') === 'true';
+    if (isVisitorMode) {
+      console.log('DB: In visitor mode - _refreshMyBeersFromAPIInternal returning empty array');
+      return [];
+    }
+    
     const myBeers = await fetchMyBeersFromAPI();
     console.log(`DB: _refreshMyBeersFromAPIInternal received ${myBeers.length} beers from API`);
 
     // Validate beers have IDs
-    const validBeers = myBeers.filter(beer => beer && beer.id);
+    const validBeers = myBeers.filter((beer: any) => beer && beer.id);
     console.log(`DB: Found ${validBeers.length} valid beers with IDs out of ${myBeers.length} total beers`);
 
     if (validBeers.length === 0) {
@@ -1161,6 +1206,13 @@ export const areApiUrlsConfigured = async (): Promise<boolean> => {
 // Fetch rewards from API
 export const fetchRewardsFromAPI = async (): Promise<Reward[]> => {
   try {
+    // Check if in visitor mode first
+    const isVisitorMode = await getPreference('is_visitor_mode') === 'true';
+    if (isVisitorMode) {
+      console.log('In visitor mode - rewards not available, returning empty array');
+      return [];
+    }
+    
     // Get the API endpoint from preferences
     const apiUrl = await getPreference('my_beers_api_url');
 

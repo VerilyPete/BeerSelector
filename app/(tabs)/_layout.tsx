@@ -87,23 +87,21 @@ export default function TabLayout() {
           default: {},
         }),
       }}>
-      {/* Left spacer tab in visitor mode */}
-      {isInVisitorMode && (
-        <Tabs.Screen
-          name="spacer_left"
-          options={{
-            title: "",
-            tabBarButton: getVisitorTabButton(0),
-            tabBarShowLabel: false,
-          }}
-          listeners={{
-            tabPress: (e) => {
-              // Prevent navigation
-              e.preventDefault();
-            },
-          }}
-        />
-      )}
+      {/* Left spacer tab - always included but only visible in visitor mode */}
+      <Tabs.Screen
+        name="spacer_left"
+        options={{
+          title: "",
+          tabBarButton: isInVisitorMode ? getVisitorTabButton(0) : () => null,
+          tabBarShowLabel: false,
+        }}
+        listeners={{
+          tabPress: (e) => {
+            // Prevent navigation
+            e.preventDefault();
+          },
+        }}
+      />
       
       {/* Home tab */}
       <Tabs.Screen
@@ -115,23 +113,21 @@ export default function TabLayout() {
         }}
       />
       
-      {/* Middle spacer tab in visitor mode */}
-      {isInVisitorMode && (
-        <Tabs.Screen
-          name="spacer_middle"
-          options={{
-            title: "",
-            tabBarButton: getVisitorTabButton(2),
-            tabBarShowLabel: false,
-          }}
-          listeners={{
-            tabPress: (e) => {
-              // Prevent navigation
-              e.preventDefault();
-            },
-          }}
-        />
-      )}
+      {/* Middle spacer tab - always included but only visible in visitor mode */}
+      <Tabs.Screen
+        name="spacer_middle"
+        options={{
+          title: "",
+          tabBarButton: isInVisitorMode ? getVisitorTabButton(2) : () => null,
+          tabBarShowLabel: false,
+        }}
+        listeners={{
+          tabPress: (e) => {
+            // Prevent navigation
+            e.preventDefault();
+          },
+        }}
+      />
       
       {/* All Beer tab */}
       <Tabs.Screen
@@ -143,23 +139,21 @@ export default function TabLayout() {
         }}
       />
       
-      {/* Right spacer tab in visitor mode */}
-      {isInVisitorMode && (
-        <Tabs.Screen
-          name="spacer_right"
-          options={{
-            title: "",
-            tabBarButton: getVisitorTabButton(4),
-            tabBarShowLabel: false,
-          }}
-          listeners={{
-            tabPress: (e) => {
-              // Prevent navigation
-              e.preventDefault();
-            },
-          }}
-        />
-      )}
+      {/* Right spacer tab - always included but only visible in visitor mode */}
+      <Tabs.Screen
+        name="spacer_right"
+        options={{
+          title: "",
+          tabBarButton: isInVisitorMode ? getVisitorTabButton(4) : () => null,
+          tabBarShowLabel: false,
+        }}
+        listeners={{
+          tabPress: (e) => {
+            // Prevent navigation
+            e.preventDefault();
+          },
+        }}
+      />
       
       {/* Beerfinder tab - hidden in visitor mode */}
       <Tabs.Screen
