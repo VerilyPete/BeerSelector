@@ -1,4 +1,14 @@
-import { getPreference, setPreference, populateBeersTable, populateMyBeersTable } from '../database/db';
+import { 
+  areApiUrlsConfigured,
+  fetchBeersFromAPI, 
+  fetchMyBeersFromAPI, 
+  getPreference, 
+  populateBeersTable, 
+  populateMyBeersTable,
+  setPreference,
+  fetchAndPopulateRewards,
+  getAllRewards
+} from '../database/db';
 import { Beer, Beerfinder } from '../types/beer';
 import { ApiErrorType, ErrorResponse, createErrorResponse } from '../utils/notificationUtils';
 
@@ -338,6 +348,7 @@ export async function shouldRefreshData(lastCheckKey: string, intervalHours: num
 export interface ManualRefreshResult {
   allBeersResult: DataUpdateResult;
   myBeersResult: DataUpdateResult;
+  rewardsResult: DataUpdateResult;
   hasErrors: boolean;
   allNetworkErrors: boolean;
 }
@@ -347,36 +358,73 @@ export interface ManualRefreshResult {
  * @returns Object with update status and error information for both data types
  */
 export async function manualRefreshAllData(): Promise<ManualRefreshResult> {
-  // Fetch and update both data sources
-  const allBeersResult = await fetchAndUpdateAllBeers();
-  const myBeersResult = await fetchAndUpdateMyBeers();
+  try {
+    // Fetch and update all data sources
+    const allBeersResult = await fetchAndUpdateAllBeers();
+    const myBeersResult = await fetchAndUpdateMyBeers();
+    
+    // Add rewards refresh
+    let rewardsResult: DataUpdateResult = {
+      success: true,
+      dataUpdated: false
+    };
+    
+    // Check if in visitor mode
+    const isVisitor = await getPreference('is_visitor_mode') === 'true';
+    
+    if (!isVisitor) {
+      try {
+        // Fetch and populate rewards if not in visitor mode
+        console.log('Refreshing rewards data');
+        await fetchAndPopulateRewards();
+        const rewardsCount = (await getAllRewards()).length;
+        rewardsResult = {
+          success: true,
+          dataUpdated: true,
+          itemCount: rewardsCount
+        };
+        console.log(`Updated rewards data with ${rewardsCount} rewards`);
+      } catch (error) {
+        console.error('Error updating rewards data:', error);
+        rewardsResult = {
+          success: false,
+          dataUpdated: false,
+          error: createErrorResponse(error)
+        };
+      }
+    } else {
+      console.log('In visitor mode, skipping rewards refresh');
+    }
 
-  // Check if either operation had errors
-  const hasErrors = !allBeersResult.success || !myBeersResult.success;
+    // Check if any operation had errors
+    const hasErrors = !allBeersResult.success || !myBeersResult.success || !rewardsResult.success;
 
-  // Check if all errors are network-related
-  const allNetworkErrors = (
-    // Both endpoints failed
-    (!allBeersResult.success && !myBeersResult.success) &&
-    // Both failures are network-related
-    allBeersResult.error?.type === 'NETWORK_ERROR' &&
-    myBeersResult.error?.type === 'NETWORK_ERROR'
-  ) || (
-    // Only All Beers failed with network error
-    (!allBeersResult.success && myBeersResult.success) &&
-    allBeersResult.error?.type === 'NETWORK_ERROR'
-  ) || (
-    // Only My Beers failed with network error
-    (allBeersResult.success && !myBeersResult.success) &&
-    myBeersResult.error?.type === 'NETWORK_ERROR'
-  );
+    // Check if all errors are network-related
+    const allNetworkErrors = (
+      // Check if failed operations are all network-related
+      (!allBeersResult.success ? allBeersResult.error?.type === 'NETWORK_ERROR' : true) &&
+      (!myBeersResult.success ? myBeersResult.error?.type === 'NETWORK_ERROR' : true) &&
+      (!rewardsResult.success ? rewardsResult.error?.type === 'NETWORK_ERROR' : true)
+    );
 
-  return {
-    allBeersResult,
-    myBeersResult,
-    hasErrors,
-    allNetworkErrors
-  };
+    return {
+      allBeersResult,
+      myBeersResult,
+      rewardsResult,
+      hasErrors,
+      allNetworkErrors
+    };
+  } catch (error) {
+    console.error('Error in manualRefreshAllData:', error);
+    // Return a basic error result if something unexpected happens
+    return {
+      allBeersResult: { success: false, dataUpdated: false, error: createErrorResponse(error) },
+      myBeersResult: { success: false, dataUpdated: false, error: createErrorResponse(error) },
+      rewardsResult: { success: false, dataUpdated: false, error: createErrorResponse(error) },
+      hasErrors: true,
+      allNetworkErrors: false
+    };
+  }
 }
 
 /**
