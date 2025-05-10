@@ -249,13 +249,13 @@ export default function HomeScreen() {
           <ThemedText style={[styles.welcomeText, styles.loginPrompt]}>
             {inVisitorMode ? 
               'Unable to load beer data. Please try logging in again as a visitor.' : 
-              'Please log in to your Flying Saucer account to start using the app.'}
+              'Please log in to your UFO Club account or as a Visitor to start using the app.'}
           </ThemedText>
           <TouchableOpacity
             style={[styles.mainButton, { backgroundColor: buttonColor }]}
-            onPress={() => router.navigate('/settings')}
+            onPress={() => router.navigate('/settings?action=login')}
           >
-            <Text style={[styles.mainButtonText, { color: buttonTextColor }]}>Go to Settings</Text>
+            <Text style={[styles.mainButtonText, { color: buttonTextColor }]}>Login</Text>
           </TouchableOpacity>
         </SafeAreaView>
       </ThemedView>
@@ -277,7 +277,7 @@ export default function HomeScreen() {
 
           <ThemedText type="title" style={styles.welcomeTitle}>Welcome to Beer Selector</ThemedText>
           <ThemedText style={styles.welcomeText}>
-            You're logged in as a visitor. Please login with your UFO Club account to view the Beerfinder, Tasted Brews, and Rewards.
+            You're logged in as a Visitor. Please login with your UFO Club account to view the Beerfinder, Tasted Brews, and Rewards.
           </ThemedText>
           <TouchableOpacity
             style={[styles.mainButton, { backgroundColor: buttonColor, marginBottom: 16 }]}

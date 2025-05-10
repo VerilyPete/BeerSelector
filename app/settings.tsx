@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { StyleSheet, TouchableOpacity, View, Switch, Alert, TextInput, ScrollView, ActivityIndicator, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import * as WebBrowser from 'expo-web-browser';
 import { WebView, WebViewNavigation, WebViewMessageEvent } from 'react-native-webview';
@@ -35,6 +35,9 @@ export default function SettingsScreen() {
   const borderColor = useThemeColor({ light: '#e0e0e0', dark: '#333' }, 'text');
   const colorScheme = useColorScheme() ?? 'light';
 
+  // Get URL search params
+  const { action } = useLocalSearchParams<{ action?: string }>();
+
   // Removed the filter preferences and notifications state variables
   const [refreshing, setRefreshing] = useState(false);
   const [preferences, setPreferences] = useState<Preference[]>([]);
@@ -63,7 +66,12 @@ export default function SettingsScreen() {
       // If router.canGoBack() throws, we can't go back
       setCanGoBack(false);
     }
-  }, []);
+    
+    // Auto-open login dialog if action=login is in URL params
+    if (action === 'login') {
+      handleLogin();
+    }
+  }, [action]);
 
   // Function to check Untappd login status
   const checkUntappdLoginStatus = async () => {
@@ -804,7 +812,7 @@ export default function SettingsScreen() {
                 <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>Welcome to Beer Selector</ThemedText>
                 <View style={styles.welcomeMessage}>
                   <ThemedText style={styles.welcomeText}>
-                    Please log in to your Flying Saucer account to start using the app. This will allow us to fetch your beer data.
+                  Please log in to your UFO Club account or as a Visitor to start using the app.
                   </ThemedText>
                   <TouchableOpacity
                     style={[
