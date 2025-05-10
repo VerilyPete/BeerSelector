@@ -354,7 +354,7 @@ export const TastedBrewList = () => {
         />
         <View style={styles.beerCountContainer}>
           <ThemedText style={styles.beerCount}>
-            {displayedBeers.length} {displayedBeers.length === 1 ? 'beer' : 'beer'} tasted
+            {displayedBeers.length} {displayedBeers.length === 1 ? 'brew' : 'brews'} tasted
           </ThemedText>
         </View>
         <View style={styles.filterContainer}>
