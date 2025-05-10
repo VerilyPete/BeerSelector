@@ -1,6 +1,6 @@
 import { saveSessionData, clearSessionData } from './sessionManager';
 import { getApiClient } from './apiClientInstance';
-import { getPreference, setPreference } from '../database/db';
+import { getPreference, setPreference, refreshAllDataFromAPI } from '../database/db';
 import { SessionData, ApiError, ApiResponse, LoginResult, isSessionData } from '../types/api';
 
 // Using LoginResult interface from ../types/api
@@ -20,6 +20,18 @@ export async function autoLogin(): Promise<LoginResult> {
 
       // Check if user is in visitor mode
       const isVisitor = await getPreference('is_visitor_mode');
+      const isVisitorMode = isVisitor === 'true';
+      
+      // Refresh all data if autologin was successful
+      if (!isVisitorMode) {
+        try {
+          await refreshAllDataFromAPI();
+          console.log('Successfully refreshed all data after auto-login');
+        } catch (refreshError) {
+          console.error('Error refreshing data after auto-login:', refreshError);
+          // Continue with login process even if refresh fails
+        }
+      }
 
       return {
         success: true,
@@ -27,7 +39,7 @@ export async function autoLogin(): Promise<LoginResult> {
         data: response.data,
         sessionData: response.data.session,
         statusCode: response.statusCode,
-        isVisitorMode: isVisitor === 'true'
+        isVisitorMode: isVisitorMode
       };
     } else {
       return {
@@ -359,6 +371,15 @@ export async function login(username: string, password: string): Promise<LoginRe
       
       // Clear visitor mode flag on regular login
       await setPreference('is_visitor_mode', 'false', 'Flag indicating whether the user is in visitor mode');
+
+      // Refresh all data from the API, including rewards
+      try {
+        await refreshAllDataFromAPI();
+        console.log('Successfully refreshed all data after login');
+      } catch (refreshError) {
+        console.error('Error refreshing data after login:', refreshError);
+        // Continue with login process even if refresh fails
+      }
 
       return {
         success: true,

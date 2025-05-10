@@ -7,6 +7,7 @@ import { useThemeColor } from '@/hooks/useThemeColor';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getSessionData } from '@/src/api/sessionManager';
 import Constants from 'expo-constants';
+import { isVisitorMode } from '@/src/api/authService';
 
 type Reward = {
   reward_id: string;
@@ -20,6 +21,7 @@ export const Rewards = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [queueingRewards, setQueueingRewards] = useState<Record<string, boolean>>({});
+  const [isVisitor, setIsVisitor] = useState(false);
 
   const cardColor = useThemeColor({}, 'background');
   const borderColor = useThemeColor({ light: '#e0e0e0', dark: '#333' }, 'text');
@@ -27,12 +29,34 @@ export const Rewards = () => {
   const buttonColor = useThemeColor({ light: '#4caf50', dark: '#4caf50' }, 'text');
   const buttonTextColor = useThemeColor({ light: '#FFFFFF', dark: '#FFFFFF' }, 'text');
 
+  const checkVisitorMode = useCallback(async () => {
+    try {
+      const visitorMode = await isVisitorMode(true);
+      setIsVisitor(visitorMode);
+      return visitorMode;
+    } catch (err) {
+      console.error('Error checking visitor mode:', err);
+      return false;
+    }
+  }, []);
+
   const loadRewards = async () => {
     try {
       setLoading(true);
-      const data = await getAllRewards();
-      setRewards(data);
-      setError(null);
+      
+      // First check if user is in visitor mode
+      const visitorMode = await checkVisitorMode();
+      
+      if (visitorMode) {
+        // In visitor mode, don't fetch rewards
+        setRewards([]);
+        setError(null);
+      } else {
+        // Normal mode, load rewards
+        const data = await getAllRewards();
+        setRewards(data);
+        setError(null);
+      }
     } catch (err) {
       console.error('Failed to load rewards:', err);
       setError('Failed to load rewards. Please try again later.');
@@ -49,7 +73,16 @@ export const Rewards = () => {
   const handleRefresh = useCallback(async () => {
     try {
       setRefreshing(true);
-      await fetchAndPopulateRewards();
+      
+      // Check visitor mode first
+      const visitorMode = await checkVisitorMode();
+      
+      if (!visitorMode) {
+        // Only refresh rewards if not in visitor mode
+        await fetchAndPopulateRewards();
+      }
+      
+      // Reload rewards (will handle visitor mode internally)
       loadRewards();
     } catch (error) {
       console.error('Error refreshing rewards:', error);
@@ -57,7 +90,7 @@ export const Rewards = () => {
     } finally {
       setRefreshing(false);
     }
-  }, []);
+  }, [checkVisitorMode]);
 
   const queueReward = async (rewardId: string, rewardType: string) => {
     try {
@@ -221,7 +254,14 @@ export const Rewards = () => {
         ]}
         ListEmptyComponent={
           <ThemedView style={styles.emptyContainer}>
-            <ThemedText style={styles.emptyText}>No rewards found.</ThemedText>
+            {isVisitor ? (
+              <ThemedText style={styles.emptyText}>
+                Rewards are not available in visitor mode.
+                Please log in to view your rewards.
+              </ThemedText>
+            ) : (
+              <ThemedText style={styles.emptyText}>No rewards found.</ThemedText>
+            )}
           </ThemedView>
         }
         refreshControl={
