@@ -1,8 +1,9 @@
-import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import { BeerListScreen } from './index';
-import { areApiUrlsConfigured } from '@/src/database/db';
+import { areApiUrlsConfigured, refreshBeersFromAPI, setPreference } from '@/src/database/db';
 import { isVisitorMode } from '@/src/api/authService';
+import { checkAndRefreshOnAppOpen } from '@/src/services/dataUpdateService';
 
 export default function TabOneScreen() {
   const [apiUrlsSet, setApiUrlsSet] = useState<boolean | null>(null);
@@ -33,6 +34,34 @@ export default function TabOneScreen() {
     
     checkVisitorMode();
   }, []);
+  
+  // Add focus effect to refresh beer data when tab becomes active
+  useFocusEffect(
+    useCallback(() => {
+      const refreshDataOnFocus = async () => {
+        // Don't attempt refresh if API URLs aren't configured
+        if (!apiUrlsSet) return;
+        
+        console.log('Beer list tab focused, checking for data updates');
+        
+        try {
+          // Use the same refresh mechanism that runs on app startup
+          const result = await checkAndRefreshOnAppOpen(12);
+          if (result.updated) {
+            console.log('Beer data was updated when tab became active');
+          }
+        } catch (error) {
+          console.error('Error refreshing data on tab focus:', error);
+        }
+      };
+      
+      refreshDataOnFocus();
+      
+      return () => {
+        // Cleanup if needed
+      };
+    }, [apiUrlsSet])
+  );
   
   // Don't render anything until we've checked API URL status
   if (apiUrlsSet === null) {
