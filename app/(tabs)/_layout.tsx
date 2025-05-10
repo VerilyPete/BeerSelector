@@ -51,35 +51,13 @@ export default function TabLayout() {
     }, [checkVisitorMode])
   );
 
-  // In visitor mode, use a specific tab button function for each position
-  // This approach gives us more control over each position in the tab bar
-  const getVisitorTabButton = (position: number) => {
-    if (!isInVisitorMode) return HapticTab;
-    
-    // The layout in visitor mode is:
-    // [Empty] [Home] [Empty] [All Beer] [Empty]
-    switch (position) {
-      case 0: // Left spacer - invisible but takes up space
-        return () => <SpacerTab />;
-      case 1: // Home tab - visible
-        return HapticTab;
-      case 2: // Middle spacer - invisible but takes up space
-        return () => <SpacerTab />;
-      case 3: // All Beer tab - visible
-        return HapticTab;
-      case 4: // Right spacer - invisible but takes up space
-        return () => <SpacerTab />;
-      default:
-        return () => null; // Other tabs are hidden completely
-    }
-  };
-
   return (
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
         headerShown: false,
         tabBarBackground: TabBarBackground,
+        tabBarButton: HapticTab,
         tabBarStyle: Platform.select({
           ios: {
             position: 'absolute',
@@ -87,21 +65,25 @@ export default function TabLayout() {
           default: {},
         }),
       }}>
-      {/* Left spacer tab - always included but only visible in visitor mode */}
-      <Tabs.Screen
-        name="spacer_left"
-        options={{
-          title: "",
-          tabBarButton: isInVisitorMode ? getVisitorTabButton(0) : () => null,
-          tabBarShowLabel: false,
-        }}
-        listeners={{
-          tabPress: (e) => {
-            // Prevent navigation
-            e.preventDefault();
-          },
-        }}
-      />
+      
+      {/* Conditionally render spacer tabs in visitor mode */}
+      {isInVisitorMode && (
+        <Tabs.Screen
+          name="spacer_left"
+          options={{
+            title: "",
+            tabBarShowLabel: false,
+            tabBarIcon: () => null,
+            tabBarStyle: { display: 'none' }
+          }}
+          listeners={{
+            tabPress: (e) => {
+              // Prevent navigation
+              e.preventDefault();
+            },
+          }}
+        />
+      )}
       
       {/* Home tab */}
       <Tabs.Screen
@@ -109,25 +91,30 @@ export default function TabLayout() {
         options={{
           title: 'Home',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
-          tabBarButton: isInVisitorMode ? getVisitorTabButton(1) : HapticTab,
+          tabBarLabelStyle: {
+            fontSize: 12,
+          }
         }}
       />
       
-      {/* Middle spacer tab - always included but only visible in visitor mode */}
-      <Tabs.Screen
-        name="spacer_middle"
-        options={{
-          title: "",
-          tabBarButton: isInVisitorMode ? getVisitorTabButton(2) : () => null,
-          tabBarShowLabel: false,
-        }}
-        listeners={{
-          tabPress: (e) => {
-            // Prevent navigation
-            e.preventDefault();
-          },
-        }}
-      />
+      {/* Conditionally render middle spacer in visitor mode */}
+      {isInVisitorMode && (
+        <Tabs.Screen
+          name="spacer_middle"
+          options={{
+            title: "",
+            tabBarShowLabel: false,
+            tabBarIcon: () => null,
+            tabBarStyle: { display: 'none' }
+          }}
+          listeners={{
+            tabPress: (e) => {
+              // Prevent navigation
+              e.preventDefault();
+            },
+          }}
+        />
+      )}
       
       {/* All Beer tab */}
       <Tabs.Screen
@@ -135,52 +122,64 @@ export default function TabLayout() {
         options={{
           title: 'All Beer',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="mug.fill" color={color} />,
-          tabBarButton: isInVisitorMode ? getVisitorTabButton(3) : HapticTab,
+          tabBarLabelStyle: {
+            fontSize: 12,
+          }
         }}
       />
       
-      {/* Right spacer tab - always included but only visible in visitor mode */}
-      <Tabs.Screen
-        name="spacer_right"
-        options={{
-          title: "",
-          tabBarButton: isInVisitorMode ? getVisitorTabButton(4) : () => null,
-          tabBarShowLabel: false,
-        }}
-        listeners={{
-          tabPress: (e) => {
-            // Prevent navigation
-            e.preventDefault();
-          },
-        }}
-      />
+      {/* Conditionally render right spacer in visitor mode */}
+      {isInVisitorMode && (
+        <Tabs.Screen
+          name="spacer_right"
+          options={{
+            title: "",
+            tabBarShowLabel: false,
+            tabBarIcon: () => null,
+            tabBarStyle: { display: 'none' }
+          }}
+          listeners={{
+            tabPress: (e) => {
+              // Prevent navigation
+              e.preventDefault();
+            },
+          }}
+        />
+      )}
       
-      {/* Beerfinder tab - hidden in visitor mode */}
-      <Tabs.Screen
-        name="mybeers"
-        options={{
-          title: 'Beerfinder',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="star.fill" color={color} />,
-          tabBarButton: isInVisitorMode ? () => null : HapticTab,
-        }}
-      />
-      
-      {/* Tasted Brews tab - hidden in visitor mode */}
-      <Tabs.Screen
-        name="tastedbrews"
-        options={{
-          title: 'Tasted Brews',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="checkmark.circle.fill" color={color} />,
-          tabBarButton: isInVisitorMode ? () => null : HapticTab,
-        }}
-      />
+      {/* Only show Beerfinder and Tasted Brews tabs when not in visitor mode */}
+      {!isInVisitorMode && (
+        <>
+          <Tabs.Screen
+            name="mybeers"
+            options={{
+              title: 'Beerfinder',
+              tabBarIcon: ({ color }) => <IconSymbol size={28} name="star.fill" color={color} />,
+              tabBarLabelStyle: {
+                fontSize: 12,
+              }
+            }}
+          />
+          
+          <Tabs.Screen
+            name="tastedbrews"
+            options={{
+              title: 'Tasted Brews',
+              tabBarIcon: ({ color }) => <IconSymbol size={28} name="checkmark.circle.fill" color={color} />,
+              tabBarLabelStyle: {
+                fontSize: 12,
+              }
+            }}
+          />
+        </>
+      )}
     </Tabs>
   );
 }
-
 const styles = StyleSheet.create({
   spacer: {
     flex: 1,
     height: '100%',
   },
 });
+
