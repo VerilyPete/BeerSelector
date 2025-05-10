@@ -12,17 +12,8 @@ import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useBottomTabOverflow } from '@/components/ui/TabBarBackground';
 import { IconSymbol } from './ui/IconSymbol';
 import { getUserFriendlyErrorMessage } from '@/src/utils/notificationUtils';
-
-type Beer = {
-  id: string;
-  brew_name: string;
-  brewer: string;
-  brewer_loc: string;
-  brew_style: string;
-  brew_container: string;
-  brew_description: string;
-  tasted_date: string;
-};
+import { Beerfinder } from '@/src/types/beer';
+import { ApiErrorType } from '@/src/utils/notificationUtils';
 
 type SortOption = 'date' | 'name';
 
@@ -32,8 +23,8 @@ export const TastedBrewList = () => {
   const insets = useSafeAreaInsets();
   const tabBarHeight = useBottomTabBarHeight();
   const tabOverflow = useBottomTabOverflow();
-  const [tastedBeers, setTastedBeers] = useState<Beer[]>([]);
-  const [displayedBeers, setDisplayedBeers] = useState<Beer[]>([]);
+  const [tastedBeers, setTastedBeers] = useState<Beerfinder[]>([]);
+  const [displayedBeers, setDisplayedBeers] = useState<Beerfinder[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -172,7 +163,7 @@ export const TastedBrewList = () => {
         // Set a user-friendly error message
         const errorMessage = apiError.message
           ? getUserFriendlyErrorMessage({
-              type: apiError.isNetworkError ? 'NETWORK_ERROR' : 'SERVER_ERROR',
+              type: apiError.isNetworkError ? ApiErrorType.NETWORK_ERROR : ApiErrorType.SERVER_ERROR,
               message: apiError.message,
               statusCode: apiError.statusCode || 0,
               originalError: apiError
@@ -261,7 +252,7 @@ export const TastedBrewList = () => {
   };
 
   // Function to format date to readable format
-  const formatDate = (dateStr: string): string => {
+  const formatDate = (dateStr: string | undefined): string => {
     if (!dateStr) return 'Unknown date';
 
     try {
@@ -298,7 +289,7 @@ export const TastedBrewList = () => {
     setSearchText('');
   };
 
-  const renderBeerItem = (item: Beer) => {
+  const renderBeerItem = (item: Beerfinder) => {
     const isExpanded = expandedId === item.id;
 
     return (
