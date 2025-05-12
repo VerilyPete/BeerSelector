@@ -11,7 +11,7 @@ import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { useColorScheme } from '@/hooks/useColorScheme';
-import { refreshAllDataFromAPI, getAllPreferences, getPreference, setPreference, setUntappdCookie, isUntappdLoggedIn } from '@/src/database/db';
+import { refreshAllDataFromAPI, getAllPreferences, getPreference, setPreference, setUntappdCookie, isUntappdLoggedIn, initDatabase, clearUntappdCookies } from '@/src/database/db';
 import { manualRefreshAllData } from '@/src/services/dataUpdateService';
 import { LoadingIndicator } from '@/components/LoadingIndicator';
 import Constants from 'expo-constants';
@@ -700,6 +700,26 @@ export default function SettingsScreen() {
     }
   };
 
+  // Function to handle Untappd logout
+  const handleUntappdLogout = async () => {
+    try {
+      await clearUntappdCookies();
+      setUntappdLoggedInStatus(false);
+      Alert.alert(
+        'Untappd Credentials Cleared',
+        'Your cached Untappd session has been cleared. To fully log out, you\'ll need to press "Check Untappd" while viewing a beer and manually log out from that session.',
+        [{ text: 'OK' }]
+      );
+    } catch (error) {
+      console.error('Error clearing Untappd credentials:', error);
+      Alert.alert(
+        'Error',
+        'Failed to clear Untappd credentials. Please try again.',
+        [{ text: 'OK' }]
+      );
+    }
+  };
+
   // Render a preference item - simplified to just display
   const renderPreferenceItem = (preference: Preference) => {
     return (
@@ -917,6 +937,26 @@ export default function SettingsScreen() {
                           : 'Login to Untappd'}
                     </ThemedText>
                   </TouchableOpacity>
+
+                  {/* Untappd Logout Button - Only show when logged in */}
+                  {untappdLoggedInStatus && (
+                    <TouchableOpacity
+                      style={[
+                        styles.dataButton,
+                        {
+                          backgroundColor: '#FF3B30',
+                          borderColor: borderColor,
+                          marginTop: 12
+                        }
+                      ]}
+                      onPress={handleUntappdLogout}
+                      disabled={refreshing}
+                    >
+                      <ThemedText style={styles.dataButtonText}>
+                        Clear Untappd Credentials
+                      </ThemedText>
+                    </TouchableOpacity>
+                  )}
 
                   {/* Return to Home button - show when API URLs are configured but we're on first launch */}
                   {apiUrlsConfigured && !canGoBack && (
