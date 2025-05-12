@@ -3,6 +3,7 @@ import { Asset } from 'expo-asset';
 import * as FileSystem from 'expo-file-system';
 import { Beer, Beerfinder, isBeer, isBeerfinder } from './types';
 import { Preference, Reward, UntappdCookie, isPreference, isReward, isUntappdCookie } from './types';
+import { SQLiteDatabase } from 'expo-sqlite';
 
 // Database connection instance
 let db: SQLite.SQLiteDatabase | null = null;
@@ -1330,3 +1331,13 @@ export const getAllRewards = async (): Promise<any[]> => {
     return [];
   }
 };
+
+export async function clearUntappdCookies(): Promise<void> {
+  try {
+    const db = await initDatabase();
+    await db.execAsync('DELETE FROM untappd');
+  } catch (error) {
+    console.error('Error clearing Untappd cookies:', error);
+    throw error;
+  }
+}
