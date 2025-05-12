@@ -707,7 +707,7 @@ export default function SettingsScreen() {
       setUntappdLoggedInStatus(false);
       Alert.alert(
         'Untappd Credentials Cleared',
-        'Your cached Untappd session has been cleared. To fully log out, you\'ll need to press "Check Untappd" while viewing a beer and manually log out from that session.',
+        'Your cached Untappd session has been cleared. To fully log out:\n\n1. Press "Check Untappd" while viewing a beer\n2. Manually log out of Untappd from that session\n3. Re-login to Untappd from the settings page',
         [{ text: 'OK' }]
       );
     } catch (error) {
