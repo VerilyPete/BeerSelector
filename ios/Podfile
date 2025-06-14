@@ -103,34 +103,7 @@ target 'BeerSelector' do
     end
     
     # Apply build fixes to individual targets
-    installer.pods_project.targets.each do |target|
-      # Fix for React-hermes directory issue
-      if target.name == 'React-hermes'
-        puts "⚠️ Applying fixes to React-hermes target..."
-        target.build_configurations.each do |config|
-          # Ensure it's a static library
-          config.build_settings['MACH_O_TYPE'] = 'staticlib'
-          config.build_settings['PRODUCT_NAME'] = 'libReact-hermes'
-          config.build_settings['EXECUTABLE_EXTENSION'] = 'a'
-          
-          # Add explicit header search paths
-          config.build_settings['HEADER_SEARCH_PATHS'] ||= '$(inherited)'
-          config.build_settings['HEADER_SEARCH_PATHS'] = [
-            "#{config.build_settings['HEADER_SEARCH_PATHS']}",
-            "\"${PODS_ROOT}/Headers/Private/React-hermes\"",
-            "\"${PODS_ROOT}/boost\"",
-          ].join(' ')
-          
-          # Force proper build output directories
-          config.build_settings['CONFIGURATION_BUILD_DIR'] = "$(BUILD_DIR)/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)/React-hermes"
-          config.build_settings['SYMROOT'] = "$(BUILD_DIR)/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)/React-hermes"
-          
-          # Ensure proper build product
-          config.build_settings['INSTALL_PATH'] = '$(LOCAL_LIBRARY_DIR)/Frameworks'
-          config.build_settings['SKIP_INSTALL'] = 'NO'
-        end
-      end
-      
+    installer.pods_project.targets.each do |target|  
       # Fix for Pods-BeerSelector target (multiple output files error)
       if target.name == 'Pods-BeerSelector'
         puts "⚠️ Applying fixes to Pods-BeerSelector target..."
@@ -183,34 +156,5 @@ target 'BeerSelector' do
         end
       end
     end
-
-    # Create a workaround shell script for the React-hermes directory issue
-    if File.directory?('Pods/Target Support Files/React-hermes')
-      puts "⚠️ Creating React-hermes build script workaround..."
-      File.open('Pods/Target Support Files/React-hermes/hermes-fix.sh', 'w') do |file|
-        file.puts '#!/bin/bash'
-        file.puts '# React-hermes fix script'
-        file.puts 'HERMES_BUILD_DIR="${PODS_CONFIGURATION_BUILD_DIR}/React-hermes"'
-        file.puts 'mkdir -p "$HERMES_BUILD_DIR"'
-        file.puts 'if [ ! -f "$HERMES_BUILD_DIR/libReact-hermes.a" ]; then'
-        file.puts '  echo "Creating dummy libReact-hermes.a"'
-        file.puts '  touch "$HERMES_BUILD_DIR/libReact-hermes.a"'
-        file.puts 'fi'
-        file.puts 'if [ -d "${PODS_ROOT}/../../DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/BeerSelector/BuildProductsPath/Release-iphoneos/React-hermes" ]; then'
-        file.puts '  echo "Creating symbolic link for React-hermes library"'
-        file.puts '  mkdir -p "${PODS_ROOT}/../../DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/BeerSelector/BuildProductsPath/Release-iphoneos/React-hermes"'
-        file.puts '  ln -sf "${HERMES_BUILD_DIR}/libReact-hermes.a" "${PODS_ROOT}/../../DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/BeerSelector/BuildProductsPath/Release-iphoneos/React-hermes/libReact-hermes.a"'
-        file.puts 'fi'
-      end
-      FileUtils.chmod('+x', 'Pods/Target Support Files/React-hermes/hermes-fix.sh')
-      
-      # Add a shell script phase to the React-hermes target
-      hermes_target = installer.pods_project.targets.find { |target| target.name == 'React-hermes' }
-      if hermes_target
-        phase = hermes_target.new_shell_script_build_phase("React-hermes Directory Fix")
-        phase.shell_script = '${PODS_TARGET_SRCROOT}/../Target\\ Support\\ Files/React-hermes/hermes-fix.sh'
-        phase.show_env_vars_in_log = '0'
-      end
-    end
-  end
+end
 end
