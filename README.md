@@ -7,15 +7,15 @@ A comprehensive React Native mobile app for beer enthusiasts to discover, track,
 ## Features
 
 ### 🍻 Core Functionality
-- **All Beers**: Browse through thousands of beers from various breweries with detailed information
-- **Beerfinder**: Advanced search and filtering to find specific beers based on style, brewery, ABV, and other criteria
-- **Tasted Brews**: Track and manage beers you've already tried with tasting dates and ratings
-- **Rewards System**: Monitor your beer tasting achievements and progress toward club rewards
-- **Offline Support**: Access your beer data even without an internet connection using local SQLite storage
+- **All Beers**: Browse through taplists at any of the Flying Saucer locations
+- **Beerfinder**: Filtering to display only beers you haven't sampled on your current plate with search across all fields to find your perfect beer.
+- **Tasted Brews**: Track beers you've already tried on your curret plate with tasting dates and ratings
+- **Rewards System**: View and redeem your UFO Club rewards
+- **Offline Support**: Access your latest synced data with built-in SQLite support
 
 ### 🔐 Authentication & User Management
 - **UFO Club Integration**: Full integration with Flying Saucer UFO Club accounts
-- **Visitor Mode**: Limited access mode for non-members to browse available beers
+- **Visitor Mode**: Limited access mode for non-members to browse available taplists
 - **Untappd Integration**: Connect your Untappd account for enhanced beer information and ratings (alpha quality)
 - **Secure Session Management**: Persistent login with secure token storage
 
@@ -50,6 +50,7 @@ A comprehensive React Native mobile app for beer enthusiasts to discover, track,
 - **[Expo Web Browser](https://docs.expo.dev/versions/latest/sdk/webbrowser/)** - External web browser integration
 
 ## Installation
+Ping Pete for an invite to the Testflight beta group
 
 ### Prerequisites
 
