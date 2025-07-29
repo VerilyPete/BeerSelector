@@ -8,15 +8,29 @@
             "username": "Petro",
             "email_address": "pete@verily.org",
             "member_since": "August 03, 2013",
-            "tasted_brew_count_this_round": "97",
+            "tasted_brew_count_this_round": "98",
             "roh": "6",
-            "total_tasted": "1297",
+            "total_tasted": "1298",
             "saucer_memberships": "1",
             "saucers_visited": "3"
         }
     },
     {
         "tasted_brew_current_round": [
+            {
+                "id": "16638483",
+                "roh_lap": "7",
+                "tasted_date": "04\/04\/2025",
+                "brew_name": "Altstadt Lager",
+                "brewer": "Altstadt",
+                "brewer_loc": "Fredricksburg, Texas",
+                "brew_style": "German Lager",
+                "brew_container": "draught",
+                "review_count": "1",
+                "review_ratings": "4",
+                "brew_description": "<p>This German lager is a light, malt centric beverage that features noble hops, just enough to balance its maltiness. It pours a clear golden color.&nbsp;&nbsp; There are notes of hay and slight malt in the flavor.&nbsp; It leaves you with a clear, clean, refreshing beverage to enjoy. 4.5% ABV<\/p>\r\n",
+                "chit_code": "16638483-13879-484587"
+            },
             {
                 "id": "7235782",
                 "roh_lap": "7",
