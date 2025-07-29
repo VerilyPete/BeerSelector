@@ -394,6 +394,18 @@
                 "brew_description": "A big, boozy, barrel-aged stout with blueberries! A collaboration with Portland, Oregon\\'s Great Notion Brewing, this stout is not for the faint of heart. Big chocolate flavors abound in this full-bodied, jet-black concoction, complemented by the slightly sweet\/slightly tart tang of fresh blueberries. Finishes silky and leaves you wanting more! 15.0% ABV"
             },
             {
+                "id": "7238859",
+                "added_date": "1743657766",
+                "brew_name": "Boulevard Bourbon Barrel Quad",
+                "brewer": "Boulevard Brewing Co.",
+                "brewer_loc": "Kansas City, MO",
+                "brew_style": "Quadruple",
+                "brew_container": "Draught",
+                "review_count": "0",
+                "review_rating": "4",
+                "brew_description": "This limited-edition version of the Sixth Glass Quad is aged in oak bourbon barrels for up to a year. Slightly present is a tartness from Oregon cherries, however much more upfront are notes of vanilla and toffee. A hint of bourbon remains on the nose, inviting savoring rather than quick consumption. An excellent candidate for cellering, as it will develop even more character and complexity over time. 11.8% ABV"
+            },
+            {
                 "id": "7238860",
                 "added_date": "1717700992",
                 "brew_name": "Boulevard Bourbon Barrel Quad (BTL)",
@@ -418,16 +430,16 @@
                 "brew_description": "Indulge in the Elegance of Age! Chardonnay Cask Saison\u2014a beer of exquisite craftsmanship. The warmth of white wine plays with a refined saison to create a symphony of fruity, flora aromas and woody notes. Aged lovingly in chardonnay oak barrels from the Napa region, this libation conjures esprit du jour in every sip.  9.5% ABV"
             },
             {
-                "id": "22207193",
-                "added_date": "1742410240",
-                "brew_name": "Boulevard Espresso Martini Stout",
+                "id": "22207204",
+                "added_date": "1743657795",
+                "brew_name": "Boulevard Espresso Martini Stout (BTL)",
                 "brewer": "Boulevard Brewing Co.",
-                "brewer_loc": "",
-                "brew_style": "Imperial Coffee Stout",
-                "brew_container": "Draught",
+                "brewer_loc": "Kansas City, MO",
+                "brew_style": "Imperial Stout",
+                "brew_container": "Bottle",
                 "review_count": null,
                 "review_rating": null,
-                "brew_description": "The original recipe for this decadent nightcap was a simple affair - vodka, espresso, and coffee liqueur, developed in the 1980s. Boulevard has taken a brewers spin on this classic cocktail by steeping soft, but rich, wheated imperial milk stout for 5 days on whole coffee beans, dry-hopping course ground Ethiopian espresso provided by roasters at Oddly Correct. The result is a smooth coffee-forward delectably full-bodied elegant way to end the perfect evening.  12% ABV"
+                "brew_description": "The original recipe for this decadent nightcap was a simple affair - vodka, espresso, and coffee liqueur, developed in the 1980s. Boulevard has taken a brewers spin on this classic cocktail by steeping soft, but rich, wheated imperial milk stout for 5 days on whole coffee beans, dry-hopping course ground Ethiopian espresso provided by roasters at Oddly Correct. The result is a smooth coffee-forward delectably full-bodied elegant way to end the perfect evening.  12.0% ABV"
             },
             {
                 "id": "19729541",
@@ -524,6 +536,30 @@
                 "review_count": "1",
                 "review_rating": "5",
                 "brew_description": "<p>Boulevard's Whiskey Barrel Stout has a big, complex malt bill with the addition of dextrose and brown sugar. Boulevard used the house Scottish yeast strain for notes of raisin and plum to complement the chocolate and espresso from the malts. Aged in various whiskey barrels, the brewers blend the best of each batch with fresh beer to help create a balanced beer.11.8% abv.<\/p>\r\n"
+            },
+            {
+                "id": "22207500",
+                "added_date": "1743657780",
+                "brew_name": "Boulevard Wood Baron (BTL)",
+                "brewer": "Boulevard Brewing Co.",
+                "brewer_loc": "",
+                "brew_style": "Imperial Porter",
+                "brew_container": "Bottle",
+                "review_count": null,
+                "review_rating": null,
+                "brew_description": "Barrel-Fresh Ale. Lapdog meets lap of luxury. Freshly-brewed meets barrel-aged. The Wood Baron is ready to be your new best friend, a hand-blended treat serving bourbon character with notes of chocolate and vanilla, this very good boy will make small moments feel dignified. 8.2% ABV"
+            },
+            {
+                "id": "22207499",
+                "added_date": "1743657772",
+                "brew_name": "Brash Black Masses (CAN)",
+                "brewer": "Brash Brewing",
+                "brewer_loc": "Houston, TX",
+                "brew_style": "Imperial Stout",
+                "brew_container": "Can",
+                "review_count": null,
+                "review_rating": null,
+                "brew_description": "Not satisfied with the coffee content in their various other coffee milk stouts, Brash has gone even further here.\u00a0 Black Masses pours pitch black with an almost oily sheen and a tight khaki head.\u00a0 Aromatics are all coffee - think espresso and coffee grounds with a very slight coffee cherry aroma.\u00a0 The flavor is much the same, drinking like cold black coffee. 9% ABV"
             },
             {
                 "id": "21661644",
@@ -790,6 +826,30 @@
                 "brew_description": "<p>This limited release sour ale is brewed with blueberry puree, vanilla, cinnamon flavor &amp; lactose, creating a beer with a vibrant purple color, sweetness &amp; spice reminiscent of the flavors in the classic dessert! 5.2%ABV<\/p>\\r\\n"
             },
             {
+                "id": "22207266",
+                "added_date": "1743657802",
+                "brew_name": "Dogfish Head 30 Minute Light IPA (CAN)",
+                "brewer": "Dogfish Head Craft Brewery",
+                "brewer_loc": "Milton, DE",
+                "brew_style": "Session IPA",
+                "brew_container": "Can",
+                "review_count": null,
+                "review_rating": null,
+                "brew_description": "Dogfish Head 30 Minute Light IPA has all the character of a world class IPA but with only 95 calories. It is light bodied & crisp with aromas of pineapple, coconut, mango & citrus. Tropical fruit flavors with a balanced hop profile. Hoppy, crisp & crushable. 4% ABV"
+            },
+            {
+                "id": "16554569",
+                "added_date": "1743657809",
+                "brew_name": "Dogfish Head Seaquench (CAN)",
+                "brewer": "Dogfish Head Craft Brewery",
+                "brewer_loc": "Milton",
+                "brew_style": "Sour Ale",
+                "brew_container": "bottled",
+                "review_count": "0",
+                "review_rating": "0",
+                "brew_description": "<p>SeaQuench Ale is Dogifsh Head's session sour quencher made with lime peel, black lime and&nbsp;sea salt. It\u2019s a citrusy-tart union of three German&nbsp;styles of beer blissfully brewed into one.&nbsp;They begun by brewing a straightforward Kolsch with lots of wheat and Munich Malt, then we brew a salty Gose with black limes, coriander and our sea salt. They follow it all up with a citrusy-tart Berlinerweiss made with lime juice and lime peel. All three beers are then blended together in the fermentation tank to create this German hybrid. 4.9%abv<\/p>\r\n"
+            },
+            {
                 "id": "20493072",
                 "added_date": "1715196540",
                 "brew_name": "Drie Fonteinen Druif Muscat Bleu (BTL)",
@@ -862,6 +922,18 @@
                 "brew_description": "Almond Pop pours a viscous pitch black with a tan head releasing notes of wonderful childhood memory. Toasted almond ice-cream pop and candy birthday cake flavor coats the tongue with the perfect balance of nutty, meets sweet, meets creamy, meets decadence. Like drinking a liquid Toasted Almond bar, the finish is velvety and luxurious. 11.0%ABV"
             },
             {
+                "id": "22207291",
+                "added_date": "1743657839",
+                "brew_name": "Equilibrium Star Light (CAN)",
+                "brewer": "Equilibrium Brewing",
+                "brewer_loc": "Middletown, NY",
+                "brew_style": "Imperial Hazy IPA",
+                "brew_container": "can",
+                "review_count": null,
+                "review_rating": null,
+                "brew_description": "This awesome Imperial Hazy IPA is a collaborative result between Equilibrium and Trillium brewing. It pours an opaque hazy copper color with a white head. Aromas and flavors of tropical fruits, fresh orange juice, peach ring candy, ripe mango and fruit sorbet hold strong in this brew. This medium\/full bodied libation finishes with a nice sweet hop flavor that is accompanied by juicy citrus notes. 8% ABV."
+            },
+            {
                 "id": "16692715",
                 "added_date": "1743001346",
                 "brew_name": "Eureka Heights Mini Boss",
@@ -898,6 +970,18 @@
                 "brew_description": "Strong aromas burst from this American Barleywine of orange, caramel, and rich, dark fruits. Flavors of light honey and crisp pine dance across the palate with a light roastiness. Light to medium body with a warming alcohol finish, weighing in at 12% ABV. "
             },
             {
+                "id": "21624251",
+                "added_date": "1743657880",
+                "brew_name": "Fifty Fifty Eclipse Old Fashion (BTL)",
+                "brewer": "Fifty Fifty Brewing",
+                "brewer_loc": "Truckee, California",
+                "brew_style": "Barrel Aged Imperial Stout",
+                "brew_container": "bottled",
+                "review_count": "0",
+                "review_rating": "0",
+                "brew_description": " Totality Imperial Stout and age it in oak bourbon barrels. That extra step adds a plethora of flavors to the already rich Imperial Stout. At first taste there is a large presence of dark chocolate, espresso and warmth from the alcohol of the beer. Oak barrel character then comes into play with hints of vanilla and coconut, followed by mild bitterness from the hops, and then a nice long lingering finish with hints of tobacco, dark dried fruit and more chocolate. Finished with Demerara sugar, aged in bourbon barrels, and infused with California orange zest."
+            },
+            {
                 "id": "22206961",
                 "added_date": "1738516103",
                 "brew_name": "FiftyFifty Eclipse Black Manhattan (BTL)",
@@ -920,6 +1004,18 @@
                 "review_count": "0",
                 "review_rating": "0",
                 "brew_description": "<p>Brewed with Pilsner malt and lime, this is a great option for those looking for a crisp, clean and still flavorful brew. Perfect for all environments and attitudes. 4.5% ABV<\/p>\\r\\n"
+            },
+            {
+                "id": "7232880",
+                "added_date": "1743657863",
+                "brew_name": "Firestone Walker Parabola (BTL)",
+                "brewer": "Firestone Walker Brewing",
+                "brewer_loc": "Paso Robles, CA",
+                "brew_style": "Imperial Stout",
+                "brew_container": "Bottled",
+                "review_count": "0",
+                "review_rating": "4",
+                "brew_description": "Parabola has been a major component of past anniversary blends and is one of Firestone Walker's most aggressive offerings. This beer features bold bourbon and tobacco aromas and a rich dark chocolate, charred oak flavor. 13% abv"
             },
             {
                 "id": "7237572",
@@ -1450,30 +1546,6 @@
                 "brew_description": "This beer pours the color of a glass of orange juice.\u00a0 Nice thick orange color.\u00a0\u00a0Aroma is exploding with all sorts of tropical and citrus fruits. Orange, mango, pineapple, papaya.\u00a0\u00a0Flavor is right there with the nose and doesn't hold anything back.\u00a0 Very citrusy with grapefruit coming in strong.\u00a0 Comes in strong at 9.5% ABV"
             },
             {
-                "id": "7234062",
-                "added_date": "1738686629",
-                "brew_name": "New Holland Dragons Milk",
-                "brewer": "New Holland Brewing Company",
-                "brewer_loc": "Holland, MI",
-                "brew_style": "Imperial Stout",
-                "brew_container": "draught",
-                "review_count": "6",
-                "review_rating": "3",
-                "brew_description": "New Hollands signature stout is aged in oak for 120 days which contributes to its bourbon flavor. This beer pours a rich black with and full dark brown head. The aroma is full of bakers chocolate and oak swirled with whiskey. The flavor adds coffee notes, vanilla, more oak, and warming alcohol. Medium to full body with a rich, warming finish. 11% ABV\r\n\r\n"
-            },
-            {
-                "id": "7234084",
-                "added_date": "1735976171",
-                "brew_name": "New Holland Dragons Milk (BTL)",
-                "brewer": "New Holland Brewing Company",
-                "brewer_loc": "Holland, MI",
-                "brew_style": "Imperial Stout",
-                "brew_container": "Bottled",
-                "review_count": "1",
-                "review_rating": "4",
-                "brew_description": "This strong ale was aged in oak for 120 days which contributes to its bourbon flavor. This beer pours a rich black with and full dark brown head. The aroma is full of bakers chocolate and oak swirled with whiskey. The flavor adds coffee notes, vanilla, more oak, and warming alcohol. Medium to full body with a rich, warming finish. 11% ABV"
-            },
-            {
                 "id": "21287519",
                 "added_date": "1729313632",
                 "brew_name": "New Holland Dragons Milk Crimson Keep (BTL)",
@@ -1832,18 +1904,6 @@
                 "review_count": "0",
                 "review_rating": "0",
                 "brew_description": "Saint Arnold Citrus Shandy is a pale lager mixed with a lemonade and grapefruit soda. The aroma presents itself with a citrus burst of lemon and grapefruit, with a slight floral note. Flavors of lemon and grapefruit play perfectly with the subtle notes of a light, refreshing beer. 4.5% ABV"
-            },
-            {
-                "id": "21642125",
-                "added_date": "1742532221",
-                "brew_name": "Saint Arnold Grand Prize",
-                "brewer": "Saint Arnold Brewing Co.",
-                "brewer_loc": "Houston, TX",
-                "brew_style": "American Lager",
-                "brew_container": "draught",
-                "review_count": "0",
-                "review_rating": "0",
-                "brew_description": "A classic American lager, Grand Prize provides a delicate balance of hop and malt flavors. A soft malt profile of biscuit and low bitterness creates an inspiring crisp, clean, and refreshing light beer.100 calorie lager with 2.7g of carbs. "
             },
             {
                 "id": "21632885",
