@@ -257,10 +257,6 @@ npm run test:ci          # Single run with coverage
 - Review [React Native documentation](https://reactnative.dev/docs/getting-started)
 - Open an issue in the GitHub repository
 
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
 ## Acknowledgements
 
 - **Flying Saucer UFO Club** for letting me bang on their API
