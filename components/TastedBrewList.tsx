@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { StyleSheet, View, TouchableOpacity, Alert, FlatList, ActivityIndicator } from 'react-native';
 import { getMyBeers, fetchAndPopulateMyBeers, areApiUrlsConfigured, setPreference } from '@/src/database/db';
+import { manualRefreshAllData } from '@/src/services/dataUpdateService';
 import { ThemedText } from './ThemedText';
 import { ThemedView } from './ThemedView';
 import { LoadingIndicator } from './LoadingIndicator';
@@ -92,7 +93,7 @@ export const TastedBrewList = () => {
   const handleRefresh = useCallback(async () => {
     try {
       setRefreshing(true);
-      console.log('Manual refresh initiated by user');
+      console.log('Manual refresh initiated by user in TastedBrewList');
 
       // First check if API URLs are configured
       const apiUrlsConfigured = await areApiUrlsConfigured();
@@ -105,17 +106,51 @@ export const TastedBrewList = () => {
         return;
       }
 
-      // For manual refresh, we should always fetch new data regardless of timestamp
-      // Clear any stored timestamps to force a fresh fetch
-      console.log('Clearing timestamp checks for manual refresh');
-      await setPreference('my_beers_last_update', '');
-      await setPreference('my_beers_last_check', '');
+      // Use the unified refresh function to refresh ALL data types
+      console.log('Using unified refresh to update all data types');
+      const result = await manualRefreshAllData();
 
-      // If API URLs are configured, proceed with refresh
-      console.log('Forcing fresh data fetch for manual refresh');
+      // Check if there were any errors
+      if (result.hasErrors) {
+        // If all errors are network-related, show a single consolidated message
+        if (result.allNetworkErrors) {
+          Alert.alert(
+            'Server Connection Error',
+            'Unable to connect to the server. Please check your internet connection and try again later.',
+            [{ text: 'OK' }]
+          );
+        }
+        // Otherwise, show individual error messages for each endpoint
+        else {
+          // Collect error messages
+          const errorMessages: string[] = [];
+
+          if (!result.allBeersResult.success && result.allBeersResult.error) {
+            const allBeersError = getUserFriendlyErrorMessage(result.allBeersResult.error);
+            errorMessages.push(`All Beer data: ${allBeersError}`);
+          }
+
+          if (!result.myBeersResult.success && result.myBeersResult.error) {
+            const myBeersError = getUserFriendlyErrorMessage(result.myBeersResult.error);
+            errorMessages.push(`Beerfinder data: ${myBeersError}`);
+          }
+          
+          if (!result.rewardsResult.success && result.rewardsResult.error) {
+            const rewardsError = getUserFriendlyErrorMessage(result.rewardsResult.error);
+            errorMessages.push(`Rewards data: ${rewardsError}`);
+          }
+
+          // Show error alert with all error messages
+          Alert.alert(
+            'Data Refresh Error',
+            `There were problems refreshing beer data:\n\n${errorMessages.join('\n\n')}`,
+            [{ text: 'OK' }]
+          );
+        }
+      }
+
+      // Refresh the local display regardless of API errors (use cached data)
       try {
-        // Attempt to refresh the beers from the API
-        await fetchAndPopulateMyBeers();
         const freshBeers = await getMyBeers();
 
         // Set the base beers
@@ -157,38 +192,19 @@ export const TastedBrewList = () => {
         // Apply the sorted beers
         setDisplayedBeers(sortedBeers);
         setError(null);
-      } catch (apiError: any) {
-        console.error('API error refreshing tasted beers:', apiError);
 
-        // Set a user-friendly error message
-        const errorMessage = apiError.message
-          ? getUserFriendlyErrorMessage({
-              type: apiError.isNetworkError ? ApiErrorType.NETWORK_ERROR : ApiErrorType.SERVER_ERROR,
-              message: apiError.message,
-              statusCode: apiError.statusCode || 0,
-              originalError: apiError
-            })
-          : 'Failed to connect to the server. Please check your internet connection and try again.';
-
-        setError(errorMessage);
-
-        // Also show an alert for immediate feedback
-        Alert.alert(
-          'Data Refresh Error',
-          errorMessage,
-          [{ text: 'OK' }]
-        );
+        // Show success message if no errors
+        if (!result.hasErrors) {
+          console.log('All data refreshed successfully from TastedBrewList tab');
+        }
+      } catch (localError: any) {
+        console.error('Error loading local beer data after refresh:', localError);
+        setError('Failed to load beer data from local storage.');
       }
     } catch (error: any) {
-      console.error('Error refreshing tasted beers:', error);
-
-      // Set a user-friendly error message
-      const errorMessage = error.message
-        ? `Failed to refresh tasted beer list: ${error.message}`
-        : 'Failed to refresh tasted beer list. Please try again later.';
-
-      setError(errorMessage);
-      Alert.alert('Error', errorMessage);
+      console.error('Error in unified refresh from TastedBrewList:', error);
+      setError('Failed to refresh beer data. Please try again later.');
+      Alert.alert('Error', 'Failed to refresh beer data. Please try again later.');
     } finally {
       setRefreshing(false);
     }

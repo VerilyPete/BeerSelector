@@ -41,7 +41,7 @@ export default function MyBeersScreen() {
         
         try {
           // Use the same refresh mechanism that runs on app startup
-          const result = await checkAndRefreshOnAppOpen(12);
+          const result = await checkAndRefreshOnAppOpen(2);
           if (result.updated) {
             console.log('Beer data was updated when Beerfinder tab became active');
           }
