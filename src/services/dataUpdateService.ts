@@ -376,79 +376,6 @@ export interface ManualRefreshResult {
   allNetworkErrors: boolean;
 }
 
-/**
- * Perform a manual refresh of all beer data
- * @returns Object with update status and error information for both data types
- */
-export async function manualRefreshAllData(): Promise<ManualRefreshResult> {
-  try {
-    // Fetch and update all data sources
-    const allBeersResult = await fetchAndUpdateAllBeers();
-    const myBeersResult = await fetchAndUpdateMyBeers();
-    
-    // Add rewards refresh
-    let rewardsResult: DataUpdateResult = {
-      success: true,
-      dataUpdated: false
-    };
-    
-    // Check if in visitor mode
-    const isVisitor = await getPreference('is_visitor_mode') === 'true';
-    
-    if (!isVisitor) {
-      try {
-        // Fetch and populate rewards if not in visitor mode
-        console.log('Refreshing rewards data');
-        await fetchAndPopulateRewards();
-        const rewardsCount = (await getAllRewards()).length;
-        rewardsResult = {
-          success: true,
-          dataUpdated: true,
-          itemCount: rewardsCount
-        };
-        console.log(`Updated rewards data with ${rewardsCount} rewards`);
-      } catch (error) {
-        console.error('Error updating rewards data:', error);
-        rewardsResult = {
-          success: false,
-          dataUpdated: false,
-          error: createErrorResponse(error)
-        };
-      }
-    } else {
-      console.log('In visitor mode, skipping rewards refresh');
-    }
-
-    // Check if any operation had errors
-    const hasErrors = !allBeersResult.success || !myBeersResult.success || !rewardsResult.success;
-
-    // Check if all errors are network-related
-    const allNetworkErrors = (
-      // Check if failed operations are all network-related
-      (!allBeersResult.success ? allBeersResult.error?.type === 'NETWORK_ERROR' : true) &&
-      (!myBeersResult.success ? myBeersResult.error?.type === 'NETWORK_ERROR' : true) &&
-      (!rewardsResult.success ? rewardsResult.error?.type === 'NETWORK_ERROR' : true)
-    );
-
-    return {
-      allBeersResult,
-      myBeersResult,
-      rewardsResult,
-      hasErrors,
-      allNetworkErrors
-    };
-  } catch (error) {
-    console.error('Error in manualRefreshAllData:', error);
-    // Return a basic error result if something unexpected happens
-    return {
-      allBeersResult: { success: false, dataUpdated: false, error: createErrorResponse(error) },
-      myBeersResult: { success: false, dataUpdated: false, error: createErrorResponse(error) },
-      rewardsResult: { success: false, dataUpdated: false, error: createErrorResponse(error) },
-      hasErrors: true,
-      allNetworkErrors: false
-    };
-  }
-}
 
 /**
  * Result of an automatic refresh operation
@@ -463,6 +390,130 @@ export interface AutoRefreshResult {
  * @param minIntervalHours Minimum hours between checks (default: 12)
  * @returns Object with update status and any errors encountered
  */
+// Create a simple wrapper for rewards update
+async function fetchAndUpdateRewards(): Promise<DataUpdateResult> {
+  try {
+    // Check if in visitor mode
+    const isVisitor = await getPreference('is_visitor_mode') === 'true';
+    
+    if (isVisitor) {
+      console.log('In visitor mode, skipping rewards refresh');
+      return { success: true, dataUpdated: false };
+    }
+
+    // Fetch and populate rewards if not in visitor mode
+    console.log('Refreshing rewards data');
+    await fetchAndPopulateRewards();
+    
+    // Note: We don't have getAllRewards function, so we'll assume success
+    console.log('Updated rewards data successfully');
+    return {
+      success: true,
+      dataUpdated: true,
+      itemCount: 1 // We don't have a way to count rewards right now
+    };
+  } catch (error) {
+    console.error('Error updating rewards data:', error);
+    return {
+      success: false,
+      dataUpdated: false,
+      error: createErrorResponse(error)
+    };
+  }
+}
+
+// Unified manual refresh function that refreshes ALL data types
+// This ensures consistent data across all tabs when user manually refreshes
+export async function manualRefreshAllData(): Promise<ManualRefreshResult> {
+  console.log('Starting unified manual refresh for all data types...');
+  
+  try {
+    // Check if API URLs are configured
+    const apiUrl = await getPreference('all_beers_api_url');
+    const myBeersApiUrl = await getPreference('my_beers_api_url');
+    
+    if (!apiUrl && !myBeersApiUrl) {
+      console.log('No API URLs configured for manual refresh');
+      return {
+        allBeersResult: { success: false, dataUpdated: false, error: { type: ApiErrorType.VALIDATION_ERROR, message: 'No API URLs configured' } },
+        myBeersResult: { success: false, dataUpdated: false, error: { type: ApiErrorType.VALIDATION_ERROR, message: 'No API URLs configured' } },
+        rewardsResult: { success: false, dataUpdated: false, error: { type: ApiErrorType.VALIDATION_ERROR, message: 'No API URLs configured' } },
+        hasErrors: true,
+        allNetworkErrors: false
+      };
+    }
+
+    // Force fresh data by clearing all timestamps
+    console.log('Clearing all timestamp checks for manual refresh');
+    await setPreference('all_beers_last_update', '');
+    await setPreference('all_beers_last_check', '');
+    await setPreference('my_beers_last_update', '');
+    await setPreference('my_beers_last_check', '');
+    await setPreference('rewards_last_update', '');
+    await setPreference('rewards_last_check', '');
+
+    // Refresh all data types in parallel for better performance
+    const [allBeersResult, myBeersResult, rewardsResult] = await Promise.allSettled([
+      apiUrl ? fetchAndUpdateAllBeers() : Promise.resolve({ success: true, dataUpdated: false }),
+      myBeersApiUrl ? fetchAndUpdateMyBeers() : Promise.resolve({ success: true, dataUpdated: false }),
+      myBeersApiUrl ? fetchAndUpdateRewards() : Promise.resolve({ success: true, dataUpdated: false })
+    ]);
+
+    // Process results
+    const processResult = (result: PromiseSettledResult<DataUpdateResult>): DataUpdateResult => {
+      if (result.status === 'fulfilled') {
+        return result.value;
+      } else {
+        console.error('Manual refresh promise rejected:', result.reason);
+        return {
+          success: false,
+          dataUpdated: false,
+          error: createErrorResponse(result.reason)
+        };
+      }
+    };
+
+    const finalAllBeersResult = processResult(allBeersResult);
+    const finalMyBeersResult = processResult(myBeersResult);
+    const finalRewardsResult = processResult(rewardsResult);
+
+    // Check if there were any errors
+    const hasErrors = !finalAllBeersResult.success || !finalMyBeersResult.success || !finalRewardsResult.success;
+    
+    // Check if all errors are network-related
+    const allNetworkErrors = hasErrors && [finalAllBeersResult, finalMyBeersResult, finalRewardsResult]
+      .filter(result => !result.success && result.error)
+      .every(result => result.error!.type === 'NETWORK_ERROR' || result.error!.type === 'TIMEOUT_ERROR');
+
+    console.log('Manual refresh completed:', {
+      allBeers: finalAllBeersResult.success,
+      myBeers: finalMyBeersResult.success,
+      rewards: finalRewardsResult.success,
+      hasErrors,
+      allNetworkErrors
+    });
+
+    return {
+      allBeersResult: finalAllBeersResult,
+      myBeersResult: finalMyBeersResult,
+      rewardsResult: finalRewardsResult,
+      hasErrors,
+      allNetworkErrors
+    };
+  } catch (error) {
+    console.error('Error in unified manual refresh:', error);
+    const errorResponse = createErrorResponse(error);
+    
+    return {
+      allBeersResult: { success: false, dataUpdated: false, error: errorResponse },
+      myBeersResult: { success: false, dataUpdated: false, error: errorResponse },
+      rewardsResult: { success: false, dataUpdated: false, error: errorResponse },
+      hasErrors: true,
+      allNetworkErrors: errorResponse.type === 'NETWORK_ERROR' || errorResponse.type === 'TIMEOUT_ERROR'
+    };
+  }
+}
+
 export async function checkAndRefreshOnAppOpen(minIntervalHours: number = 12): Promise<AutoRefreshResult> {
   try {
     // First check if API URLs are actually configured

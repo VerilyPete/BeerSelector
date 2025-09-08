@@ -91,8 +91,8 @@ export default function RootLayout() {
 
               // Only check for updates if API URLs are configured
               if (allBeersApiUrl || myBeersApiUrl) {
-                // Check for updates on app open (if it's been at least 12 hours since last check)
-                checkAndRefreshOnAppOpen(12).then(result => {
+                // Check for updates on app open (if it's been at least 2 hours since last check)
+                checkAndRefreshOnAppOpen(2).then(result => {
                   if (result.updated) {
                     console.log('Data was updated on app open');
                   }
