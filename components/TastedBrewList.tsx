@@ -70,7 +70,7 @@ export const TastedBrewList = () => {
       if (filteredData.length > 0) {
         console.log('TastedBrewList: Sample beer:', JSON.stringify(filteredData[0]));
       } else {
-        console.log('TastedBrewList: No tasted beers found after filtering');
+        console.log('TastedBrewList: No tasted beers found after filtering (new user or round rollover at 200 beers)');
       }
 
       setTastedBeers(filteredData);

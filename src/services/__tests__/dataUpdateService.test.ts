@@ -239,8 +239,10 @@ describe('dataUpdateService', () => {
       
       const result = await fetchAndUpdateMyBeers();
       
-      expect(result).toBe(false);
-      expect(console.error).toHaveBeenCalledWith('No valid beers with IDs found, aborting database update');
+      expect(result.success).toBe(true);
+      expect(result.dataUpdated).toBe(true);
+      expect(result.itemCount).toBe(0);
+      expect(console.log).toHaveBeenCalledWith('No valid beers with IDs found, but API returned data - clearing database');
     });
     
     it('should successfully update my beers', async () => {
