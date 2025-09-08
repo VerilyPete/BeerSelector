@@ -320,6 +320,41 @@ describe('dataUpdateService integration tests', () => {
       expect(console.error).toHaveBeenCalledWith('Invalid my beers data format: missing tasted_brew_current_round');
     });
 
+    it('should handle empty tasted beers array (new user or round rollover)', async () => {
+      // Create data with empty tasted_brew_current_round array (happens when round rolls over at 200 beers)
+      const emptyBeersData = [
+        { member: { member_id: '123', name: 'Test User' } },
+        { tasted_brew_current_round: [] }  // Empty array - new user or round rollover
+      ];
+
+      // Mock fetch to return the empty data
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: jest.fn().mockResolvedValue(emptyBeersData),
+      });
+
+      // Call the function
+      const result = await fetchAndUpdateMyBeers();
+
+      // Verify the result - should succeed with 0 items
+      expect(result.success).toBe(true);
+      expect(result.dataUpdated).toBe(true);
+      expect(result.itemCount).toBe(0);
+
+      // Verify that fetch was called
+      expect(global.fetch).toHaveBeenCalledWith('https://example.com/mybeers.json');
+
+      // Verify that populateMyBeersTable was called with empty array
+      expect(populateMyBeersTable).toHaveBeenCalledWith([]);
+
+      // Verify that setPreference was called to update timestamps
+      expect(setPreference).toHaveBeenCalledWith('my_beers_last_update', expect.any(String));
+      expect(setPreference).toHaveBeenCalledWith('my_beers_last_check', expect.any(String));
+
+      // Verify that the correct log message was called
+      expect(console.log).toHaveBeenCalledWith('Empty tasted beers array - user has no tasted beers in current round (new user or round rollover at 200 beers), clearing database');
+    });
+
     it('should handle data with no valid beers', async () => {
       // Create a modified version of the data with invalid beers (no IDs)
       const invalidBeersData = [
@@ -340,20 +375,23 @@ describe('dataUpdateService integration tests', () => {
       // Call the function
       const result = await fetchAndUpdateMyBeers();
 
-      // Verify the result
-      expect(result).toBe(false);
+      // Verify the result - should now succeed with 0 items
+      expect(result.success).toBe(true);
+      expect(result.dataUpdated).toBe(true);
+      expect(result.itemCount).toBe(0);
 
       // Verify that fetch was called
       expect(global.fetch).toHaveBeenCalledWith('https://example.com/mybeers.json');
 
-      // Verify that populateMyBeersTable was not called
-      expect(populateMyBeersTable).not.toHaveBeenCalled();
+      // Verify that populateMyBeersTable was called with empty array
+      expect(populateMyBeersTable).toHaveBeenCalledWith([]);
 
-      // Verify that setPreference was not called
-      expect(setPreference).not.toHaveBeenCalled();
+      // Verify that setPreference was called to update timestamps
+      expect(setPreference).toHaveBeenCalledWith('my_beers_last_update', expect.any(String));
+      expect(setPreference).toHaveBeenCalledWith('my_beers_last_check', expect.any(String));
 
-      // Verify that an error was logged
-      expect(console.error).toHaveBeenCalledWith('No valid beers with IDs found, aborting database update');
+      // Verify that the new log message was called
+      expect(console.log).toHaveBeenCalledWith('No valid beers with IDs found, but API returned data - clearing database');
     });
 
     it('should handle fetch throwing an exception', async () => {

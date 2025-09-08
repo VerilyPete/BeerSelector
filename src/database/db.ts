@@ -618,6 +618,15 @@ export const initializeBeerDatabase = async (): Promise<void> => {
 };
 
 // Fetch Beerfinder beers from API
+// Note: The tasted_brew_current_round array can be legitimately empty in two scenarios:
+// 1. New user who hasn't tasted any beers yet
+// 2. Experienced user whose "round" has rolled over after reaching 200 tasted beers
+// 
+// Business rules:
+// - Users can only log max 3 beers per day, so round rollover from 197→200 takes minimum 24 hours
+// - This gives users predictable timing and prevents sudden empty states during active sessions
+// 
+// Both scenarios should be handled as valid states, not errors.
 export const fetchMyBeersFromAPI = async (): Promise<Beerfinder[]> => {
   try {
     // First check if in visitor mode to immediately return empty array
@@ -669,6 +678,12 @@ export const fetchMyBeersFromAPI = async (): Promise<Beerfinder[]> => {
       const beers = data[1].tasted_brew_current_round;
       console.log(`DB: Found tasted_brew_current_round with ${beers.length} beers`);
 
+      // Handle empty array as a valid state (user has no tasted beers or round has rolled over)
+      if (beers.length === 0) {
+        console.log('DB: Empty tasted beers array - user has no tasted beers in current round (new user or round rollover at 200 beers)');
+        return [];
+      }
+
       // Validate the beers array - check for missing IDs
       const validBeers = beers.filter((beer: any) => beer && beer.id);
       const invalidBeers = beers.filter((beer: any) => !beer || !beer.id);
@@ -683,12 +698,12 @@ export const fetchMyBeersFromAPI = async (): Promise<Beerfinder[]> => {
         });
       }
 
-      // Only return valid beers with IDs
+      // Return valid beers (could be empty if all beers are invalid)
       if (validBeers.length > 0) {
         return validBeers;
       } else {
-        console.error('DB: No valid beers with IDs found in the response');
-        throw new Error('No valid beers with IDs found in the response');
+        console.log('DB: No valid beers with IDs found in response, but returning empty array instead of error');
+        return [];
       }
     }
 
@@ -704,10 +719,25 @@ export const fetchMyBeersFromAPI = async (): Promise<Beerfinder[]> => {
 export const populateMyBeersTable = async (beers: Beerfinder[]): Promise<void> => {
   console.log(`DB: Populating My Beers table with ${beers.length} beers`);
 
-  // Validate that we have beers with IDs before proceeding
+  // Handle empty array as valid (clear the table for new user or round rollover)
   if (!beers || beers.length === 0) {
-    console.error('DB: No beers provided to populate the table');
-    throw new Error('No beers provided to populate the table');
+    console.log('DB: Empty beers array - clearing tasted_brew_current_round table (new user or round rollover at 200 beers)');
+    
+    if (!await acquireLock('populateMyBeersTable')) {
+      console.log('DB: Could not acquire lock for populateMyBeersTable, another operation is in progress');
+      return;
+    }
+
+    try {
+      const database = await initDatabase();
+      await database.withTransactionAsync(async () => {
+        await database.runAsync('DELETE FROM tasted_brew_current_round');
+      });
+      console.log('DB: Successfully cleared tasted_brew_current_round table');
+    } finally {
+      releaseLock('populateMyBeersTable');
+    }
+    return;
   }
 
   // Count beers with valid IDs
@@ -715,8 +745,23 @@ export const populateMyBeersTable = async (beers: Beerfinder[]): Promise<void> =
   console.log(`DB: Found ${validBeers.length} valid beers with IDs out of ${beers.length} total beers`);
 
   if (validBeers.length === 0) {
-    console.error('DB: No valid beers with IDs found, aborting table update');
-    throw new Error('No valid beers with IDs found, aborting table update');
+    console.log('DB: No valid beers with IDs found, clearing table instead of throwing error');
+    
+    if (!await acquireLock('populateMyBeersTable')) {
+      console.log('DB: Could not acquire lock for populateMyBeersTable, another operation is in progress');
+      return;
+    }
+
+    try {
+      const database = await initDatabase();
+      await database.withTransactionAsync(async () => {
+        await database.runAsync('DELETE FROM tasted_brew_current_round');
+      });
+      console.log('DB: Successfully cleared tasted_brew_current_round table (all beers invalid)');
+    } finally {
+      releaseLock('populateMyBeersTable');
+    }
+    return;
   }
 
   if (!await acquireLock('populateMyBeersTable')) {
@@ -920,13 +965,35 @@ const _refreshMyBeersFromAPIInternal = async (): Promise<Beerfinder[]> => {
     const myBeers = await fetchMyBeersFromAPI();
     console.log(`DB: _refreshMyBeersFromAPIInternal received ${myBeers.length} beers from API`);
 
+    // Handle empty array as a valid state (user has no tasted beers or round has rolled over)
+    if (myBeers.length === 0) {
+      console.log('DB: Empty tasted beers array - user has no tasted beers in current round (new user or round rollover at 200 beers), clearing database');
+      
+      const database = await initDatabase();
+      await database.withTransactionAsync(async () => {
+        // Clear existing data since there are no beers
+        await database.runAsync('DELETE FROM tasted_brew_current_round');
+      });
+      
+      console.log('DB: My Beers cleared (empty state)!');
+      return [];
+    }
+
     // Validate beers have IDs
     const validBeers = myBeers.filter((beer: any) => beer && beer.id);
     console.log(`DB: Found ${validBeers.length} valid beers with IDs out of ${myBeers.length} total beers`);
 
     if (validBeers.length === 0) {
-      console.error('DB: No valid beers with IDs found, aborting database update');
-      throw new Error('No valid beers with IDs found, aborting database update');
+      console.log('DB: No valid beers with IDs found, clearing database instead of throwing error');
+      
+      const database = await initDatabase();
+      await database.withTransactionAsync(async () => {
+        // Clear existing data since all beers are invalid
+        await database.runAsync('DELETE FROM tasted_brew_current_round');
+      });
+      
+      console.log('DB: My Beers cleared (all invalid)!');
+      return [];
     }
 
     const database = await initDatabase();

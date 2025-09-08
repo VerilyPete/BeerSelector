@@ -279,19 +279,42 @@ export async function fetchAndUpdateMyBeers(): Promise<DataUpdateResult> {
       };
     }
 
+    // Handle empty array as a valid state (user has no tasted beers or round has rolled over)
+    if (myBeers.length === 0) {
+      console.log('Empty tasted beers array - user has no tasted beers in current round (new user or round rollover at 200 beers), clearing database');
+      // Clear the database table since there are no beers
+      await populateMyBeersTable([]);
+      
+      // Update the last update timestamp
+      await setPreference('my_beers_last_update', new Date().toISOString());
+      await setPreference('my_beers_last_check', new Date().toISOString());
+      
+      console.log('Updated my beers data with 0 beers (empty state)');
+      return {
+        success: true,
+        dataUpdated: true,
+        itemCount: 0
+      };
+    }
+
     // Validate that we have beers with IDs
     const validBeers = myBeers.filter(beer => beer && beer.id);
     console.log(`Found ${validBeers.length} valid beers with IDs out of ${myBeers.length} total beers`);
 
     if (validBeers.length === 0) {
-      console.error('No valid beers with IDs found, aborting database update');
+      console.log('No valid beers with IDs found, but API returned data - clearing database');
+      // This means all beers in the response are invalid, so clear the database
+      await populateMyBeersTable([]);
+      
+      // Update the last update timestamp
+      await setPreference('my_beers_last_update', new Date().toISOString());
+      await setPreference('my_beers_last_check', new Date().toISOString());
+      
+      console.log('Updated my beers data with 0 beers (all invalid)');
       return {
-        success: false,
-        dataUpdated: false,
-        error: {
-          type: ApiErrorType.VALIDATION_ERROR,
-          message: 'No valid tasted beers found in server response'
-        }
+        success: true,
+        dataUpdated: true,
+        itemCount: 0
       };
     }
 
