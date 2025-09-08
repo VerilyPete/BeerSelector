@@ -246,7 +246,7 @@ describe('TastedBrewList Integration Tests', () => {
     const { findByText } = render(<TastedBrewList />);
 
     // Check that the empty state message is displayed
-    const emptyMessage = await findByText('No tasted beer found. Please check your connection and try again.');
+    const emptyMessage = await findByText('No beers in your current round yet. Start exploring and log some brews!');
     expect(emptyMessage).toBeTruthy();
   });
 
