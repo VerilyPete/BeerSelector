@@ -389,7 +389,7 @@ export const TastedBrewList = () => {
               <ThemedText style={styles.emptyText}>
                 {searchText
                   ? "No tasted beer matches your search criteria."
-                  : "No tasted beer found. Please check your connection and try again."}
+                  : "No beers in your current round yet. Start exploring and log some brews!"}
               </ThemedText>
             </View>
           ) : (
