@@ -126,11 +126,6 @@ export const AllBeers = () => {
             const myBeersError = getUserFriendlyErrorMessage(result.myBeersResult.error);
             errorMessages.push(`Beerfinder data: ${myBeersError}`);
           }
-          
-          if (!result.rewardsResult.success && result.rewardsResult.error) {
-            const rewardsError = getUserFriendlyErrorMessage(result.rewardsResult.error);
-            errorMessages.push(`Rewards data: ${rewardsError}`);
-          }
 
           // Show error alert with all error messages
           Alert.alert(
