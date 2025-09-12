@@ -139,11 +139,6 @@ export default function SettingsScreen() {
             const myBeersError = getUserFriendlyErrorMessage(result.myBeersResult.error);
             errorMessages.push(`Beerfinder data: ${myBeersError}`);
           }
-          
-          if (!result.rewardsResult.success && result.rewardsResult.error) {
-            const rewardsError = getUserFriendlyErrorMessage(result.rewardsResult.error);
-            errorMessages.push(`Rewards data: ${rewardsError}`);
-          }
 
           // Show error alert with all error messages
           Alert.alert(
@@ -154,11 +149,10 @@ export default function SettingsScreen() {
         }
       }
       // If no errors but data was updated
-      else if (result.allBeersResult.dataUpdated || result.myBeersResult.dataUpdated || result.rewardsResult.dataUpdated) {
+      else if (result.allBeersResult.dataUpdated || result.myBeersResult.dataUpdated) {
         // Show success message with counts
         const allBeersCount = result.allBeersResult.itemCount || 0;
         const myBeersCount = result.myBeersResult.itemCount || 0;
-        const rewardsCount = result.rewardsResult.itemCount || 0;
         
         // Check if user is in visitor mode to customize message
         const isVisitor = await getPreference('is_visitor_mode') === 'true';
@@ -166,7 +160,7 @@ export default function SettingsScreen() {
         let successMessage = `Beer data refreshed successfully!\n\nAll Beer: ${allBeersCount} beers\n`;
         
         if (!isVisitor) {
-          successMessage += `Beerfinder: ${myBeersCount} beers\nRewards: ${rewardsCount} rewards`;
+          successMessage += `Beerfinder: ${myBeersCount} beers`;
         } else {
           successMessage += 'Visitor mode: Personal data not available';
         }

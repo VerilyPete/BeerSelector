@@ -10,7 +10,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { initializeBeerDatabase, getPreference, setPreference } from '@/src/database/db';
-import { checkAndRefreshOnAppOpen } from '@/src/services/dataUpdateService';
+import { checkAndRefreshOnAppOpen, manualRefreshAllData, fetchAndUpdateRewards } from '@/src/services/dataUpdateService';
 import { getUserFriendlyErrorMessage } from '@/src/utils/notificationUtils';
 
 // Track if database initialization has been started to prevent multiple calls
@@ -91,46 +91,29 @@ export default function RootLayout() {
 
               // Only check for updates if API URLs are configured
               if (allBeersApiUrl || myBeersApiUrl) {
-                // Check for updates on app open (if it's been at least 2 hours since last check)
-                checkAndRefreshOnAppOpen(2).then(result => {
-                  if (result.updated) {
-                    console.log('Data was updated on app open');
-                  }
+                // Always refresh core data on app open, and refresh rewards as well
+                try {
+                  // Kick off core data refresh and rewards refresh in parallel
+                  const refreshPromises: Promise<any>[] = [];
+                  refreshPromises.push(manualRefreshAllData());
+                  refreshPromises.push(fetchAndUpdateRewards());
 
-                  // If there were errors during the refresh, notify the user
-                  if (result.errors && result.errors.length > 0) {
-                    console.error('Errors during automatic data refresh:', result.errors);
-
-                    // Check if all errors are network-related
-                    const allNetworkErrors = result.errors.every(error =>
-                      error.type === 'NETWORK_ERROR' || error.type === 'TIMEOUT_ERROR'
-                    );
-
-                    // Show the error alert after a short delay to ensure the app is fully loaded
-                    setTimeout(() => {
-                      if (allNetworkErrors && result.errors.length > 1) {
-                        // If all errors are network-related, show a single consolidated message
-                        Alert.alert(
-                          'Server Connection Error',
-                          'Unable to connect to the server. Please check your internet connection and try again later.',
-                          [{ text: 'OK' }]
-                        );
-                      } else {
-                        // Otherwise, show the first error
-                        const firstError = result.errors[0];
-                        const errorMessage = getUserFriendlyErrorMessage(firstError);
-
-                        Alert.alert(
-                          'Data Refresh Error',
-                          `There was a problem refreshing beer data: ${errorMessage}`,
-                          [{ text: 'OK' }]
-                        );
+                  Promise.allSettled(refreshPromises).then(results => {
+                    const coreResult = results[0];
+                    if (coreResult.status === 'fulfilled') {
+                      const value: any = coreResult.value;
+                      if (value && !value.hasErrors) {
+                        console.log('Core data refreshed successfully on app open');
+                      } else if (value && value.hasErrors) {
+                        console.warn('Core data refresh completed with errors on app open');
                       }
-                    }, 1000);
-                  }
-                }).catch(error => {
-                  console.error('Error checking for updates on app open:', error);
-                });
+                    }
+                  }).catch(err => {
+                    console.error('Error during startup data refresh:', err);
+                  });
+                } catch (e) {
+                  console.error('Failed to initiate startup data refresh:', e);
+                }
               } else {
                 console.log('API URLs not configured, skipping automatic data refresh');
               }
