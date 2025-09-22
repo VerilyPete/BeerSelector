@@ -494,13 +494,13 @@ export const populateBeersTable = async (beers: Beer[]): Promise<void> => {
   const database = await initDatabase();
 
   try {
-    // Check if table is already populated
-    const count = await database.getFirstAsync<{ count: number }>('SELECT COUNT(*) as count FROM allbeers');
-
-    if (count && count.count > 0) {
-      console.log(`Database already contains ${count.count} beers. Skipping import.`);
-      return;
-    }
+    // Always refresh the allbeers table with the latest data
+    // Clear existing data first, then insert fresh records in batches
+    await database.withTransactionAsync(async () => {
+      const before = await database.getFirstAsync<{ count: number }>('SELECT COUNT(*) as count FROM allbeers');
+      await database.runAsync('DELETE FROM allbeers');
+      console.log(`Cleared allbeers table (removed ${before?.count ?? 0} rows)`);
+    });
 
     console.log(`Starting import of ${beers.length} beers...`);
 
@@ -542,7 +542,13 @@ export const populateBeersTable = async (beers: Beer[]): Promise<void> => {
       }
     }
 
-    console.log('Beer import complete!');
+    // Verify final row count
+    try {
+      const after = await database.getFirstAsync<{ count: number }>('SELECT COUNT(*) as count FROM allbeers');
+      console.log(`Beer import complete! allbeers now has ${after?.count ?? 0} rows`);
+    } catch (e) {
+      console.log('Beer import complete! (row count query failed)');
+    }
   } catch (error) {
     console.error('Error populating beer database:', error);
     throw error;
@@ -730,10 +736,12 @@ export const populateMyBeersTable = async (beers: Beerfinder[]): Promise<void> =
 
     try {
       const database = await initDatabase();
+      const before = await database.getFirstAsync<{ count: number }>('SELECT COUNT(*) as count FROM tasted_brew_current_round');
       await database.withTransactionAsync(async () => {
         await database.runAsync('DELETE FROM tasted_brew_current_round');
       });
-      console.log('DB: Successfully cleared tasted_brew_current_round table');
+      const after = await database.getFirstAsync<{ count: number }>('SELECT COUNT(*) as count FROM tasted_brew_current_round');
+      console.log(`DB: Successfully cleared tasted_brew_current_round table (removed ${before?.count ?? 0} rows, now ${after?.count ?? 0})`);
     } finally {
       releaseLock('populateMyBeersTable');
     }
@@ -821,19 +829,19 @@ export const populateMyBeersTable = async (beers: Beerfinder[]): Promise<void> =
               ]
             );
           } catch (err) {
-            console.error(`DB: Error inserting beer ${beer.id}:`, err);
-            throw err;
+            console.error('DB: Error inserting beer into tasted_brew_current_round:', err);
           }
-        }
-
-        // Log progress for larger batches
-        if ((i + batchSize) % 100 === 0 || i + batchSize >= validBeers.length) {
-          console.log(`Imported ${Math.min(i + batchSize, validBeers.length)} of ${validBeers.length} valid My Beers...`);
         }
       }
     });
 
-    console.log('My Beers import complete!');
+    // Verify final row count
+    try {
+      const after = await database.getFirstAsync<{ count: number }>('SELECT COUNT(*) as count FROM tasted_brew_current_round');
+      console.log(`DB: My Beers import complete! tasted_brew_current_round now has ${after?.count ?? 0} rows`);
+    } catch (e) {
+      console.log('DB: My Beers import complete! (row count query failed)');
+    }
   } catch (error) {
     console.error('Error populating My Beers database:', error);
     throw error;
