@@ -10,8 +10,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { initializeBeerDatabase, getPreference, setPreference } from '@/src/database/db';
-import { checkAndRefreshOnAppOpen, manualRefreshAllData, fetchAndUpdateRewards } from '@/src/services/dataUpdateService';
-import { getUserFriendlyErrorMessage } from '@/src/utils/notificationUtils';
+import { manualRefreshAllData, fetchAndUpdateRewards } from '@/src/services/dataUpdateService';
 
 // Track if database initialization has been started to prevent multiple calls
 let dbInitStarted = false;
