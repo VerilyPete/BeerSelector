@@ -33,6 +33,15 @@ export const checkInBeer = async (beer: Beer): Promise<CheckInResponse> => {
       console.log('Auto-login successful, continuing with check-in');
     }
 
+    // Check if user is in visitor mode
+    if (sessionData.memberId === 'visitor') {
+      return {
+        success: false,
+        error: 'Check-in requires UFO Club member login. Please log in via Settings.',
+        message: 'Visitor mode does not support check-in'
+      };
+    }
+
     // Create the chitCode
     const chitCode = `${beer.id}-${sessionData.storeId}-${sessionData.memberId}`;
 

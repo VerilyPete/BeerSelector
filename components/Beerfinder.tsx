@@ -324,8 +324,13 @@ export const Beerfinder = () => {
 
       console.log('Check-in result:', result);
 
-      // Show success message
-      Alert.alert('Success', `Successfully checked in ${item.brew_name}!`);
+      // Check if the result indicates success or failure
+      if (result.success) {
+        Alert.alert('Success', `Successfully checked in ${item.brew_name}!`);
+      } else {
+        // Show the error from the API response
+        Alert.alert('Check-In Failed', result.error || 'Unable to check in beer. Please try again.');
+      }
     } catch (error: any) {
       console.error('Check-in error:', error);
 

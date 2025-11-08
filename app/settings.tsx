@@ -18,6 +18,7 @@ import Constants from 'expo-constants';
 import { createMockSession } from '@/src/api/mockSession';
 import { getUserFriendlyErrorMessage } from '@/src/utils/notificationUtils';
 import { handleVisitorLogin } from '@/src/api/authService';
+import { saveSessionData, extractSessionDataFromResponse } from '@/src/api/sessionManager';
 
 // Define a Preference type for typechecking
 interface Preference {
@@ -464,6 +465,19 @@ export default function SettingsScreen() {
 
           // Save cookies
           setPreference('auth_cookies', JSON.stringify(cookies), 'Authentication cookies');
+
+          // Extract and save session data to SecureStore for API requests
+          const sessionData = extractSessionDataFromResponse(new Headers(), cookies);
+          if (sessionData.memberId && sessionData.sessionId && sessionData.storeId && sessionData.storeName) {
+            await saveSessionData(sessionData as any);
+            console.log('Member session data saved to SecureStore:', {
+              memberId: sessionData.memberId,
+              storeId: sessionData.storeId,
+              storeName: sessionData.storeName
+            });
+          } else {
+            console.warn('Incomplete session data from member login cookies:', sessionData);
+          }
 
           // Refresh the data
           handleRefresh();
