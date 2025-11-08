@@ -1,15 +1,99 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuites name="jest tests" tests="21" failures="0" errors="0" time="1.683">
-  <testsuite name="Preference Functions" errors="0" failures="0" skipped="0" timestamp="2025-11-08T06:46:08" time="1.183" tests="21">
-    <testcase classname="Preference Functions getPreference should return preference value when it exists" name="Preference Functions getPreference should return preference value when it exists" time="0.002">
+<testsuites name="jest tests" tests="61" failures="0" errors="0" time="10.897">
+  <testsuite name="Beer API" errors="0" failures="0" skipped="0" timestamp="2025-11-08T15:13:13" time="9.322" tests="23">
+    <testcase classname="Beer API fetchWithRetry should return data on successful fetch" name="Beer API fetchWithRetry should return data on successful fetch" time="0.003">
     </testcase>
-    <testcase classname="Preference Functions getPreference should return null when preference does not exist" name="Preference Functions getPreference should return null when preference does not exist" time="0">
+    <testcase classname="Beer API fetchWithRetry should handle none:// protocol URLs by returning empty data" name="Beer API fetchWithRetry should handle none:// protocol URLs by returning empty data" time="0.001">
     </testcase>
-    <testcase classname="Preference Functions getPreference should return null on database error" name="Preference Functions getPreference should return null on database error" time="0.001">
+    <testcase classname="Beer API fetchWithRetry should retry on fetch failure" name="Beer API fetchWithRetry should retry on fetch failure" time="0.006">
     </testcase>
-    <testcase classname="Preference Functions getPreference should handle empty string key" name="Preference Functions getPreference should handle empty string key" time="0.001">
+    <testcase classname="Beer API fetchWithRetry should throw error after exhausting retries" name="Beer API fetchWithRetry should throw error after exhausting retries" time="0.02">
     </testcase>
-    <testcase classname="Preference Functions getPreference should handle special characters in key" name="Preference Functions getPreference should handle special characters in key" time="0">
+    <testcase classname="Beer API fetchWithRetry should throw error on non-ok HTTP status" name="Beer API fetchWithRetry should throw error on non-ok HTTP status" time="0.019">
+    </testcase>
+    <testcase classname="Beer API fetchBeersFromAPI should return empty array when API URL is not configured" name="Beer API fetchBeersFromAPI should return empty array when API URL is not configured" time="0.001">
+    </testcase>
+    <testcase classname="Beer API fetchBeersFromAPI should fetch and return beers in standard brewInStock format" name="Beer API fetchBeersFromAPI should fetch and return beers in standard brewInStock format" time="0">
+    </testcase>
+    <testcase classname="Beer API fetchBeersFromAPI should find beers in nested object structure" name="Beer API fetchBeersFromAPI should find beers in nested object structure" time="0">
+    </testcase>
+    <testcase classname="Beer API fetchBeersFromAPI should throw error when no beer data found in response" name="Beer API fetchBeersFromAPI should throw error when no beer data found in response" time="0.001">
+    </testcase>
+    <testcase classname="Beer API fetchBeersFromAPI should propagate fetch errors" name="Beer API fetchBeersFromAPI should propagate fetch errors" time="2.502">
+    </testcase>
+    <testcase classname="Beer API fetchMyBeersFromAPI should return empty array in visitor mode" name="Beer API fetchMyBeersFromAPI should return empty array in visitor mode" time="0">
+    </testcase>
+    <testcase classname="Beer API fetchMyBeersFromAPI should return empty array when API URL is not configured" name="Beer API fetchMyBeersFromAPI should return empty array when API URL is not configured" time="0.001">
+    </testcase>
+    <testcase classname="Beer API fetchMyBeersFromAPI should return empty array for none:// protocol URLs" name="Beer API fetchMyBeersFromAPI should return empty array for none:// protocol URLs" time="0">
+    </testcase>
+    <testcase classname="Beer API fetchMyBeersFromAPI should fetch and return tasted beers" name="Beer API fetchMyBeersFromAPI should fetch and return tasted beers" time="0">
+    </testcase>
+    <testcase classname="Beer API fetchMyBeersFromAPI should handle empty tasted beers array as valid state" name="Beer API fetchMyBeersFromAPI should handle empty tasted beers array as valid state" time="0">
+    </testcase>
+    <testcase classname="Beer API fetchMyBeersFromAPI should filter out beers without IDs" name="Beer API fetchMyBeersFromAPI should filter out beers without IDs" time="0">
+    </testcase>
+    <testcase classname="Beer API fetchMyBeersFromAPI should throw error on invalid response format" name="Beer API fetchMyBeersFromAPI should throw error on invalid response format" time="0">
+    </testcase>
+    <testcase classname="Beer API fetchMyBeersFromAPI should propagate fetch errors" name="Beer API fetchMyBeersFromAPI should propagate fetch errors" time="2.504">
+    </testcase>
+    <testcase classname="Beer API fetchRewardsFromAPI should return empty array in visitor mode" name="Beer API fetchRewardsFromAPI should return empty array in visitor mode" time="0.001">
+    </testcase>
+    <testcase classname="Beer API fetchRewardsFromAPI should return empty array when API URL is not configured" name="Beer API fetchRewardsFromAPI should return empty array when API URL is not configured" time="0.001">
+    </testcase>
+    <testcase classname="Beer API fetchRewardsFromAPI should fetch and return rewards" name="Beer API fetchRewardsFromAPI should fetch and return rewards" time="0.001">
+    </testcase>
+    <testcase classname="Beer API fetchRewardsFromAPI should throw error on invalid response format" name="Beer API fetchRewardsFromAPI should throw error on invalid response format" time="0.001">
+    </testcase>
+    <testcase classname="Beer API fetchRewardsFromAPI should propagate fetch errors" name="Beer API fetchRewardsFromAPI should propagate fetch errors" time="2.504">
+    </testcase>
+  </testsuite>
+  <testsuite name="Database Schema" errors="0" failures="0" skipped="0" timestamp="2025-11-08T15:13:23" time="0.736" tests="17">
+    <testcase classname="Database Schema setupDatabase should create all required tables" name="Database Schema setupDatabase should create all required tables" time="0.002">
+    </testcase>
+    <testcase classname="Database Schema setupDatabase should create allbeers table with correct columns" name="Database Schema setupDatabase should create allbeers table with correct columns" time="0.001">
+    </testcase>
+    <testcase classname="Database Schema setupDatabase should create tasted_brew_current_round table with correct columns" name="Database Schema setupDatabase should create tasted_brew_current_round table with correct columns" time="0.001">
+    </testcase>
+    <testcase classname="Database Schema setupDatabase should create rewards table with correct columns" name="Database Schema setupDatabase should create rewards table with correct columns" time="0.001">
+    </testcase>
+    <testcase classname="Database Schema setupDatabase should create preferences table with correct columns" name="Database Schema setupDatabase should create preferences table with correct columns" time="0">
+    </testcase>
+    <testcase classname="Database Schema setupDatabase should create untappd table with correct columns" name="Database Schema setupDatabase should create untappd table with correct columns" time="0">
+    </testcase>
+    <testcase classname="Database Schema setupDatabase should initialize default preferences if table is empty" name="Database Schema setupDatabase should initialize default preferences if table is empty" time="0.001">
+    </testcase>
+    <testcase classname="Database Schema setupDatabase should not reinitialize preferences if table already has data" name="Database Schema setupDatabase should not reinitialize preferences if table already has data" time="0">
+    </testcase>
+    <testcase classname="Database Schema setupDatabase should handle errors gracefully" name="Database Schema setupDatabase should handle errors gracefully" time="0.012">
+    </testcase>
+    <testcase classname="Database Schema setupDatabase should use a transaction for table creation" name="Database Schema setupDatabase should use a transaction for table creation" time="0">
+    </testcase>
+    <testcase classname="Database Schema setupDatabase should log setup completion" name="Database Schema setupDatabase should log setup completion" time="0.001">
+    </testcase>
+    <testcase classname="Database Schema initDatabase should call getDatabase from connection module" name="Database Schema initDatabase should call getDatabase from connection module" time="0">
+    </testcase>
+    <testcase classname="Database Schema initDatabase should return the same database instance" name="Database Schema initDatabase should return the same database instance" time="0">
+    </testcase>
+    <testcase classname="Database Schema Table Schema Verification should have 5 tables total" name="Database Schema Table Schema Verification should have 5 tables total" time="0">
+    </testcase>
+    <testcase classname="Database Schema Table Schema Verification should use TEXT type for all columns" name="Database Schema Table Schema Verification should use TEXT type for all columns" time="0.001">
+    </testcase>
+    <testcase classname="Database Schema Table Schema Verification should use PRIMARY KEY for id columns" name="Database Schema Table Schema Verification should use PRIMARY KEY for id columns" time="0.003">
+    </testcase>
+    <testcase classname="Database Schema Table Schema Verification should use IF NOT EXISTS for all tables" name="Database Schema Table Schema Verification should use IF NOT EXISTS for all tables" time="0.001">
+    </testcase>
+  </testsuite>
+  <testsuite name="Preference Functions" errors="0" failures="0" skipped="0" timestamp="2025-11-08T15:13:23" time="0.18" tests="21">
+    <testcase classname="Preference Functions getPreference should return preference value when it exists" name="Preference Functions getPreference should return preference value when it exists" time="0">
+    </testcase>
+    <testcase classname="Preference Functions getPreference should return null when preference does not exist" name="Preference Functions getPreference should return null when preference does not exist" time="0.001">
+    </testcase>
+    <testcase classname="Preference Functions getPreference should return null on database error" name="Preference Functions getPreference should return null on database error" time="0">
+    </testcase>
+    <testcase classname="Preference Functions getPreference should handle empty string key" name="Preference Functions getPreference should handle empty string key" time="0">
+    </testcase>
+    <testcase classname="Preference Functions getPreference should handle special characters in key" name="Preference Functions getPreference should handle special characters in key" time="0.001">
     </testcase>
     <testcase classname="Preference Functions setPreference should insert new preference with description" name="Preference Functions setPreference should insert new preference with description" time="0">
     </testcase>
@@ -17,15 +101,15 @@
     </testcase>
     <testcase classname="Preference Functions setPreference should set empty description when updating non-existent preference without description" name="Preference Functions setPreference should set empty description when updating non-existent preference without description" time="0">
     </testcase>
-    <testcase classname="Preference Functions setPreference should handle empty string value" name="Preference Functions setPreference should handle empty string value" time="0">
+    <testcase classname="Preference Functions setPreference should handle empty string value" name="Preference Functions setPreference should handle empty string value" time="0.001">
     </testcase>
     <testcase classname="Preference Functions setPreference should handle special characters in value" name="Preference Functions setPreference should handle special characters in value" time="0">
     </testcase>
-    <testcase classname="Preference Functions setPreference should throw error when database operation fails" name="Preference Functions setPreference should throw error when database operation fails" time="0.012">
+    <testcase classname="Preference Functions setPreference should throw error when database operation fails" name="Preference Functions setPreference should throw error when database operation fails" time="0.011">
     </testcase>
-    <testcase classname="Preference Functions setPreference should handle description update when providing new description" name="Preference Functions setPreference should handle description update when providing new description" time="0">
+    <testcase classname="Preference Functions setPreference should handle description update when providing new description" name="Preference Functions setPreference should handle description update when providing new description" time="0.001">
     </testcase>
-    <testcase classname="Preference Functions setPreference should handle undefined description parameter" name="Preference Functions setPreference should handle undefined description parameter" time="0.001">
+    <testcase classname="Preference Functions setPreference should handle undefined description parameter" name="Preference Functions setPreference should handle undefined description parameter" time="0">
     </testcase>
     <testcase classname="Preference Functions getAllPreferences should return all preferences ordered by key" name="Preference Functions getAllPreferences should return all preferences ordered by key" time="0">
     </testcase>
@@ -35,13 +119,13 @@
     </testcase>
     <testcase classname="Preference Functions getAllPreferences should handle null return from database" name="Preference Functions getAllPreferences should handle null return from database" time="0">
     </testcase>
-    <testcase classname="Preference Functions getAllPreferences should return preferences with empty descriptions" name="Preference Functions getAllPreferences should return preferences with empty descriptions" time="0.001">
+    <testcase classname="Preference Functions getAllPreferences should return preferences with empty descriptions" name="Preference Functions getAllPreferences should return preferences with empty descriptions" time="0">
     </testcase>
-    <testcase classname="Preference Functions getAllPreferences should preserve preference ordering by key" name="Preference Functions getAllPreferences should preserve preference ordering by key" time="0.002">
+    <testcase classname="Preference Functions getAllPreferences should preserve preference ordering by key" name="Preference Functions getAllPreferences should preserve preference ordering by key" time="0">
     </testcase>
-    <testcase classname="Preference Functions Integration scenarios should handle set and get preference workflow" name="Preference Functions Integration scenarios should handle set and get preference workflow" time="0.001">
+    <testcase classname="Preference Functions Integration scenarios should handle set and get preference workflow" name="Preference Functions Integration scenarios should handle set and get preference workflow" time="0">
     </testcase>
-    <testcase classname="Preference Functions Integration scenarios should handle multiple preference updates" name="Preference Functions Integration scenarios should handle multiple preference updates" time="0">
+    <testcase classname="Preference Functions Integration scenarios should handle multiple preference updates" name="Preference Functions Integration scenarios should handle multiple preference updates" time="0.001">
     </testcase>
   </testsuite>
 </testsuites>
