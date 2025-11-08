@@ -1,102 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuites name="jest tests" tests="368" failures="0" errors="0" time="9.417">
-  <testsuite name="manualRefreshAllData" errors="0" failures="0" skipped="0" timestamp="2025-11-08T18:29:02" time="1.019" tests="2">
-    <testcase classname="manualRefreshAllData refreshes core endpoints and returns no errors when both succeed" name="manualRefreshAllData refreshes core endpoints and returns no errors when both succeed" time="0.01">
+<testsuites name="jest tests" tests="100" failures="0" errors="0" time="1.808">
+  <testsuite name="BeerRepository" errors="0" failures="0" skipped="0" timestamp="2025-11-08T18:47:26" time="0.896" tests="34">
+    <testcase classname="BeerRepository insertMany should insert multiple beers in batches" name="BeerRepository insertMany should insert multiple beers in batches" time="0.008">
     </testcase>
-    <testcase classname="manualRefreshAllData handles partial failure and sets hasErrors" name="manualRefreshAllData handles partial failure and sets hasErrors" time="0">
-    </testcase>
-  </testsuite>
-  <testsuite name="dataUpdateService integration tests" errors="0" failures="0" skipped="0" timestamp="2025-11-08T18:29:02" time="1.027" tests="12">
-    <testcase classname="dataUpdateService integration tests fetchAndUpdateAllBeers should process valid allbeers.json data correctly" name="dataUpdateService integration tests fetchAndUpdateAllBeers should process valid allbeers.json data correctly" time="0.011">
-    </testcase>
-    <testcase classname="dataUpdateService integration tests fetchAndUpdateAllBeers should handle missing API URL" name="dataUpdateService integration tests fetchAndUpdateAllBeers should handle missing API URL" time="0.001">
-    </testcase>
-    <testcase classname="dataUpdateService integration tests fetchAndUpdateAllBeers should handle failed fetch" name="dataUpdateService integration tests fetchAndUpdateAllBeers should handle failed fetch" time="0.001">
-    </testcase>
-    <testcase classname="dataUpdateService integration tests fetchAndUpdateAllBeers should handle invalid data format" name="dataUpdateService integration tests fetchAndUpdateAllBeers should handle invalid data format" time="0.001">
-    </testcase>
-    <testcase classname="dataUpdateService integration tests fetchAndUpdateAllBeers should handle fetch throwing an exception" name="dataUpdateService integration tests fetchAndUpdateAllBeers should handle fetch throwing an exception" time="0.001">
-    </testcase>
-    <testcase classname="dataUpdateService integration tests fetchAndUpdateMyBeers should process valid mybeers.json data correctly" name="dataUpdateService integration tests fetchAndUpdateMyBeers should process valid mybeers.json data correctly" time="0.003">
-    </testcase>
-    <testcase classname="dataUpdateService integration tests fetchAndUpdateMyBeers should handle missing API URL" name="dataUpdateService integration tests fetchAndUpdateMyBeers should handle missing API URL" time="0">
-    </testcase>
-    <testcase classname="dataUpdateService integration tests fetchAndUpdateMyBeers should handle failed fetch" name="dataUpdateService integration tests fetchAndUpdateMyBeers should handle failed fetch" time="0.001">
-    </testcase>
-    <testcase classname="dataUpdateService integration tests fetchAndUpdateMyBeers should handle invalid data format" name="dataUpdateService integration tests fetchAndUpdateMyBeers should handle invalid data format" time="0.001">
-    </testcase>
-    <testcase classname="dataUpdateService integration tests fetchAndUpdateMyBeers should handle empty tasted beers array (new user or round rollover)" name="dataUpdateService integration tests fetchAndUpdateMyBeers should handle empty tasted beers array (new user or round rollover)" time="0">
-    </testcase>
-    <testcase classname="dataUpdateService integration tests fetchAndUpdateMyBeers should handle data with no valid beers" name="dataUpdateService integration tests fetchAndUpdateMyBeers should handle data with no valid beers" time="0.001">
-    </testcase>
-    <testcase classname="dataUpdateService integration tests fetchAndUpdateMyBeers should handle fetch throwing an exception" name="dataUpdateService integration tests fetchAndUpdateMyBeers should handle fetch throwing an exception" time="0.001">
-    </testcase>
-  </testsuite>
-  <testsuite name="Data Refresh Integration Tests" errors="0" failures="0" skipped="1" timestamp="2025-11-08T18:29:03" time="0.287" tests="14">
-    <testcase classname="Data Refresh Integration Tests Full refresh flow should successfully refresh all data with real JSON fixtures" name="Data Refresh Integration Tests Full refresh flow should successfully refresh all data with real JSON fixtures" time="0.002">
-    </testcase>
-    <testcase classname="Data Refresh Integration Tests Full refresh flow should handle visitor mode correctly (no my beers)" name="Data Refresh Integration Tests Full refresh flow should handle visitor mode correctly (no my beers)" time="0.001">
-    </testcase>
-    <testcase classname="Data Refresh Integration Tests Full refresh flow should refresh data in parallel for performance" name="Data Refresh Integration Tests Full refresh flow should refresh data in parallel for performance" time="0">
-      <skipped/>
-    </testcase>
-    <testcase classname="Data Refresh Integration Tests Partial refresh scenarios should handle empty all beers response" name="Data Refresh Integration Tests Partial refresh scenarios should handle empty all beers response" time="0">
-    </testcase>
-    <testcase classname="Data Refresh Integration Tests Partial refresh scenarios should handle empty my beers response (new user)" name="Data Refresh Integration Tests Partial refresh scenarios should handle empty my beers response (new user)" time="0.001">
-    </testcase>
-    <testcase classname="Data Refresh Integration Tests Partial refresh scenarios should handle round rollover (200 beers reached)" name="Data Refresh Integration Tests Partial refresh scenarios should handle round rollover (200 beers reached)" time="0">
-    </testcase>
-    <testcase classname="Data Refresh Integration Tests Refresh failure recovery should throw error when API URLs not configured" name="Data Refresh Integration Tests Refresh failure recovery should throw error when API URLs not configured" time="0.033">
-    </testcase>
-    <testcase classname="Data Refresh Integration Tests Refresh failure recovery should throw error when all beers API fails" name="Data Refresh Integration Tests Refresh failure recovery should throw error when all beers API fails" time="0.014">
-    </testcase>
-    <testcase classname="Data Refresh Integration Tests Refresh failure recovery should throw error when my beers API fails" name="Data Refresh Integration Tests Refresh failure recovery should throw error when my beers API fails" time="0.001">
-    </testcase>
-    <testcase classname="Data Refresh Integration Tests Refresh failure recovery should throw error when rewards API fails" name="Data Refresh Integration Tests Refresh failure recovery should throw error when rewards API fails" time="0.001">
-    </testcase>
-    <testcase classname="Data Refresh Integration Tests Refresh failure recovery should handle database insertion failure" name="Data Refresh Integration Tests Refresh failure recovery should handle database insertion failure" time="0.001">
-    </testcase>
-    <testcase classname="Data Refresh Integration Tests Data validation should handle beers with missing IDs gracefully" name="Data Refresh Integration Tests Data validation should handle beers with missing IDs gracefully" time="0.001">
-    </testcase>
-    <testcase classname="Data Refresh Integration Tests Data validation should verify all beers from fixture have required fields" name="Data Refresh Integration Tests Data validation should verify all beers from fixture have required fields" time="0.046">
-    </testcase>
-    <testcase classname="Data Refresh Integration Tests Data validation should verify my beers from fixture have Beerfinder fields" name="Data Refresh Integration Tests Data validation should verify my beers from fixture have Beerfinder fields" time="0.011">
-    </testcase>
-  </testsuite>
-  <testsuite name="beerService" errors="0" failures="0" skipped="4" timestamp="2025-11-08T18:29:03" time="0.271" tests="7">
-    <testcase classname="beerService checkInBeer should successfully check in a beer" name="beerService checkInBeer should successfully check in a beer" time="0">
-      <skipped/>
-    </testcase>
-    <testcase classname="beerService checkInBeer should attempt auto-login if session data is missing" name="beerService checkInBeer should attempt auto-login if session data is missing" time="0.034">
-    </testcase>
-    <testcase classname="beerService checkInBeer should handle API errors gracefully" name="beerService checkInBeer should handle API errors gracefully" time="0">
-      <skipped/>
-    </testcase>
-    <testcase classname="beerService getBeerDetails should return beer details for a valid ID" name="beerService getBeerDetails should return beer details for a valid ID" time="0">
-      <skipped/>
-    </testcase>
-    <testcase classname="beerService getBeerDetails should handle empty beer ID" name="beerService getBeerDetails should handle empty beer ID" time="0">
-    </testcase>
-    <testcase classname="beerService searchBeers should search beers with a valid query" name="beerService searchBeers should search beers with a valid query" time="0">
-      <skipped/>
-    </testcase>
-    <testcase classname="beerService searchBeers should handle empty search query" name="beerService searchBeers should handle empty search query" time="0">
-    </testcase>
-  </testsuite>
-  <testsuite name="BeerRepository" errors="0" failures="0" skipped="0" timestamp="2025-11-08T18:29:03" time="0.168" tests="34">
-    <testcase classname="BeerRepository insertMany should insert multiple beers in batches" name="BeerRepository insertMany should insert multiple beers in batches" time="0.001">
-    </testcase>
-    <testcase classname="BeerRepository insertMany should skip beers without IDs" name="BeerRepository insertMany should skip beers without IDs" time="0.001">
+    <testcase classname="BeerRepository insertMany should skip beers without IDs" name="BeerRepository insertMany should skip beers without IDs" time="0">
     </testcase>
     <testcase classname="BeerRepository insertMany should process beers in batches of 50" name="BeerRepository insertMany should process beers in batches of 50" time="0.001">
     </testcase>
     <testcase classname="BeerRepository insertMany should handle empty beer array" name="BeerRepository insertMany should handle empty beer array" time="0">
     </testcase>
-    <testcase classname="BeerRepository insertMany should handle beers with optional fields missing" name="BeerRepository insertMany should handle beers with optional fields missing" time="0">
+    <testcase classname="BeerRepository insertMany should handle beers with optional fields missing" name="BeerRepository insertMany should handle beers with optional fields missing" time="0.001">
     </testcase>
-    <testcase classname="BeerRepository insertMany should throw error on database failure" name="BeerRepository insertMany should throw error on database failure" time="0.016">
+    <testcase classname="BeerRepository insertMany should throw error on database failure" name="BeerRepository insertMany should throw error on database failure" time="0.02">
     </testcase>
-    <testcase classname="BeerRepository insertMany should log progress during import" name="BeerRepository insertMany should log progress during import" time="0">
+    <testcase classname="BeerRepository insertMany should log progress during import" name="BeerRepository insertMany should log progress during import" time="0.001">
     </testcase>
     <testcase classname="BeerRepository getAll should return all beers ordered by added_date DESC" name="BeerRepository getAll should return all beers ordered by added_date DESC" time="0.001">
     </testcase>
@@ -108,15 +25,15 @@
     </testcase>
     <testcase classname="BeerRepository getById should return beer when found" name="BeerRepository getById should return beer when found" time="0">
     </testcase>
-    <testcase classname="BeerRepository getById should return null when beer not found" name="BeerRepository getById should return null when beer not found" time="0">
+    <testcase classname="BeerRepository getById should return null when beer not found" name="BeerRepository getById should return null when beer not found" time="0.001">
     </testcase>
-    <testcase classname="BeerRepository getById should handle empty ID string" name="BeerRepository getById should handle empty ID string" time="0.001">
+    <testcase classname="BeerRepository getById should handle empty ID string" name="BeerRepository getById should handle empty ID string" time="0">
     </testcase>
     <testcase classname="BeerRepository getById should throw error on database failure" name="BeerRepository getById should throw error on database failure" time="0">
     </testcase>
-    <testcase classname="BeerRepository search should search beers by name, brewer, style, and description" name="BeerRepository search should search beers by name, brewer, style, and description" time="0">
+    <testcase classname="BeerRepository search should search beers by name, brewer, style, and description" name="BeerRepository search should search beers by name, brewer, style, and description" time="0.001">
     </testcase>
-    <testcase classname="BeerRepository search should return all beers when query is empty" name="BeerRepository search should return all beers when query is empty" time="0.001">
+    <testcase classname="BeerRepository search should return all beers when query is empty" name="BeerRepository search should return all beers when query is empty" time="0">
     </testcase>
     <testcase classname="BeerRepository search should trim whitespace from query" name="BeerRepository search should trim whitespace from query" time="0">
     </testcase>
@@ -124,7 +41,7 @@
     </testcase>
     <testcase classname="BeerRepository search should search across all text fields" name="BeerRepository search should search across all text fields" time="0.001">
     </testcase>
-    <testcase classname="BeerRepository search should throw error on database failure" name="BeerRepository search should throw error on database failure" time="0.003">
+    <testcase classname="BeerRepository search should throw error on database failure" name="BeerRepository search should throw error on database failure" time="0">
     </testcase>
     <testcase classname="BeerRepository getByStyle should return beers matching the style" name="BeerRepository getByStyle should return beers matching the style" time="0.001">
     </testcase>
@@ -138,123 +55,29 @@
     </testcase>
     <testcase classname="BeerRepository getByBrewer should return empty array when no beers match brewer" name="BeerRepository getByBrewer should return empty array when no beers match brewer" time="0">
     </testcase>
-    <testcase classname="BeerRepository getByBrewer should handle empty brewer string" name="BeerRepository getByBrewer should handle empty brewer string" time="0.001">
+    <testcase classname="BeerRepository getByBrewer should handle empty brewer string" name="BeerRepository getByBrewer should handle empty brewer string" time="0">
     </testcase>
-    <testcase classname="BeerRepository getByBrewer should throw error on database failure" name="BeerRepository getByBrewer should throw error on database failure" time="0">
+    <testcase classname="BeerRepository getByBrewer should throw error on database failure" name="BeerRepository getByBrewer should throw error on database failure" time="0.001">
     </testcase>
     <testcase classname="BeerRepository getUntasted should return beers not in tasted_brew_current_round table" name="BeerRepository getUntasted should return beers not in tasted_brew_current_round table" time="0">
     </testcase>
-    <testcase classname="BeerRepository getUntasted should return empty array when all beers are tasted" name="BeerRepository getUntasted should return empty array when all beers are tasted" time="0">
+    <testcase classname="BeerRepository getUntasted should return empty array when all beers are tasted" name="BeerRepository getUntasted should return empty array when all beers are tasted" time="0.001">
     </testcase>
     <testcase classname="BeerRepository getUntasted should filter out beers with null or empty brew_name" name="BeerRepository getUntasted should filter out beers with null or empty brew_name" time="0">
     </testcase>
     <testcase classname="BeerRepository getUntasted should order results by added_date DESC" name="BeerRepository getUntasted should order results by added_date DESC" time="0">
     </testcase>
-    <testcase classname="BeerRepository getUntasted should throw error on database failure" name="BeerRepository getUntasted should throw error on database failure" time="0">
+    <testcase classname="BeerRepository getUntasted should throw error on database failure" name="BeerRepository getUntasted should throw error on database failure" time="0.001">
     </testcase>
   </testsuite>
-  <testsuite name="Database Schema" errors="0" failures="0" skipped="0" timestamp="2025-11-08T18:29:04" time="0.167" tests="17">
-    <testcase classname="Database Schema setupDatabase should create all required tables" name="Database Schema setupDatabase should create all required tables" time="0.001">
-    </testcase>
-    <testcase classname="Database Schema setupDatabase should create allbeers table with correct columns" name="Database Schema setupDatabase should create allbeers table with correct columns" time="0.004">
-    </testcase>
-    <testcase classname="Database Schema setupDatabase should create tasted_brew_current_round table with correct columns" name="Database Schema setupDatabase should create tasted_brew_current_round table with correct columns" time="0.004">
-    </testcase>
-    <testcase classname="Database Schema setupDatabase should create rewards table with correct columns" name="Database Schema setupDatabase should create rewards table with correct columns" time="0">
-    </testcase>
-    <testcase classname="Database Schema setupDatabase should create preferences table with correct columns" name="Database Schema setupDatabase should create preferences table with correct columns" time="0">
-    </testcase>
-    <testcase classname="Database Schema setupDatabase should create untappd table with correct columns" name="Database Schema setupDatabase should create untappd table with correct columns" time="0.001">
-    </testcase>
-    <testcase classname="Database Schema setupDatabase should initialize default preferences if table is empty" name="Database Schema setupDatabase should initialize default preferences if table is empty" time="0">
-    </testcase>
-    <testcase classname="Database Schema setupDatabase should not reinitialize preferences if table already has data" name="Database Schema setupDatabase should not reinitialize preferences if table already has data" time="0.001">
-    </testcase>
-    <testcase classname="Database Schema setupDatabase should handle errors gracefully" name="Database Schema setupDatabase should handle errors gracefully" time="0.013">
-    </testcase>
-    <testcase classname="Database Schema setupDatabase should use a transaction for table creation" name="Database Schema setupDatabase should use a transaction for table creation" time="0.001">
-    </testcase>
-    <testcase classname="Database Schema setupDatabase should log setup completion" name="Database Schema setupDatabase should log setup completion" time="0">
-    </testcase>
-    <testcase classname="Database Schema initDatabase should call getDatabase from connection module" name="Database Schema initDatabase should call getDatabase from connection module" time="0">
-    </testcase>
-    <testcase classname="Database Schema initDatabase should return the same database instance" name="Database Schema initDatabase should return the same database instance" time="0">
-    </testcase>
-    <testcase classname="Database Schema Table Schema Verification should have 5 tables total" name="Database Schema Table Schema Verification should have 5 tables total" time="0.001">
-    </testcase>
-    <testcase classname="Database Schema Table Schema Verification should use TEXT type for all columns" name="Database Schema Table Schema Verification should use TEXT type for all columns" time="0">
-    </testcase>
-    <testcase classname="Database Schema Table Schema Verification should use PRIMARY KEY for id columns" name="Database Schema Table Schema Verification should use PRIMARY KEY for id columns" time="0.001">
-    </testcase>
-    <testcase classname="Database Schema Table Schema Verification should use IF NOT EXISTS for all tables" name="Database Schema Table Schema Verification should use IF NOT EXISTS for all tables" time="0">
-    </testcase>
-  </testsuite>
-  <testsuite name="MyBeersRepository" errors="0" failures="0" skipped="0" timestamp="2025-11-08T18:29:04" time="0.164" tests="28">
-    <testcase classname="MyBeersRepository insertMany should insert multiple tasted beers in batches" name="MyBeersRepository insertMany should insert multiple tasted beers in batches" time="0.001">
-    </testcase>
-    <testcase classname="MyBeersRepository insertMany should handle empty array by clearing the table" name="MyBeersRepository insertMany should handle empty array by clearing the table" time="0">
-    </testcase>
-    <testcase classname="MyBeersRepository insertMany should filter out beers without IDs" name="MyBeersRepository insertMany should filter out beers without IDs" time="0.001">
-    </testcase>
-    <testcase classname="MyBeersRepository insertMany should clear table when all beers are invalid" name="MyBeersRepository insertMany should clear table when all beers are invalid" time="0">
-    </testcase>
-    <testcase classname="MyBeersRepository insertMany should process beers in batches of 20" name="MyBeersRepository insertMany should process beers in batches of 20" time="0.001">
-    </testcase>
-    <testcase classname="MyBeersRepository insertMany should handle beers with optional fields missing" name="MyBeersRepository insertMany should handle beers with optional fields missing" time="0.001">
-    </testcase>
-    <testcase classname="MyBeersRepository insertMany should throw error on database failure during insert" name="MyBeersRepository insertMany should throw error on database failure during insert" time="0.013">
-    </testcase>
-    <testcase classname="MyBeersRepository insertMany should log progress during import" name="MyBeersRepository insertMany should log progress during import" time="0.001">
-    </testcase>
-    <testcase classname="MyBeersRepository insertMany should include all Beerfinder-specific fields in insert" name="MyBeersRepository insertMany should include all Beerfinder-specific fields in insert" time="0">
-    </testcase>
-    <testcase classname="MyBeersRepository getAll should return all tasted beers ordered by id" name="MyBeersRepository getAll should return all tasted beers ordered by id" time="0.001">
-    </testcase>
-    <testcase classname="MyBeersRepository getAll should return empty array when no tasted beers exist" name="MyBeersRepository getAll should return empty array when no tasted beers exist" time="0">
-    </testcase>
-    <testcase classname="MyBeersRepository getAll should throw error on database failure" name="MyBeersRepository getAll should throw error on database failure" time="0">
-    </testcase>
-    <testcase classname="MyBeersRepository getAll should log retrieval of tasted beers" name="MyBeersRepository getAll should log retrieval of tasted beers" time="0">
-    </testcase>
-    <testcase classname="MyBeersRepository getAll should log when no tasted beers found and check table structure" name="MyBeersRepository getAll should log when no tasted beers found and check table structure" time="0">
-    </testcase>
-    <testcase classname="MyBeersRepository getById should return tasted beer when found" name="MyBeersRepository getById should return tasted beer when found" time="0">
-    </testcase>
-    <testcase classname="MyBeersRepository getById should return null when beer not found" name="MyBeersRepository getById should return null when beer not found" time="0.001">
-    </testcase>
-    <testcase classname="MyBeersRepository getById should handle empty ID string" name="MyBeersRepository getById should handle empty ID string" time="0">
-    </testcase>
-    <testcase classname="MyBeersRepository getById should throw error on database failure" name="MyBeersRepository getById should throw error on database failure" time="0">
-    </testcase>
-    <testcase classname="MyBeersRepository clear should clear all tasted beers from the table" name="MyBeersRepository clear should clear all tasted beers from the table" time="0.001">
-    </testcase>
-    <testcase classname="MyBeersRepository clear should log the number of rows removed" name="MyBeersRepository clear should log the number of rows removed" time="0">
-    </testcase>
-    <testcase classname="MyBeersRepository clear should handle clearing empty table" name="MyBeersRepository clear should handle clearing empty table" time="0">
-    </testcase>
-    <testcase classname="MyBeersRepository clear should throw error on database failure" name="MyBeersRepository clear should throw error on database failure" time="0.001">
-    </testcase>
-    <testcase classname="MyBeersRepository getCount should return count of tasted beers" name="MyBeersRepository getCount should return count of tasted beers" time="0">
-    </testcase>
-    <testcase classname="MyBeersRepository getCount should return 0 when no beers exist" name="MyBeersRepository getCount should return 0 when no beers exist" time="0.002">
-    </testcase>
-    <testcase classname="MyBeersRepository getCount should handle null count result" name="MyBeersRepository getCount should handle null count result" time="0">
-    </testcase>
-    <testcase classname="MyBeersRepository getCount should throw error on database failure" name="MyBeersRepository getCount should throw error on database failure" time="0">
-    </testcase>
-    <testcase classname="MyBeersRepository error handling should handle individual beer insert errors gracefully" name="MyBeersRepository error handling should handle individual beer insert errors gracefully" time="0">
-    </testcase>
-    <testcase classname="MyBeersRepository error handling should throw error on transaction failure" name="MyBeersRepository error handling should throw error on transaction failure" time="0.001">
-    </testcase>
-  </testsuite>
-  <testsuite name="RewardsRepository" errors="0" failures="0" skipped="0" timestamp="2025-11-08T18:29:04" time="0.173" tests="38">
-    <testcase classname="RewardsRepository insertMany should insert multiple rewards in batches" name="RewardsRepository insertMany should insert multiple rewards in batches" time="0.002">
+  <testsuite name="RewardsRepository" errors="0" failures="0" skipped="0" timestamp="2025-11-08T18:47:26" time="0.895" tests="38">
+    <testcase classname="RewardsRepository insertMany should insert multiple rewards in batches" name="RewardsRepository insertMany should insert multiple rewards in batches" time="0.007">
     </testcase>
     <testcase classname="RewardsRepository insertMany should handle empty array by returning early" name="RewardsRepository insertMany should handle empty array by returning early" time="0">
     </testcase>
-    <testcase classname="RewardsRepository insertMany should handle null rewards array" name="RewardsRepository insertMany should handle null rewards array" time="0">
+    <testcase classname="RewardsRepository insertMany should handle null rewards array" name="RewardsRepository insertMany should handle null rewards array" time="0.001">
     </testcase>
-    <testcase classname="RewardsRepository insertMany should process rewards in batches of 100" name="RewardsRepository insertMany should process rewards in batches of 100" time="0">
+    <testcase classname="RewardsRepository insertMany should process rewards in batches of 100" name="RewardsRepository insertMany should process rewards in batches of 100" time="0.001">
     </testcase>
     <testcase classname="RewardsRepository insertMany should handle rewards with empty optional fields" name="RewardsRepository insertMany should handle rewards with empty optional fields" time="0">
     </testcase>
@@ -266,15 +89,15 @@
     </testcase>
     <testcase classname="RewardsRepository insertMany should handle missing reward_id by using empty string" name="RewardsRepository insertMany should handle missing reward_id by using empty string" time="0">
     </testcase>
-    <testcase classname="RewardsRepository insertMany should clear table before inserting" name="RewardsRepository insertMany should clear table before inserting" time="0.001">
+    <testcase classname="RewardsRepository insertMany should clear table before inserting" name="RewardsRepository insertMany should clear table before inserting" time="0">
     </testcase>
-    <testcase classname="RewardsRepository getAll should return all rewards ordered by reward_id" name="RewardsRepository getAll should return all rewards ordered by reward_id" time="0">
+    <testcase classname="RewardsRepository getAll should return all rewards ordered by reward_id" name="RewardsRepository getAll should return all rewards ordered by reward_id" time="0.001">
     </testcase>
     <testcase classname="RewardsRepository getAll should return empty array when no rewards exist" name="RewardsRepository getAll should return empty array when no rewards exist" time="0">
     </testcase>
-    <testcase classname="RewardsRepository getAll should return empty array on database error" name="RewardsRepository getAll should return empty array on database error" time="0.001">
+    <testcase classname="RewardsRepository getAll should return empty array on database error" name="RewardsRepository getAll should return empty array on database error" time="0">
     </testcase>
-    <testcase classname="RewardsRepository getAll should handle database returning null" name="RewardsRepository getAll should handle database returning null" time="0">
+    <testcase classname="RewardsRepository getAll should handle database returning null" name="RewardsRepository getAll should handle database returning null" time="0.001">
     </testcase>
     <testcase classname="RewardsRepository getById should return reward when found" name="RewardsRepository getById should return reward when found" time="0">
     </testcase>
@@ -284,9 +107,9 @@
     </testcase>
     <testcase classname="RewardsRepository getById should throw error on database failure" name="RewardsRepository getById should throw error on database failure" time="0">
     </testcase>
-    <testcase classname="RewardsRepository getByType should return rewards matching the type" name="RewardsRepository getByType should return rewards matching the type" time="0.001">
+    <testcase classname="RewardsRepository getByType should return rewards matching the type" name="RewardsRepository getByType should return rewards matching the type" time="0">
     </testcase>
-    <testcase classname="RewardsRepository getByType should return empty array when no rewards match type" name="RewardsRepository getByType should return empty array when no rewards match type" time="0">
+    <testcase classname="RewardsRepository getByType should return empty array when no rewards match type" name="RewardsRepository getByType should return empty array when no rewards match type" time="0.001">
     </testcase>
     <testcase classname="RewardsRepository getByType should handle empty type string" name="RewardsRepository getByType should handle empty type string" time="0">
     </testcase>
@@ -322,480 +145,65 @@
     </testcase>
     <testcase classname="RewardsRepository error handling should log error when populate fails" name="RewardsRepository error handling should log error when populate fails" time="0.001">
     </testcase>
-    <testcase classname="RewardsRepository error handling should use transaction for atomic operations" name="RewardsRepository error handling should use transaction for atomic operations" time="0.003">
+    <testcase classname="RewardsRepository error handling should use transaction for atomic operations" name="RewardsRepository error handling should use transaction for atomic operations" time="0">
     </testcase>
   </testsuite>
-  <testsuite name="Database Operations" errors="0" failures="0" skipped="8" timestamp="2025-11-08T18:29:04" time="0.176" tests="37">
-    <testcase classname="Database Operations initDatabase should initialize the database" name="Database Operations initDatabase should initialize the database" time="0.001">
+  <testsuite name="MyBeersRepository" errors="0" failures="0" skipped="0" timestamp="2025-11-08T18:47:27" time="0.126" tests="28">
+    <testcase classname="MyBeersRepository insertMany should insert multiple tasted beers in batches" name="MyBeersRepository insertMany should insert multiple tasted beers in batches" time="0.001">
     </testcase>
-    <testcase classname="Database Operations initDatabase should return existing database instance if already initialized" name="Database Operations initDatabase should return existing database instance if already initialized" time="0">
-      <skipped/>
+    <testcase classname="MyBeersRepository insertMany should handle empty array by clearing the table" name="MyBeersRepository insertMany should handle empty array by clearing the table" time="0.001">
     </testcase>
-    <testcase classname="Database Operations initDatabase should handle errors when opening the database" name="Database Operations initDatabase should handle errors when opening the database" time="0">
-      <skipped/>
+    <testcase classname="MyBeersRepository insertMany should filter out beers without IDs" name="MyBeersRepository insertMany should filter out beers without IDs" time="0">
     </testcase>
-    <testcase classname="Database Operations setupDatabase should create tables if they do not exist" name="Database Operations setupDatabase should create tables if they do not exist" time="0.001">
+    <testcase classname="MyBeersRepository insertMany should clear table when all beers are invalid" name="MyBeersRepository insertMany should clear table when all beers are invalid" time="0.001">
     </testcase>
-    <testcase classname="Database Operations setupDatabase should initialize default preferences if preferences table is empty" name="Database Operations setupDatabase should initialize default preferences if preferences table is empty" time="0.001">
+    <testcase classname="MyBeersRepository insertMany should process beers in batches of 20" name="MyBeersRepository insertMany should process beers in batches of 20" time="0">
     </testcase>
-    <testcase classname="Database Operations setupDatabase should not initialize preferences if they already exist" name="Database Operations setupDatabase should not initialize preferences if they already exist" time="0">
+    <testcase classname="MyBeersRepository insertMany should handle beers with optional fields missing" name="MyBeersRepository insertMany should handle beers with optional fields missing" time="0.001">
     </testcase>
-    <testcase classname="Database Operations setupDatabase should handle errors during setup" name="Database Operations setupDatabase should handle errors during setup" time="0.014">
+    <testcase classname="MyBeersRepository insertMany should throw error on database failure during insert" name="MyBeersRepository insertMany should throw error on database failure during insert" time="0.013">
     </testcase>
-    <testcase classname="Database Operations getAllBeers should return all beers from the database" name="Database Operations getAllBeers should return all beers from the database" time="0">
+    <testcase classname="MyBeersRepository insertMany should log progress during import" name="MyBeersRepository insertMany should log progress during import" time="0.001">
     </testcase>
-    <testcase classname="Database Operations getAllBeers should handle errors when getting beers" name="Database Operations getAllBeers should handle errors when getting beers" time="0.001">
+    <testcase classname="MyBeersRepository insertMany should include all Beerfinder-specific fields in insert" name="MyBeersRepository insertMany should include all Beerfinder-specific fields in insert" time="0">
     </testcase>
-    <testcase classname="Database Operations getMyBeers should return all tasted beers from the database" name="Database Operations getMyBeers should return all tasted beers from the database" time="0">
+    <testcase classname="MyBeersRepository getAll should return all tasted beers ordered by id" name="MyBeersRepository getAll should return all tasted beers ordered by id" time="0">
     </testcase>
-    <testcase classname="Database Operations getMyBeers should handle errors when getting tasted beers" name="Database Operations getMyBeers should handle errors when getting tasted beers" time="0">
+    <testcase classname="MyBeersRepository getAll should return empty array when no tasted beers exist" name="MyBeersRepository getAll should return empty array when no tasted beers exist" time="0.001">
     </testcase>
-    <testcase classname="Database Operations getBeerById should return a beer by ID" name="Database Operations getBeerById should return a beer by ID" time="0.001">
+    <testcase classname="MyBeersRepository getAll should throw error on database failure" name="MyBeersRepository getAll should throw error on database failure" time="0">
     </testcase>
-    <testcase classname="Database Operations getBeerById should return null if beer not found" name="Database Operations getBeerById should return null if beer not found" time="0">
+    <testcase classname="MyBeersRepository getAll should log retrieval of tasted beers" name="MyBeersRepository getAll should log retrieval of tasted beers" time="0">
     </testcase>
-    <testcase classname="Database Operations getBeerById should handle errors when getting beer by ID" name="Database Operations getBeerById should handle errors when getting beer by ID" time="0">
+    <testcase classname="MyBeersRepository getAll should log when no tasted beers found and check table structure" name="MyBeersRepository getAll should log when no tasted beers found and check table structure" time="0.001">
     </testcase>
-    <testcase classname="Database Operations searchBeers should search beers by query" name="Database Operations searchBeers should search beers by query" time="0.001">
+    <testcase classname="MyBeersRepository getById should return tasted beer when found" name="MyBeersRepository getById should return tasted beer when found" time="0">
     </testcase>
-    <testcase classname="Database Operations searchBeers should return all beers if query is empty" name="Database Operations searchBeers should return all beers if query is empty" time="0">
+    <testcase classname="MyBeersRepository getById should return null when beer not found" name="MyBeersRepository getById should return null when beer not found" time="0">
     </testcase>
-    <testcase classname="Database Operations searchBeers should handle errors when searching beers" name="Database Operations searchBeers should handle errors when searching beers" time="0">
+    <testcase classname="MyBeersRepository getById should handle empty ID string" name="MyBeersRepository getById should handle empty ID string" time="0">
     </testcase>
-    <testcase classname="Database Operations getBeersNotInMyBeers should return beers not in my beers" name="Database Operations getBeersNotInMyBeers should return beers not in my beers" time="0.001">
+    <testcase classname="MyBeersRepository getById should throw error on database failure" name="MyBeersRepository getById should throw error on database failure" time="0.001">
     </testcase>
-    <testcase classname="Database Operations getBeersNotInMyBeers should handle errors when getting beers not in my beers" name="Database Operations getBeersNotInMyBeers should handle errors when getting beers not in my beers" time="0">
+    <testcase classname="MyBeersRepository clear should clear all tasted beers from the table" name="MyBeersRepository clear should clear all tasted beers from the table" time="0">
     </testcase>
-    <testcase classname="Database Operations populateBeersTable should populate the beers table with provided beers" name="Database Operations populateBeersTable should populate the beers table with provided beers" time="0">
-      <skipped/>
+    <testcase classname="MyBeersRepository clear should log the number of rows removed" name="MyBeersRepository clear should log the number of rows removed" time="0">
     </testcase>
-    <testcase classname="Database Operations populateBeersTable should handle empty beer array" name="Database Operations populateBeersTable should handle empty beer array" time="0">
-      <skipped/>
+    <testcase classname="MyBeersRepository clear should handle clearing empty table" name="MyBeersRepository clear should handle clearing empty table" time="0.001">
     </testcase>
-    <testcase classname="Database Operations populateBeersTable should handle errors when populating beers table" name="Database Operations populateBeersTable should handle errors when populating beers table" time="0">
-      <skipped/>
+    <testcase classname="MyBeersRepository clear should throw error on database failure" name="MyBeersRepository clear should throw error on database failure" time="0">
     </testcase>
-    <testcase classname="Database Operations populateMyBeersTable should populate the my beers table with provided beers" name="Database Operations populateMyBeersTable should populate the my beers table with provided beers" time="0">
-      <skipped/>
+    <testcase classname="MyBeersRepository getCount should return count of tasted beers" name="MyBeersRepository getCount should return count of tasted beers" time="0">
     </testcase>
-    <testcase classname="Database Operations populateMyBeersTable should handle empty beer array" name="Database Operations populateMyBeersTable should handle empty beer array" time="0">
-      <skipped/>
+    <testcase classname="MyBeersRepository getCount should return 0 when no beers exist" name="MyBeersRepository getCount should return 0 when no beers exist" time="0">
     </testcase>
-    <testcase classname="Database Operations populateMyBeersTable should handle errors when populating my beers table" name="Database Operations populateMyBeersTable should handle errors when populating my beers table" time="0">
-      <skipped/>
+    <testcase classname="MyBeersRepository getCount should handle null count result" name="MyBeersRepository getCount should handle null count result" time="0.001">
     </testcase>
-    <testcase classname="Database Operations getPreference should return preference value by key" name="Database Operations getPreference should return preference value by key" time="0">
+    <testcase classname="MyBeersRepository getCount should throw error on database failure" name="MyBeersRepository getCount should throw error on database failure" time="0">
     </testcase>
-    <testcase classname="Database Operations getPreference should return null if preference not found" name="Database Operations getPreference should return null if preference not found" time="0.001">
+    <testcase classname="MyBeersRepository error handling should handle individual beer insert errors gracefully" name="MyBeersRepository error handling should handle individual beer insert errors gracefully" time="0">
     </testcase>
-    <testcase classname="Database Operations getPreference should handle errors when getting preference" name="Database Operations getPreference should handle errors when getting preference" time="0">
-    </testcase>
-    <testcase classname="Database Operations setPreference should set preference value by key" name="Database Operations setPreference should set preference value by key" time="0">
-    </testcase>
-    <testcase classname="Database Operations setPreference should use empty string for description if not provided" name="Database Operations setPreference should use empty string for description if not provided" time="0">
-    </testcase>
-    <testcase classname="Database Operations setPreference should handle errors when setting preference" name="Database Operations setPreference should handle errors when setting preference" time="0.001">
-    </testcase>
-    <testcase classname="Database Operations getUntappdCookie should return untappd cookie value by key" name="Database Operations getUntappdCookie should return untappd cookie value by key" time="0">
-    </testcase>
-    <testcase classname="Database Operations getUntappdCookie should return null if untappd cookie not found" name="Database Operations getUntappdCookie should return null if untappd cookie not found" time="0">
-    </testcase>
-    <testcase classname="Database Operations getUntappdCookie should handle errors when getting untappd cookie" name="Database Operations getUntappdCookie should handle errors when getting untappd cookie" time="0">
-    </testcase>
-    <testcase classname="Database Operations setUntappdCookie should set untappd cookie value by key" name="Database Operations setUntappdCookie should set untappd cookie value by key" time="0">
-    </testcase>
-    <testcase classname="Database Operations setUntappdCookie should use empty string for description if not provided" name="Database Operations setUntappdCookie should use empty string for description if not provided" time="0">
-    </testcase>
-    <testcase classname="Database Operations setUntappdCookie should handle errors when setting untappd cookie" name="Database Operations setUntappdCookie should handle errors when setting untappd cookie" time="0.002">
-    </testcase>
-  </testsuite>
-  <testsuite name="ApiClient" errors="0" failures="0" skipped="1" timestamp="2025-11-08T18:29:04" time="0.151" tests="8">
-    <testcase classname="ApiClient get should make a GET request and return data" name="ApiClient get should make a GET request and return data" time="0.017">
-    </testcase>
-    <testcase classname="ApiClient get should handle query parameters correctly" name="ApiClient get should handle query parameters correctly" time="0.01">
-    </testcase>
-    <testcase classname="ApiClient get should handle errors correctly" name="ApiClient get should handle errors correctly" time="0">
-    </testcase>
-    <testcase classname="ApiClient get should retry on network errors" name="ApiClient get should retry on network errors" time="0">
-      <skipped/>
-    </testcase>
-    <testcase classname="ApiClient post should make a POST request with correct body" name="ApiClient post should make a POST request with correct body" time="0.001">
-    </testcase>
-    <testcase classname="ApiClient ApiError should create an ApiError with correct properties" name="ApiClient ApiError should create an ApiError with correct properties" time="0">
-    </testcase>
-    <testcase classname="ApiClient ApiError should mark 5xx errors as retryable" name="ApiClient ApiError should mark 5xx errors as retryable" time="0">
-    </testcase>
-    <testcase classname="ApiClient ApiError should mark 4xx errors as non-retryable (except 408 and 429)" name="ApiClient ApiError should mark 4xx errors as non-retryable (except 408 and 429)" time="0">
-    </testcase>
-  </testsuite>
-  <testsuite name="Database Operations" errors="0" failures="0" skipped="0" timestamp="2025-11-08T18:29:04" time="0.133" tests="12">
-    <testcase classname="Database Operations getAllBeers should return all beers from the database" name="Database Operations getAllBeers should return all beers from the database" time="0.001">
-    </testcase>
-    <testcase classname="Database Operations getAllBeers should handle errors when getting all beers" name="Database Operations getAllBeers should handle errors when getting all beers" time="0.009">
-    </testcase>
-    <testcase classname="Database Operations getMyBeers should return all tasted beers from the database" name="Database Operations getMyBeers should return all tasted beers from the database" time="0.001">
-    </testcase>
-    <testcase classname="Database Operations getMyBeers should handle errors when getting tasted beers" name="Database Operations getMyBeers should handle errors when getting tasted beers" time="0">
-    </testcase>
-    <testcase classname="Database Operations getBeerById should return a beer by ID" name="Database Operations getBeerById should return a beer by ID" time="0">
-    </testcase>
-    <testcase classname="Database Operations getBeerById should return null if beer is not found" name="Database Operations getBeerById should return null if beer is not found" time="0.001">
-    </testcase>
-    <testcase classname="Database Operations getBeerById should handle errors when getting beer by ID" name="Database Operations getBeerById should handle errors when getting beer by ID" time="0">
-    </testcase>
-    <testcase classname="Database Operations searchBeers should search beers by query" name="Database Operations searchBeers should search beers by query" time="0">
-    </testcase>
-    <testcase classname="Database Operations searchBeers should return all beers if query is empty" name="Database Operations searchBeers should return all beers if query is empty" time="0.001">
-    </testcase>
-    <testcase classname="Database Operations searchBeers should handle errors when searching beers" name="Database Operations searchBeers should handle errors when searching beers" time="0">
-    </testcase>
-    <testcase classname="Database Operations getBeersNotInMyBeers should return beers not in My Beers" name="Database Operations getBeersNotInMyBeers should return beers not in My Beers" time="0">
-    </testcase>
-    <testcase classname="Database Operations getBeersNotInMyBeers should handle errors when getting beers not in My Beers" name="Database Operations getBeersNotInMyBeers should handle errors when getting beers not in My Beers" time="0.001">
-    </testcase>
-  </testsuite>
-  <testsuite name="sessionManager" errors="0" failures="0" skipped="0" timestamp="2025-11-08T18:29:04" time="0.136" tests="17">
-    <testcase classname="sessionManager saveSessionData should save session data to secure storage" name="sessionManager saveSessionData should save session data to secure storage" time="0.001">
-    </testcase>
-    <testcase classname="sessionManager saveSessionData should throw error when saving session data fails" name="sessionManager saveSessionData should throw error when saving session data fails" time="0.011">
-    </testcase>
-    <testcase classname="sessionManager getSessionData should return session data from secure storage" name="sessionManager getSessionData should return session data from secure storage" time="0">
-    </testcase>
-    <testcase classname="sessionManager getSessionData should return null when no session data exists" name="sessionManager getSessionData should return null when no session data exists" time="0">
-    </testcase>
-    <testcase classname="sessionManager getSessionData should return null when session data is invalid" name="sessionManager getSessionData should return null when session data is invalid" time="0">
-    </testcase>
-    <testcase classname="sessionManager getSessionData should return null when there is an error getting session data" name="sessionManager getSessionData should return null when there is an error getting session data" time="0">
-    </testcase>
-    <testcase classname="sessionManager clearSessionData should clear session data from secure storage" name="sessionManager clearSessionData should clear session data from secure storage" time="0">
-    </testcase>
-    <testcase classname="sessionManager clearSessionData should throw error when clearing session data fails" name="sessionManager clearSessionData should throw error when clearing session data fails" time="0.001">
-    </testcase>
-    <testcase classname="sessionManager hasSession should return true when session data exists" name="sessionManager hasSession should return true when session data exists" time="0">
-    </testcase>
-    <testcase classname="sessionManager hasSession should return false when no session data exists" name="sessionManager hasSession should return false when no session data exists" time="0">
-    </testcase>
-    <testcase classname="sessionManager hasSession should return false when there is an error checking session" name="sessionManager hasSession should return false when there is an error checking session" time="0.001">
-    </testcase>
-    <testcase classname="sessionManager parseCookies should parse cookies from set-cookie header" name="sessionManager parseCookies should parse cookies from set-cookie header" time="0.002">
-    </testcase>
-    <testcase classname="sessionManager parseCookies should handle empty cookie header" name="sessionManager parseCookies should handle empty cookie header" time="0">
-    </testcase>
-    <testcase classname="sessionManager parseCookies should handle malformed cookie header" name="sessionManager parseCookies should handle malformed cookie header" time="0.001">
-    </testcase>
-    <testcase classname="sessionManager extractSessionDataFromResponse should extract session data from response headers and cookies" name="sessionManager extractSessionDataFromResponse should extract session data from response headers and cookies" time="0">
-    </testcase>
-    <testcase classname="sessionManager extractSessionDataFromResponse should handle missing cookies" name="sessionManager extractSessionDataFromResponse should handle missing cookies" time="0">
-    </testcase>
-    <testcase classname="sessionManager extractSessionDataFromResponse should handle malformed URI components" name="sessionManager extractSessionDataFromResponse should handle malformed URI components" time="0.001">
-    </testcase>
-  </testsuite>
-  <testsuite name="authService" errors="0" failures="0" skipped="0" timestamp="2025-11-08T18:29:04" time="0.118" tests="13">
-    <testcase classname="authService autoLogin should return success when auto-login is successful" name="authService autoLogin should return success when auto-login is successful" time="0.001">
-    </testcase>
-    <testcase classname="authService autoLogin should return failure when auto-login fails" name="authService autoLogin should return failure when auto-login fails" time="0.001">
-    </testcase>
-    <testcase classname="authService autoLogin should handle API errors" name="authService autoLogin should handle API errors" time="0">
-    </testcase>
-    <testcase classname="authService autoLogin should handle unknown errors" name="authService autoLogin should handle unknown errors" time="0">
-    </testcase>
-    <testcase classname="authService login should return success when login is successful" name="authService login should return success when login is successful" time="0.001">
-    </testcase>
-    <testcase classname="authService login should return failure when login fails" name="authService login should return failure when login fails" time="0">
-    </testcase>
-    <testcase classname="authService login should validate input parameters" name="authService login should validate input parameters" time="0.001">
-    </testcase>
-    <testcase classname="authService logout should return success when logout is successful" name="authService logout should return success when logout is successful" time="0">
-    </testcase>
-    <testcase classname="authService logout should handle API errors during logout" name="authService logout should handle API errors during logout" time="0">
-    </testcase>
-    <testcase classname="authService handleTapThatAppLogin should parse cookies string and save session data" name="authService handleTapThatAppLogin should parse cookies string and save session data" time="0.001">
-    </testcase>
-    <testcase classname="authService handleTapThatAppLogin should handle cookies object" name="authService handleTapThatAppLogin should handle cookies object" time="0">
-    </testcase>
-    <testcase classname="authService handleTapThatAppLogin should return failure when required cookies are missing" name="authService handleTapThatAppLogin should return failure when required cookies are missing" time="0">
-    </testcase>
-    <testcase classname="authService handleTapThatAppLogin should handle malformed cookie values gracefully" name="authService handleTapThatAppLogin should handle malformed cookie values gracefully" time="0">
-    </testcase>
-  </testsuite>
-  <testsuite name="Preference Functions" errors="0" failures="0" skipped="0" timestamp="2025-11-08T18:29:04" time="0.129" tests="21">
-    <testcase classname="Preference Functions getPreference should return preference value when it exists" name="Preference Functions getPreference should return preference value when it exists" time="0.001">
-    </testcase>
-    <testcase classname="Preference Functions getPreference should return null when preference does not exist" name="Preference Functions getPreference should return null when preference does not exist" time="0">
-    </testcase>
-    <testcase classname="Preference Functions getPreference should return null on database error" name="Preference Functions getPreference should return null on database error" time="0">
-    </testcase>
-    <testcase classname="Preference Functions getPreference should handle empty string key" name="Preference Functions getPreference should handle empty string key" time="0.001">
-    </testcase>
-    <testcase classname="Preference Functions getPreference should handle special characters in key" name="Preference Functions getPreference should handle special characters in key" time="0">
-    </testcase>
-    <testcase classname="Preference Functions setPreference should insert new preference with description" name="Preference Functions setPreference should insert new preference with description" time="0">
-    </testcase>
-    <testcase classname="Preference Functions setPreference should update existing preference value and preserve description" name="Preference Functions setPreference should update existing preference value and preserve description" time="0">
-    </testcase>
-    <testcase classname="Preference Functions setPreference should set empty description when updating non-existent preference without description" name="Preference Functions setPreference should set empty description when updating non-existent preference without description" time="0.001">
-    </testcase>
-    <testcase classname="Preference Functions setPreference should handle empty string value" name="Preference Functions setPreference should handle empty string value" time="0">
-    </testcase>
-    <testcase classname="Preference Functions setPreference should handle special characters in value" name="Preference Functions setPreference should handle special characters in value" time="0">
-    </testcase>
-    <testcase classname="Preference Functions setPreference should throw error when database operation fails" name="Preference Functions setPreference should throw error when database operation fails" time="0.013">
-    </testcase>
-    <testcase classname="Preference Functions setPreference should handle description update when providing new description" name="Preference Functions setPreference should handle description update when providing new description" time="0">
-    </testcase>
-    <testcase classname="Preference Functions setPreference should handle undefined description parameter" name="Preference Functions setPreference should handle undefined description parameter" time="0">
-    </testcase>
-    <testcase classname="Preference Functions getAllPreferences should return all preferences ordered by key" name="Preference Functions getAllPreferences should return all preferences ordered by key" time="0">
-    </testcase>
-    <testcase classname="Preference Functions getAllPreferences should return empty array when no preferences exist" name="Preference Functions getAllPreferences should return empty array when no preferences exist" time="0">
-    </testcase>
-    <testcase classname="Preference Functions getAllPreferences should return empty array on database error" name="Preference Functions getAllPreferences should return empty array on database error" time="0">
-    </testcase>
-    <testcase classname="Preference Functions getAllPreferences should handle null return from database" name="Preference Functions getAllPreferences should handle null return from database" time="0.001">
-    </testcase>
-    <testcase classname="Preference Functions getAllPreferences should return preferences with empty descriptions" name="Preference Functions getAllPreferences should return preferences with empty descriptions" time="0">
-    </testcase>
-    <testcase classname="Preference Functions getAllPreferences should preserve preference ordering by key" name="Preference Functions getAllPreferences should preserve preference ordering by key" time="0">
-    </testcase>
-    <testcase classname="Preference Functions Integration scenarios should handle set and get preference workflow" name="Preference Functions Integration scenarios should handle set and get preference workflow" time="0">
-    </testcase>
-    <testcase classname="Preference Functions Integration scenarios should handle multiple preference updates" name="Preference Functions Integration scenarios should handle multiple preference updates" time="0.001">
-    </testcase>
-  </testsuite>
-  <testsuite name="Type Guards" errors="0" failures="0" skipped="0" timestamp="2025-11-08T18:29:04" time="0.139" tests="18">
-    <testcase classname="Type Guards Beer Type Guards isBeer should return true for valid Beer objects" name="Type Guards Beer Type Guards isBeer should return true for valid Beer objects" time="0">
-    </testcase>
-    <testcase classname="Type Guards Beer Type Guards isBeer should return false for invalid Beer objects" name="Type Guards Beer Type Guards isBeer should return false for invalid Beer objects" time="0.001">
-    </testcase>
-    <testcase classname="Type Guards Beer Type Guards isBeerfinder should return true for valid Beerfinder objects" name="Type Guards Beer Type Guards isBeerfinder should return true for valid Beerfinder objects" time="0">
-    </testcase>
-    <testcase classname="Type Guards Beer Type Guards isBeerfinder should return false for objects that are not Beerfinder" name="Type Guards Beer Type Guards isBeerfinder should return false for objects that are not Beerfinder" time="0">
-    </testcase>
-    <testcase classname="Type Guards Beer Type Guards isBeerDetails should return true for valid BeerDetails objects" name="Type Guards Beer Type Guards isBeerDetails should return true for valid BeerDetails objects" time="0">
-    </testcase>
-    <testcase classname="Type Guards Beer Type Guards isBeerDetails should return false for objects that are not BeerDetails" name="Type Guards Beer Type Guards isBeerDetails should return false for objects that are not BeerDetails" time="0">
-    </testcase>
-    <testcase classname="Type Guards API Type Guards isSessionData should return true for valid SessionData objects" name="Type Guards API Type Guards isSessionData should return true for valid SessionData objects" time="0">
-    </testcase>
-    <testcase classname="Type Guards API Type Guards isSessionData should return false for invalid SessionData objects" name="Type Guards API Type Guards isSessionData should return false for invalid SessionData objects" time="0.002">
-    </testcase>
-    <testcase classname="Type Guards API Type Guards isApiResponse should return true for valid ApiResponse objects" name="Type Guards API Type Guards isApiResponse should return true for valid ApiResponse objects" time="0">
-    </testcase>
-    <testcase classname="Type Guards API Type Guards isApiResponse should return false for invalid ApiResponse objects" name="Type Guards API Type Guards isApiResponse should return false for invalid ApiResponse objects" time="0">
-    </testcase>
-    <testcase classname="Type Guards API Type Guards isLoginResult should return true for valid LoginResult objects" name="Type Guards API Type Guards isLoginResult should return true for valid LoginResult objects" time="0.001">
-    </testcase>
-    <testcase classname="Type Guards API Type Guards isLoginResult should return false for invalid LoginResult objects" name="Type Guards API Type Guards isLoginResult should return false for invalid LoginResult objects" time="0">
-    </testcase>
-    <testcase classname="Type Guards Database Type Guards isPreference should return true for valid Preference objects" name="Type Guards Database Type Guards isPreference should return true for valid Preference objects" time="0">
-    </testcase>
-    <testcase classname="Type Guards Database Type Guards isPreference should return false for invalid Preference objects" name="Type Guards Database Type Guards isPreference should return false for invalid Preference objects" time="0">
-    </testcase>
-    <testcase classname="Type Guards Database Type Guards isReward should return true for valid Reward objects" name="Type Guards Database Type Guards isReward should return true for valid Reward objects" time="0">
-    </testcase>
-    <testcase classname="Type Guards Database Type Guards isReward should return false for invalid Reward objects" name="Type Guards Database Type Guards isReward should return false for invalid Reward objects" time="0">
-    </testcase>
-    <testcase classname="Type Guards Database Type Guards isUntappdCookie should return true for valid UntappdCookie objects" name="Type Guards Database Type Guards isUntappdCookie should return true for valid UntappdCookie objects" time="0.001">
-    </testcase>
-    <testcase classname="Type Guards Database Type Guards isUntappdCookie should return false for invalid UntappdCookie objects" name="Type Guards Database Type Guards isUntappdCookie should return false for invalid UntappdCookie objects" time="0">
-    </testcase>
-  </testsuite>
-  <testsuite name="sessionValidator" errors="0" failures="0" skipped="0" timestamp="2025-11-08T18:29:04" time="0.161" tests="10">
-    <testcase classname="sessionValidator validateSession should return session data when valid" name="sessionValidator validateSession should return session data when valid" time="0.001">
-    </testcase>
-    <testcase classname="sessionValidator validateSession should return null when session data is null" name="sessionValidator validateSession should return null when session data is null" time="0">
-    </testcase>
-    <testcase classname="sessionValidator validateSession should return null when session data fails type guard validation" name="sessionValidator validateSession should return null when session data fails type guard validation" time="0.001">
-    </testcase>
-    <testcase classname="sessionValidator validateSession should return null when session data is missing required fields" name="sessionValidator validateSession should return null when session data is missing required fields" time="0.003">
-    </testcase>
-    <testcase classname="sessionValidator validateSession should return null when session data has empty required fields" name="sessionValidator validateSession should return null when session data has empty required fields" time="0">
-    </testcase>
-    <testcase classname="sessionValidator getCurrentSession should return validated session data" name="sessionValidator getCurrentSession should return validated session data" time="0">
-    </testcase>
-    <testcase classname="sessionValidator getCurrentSession should return null when no session data exists" name="sessionValidator getCurrentSession should return null when no session data exists" time="0">
-    </testcase>
-    <testcase classname="sessionValidator getCurrentSession should return null when session data is invalid" name="sessionValidator getCurrentSession should return null when session data is invalid" time="0">
-    </testcase>
-    <testcase classname="sessionValidator getCurrentSession should throw ApiError when getSessionData throws an error" name="sessionValidator getCurrentSession should throw ApiError when getSessionData throws an error" time="0.008">
-    </testcase>
-    <testcase classname="sessionValidator getCurrentSession should rethrow ApiError when getSessionData throws an ApiError" name="sessionValidator getCurrentSession should rethrow ApiError when getSessionData throws an ApiError" time="0.005">
-    </testcase>
-  </testsuite>
-  <testsuite name="sessionService" errors="0" failures="0" skipped="0" timestamp="2025-11-08T18:29:05" time="0.136" tests="7">
-    <testcase classname="sessionService refreshSession should refresh session successfully" name="sessionService refreshSession should refresh session successfully" time="0.001">
-    </testcase>
-    <testcase classname="sessionService refreshSession should return null when refresh fails" name="sessionService refreshSession should return null when refresh fails" time="0">
-    </testcase>
-    <testcase classname="sessionService refreshSession should handle API errors" name="sessionService refreshSession should handle API errors" time="0">
-    </testcase>
-    <testcase classname="sessionService getValidSession should return valid session when session exists" name="sessionService getValidSession should return valid session when session exists" time="0.001">
-    </testcase>
-    <testcase classname="sessionService getValidSession should attempt refresh when session is invalid" name="sessionService getValidSession should attempt refresh when session is invalid" time="0">
-    </testcase>
-    <testcase classname="sessionService getValidSession should return null when session is invalid and refresh fails" name="sessionService getValidSession should return null when session is invalid and refresh fails" time="0">
-    </testcase>
-    <testcase classname="sessionService getValidSession should handle errors" name="sessionService getValidSession should handle errors" time="0.001">
-    </testcase>
-  </testsuite>
-  <testsuite name="dataUpdateService" errors="0" failures="0" skipped="0" timestamp="2025-11-08T18:29:05" time="0.164" tests="13">
-    <testcase classname="dataUpdateService fetchAndUpdateAllBeers should return failure result if API URL is not set" name="dataUpdateService fetchAndUpdateAllBeers should return failure result if API URL is not set" time="0.001">
-    </testcase>
-    <testcase classname="dataUpdateService fetchAndUpdateAllBeers should return failure result if fetch fails" name="dataUpdateService fetchAndUpdateAllBeers should return failure result if fetch fails" time="0.001">
-    </testcase>
-    <testcase classname="dataUpdateService fetchAndUpdateAllBeers should return failure result if response is not an array" name="dataUpdateService fetchAndUpdateAllBeers should return failure result if response is not an array" time="0.001">
-    </testcase>
-    <testcase classname="dataUpdateService fetchAndUpdateAllBeers should return failure result if response does not contain brewInStock" name="dataUpdateService fetchAndUpdateAllBeers should return failure result if response does not contain brewInStock" time="0">
-    </testcase>
-    <testcase classname="dataUpdateService fetchAndUpdateAllBeers should successfully update all beers" name="dataUpdateService fetchAndUpdateAllBeers should successfully update all beers" time="0.001">
-    </testcase>
-    <testcase classname="dataUpdateService fetchAndUpdateAllBeers should handle errors during update" name="dataUpdateService fetchAndUpdateAllBeers should handle errors during update" time="0.001">
-    </testcase>
-    <testcase classname="dataUpdateService fetchAndUpdateMyBeers should return failure result if API URL is not set" name="dataUpdateService fetchAndUpdateMyBeers should return failure result if API URL is not set" time="0">
-    </testcase>
-    <testcase classname="dataUpdateService fetchAndUpdateMyBeers should return failure result if fetch fails" name="dataUpdateService fetchAndUpdateMyBeers should return failure result if fetch fails" time="0.001">
-    </testcase>
-    <testcase classname="dataUpdateService fetchAndUpdateMyBeers should return failure result if response is not an array" name="dataUpdateService fetchAndUpdateMyBeers should return failure result if response is not an array" time="0">
-    </testcase>
-    <testcase classname="dataUpdateService fetchAndUpdateMyBeers should return failure result if response does not contain tasted_brew_current_round" name="dataUpdateService fetchAndUpdateMyBeers should return failure result if response does not contain tasted_brew_current_round" time="0.001">
-    </testcase>
-    <testcase classname="dataUpdateService fetchAndUpdateMyBeers should return success with 0 items if no valid beers with IDs are found" name="dataUpdateService fetchAndUpdateMyBeers should return success with 0 items if no valid beers with IDs are found" time="0.002">
-    </testcase>
-    <testcase classname="dataUpdateService fetchAndUpdateMyBeers should successfully update my beers" name="dataUpdateService fetchAndUpdateMyBeers should successfully update my beers" time="0.001">
-    </testcase>
-    <testcase classname="dataUpdateService fetchAndUpdateMyBeers should handle errors during update" name="dataUpdateService fetchAndUpdateMyBeers should handle errors during update" time="0">
-    </testcase>
-  </testsuite>
-  <testsuite name="Database Type Guards" errors="0" failures="0" skipped="0" timestamp="2025-11-08T18:29:05" time="0.114" tests="6">
-    <testcase classname="Database Type Guards isPreference should return true for valid Preference objects" name="Database Type Guards isPreference should return true for valid Preference objects" time="0">
-    </testcase>
-    <testcase classname="Database Type Guards isPreference should return false for invalid Preference objects" name="Database Type Guards isPreference should return false for invalid Preference objects" time="0.001">
-    </testcase>
-    <testcase classname="Database Type Guards isReward should return true for valid Reward objects" name="Database Type Guards isReward should return true for valid Reward objects" time="0">
-    </testcase>
-    <testcase classname="Database Type Guards isReward should return false for invalid Reward objects" name="Database Type Guards isReward should return false for invalid Reward objects" time="0">
-    </testcase>
-    <testcase classname="Database Type Guards isUntappdCookie should return true for valid UntappdCookie objects" name="Database Type Guards isUntappdCookie should return true for valid UntappdCookie objects" time="0">
-    </testcase>
-    <testcase classname="Database Type Guards isUntappdCookie should return false for invalid UntappdCookie objects" name="Database Type Guards isUntappdCookie should return false for invalid UntappdCookie objects" time="0.001">
-    </testcase>
-  </testsuite>
-  <testsuite name="Beer Type Guards" errors="0" failures="0" skipped="0" timestamp="2025-11-08T18:29:05" time="0.124" tests="14">
-    <testcase classname="Beer Type Guards isBeer should return true for valid Beer objects" name="Beer Type Guards isBeer should return true for valid Beer objects" time="0">
-    </testcase>
-    <testcase classname="Beer Type Guards isBeer should return false for invalid Beer objects" name="Beer Type Guards isBeer should return false for invalid Beer objects" time="0">
-    </testcase>
-    <testcase classname="Beer Type Guards isBeerfinder should return true for valid Beerfinder objects" name="Beer Type Guards isBeerfinder should return true for valid Beerfinder objects" time="0">
-    </testcase>
-    <testcase classname="Beer Type Guards isBeerfinder should return true for Beer objects with at least one Beerfinder property" name="Beer Type Guards isBeerfinder should return true for Beer objects with at least one Beerfinder property" time="0">
-    </testcase>
-    <testcase classname="Beer Type Guards isBeerfinder should return false for regular Beer objects without Beerfinder properties" name="Beer Type Guards isBeerfinder should return false for regular Beer objects without Beerfinder properties" time="0">
-    </testcase>
-    <testcase classname="Beer Type Guards isBeerfinder should return false for invalid objects" name="Beer Type Guards isBeerfinder should return false for invalid objects" time="0">
-    </testcase>
-    <testcase classname="Beer Type Guards isBeerDetails should return true for valid BeerDetails objects" name="Beer Type Guards isBeerDetails should return true for valid BeerDetails objects" time="0.001">
-    </testcase>
-    <testcase classname="Beer Type Guards isBeerDetails should return true for Beer objects with at least one BeerDetails property" name="Beer Type Guards isBeerDetails should return true for Beer objects with at least one BeerDetails property" time="0">
-    </testcase>
-    <testcase classname="Beer Type Guards isBeerDetails should return false for regular Beer objects without BeerDetails properties" name="Beer Type Guards isBeerDetails should return false for regular Beer objects without BeerDetails properties" time="0">
-    </testcase>
-    <testcase classname="Beer Type Guards isBeerDetails should return false for invalid objects" name="Beer Type Guards isBeerDetails should return false for invalid objects" time="0.001">
-    </testcase>
-    <testcase classname="Beer Type Guards isCheckInResponse should return true for valid CheckInResponse objects" name="Beer Type Guards isCheckInResponse should return true for valid CheckInResponse objects" time="0">
-    </testcase>
-    <testcase classname="Beer Type Guards isCheckInResponse should return false for objects without success property" name="Beer Type Guards isCheckInResponse should return false for objects without success property" time="0">
-    </testcase>
-    <testcase classname="Beer Type Guards isCheckInResponse should return false for objects with wrong type for success property" name="Beer Type Guards isCheckInResponse should return false for objects with wrong type for success property" time="0">
-    </testcase>
-    <testcase classname="Beer Type Guards isCheckInResponse should return false for invalid objects" name="Beer Type Guards isCheckInResponse should return false for invalid objects" time="0.002">
-    </testcase>
-  </testsuite>
-  <testsuite name="ApiError" errors="0" failures="0" skipped="0" timestamp="2025-11-08T18:29:05" time="0.118" tests="3">
-    <testcase classname="ApiError should create an ApiError with correct properties" name="ApiError should create an ApiError with correct properties" time="0">
-    </testcase>
-    <testcase classname="ApiError should mark 5xx errors as retryable" name="ApiError should mark 5xx errors as retryable" time="0.001">
-    </testcase>
-    <testcase classname="ApiError should mark 4xx errors as non-retryable (except 408 and 429)" name="ApiError should mark 4xx errors as non-retryable (except 408 and 429)" time="0">
-    </testcase>
-  </testsuite>
-  <testsuite name="DatabaseLockManager" errors="0" failures="0" skipped="0" timestamp="2025-11-08T18:29:05" time="0.122" tests="10">
-    <testcase classname="DatabaseLockManager acquireLock should successfully acquire lock when available" name="DatabaseLockManager acquireLock should successfully acquire lock when available" time="0">
-    </testcase>
-    <testcase classname="DatabaseLockManager acquireLock should log lock acquisition" name="DatabaseLockManager acquireLock should log lock acquisition" time="0">
-    </testcase>
-    <testcase classname="DatabaseLockManager releaseLock should release the lock" name="DatabaseLockManager releaseLock should release the lock" time="0">
-    </testcase>
-    <testcase classname="DatabaseLockManager releaseLock should log lock release" name="DatabaseLockManager releaseLock should log lock release" time="0.001">
-    </testcase>
-    <testcase classname="DatabaseLockManager releaseLock should handle releasing lock when not held" name="DatabaseLockManager releaseLock should handle releasing lock when not held" time="0">
-    </testcase>
-    <testcase classname="DatabaseLockManager concurrent operations should handle rapid acquire/release cycles" name="DatabaseLockManager concurrent operations should handle rapid acquire/release cycles" time="0">
-    </testcase>
-    <testcase classname="DatabaseLockManager error scenarios should handle errors without leaving lock in bad state" name="DatabaseLockManager error scenarios should handle errors without leaving lock in bad state" time="0">
-    </testcase>
-    <testcase classname="DatabaseLockManager isLocked should return false when no lock is held" name="DatabaseLockManager isLocked should return false when no lock is held" time="0">
-    </testcase>
-    <testcase classname="DatabaseLockManager isLocked should return true when lock is held" name="DatabaseLockManager isLocked should return true when lock is held" time="0.001">
-    </testcase>
-    <testcase classname="DatabaseLockManager isLocked should return false after lock is released" name="DatabaseLockManager isLocked should return false after lock is released" time="0">
-    </testcase>
-  </testsuite>
-  <testsuite name="Type Guards" errors="0" failures="0" skipped="0" timestamp="2025-11-08T18:29:05" time="0.101" tests="4">
-    <testcase classname="Type Guards isBeer should return true for valid Beer objects" name="Type Guards isBeer should return true for valid Beer objects" time="0">
-    </testcase>
-    <testcase classname="Type Guards isBeer should return false for invalid Beer objects" name="Type Guards isBeer should return false for invalid Beer objects" time="0">
-    </testcase>
-    <testcase classname="Type Guards isBeerfinder should return true for valid Beerfinder objects" name="Type Guards isBeerfinder should return true for valid Beerfinder objects" time="0.001">
-    </testcase>
-    <testcase classname="Type Guards isBeerfinder should return false for objects that are not Beerfinder" name="Type Guards isBeerfinder should return false for objects that are not Beerfinder" time="0">
-    </testcase>
-  </testsuite>
-  <testsuite name="Beer API" errors="0" failures="0" skipped="0" timestamp="2025-11-08T18:29:02" time="8.541" tests="23">
-    <testcase classname="Beer API fetchWithRetry should return data on successful fetch" name="Beer API fetchWithRetry should return data on successful fetch" time="0.007">
-    </testcase>
-    <testcase classname="Beer API fetchWithRetry should handle none:// protocol URLs by returning empty data" name="Beer API fetchWithRetry should handle none:// protocol URLs by returning empty data" time="0.001">
-    </testcase>
-    <testcase classname="Beer API fetchWithRetry should retry on fetch failure" name="Beer API fetchWithRetry should retry on fetch failure" time="0.008">
-    </testcase>
-    <testcase classname="Beer API fetchWithRetry should throw error after exhausting retries" name="Beer API fetchWithRetry should throw error after exhausting retries" time="0.018">
-    </testcase>
-    <testcase classname="Beer API fetchWithRetry should throw error on non-ok HTTP status" name="Beer API fetchWithRetry should throw error on non-ok HTTP status" time="0.022">
-    </testcase>
-    <testcase classname="Beer API fetchBeersFromAPI should return empty array when API URL is not configured" name="Beer API fetchBeersFromAPI should return empty array when API URL is not configured" time="0.001">
-    </testcase>
-    <testcase classname="Beer API fetchBeersFromAPI should fetch and return beers in standard brewInStock format" name="Beer API fetchBeersFromAPI should fetch and return beers in standard brewInStock format" time="0.001">
-    </testcase>
-    <testcase classname="Beer API fetchBeersFromAPI should find beers in nested object structure" name="Beer API fetchBeersFromAPI should find beers in nested object structure" time="0">
-    </testcase>
-    <testcase classname="Beer API fetchBeersFromAPI should throw error when no beer data found in response" name="Beer API fetchBeersFromAPI should throw error when no beer data found in response" time="0.001">
-    </testcase>
-    <testcase classname="Beer API fetchBeersFromAPI should propagate fetch errors" name="Beer API fetchBeersFromAPI should propagate fetch errors" time="2.504">
-    </testcase>
-    <testcase classname="Beer API fetchMyBeersFromAPI should return empty array in visitor mode" name="Beer API fetchMyBeersFromAPI should return empty array in visitor mode" time="0.001">
-    </testcase>
-    <testcase classname="Beer API fetchMyBeersFromAPI should return empty array when API URL is not configured" name="Beer API fetchMyBeersFromAPI should return empty array when API URL is not configured" time="0">
-    </testcase>
-    <testcase classname="Beer API fetchMyBeersFromAPI should return empty array for none:// protocol URLs" name="Beer API fetchMyBeersFromAPI should return empty array for none:// protocol URLs" time="0.001">
-    </testcase>
-    <testcase classname="Beer API fetchMyBeersFromAPI should fetch and return tasted beers" name="Beer API fetchMyBeersFromAPI should fetch and return tasted beers" time="0.001">
-    </testcase>
-    <testcase classname="Beer API fetchMyBeersFromAPI should handle empty tasted beers array as valid state" name="Beer API fetchMyBeersFromAPI should handle empty tasted beers array as valid state" time="0.002">
-    </testcase>
-    <testcase classname="Beer API fetchMyBeersFromAPI should filter out beers without IDs" name="Beer API fetchMyBeersFromAPI should filter out beers without IDs" time="0">
-    </testcase>
-    <testcase classname="Beer API fetchMyBeersFromAPI should throw error on invalid response format" name="Beer API fetchMyBeersFromAPI should throw error on invalid response format" time="0.001">
-    </testcase>
-    <testcase classname="Beer API fetchMyBeersFromAPI should propagate fetch errors" name="Beer API fetchMyBeersFromAPI should propagate fetch errors" time="2.503">
-    </testcase>
-    <testcase classname="Beer API fetchRewardsFromAPI should return empty array in visitor mode" name="Beer API fetchRewardsFromAPI should return empty array in visitor mode" time="0">
-    </testcase>
-    <testcase classname="Beer API fetchRewardsFromAPI should return empty array when API URL is not configured" name="Beer API fetchRewardsFromAPI should return empty array when API URL is not configured" time="0">
-    </testcase>
-    <testcase classname="Beer API fetchRewardsFromAPI should fetch and return rewards" name="Beer API fetchRewardsFromAPI should fetch and return rewards" time="0">
-    </testcase>
-    <testcase classname="Beer API fetchRewardsFromAPI should throw error on invalid response format" name="Beer API fetchRewardsFromAPI should throw error on invalid response format" time="0.001">
-    </testcase>
-    <testcase classname="Beer API fetchRewardsFromAPI should propagate fetch errors" name="Beer API fetchRewardsFromAPI should propagate fetch errors" time="2.508">
+    <testcase classname="MyBeersRepository error handling should throw error on transaction failure" name="MyBeersRepository error handling should throw error on transaction failure" time="0.001">
     </testcase>
   </testsuite>
 </testsuites>
