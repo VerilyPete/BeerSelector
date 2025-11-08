@@ -232,13 +232,35 @@ export class ApiClient {
 
     try {
       const response = await this.fetchWithRetry(url, requestOptions);
-      const data = await response.json();
 
-      return {
-        data,
-        success: true,
-        statusCode: response.status
-      };
+      // Get response text first to handle empty responses
+      const responseText = await response.text();
+
+      // If response is empty, return success with empty object
+      if (!responseText || responseText.trim().length === 0) {
+        return {
+          data: {} as T,
+          success: true,
+          statusCode: response.status
+        };
+      }
+
+      // Try to parse as JSON
+      try {
+        const data = JSON.parse(responseText);
+        return {
+          data,
+          success: true,
+          statusCode: response.status
+        };
+      } catch (jsonError) {
+        // If JSON parsing fails, return the text as-is
+        return {
+          data: responseText as unknown as T,
+          success: true,
+          statusCode: response.status
+        };
+      }
     } catch (error) {
       // If it's already an ApiError, just rethrow it with the response structure
       if (error instanceof ApiError) {
