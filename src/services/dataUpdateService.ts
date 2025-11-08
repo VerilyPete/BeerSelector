@@ -1,16 +1,11 @@
-import { 
-  areApiUrlsConfigured,
-  fetchBeersFromAPI, 
-  fetchMyBeersFromAPI, 
-  getPreference, 
-  populateBeersTable, 
-  populateMyBeersTable,
-  setPreference,
-  fetchAndPopulateRewards,
-  getAllRewards
-} from '../database/db';
+import { getPreference, setPreference, areApiUrlsConfigured } from '../database/preferences';
+import { fetchBeersFromAPI, fetchMyBeersFromAPI, fetchRewardsFromAPI } from '../api/beerApi';
 import { Beer, Beerfinder } from '../types/beer';
+import { Reward } from '../types/database';
 import { ApiErrorType, ErrorResponse, createErrorResponse } from '../utils/notificationUtils';
+import { beerRepository } from '../database/repositories/BeerRepository';
+import { myBeersRepository } from '../database/repositories/MyBeersRepository';
+import { rewardsRepository } from '../database/repositories/RewardsRepository';
 
 /**
  * Result of a data update operation
@@ -131,7 +126,7 @@ export async function fetchAndUpdateAllBeers(): Promise<DataUpdateResult> {
     }
 
     // Update the database
-    await populateBeersTable(allBeers);
+    await beerRepository.insertMany(allBeers);
 
     // Update the last update timestamp
     await setPreference('all_beers_last_update', new Date().toISOString());
@@ -283,12 +278,12 @@ export async function fetchAndUpdateMyBeers(): Promise<DataUpdateResult> {
     if (myBeers.length === 0) {
       console.log('Empty tasted beers array - user has no tasted beers in current round (new user or round rollover at 200 beers), clearing database');
       // Clear the database table since there are no beers
-      await populateMyBeersTable([]);
-      
+      await myBeersRepository.insertMany([]);
+
       // Update the last update timestamp
       await setPreference('my_beers_last_update', new Date().toISOString());
       await setPreference('my_beers_last_check', new Date().toISOString());
-      
+
       console.log('Updated my beers data with 0 beers (empty state)');
       return {
         success: true,
@@ -304,12 +299,12 @@ export async function fetchAndUpdateMyBeers(): Promise<DataUpdateResult> {
     if (validBeers.length === 0) {
       console.log('No valid beers with IDs found, but API returned data - clearing database');
       // This means all beers in the response are invalid, so clear the database
-      await populateMyBeersTable([]);
-      
+      await myBeersRepository.insertMany([]);
+
       // Update the last update timestamp
       await setPreference('my_beers_last_update', new Date().toISOString());
       await setPreference('my_beers_last_check', new Date().toISOString());
-      
+
       console.log('Updated my beers data with 0 beers (all invalid)');
       return {
         success: true,
@@ -319,7 +314,7 @@ export async function fetchAndUpdateMyBeers(): Promise<DataUpdateResult> {
     }
 
     // Update the database with the valid beers
-    await populateMyBeersTable(validBeers);
+    await myBeersRepository.insertMany(validBeers);
 
     // Update the last update timestamp
     await setPreference('my_beers_last_update', new Date().toISOString());
@@ -371,6 +366,7 @@ export async function shouldRefreshData(lastCheckKey: string, intervalHours: num
 export interface ManualRefreshResult {
   allBeersResult: DataUpdateResult;
   myBeersResult: DataUpdateResult;
+  rewardsResult: DataUpdateResult;
   hasErrors: boolean;
   allNetworkErrors: boolean;
 }
@@ -394,7 +390,7 @@ export async function fetchAndUpdateRewards(): Promise<DataUpdateResult> {
   try {
     // Check if in visitor mode
     const isVisitor = await getPreference('is_visitor_mode') === 'true';
-    
+
     if (isVisitor) {
       console.log('In visitor mode, skipping rewards refresh');
       return { success: true, dataUpdated: false };
@@ -402,14 +398,14 @@ export async function fetchAndUpdateRewards(): Promise<DataUpdateResult> {
 
     // Fetch and populate rewards if not in visitor mode
     console.log('Refreshing rewards data');
-    await fetchAndPopulateRewards();
-    
-    // Note: We don't have getAllRewards function, so we'll assume success
-    console.log('Updated rewards data successfully');
+    const rewards = await fetchRewardsFromAPI();
+    await rewardsRepository.insertMany(rewards);
+
+    console.log(`Updated rewards data successfully: ${rewards.length} rewards`);
     return {
       success: true,
       dataUpdated: true,
-      itemCount: 1 // We don't have a way to count rewards right now
+      itemCount: rewards.length
     };
   } catch (error) {
     console.error('Error updating rewards data:', error);
@@ -421,49 +417,53 @@ export async function fetchAndUpdateRewards(): Promise<DataUpdateResult> {
   }
 }
 
-// Unified manual refresh function that refreshes core data types (all beers and my beers)
-// Rewards are intentionally excluded from manual refresh and are handled on app launch
+// Unified manual refresh function that refreshes all data types (all beers, my beers, and rewards)
 // Allow tests to override the internal implementations used for refresh
 let fetchAllImpl = fetchAndUpdateAllBeers;
 let fetchMyImpl = fetchAndUpdateMyBeers;
+let fetchRewardsImpl = fetchAndUpdateRewards;
 
 export function __setRefreshImplementations(overrides: {
   fetchAll?: typeof fetchAndUpdateAllBeers;
   fetchMy?: typeof fetchAndUpdateMyBeers;
+  fetchRewards?: typeof fetchAndUpdateRewards;
 }) {
   if (overrides.fetchAll) fetchAllImpl = overrides.fetchAll;
   if (overrides.fetchMy) fetchMyImpl = overrides.fetchMy;
+  if (overrides.fetchRewards) fetchRewardsImpl = overrides.fetchRewards;
 }
 
 export async function manualRefreshAllData(): Promise<ManualRefreshResult> {
-  console.log('Starting unified manual refresh for core data types...');
-  
+  console.log('Starting unified manual refresh for all data types...');
+
   try {
     // Check if API URLs are configured
     const apiUrl = await getPreference('all_beers_api_url');
     const myBeersApiUrl = await getPreference('my_beers_api_url');
-    
+
     if (!apiUrl && !myBeersApiUrl) {
       console.log('No API URLs configured for manual refresh');
       return {
         allBeersResult: { success: false, dataUpdated: false, error: { type: ApiErrorType.VALIDATION_ERROR, message: 'No API URLs configured' } },
         myBeersResult: { success: false, dataUpdated: false, error: { type: ApiErrorType.VALIDATION_ERROR, message: 'No API URLs configured' } },
+        rewardsResult: { success: false, dataUpdated: false, error: { type: ApiErrorType.VALIDATION_ERROR, message: 'No API URLs configured' } },
         hasErrors: true,
         allNetworkErrors: false
       };
     }
 
     // Force fresh data by clearing relevant timestamps
-    console.log('Clearing timestamp checks for manual refresh (core data)');
+    console.log('Clearing timestamp checks for manual refresh (all data)');
     await setPreference('all_beers_last_update', '');
     await setPreference('all_beers_last_check', '');
     await setPreference('my_beers_last_update', '');
     await setPreference('my_beers_last_check', '');
 
-    // Refresh core data in parallel for better performance
-const [allBeersResult, myBeersResult] = await Promise.allSettled([
+    // Refresh all data in parallel for better performance
+    const [allBeersResult, myBeersResult, rewardsResult] = await Promise.allSettled([
       apiUrl ? fetchAllImpl() : Promise.resolve({ success: true, dataUpdated: false }),
-      myBeersApiUrl ? fetchMyImpl() : Promise.resolve({ success: true, dataUpdated: false })
+      myBeersApiUrl ? fetchMyImpl() : Promise.resolve({ success: true, dataUpdated: false }),
+      myBeersApiUrl ? fetchRewardsImpl() : Promise.resolve({ success: true, dataUpdated: false })
     ]);
 
     // Process results
@@ -482,18 +482,20 @@ const [allBeersResult, myBeersResult] = await Promise.allSettled([
 
     const finalAllBeersResult = processResult(allBeersResult);
     const finalMyBeersResult = processResult(myBeersResult);
+    const finalRewardsResult = processResult(rewardsResult);
 
     // Check if there were any errors
-    const hasErrors = !finalAllBeersResult.success || !finalMyBeersResult.success;
-    
+    const hasErrors = !finalAllBeersResult.success || !finalMyBeersResult.success || !finalRewardsResult.success;
+
     // Check if all errors are network-related
-    const allNetworkErrors = hasErrors && [finalAllBeersResult, finalMyBeersResult]
+    const allNetworkErrors = hasErrors && [finalAllBeersResult, finalMyBeersResult, finalRewardsResult]
       .filter(result => !result.success && result.error)
       .every(result => result.error!.type === 'NETWORK_ERROR' || result.error!.type === 'TIMEOUT_ERROR');
 
     console.log('Manual refresh completed:', {
       allBeers: finalAllBeersResult.success,
       myBeers: finalMyBeersResult.success,
+      rewards: finalRewardsResult.success,
       hasErrors,
       allNetworkErrors
     });
@@ -501,16 +503,18 @@ const [allBeersResult, myBeersResult] = await Promise.allSettled([
     return {
       allBeersResult: finalAllBeersResult,
       myBeersResult: finalMyBeersResult,
+      rewardsResult: finalRewardsResult,
       hasErrors,
       allNetworkErrors
     };
   } catch (error) {
     console.error('Error in unified manual refresh:', error);
     const errorResponse = createErrorResponse(error);
-    
+
     return {
       allBeersResult: { success: false, dataUpdated: false, error: errorResponse },
       myBeersResult: { success: false, dataUpdated: false, error: errorResponse },
+      rewardsResult: { success: false, dataUpdated: false, error: errorResponse },
       hasErrors: true,
       allNetworkErrors: errorResponse.type === 'NETWORK_ERROR' || errorResponse.type === 'TIMEOUT_ERROR'
     };
@@ -583,3 +587,51 @@ export async function checkAndRefreshOnAppOpen(minIntervalHours: number = 12): P
     };
   }
 }
+
+/**
+ * Refresh all data from API (all beers, my beers, and rewards)
+ *
+ * This is the main entry point for fetching fresh data from the Flying Saucer API.
+ * It fetches all three data types in parallel for better performance.
+ *
+ * @returns Object containing arrays of fetched data
+ * @throws Error if API URLs are not configured
+ */
+export const refreshAllDataFromAPI = async (): Promise<{
+  allBeers: Beer[];
+  myBeers: Beerfinder[];
+  rewards: Reward[];
+}> => {
+  console.log('Refreshing all data from API...');
+
+  // Check that API URLs are configured
+  const apiUrlsConfigured = await areApiUrlsConfigured();
+  if (!apiUrlsConfigured) {
+    throw new Error('API URLs not configured. Please log in to set up API URLs.');
+  }
+
+  // Fetch all data in parallel for better performance
+  const [allBeers, myBeers, rewards] = await Promise.all([
+    // Fetch and populate all beers
+    fetchBeersFromAPI().then(async (beers) => {
+      await beerRepository.insertMany(beers);
+      return beers;
+    }),
+
+    // Fetch and populate my beers (tasted beers)
+    fetchMyBeersFromAPI().then(async (beers) => {
+      await myBeersRepository.insertMany(beers);
+      return beers;
+    }),
+
+    // Fetch and populate rewards
+    fetchRewardsFromAPI().then(async (rewards) => {
+      await rewardsRepository.insertMany(rewards);
+      return rewards;
+    })
+  ]);
+
+  console.log(`Refreshed all data: ${allBeers.length} beers, ${myBeers.length} tasted beers, ${rewards.length} rewards`);
+
+  return { allBeers, myBeers, rewards };
+};

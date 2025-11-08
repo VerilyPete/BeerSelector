@@ -7,6 +7,7 @@
 
 import { getDatabase } from '../connection';
 import { Reward } from '../../types/database';
+import { databaseLockManager } from '../locks';
 
 /**
  * Repository class for Reward entity operations
@@ -21,6 +22,7 @@ export class RewardsRepository {
    *
    * Clears existing data and inserts fresh records in batches of 100.
    * Uses batch insert with placeholders for efficiency.
+   * Uses database lock to prevent concurrent operations.
    *
    * @param rewards - Array of Reward objects to insert
    */
@@ -28,6 +30,11 @@ export class RewardsRepository {
     if (!rewards || rewards.length === 0) {
       console.log('No rewards to populate');
       return;
+    }
+
+    // Acquire database lock to prevent concurrent operations
+    if (!await databaseLockManager.acquireLock('RewardsRepository.insertMany')) {
+      throw new Error('Could not acquire database lock for rewards insertion');
     }
 
     try {
@@ -70,6 +77,9 @@ export class RewardsRepository {
     } catch (error) {
       console.error('Error populating rewards table:', error);
       throw error;
+    } finally {
+      // Always release the lock
+      databaseLockManager.releaseLock('RewardsRepository.insertMany');
     }
   }
 

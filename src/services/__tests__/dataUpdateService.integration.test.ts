@@ -1,14 +1,26 @@
 import { fetchAndUpdateAllBeers, fetchAndUpdateMyBeers } from '../dataUpdateService';
-import { getPreference, setPreference, populateBeersTable, populateMyBeersTable } from '../../database/db';
+import { getPreference, setPreference } from '../../database/preferences';
+import { beerRepository } from '../../database/repositories/BeerRepository';
+import { myBeersRepository } from '../../database/repositories/MyBeersRepository';
 import * as fs from 'fs';
 import * as path from 'path';
 
 // Mock dependencies
-jest.mock('../../database/db', () => ({
+jest.mock('../../database/preferences', () => ({
   getPreference: jest.fn(),
   setPreference: jest.fn(),
-  populateBeersTable: jest.fn(),
-  populateMyBeersTable: jest.fn(),
+}));
+
+jest.mock('../../database/repositories/BeerRepository', () => ({
+  beerRepository: {
+    insertMany: jest.fn(),
+  },
+}));
+
+jest.mock('../../database/repositories/MyBeersRepository', () => ({
+  myBeersRepository: {
+    insertMany: jest.fn(),
+  },
 }));
 
 // Mock fetch
@@ -67,10 +79,12 @@ describe('dataUpdateService integration tests', () => {
       const result = await fetchAndUpdateAllBeers();
 
       // Verify the result
-      expect(result).toBe(true);
+      expect(result.success).toBe(true);
+      expect(result.dataUpdated).toBe(true);
+      expect(result.itemCount).toBeGreaterThan(0);
 
       // Verify that fetch was called with the correct URL
-      expect(global.fetch).toHaveBeenCalledWith('https://example.com/allbeers.json');
+      expect(global.fetch).toHaveBeenCalledWith('https://example.com/allbeers.json', expect.objectContaining({ signal: expect.any(Object) }));
 
       // Verify that populateBeersTable was called with the correct data
       expect(populateBeersTable).toHaveBeenCalledTimes(1);
@@ -105,7 +119,8 @@ describe('dataUpdateService integration tests', () => {
       const result = await fetchAndUpdateAllBeers();
 
       // Verify the result
-      expect(result).toBe(false);
+      expect(result.success).toBe(false);
+      expect(result.dataUpdated).toBe(false);
 
       // Verify that fetch was not called
       expect(global.fetch).not.toHaveBeenCalled();
@@ -132,10 +147,11 @@ describe('dataUpdateService integration tests', () => {
       const result = await fetchAndUpdateAllBeers();
 
       // Verify the result
-      expect(result).toBe(false);
+      expect(result.success).toBe(false);
+      expect(result.dataUpdated).toBe(false);
 
       // Verify that fetch was called
-      expect(global.fetch).toHaveBeenCalledWith('https://example.com/allbeers.json');
+      expect(global.fetch).toHaveBeenCalledWith('https://example.com/allbeers.json', expect.objectContaining({ signal: expect.any(Object) }));
 
       // Verify that populateBeersTable was not called
       expect(populateBeersTable).not.toHaveBeenCalled();
@@ -158,10 +174,11 @@ describe('dataUpdateService integration tests', () => {
       const result = await fetchAndUpdateAllBeers();
 
       // Verify the result
-      expect(result).toBe(false);
+      expect(result.success).toBe(false);
+      expect(result.dataUpdated).toBe(false);
 
       // Verify that fetch was called
-      expect(global.fetch).toHaveBeenCalledWith('https://example.com/allbeers.json');
+      expect(global.fetch).toHaveBeenCalledWith('https://example.com/allbeers.json', expect.objectContaining({ signal: expect.any(Object) }));
 
       // Verify that populateBeersTable was not called
       expect(populateBeersTable).not.toHaveBeenCalled();
@@ -181,10 +198,11 @@ describe('dataUpdateService integration tests', () => {
       const result = await fetchAndUpdateAllBeers();
 
       // Verify the result
-      expect(result).toBe(false);
+      expect(result.success).toBe(false);
+      expect(result.dataUpdated).toBe(false);
 
       // Verify that fetch was called
-      expect(global.fetch).toHaveBeenCalledWith('https://example.com/allbeers.json');
+      expect(global.fetch).toHaveBeenCalledWith('https://example.com/allbeers.json', expect.objectContaining({ signal: expect.any(Object) }));
 
       // Verify that populateBeersTable was not called
       expect(populateBeersTable).not.toHaveBeenCalled();
@@ -193,7 +211,7 @@ describe('dataUpdateService integration tests', () => {
       expect(setPreference).not.toHaveBeenCalled();
 
       // Verify that an error was logged
-      expect(console.error).toHaveBeenCalledWith('Error updating all beers data:', expect.any(Error));
+      expect(console.error).toHaveBeenCalledWith('Network error fetching all beers data:', expect.any(Error));
     });
   });
 
@@ -212,10 +230,12 @@ describe('dataUpdateService integration tests', () => {
       const result = await fetchAndUpdateMyBeers();
 
       // Verify the result
-      expect(result).toBe(true);
+      expect(result.success).toBe(true);
+      expect(result.dataUpdated).toBe(true);
+      expect(result.itemCount).toBeGreaterThan(0);
 
       // Verify that fetch was called with the correct URL
-      expect(global.fetch).toHaveBeenCalledWith('https://example.com/mybeers.json');
+      expect(global.fetch).toHaveBeenCalledWith('https://example.com/mybeers.json', expect.objectContaining({ signal: expect.any(Object) }));
 
       // Verify that populateMyBeersTable was called with the correct data
       expect(populateMyBeersTable).toHaveBeenCalledTimes(1);
@@ -252,7 +272,8 @@ describe('dataUpdateService integration tests', () => {
       const result = await fetchAndUpdateMyBeers();
 
       // Verify the result
-      expect(result).toBe(false);
+      expect(result.success).toBe(false);
+      expect(result.dataUpdated).toBe(false);
 
       // Verify that fetch was not called
       expect(global.fetch).not.toHaveBeenCalled();
@@ -279,10 +300,11 @@ describe('dataUpdateService integration tests', () => {
       const result = await fetchAndUpdateMyBeers();
 
       // Verify the result
-      expect(result).toBe(false);
+      expect(result.success).toBe(false);
+      expect(result.dataUpdated).toBe(false);
 
       // Verify that fetch was called
-      expect(global.fetch).toHaveBeenCalledWith('https://example.com/mybeers.json');
+      expect(global.fetch).toHaveBeenCalledWith('https://example.com/mybeers.json', expect.objectContaining({ signal: expect.any(Object) }));
 
       // Verify that populateMyBeersTable was not called
       expect(populateMyBeersTable).not.toHaveBeenCalled();
@@ -305,10 +327,11 @@ describe('dataUpdateService integration tests', () => {
       const result = await fetchAndUpdateMyBeers();
 
       // Verify the result
-      expect(result).toBe(false);
+      expect(result.success).toBe(false);
+      expect(result.dataUpdated).toBe(false);
 
       // Verify that fetch was called
-      expect(global.fetch).toHaveBeenCalledWith('https://example.com/mybeers.json');
+      expect(global.fetch).toHaveBeenCalledWith('https://example.com/mybeers.json', expect.objectContaining({ signal: expect.any(Object) }));
 
       // Verify that populateMyBeersTable was not called
       expect(populateMyBeersTable).not.toHaveBeenCalled();
@@ -342,7 +365,7 @@ describe('dataUpdateService integration tests', () => {
       expect(result.itemCount).toBe(0);
 
       // Verify that fetch was called
-      expect(global.fetch).toHaveBeenCalledWith('https://example.com/mybeers.json');
+      expect(global.fetch).toHaveBeenCalledWith('https://example.com/mybeers.json', expect.objectContaining({ signal: expect.any(Object) }));
 
       // Verify that populateMyBeersTable was called with empty array
       expect(populateMyBeersTable).toHaveBeenCalledWith([]);
@@ -381,7 +404,7 @@ describe('dataUpdateService integration tests', () => {
       expect(result.itemCount).toBe(0);
 
       // Verify that fetch was called
-      expect(global.fetch).toHaveBeenCalledWith('https://example.com/mybeers.json');
+      expect(global.fetch).toHaveBeenCalledWith('https://example.com/mybeers.json', expect.objectContaining({ signal: expect.any(Object) }));
 
       // Verify that populateMyBeersTable was called with empty array
       expect(populateMyBeersTable).toHaveBeenCalledWith([]);
@@ -402,10 +425,11 @@ describe('dataUpdateService integration tests', () => {
       const result = await fetchAndUpdateMyBeers();
 
       // Verify the result
-      expect(result).toBe(false);
+      expect(result.success).toBe(false);
+      expect(result.dataUpdated).toBe(false);
 
       // Verify that fetch was called
-      expect(global.fetch).toHaveBeenCalledWith('https://example.com/mybeers.json');
+      expect(global.fetch).toHaveBeenCalledWith('https://example.com/mybeers.json', expect.objectContaining({ signal: expect.any(Object) }));
 
       // Verify that populateMyBeersTable was not called
       expect(populateMyBeersTable).not.toHaveBeenCalled();
@@ -414,7 +438,7 @@ describe('dataUpdateService integration tests', () => {
       expect(setPreference).not.toHaveBeenCalled();
 
       // Verify that an error was logged
-      expect(console.error).toHaveBeenCalledWith('Error updating my beers data:', expect.any(Error));
+      expect(console.error).toHaveBeenCalledWith('Network error fetching my beers data:', expect.any(Error));
     });
   });
 });

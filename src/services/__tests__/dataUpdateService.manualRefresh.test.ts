@@ -3,7 +3,7 @@ import { __setRefreshImplementations } from '../../services/dataUpdateService';
 
 // Mocks
 
-jest.mock('../../database/db', () => ({
+jest.mock('../../database/preferences', () => ({
   getPreference: jest.fn(async (k: string) => {
     if (k === 'all_beers_api_url') return 'https://example.com/allbeers.json';
     if (k === 'my_beers_api_url') return 'https://example.com/mybeers.json';

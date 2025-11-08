@@ -2,6 +2,8 @@ import { autoLogin, login, logout, handleTapThatAppLogin } from '../authService'
 import { saveSessionData, clearSessionData } from '../sessionManager';
 import { getApiClient } from '../apiClientInstance';
 import { ApiError, SessionData } from '../../types/api';
+import { getPreference, setPreference } from '../../database/db';
+import { refreshAllDataFromAPI } from '../../services/dataUpdateService';
 
 // Mock dependencies
 jest.mock('../sessionManager', () => ({
@@ -11,6 +13,17 @@ jest.mock('../sessionManager', () => ({
 
 jest.mock('../apiClientInstance', () => ({
   getApiClient: jest.fn(),
+}));
+
+// Mock database functions
+jest.mock('../../database/db', () => ({
+  getPreference: jest.fn().mockResolvedValue(null),
+  setPreference: jest.fn().mockResolvedValue(undefined),
+}));
+
+// Mock dataUpdateService functions
+jest.mock('../../services/dataUpdateService', () => ({
+  refreshAllDataFromAPI: jest.fn().mockResolvedValue({ allBeers: [], myBeers: [], rewards: [] }),
 }));
 
 describe('authService', () => {
@@ -28,6 +41,10 @@ describe('authService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (getApiClient as jest.Mock).mockReturnValue(mockApiClient);
+    // Reset database mocks to default values
+    (getPreference as jest.Mock).mockResolvedValue(null);
+    (setPreference as jest.Mock).mockResolvedValue(undefined);
+    (refreshAllDataFromAPI as jest.Mock).mockResolvedValue(undefined);
   });
 
   describe('autoLogin', () => {
@@ -54,6 +71,7 @@ describe('authService', () => {
         data: { session: mockSessionData },
         sessionData: mockSessionData,
         statusCode: 200,
+        isVisitorMode: false,
       });
     });
 
@@ -138,6 +156,7 @@ describe('authService', () => {
         data: { session: mockSessionData },
         sessionData: mockSessionData,
         statusCode: 200,
+        isVisitorMode: false,
       });
     });
 
@@ -240,9 +259,9 @@ describe('authService', () => {
   describe('handleTapThatAppLogin', () => {
     it('should parse cookies string and save session data', async () => {
       const cookiesString = 'PHPSESSID=test-session-id; member_id=test-member-id; store__id=test-store-id; store_name=Test%20Store';
-      
+
       const result = await handleTapThatAppLogin(cookiesString);
-      
+
       // Check that session data was saved with the correct values
       expect(saveSessionData).toHaveBeenCalledWith({
         sessionId: 'test-session-id',
@@ -250,7 +269,7 @@ describe('authService', () => {
         storeId: 'test-store-id',
         storeName: 'Test Store',
       });
-      
+
       // Check that the result is correct
       expect(result).toEqual({
         success: true,
@@ -262,6 +281,7 @@ describe('authService', () => {
           storeName: 'Test Store',
         },
         statusCode: 200,
+        isVisitorMode: false,
       });
     });
 
@@ -272,9 +292,9 @@ describe('authService', () => {
         store__id: 'test-store-id',
         store_name: 'Test%20Store',
       };
-      
+
       const result = await handleTapThatAppLogin(cookiesObject);
-      
+
       // Check that session data was saved with the correct values
       expect(saveSessionData).toHaveBeenCalledWith({
         sessionId: 'test-session-id',
@@ -282,7 +302,7 @@ describe('authService', () => {
         storeId: 'test-store-id',
         storeName: 'Test Store',
       });
-      
+
       // Check that the result is correct
       expect(result).toEqual({
         success: true,
@@ -294,6 +314,7 @@ describe('authService', () => {
           storeName: 'Test Store',
         },
         statusCode: 200,
+        isVisitorMode: false,
       });
     });
 
@@ -344,9 +365,9 @@ describe('authService', () => {
     it('should handle malformed cookie values gracefully', async () => {
       // Malformed store_name (invalid URI component)
       const cookiesString = 'PHPSESSID=test-session-id; member_id=test-member-id; store__id=test-store-id; store_name=%invalid';
-      
+
       const result = await handleTapThatAppLogin(cookiesString);
-      
+
       // Check that session data was saved with the correct values (store_name should be raw value)
       expect(saveSessionData).toHaveBeenCalledWith({
         sessionId: 'test-session-id',
@@ -354,7 +375,7 @@ describe('authService', () => {
         storeId: 'test-store-id',
         storeName: '%invalid',
       });
-      
+
       // Check that the result is correct
       expect(result).toEqual({
         success: true,
@@ -366,6 +387,7 @@ describe('authService', () => {
           storeName: '%invalid',
         },
         statusCode: 200,
+        isVisitorMode: false,
       });
     });
   });

@@ -11,8 +11,8 @@ import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { useColorScheme } from '@/hooks/useColorScheme';
-import { refreshAllDataFromAPI, getAllPreferences, getPreference, setPreference, setUntappdCookie, isUntappdLoggedIn, initDatabase, clearUntappdCookies } from '@/src/database/db';
-import { manualRefreshAllData } from '@/src/services/dataUpdateService';
+import { getAllPreferences, getPreference, setPreference, setUntappdCookie, isUntappdLoggedIn, initDatabase, clearUntappdCookies } from '@/src/database/db';
+import { manualRefreshAllData, refreshAllDataFromAPI } from '@/src/services/dataUpdateService';
 import { LoadingIndicator } from '@/components/LoadingIndicator';
 import Constants from 'expo-constants';
 import { createMockSession } from '@/src/api/mockSession';
@@ -207,10 +207,29 @@ export default function SettingsScreen() {
     }
   };
 
+  // Track processed URLs to avoid re-injecting JavaScript
+  const processedUrlsRef = useRef<Set<string>>(new Set());
+
   // Handle WebView navigation state changes
   const handleWebViewNavigationStateChange = (navState: WebViewNavigation) => {
+    // Only process when page has finished loading
+    if (navState.loading) {
+      return;
+    }
+
+    // Create a unique key for this URL
+    const urlKey = navState.url;
+
+    // If we've already processed this URL, skip it
+    if (processedUrlsRef.current.has(urlKey)) {
+      return;
+    }
+
     // If we're on the member dashboard page
     if (navState.url.includes('member-dash.php')) {
+      // Mark as processed
+      processedUrlsRef.current.add(urlKey);
+
       // Inject JavaScript to extract the API URLs and cookies
       if (webViewRef.current) {
         webViewRef.current.injectJavaScript(`
@@ -288,8 +307,11 @@ export default function SettingsScreen() {
     }
     // Check if user selected visitor mode
     else if (navState.url.includes('visitor.php')) {
+      // Mark as processed
+      processedUrlsRef.current.add(urlKey);
+
       console.log('Visitor mode detected in WebView at URL:', navState.url);
-      
+
       // Extract cookies and store information for visitor mode
       if (webViewRef.current) {
         webViewRef.current.injectJavaScript(`
@@ -303,7 +325,7 @@ export default function SettingsScreen() {
                 }
                 return acc;
               }, {});
-              
+
               console.log('In WebView - Cookies found:', document.cookie);
 
               // Send the data back to React Native
@@ -750,10 +772,25 @@ export default function SettingsScreen() {
             source={{ uri: 'https://tapthatapp.beerknurd.com/kiosk.php' }}
             onNavigationStateChange={handleWebViewNavigationStateChange}
             onMessage={handleWebViewMessage}
+            onError={(syntheticEvent) => {
+              const { nativeEvent } = syntheticEvent;
+              console.error('WebView error:', nativeEvent);
+            }}
+            onHttpError={(syntheticEvent) => {
+              const { nativeEvent } = syntheticEvent;
+              console.error('WebView HTTP error:', nativeEvent.statusCode, nativeEvent.url);
+            }}
             style={{ flex: 1 }}
             javaScriptEnabled={true}
             domStorageEnabled={true}
             sharedCookiesEnabled={true}
+            scalesPageToFit={false}
+            scrollEnabled={true}
+            bounces={false}
+            allowsBackForwardNavigationGestures={false}
+            androidLayerType="hardware"
+            cacheEnabled={true}
+            cacheMode="LOAD_DEFAULT"
           />
         </SafeAreaView>
       </Modal>

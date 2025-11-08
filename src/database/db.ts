@@ -5,7 +5,7 @@ import { Beer, Beerfinder, isBeer, isBeerfinder } from './types';
 import { Preference, Reward, UntappdCookie, isPreference, isReward, isUntappdCookie } from './types';
 import { SQLiteDatabase } from 'expo-sqlite';
 import { getDatabase } from './connection';
-import { getPreference, setPreference, getAllPreferences } from './preferences';
+import { getPreference, setPreference, getAllPreferences, areApiUrlsConfigured as _areApiUrlsConfigured } from './preferences';
 import { setupTables } from './schema';
 import { databaseLockManager } from './locks';
 // Import API fetch functions (will re-export for backwards compatibility)
@@ -805,68 +805,8 @@ export const resetDatabaseState = (): void => {
   console.log('Database state flags reset');
 };
 
-// Refresh all data from APIs (both all beers and Beerfinder beers)
-export const refreshAllDataFromAPI = async (): Promise<{ allBeers: Beer[], myBeers: Beerfinder[], rewards: Reward[] }> => {
-  console.log('Refreshing all data from API...');
-
-  // Check if API URLs are configured
-  const apiUrlsConfigured = await areApiUrlsConfigured();
-  if (!apiUrlsConfigured) {
-    console.log('API URLs not configured, cannot refresh data');
-    throw new Error('API URLs not configured. Please log in to set up API URLs.');
-  }
-
-  try {
-    // Get preferences to check API URLs
-    const allBeersApiUrl = await getPreference('all_beers_api_url');
-    const myBeersApiUrl = await getPreference('my_beers_api_url');
-
-    if (!allBeersApiUrl || !myBeersApiUrl) {
-      console.log('API URLs not found in preferences');
-      throw new Error('API URLs not found. Please log in to set up API URLs.');
-    }
-
-    // Refresh all data sources in parallel
-    const [allBeers, myBeers, rewards] = await Promise.all([
-      _refreshBeersFromAPIInternal(),
-      _refreshMyBeersFromAPIInternal(),
-      fetchRewardsFromAPI().then(data => {
-        populateRewardsTable(data);
-        return data;
-      })
-    ]);
-
-    console.log(`Successfully refreshed all data: ${allBeers.length} beers, ${myBeers.length} tasted beers, ${rewards.length} rewards`);
-
-    return { allBeers, myBeers, rewards };
-  } catch (error) {
-    console.error('Error refreshing all data from API:', error);
-    throw error;
-  }
-};
-
-// Check if API URLs are configured
-export const areApiUrlsConfigured = async (): Promise<boolean> => {
-  try {
-    // Check if we're in visitor mode
-    const isVisitor = await getPreference('is_visitor_mode') === 'true';
-    
-    // Get API URLs
-    const allBeersApiUrl = await getPreference('all_beers_api_url');
-    const myBeersApiUrl = await getPreference('my_beers_api_url');
-
-    // In visitor mode, we only need the all_beers_api_url to be set
-    if (isVisitor) {
-      return !!allBeersApiUrl; // Just need the all beers URL
-    }
-    
-    // For normal mode, both URLs must be set
-    return !!allBeersApiUrl && !!myBeersApiUrl;
-  } catch (error) {
-    console.error('Error checking API URLs:', error);
-    return false;
-  }
-};
+// Re-export areApiUrlsConfigured from preferences for backwards compatibility
+export const areApiUrlsConfigured = _areApiUrlsConfigured;
 
 // Fetch rewards from API
 // Re-export Rewards API fetch function for backwards compatibility
