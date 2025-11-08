@@ -4,7 +4,7 @@
  */
 
 import { Preference } from './types';
-import { initDatabase } from './db';
+import { getDatabase } from './connection';
 
 /**
  * Get a preference value by key
@@ -12,7 +12,7 @@ import { initDatabase } from './db';
  * @returns The preference value, or null if not found or on error
  */
 export const getPreference = async (key: string): Promise<string | null> => {
-  const database = await initDatabase();
+  const database = await getDatabase();
 
   try {
     const result = await database.getFirstAsync<{ value: string }>(
@@ -35,7 +35,7 @@ export const getPreference = async (key: string): Promise<string | null> => {
  * @throws Error if the database operation fails
  */
 export const setPreference = async (key: string, value: string, description?: string): Promise<void> => {
-  const database = await initDatabase();
+  const database = await getDatabase();
 
   try {
     // If description is provided, update it; otherwise just update the value
@@ -67,7 +67,7 @@ export const setPreference = async (key: string, value: string, description?: st
  * @returns Array of all preferences, ordered by key. Returns empty array on error.
  */
 export const getAllPreferences = async (): Promise<Preference[]> => {
-  const database = await initDatabase();
+  const database = await getDatabase();
 
   try {
     const preferences = await database.getAllAsync<{ key: string, value: string, description: string }>(

@@ -1,9 +1,47 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuites name="jest tests" tests="2" failures="0" errors="0" time="0.455">
-  <testsuite name="manualRefreshAllData" errors="0" failures="0" skipped="0" timestamp="2025-09-12T15:09:56" time="0.18" tests="2">
-    <testcase classname="manualRefreshAllData refreshes core endpoints and returns no errors when both succeed" name="manualRefreshAllData refreshes core endpoints and returns no errors when both succeed" time="0.002">
+<testsuites name="jest tests" tests="21" failures="0" errors="0" time="1.683">
+  <testsuite name="Preference Functions" errors="0" failures="0" skipped="0" timestamp="2025-11-08T06:46:08" time="1.183" tests="21">
+    <testcase classname="Preference Functions getPreference should return preference value when it exists" name="Preference Functions getPreference should return preference value when it exists" time="0.002">
     </testcase>
-    <testcase classname="manualRefreshAllData handles partial failure and sets hasErrors" name="manualRefreshAllData handles partial failure and sets hasErrors" time="0">
+    <testcase classname="Preference Functions getPreference should return null when preference does not exist" name="Preference Functions getPreference should return null when preference does not exist" time="0">
+    </testcase>
+    <testcase classname="Preference Functions getPreference should return null on database error" name="Preference Functions getPreference should return null on database error" time="0.001">
+    </testcase>
+    <testcase classname="Preference Functions getPreference should handle empty string key" name="Preference Functions getPreference should handle empty string key" time="0.001">
+    </testcase>
+    <testcase classname="Preference Functions getPreference should handle special characters in key" name="Preference Functions getPreference should handle special characters in key" time="0">
+    </testcase>
+    <testcase classname="Preference Functions setPreference should insert new preference with description" name="Preference Functions setPreference should insert new preference with description" time="0">
+    </testcase>
+    <testcase classname="Preference Functions setPreference should update existing preference value and preserve description" name="Preference Functions setPreference should update existing preference value and preserve description" time="0">
+    </testcase>
+    <testcase classname="Preference Functions setPreference should set empty description when updating non-existent preference without description" name="Preference Functions setPreference should set empty description when updating non-existent preference without description" time="0">
+    </testcase>
+    <testcase classname="Preference Functions setPreference should handle empty string value" name="Preference Functions setPreference should handle empty string value" time="0">
+    </testcase>
+    <testcase classname="Preference Functions setPreference should handle special characters in value" name="Preference Functions setPreference should handle special characters in value" time="0">
+    </testcase>
+    <testcase classname="Preference Functions setPreference should throw error when database operation fails" name="Preference Functions setPreference should throw error when database operation fails" time="0.012">
+    </testcase>
+    <testcase classname="Preference Functions setPreference should handle description update when providing new description" name="Preference Functions setPreference should handle description update when providing new description" time="0">
+    </testcase>
+    <testcase classname="Preference Functions setPreference should handle undefined description parameter" name="Preference Functions setPreference should handle undefined description parameter" time="0.001">
+    </testcase>
+    <testcase classname="Preference Functions getAllPreferences should return all preferences ordered by key" name="Preference Functions getAllPreferences should return all preferences ordered by key" time="0">
+    </testcase>
+    <testcase classname="Preference Functions getAllPreferences should return empty array when no preferences exist" name="Preference Functions getAllPreferences should return empty array when no preferences exist" time="0.001">
+    </testcase>
+    <testcase classname="Preference Functions getAllPreferences should return empty array on database error" name="Preference Functions getAllPreferences should return empty array on database error" time="0">
+    </testcase>
+    <testcase classname="Preference Functions getAllPreferences should handle null return from database" name="Preference Functions getAllPreferences should handle null return from database" time="0">
+    </testcase>
+    <testcase classname="Preference Functions getAllPreferences should return preferences with empty descriptions" name="Preference Functions getAllPreferences should return preferences with empty descriptions" time="0.001">
+    </testcase>
+    <testcase classname="Preference Functions getAllPreferences should preserve preference ordering by key" name="Preference Functions getAllPreferences should preserve preference ordering by key" time="0.002">
+    </testcase>
+    <testcase classname="Preference Functions Integration scenarios should handle set and get preference workflow" name="Preference Functions Integration scenarios should handle set and get preference workflow" time="0.001">
+    </testcase>
+    <testcase classname="Preference Functions Integration scenarios should handle multiple preference updates" name="Preference Functions Integration scenarios should handle multiple preference updates" time="0">
     </testcase>
   </testsuite>
 </testsuites>

@@ -4,9 +4,7 @@ import * as FileSystem from 'expo-file-system';
 import { Beer, Beerfinder, isBeer, isBeerfinder } from './types';
 import { Preference, Reward, UntappdCookie, isPreference, isReward, isUntappdCookie } from './types';
 import { SQLiteDatabase } from 'expo-sqlite';
-
-// Database connection instance
-let db: SQLite.SQLiteDatabase | null = null;
+import { getDatabase } from './connection';
 
 // Database operation lock to prevent concurrent operations
 let dbOperationInProgress = false;
@@ -30,17 +28,9 @@ let myBeersImportComplete = false;
 // Track if setupDatabase is in progress
 let setupDatabaseInProgress = false;
 
-// Initialize database
+// Initialize database (wrapper for backwards compatibility)
 export const initDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
-  if (db) return db;
-
-  try {
-    db = await SQLite.openDatabaseAsync('beers.db');
-    return db;
-  } catch (error) {
-    console.error('Failed to open database:', error);
-    throw error;
-  }
+  return await getDatabase();
 };
 
 // Create tables if they don't exist
