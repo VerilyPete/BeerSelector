@@ -80,3 +80,33 @@ export const getAllPreferences = async (): Promise<Preference[]> => {
     return [];
   }
 };
+
+/**
+ * Check if API URLs are configured based on the current mode
+ *
+ * In visitor mode: Only requires all_beers_api_url
+ * In normal mode: Requires both all_beers_api_url and my_beers_api_url
+ *
+ * @returns True if required API URLs are configured, false otherwise
+ */
+export const areApiUrlsConfigured = async (): Promise<boolean> => {
+  try {
+    // Check if we're in visitor mode
+    const isVisitor = await getPreference('is_visitor_mode') === 'true';
+
+    // Get API URLs
+    const allBeersApiUrl = await getPreference('all_beers_api_url');
+    const myBeersApiUrl = await getPreference('my_beers_api_url');
+
+    // In visitor mode, we only need the all_beers_api_url to be set
+    if (isVisitor) {
+      return !!allBeersApiUrl; // Just need the all beers URL
+    }
+
+    // For normal mode, both URLs must be set
+    return !!allBeersApiUrl && !!myBeersApiUrl;
+  } catch (error) {
+    console.error('Error checking API URLs:', error);
+    return false;
+  }
+};

@@ -7,6 +7,7 @@
 
 import { getDatabase } from '../connection';
 import { Beer } from '../../types/beer';
+import { databaseLockManager } from '../locks';
 
 /**
  * Repository class for Beer entity operations
@@ -23,13 +24,19 @@ export class BeerRepository {
    *
    * Clears existing data and inserts fresh records in batches of 50.
    * Skips beers without valid IDs.
+   * Uses database lock to prevent concurrent operations.
    *
    * @param beers - Array of Beer objects to insert
    */
   async insertMany(beers: Beer[]): Promise<void> {
-    const database = await getDatabase();
+    // Acquire database lock to prevent concurrent operations
+    if (!await databaseLockManager.acquireLock('BeerRepository.insertMany')) {
+      throw new Error('Could not acquire database lock for beer insertion');
+    }
 
     try {
+      const database = await getDatabase();
+
       // Always refresh the allbeers table with the latest data
       // Clear existing data first, then insert fresh records in batches
       await database.withTransactionAsync(async () => {
@@ -88,6 +95,9 @@ export class BeerRepository {
     } catch (error) {
       console.error('Error populating beer database:', error);
       throw error;
+    } finally {
+      // Always release the lock
+      databaseLockManager.releaseLock('BeerRepository.insertMany');
     }
   }
 
