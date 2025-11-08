@@ -122,12 +122,28 @@ This ensures the refactoring is safe, verifiable, and maintains (or improves) co
 - Update all imports and tests
 - **Testing**: Run `npm test`, then full integration test - login, refresh all data, verify All Beers, Beerfinder, Tasted Brews all show correct counts
 
+**Step 7a**: Write tests for db.ts compatibility layer
+- Create `src/database/__tests__/db.compatibility.test.ts`
+- Test that db.ts functions delegate to repositories correctly
+- Test no duplicate INSERT logic remains
+- Verify db.ts is thin wrapper (<300 lines)
+- **Testing**: Run `npm test`, verify compatibility layer tests pass
+
+**Step 7b**: Remove duplicate code from db.ts (Post-HP-1 Cleanup)
+- **Critical Issue CI-1**: db.ts (918 lines) still contains duplicate INSERT logic that's already in repositories
+- Replace `_refreshBeersFromAPIInternal` with calls to `beerRepository.insertMany()`
+- Replace `_refreshMyBeersFromAPIInternal` with calls to `myBeersRepository.insertMany()`
+- Replace `_refreshRewardsFromAPIInternal` with calls to `rewardsRepository.insertMany()`
+- Reduce db.ts to ~300 lines (thin compatibility wrapper only)
+- **Testing**: Run `npm test`, then full refresh test - verify all data refreshes work correctly with no duplication
+
 **Testing Focus**:
 - All database operations continue to work
 - No data loss during refactoring
 - Offline functionality preserved
 - Both visitor and member modes work correctly
 - Dark mode compatibility maintained
+- **CI-1 Resolved**: Single source of truth for database operations (DRY principle)
 
 ---
 
@@ -206,11 +222,29 @@ These flags are checked and modified across async operations without proper sync
 - Update lock manager implementation
 - **Testing**: Run `npm test`, then network timeout test - enable airplane mode mid-refresh, verify app doesn't freeze
 
+**Step 5a**: Write tests for sequential refresh coordination
+- Create `src/services/__tests__/refreshCoordination.test.ts`
+- Test sequential execution prevents lock contention
+- Test master lock coordinates multiple operations
+- Test parallel operations are properly serialized
+- **Testing**: Run `npm test`, verify coordination tests pass
+
+**Step 5b**: Fix parallel refresh lock contention (Post-HP-1 Cleanup)
+- **Critical Issue CI-2**: `manualRefreshAllData()` runs 3 operations in parallel causing lock contention
+- Replace `Promise.allSettled([fetch1, fetch2, fetch3])` with sequential execution
+- Acquire single master lock for entire refresh operation
+- Each sub-operation skips lock acquisition (called within locked context)
+- Add `insertManyUnsafe()` methods to repositories for use within locked contexts
+- Reduce lock timeout from 60s to 15s for better mobile UX (**RI-1**)
+- **Testing**: Run `npm test`, then rapid refresh test - trigger 3 refreshes simultaneously, verify no 4.5s wait times
+
 **Testing Focus**:
 - No deadlocks during rapid operations
 - Proper error recovery from failed operations
 - Clean state after logout
 - First launch reliability
+- **CI-2 Resolved**: No lock contention during parallel refresh operations
+- **RI-1 Resolved**: Mobile-appropriate timeout values (15s instead of 60s)
 
 ---
 
@@ -499,6 +533,72 @@ const parseQueuedBeersFromHtml = (html: string): QueuedBeer[] => {
 
 ---
 
+### HP-6: Missing Database Connection Lifecycle Management
+
+**Description**: The database connection in `src/database/connection.ts` (33 lines) is opened but never closed. The app doesn't properly manage database lifecycle during app backgrounding, which can lead to corruption if the app is killed during a transaction.
+
+**Impact**:
+- Potential database corruption if app is killed during a write operation
+- Memory leaks on long-running sessions
+- File lock issues on some Android devices
+- No WAL (Write-Ahead Logging) mode enabled for better concurrency and crash safety
+- Poor resource management violates React Native mobile best practices
+
+**Refactoring Plan**:
+
+**Step 1a**: Write tests for database lifecycle
+- Create `src/database/__tests__/lifecycle.test.ts`
+- Test database open/close operations
+- Test WAL mode enablement
+- Test PRAGMA settings
+- **Testing**: Run `npm test`, verify lifecycle tests pass
+
+**Step 1b**: Add database lifecycle management
+- Add `closeDatabaseConnection()` function to `connection.ts`
+- Enable WAL mode: `PRAGMA journal_mode = WAL`
+- Set synchronous mode: `PRAGMA synchronous = NORMAL`
+- Export close function for use by app lifecycle hooks
+- **Testing**: Run `npm test`, then test database operations after close/reopen cycle
+
+**Step 2a**: Write tests for app state integration
+- Create `app/__tests__/databaseLifecycle.test.tsx`
+- Test database closes when app backgrounds
+- Test database reopens when app foregrounds
+- Test pending operations complete before close
+- **Testing**: Run `npm test`, verify app lifecycle tests pass
+
+**Step 2b**: Integrate with React Native AppState
+- Add AppState listener in `app/_layout.tsx`
+- Close database connection when app state changes to 'background'
+- Reopen connection when app state changes to 'active'
+- Ensure all pending transactions complete before closing
+- Add error handling for close failures
+- **Testing**: Run `npm test`, then manual test - background app during refresh, verify no corruption when returning
+
+**Step 3a**: Write tests for graceful shutdown
+- Add tests to `lifecycle.test.ts` for shutdown scenarios
+- Test pending operations complete before shutdown
+- Test locks are released on shutdown
+- Test error recovery on forced close
+- **Testing**: Run `npm test`, verify shutdown tests pass
+
+**Step 3b**: Add graceful shutdown mechanism
+- Check for active locks before closing connection
+- Wait for locks to release (with timeout)
+- Log warning if forced to close with active operations
+- Add shutdown state to prevent new operations during close
+- **Testing**: Run `npm test`, then force close during operation, verify log warnings appear
+
+**Testing Focus**:
+- No database corruption on app backgrounding
+- Proper resource cleanup
+- File locks are released correctly
+- WAL mode improves concurrency
+- Memory usage is managed properly
+- **CI-3 Resolved**: Database connections properly managed through app lifecycle
+
+---
+
 ## Medium Priority Issues
 
 ### MP-1: Settings Screen Complexity (1,200 lines)
@@ -638,10 +738,26 @@ const parseQueuedBeersFromHtml = (html: string): QueuedBeer[] => {
 - Update tests as needed
 - **Testing**: Run `npm run tsc` with no errors, then `npm test` to verify functionality
 
+**Step 5a**: Write tests for repository type safety (Post-HP-1 Enhancement)
+- Create `src/database/repositories/__tests__/typeSafety.test.ts`
+- Test generic type parameters work correctly
+- Test invalid data is filtered out
+- Test type guards are applied
+- **Testing**: Run `npm test`, verify repository type safety tests pass
+
+**Step 5b**: Add strict typing to repository methods
+- **Recommended Issue RI-2**: Repository methods use `getAllAsync<any>()` instead of proper generics
+- Replace `getAllAsync<any>()` with `getAllAsync<Beer>()`, `getAllAsync<Beerfinder>()`, etc.
+- Add runtime validation with type guards (filter invalid rows)
+- Return type-safe arrays with compile-time guarantees
+- Log and skip invalid rows instead of throwing
+- **Testing**: Run `npm test`, then mock database returning extra/missing fields, verify graceful handling
+
 **Testing Focus**:
 - Type errors caught at compile time
 - Runtime validation catches malformed data
 - No `any` types in production code
+- **RI-2 Resolved**: Repository methods have proper type safety with generics and runtime validation
 
 ---
 
@@ -1084,6 +1200,64 @@ const parseQueuedBeersFromHtml = (html: string): QueuedBeer[] => {
 
 ---
 
+### LP-9: Inconsistent and Undocumented Batch Sizes
+
+**Description**: Different repositories use different batch sizes without documentation or justification:
+- BeerRepository: 50 beers per batch
+- MyBeersRepository: 20 beers per batch
+- RewardsRepository: 100 rewards per batch
+
+No memory testing or performance profiling justifies these values.
+
+**Impact**:
+- Potential memory issues on low-end devices
+- Suboptimal performance (batch sizes may be too small or too large)
+- Inconsistent behavior across repository operations
+- **Recommended Issue RI-5**: No mobile memory constraints validation
+
+**Refactoring Plan**:
+
+**Step 1a**: Write performance tests for batch operations
+- Create `src/__tests__/performance/batchSizes.perf.test.ts`
+- Test memory usage with different batch sizes (10, 25, 50, 100, 200)
+- Test transaction time with different batch sizes
+- Test on simulated low-end device constraints
+- **Testing**: Run performance tests, record baseline metrics
+
+**Step 1b**: Standardize and document batch sizes
+- Create `src/constants/database.ts` with:
+  ```typescript
+  export const DB_BATCH_SIZES = {
+    BEERS: 50,        // Tested with 1000 beers, ~2MB memory
+    MY_BEERS: 50,     // Unified with beers for consistency
+    REWARDS: 100,     // Rewards are smaller objects
+    MAX_TRANSACTION_TIME_MS: 5000  // Prevent long-running transactions
+  };
+  ```
+- Update all repositories to use constants
+- Add JSDoc comments explaining choices
+- **Testing**: Run `npm test`, verify all repositories use standard batch sizes
+
+**Step 2a**: Write tests for transaction time monitoring
+- Create `src/database/__tests__/transactionMonitoring.test.ts`
+- Test warning logs for slow transactions
+- Test metrics collection
+- **Testing**: Run `npm test`, verify monitoring tests pass
+
+**Step 2b**: Add transaction performance monitoring
+- Log warning if batch operation exceeds `MAX_TRANSACTION_TIME_MS`
+- Suggest reducing batch size in warning
+- Track metrics for future optimization
+- **Testing**: Run `npm test`, then import 1000+ beers, verify completion time is acceptable
+
+**Testing Focus**:
+- Batch sizes optimized for mobile memory constraints
+- Consistent behavior across all repositories
+- Clear documentation of performance trade-offs
+- **RI-5 Resolved**: Batch sizes justified and validated against mobile device constraints
+
+---
+
 ## Technical Debt & Future Considerations
 
 ### Database Migration Strategy
@@ -1157,27 +1331,37 @@ This approach ensures:
 - Living documentation of expected behavior
 
 **Immediate Next Steps (High Priority)**:
-1. Split database module into smaller files (HP-1) - **Estimated: 3 weeks** (was 2 weeks + 1 week for tests)
-2. Fix race conditions with proper locking (HP-2) - **Estimated: 1.5 weeks** (was 1 week + 0.5 weeks for tests)
-3. Extract shared beer component code (HP-3) - **Estimated: 2 weeks** (was 1 week + 1 week for tests)
-4. Secure HTML parsing and add error handling (HP-4, HP-5) - **Estimated: 2 weeks** (was 1 week + 1 week for tests)
+1. Split database module into smaller files (HP-1) - **Estimated: 3.5 weeks** (includes Step 7 cleanup for CI-1)
+2. Fix race conditions with proper locking (HP-2) - **Estimated: 2 weeks** (includes Step 5 for CI-2 and RI-1)
+3. Extract shared beer component code (HP-3) - **Estimated: 2 weeks**
+4. Secure HTML parsing and add error handling (HP-4, HP-5) - **Estimated: 2 weeks**
+5. Add database lifecycle management (HP-6) - **Estimated: 1 week** (new from code review CI-3)
 
 **Short Term (Medium Priority, 2-3 months)**:
-1. Refactor settings screen (MP-1) - **Estimated: 1.5 weeks** (was 1 week + 0.5 weeks for tests)
-2. Add type safety to database (MP-2) - **Estimated: 1.5 weeks** (was 1 week + 0.5 weeks for tests)
-3. Implement performance optimizations (MP-3) - **Estimated: 1 week** (was 3 days + 2 days for tests)
-4. Create AppContext for state (MP-4) - **Estimated: 1.5 weeks** (was 1 week + 0.5 weeks for tests)
+1. Refactor settings screen (MP-1) - **Estimated: 1.5 weeks**
+2. Add type safety to database (MP-2) - **Estimated: 2 weeks** (includes Step 5 for RI-2 repository type safety)
+3. Implement performance optimizations (MP-3) - **Estimated: 1 week**
+4. Create AppContext for state (MP-4) - **Estimated: 1.5 weeks**
 5. Build comprehensive integration test suite (MP-5) - **Estimated: 2 weeks**
 6. Eliminate hardcoded values (MP-6) - **Estimated: 1 week**
 7. Improve offline UX (MP-7) - **Estimated: 1.5 weeks**
 
 **Long Term (3-6 months)**:
-1. Address all low priority items (LP-1 through LP-8) - **Estimated: 2-3 weeks**
+1. Address all low priority items (LP-1 through LP-9) - **Estimated: 3-4 weeks** (includes LP-9 for RI-5 batch optimization)
 2. Implement future considerations (migrations, analytics, documentation)
 3. Set up CI/CD with automated test runs
 4. Add E2E testing framework (Detox/Maestro)
 
-**Estimated Total Refactoring Effort**: 12-14 weeks for all high and medium priority issues (including automated testing)
+**Estimated Total Refactoring Effort**: 13-15 weeks for all high and medium priority issues (including automated testing)
+
+**Code Review Findings Incorporated**:
+The plan now includes all critical issues (CI-1, CI-2, CI-3) and recommended improvements (RI-1, RI-2, RI-5) from the comprehensive code review:
+- **CI-1**: Duplicate code in db.ts → Added to HP-1 Step 7
+- **CI-2**: Lock contention in parallel refresh → Added to HP-2 Step 5
+- **CI-3**: Missing database lifecycle → New HP-6
+- **RI-1**: Lock timeout too long → Included in HP-2 Step 5
+- **RI-2**: Type safety gaps in repositories → Added to MP-2 Step 5
+- **RI-5**: Batch sizes not optimized → New LP-9
 
 **Test Coverage Goals**:
 - **Week 4**: 50% code coverage
