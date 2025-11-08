@@ -289,7 +289,8 @@ export const fetchAndPopulateMyBeers = async (): Promise<void> => {
 
   try {
     const myBeers = await fetchMyBeersFromAPI();
-    await myBeersRepository.insertMany(myBeers);
+    // Use UNSAFE method since we're already holding the lock
+    await myBeersRepository.insertManyUnsafe(myBeers);
     myBeersImportComplete = true;
   } finally {
     myBeersImportInProgress = false;
