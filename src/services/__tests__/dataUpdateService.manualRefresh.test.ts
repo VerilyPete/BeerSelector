@@ -19,6 +19,7 @@ describe('manualRefreshAllData', () => {
     __setRefreshImplementations({
       fetchAll: async () => ({ success: true, dataUpdated: true, itemCount: 1 } as any),
       fetchMy: async () => ({ success: true, dataUpdated: true, itemCount: 1 } as any),
+      fetchRewards: async () => ({ success: true, dataUpdated: true, itemCount: 1 } as any),
     });
   });
 
@@ -26,6 +27,7 @@ describe('manualRefreshAllData', () => {
     __setRefreshImplementations({
       fetchAll: async () => ({ success: true, dataUpdated: true, itemCount: 3 } as any),
       fetchMy: async () => ({ success: true, dataUpdated: true, itemCount: 2 } as any),
+      fetchRewards: async () => ({ success: true, dataUpdated: true, itemCount: 5 } as any),
     });
 
     const result = await svc.manualRefreshAllData();
@@ -35,12 +37,14 @@ describe('manualRefreshAllData', () => {
     expect(result.hasErrors).toBe(false);
     expect(result.allBeersResult.success).toBe(true);
     expect(result.myBeersResult.success).toBe(true);
+    expect(result.rewardsResult.success).toBe(true);
   });
 
   it('handles partial failure and sets hasErrors', async () => {
     __setRefreshImplementations({
       fetchAll: async () => ({ success: false, dataUpdated: false, error: { type: 'SERVER_ERROR', message: 'boom' } } as any),
       fetchMy: async () => ({ success: true, dataUpdated: true, itemCount: 2 } as any),
+      fetchRewards: async () => ({ success: true, dataUpdated: true, itemCount: 5 } as any),
     });
 
     const result = await svc.manualRefreshAllData();
@@ -49,5 +53,6 @@ describe('manualRefreshAllData', () => {
     expect(result.hasErrors).toBe(true);
     expect(result.allBeersResult.success).toBe(false);
     expect(result.myBeersResult.success).toBe(true);
+    expect(result.rewardsResult.success).toBe(true);
   });
 });

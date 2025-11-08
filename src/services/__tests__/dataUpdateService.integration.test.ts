@@ -47,9 +47,9 @@ describe('dataUpdateService integration tests', () => {
     // Default mock for setPreference
     (setPreference as jest.Mock).mockResolvedValue(undefined);
 
-    // Default mock for populateBeersTable and populateMyBeersTable
-    (populateBeersTable as jest.Mock).mockResolvedValue(undefined);
-    (populateMyBeersTable as jest.Mock).mockResolvedValue(undefined);
+    // Default mock for repository insertMany methods
+    (beerRepository.insertMany as jest.Mock).mockResolvedValue(undefined);
+    (myBeersRepository.insertMany as jest.Mock).mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -86,11 +86,11 @@ describe('dataUpdateService integration tests', () => {
       // Verify that fetch was called with the correct URL
       expect(global.fetch).toHaveBeenCalledWith('https://example.com/allbeers.json', expect.objectContaining({ signal: expect.any(Object) }));
 
-      // Verify that populateBeersTable was called with the correct data
-      expect(populateBeersTable).toHaveBeenCalledTimes(1);
+      // Verify that beerRepository.insertMany was called with the correct data
+      expect(beerRepository.insertMany).toHaveBeenCalledTimes(1);
       
-      // Verify that the data passed to populateBeersTable is the brewInStock array
-      const beersPassedToPopulate = (populateBeersTable as jest.Mock).mock.calls[0][0];
+      // Verify that the data passed to beerRepository.insertMany is the brewInStock array
+      const beersPassedToPopulate = (beerRepository.insertMany as jest.Mock).mock.calls[0][0];
       expect(Array.isArray(beersPassedToPopulate)).toBe(true);
       
       // Verify that the data structure matches what we expect
@@ -125,8 +125,8 @@ describe('dataUpdateService integration tests', () => {
       // Verify that fetch was not called
       expect(global.fetch).not.toHaveBeenCalled();
 
-      // Verify that populateBeersTable was not called
-      expect(populateBeersTable).not.toHaveBeenCalled();
+      // Verify that beerRepository.insertMany was not called
+      expect(beerRepository.insertMany).not.toHaveBeenCalled();
 
       // Verify that setPreference was not called
       expect(setPreference).not.toHaveBeenCalled();
@@ -153,8 +153,8 @@ describe('dataUpdateService integration tests', () => {
       // Verify that fetch was called
       expect(global.fetch).toHaveBeenCalledWith('https://example.com/allbeers.json', expect.objectContaining({ signal: expect.any(Object) }));
 
-      // Verify that populateBeersTable was not called
-      expect(populateBeersTable).not.toHaveBeenCalled();
+      // Verify that beerRepository.insertMany was not called
+      expect(beerRepository.insertMany).not.toHaveBeenCalled();
 
       // Verify that setPreference was not called
       expect(setPreference).not.toHaveBeenCalled();
@@ -180,8 +180,8 @@ describe('dataUpdateService integration tests', () => {
       // Verify that fetch was called
       expect(global.fetch).toHaveBeenCalledWith('https://example.com/allbeers.json', expect.objectContaining({ signal: expect.any(Object) }));
 
-      // Verify that populateBeersTable was not called
-      expect(populateBeersTable).not.toHaveBeenCalled();
+      // Verify that beerRepository.insertMany was not called
+      expect(beerRepository.insertMany).not.toHaveBeenCalled();
 
       // Verify that setPreference was not called
       expect(setPreference).not.toHaveBeenCalled();
@@ -204,8 +204,8 @@ describe('dataUpdateService integration tests', () => {
       // Verify that fetch was called
       expect(global.fetch).toHaveBeenCalledWith('https://example.com/allbeers.json', expect.objectContaining({ signal: expect.any(Object) }));
 
-      // Verify that populateBeersTable was not called
-      expect(populateBeersTable).not.toHaveBeenCalled();
+      // Verify that beerRepository.insertMany was not called
+      expect(beerRepository.insertMany).not.toHaveBeenCalled();
 
       // Verify that setPreference was not called
       expect(setPreference).not.toHaveBeenCalled();
@@ -237,11 +237,11 @@ describe('dataUpdateService integration tests', () => {
       // Verify that fetch was called with the correct URL
       expect(global.fetch).toHaveBeenCalledWith('https://example.com/mybeers.json', expect.objectContaining({ signal: expect.any(Object) }));
 
-      // Verify that populateMyBeersTable was called with the correct data
-      expect(populateMyBeersTable).toHaveBeenCalledTimes(1);
+      // Verify that myBeersRepository.insertMany was called with the correct data
+      expect(myBeersRepository.insertMany).toHaveBeenCalledTimes(1);
       
-      // Verify that the data passed to populateMyBeersTable is the tasted_brew_current_round array
-      const beersPassedToPopulate = (populateMyBeersTable as jest.Mock).mock.calls[0][0];
+      // Verify that the data passed to myBeersRepository.insertMany is the tasted_brew_current_round array
+      const beersPassedToPopulate = (myBeersRepository.insertMany as jest.Mock).mock.calls[0][0];
       expect(Array.isArray(beersPassedToPopulate)).toBe(true);
       
       // Verify that the data structure matches what we expect
@@ -278,8 +278,8 @@ describe('dataUpdateService integration tests', () => {
       // Verify that fetch was not called
       expect(global.fetch).not.toHaveBeenCalled();
 
-      // Verify that populateMyBeersTable was not called
-      expect(populateMyBeersTable).not.toHaveBeenCalled();
+      // Verify that myBeersRepository.insertMany was not called
+      expect(myBeersRepository.insertMany).not.toHaveBeenCalled();
 
       // Verify that setPreference was not called
       expect(setPreference).not.toHaveBeenCalled();
@@ -306,8 +306,8 @@ describe('dataUpdateService integration tests', () => {
       // Verify that fetch was called
       expect(global.fetch).toHaveBeenCalledWith('https://example.com/mybeers.json', expect.objectContaining({ signal: expect.any(Object) }));
 
-      // Verify that populateMyBeersTable was not called
-      expect(populateMyBeersTable).not.toHaveBeenCalled();
+      // Verify that myBeersRepository.insertMany was not called
+      expect(myBeersRepository.insertMany).not.toHaveBeenCalled();
 
       // Verify that setPreference was not called
       expect(setPreference).not.toHaveBeenCalled();
@@ -333,8 +333,8 @@ describe('dataUpdateService integration tests', () => {
       // Verify that fetch was called
       expect(global.fetch).toHaveBeenCalledWith('https://example.com/mybeers.json', expect.objectContaining({ signal: expect.any(Object) }));
 
-      // Verify that populateMyBeersTable was not called
-      expect(populateMyBeersTable).not.toHaveBeenCalled();
+      // Verify that myBeersRepository.insertMany was not called
+      expect(myBeersRepository.insertMany).not.toHaveBeenCalled();
 
       // Verify that setPreference was not called
       expect(setPreference).not.toHaveBeenCalled();
@@ -367,8 +367,8 @@ describe('dataUpdateService integration tests', () => {
       // Verify that fetch was called
       expect(global.fetch).toHaveBeenCalledWith('https://example.com/mybeers.json', expect.objectContaining({ signal: expect.any(Object) }));
 
-      // Verify that populateMyBeersTable was called with empty array
-      expect(populateMyBeersTable).toHaveBeenCalledWith([]);
+      // Verify that myBeersRepository.insertMany was called with empty array
+      expect(myBeersRepository.insertMany).toHaveBeenCalledWith([]);
 
       // Verify that setPreference was called to update timestamps
       expect(setPreference).toHaveBeenCalledWith('my_beers_last_update', expect.any(String));
@@ -406,8 +406,8 @@ describe('dataUpdateService integration tests', () => {
       // Verify that fetch was called
       expect(global.fetch).toHaveBeenCalledWith('https://example.com/mybeers.json', expect.objectContaining({ signal: expect.any(Object) }));
 
-      // Verify that populateMyBeersTable was called with empty array
-      expect(populateMyBeersTable).toHaveBeenCalledWith([]);
+      // Verify that myBeersRepository.insertMany was called with empty array
+      expect(myBeersRepository.insertMany).toHaveBeenCalledWith([]);
 
       // Verify that setPreference was called to update timestamps
       expect(setPreference).toHaveBeenCalledWith('my_beers_last_update', expect.any(String));
@@ -431,8 +431,8 @@ describe('dataUpdateService integration tests', () => {
       // Verify that fetch was called
       expect(global.fetch).toHaveBeenCalledWith('https://example.com/mybeers.json', expect.objectContaining({ signal: expect.any(Object) }));
 
-      // Verify that populateMyBeersTable was not called
-      expect(populateMyBeersTable).not.toHaveBeenCalled();
+      // Verify that myBeersRepository.insertMany was not called
+      expect(myBeersRepository.insertMany).not.toHaveBeenCalled();
 
       // Verify that setPreference was not called
       expect(setPreference).not.toHaveBeenCalled();
