@@ -1,9 +1,9 @@
 import { getPreference, setPreference, getAllPreferences } from '../preferences';
 import { Preference } from '../../types/database';
-import * as db from '../db';
+import * as connection from '../connection';
 
-// Mock the db module
-jest.mock('../db');
+// Mock the connection module
+jest.mock('../connection');
 
 describe('Preference Functions', () => {
   // Mock database methods
@@ -22,8 +22,8 @@ describe('Preference Functions', () => {
   beforeEach(() => {
     jest.clearAllMocks();
 
-    // Mock initDatabase to return our mock database
-    (db.initDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+    // Mock getDatabase to return our mock database
+    (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
 
     // Spy on console.error
     consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
