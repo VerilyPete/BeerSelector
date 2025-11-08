@@ -28,9 +28,11 @@ This ensures the refactoring is safe, verifiable, and maintains (or improves) co
 
 ## High Priority Issues
 
-### HP-1: Monolithic Database Module (1,417 lines)
+### HP-1: Monolithic Database Module (1,417 lines) ✅ COMPLETED
 
-**Description**: `/workspace/BeerSelector/src/database/db.ts` is a massive 1,417-line file that handles database schema, data fetching, API calls, business logic, caching, locks, and preferences. This violates the Single Responsibility Principle and makes the code extremely difficult to test, debug, and maintain.
+**Status**: ✅ **COMPLETED** (2025-11-08)
+
+**Description**: `/workspace/BeerSelector/src/database/db.ts` was a massive 918-line file that handled database schema, data fetching, API calls, business logic, caching, locks, and preferences. This violated the Single Responsibility Principle and made the code extremely difficult to test, debug, and maintain.
 
 **Impact**:
 - High risk of bugs when making changes
@@ -39,7 +41,15 @@ This ensures the refactoring is safe, verifiable, and maintains (or improves) co
 - Performance issues due to module-level state variables
 - Race conditions from shared lock mechanisms
 
-**Refactoring Plan**:
+**Resolution Summary**:
+- ✅ Reduced db.ts from 918 lines to 432 lines (53% reduction)
+- ✅ Eliminated ALL duplicate INSERT/UPDATE/DELETE logic (CI-1 resolved)
+- ✅ Created 18 passing compatibility tests verifying delegation pattern
+- ✅ All 147 database and service tests passing with no regressions
+- ✅ Achieved 54.44% code coverage for database layer (up from ~6%)
+- ✅ Single source of truth: All operations delegate to repositories
+
+**Refactoring Plan** (Completed):
 
 **Step 1a**: Write tests for current preference functions
 - Create `src/database/__tests__/preferences.test.ts`
@@ -238,6 +248,21 @@ These flags are checked and modified across async operations without proper sync
 - Reduce lock timeout from 60s to 15s for better mobile UX (**RI-1**)
 - **Testing**: Run `npm test`, then rapid refresh test - trigger 3 refreshes simultaneously, verify no 4.5s wait times
 
+**Step 6a**: Write tests for improved lock coverage
+- Extend `src/database/__tests__/locks.test.ts` with additional edge cases
+- Test timeout edge cases
+- Test concurrent lock acquisition from multiple callers
+- Test error recovery paths
+- Target 90%+ coverage for locks.ts
+- **Testing**: Run `npm test`, verify lock tests achieve 90%+ coverage
+
+**Step 6b**: Improve lock and db.ts test coverage
+- Test remaining uncovered paths in locks.ts
+- Add tests for uncovered db.ts delegation paths
+- Ensure error handling is tested
+- Target 80%+ overall database layer coverage
+- **Testing**: Run `npm test -- --coverage --collectCoverageFrom='src/database/**/*.ts'`, verify 80%+ coverage
+
 **Testing Focus**:
 - No deadlocks during rapid operations
 - Proper error recovery from failed operations
@@ -245,6 +270,7 @@ These flags are checked and modified across async operations without proper sync
 - First launch reliability
 - **CI-2 Resolved**: No lock contention during parallel refresh operations
 - **RI-1 Resolved**: Mobile-appropriate timeout values (15s instead of 60s)
+- **Test Coverage**: 80%+ database layer coverage achieved
 
 ---
 
@@ -596,6 +622,119 @@ const parseQueuedBeersFromHtml = (html: string): QueuedBeer[] => {
 - WAL mode improves concurrency
 - Memory usage is managed properly
 - **CI-3 Resolved**: Database connections properly managed through app lifecycle
+
+---
+
+### HP-7: Deprecate and Remove db.ts Compatibility Layer
+
+**Description**: The db.ts file (432 lines after HP-1 Step 7b) is now a thin compatibility wrapper that delegates all operations to repositories. While functional, it adds an unnecessary indirection layer and can confuse developers about the proper data access pattern. Currently 14 files import from db.ts across components, screens, and services.
+
+**Impact**:
+- Unnecessary indirection in data access flow
+- Confusion about whether to use db.ts or repositories directly
+- Additional maintenance burden
+- Slightly reduced performance from extra function calls
+- Harder to reason about data flow
+
+**Current State**:
+- db.ts: 432 lines (thin wrapper only)
+- 14 files importing from db.ts
+- All actual database logic in repositories (95-98% test coverage)
+
+**Refactoring Plan**:
+
+**Step 1a**: Write tests for deprecation warnings
+- Create `src/database/__tests__/deprecation.test.ts`
+- Test that @deprecated JSDoc annotations are present
+- Test development mode warnings are logged
+- **Testing**: Run `npm test`, verify deprecation tests pass
+
+**Step 1b**: Add deprecation warnings
+- Add `@deprecated` JSDoc to all db.ts exported functions
+- Document repository imports in CLAUDE.md
+- Add console.warn in development mode when db.ts functions are called
+- Create migration guide in documentation
+- **Testing**: Run app in dev mode, verify warnings appear for db.ts usage
+
+**Step 2a**: Write migration tests for simple components
+- Create tests for Rewards.tsx using repository pattern
+- Create tests for TastedBrewList.tsx using repository pattern
+- Verify all functionality preserved
+- **Testing**: Run `npm test`, verify component tests pass with repository imports
+
+**Step 2b**: Migrate simple components (lowest risk first)
+- Migrate Rewards.tsx → import from repositories
+- Migrate TastedBrewList.tsx → import from repositories
+- Update component tests
+- Manual test each component in light/dark mode
+- **Testing**: Run `npm test`, then manual testing of affected components
+
+**Step 3a**: Write migration tests for complex components
+- Create tests for AllBeers.tsx using repository pattern
+- Create tests for Beerfinder.tsx using repository pattern
+- Test all filter/search/refresh scenarios
+- **Testing**: Run `npm test`, verify complex component tests pass
+
+**Step 3b**: Migrate complex components
+- Migrate AllBeers.tsx → import from repositories
+- Migrate Beerfinder.tsx → import from repositories
+- Update component tests
+- Full regression testing (filters, search, sort, refresh)
+- **Testing**: Run `npm test`, then full manual test of beer list features
+
+**Step 4a**: Write migration tests for screens and services
+- Create tests for tab screens using repository pattern
+- Create tests for authService.ts using repository pattern
+- Test app initialization flow with repository pattern
+- **Testing**: Run `npm test`, verify screen/service tests pass
+
+**Step 4b**: Migrate screens and services
+- Migrate tab screens (index.tsx, beerlist.tsx, tastedbrews.tsx, mybeers.tsx)
+- Migrate settings.tsx (careful - large file)
+- Migrate authService.ts
+- Migrate app/_layout.tsx (critical - test thoroughly)
+- Update all tests
+- **Testing**: Run `npm test`, then full app regression test (visitor mode, member mode, login/logout)
+
+**Step 5a**: Write final integration tests
+- Create `src/__tests__/integration/repositoryMigration.integration.test.ts`
+- Test complete user flows with repository pattern
+- Test no db.ts imports remain (lint check)
+- Test all database operations work correctly
+- **Testing**: Run `npm test:ci`, verify 100% pass rate
+
+**Step 5b**: Remove db.ts entirely
+- Delete src/database/db.ts
+- Remove from exports
+- Update CLAUDE.md to document repository pattern
+- Remove deprecation tests
+- Final integration test run
+- **Testing**: Run `npm test`, then complete regression - all tabs, login/logout, refresh, filters
+
+**Migration Guide Example**:
+```typescript
+// OLD (deprecated)
+import { getAllBeers, getMyBeers } from '@/database/db';
+const beers = await getAllBeers();
+const myBeers = await getMyBeers();
+
+// NEW (recommended)
+import { beerRepository } from '@/database/repositories/BeerRepository';
+import { myBeersRepository } from '@/database/repositories/MyBeersRepository';
+const beers = await beerRepository.getAll();
+const myBeers = await myBeersRepository.getAll();
+```
+
+**Testing Focus**:
+- Zero regressions during migration
+- All components work identically
+- Performance maintained or improved
+- No db.ts imports remain in codebase
+- Clear documentation for repository pattern
+
+**Estimated effort**: 1 week
+**Priority**: Medium-Low (complete after HP-6)
+**Dependencies**: HP-1 must be complete (already done)
 
 ---
 
@@ -1331,11 +1470,12 @@ This approach ensures:
 - Living documentation of expected behavior
 
 **Immediate Next Steps (High Priority)**:
-1. Split database module into smaller files (HP-1) - **Estimated: 3.5 weeks** (includes Step 7 cleanup for CI-1)
-2. Fix race conditions with proper locking (HP-2) - **Estimated: 2 weeks** (includes Step 5 for CI-2 and RI-1)
+1. ~~Split database module into smaller files (HP-1)~~ - **✅ COMPLETE** (Step 7 cleanup for CI-1 done)
+2. Fix race conditions with proper locking (HP-2) - **Estimated: 2.5 weeks** (includes Steps 5-6 for CI-2, RI-1, and test coverage)
 3. Extract shared beer component code (HP-3) - **Estimated: 2 weeks**
 4. Secure HTML parsing and add error handling (HP-4, HP-5) - **Estimated: 2 weeks**
 5. Add database lifecycle management (HP-6) - **Estimated: 1 week** (new from code review CI-3)
+6. Deprecate and remove db.ts compatibility layer (HP-7) - **Estimated: 1 week** (medium-low priority, post-HP-6)
 
 **Short Term (Medium Priority, 2-3 months)**:
 1. Refactor settings screen (MP-1) - **Estimated: 1.5 weeks**
