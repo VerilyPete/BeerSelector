@@ -6,6 +6,7 @@ import { Preference, Reward, UntappdCookie, isPreference, isReward, isUntappdCoo
 import { SQLiteDatabase } from 'expo-sqlite';
 import { getDatabase } from './connection';
 import { getPreference, setPreference, getAllPreferences } from './preferences';
+import { setupTables } from './schema';
 // Import API fetch functions (will re-export for backwards compatibility)
 import {
   fetchBeersFromAPI as _fetchBeersFromAPI,
@@ -69,71 +70,8 @@ export const setupDatabase = async (): Promise<void> => {
     const database = await initDatabase();
 
     try {
-      // Use a transaction for creating all tables
-      await database.withTransactionAsync(async () => {
-        await database.execAsync(`
-          CREATE TABLE IF NOT EXISTS allbeers (
-            id TEXT PRIMARY KEY,
-            added_date TEXT,
-            brew_name TEXT,
-            brewer TEXT,
-            brewer_loc TEXT,
-            brew_style TEXT,
-            brew_container TEXT,
-            review_count TEXT,
-            review_rating TEXT,
-            brew_description TEXT
-          )
-        `);
-
-        // Create the table for My Beers (tasted beers)
-        await database.execAsync(`
-          CREATE TABLE IF NOT EXISTS tasted_brew_current_round (
-            id TEXT PRIMARY KEY,
-            roh_lap TEXT,
-            tasted_date TEXT,
-            brew_name TEXT,
-            brewer TEXT,
-            brewer_loc TEXT,
-            brew_style TEXT,
-            brew_container TEXT,
-            review_count TEXT,
-            review_ratings TEXT,
-            brew_description TEXT,
-            chit_code TEXT
-          )
-        `);
-
-        // Create rewards table to store user rewards
-        await database.execAsync(`
-          CREATE TABLE IF NOT EXISTS rewards (
-            reward_id TEXT PRIMARY KEY,
-            redeemed TEXT,
-            reward_type TEXT
-          )
-        `);
-
-        // Create preferences table to store API endpoints and other preferences
-        await database.execAsync(`
-          CREATE TABLE IF NOT EXISTS preferences (
-            key TEXT PRIMARY KEY,
-            value TEXT,
-            description TEXT
-          )
-        `);
-
-        // Create untappd table to store untappd session cookies
-        await database.execAsync(`
-          CREATE TABLE IF NOT EXISTS untappd (
-            key TEXT PRIMARY KEY,
-            value TEXT,
-            description TEXT
-          )
-        `);
-      });
-
-      // Initialize preferences with API endpoints if they don't exist
-      await initializePreferences(database);
+      // Use the setupTables function from schema module
+      await setupTables(database);
 
       console.log('Database setup complete');
       databaseSetupComplete = true;
@@ -143,51 +81,6 @@ export const setupDatabase = async (): Promise<void> => {
     }
   } finally {
     setupDatabaseInProgress = false;
-  }
-};
-
-// Initialize preferences with default values
-const initializePreferences = async (database: SQLite.SQLiteDatabase): Promise<void> => {
-  try {
-    // Check if preferences already exist
-    const count = await database.getFirstAsync<{ count: number }>('SELECT COUNT(*) as count FROM preferences');
-
-    // Only add default preferences if the table is empty
-    if (!count || count.count === 0) {
-      const preferences: Preference[] = [
-        {
-          key: 'all_beers_api_url',
-          value: '',
-          description: 'API endpoint for fetching all beers'
-        },
-        {
-          key: 'my_beers_api_url',
-          value: '',
-          description: 'API endpoint for fetching Beerfinder beers'
-        },
-        {
-          key: 'first_launch',
-          value: 'true',
-          description: 'Flag indicating if this is the first app launch'
-        }
-      ];
-
-      // Use a transaction for inserting all preferences
-      await database.withTransactionAsync(async () => {
-        // Insert default preferences
-        for (const pref of preferences) {
-          await database.runAsync(
-            'INSERT OR IGNORE INTO preferences (key, value, description) VALUES (?, ?, ?)',
-            [pref.key, pref.value, pref.description]
-          );
-        }
-      });
-
-      console.log('Default preferences initialized');
-    }
-  } catch (error) {
-    console.error('Error initializing preferences:', error);
-    throw error;
   }
 };
 
