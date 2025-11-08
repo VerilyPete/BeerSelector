@@ -464,15 +464,20 @@ export default function SettingsScreen() {
 
           // Extract and save session data to SecureStore for API requests
           const sessionData = extractSessionDataFromResponse(new Headers(), cookies);
+          console.log('Extracted session data:', sessionData);
+
           if (sessionData.memberId && sessionData.sessionId && sessionData.storeId && sessionData.storeName) {
             await saveSessionData(sessionData as any);
-            console.log('Member session data saved to SecureStore:', {
-              memberId: sessionData.memberId,
-              storeId: sessionData.storeId,
-              storeName: sessionData.storeName
-            });
+            console.log('Member session data saved to SecureStore successfully');
           } else {
-            console.warn('Incomplete session data from member login cookies:', sessionData);
+            console.warn('Incomplete session data from member login cookies - missing required fields');
+            console.warn('Required: memberId, sessionId, storeId, storeName');
+            console.warn('Got:', {
+              hasMemberId: !!sessionData.memberId,
+              hasSessionId: !!sessionData.sessionId,
+              hasStoreId: !!sessionData.storeId,
+              hasStoreName: !!sessionData.storeName
+            });
           }
 
           // Refresh the data
