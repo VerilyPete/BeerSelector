@@ -194,65 +194,9 @@ const initializePreferences = async (database: SQLite.SQLiteDatabase): Promise<v
 };
 
 // Helper functions to get and set preferences
-export const getPreference = async (key: string): Promise<string | null> => {
-  const database = await initDatabase();
-
-  try {
-    const result = await database.getFirstAsync<{ value: string }>(
-      'SELECT value FROM preferences WHERE key = ?',
-      [key]
-    );
-
-    return result ? result.value : null;
-  } catch (error) {
-    console.error(`Error getting preference ${key}:`, error);
-    return null;
-  }
-};
-
-export const setPreference = async (key: string, value: string, description?: string): Promise<void> => {
-  const database = await initDatabase();
-
-  try {
-    // If description is provided, update it; otherwise just update the value
-    if (description) {
-      await database.runAsync(
-        'INSERT OR REPLACE INTO preferences (key, value, description) VALUES (?, ?, ?)',
-        [key, value, description]
-      );
-    } else {
-      // Get the existing description if available
-      const existing = await database.getFirstAsync<{ description: string }>(
-        'SELECT description FROM preferences WHERE key = ?',
-        [key]
-      );
-
-      await database.runAsync(
-        'INSERT OR REPLACE INTO preferences (key, value, description) VALUES (?, ?, ?)',
-        [key, value, existing?.description || '']
-      );
-    }
-  } catch (error) {
-    console.error(`Error setting preference ${key}:`, error);
-    throw error;
-  }
-};
-
-// Get all preferences from the database
-export const getAllPreferences = async (): Promise<Preference[]> => {
-  const database = await initDatabase();
-
-  try {
-    const preferences = await database.getAllAsync<{ key: string, value: string, description: string }>(
-      'SELECT key, value, description FROM preferences ORDER BY key'
-    );
-
-    return preferences || [];
-  } catch (error) {
-    console.error('Error getting all preferences:', error);
-    return [];
-  }
-};
+// These functions have been moved to src/database/preferences.ts
+// Re-export them here for backwards compatibility
+export { getPreference, setPreference, getAllPreferences } from './preferences';
 
 // Helper functions for Untappd cookies
 export const getUntappdCookie = async (key: string): Promise<string | null> => {
