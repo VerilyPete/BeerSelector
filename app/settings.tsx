@@ -274,32 +274,25 @@ export default function SettingsScreen() {
               }
             }
 
-            // Make a fetch request to the current page to get cookies from headers
-            fetch(window.location.href, {
-              credentials: 'include'
-            }).then(response => {
-              // Get cookies from response headers
-              const cookies = {};
-              const cookieHeader = response.headers.get('set-cookie');
-              if (cookieHeader) {
-                cookieHeader.split(',').forEach(cookie => {
-                  const [cookiePart] = cookie.split(';');
-                  const [name, value] = cookiePart.split('=');
-                  if (name && value) {
-                    cookies[name.trim()] = value.trim();
-                  }
-                });
-              }
+            // Parse cookies from document.cookie
+            const cookies = {};
+            if (document.cookie) {
+              document.cookie.split(';').forEach(cookie => {
+                const [name, value] = cookie.split('=').map(c => c.trim());
+                if (name && value) {
+                  cookies[name] = decodeURIComponent(value);
+                }
+              });
+            }
 
-              // Send the results back to React Native
-              window.ReactNativeWebView.postMessage(JSON.stringify({
-                type: 'URLs',
-                userJsonUrl,
-                storeJsonUrl,
-                html: html.substring(0, 1000), // Send a portion of HTML for debugging
-                cookies: cookies
-              }));
-            });
+            // Send the results back to React Native
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'URLs',
+              userJsonUrl,
+              storeJsonUrl,
+              html: html.substring(0, 1000), // Send a portion of HTML for debugging
+              cookies: cookies
+            }));
 
             true; // Return statement needed for Android
           })();
@@ -447,6 +440,9 @@ export default function SettingsScreen() {
 
       if (data.type === 'URLs') {
         const { userJsonUrl, storeJsonUrl, cookies } = data;
+
+        console.log('Received member login data from WebView');
+        console.log('Cookies received:', Object.keys(cookies || {}).join(', '));
 
         if (userJsonUrl && storeJsonUrl) {
           // Explicitly clear visitor mode flag for regular login
