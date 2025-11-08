@@ -5,6 +5,7 @@ import { Beer, Beerfinder, isBeer, isBeerfinder } from './types';
 import { Preference, Reward, UntappdCookie, isPreference, isReward, isUntappdCookie } from './types';
 import { SQLiteDatabase } from 'expo-sqlite';
 import { getDatabase } from './connection';
+import { getPreference, setPreference, getAllPreferences } from './preferences';
 
 // Database operation lock to prevent concurrent operations
 let dbOperationInProgress = false;
