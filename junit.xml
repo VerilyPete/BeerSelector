@@ -1,93 +1,23 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuites name="jest tests" tests="100" failures="0" errors="0" time="1.808">
-  <testsuite name="BeerRepository" errors="0" failures="0" skipped="0" timestamp="2025-11-08T18:47:26" time="0.896" tests="34">
-    <testcase classname="BeerRepository insertMany should insert multiple beers in batches" name="BeerRepository insertMany should insert multiple beers in batches" time="0.008">
+<testsuites name="jest tests" tests="38" failures="0" errors="0" time="2.223">
+  <testsuite name="RewardsRepository" errors="0" failures="0" skipped="0" timestamp="2025-11-08T19:14:14" time="1.664" tests="38">
+    <testcase classname="RewardsRepository insertMany should insert multiple rewards in batches" name="RewardsRepository insertMany should insert multiple rewards in batches" time="0.004">
     </testcase>
-    <testcase classname="BeerRepository insertMany should skip beers without IDs" name="BeerRepository insertMany should skip beers without IDs" time="0">
-    </testcase>
-    <testcase classname="BeerRepository insertMany should process beers in batches of 50" name="BeerRepository insertMany should process beers in batches of 50" time="0.001">
-    </testcase>
-    <testcase classname="BeerRepository insertMany should handle empty beer array" name="BeerRepository insertMany should handle empty beer array" time="0">
-    </testcase>
-    <testcase classname="BeerRepository insertMany should handle beers with optional fields missing" name="BeerRepository insertMany should handle beers with optional fields missing" time="0.001">
-    </testcase>
-    <testcase classname="BeerRepository insertMany should throw error on database failure" name="BeerRepository insertMany should throw error on database failure" time="0.02">
-    </testcase>
-    <testcase classname="BeerRepository insertMany should log progress during import" name="BeerRepository insertMany should log progress during import" time="0.001">
-    </testcase>
-    <testcase classname="BeerRepository getAll should return all beers ordered by added_date DESC" name="BeerRepository getAll should return all beers ordered by added_date DESC" time="0.001">
-    </testcase>
-    <testcase classname="BeerRepository getAll should return empty array when no beers exist" name="BeerRepository getAll should return empty array when no beers exist" time="0">
-    </testcase>
-    <testcase classname="BeerRepository getAll should filter out beers with null or empty brew_name" name="BeerRepository getAll should filter out beers with null or empty brew_name" time="0">
-    </testcase>
-    <testcase classname="BeerRepository getAll should throw error on database failure" name="BeerRepository getAll should throw error on database failure" time="0.001">
-    </testcase>
-    <testcase classname="BeerRepository getById should return beer when found" name="BeerRepository getById should return beer when found" time="0">
-    </testcase>
-    <testcase classname="BeerRepository getById should return null when beer not found" name="BeerRepository getById should return null when beer not found" time="0.001">
-    </testcase>
-    <testcase classname="BeerRepository getById should handle empty ID string" name="BeerRepository getById should handle empty ID string" time="0">
-    </testcase>
-    <testcase classname="BeerRepository getById should throw error on database failure" name="BeerRepository getById should throw error on database failure" time="0">
-    </testcase>
-    <testcase classname="BeerRepository search should search beers by name, brewer, style, and description" name="BeerRepository search should search beers by name, brewer, style, and description" time="0.001">
-    </testcase>
-    <testcase classname="BeerRepository search should return all beers when query is empty" name="BeerRepository search should return all beers when query is empty" time="0">
-    </testcase>
-    <testcase classname="BeerRepository search should trim whitespace from query" name="BeerRepository search should trim whitespace from query" time="0">
-    </testcase>
-    <testcase classname="BeerRepository search should handle special characters in search query" name="BeerRepository search should handle special characters in search query" time="0">
-    </testcase>
-    <testcase classname="BeerRepository search should search across all text fields" name="BeerRepository search should search across all text fields" time="0.001">
-    </testcase>
-    <testcase classname="BeerRepository search should throw error on database failure" name="BeerRepository search should throw error on database failure" time="0">
-    </testcase>
-    <testcase classname="BeerRepository getByStyle should return beers matching the style" name="BeerRepository getByStyle should return beers matching the style" time="0.001">
-    </testcase>
-    <testcase classname="BeerRepository getByStyle should return empty array when no beers match style" name="BeerRepository getByStyle should return empty array when no beers match style" time="0">
-    </testcase>
-    <testcase classname="BeerRepository getByStyle should handle empty style string" name="BeerRepository getByStyle should handle empty style string" time="0">
-    </testcase>
-    <testcase classname="BeerRepository getByStyle should throw error on database failure" name="BeerRepository getByStyle should throw error on database failure" time="0.001">
-    </testcase>
-    <testcase classname="BeerRepository getByBrewer should return beers from the specified brewer" name="BeerRepository getByBrewer should return beers from the specified brewer" time="0">
-    </testcase>
-    <testcase classname="BeerRepository getByBrewer should return empty array when no beers match brewer" name="BeerRepository getByBrewer should return empty array when no beers match brewer" time="0">
-    </testcase>
-    <testcase classname="BeerRepository getByBrewer should handle empty brewer string" name="BeerRepository getByBrewer should handle empty brewer string" time="0">
-    </testcase>
-    <testcase classname="BeerRepository getByBrewer should throw error on database failure" name="BeerRepository getByBrewer should throw error on database failure" time="0.001">
-    </testcase>
-    <testcase classname="BeerRepository getUntasted should return beers not in tasted_brew_current_round table" name="BeerRepository getUntasted should return beers not in tasted_brew_current_round table" time="0">
-    </testcase>
-    <testcase classname="BeerRepository getUntasted should return empty array when all beers are tasted" name="BeerRepository getUntasted should return empty array when all beers are tasted" time="0.001">
-    </testcase>
-    <testcase classname="BeerRepository getUntasted should filter out beers with null or empty brew_name" name="BeerRepository getUntasted should filter out beers with null or empty brew_name" time="0">
-    </testcase>
-    <testcase classname="BeerRepository getUntasted should order results by added_date DESC" name="BeerRepository getUntasted should order results by added_date DESC" time="0">
-    </testcase>
-    <testcase classname="BeerRepository getUntasted should throw error on database failure" name="BeerRepository getUntasted should throw error on database failure" time="0.001">
-    </testcase>
-  </testsuite>
-  <testsuite name="RewardsRepository" errors="0" failures="0" skipped="0" timestamp="2025-11-08T18:47:26" time="0.895" tests="38">
-    <testcase classname="RewardsRepository insertMany should insert multiple rewards in batches" name="RewardsRepository insertMany should insert multiple rewards in batches" time="0.007">
-    </testcase>
-    <testcase classname="RewardsRepository insertMany should handle empty array by returning early" name="RewardsRepository insertMany should handle empty array by returning early" time="0">
+    <testcase classname="RewardsRepository insertMany should handle empty array by returning early" name="RewardsRepository insertMany should handle empty array by returning early" time="0.001">
     </testcase>
     <testcase classname="RewardsRepository insertMany should handle null rewards array" name="RewardsRepository insertMany should handle null rewards array" time="0.001">
     </testcase>
-    <testcase classname="RewardsRepository insertMany should process rewards in batches of 100" name="RewardsRepository insertMany should process rewards in batches of 100" time="0.001">
+    <testcase classname="RewardsRepository insertMany should process rewards in batches of 100" name="RewardsRepository insertMany should process rewards in batches of 100" time="0">
     </testcase>
     <testcase classname="RewardsRepository insertMany should handle rewards with empty optional fields" name="RewardsRepository insertMany should handle rewards with empty optional fields" time="0">
     </testcase>
-    <testcase classname="RewardsRepository insertMany should use placeholders for each reward" name="RewardsRepository insertMany should use placeholders for each reward" time="0.001">
+    <testcase classname="RewardsRepository insertMany should use placeholders for each reward" name="RewardsRepository insertMany should use placeholders for each reward" time="0">
     </testcase>
-    <testcase classname="RewardsRepository insertMany should throw error on database failure" name="RewardsRepository insertMany should throw error on database failure" time="0.02">
+    <testcase classname="RewardsRepository insertMany should throw error on database failure" name="RewardsRepository insertMany should throw error on database failure" time="0.013">
     </testcase>
     <testcase classname="RewardsRepository insertMany should log success message after populating" name="RewardsRepository insertMany should log success message after populating" time="0">
     </testcase>
-    <testcase classname="RewardsRepository insertMany should handle missing reward_id by using empty string" name="RewardsRepository insertMany should handle missing reward_id by using empty string" time="0">
+    <testcase classname="RewardsRepository insertMany should handle missing reward_id by using empty string" name="RewardsRepository insertMany should handle missing reward_id by using empty string" time="0.001">
     </testcase>
     <testcase classname="RewardsRepository insertMany should clear table before inserting" name="RewardsRepository insertMany should clear table before inserting" time="0">
     </testcase>
@@ -103,107 +33,49 @@
     </testcase>
     <testcase classname="RewardsRepository getById should return null when reward not found" name="RewardsRepository getById should return null when reward not found" time="0">
     </testcase>
-    <testcase classname="RewardsRepository getById should handle empty reward_id string" name="RewardsRepository getById should handle empty reward_id string" time="0.001">
+    <testcase classname="RewardsRepository getById should handle empty reward_id string" name="RewardsRepository getById should handle empty reward_id string" time="0">
     </testcase>
     <testcase classname="RewardsRepository getById should throw error on database failure" name="RewardsRepository getById should throw error on database failure" time="0">
     </testcase>
-    <testcase classname="RewardsRepository getByType should return rewards matching the type" name="RewardsRepository getByType should return rewards matching the type" time="0">
+    <testcase classname="RewardsRepository getByType should return rewards matching the type" name="RewardsRepository getByType should return rewards matching the type" time="0.001">
     </testcase>
-    <testcase classname="RewardsRepository getByType should return empty array when no rewards match type" name="RewardsRepository getByType should return empty array when no rewards match type" time="0.001">
+    <testcase classname="RewardsRepository getByType should return empty array when no rewards match type" name="RewardsRepository getByType should return empty array when no rewards match type" time="0">
     </testcase>
     <testcase classname="RewardsRepository getByType should handle empty type string" name="RewardsRepository getByType should handle empty type string" time="0">
     </testcase>
-    <testcase classname="RewardsRepository getByType should throw error on database failure" name="RewardsRepository getByType should throw error on database failure" time="0">
+    <testcase classname="RewardsRepository getByType should throw error on database failure" name="RewardsRepository getByType should throw error on database failure" time="0.001">
     </testcase>
-    <testcase classname="RewardsRepository getRedeemed should return rewards that have been redeemed" name="RewardsRepository getRedeemed should return rewards that have been redeemed" time="0.001">
+    <testcase classname="RewardsRepository getRedeemed should return rewards that have been redeemed" name="RewardsRepository getRedeemed should return rewards that have been redeemed" time="0">
     </testcase>
     <testcase classname="RewardsRepository getRedeemed should return empty array when no redeemed rewards exist" name="RewardsRepository getRedeemed should return empty array when no redeemed rewards exist" time="0">
     </testcase>
-    <testcase classname="RewardsRepository getRedeemed should throw error on database failure" name="RewardsRepository getRedeemed should throw error on database failure" time="0">
+    <testcase classname="RewardsRepository getRedeemed should throw error on database failure" name="RewardsRepository getRedeemed should throw error on database failure" time="0.001">
     </testcase>
-    <testcase classname="RewardsRepository getUnredeemed should return rewards that have not been redeemed" name="RewardsRepository getUnredeemed should return rewards that have not been redeemed" time="0.001">
+    <testcase classname="RewardsRepository getUnredeemed should return rewards that have not been redeemed" name="RewardsRepository getUnredeemed should return rewards that have not been redeemed" time="0">
     </testcase>
-    <testcase classname="RewardsRepository getUnredeemed should return empty array when all rewards are redeemed" name="RewardsRepository getUnredeemed should return empty array when all rewards are redeemed" time="0">
+    <testcase classname="RewardsRepository getUnredeemed should return empty array when all rewards are redeemed" name="RewardsRepository getUnredeemed should return empty array when all rewards are redeemed" time="0.001">
     </testcase>
     <testcase classname="RewardsRepository getUnredeemed should handle redeemed stored as &quot;0&quot; (alternative false)" name="RewardsRepository getUnredeemed should handle redeemed stored as &quot;0&quot; (alternative false)" time="0">
     </testcase>
     <testcase classname="RewardsRepository getUnredeemed should throw error on database failure" name="RewardsRepository getUnredeemed should throw error on database failure" time="0">
     </testcase>
-    <testcase classname="RewardsRepository clear should clear all rewards from the table" name="RewardsRepository clear should clear all rewards from the table" time="0">
+    <testcase classname="RewardsRepository clear should clear all rewards from the table" name="RewardsRepository clear should clear all rewards from the table" time="0.001">
     </testcase>
     <testcase classname="RewardsRepository clear should log clearing message" name="RewardsRepository clear should log clearing message" time="0">
     </testcase>
-    <testcase classname="RewardsRepository clear should throw error on database failure" name="RewardsRepository clear should throw error on database failure" time="0">
+    <testcase classname="RewardsRepository clear should throw error on database failure" name="RewardsRepository clear should throw error on database failure" time="0.001">
     </testcase>
-    <testcase classname="RewardsRepository getCount should return count of rewards" name="RewardsRepository getCount should return count of rewards" time="0.001">
+    <testcase classname="RewardsRepository getCount should return count of rewards" name="RewardsRepository getCount should return count of rewards" time="0">
     </testcase>
     <testcase classname="RewardsRepository getCount should return 0 when no rewards exist" name="RewardsRepository getCount should return 0 when no rewards exist" time="0">
     </testcase>
     <testcase classname="RewardsRepository getCount should handle null count result" name="RewardsRepository getCount should handle null count result" time="0">
     </testcase>
-    <testcase classname="RewardsRepository getCount should throw error on database failure" name="RewardsRepository getCount should throw error on database failure" time="0">
+    <testcase classname="RewardsRepository getCount should throw error on database failure" name="RewardsRepository getCount should throw error on database failure" time="0.001">
     </testcase>
-    <testcase classname="RewardsRepository error handling should log error when populate fails" name="RewardsRepository error handling should log error when populate fails" time="0.001">
+    <testcase classname="RewardsRepository error handling should log error when populate fails" name="RewardsRepository error handling should log error when populate fails" time="0">
     </testcase>
-    <testcase classname="RewardsRepository error handling should use transaction for atomic operations" name="RewardsRepository error handling should use transaction for atomic operations" time="0">
-    </testcase>
-  </testsuite>
-  <testsuite name="MyBeersRepository" errors="0" failures="0" skipped="0" timestamp="2025-11-08T18:47:27" time="0.126" tests="28">
-    <testcase classname="MyBeersRepository insertMany should insert multiple tasted beers in batches" name="MyBeersRepository insertMany should insert multiple tasted beers in batches" time="0.001">
-    </testcase>
-    <testcase classname="MyBeersRepository insertMany should handle empty array by clearing the table" name="MyBeersRepository insertMany should handle empty array by clearing the table" time="0.001">
-    </testcase>
-    <testcase classname="MyBeersRepository insertMany should filter out beers without IDs" name="MyBeersRepository insertMany should filter out beers without IDs" time="0">
-    </testcase>
-    <testcase classname="MyBeersRepository insertMany should clear table when all beers are invalid" name="MyBeersRepository insertMany should clear table when all beers are invalid" time="0.001">
-    </testcase>
-    <testcase classname="MyBeersRepository insertMany should process beers in batches of 20" name="MyBeersRepository insertMany should process beers in batches of 20" time="0">
-    </testcase>
-    <testcase classname="MyBeersRepository insertMany should handle beers with optional fields missing" name="MyBeersRepository insertMany should handle beers with optional fields missing" time="0.001">
-    </testcase>
-    <testcase classname="MyBeersRepository insertMany should throw error on database failure during insert" name="MyBeersRepository insertMany should throw error on database failure during insert" time="0.013">
-    </testcase>
-    <testcase classname="MyBeersRepository insertMany should log progress during import" name="MyBeersRepository insertMany should log progress during import" time="0.001">
-    </testcase>
-    <testcase classname="MyBeersRepository insertMany should include all Beerfinder-specific fields in insert" name="MyBeersRepository insertMany should include all Beerfinder-specific fields in insert" time="0">
-    </testcase>
-    <testcase classname="MyBeersRepository getAll should return all tasted beers ordered by id" name="MyBeersRepository getAll should return all tasted beers ordered by id" time="0">
-    </testcase>
-    <testcase classname="MyBeersRepository getAll should return empty array when no tasted beers exist" name="MyBeersRepository getAll should return empty array when no tasted beers exist" time="0.001">
-    </testcase>
-    <testcase classname="MyBeersRepository getAll should throw error on database failure" name="MyBeersRepository getAll should throw error on database failure" time="0">
-    </testcase>
-    <testcase classname="MyBeersRepository getAll should log retrieval of tasted beers" name="MyBeersRepository getAll should log retrieval of tasted beers" time="0">
-    </testcase>
-    <testcase classname="MyBeersRepository getAll should log when no tasted beers found and check table structure" name="MyBeersRepository getAll should log when no tasted beers found and check table structure" time="0.001">
-    </testcase>
-    <testcase classname="MyBeersRepository getById should return tasted beer when found" name="MyBeersRepository getById should return tasted beer when found" time="0">
-    </testcase>
-    <testcase classname="MyBeersRepository getById should return null when beer not found" name="MyBeersRepository getById should return null when beer not found" time="0">
-    </testcase>
-    <testcase classname="MyBeersRepository getById should handle empty ID string" name="MyBeersRepository getById should handle empty ID string" time="0">
-    </testcase>
-    <testcase classname="MyBeersRepository getById should throw error on database failure" name="MyBeersRepository getById should throw error on database failure" time="0.001">
-    </testcase>
-    <testcase classname="MyBeersRepository clear should clear all tasted beers from the table" name="MyBeersRepository clear should clear all tasted beers from the table" time="0">
-    </testcase>
-    <testcase classname="MyBeersRepository clear should log the number of rows removed" name="MyBeersRepository clear should log the number of rows removed" time="0">
-    </testcase>
-    <testcase classname="MyBeersRepository clear should handle clearing empty table" name="MyBeersRepository clear should handle clearing empty table" time="0.001">
-    </testcase>
-    <testcase classname="MyBeersRepository clear should throw error on database failure" name="MyBeersRepository clear should throw error on database failure" time="0">
-    </testcase>
-    <testcase classname="MyBeersRepository getCount should return count of tasted beers" name="MyBeersRepository getCount should return count of tasted beers" time="0">
-    </testcase>
-    <testcase classname="MyBeersRepository getCount should return 0 when no beers exist" name="MyBeersRepository getCount should return 0 when no beers exist" time="0">
-    </testcase>
-    <testcase classname="MyBeersRepository getCount should handle null count result" name="MyBeersRepository getCount should handle null count result" time="0.001">
-    </testcase>
-    <testcase classname="MyBeersRepository getCount should throw error on database failure" name="MyBeersRepository getCount should throw error on database failure" time="0">
-    </testcase>
-    <testcase classname="MyBeersRepository error handling should handle individual beer insert errors gracefully" name="MyBeersRepository error handling should handle individual beer insert errors gracefully" time="0">
-    </testcase>
-    <testcase classname="MyBeersRepository error handling should throw error on transaction failure" name="MyBeersRepository error handling should throw error on transaction failure" time="0.001">
+    <testcase classname="RewardsRepository error handling should use transaction for atomic operations" name="RewardsRepository error handling should use transaction for atomic operations" time="0.003">
     </testcase>
   </testsuite>
 </testsuites>
