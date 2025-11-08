@@ -7,6 +7,7 @@ import { SQLiteDatabase } from 'expo-sqlite';
 import { getDatabase } from './connection';
 import { getPreference, setPreference, getAllPreferences } from './preferences';
 import { setupTables } from './schema';
+import { databaseLockManager } from './locks';
 // Import API fetch functions (will re-export for backwards compatibility)
 import {
   fetchBeersFromAPI as _fetchBeersFromAPI,
@@ -14,12 +15,6 @@ import {
   fetchRewardsFromAPI as _fetchRewardsFromAPI,
   fetchWithRetry
 } from '../api/beerApi';
-
-// Database operation lock to prevent concurrent operations
-let dbOperationInProgress = false;
-
-// Simple database lock to prevent concurrent operations
-let lockTimeoutId: NodeJS.Timeout | null = null;
 
 // Track if database has been initialized
 let databaseInitialized = false;
@@ -174,51 +169,9 @@ export const isUntappdLoggedIn = async (): Promise<boolean> => {
 // Re-export API fetch functions from beerApi module for backwards compatibility
 export const fetchBeersFromAPI = _fetchBeersFromAPI;
 
-// Simple database lock to prevent concurrent operations
-const acquireLock = async (operationName: string): Promise<boolean> => {
-  if (dbOperationInProgress) {
-    console.log(`Database operation already in progress, waiting for lock (${operationName})...`);
-    // Wait for operation to complete
-    let attempts = 0;
-    while (dbOperationInProgress && attempts < 15) {
-      await new Promise(resolve => setTimeout(resolve, 300));
-      attempts++;
-    }
-
-    if (dbOperationInProgress) {
-      console.error(`Failed to acquire database lock after waiting (${operationName})`);
-      return false;
-    }
-  }
-
-  console.log(`Lock acquired for: ${operationName}`);
-  dbOperationInProgress = true;
-
-  // Safety timeout to release lock after 60 seconds in case of any issues
-  if (lockTimeoutId) {
-    clearTimeout(lockTimeoutId);
-  }
-
-  lockTimeoutId = setTimeout(() => {
-    console.warn('Database lock forcibly released after timeout');
-    dbOperationInProgress = false;
-  }, 60000); // 60 second safety timeout
-
-  return true;
-};
-
-const releaseLock = (operationName: string): void => {
-  if (lockTimeoutId) {
-    clearTimeout(lockTimeoutId);
-    lockTimeoutId = null;
-  }
-  console.log(`Lock released for: ${operationName}`);
-  dbOperationInProgress = false;
-};
-
 // Insert beers into database using transactions
 export const populateBeersTable = async (beers: Beer[]): Promise<void> => {
-  if (!await acquireLock('populateBeersTable')) {
+  if (!await databaseLockManager.acquireLock('populateBeersTable')) {
     throw new Error('Failed to acquire database lock for populating beers table');
   }
 
@@ -284,7 +237,7 @@ export const populateBeersTable = async (beers: Beer[]): Promise<void> => {
     console.error('Error populating beer database:', error);
     throw error;
   } finally {
-    releaseLock('populateBeersTable');
+    databaseLockManager.releaseLock('populateBeersTable');
   }
 };
 
@@ -365,7 +318,7 @@ export const populateMyBeersTable = async (beers: Beerfinder[]): Promise<void> =
   if (!beers || beers.length === 0) {
     console.log('DB: Empty beers array - clearing tasted_brew_current_round table (new user or round rollover at 200 beers)');
     
-    if (!await acquireLock('populateMyBeersTable')) {
+    if (!await databaseLockManager.acquireLock('populateMyBeersTable')) {
       console.log('DB: Could not acquire lock for populateMyBeersTable, another operation is in progress');
       return;
     }
@@ -379,7 +332,7 @@ export const populateMyBeersTable = async (beers: Beerfinder[]): Promise<void> =
       const after = await database.getFirstAsync<{ count: number }>('SELECT COUNT(*) as count FROM tasted_brew_current_round');
       console.log(`DB: Successfully cleared tasted_brew_current_round table (removed ${before?.count ?? 0} rows, now ${after?.count ?? 0})`);
     } finally {
-      releaseLock('populateMyBeersTable');
+      databaseLockManager.releaseLock('populateMyBeersTable');
     }
     return;
   }
@@ -391,7 +344,7 @@ export const populateMyBeersTable = async (beers: Beerfinder[]): Promise<void> =
   if (validBeers.length === 0) {
     console.log('DB: No valid beers with IDs found, clearing table instead of throwing error');
     
-    if (!await acquireLock('populateMyBeersTable')) {
+    if (!await databaseLockManager.acquireLock('populateMyBeersTable')) {
       console.log('DB: Could not acquire lock for populateMyBeersTable, another operation is in progress');
       return;
     }
@@ -403,12 +356,12 @@ export const populateMyBeersTable = async (beers: Beerfinder[]): Promise<void> =
       });
       console.log('DB: Successfully cleared tasted_brew_current_round table (all beers invalid)');
     } finally {
-      releaseLock('populateMyBeersTable');
+      databaseLockManager.releaseLock('populateMyBeersTable');
     }
     return;
   }
 
-  if (!await acquireLock('populateMyBeersTable')) {
+  if (!await databaseLockManager.acquireLock('populateMyBeersTable')) {
     console.error('DB: Failed to acquire database lock for populating Beerfinder beers table');
     throw new Error('Failed to acquire database lock for populating Beerfinder beers table');
   }
@@ -482,7 +435,7 @@ export const populateMyBeersTable = async (beers: Beerfinder[]): Promise<void> =
     console.error('Error populating My Beers database:', error);
     throw error;
   } finally {
-    releaseLock('populateMyBeersTable');
+    databaseLockManager.releaseLock('populateMyBeersTable');
   }
 };
 
@@ -507,7 +460,7 @@ export const fetchAndPopulateMyBeers = async (): Promise<void> => {
     return;
   }
 
-  if (!await acquireLock('fetchAndPopulateMyBeers')) {
+  if (!await databaseLockManager.acquireLock('fetchAndPopulateMyBeers')) {
     throw new Error('Failed to acquire database lock for fetching and populating My Beers');
   }
 
@@ -518,7 +471,7 @@ export const fetchAndPopulateMyBeers = async (): Promise<void> => {
     myBeersImportComplete = true;
   } finally {
     myBeersImportInProgress = false;
-    releaseLock('fetchAndPopulateMyBeers');
+    databaseLockManager.releaseLock('fetchAndPopulateMyBeers');
   }
 };
 
@@ -585,14 +538,14 @@ const _refreshBeersFromAPIInternal = async (): Promise<Beer[]> => {
 
 // Public version that handles locking
 export const refreshBeersFromAPI = async (): Promise<Beer[]> => {
-  if (!await acquireLock('refreshBeersFromAPI')) {
+  if (!await databaseLockManager.acquireLock('refreshBeersFromAPI')) {
     throw new Error('Failed to acquire database lock for refreshing beers');
   }
 
   try {
     return await _refreshBeersFromAPIInternal();
   } finally {
-    releaseLock('refreshBeersFromAPI');
+    databaseLockManager.releaseLock('refreshBeersFromAPI');
   }
 };
 
@@ -928,7 +881,7 @@ export const populateRewardsTable = async (rewards: Reward[]): Promise<void> => 
 
   try {
     const database = await initDatabase();
-    const acquired = await acquireLock('populate_rewards_table');
+    const acquired = await databaseLockManager.acquireLock('populate_rewards_table');
 
     if (!acquired) {
       console.log('Could not acquire lock for rewards table population');
@@ -971,7 +924,7 @@ export const populateRewardsTable = async (rewards: Reward[]): Promise<void> => 
 
       console.log(`Successfully populated rewards table with ${rewards.length} rewards`);
     } finally {
-      releaseLock('populate_rewards_table');
+      databaseLockManager.releaseLock('populate_rewards_table');
     }
   } catch (error) {
     console.error('Error populating rewards table:', error);
