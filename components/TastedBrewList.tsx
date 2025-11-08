@@ -31,6 +31,7 @@ export const TastedBrewList = () => {
   const [error, setError] = useState<string | null>(null);
 
   // Use the shared filtering hook (no Heavies/IPA filters needed for tasted beers)
+  // Pass 'tasted_date' to sort by the date the beer was tasted instead of added_date
   const {
     filteredBeers,
     filters,
@@ -41,7 +42,7 @@ export const TastedBrewList = () => {
     toggleFilter,
     toggleSort,
     toggleExpand,
-  } = useBeerFilters(tastedBeers);
+  } = useBeerFilters(tastedBeers, 'tasted_date');
 
   // Theme colors
   const activeButtonColor = useThemeColor({}, 'tint');
