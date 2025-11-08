@@ -12,12 +12,15 @@ type Beer = {
   brew_container: string;
   brew_description: string;
   added_date: string;
+  tasted_date?: string; // For tasted beers
 };
 
 type BeerItemProps = {
   beer: Beer;
   isExpanded: boolean;
   onToggle: (id: string) => void;
+  dateLabel?: string; // e.g., "Date Added" or "Tasted"
+  renderActions?: () => React.ReactNode; // Optional action buttons
 };
 
 // Function to format unix timestamp to readable date
@@ -38,10 +41,45 @@ const formatDate = (timestamp: string): string => {
   }
 };
 
-export const BeerItem: React.FC<BeerItemProps> = ({ beer, isExpanded, onToggle }) => {
+// Function to format date string (MM/DD/YYYY) to readable date
+const formatDateString = (dateStr: string): string => {
+  if (!dateStr) return 'Unknown date';
+
+  try {
+    const parts = dateStr.split('/');
+    if (parts.length === 3) {
+      const month = parseInt(parts[0], 10) - 1;
+      const day = parseInt(parts[1], 10);
+      const year = parseInt(parts[2], 10);
+      const date = new Date(year, month, day);
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+    }
+    return dateStr;
+  } catch (err) {
+    console.error('Error formatting date:', err);
+    return 'Invalid date';
+  }
+};
+
+export const BeerItem: React.FC<BeerItemProps> = ({
+  beer,
+  isExpanded,
+  onToggle,
+  dateLabel = 'Date Added',
+  renderActions
+}) => {
   // Theme colors
   const cardColor = useThemeColor({}, 'background');
   const borderColor = useThemeColor({ light: '#e0e0e0', dark: '#333' }, 'text');
+
+  // Determine which date to show and how to format it
+  const displayDate = beer.tasted_date
+    ? formatDateString(beer.tasted_date)
+    : formatDate(beer.added_date);
 
   return (
     <TouchableOpacity
@@ -66,7 +104,7 @@ export const BeerItem: React.FC<BeerItemProps> = ({ beer, isExpanded, onToggle }
           {beer.brew_style} {beer.brew_container ? `• ${beer.brew_container}` : ''}
         </ThemedText>
         <ThemedText style={styles.dateAdded}>
-          Date Added: {formatDate(beer.added_date)}
+          {dateLabel}: {displayDate}
         </ThemedText>
 
         {isExpanded && beer.brew_description && (
@@ -75,8 +113,9 @@ export const BeerItem: React.FC<BeerItemProps> = ({ beer, isExpanded, onToggle }
               Description:
             </ThemedText>
             <ThemedText style={styles.description}>
-              {beer.brew_description}
+              {beer.brew_description.replace(/<\/?p>/g, '').replace(/<\/?br ?\/?>/, '\n')}
             </ThemedText>
+            {renderActions && renderActions()}
           </View>
         )}
       </View>
