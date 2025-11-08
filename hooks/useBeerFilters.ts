@@ -9,6 +9,7 @@ type Beer = {
   brew_container: string;
   brew_description: string;
   added_date: string;
+  tasted_date?: string;
 };
 
 type SortOption = 'date' | 'name';
@@ -22,6 +23,8 @@ type FilterState = {
 type FilterOptions = FilterState & {
   searchText: string;
 };
+
+type DateSortField = 'added_date' | 'tasted_date';
 
 // Exported for testing
 export const applyFilters = (beers: Beer[], options: FilterOptions): Beer[] => {
@@ -70,24 +73,53 @@ export const applyFilters = (beers: Beer[], options: FilterOptions): Beer[] => {
 };
 
 // Exported for testing
-export const applySorting = (beers: Beer[], sortBy: SortOption): Beer[] => {
+export const applySorting = (beers: Beer[], sortBy: SortOption, dateField: DateSortField = 'added_date'): Beer[] => {
   const sorted = [...beers];
 
   if (sortBy === 'name') {
     sorted.sort((a, b) => (a.brew_name || '').localeCompare(b.brew_name || ''));
   } else {
     // Sort by date descending (most recent first)
-    sorted.sort((a, b) => {
-      const dateA = parseInt(a.added_date || '0', 10);
-      const dateB = parseInt(b.added_date || '0', 10);
-      return dateB - dateA;
-    });
+    if (dateField === 'tasted_date') {
+      // Parse dates in format MM/DD/YYYY for tasted_date
+      sorted.sort((a, b) => {
+        const partsA = (a.tasted_date || '').split('/');
+        const partsB = (b.tasted_date || '').split('/');
+
+        if (partsA.length === 3 && partsB.length === 3) {
+          // Create Date objects with year, month (0-based), day
+          const dateA = new Date(
+            parseInt(partsA[2], 10),
+            parseInt(partsA[0], 10) - 1,
+            parseInt(partsA[1], 10)
+          ).getTime();
+
+          const dateB = new Date(
+            parseInt(partsB[2], 10),
+            parseInt(partsB[0], 10) - 1,
+            parseInt(partsB[1], 10)
+          ).getTime();
+
+          return dateB - dateA; // Descending order
+        }
+
+        // Fallback if date parsing fails
+        return 0;
+      });
+    } else {
+      // added_date is a timestamp
+      sorted.sort((a, b) => {
+        const dateA = parseInt(a.added_date || '0', 10);
+        const dateB = parseInt(b.added_date || '0', 10);
+        return dateB - dateA;
+      });
+    }
   }
 
   return sorted;
 };
 
-export const useBeerFilters = (beers: Beer[]) => {
+export const useBeerFilters = (beers: Beer[], dateField: DateSortField = 'added_date') => {
   const [filters, setFilters] = useState<FilterState>({
     isDraft: false,
     isHeavies: false,
@@ -100,8 +132,8 @@ export const useBeerFilters = (beers: Beer[]) => {
   // Apply filters and sorting
   const filteredBeers = useMemo(() => {
     const filtered = applyFilters(beers, { ...filters, searchText });
-    return applySorting(filtered, sortBy);
-  }, [beers, filters, searchText, sortBy]);
+    return applySorting(filtered, sortBy, dateField);
+  }, [beers, filters, searchText, sortBy, dateField]);
 
   // Reset expanded item when filters change
   useEffect(() => {
