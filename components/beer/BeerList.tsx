@@ -24,6 +24,8 @@ type BeerListProps = {
   emptyMessage?: string;
   expandedId: string | null;
   onToggleExpand: (id: string) => void;
+  dateLabel?: string;
+  renderItemActions?: (beer: Beer) => React.ReactNode;
 };
 
 export const BeerList: React.FC<BeerListProps> = ({
@@ -34,6 +36,8 @@ export const BeerList: React.FC<BeerListProps> = ({
   emptyMessage = 'No beers found',
   expandedId,
   onToggleExpand,
+  dateLabel,
+  renderItemActions,
 }) => {
   const tintColor = useThemeColor({}, 'tint');
 
@@ -54,6 +58,8 @@ export const BeerList: React.FC<BeerListProps> = ({
           beer={item}
           isExpanded={expandedId === item.id}
           onToggle={onToggleExpand}
+          dateLabel={dateLabel}
+          renderActions={renderItemActions ? () => renderItemActions(item) : undefined}
         />
       )}
       contentContainerStyle={styles.listContent}
