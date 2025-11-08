@@ -32,13 +32,6 @@ let databaseInitialized = false;
 // Track if database setup has been completed
 let databaseSetupComplete = false;
 
-// Track if My Beers import has been scheduled
-let myBeersImportScheduled = false;
-
-// Track if My Beers fetch/import is in progress or complete
-let myBeersImportInProgress = false;
-let myBeersImportComplete = false;
-
 // Track if setupDatabase is in progress
 let setupDatabaseInProgress = false;
 
@@ -203,24 +196,18 @@ export const initializeBeerDatabase = async (): Promise<void> => {
     // Check for visitor mode to handle differently
     const isVisitorMode = await getPreference('is_visitor_mode') === 'true';
 
-    // If we haven't already scheduled My Beers import and not in visitor mode, do it now
-    if (!myBeersImportScheduled && !isVisitorMode) {
-      myBeersImportScheduled = true;
-
+    // Schedule My Beers import in background (idempotent, uses lock manager)
+    if (!isVisitorMode) {
       // Use setTimeout to make My Beers import non-blocking
       setTimeout(async () => {
         try {
           await fetchAndPopulateMyBeers();
-          myBeersImportComplete = true;
         } catch (error) {
           console.error('Error in scheduled My Beers import:', error);
-        } finally {
-          myBeersImportInProgress = false;
         }
       }, 100);
-    } else if (isVisitorMode) {
+    } else {
       console.log('In visitor mode - skipping scheduled My Beers import');
-      myBeersImportComplete = true;
     }
 
     // Schedule rewards import - only if not in visitor mode
@@ -261,39 +248,26 @@ export const populateMyBeersTable = async (beers: Beerfinder[]): Promise<void> =
 };
 
 // Fetch and populate My Beers
+// NOTE: This function is idempotent - it can be called multiple times safely
+// The lock manager ensures only one operation runs at a time
 export const fetchAndPopulateMyBeers = async (): Promise<void> => {
   // Check for visitor mode first and exit early without acquiring lock
   const isVisitorMode = await getPreference('is_visitor_mode') === 'true';
   if (isVisitorMode) {
     console.log('In visitor mode - skipping fetchAndPopulateMyBeers');
-    myBeersImportComplete = true;
     return;
   }
 
-  // Skip if we're already doing this operation or it's already complete
-  if (myBeersImportInProgress) {
-    console.log('My Beers import already in progress, skipping duplicate request');
-    return;
-  }
-
-  if (myBeersImportComplete) {
-    console.log('My Beers import already completed, skipping duplicate request');
-    return;
-  }
-
+  // Acquire lock - if another call is in progress, this will queue
   if (!await databaseLockManager.acquireLock('fetchAndPopulateMyBeers')) {
     throw new Error('Failed to acquire database lock for fetching and populating My Beers');
   }
-
-  myBeersImportInProgress = true;
 
   try {
     const myBeers = await fetchMyBeersFromAPI();
     // Use UNSAFE method since we're already holding the lock
     await myBeersRepository.insertManyUnsafe(myBeers);
-    myBeersImportComplete = true;
   } finally {
-    myBeersImportInProgress = false;
     databaseLockManager.releaseLock('fetchAndPopulateMyBeers');
   }
 };
@@ -371,9 +345,6 @@ export const getBeersNotInMyBeers = async (): Promise<Beer[]> => {
 export const resetDatabaseState = (): void => {
   databaseInitialized = false;
   databaseSetupComplete = false;
-  myBeersImportScheduled = false;
-  myBeersImportInProgress = false;
-  myBeersImportComplete = false;
   setupDatabaseInProgress = false;
   console.log('Database state flags reset');
 };

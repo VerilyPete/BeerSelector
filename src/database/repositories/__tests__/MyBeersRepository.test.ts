@@ -519,4 +519,139 @@ describe('MyBeersRepository', () => {
       await expect(repository.insertMany(beers)).rejects.toThrow('Transaction failed');
     });
   });
+
+  describe('insertManyUnsafe', () => {
+    it('should insert beers without acquiring lock', async () => {
+      const beers: Beerfinder[] = [
+        { id: '1', brew_name: 'Test Beer 1', brewer: 'Test Brewery', roh_lap: '1' },
+        { id: '2', brew_name: 'Test Beer 2', brewer: 'Test Brewery', roh_lap: '2' }
+      ];
+
+      mockDatabase.getFirstAsync.mockResolvedValue({ count: 0 });
+
+      await repository.insertManyUnsafe(beers);
+
+      expect(mockDatabase.withTransactionAsync).toHaveBeenCalled();
+      const insertCalls = mockDatabase.runAsync.mock.calls.filter((call: any) =>
+        call[0].includes('INSERT OR REPLACE')
+      );
+      expect(insertCalls).toHaveLength(2);
+    });
+
+    it('should handle empty array by clearing table', async () => {
+      const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
+      mockDatabase.getFirstAsync.mockResolvedValue({ count: 5 });
+
+      await repository.insertManyUnsafe([]);
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Empty beers array')
+      );
+      expect(mockDatabase.runAsync).toHaveBeenCalledWith('DELETE FROM tasted_brew_current_round');
+      consoleLogSpy.mockRestore();
+    });
+
+    it('should clear table when all beers invalid', async () => {
+      const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
+      const beers: Beerfinder[] = [
+        { id: '', brew_name: 'Invalid Beer', brewer: 'Test' } as Beerfinder
+      ];
+
+      mockDatabase.getFirstAsync.mockResolvedValue({ count: 0 });
+
+      await repository.insertManyUnsafe(beers);
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining('No valid beers with IDs found')
+      );
+      expect(mockDatabase.runAsync).toHaveBeenCalledWith('DELETE FROM tasted_brew_current_round');
+      consoleLogSpy.mockRestore();
+    });
+
+    it('should process beers in batches of 20', async () => {
+      const beers: Beerfinder[] = Array.from({ length: 50 }, (_, i) => ({
+        id: `beer-${i}`,
+        brew_name: `Beer ${i}`,
+        brewer: 'Test Brewery',
+        roh_lap: `${i}`
+      }));
+
+      mockDatabase.getFirstAsync.mockResolvedValue({ count: 0 });
+
+      await repository.insertManyUnsafe(beers);
+
+      const insertCalls = mockDatabase.runAsync.mock.calls.filter((call: any) =>
+        call[0].includes('INSERT OR REPLACE')
+      );
+      expect(insertCalls).toHaveLength(50);
+    });
+
+    it('should skip beers without IDs during insert', async () => {
+      const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
+      const beers: Beerfinder[] = [
+        { id: '1', brew_name: 'Valid', brewer: 'Test' },
+        { id: '', brew_name: 'Invalid', brewer: 'Test' } as Beerfinder,
+        { id: '2', brew_name: 'Valid 2', brewer: 'Test' }
+      ];
+
+      mockDatabase.getFirstAsync.mockResolvedValue({ count: 0 });
+
+      await repository.insertManyUnsafe(beers);
+
+      const insertCalls = mockDatabase.runAsync.mock.calls.filter((call: any) =>
+        call[0].includes('INSERT OR REPLACE')
+      );
+      expect(insertCalls).toHaveLength(2); // Only valid beers inserted
+      consoleLogSpy.mockRestore();
+    });
+
+    it('should handle insert errors gracefully', async () => {
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+      const beers: Beerfinder[] = [
+        { id: '1', brew_name: 'Beer 1', brewer: 'Test' }
+      ];
+
+      mockDatabase.getFirstAsync.mockResolvedValue({ count: 0 });
+      mockDatabase.runAsync
+        .mockResolvedValueOnce(undefined) // DELETE succeeds
+        .mockRejectedValueOnce(new Error('Insert failed')); // INSERT fails
+
+      await repository.insertManyUnsafe(beers);
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Error inserting beer'),
+        expect.any(Error)
+      );
+      consoleErrorSpy.mockRestore();
+    });
+
+    it('should log final row count', async () => {
+      const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
+      const beers: Beerfinder[] = [
+        { id: '1', brew_name: 'Test Beer', brewer: 'Test' }
+      ];
+
+      mockDatabase.getFirstAsync
+        .mockResolvedValueOnce({ count: 1 }); // Final count after insert
+
+      await repository.insertManyUnsafe(beers);
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining('My Beers import complete')
+      );
+      consoleLogSpy.mockRestore();
+    });
+
+    it('should throw error on transaction failure', async () => {
+      const beers: Beerfinder[] = [
+        { id: '1', brew_name: 'Test Beer', brewer: 'Test' }
+      ];
+
+      mockDatabase.withTransactionAsync.mockRejectedValueOnce(
+        new Error('Transaction failed')
+      );
+
+      await expect(repository.insertManyUnsafe(beers)).rejects.toThrow('Transaction failed');
+    });
+  });
 });
