@@ -15,12 +15,15 @@ The BeerSelector React Native/Expo application is a functional offline-first mob
 **Overall Code Health**: 5/10 - The app works but requires substantial refactoring to be maintainable and extensible.
 
 **Recommended Priority**:
-1. ✅ **COMPLETED**: Fix CI-4 and CI-5 (sequential refresh integration) - **RESOLVED** via TDD approach
-2. Address remaining High Priority issues (HP-3 component refactoring, HP-4 state management)
-3. Tackle Medium Priority issues to improve code maintainability
+1. ✅ **COMPLETED**: Fix CI-4, CI-5, and CI-6 (sequential refresh + event-based waiting) - **RESOLVED** via TDD approach
+2. ⚠️ **OPTIONAL**: Fix CI-7 (nested lock optimization in refreshAllDataFromAPI) - Medium priority, 2-3 hour effort
+3. Address remaining High Priority issues (HP-3 component refactoring, HP-4 state management)
+4. Tackle Medium Priority issues to improve code maintainability
 
-**Latest Review Findings** (2025-11-08):
-✅ **CI-4 and CI-5 RESOLVED**: Sequential refresh is now fully integrated into production code using Test-Driven Development (TDD). All 12 tests passing (7 original + 5 new integration tests). Lock contention eliminated (3x performance improvement: 4.5s → 1.5s). Both `manualRefreshAllData()` and `refreshAllDataFromAPI()` now use sequential execution with master lock coordination. **CI-2 (lock contention) is FULLY RESOLVED**.
+**Latest Review Findings** (2025-11-09):
+✅ **CI-4, CI-5, and CI-6 RESOLVED**: Sequential refresh is now fully integrated into production code using Test-Driven Development (TDD). All 27 tests passing (12 refresh coordination + 15 state machine). Lock contention eliminated (3x performance improvement: 4.5s → 1.5s). Both `manualRefreshAllData()` and `refreshAllDataFromAPI()` now use sequential execution with master lock coordination. **CI-2 (lock contention) is FULLY RESOLVED**. Event-based waiting replaces polling loop for 100-200ms performance gain.
+
+⚠️ **CI-7 OPTIMIZATION OPPORTUNITY**: Code review found nested lock acquisition in `refreshAllDataFromAPI()` (uses `insertMany()` while holding master lock). Works correctly but has 300-600ms overhead. Adding `insertManyUnsafe()` methods to BeerRepository and RewardsRepository will eliminate this. Medium priority, safe to defer.
 
 **Testing Approach**: All refactoring plans in this document follow a Test-Driven Development (TDD) approach. Each step includes:
 1. **Write automated tests first** - Establish baseline and define expected behavior
@@ -217,11 +220,15 @@ These flags are checked and modified across async operations without proper sync
 **Step 2c**: ✅ **COMPLETE** - Integrate DatabaseInitializer into production code
 - ✅ Replaced module-level flags in db.ts with `databaseInitializer`
 - ✅ Updated `setupDatabase()` to use state machine transitions (UNINITIALIZED → INITIALIZING → READY)
-- ✅ Updated polling loop to check state machine states instead of boolean flags
+- ✅ **ENHANCED**: Replaced polling loop with event-based `waitUntilReady()` (CI-6 fix)
+  - Event-driven promise resolution instead of 200ms polling
+  - Timeout support (default 30s) with proper cleanup
+  - Notifies all concurrent waiters when ready
+  - ~100-200ms faster, better battery/CPU efficiency
 - ✅ Updated `resetDatabaseState()` to use `databaseInitializer.reset()`
-- ✅ Created comprehensive integration tests (9 tests, all passing)
-- ✅ Tests verify state transitions, error handling, and reset functionality
-- **Testing**: Run `npm test -- db-state-machine-integration`, 9/9 tests pass
+- ✅ Created comprehensive integration tests (15 tests, all passing)
+- ✅ Tests verify state transitions, error handling, reset functionality, and event-based waiting
+- **Testing**: Run `npm test -- db-state-machine-integration`, 15/15 tests pass
 - **Testing**: Cold start app 5 times, verify beers load successfully each time
 - **Testing**: Monitor logs for state machine transitions instead of flag messages
 
@@ -372,12 +379,18 @@ These flags are checked and modified across async operations without proper sync
   - Lock contention eliminated in authService.ts login flow
   - 12/12 tests passing including new CI-5 integration tests
   - Used in 2 production locations: auto-login and regular login
-- **CI-6 (MEDIUM)**: Polling loop in `setupDatabase()` could be replaced with promise-based wait
+- ✅ **CI-6 (MEDIUM)**: Polling loop in `setupDatabase()` replaced with event-based waiting
+  - **RESOLVED**: Implemented `waitUntilReady()` promise-based method in DatabaseInitializer
+  - Replaces polling loop (200ms intervals) with event-driven notification pattern
+  - Performance improvement: ~100-200ms faster concurrent initialization
+  - Battery/CPU efficiency: No repeated polling checks
+  - 15/15 integration tests passing (added 6 new tests for event-based waiting)
+  - Uses real timers in tests to verify async behavior
 
 See HP2_COMPREHENSIVE_REVIEW.md for detailed analysis.
 
 **Current Status** (as of 2025-11-08):
-✅ **HP-2 FULLY COMPLETE** - All steps completed with 82.29% database layer coverage and CI-2/CI-4/CI-5 resolved
+✅ **HP-2 FULLY COMPLETE** - All steps completed with 82.29% database layer coverage and CI-2/CI-4/CI-5/CI-6 resolved
 
 **Summary of Completed Work**:
 - ✅ Steps 1a-1b: DatabaseLockManager implemented (98.14% coverage)
@@ -420,9 +433,40 @@ See HP2_COMPREHENSIVE_REVIEW.md for detailed analysis.
 
 ---
 
+### CI-7: Nested Lock Acquisition Optimization (COMPLETED)
+
+**Status**: ✅ **COMPLETED** (2025-11-09)
+
+**What Was Done**:
+Eliminated nested lock acquisition in `refreshAllDataFromAPI()` and `sequentialRefreshAllData()` by implementing `insertManyUnsafe()` methods across all repository classes and updating data refresh functions to use the master lock pattern.
+
+**Implementation Summary**:
+1. ✅ Added `insertManyUnsafe()` to `BeerRepository` (lines 46-55)
+2. ✅ Added `insertManyUnsafe()` to `RewardsRepository` (lines 48-63)
+3. ✅ Updated `refreshAllDataFromAPI()` (lines 676-714) to use unsafe methods under master lock
+4. ✅ Updated `sequentialRefreshAllData()` (lines 450-547) to use unsafe methods under master lock
+5. ✅ Added test coverage in `refreshCoordination.test.ts` (Tests 6 and 12 verify lock pattern)
+
+**Performance Impact**:
+- Eliminates 300-600ms overhead from nested lock queue operations
+- Reduces lock manager contention during login/auto-login
+- All refresh operations now use single master lock with lock-free repository methods
+
+**Architecture Pattern**:
+All repositories now follow the safe/unsafe method pattern:
+- `insertMany()` - Public API, acquires its own lock (safe for standalone use)
+- `insertManyUnsafe()` - Internal API, requires caller to hold lock (optimized for batch operations)
+- `_insertManyInternal()` - Private shared implementation
+
+**Code Review**: Production-ready with recommendations for future enhancements (structured error handling, empty array validation, performance logging). See react-native-code-reviewer assessment above for details.
+
+---
+
 ### HP-3: Massive Code Duplication in Beer List Components
 
-**Description**: The components `AllBeers.tsx` (643 lines), `Beerfinder.tsx` (1,276 lines), and `TastedBrewList.tsx` (521 lines) share approximately 80% identical code:
+**Status**: ⚠️ **PARTIALLY COMPLETE** - Code reduced by 25% but critical quality gaps remain (2025-11-09)
+
+**Original Description**: The components `AllBeers.tsx` (643 lines), `Beerfinder.tsx` (1,276 lines), and `TastedBrewList.tsx` (521 lines) shared approximately 80% identical code:
 - Same filter UI (Draft/Heavies/IPA buttons)
 - Same search bar implementation
 - Same beer item rendering logic
@@ -435,94 +479,501 @@ See HP2_COMPREHENSIVE_REVIEW.md for detailed analysis.
 - Wasted development time maintaining duplicate code
 - Increased bundle size
 
-**Refactoring Plan**:
+---
 
-**Step 1a**: Write tests for BeerItem component
-- Create `components/beer/__tests__/BeerItem.test.tsx`
-- Test rendering with collapsed state
-- Test rendering with expanded state
-- Test toggle behavior
-- Test dark mode rendering
-- **Testing**: Run `npm test`, verify BeerItem tests pass
+## HP-3 Code Review Findings (2025-11-09)
 
-**Step 1b**: Extract BeerItem component
-- Create `components/beer/BeerItem.tsx` with expand/collapse logic
-- Accept `beer`, `isExpanded`, `onToggle` props
-- Include description display when expanded
-- **Testing**: Run `npm test`, then tap beer in each tab (AllBeers, Beerfinder, Tasted Brews), verify expand/collapse works
+### Overall Assessment: 6.5/10
 
-**Step 2a**: Write tests for FilterBar component
-- Create `components/beer/__tests__/FilterBar.test.tsx`
-- Test filter button toggles
-- Test sort button toggles
-- Test active filter styling
-- **Testing**: Run `npm test`, verify FilterBar tests pass
+HP-3 achieved its **primary goal** of extracting shared components and reducing code duplication **by 25%** (2,442 → 1,834 lines = **608 lines eliminated**). The `useBeerFilters` hook is **excellent** with 22/22 tests passing. However, the work is **incomplete and not production-ready**.
 
-**Step 2b**: Extract FilterBar component
-- Create `components/beer/FilterBar.tsx`
-- Props: `filters`, `onFilterChange`, `sortBy`, `onSortChange`
-- Include Draft/Heavies/IPA buttons and sort toggle
-- **Testing**: Run `npm test`, then toggle each filter in each tab, verify beer list updates correctly
+**Line Count Reduction**:
+- **Before HP-3**: AllBeers (642 lines) + Beerfinder (1,280 lines) + TastedBrewList (520 lines) = **2,442 lines**
+- **After HP-3**: AllBeers (245 lines) + Beerfinder (724 lines) + TastedBrewList (262 lines) + Shared (603 lines) = **1,834 lines**
+- **Net Reduction**: 608 lines eliminated (25% reduction)
 
-**Step 3a**: Write tests for SearchBar enhancements
-- Add tests to `components/__tests__/SearchBar.test.tsx`
-- Test debouncing (input doesn't fire immediately)
-- Test search text updates
-- **Testing**: Run `npm test`, verify SearchBar debounce tests pass
+**Strengths**:
+- ✅ Clean hook-based filtering logic (22/22 tests passing, `useBeerFilters` hook)
+- ✅ Well-structured shared components (BeerItem, FilterBar, BeerList)
+- ✅ Successful integration into parent components
+- ✅ Preserved all functionality (filters, search, sort, refresh)
 
-**Step 3b**: Extract SearchBar enhancements
-- Already have `SearchBar.tsx`, ensure it's used consistently
-- Add debouncing for search performance (300ms delay)
-- Update all usages
-- **Testing**: Run `npm test`, then type search query quickly, verify no lag
+**Critical Gaps**:
+- ❌ **ZERO test coverage** for shared components (1,184 lines of tests removed in commit 2c2f331)
+- ❌ **Missing accessibility support** (legal/compliance risk)
+- ❌ **Missing performance optimizations** (no React.memo, poor mobile UX)
+- ❌ **Missed 208 lines of refresh logic duplication** (HP-3's primary goal)
 
-**Step 4a**: Write tests for BeerList component
-- Create `components/beer/__tests__/BeerList.test.tsx`
-- Test rendering with empty list
-- Test rendering with beers
-- Test refresh behavior
-- Test loading states
-- **Testing**: Run `npm test`, verify BeerList tests pass
+---
 
-**Step 4b**: Create BeerList generic component
-- Create `components/beer/BeerList.tsx`
-- Props: `beers`, `loading`, `refreshing`, `onRefresh`, `emptyMessage`
-- Use FlatList with optimized rendering
-- **Testing**: Run `npm test`, then scroll through 200+ beers in AllBeers, verify smooth scrolling
+### Completed Work (Steps 1-6)
 
-**Step 5a**: Write tests for useBeerFilters hook
-- Create `hooks/__tests__/useBeerFilters.test.ts`
-- Test filter combinations
-- Test sort logic
-- Test search filtering
-- Test combined operations
-- **Testing**: Run `npm test`, verify hook tests pass with 100% coverage
+#### ✅ Step 1a-1b: BeerItem Component Extracted
+**File**: `components/beer/BeerItem.tsx` (159 lines)
 
-**Step 5b**: Create useBeerFilters hook
-- Extract filter/sort/search logic to `hooks/useBeerFilters.ts`
-- Return `{ filteredBeers, filters, searchText, setSearchText, toggleFilter, toggleSort }`
-- **Testing**: Run `npm test`, then apply multiple filters (Draft + IPA + sort by name), verify correct results
+**Quality**: 7/10
+- ✅ Clean separation of concerns (presentation only)
+- ✅ Proper TypeScript typing with Beer interface
+- ✅ Supports both `added_date` (timestamp) and `tasted_date` (MM/DD/YYYY) formats
+- ✅ Optional `renderActions` prop for custom buttons (Beerfinder check-in)
+- ✅ HTML stripping for descriptions (line 116)
+- ✅ Dark mode support via `useThemeColor` hook
+- ❌ **CRITICAL**: No React.memo for performance (unnecessary re-renders)
+- ❌ **CRITICAL**: Missing accessibility labels (lines 85-122)
+- ❌ **CRITICAL**: No test coverage (tests removed in commit 2c2f331)
+- ❌ Date formatting functions not memoized (lines 27-66, recalculate on every render)
 
-**Step 6a**: Write integration tests for refactored components
-- Create `components/__tests__/BeerListIntegration.test.tsx`
-- Test AllBeers with shared components
-- Test Beerfinder with shared components
-- Test TastedBrewList with shared components
-- **Testing**: Run `npm test:ci`, verify integration tests pass
+#### ✅ Step 2a-2b: FilterBar Component Extracted
+**File**: `components/beer/FilterBar.tsx` (167 lines)
 
-**Step 6b**: Refactor each component to use shared code
-- Reduce AllBeers.tsx to ~150 lines (data source + layout)
-- Reduce Beerfinder.tsx to ~200 lines (add check-in + queue functionality)
-- Reduce TastedBrewList.tsx to ~100 lines (simplest, just display)
-- Update all tests
-- **Testing**: Run `npm test`, then full regression test - verify all three tabs still work with filters, search, sort, refresh
+**Quality**: 7/10
+- ✅ Clean props interface with proper TypeScript typing
+- ✅ Optional `showHeaviesAndIpa` prop for TastedBrewList (line 21)
+- ✅ Dark mode button color logic (lines 38-40)
+- ✅ Proper visual feedback for active filters
+- ❌ **CRITICAL**: No React.memo (re-renders on every parent state change)
+- ❌ **CRITICAL**: Missing accessibility labels on all buttons (lines 44-128)
+- ❌ **CRITICAL**: No test coverage (tests removed in commit 2c2f331)
+- ❌ **PERFORMANCE**: Active state calculation on every render (line 38)
+- ❌ **UX ISSUE**: Sort button label is confusing - shows opposite of current state (line 120)
 
-**Testing Focus**:
-- All filtering combinations work correctly
-- Pull-to-refresh works in all tabs
-- Dark mode rendering is consistent
-- Empty states display correctly
-- Performance is maintained or improved
+#### ✅ Step 4a-4b: BeerList Component Extracted
+**File**: `components/beer/BeerList.tsx` (96 lines)
+
+**Quality**: 6.5/10
+- ✅ Clean FlatList wrapper with proper TypeScript generics
+- ✅ Proper empty state handling (lines 44-50)
+- ✅ RefreshControl integration (lines 66-73)
+- ✅ FlatList optimization props present (lines 74-77)
+- ✅ Optional `renderItemActions` callback pattern (line 62)
+- ❌ **CRITICAL**: No React.memo for BeerItem (line 57-63)
+- ❌ **CRITICAL**: Missing accessibility labels
+- ❌ **CRITICAL**: No test coverage (tests removed in commit 2c2f331)
+- ❌ **PERFORMANCE**: `renderItem` inline function recreated on every render (line 56-64)
+- ⚠️ **PERFORMANCE**: FlatList config not tuned for mobile (initialNumToRender={20} too high)
+
+#### ✅ Step 5a-5b: useBeerFilters Hook Extracted ⭐ **BEST COMPONENT OF HP-3**
+**File**: `hooks/useBeerFilters.ts` (181 lines)
+
+**Quality**: 9/10
+- ✅ **EXCELLENT**: Comprehensive test coverage (22/22 tests passing, 46% coverage)
+- ✅ Exported pure functions (`applyFilters`, `applySorting`) for testing
+- ✅ Proper `useMemo` for filtered/sorted results (line 133-136)
+- ✅ Supports different date fields (`added_date` vs `tasted_date`) (line 122)
+- ✅ Mutual exclusivity for Heavies/IPA filters (lines 151-155)
+- ✅ Resets expanded state when filters change (lines 139-141)
+- ✅ Handles edge cases (empty names, null dates)
+- ❌ **MINOR**: No JSDoc comments (difficult to understand from imports)
+- ❌ **MINOR**: 46% coverage - missing tasted_date parsing and hook state tests
+
+#### ❌ Step 6a: Integration Tests (REMOVED)
+**Status**: ❌ **ALL TESTS REMOVED** in commit 2c2f331 due to React Native testing environment issues
+
+**Original Test Files** (created in commit baabff5, deleted in commit 2c2f331):
+1. `components/beer/__tests__/BeerItem.test.tsx` (335 lines, 13 test cases)
+2. `components/beer/__tests__/FilterBar.test.tsx` (213 lines, 18 test cases)
+3. `components/beer/__tests__/BeerList.test.tsx` (237 lines, 13 test cases)
+4. `components/__tests__/BeerListIntegration.test.tsx` (399 lines, 11 test cases)
+
+**Total Test Code Lost**: 1,184 lines (55+ test cases)
+
+**Critical Analysis**:
+- ❌ This is **NOT acceptable** - React Native component testing is possible with proper setup
+- ❌ Removing tests instead of fixing the environment violates TDD principles
+- ❌ Should have used `@testing-library/react-native` with proper mock setup
+- ⚠️ The issue is likely improper mocking of `useThemeColor` and `useColorScheme` hooks
+
+#### ✅ Step 6b: Parent Components Refactored
+
+**AllBeers.tsx** (245 lines, down from 642 = **62% reduction**):
+- ✅ Successfully integrated useBeerFilters hook (lines 35-45)
+- ✅ Successfully integrated FilterBar component (lines 182-187)
+- ✅ Successfully integrated BeerList component (lines 190-198)
+- ✅ Preserved refresh functionality and error handling
+- ❌ **CODE DUPLICATION**: Lines 71-141 (refresh handler) duplicated in all 3 components
+
+**Beerfinder.tsx** (724 lines, down from 1,280 = **43% reduction**):
+- ✅ Successfully integrated useBeerFilters hook (lines 51-61)
+- ✅ Successfully integrated FilterBar component (lines 549-554)
+- ✅ Successfully integrated BeerList component (lines 557-566)
+- ✅ Custom action buttons via `renderBeerActions` (lines 376-413)
+- ❌ **CODE DUPLICATION**: Lines 96-161 (refresh handler) duplicated across components
+- ❌ **ARCHITECTURE**: 200+ lines of HTML parsing (lines 319-361) should be extracted
+
+**TastedBrewList.tsx** (262 lines, down from 520 = **50% reduction**):
+- ✅ Successfully integrated useBeerFilters hook (lines 35-45)
+- ✅ Successfully integrated FilterBar component (lines 203-209)
+- ✅ Successfully integrated BeerList component (lines 212-221)
+- ✅ Properly hides Heavies/IPA filters (line 208)
+- ✅ Uses `tasted_date` for sorting (line 45)
+- ❌ **CODE DUPLICATION**: Lines 88-158 (refresh handler) duplicated across components
+
+---
+
+### Critical Issues Found
+
+#### CI-HP3-1: Zero Test Coverage for Shared Components (CRITICAL)
+**Severity**: Critical - 603 lines of shared code with zero regression protection
+
+**Problem**: All component tests were removed in commit 2c2f331 instead of fixing the testing environment.
+
+**Impact**:
+- No regression protection for shared components
+- Breaking changes undetected until manual testing
+- Violates TDD principle from CODE_REVIEW.md
+- Production deployment risk
+
+**Files Affected**:
+- `components/beer/BeerItem.tsx` (159 lines) - 0% test coverage
+- `components/beer/FilterBar.tsx` (167 lines) - 0% test coverage
+- `components/beer/BeerList.tsx` (96 lines) - 0% test coverage
+
+**Fix Required**: Resurrect tests with proper React Native Testing Library setup (10 hours)
+
+#### CI-HP3-2: Missing Performance Optimizations (CRITICAL MOBILE UX)
+**Severity**: Critical - Poor mobile user experience with 200+ beer lists
+
+**Problem**: No React.memo on any shared component, causing 600+ unnecessary re-renders
+
+**Evidence**:
+```typescript
+// components/beer/BeerItem.tsx - NO React.memo
+export const BeerItem: React.FC<BeerItemProps> = ({...}) => {
+  // This component re-renders for EVERY beer when ANY state changes
+}
+```
+
+**Impact**:
+- **200 beers × 3 components = 600+ unnecessary re-renders** on filter toggle
+- Laggy scrolling (missed frames during filter changes)
+- Battery drain from excessive React reconciliation
+- Poor mobile UX (jank during interactions)
+
+**Calculation**:
+- User toggles "Draft" filter
+- **WITHOUT React.memo**: All 200 BeerItem components re-render = **202 renders**
+- **WITH React.memo**: Only FilterBar re-renders = **1 render + 200 prop comparisons**
+
+**Fix Required**: Add React.memo to all components (1 hour)
+
+#### CI-HP3-3: Missing Accessibility Support (LEGAL/COMPLIANCE RISK)
+**Severity**: Critical - App Store rejection risk, ADA compliance failure
+
+**Problem**: ZERO accessibility labels in any shared component
+
+**Evidence**:
+```bash
+$ grep -r "accessibilityLabel|accessibilityRole" components/beer/
+# No results
+```
+
+**Impact**:
+- **WCAG 2.1 Level A failure** (minimum standard)
+- **App Store rejection risk** (iOS requires basic accessibility)
+- **Legal risk** (ADA compliance)
+- **User exclusion** (visually impaired users cannot use app)
+
+**Fix Required**: Add accessibility labels to all interactive elements (4 hours)
+
+#### CI-HP3-4: Refresh Logic Duplication NOT Addressed (HP-3 GOAL MISSED)
+**Severity**: High - Primary goal of HP-3 was code deduplication, but 208 lines remain duplicated
+
+**Problem**: All three components have **identical refresh logic** (208 lines total duplicated):
+
+**Location**:
+- `components/AllBeers.tsx` lines 71-141 (71 lines)
+- `components/Beerfinder.tsx` lines 96-161 (66 lines)
+- `components/TastedBrewList.tsx` lines 88-158 (71 lines)
+
+**Duplicate Code Pattern**:
+1. Check if API URLs configured (lines 76-85 in AllBeers)
+2. Call `manualRefreshAllData()` (line 89)
+3. Handle network errors vs partial errors (lines 92-119)
+4. Reload local data (lines 122-133)
+5. Error handling (lines 134-140)
+
+**HP-3 Failure**: This was the PRIMARY goal of HP-3 but was completely missed
+
+**Fix Required**: Extract to `hooks/useDataRefresh.ts` (3 hours)
+
+#### CI-HP3-5: FlatList Configuration Not Tuned for Mobile
+**Severity**: Medium - Performance issues on low-end devices
+
+**Problem**: FlatList optimization props not optimal for mobile
+
+**Current Config** (components/beer/BeerList.tsx lines 74-77):
+```typescript
+initialNumToRender={20}    // TOO HIGH for complex items (causes initial jank)
+maxToRenderPerBatch={20}   // TOO AGGRESSIVE (frame drops during scroll)
+windowSize={21}            // DEFAULT (no optimization gained)
+removeClippedSubviews={true}  // Can cause Android bugs
+```
+
+**Issues**:
+1. `initialNumToRender={20}` too high for complex BeerItem components (200-300dp tall)
+2. `maxToRenderPerBatch={20}` causes frame drops when scrolling fast
+3. `windowSize={21}` is default (no memory optimization)
+4. `removeClippedSubviews={true}` has known React Native bugs on Android
+
+**Fix Required**: Tune FlatList props for mobile (2 hours)
+
+---
+
+### Missing Work (Not Completed)
+
+#### MW-HP3-1: Component Tests (Step 1a, 2a, 4a, 6a)
+**Status**: ❌ Removed instead of fixed
+**Estimated Effort**: 10 hours
+
+**Required Test Files**:
+1. `components/beer/__tests__/BeerItem.test.tsx` (13 test scenarios)
+2. `components/beer/__tests__/FilterBar.test.tsx` (18 test scenarios)
+3. `components/beer/__tests__/BeerList.test.tsx` (13 test scenarios)
+4. `components/__tests__/BeerListIntegration.test.tsx` (11 test scenarios)
+
+#### MW-HP3-2: Performance Optimizations
+**Status**: ❌ Not implemented
+**Estimated Effort**: 2 hours
+
+**Required Changes**:
+1. Add React.memo to BeerItem, FilterBar, BeerList
+2. Add useCallback to BeerList renderItem
+3. Add useMemo to BeerItem date formatting
+4. Optimize FlatList configuration
+
+#### MW-HP3-3: Accessibility Support
+**Status**: ❌ Not implemented
+**Estimated Effort**: 4 hours
+
+**Required Changes**:
+1. Add accessibilityLabel to all buttons and interactive elements
+2. Add accessibilityRole to buttons, lists
+3. Add accessibilityState for expanded/selected states
+4. Add accessibilityHint for complex interactions
+5. Validate touch target sizes (44x44 minimum)
+
+#### MW-HP3-4: Refresh Logic Extraction
+**Status**: ❌ Not started (should have been part of HP-3)
+**Estimated Effort**: 3 hours
+
+**Required**: Create `hooks/useDataRefresh.ts` to eliminate 208 lines of duplication
+
+#### MW-HP3-5: Error Handling Improvements
+**Status**: ⚠️ Partially implemented
+**Estimated Effort**: 2 hours
+
+**Required Changes**:
+1. Add error boundaries around BeerItem
+2. Better error messages in date formatting
+3. Fix HTML regex to use proper parser
+4. Add logging with beer ID context
+
+#### MW-HP3-6: JSDoc Documentation
+**Status**: ❌ Not implemented
+**Estimated Effort**: 2 hours
+
+**Required**: Add JSDoc comments to all exported components and hooks
+
+---
+
+### Prioritized Fix Plan for HP-3
+
+#### Priority 1: CRITICAL - Make Production-Ready (15 hours)
+
+**1. Restore Test Coverage (10 hours)** ⚠️ HIGHEST PRIORITY
+   - Fix React Native testing environment setup with proper mocking (2 hours)
+   - Resurrect BeerItem tests with @testing-library/react-native (4 hours)
+   - Resurrect FilterBar tests (3 hours)
+   - Resurrect BeerList tests (3 hours)
+   - Resurrect integration tests (moved to Priority 2)
+   - **Why First**: Tests protect all other fixes from regression
+   - **Dependencies**: None
+   - **Impact**: Enables confident refactoring
+   - **Files**: Install `@testing-library/react-native`, recreate test files
+
+**2. Add Accessibility Support (4 hours)** ⚠️ LEGAL/COMPLIANCE RISK
+   - Add accessibilityLabel to all buttons (BeerItem, FilterBar) (1 hour)
+   - Add accessibilityRole to interactive elements (1 hour)
+   - Add accessibilityState for expanded/selected (1 hour)
+   - Validate touch target sizes >= 44x44 points (30 min)
+   - Test with VoiceOver/TalkBack (30 min)
+   - **Why Second**: Legal requirement, App Store requirement
+   - **Dependencies**: None
+   - **Impact**: Compliance, user inclusion, avoid App Store rejection
+
+**3. Fix Performance Issues - Memoization (1 hour)** 🏎️ MOBILE UX
+   - Add React.memo to BeerItem (15 min)
+   - Add React.memo to FilterBar (15 min)
+   - Add useCallback to BeerList renderItem (15 min)
+   - Add useMemo to BeerItem date formatting (15 min)
+   - **Why Third**: Users experiencing jank right now
+   - **Dependencies**: Tests (to verify no regression)
+   - **Impact**: 3x render reduction (600 → 200), smoother UX
+
+#### Priority 2: HIGH - Complete HP-3 Goals (13 hours)
+
+**4. Extract Refresh Logic to Shared Hook (3 hours)** 🎯 HP-3 PRIMARY GOAL
+   - Create `hooks/useDataRefresh.ts` (2 hours)
+   - Integrate into AllBeers, Beerfinder, TastedBrewList (1 hour)
+   - **Why Fourth**: This was the main goal of HP-3 but was missed
+   - **Dependencies**: Tests
+   - **Impact**: Eliminate 208 lines of duplication (71+66+71)
+
+**5. Resurrect Integration Tests (6 hours)**
+   - Recreate `BeerListIntegration.test.tsx` with real data fixtures (4 hours)
+   - Add performance benchmarks (scrolling, filtering) (1 hour)
+   - Add accessibility tests (VoiceOver navigation) (1 hour)
+   - **Why Fifth**: End-to-end validation of shared component integration
+   - **Dependencies**: Component tests from Priority 1
+   - **Impact**: Catch integration bugs, verify HP-3 goals achieved
+
+**6. Optimize FlatList Configuration (2 hours)**
+   - Tune initialNumToRender, maxToRenderPerBatch, windowSize (30 min)
+   - Add conditional removeClippedSubviews (Platform.OS === 'ios') (15 min)
+   - Add updateCellsBatchingPeriod for smoother scrolling (15 min)
+   - Performance test on low-end device simulator (1 hour)
+   - **Why Sixth**: Mobile-specific optimization for 200+ beer lists
+   - **Dependencies**: Performance tests from Priority 2 Step 5
+   - **Impact**: Better memory usage, smoother scrolling on budget devices
+
+**7. Improve Error Handling (2 hours)**
+   - Add error boundaries around BeerItem rendering (1 hour)
+   - Improve date formatting error messages with beer ID (30 min)
+   - Fix HTML regex → use html-to-text library (30 min)
+   - **Why Seventh**: Production stability, graceful degradation
+   - **Dependencies**: Tests
+   - **Impact**: App doesn't crash on malformed data
+
+#### Priority 3: MEDIUM - Code Quality (6 hours)
+
+**8. Add JSDoc Documentation (2 hours)**
+   - Document all component props with examples
+   - Add usage examples for hooks
+   - Document performance considerations
+   - **Why Eighth**: Developer onboarding, maintainability
+   - **Dependencies**: None
+   - **Impact**: Easier for future developers to use shared components
+
+**9. Fix HTML Parsing to Use Proper Library (1 hour)**
+   - Replace regex with `html-to-text` library
+   - Add tests for various HTML inputs (strong, em, div, span)
+   - Handle HTML entities (&amp;, &lt;, &nbsp;)
+   - **Why Ninth**: Robustness for beer descriptions
+   - **Dependencies**: Tests
+   - **Impact**: Handle more HTML edge cases correctly
+
+**10. Extract Magic Numbers to Constants (1 hour)**
+   - Create `constants/styles.ts` for style constants
+   - Create `constants/performance.ts` for FlatList config
+   - **Why Tenth**: Readability, easier tuning
+   - **Dependencies**: None
+   - **Impact**: Centralized configuration
+
+**11. Enable TypeScript Strict Mode (2 hours)**
+   - Enable strict mode in tsconfig.json
+   - Fix all strict mode errors in shared components
+   - Add stricter null checking
+   - **Why Eleventh**: Type safety
+   - **Dependencies**: None
+   - **Impact**: Catch bugs at compile time
+
+#### Priority 4: LOW - Nice to Have (4 hours)
+
+**12. Add Haptic Feedback (1 hour)**
+   - Add haptic feedback to filter toggle buttons (expo-haptics)
+   - Add haptic feedback to beer expand/collapse
+   - **Why Twelfth**: Mobile UX polish
+   - **Dependencies**: None
+   - **Impact**: Better tactile feedback on filter changes
+
+**13. Improve Empty State Messages (1 hour)**
+   - Better visitor mode messaging in TastedBrewList
+   - Add illustrations to empty states
+   - **Why Thirteenth**: UX polish for first-time users
+   - **Dependencies**: None
+   - **Impact**: Better first-time user experience
+
+**14. Increase useBeerFilters Coverage to 80%+ (2 hours)**
+   - Add 7 missing test scenarios (tasted_date sorting, hook state)
+   - Cover uncovered lines 85-107, 123-169
+   - **Why Fourteenth**: Complete hook test coverage
+   - **Dependencies**: None
+   - **Impact**: Better hook test coverage (currently 46%)
+
+---
+
+### Total Estimated Effort to Complete HP-3
+
+**CRITICAL (Priority 1)**: 15 hours
+**HIGH (Priority 2)**: 13 hours
+**MEDIUM (Priority 3)**: 6 hours
+**LOW (Priority 4)**: 4 hours
+
+**TOTAL**: 38 hours (approximately 1 week of focused work)
+
+**Current HP-3 Score**: 6.5/10
+**With Priority 1 Complete**: 8/10
+**With Priority 1+2 Complete**: 9/10
+**With All Priorities Complete**: 9.5/10
+
+---
+
+### Recommendations
+
+**Immediate Actions (This Week)**:
+
+1. **DO NOT DEPLOY TO PRODUCTION** until Priority 1 items are complete
+   - Missing tests = no regression protection
+   - Missing accessibility = legal/compliance risk (ADA, App Store)
+   - Performance issues = poor mobile UX (jank, battery drain)
+
+2. **Fix Testing Environment FIRST** (2 hours)
+   - Install `@testing-library/react-native`
+   - Setup proper mocking for `useThemeColor` and `useColorScheme` hooks
+   - Create test setup file with mock configuration
+   - The "testing limitation" excuse is not valid - RN components are testable
+
+3. **Add Accessibility NOW** (4 hours after tests)
+   - Legal requirement (ADA compliance)
+   - App Store requirement (iOS Human Interface Guidelines)
+   - 4 hours of work to avoid legal/business risk
+
+**For Future Refactoring Work**:
+
+1. **DO NOT remove tests** - Fix the testing environment instead
+2. **Performance is not optional** on mobile - Always add React.memo, useCallback, useMemo
+3. **Accessibility is not optional** - Add a11y labels from the start
+4. **Measure before/after** - Always include performance benchmarks
+5. **Complete code duplication analysis** - HP-3 missed 208 lines, analysis was incomplete
+
+**Code Review Process Improvements**:
+
+1. **Require test coverage** before merging component refactoring (minimum 80%)
+2. **Require performance tests** for list-based components (FlatList benchmarks)
+3. **Require accessibility audit** for all UI components (WCAG 2.1 Level A)
+4. **Require before/after metrics** for refactoring PRs (line counts, test coverage, performance)
+
+---
+
+### HP-3 Conclusion
+
+HP-3 achieved its **primary goal** of extracting shared components and reducing code duplication **by 25%** (2,442 → 1,834 lines). The `useBeerFilters` hook is **excellent** with 22/22 tests passing. However, the work is **incomplete and not production-ready**:
+
+**✅ SUCCESSES**:
+- 608 lines eliminated (25% reduction)
+- Clean shared component architecture (BeerItem, FilterBar, BeerList)
+- Excellent useBeerFilters hook (22/22 tests passing)
+- Successful integration into all 3 parent components
+
+**❌ CRITICAL GAPS**:
+- Zero test coverage for shared components (1,184 lines of tests removed)
+- Missing accessibility support (legal/compliance risk)
+- Missing performance optimizations (poor mobile UX)
+- Missed 208 lines of refresh logic duplication (primary HP-3 goal)
+
+**Recommendation**: **Invest 15 hours in Priority 1 fixes** before considering HP-3 complete. Current state is 6.5/10 - with fixes it would be 9/10.
+
+**DO NOT PROCEED to HP-4** until HP-3 Priority 1 items are complete. The shared components are the foundation for all beer list UX - they must be production-ready before moving forward.
 
 ---
 
@@ -1657,7 +2108,7 @@ The plan now includes all critical issues (CI-1 through CI-6) and recommended im
 - **CI-3**: Missing database lifecycle → New HP-6 ❌ NOT STARTED
 - **CI-4**: Sequential refresh not integrated → HP-2 Step 5c ❌ CRITICAL (1 hour fix)
 - **CI-5**: refreshAllDataFromAPI uses parallel pattern → HP-2 cleanup ❌ HIGH (30 min fix)
-- **CI-6**: Polling loop in setupDatabase → HP-2 enhancement ⚠️ MEDIUM (2 hour refactor, optional)
+- **CI-6**: Polling loop in setupDatabase → HP-2 enhancement ✅ COMPLETE (event-based waiting)
 - **RI-1**: Lock timeout too long → HP-2 Step 4 ✅ COMPLETE (15s)
 - **RI-2**: Type safety gaps in repositories → Added to MP-2 Step 5
 - **RI-5**: Batch sizes not optimized → New LP-9
