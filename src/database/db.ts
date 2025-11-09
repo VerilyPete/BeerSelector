@@ -25,15 +25,7 @@ import {
 import { beerRepository } from './repositories/BeerRepository';
 import { myBeersRepository } from './repositories/MyBeersRepository';
 import { rewardsRepository } from './repositories/RewardsRepository';
-
-// Track if database has been initialized
-let databaseInitialized = false;
-
-// Track if database setup has been completed
-let databaseSetupComplete = false;
-
-// Track if setupDatabase is in progress
-let setupDatabaseInProgress = false;
+import { databaseInitializer } from './initializationState';
 
 // Initialize database (wrapper for backwards compatibility)
 export const initDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
@@ -42,43 +34,63 @@ export const initDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
 
 // Create tables if they don't exist
 export const setupDatabase = async (): Promise<void> => {
-  // Prevent multiple simultaneous calls
-  if (setupDatabaseInProgress) {
+  // If already ready, return immediately
+  if (databaseInitializer.isReady()) {
+    console.log('Database already ready');
+    return;
+  }
+
+  // If in ERROR state, throw the error immediately
+  if (databaseInitializer.isError()) {
+    throw new Error(`Database setup failed: ${databaseInitializer.getErrorMessage()}`);
+  }
+
+  // If initialization is in progress, wait for it to complete
+  if (databaseInitializer.isInitializing()) {
     console.log('Database setup already in progress, waiting...');
-    // Wait for the setup to complete
     let attempts = 0;
-    while (setupDatabaseInProgress && attempts < 10) {
+    while (databaseInitializer.isInitializing() && attempts < 10) {
       await new Promise(resolve => setTimeout(resolve, 200));
       attempts++;
     }
 
-    if (databaseSetupComplete) {
+    if (databaseInitializer.isReady()) {
       console.log('Database setup completed while waiting');
       return;
     }
 
-    if (setupDatabaseInProgress) {
-      console.warn('Timed out waiting for database setup to complete');
+    if (databaseInitializer.isInitializing()) {
+      throw new Error('Timed out waiting for database setup to complete');
+    }
+
+    if (databaseInitializer.isError()) {
+      throw new Error(`Database setup failed: ${databaseInitializer.getErrorMessage()}`);
     }
   }
 
-  setupDatabaseInProgress = true;
+  // Transition to INITIALIZING state
+  try {
+    databaseInitializer.setInitializing();
+  } catch (error) {
+    // If we can't transition to INITIALIZING (e.g., already READY), return
+    console.log('Cannot transition to INITIALIZING, database may already be ready');
+    return;
+  }
 
   try {
     const database = await initDatabase();
 
-    try {
-      // Use the setupTables function from schema module
-      await setupTables(database);
+    // Use the setupTables function from schema module
+    await setupTables(database);
 
-      console.log('Database setup complete');
-      databaseSetupComplete = true;
-    } catch (error) {
-      console.error('Error setting up database:', error);
-      throw error;
-    }
-  } finally {
-    setupDatabaseInProgress = false;
+    // Transition to READY state
+    databaseInitializer.setReady();
+    console.log('Database setup complete');
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    databaseInitializer.setError(errorMessage);
+    console.error('Error setting up database:', error);
+    throw error;
   }
 };
 
@@ -343,10 +355,8 @@ export const getBeersNotInMyBeers = async (): Promise<Beer[]> => {
 
 // Reset database initialization state (for manual refresh)
 export const resetDatabaseState = (): void => {
-  databaseInitialized = false;
-  databaseSetupComplete = false;
-  setupDatabaseInProgress = false;
-  console.log('Database state flags reset');
+  databaseInitializer.reset();
+  console.log('Database state reset');
 };
 
 // Re-export areApiUrlsConfigured from preferences for backwards compatibility

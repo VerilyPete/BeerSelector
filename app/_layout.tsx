@@ -12,9 +12,6 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 import { initializeBeerDatabase, getPreference, setPreference } from '@/src/database/db';
 import { manualRefreshAllData, fetchAndUpdateRewards } from '@/src/services/dataUpdateService';
 
-// Track if database initialization has been started to prevent multiple calls
-let dbInitStarted = false;
-
 // Disable react-devtools connection to port 8097
 if (__DEV__) {
   const originalConsoleError = console.error;
@@ -57,23 +54,19 @@ export default function RootLayout() {
         // Initialize database with retry mechanism
         let dbInitialized = false;
 
-        // Only attempt database initialization if not already started
-        if (!dbInitStarted) {
-          dbInitStarted = true; // Mark as started immediately
+        try {
+          console.log('Initializing database first attempt...');
+          await initializeBeerDatabase();
+          dbInitialized = true;
+          console.log('Database initialized successfully');
 
-          try {
-            console.log('Initializing database first attempt...');
-            await initializeBeerDatabase();
-            dbInitialized = true;
-            console.log('Database initialized successfully');
+          // Check if API URLs are set
+          const allBeersApiUrl = await getPreference('all_beers_api_url');
+          const myBeersApiUrl = await getPreference('my_beers_api_url');
+          const isFirstLaunch = await getPreference('first_launch');
 
-            // Check if API URLs are set
-            const allBeersApiUrl = await getPreference('all_beers_api_url');
-            const myBeersApiUrl = await getPreference('my_beers_api_url');
-            const isFirstLaunch = await getPreference('first_launch');
-
-            // If API URLs are empty or it's first launch, set initial route to settings
-            if ((!allBeersApiUrl || !myBeersApiUrl || isFirstLaunch === 'true') && loaded) {
+          // If API URLs are empty or it's first launch, set initial route to settings
+          if ((!allBeersApiUrl || !myBeersApiUrl || isFirstLaunch === 'true') && loaded) {
               console.log('API URLs not set or first launch, redirecting to settings page');
               // Mark that it's no longer the first launch
               if (isFirstLaunch === 'true') {
@@ -139,10 +132,7 @@ export default function RootLayout() {
               setInitialRoute('(tabs)');
             }
           }
-        } else {
-          console.log('Database initialization already in progress in another effect, skipping');
-          setInitialRoute('(tabs)');
-        }
+
 
         if (loaded) {
           await SplashScreen.hideAsync();

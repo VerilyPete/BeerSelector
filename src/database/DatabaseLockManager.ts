@@ -17,7 +17,9 @@
 interface LockRequest {
   operationName: string;
   resolve: (acquired: boolean) => void;
+  reject: (error: Error) => void;
   timestamp: number;
+  acquisitionTimeoutId?: NodeJS.Timeout;
 }
 
 /**
@@ -47,8 +49,13 @@ export class DatabaseLockManager {
   private lockHeld: boolean = false;
   private queue: LockRequest[] = [];
   private timeoutId: NodeJS.Timeout | null = null;
-  private readonly LOCK_TIMEOUT_MS = 15000; // 15 seconds for mobile UX (was 60s)
+  private readonly LOCK_TIMEOUT_MS = 15000; // 15 seconds for mobile UX (hold timeout)
+  private readonly ACQUISITION_TIMEOUT_MS = 30000; // 30 seconds for acquisition timeout
   private currentOperation: string | null = null;
+  private debugLogging: boolean = false;
+  private recentWaitTimes: number[] = []; // Track recent queue wait times
+  private readonly MAX_WAIT_TIME_HISTORY = 10; // Keep last 10 wait times
+  private readonly QUEUE_WARNING_THRESHOLD = 5; // Warn if queue exceeds this length
 
   /**
    * Attempt to acquire the database lock
@@ -59,24 +66,43 @@ export class DatabaseLockManager {
    * When the lock is successfully acquired, a 15-second timeout is set
    * to automatically release the lock in case of errors or hung operations.
    *
+   * Acquisition timeout: If lock cannot be acquired within timeoutMs (default 30s),
+   * the promise will be rejected with a timeout error.
+   *
    * @param operationName - Name of the operation requesting the lock (for logging)
-   * @returns Promise<boolean> - true if lock acquired, false on error
+   * @param timeoutMs - Optional acquisition timeout in milliseconds (default: 30000)
+   * @returns Promise<boolean> - true if lock acquired, rejects on acquisition timeout
    */
-  async acquireLock(operationName: string): Promise<boolean> {
-    return new Promise((resolve) => {
+  async acquireLock(operationName: string, timeoutMs?: number): Promise<boolean> {
+    return new Promise((resolve, reject) => {
       // If lock is not held, acquire immediately
       if (!this.lockHeld) {
         this._grantLock(operationName, resolve);
         return;
       }
 
-      // Lock is held, add to queue
+      // Lock is held, add to queue with acquisition timeout
       console.log(`Database operation already in progress, waiting for lock (${operationName})...`);
+
+      const timeout = timeoutMs !== undefined ? timeoutMs : this.ACQUISITION_TIMEOUT_MS;
+
+      // Set acquisition timeout
+      const acquisitionTimeoutId = setTimeout(() => {
+        this._timeoutAcquisition(operationName, timeout);
+      }, timeout);
+
       this.queue.push({
         operationName,
         resolve,
-        timestamp: Date.now()
+        reject,
+        timestamp: Date.now(),
+        acquisitionTimeoutId
       });
+
+      // Warn if queue is getting long (after adding to queue)
+      if (this.queue.length >= this.QUEUE_WARNING_THRESHOLD) {
+        console.warn(`[LockManager] Queue length is ${this.queue.length}, exceeding threshold of ${this.QUEUE_WARNING_THRESHOLD}`);
+      }
     });
   }
 
@@ -85,24 +111,76 @@ export class DatabaseLockManager {
    *
    * @param operationName - Name of the operation
    * @param resolve - Promise resolve function
+   * @param acquisitionTimeoutId - Optional acquisition timeout to clear
+   * @param requestTimestamp - Optional timestamp when request was queued (for wait time tracking)
    */
-  private _grantLock(operationName: string, resolve: (acquired: boolean) => void): void {
+  private _grantLock(
+    operationName: string,
+    resolve: (acquired: boolean) => void,
+    acquisitionTimeoutId?: NodeJS.Timeout,
+    requestTimestamp?: number
+  ): void {
+    // Track wait time if this was a queued request
+    if (requestTimestamp !== undefined) {
+      const waitTime = Date.now() - requestTimestamp;
+      this._recordWaitTime(waitTime);
+
+      if (this.debugLogging) {
+        console.log(`[LockManager] Lock acquired for: ${operationName} (waited ${waitTime}ms)`);
+      }
+    } else if (this.debugLogging) {
+      console.log(`[LockManager] Lock acquired immediately for: ${operationName}`);
+    }
+
+    // Always log lock acquisition (not just in debug mode)
     console.log(`Lock acquired for: ${operationName}`);
+
     this.lockHeld = true;
     this.currentOperation = operationName;
 
-    // Clear any existing timeout
+    // Clear acquisition timeout if it exists
+    if (acquisitionTimeoutId) {
+      clearTimeout(acquisitionTimeoutId);
+    }
+
+    // Clear any existing hold timeout
     if (this.timeoutId) {
       clearTimeout(this.timeoutId);
     }
 
-    // Set safety timeout to auto-release lock after 15 seconds
+    // Set safety timeout to auto-release lock after 15 seconds (hold timeout)
     this.timeoutId = setTimeout(() => {
       console.warn(`Database lock forcibly released after timeout (${this.currentOperation})`);
       this._forceRelease();
     }, this.LOCK_TIMEOUT_MS);
 
     resolve(true);
+  }
+
+  /**
+   * Handle acquisition timeout for a queued operation
+   *
+   * Removes the operation from the queue and rejects its promise.
+   *
+   * @param operationName - Name of the operation that timed out
+   * @param timeoutMs - Timeout duration that expired
+   */
+  private _timeoutAcquisition(operationName: string, timeoutMs: number): void {
+    // Find the request in the queue
+    const index = this.queue.findIndex(req => req.operationName === operationName);
+
+    if (index !== -1) {
+      const request = this.queue[index];
+
+      // Remove from queue
+      this.queue.splice(index, 1);
+
+      // Log warning
+      console.warn(`Lock acquisition timeout for ${operationName} after ${timeoutMs}ms`);
+
+      // Reject the promise
+      request.reject(new Error(`Lock acquisition timeout for ${operationName} after ${timeoutMs}ms`));
+    }
   }
 
   /**
@@ -151,7 +229,7 @@ export class DatabaseLockManager {
     if (this.queue.length > 0) {
       const next = this.queue.shift();
       if (next) {
-        this._grantLock(next.operationName, next.resolve);
+        this._grantLock(next.operationName, next.resolve, next.acquisitionTimeoutId, next.timestamp);
       }
     }
   }
@@ -181,6 +259,56 @@ export class DatabaseLockManager {
    */
   getCurrentOperation(): string | null {
     return this.currentOperation;
+  }
+
+  /**
+   * Record a queue wait time
+   *
+   * @param waitTime - Wait time in milliseconds
+   */
+  private _recordWaitTime(waitTime: number): void {
+    this.recentWaitTimes.push(waitTime);
+
+    // Keep only the most recent wait times
+    if (this.recentWaitTimes.length > this.MAX_WAIT_TIME_HISTORY) {
+      this.recentWaitTimes.shift();
+    }
+  }
+
+  /**
+   * Enable or disable debug logging
+   *
+   * When enabled, detailed lock acquisition logs will be written to console.
+   *
+   * @param enabled - true to enable debug logging, false to disable
+   */
+  setDebugLogging(enabled: boolean): void {
+    this.debugLogging = enabled;
+    if (enabled) {
+      console.log('[LockManager] Debug logging enabled');
+    }
+  }
+
+  /**
+   * Get lock metrics for monitoring and troubleshooting
+   *
+   * Returns an object containing:
+   * - currentOperation: Name of the operation currently holding the lock (or null)
+   * - queueLength: Number of operations waiting for the lock
+   * - queueWaitTimes: Array of recent queue wait times in milliseconds
+   *
+   * @returns LockMetrics object
+   */
+  getLockMetrics(): {
+    currentOperation: string | null;
+    queueLength: number;
+    queueWaitTimes: number[];
+  } {
+    return {
+      currentOperation: this.currentOperation,
+      queueLength: this.queue.length,
+      queueWaitTimes: [...this.recentWaitTimes], // Return a copy
+    };
   }
 }
 

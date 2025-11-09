@@ -342,4 +342,267 @@ describe('DatabaseLockManager', () => {
       consoleSpy.mockRestore();
     });
   });
+
+  describe('Lock acquisition timeout (Step 5d)', () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    /**
+     * Test 1: Reject promise if lock not acquired within custom timeout
+     *
+     * REQUIREMENT: acquireLock() should accept optional timeoutMs parameter
+     * CURRENT BEHAVIOR: acquireLock() only accepts operationName (no timeout)
+     * DESIRED BEHAVIOR: Promise rejected with timeout error after timeoutMs
+     *
+     * This test will FAIL until Step 5d-b is implemented
+     */
+    it('should reject promise if lock not acquired within custom timeout', async () => {
+      // Hold lock indefinitely
+      await lockManager.acquireLock('blocking-operation');
+
+      // Try to acquire lock with 5-second timeout
+      const acquirePromise = lockManager.acquireLock('timeout-operation', 5000);
+
+      // Fast-forward 5 seconds
+      jest.advanceTimersByTime(5000);
+
+      // Promise should reject with timeout error
+      await expect(acquirePromise).rejects.toThrow(/timeout.*5000ms/i);
+
+      lockManager.releaseLock('blocking-operation');
+    });
+
+    /**
+     * Test 2: Use default 30-second timeout if not specified
+     *
+     * REQUIREMENT: Default to 30 seconds for acquisition timeout
+     * CURRENT BEHAVIOR: No acquisition timeout (waits indefinitely)
+     * DESIRED BEHAVIOR: 30-second default timeout
+     *
+     * This test will FAIL until Step 5d-b is implemented
+     */
+    it('should use default 30-second timeout if not specified', async () => {
+      // Part 1: Verify default timeout is 30 seconds (not some other value)
+      // We'll verify this by checking that operation is still pending at 10s
+      await lockManager.acquireLock('blocking-operation');
+
+      const acquirePromise = lockManager.acquireLock('default-timeout-operation');
+
+      // Advance to 10 seconds (before hold timeout of 15s) - should still be pending
+      jest.advanceTimersByTime(10000);
+
+      // Check that promise is still pending (not resolved or rejected)
+      // We can verify this by checking the queue length
+      expect(lockManager.getQueueLength()).toBe(1);
+
+      // Now release the blocking lock so the queued operation can acquire it
+      lockManager.releaseLock('blocking-operation');
+
+      // The queued operation should acquire the lock successfully (before timeout)
+      const result = await acquirePromise;
+      expect(result).toBe(true);
+      expect(lockManager.getCurrentOperation()).toBe('default-timeout-operation');
+
+      lockManager.releaseLock('default-timeout-operation');
+
+      // Part 2: Verify timeout actually fires
+      // Use a custom 10-second timeout to avoid hold timeout interference
+      await lockManager.acquireLock('blocking-operation-2');
+
+      const timeoutPromise = lockManager.acquireLock('should-timeout-operation', 10000);
+
+      // Advance to 10.1 seconds - should timeout
+      jest.advanceTimersByTime(10100);
+
+      // Should timeout and reject
+      await expect(timeoutPromise).rejects.toThrow(/timeout.*10000ms/i);
+    });
+
+    /**
+     * Test 3: Acquisition timeout is different from hold timeout
+     *
+     * REQUIREMENT: Two separate timeouts - acquisition (30s) vs hold (15s)
+     * CURRENT BEHAVIOR: Only hold timeout exists
+     * DESIRED BEHAVIOR: Acquisition timeout for waiting operations, hold timeout for active operations
+     *
+     * This test will FAIL until Step 5d-b is implemented
+     */
+    it('should have separate acquisition timeout (30s) and hold timeout (15s)', async () => {
+      // Operation 1 acquires lock
+      const acquire1 = await lockManager.acquireLock('operation-1');
+      expect(acquire1).toBe(true);
+
+      // Operation 2 queued (should have acquisition timeout)
+      const acquirePromise2 = lockManager.acquireLock('operation-2', 10000); // 10s acquisition timeout
+
+      // Fast-forward 10 seconds - operation 2 should timeout (acquisition timeout)
+      jest.advanceTimersByTime(10000);
+
+      // Operation 2 should reject with acquisition timeout
+      await expect(acquirePromise2).rejects.toThrow(/timeout.*10000ms/i);
+
+      // Fast-forward 5 more seconds (total 15s) - operation 1 should timeout (hold timeout)
+      jest.advanceTimersByTime(5000);
+
+      // Operation 1 should be forcibly released due to hold timeout
+      expect(lockManager.isLocked()).toBe(false);
+    });
+
+    /**
+     * Test 4: Clear acquisition timeout if lock is granted before timeout
+     *
+     * REQUIREMENT: Cancel timeout timer when lock is successfully acquired
+     * CURRENT BEHAVIOR: No acquisition timeout to clear
+     * DESIRED BEHAVIOR: Timeout cleared when lock granted from queue
+     *
+     * This test will FAIL until Step 5d-b is implemented
+     */
+    it('should clear acquisition timeout if lock is granted before timeout', async () => {
+      // Operation 1 holds lock
+      await lockManager.acquireLock('operation-1');
+
+      // Operation 2 queued with 30-second acquisition timeout
+      const acquirePromise2 = lockManager.acquireLock('operation-2', 30000);
+
+      // Release operation 1 after 5 seconds
+      jest.advanceTimersByTime(5000);
+      lockManager.releaseLock('operation-1');
+
+      // Let promises resolve
+      await Promise.resolve();
+      await Promise.resolve();
+
+      // Operation 2 should have acquired lock successfully
+      const acquired2 = await acquirePromise2;
+      expect(acquired2).toBe(true);
+
+      // Verify it holds the lock
+      expect(lockManager.getCurrentOperation()).toBe('operation-2');
+
+      // Fast-forward 10 seconds (total 15s from operation-1's start, before hold timeout)
+      // This proves the acquisition timeout was cleared (doesn't fire at 30s from queue time)
+      jest.advanceTimersByTime(10000);
+
+      // Operation 2 should still hold lock (acquisition timeout was cleared when lock granted)
+      expect(lockManager.getCurrentOperation()).toBe('operation-2');
+
+      lockManager.releaseLock('operation-2');
+    });
+
+    /**
+     * Test 5: Remove timed-out operation from queue
+     *
+     * REQUIREMENT: Operation removed from queue on acquisition timeout
+     * CURRENT BEHAVIOR: Queue only modified on lock acquisition/release
+     * DESIRED BEHAVIOR: Timed-out operation removed from queue
+     *
+     * This test will FAIL until Step 5d-b is implemented
+     */
+    it('should remove timed-out operation from queue', async () => {
+      // Operation 1 holds lock
+      await lockManager.acquireLock('operation-1');
+
+      // Queue operations 2 and 3
+      const promise2 = lockManager.acquireLock('operation-2', 5000); // 5s timeout
+      const promise3 = lockManager.acquireLock('operation-3', 30000); // 30s timeout
+
+      expect(lockManager.getQueueLength()).toBe(2);
+
+      // Fast-forward 5 seconds - operation 2 should timeout
+      jest.advanceTimersByTime(5000);
+
+      // Operation 2 should reject
+      await expect(promise2).rejects.toThrow(/timeout/i);
+
+      // Queue should now have only 1 operation (operation 3)
+      expect(lockManager.getQueueLength()).toBe(1);
+
+      // Release operation 1
+      lockManager.releaseLock('operation-1');
+
+      // Operation 3 should acquire lock (not operation 2)
+      await promise3;
+      expect(lockManager.getCurrentOperation()).toBe('operation-3');
+
+      lockManager.releaseLock('operation-3');
+    });
+
+    /**
+     * Test 6: Multiple queued operations with different timeouts
+     *
+     * REQUIREMENT: Each queued operation has independent timeout
+     * CURRENT BEHAVIOR: No acquisition timeouts
+     * DESIRED BEHAVIOR: Each operation times out independently
+     *
+     * This test will FAIL until Step 5d-b is implemented
+     */
+    it('should handle multiple queued operations with different timeouts', async () => {
+      // Operation 1 holds lock
+      await lockManager.acquireLock('operation-1');
+
+      // Queue 3 operations with different timeouts
+      const promise2 = lockManager.acquireLock('operation-2', 5000);  // 5s
+      const promise3 = lockManager.acquireLock('operation-3', 10000); // 10s
+      const promise4 = lockManager.acquireLock('operation-4', 15000); // 15s
+
+      expect(lockManager.getQueueLength()).toBe(3);
+
+      // Fast-forward 5 seconds - operation 2 should timeout
+      jest.advanceTimersByTime(5000);
+      await expect(promise2).rejects.toThrow(/timeout/i);
+      expect(lockManager.getQueueLength()).toBe(2);
+
+      // Fast-forward 5 more seconds (10s total) - operation 3 should timeout
+      jest.advanceTimersByTime(5000);
+      await expect(promise3).rejects.toThrow(/timeout/i);
+      expect(lockManager.getQueueLength()).toBe(1);
+
+      // Release operation 1 before operation 4 times out
+      lockManager.releaseLock('operation-1');
+
+      // Operation 4 should acquire lock
+      await promise4;
+      expect(lockManager.getCurrentOperation()).toBe('operation-4');
+
+      lockManager.releaseLock('operation-4');
+    });
+
+    /**
+     * Test 7: Log warning when acquisition timeout occurs
+     *
+     * REQUIREMENT: Log meaningful message when operation times out waiting
+     * CURRENT BEHAVIOR: No acquisition timeout logging
+     * DESIRED BEHAVIOR: Warning logged with operation name and timeout duration
+     *
+     * This test will FAIL until Step 5d-b is implemented
+     */
+    it('should log warning when acquisition timeout occurs', async () => {
+      const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
+
+      // Operation 1 holds lock
+      await lockManager.acquireLock('operation-1');
+
+      // Operation 2 queued with 5s timeout
+      const promise2 = lockManager.acquireLock('timed-out-operation', 5000);
+
+      // Fast-forward 5 seconds
+      jest.advanceTimersByTime(5000);
+
+      // Wait for rejection
+      await expect(promise2).rejects.toThrow();
+
+      // Should log warning about acquisition timeout
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        expect.stringMatching(/acquisition.*timeout.*timed-out-operation.*5000/i)
+      );
+
+      consoleWarnSpy.mockRestore();
+      lockManager.releaseLock('operation-1');
+    });
+  });
 });
