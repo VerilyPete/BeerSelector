@@ -1,18 +1,17 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState } from 'react';
 import { StyleSheet, View, TouchableOpacity, Alert, ActivityIndicator, Modal, FlatList } from 'react-native';
-import { getBeersNotInMyBeers, fetchAndPopulateMyBeers, areApiUrlsConfigured } from '@/src/database/db';
-import { manualRefreshAllData } from '@/src/services/dataUpdateService';
+import { getBeersNotInMyBeers, fetchAndPopulateMyBeers } from '@/src/database/db';
 import { ThemedText } from './ThemedText';
 import { LoadingIndicator } from './LoadingIndicator';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { SearchBar } from './SearchBar';
-import { getUserFriendlyErrorMessage } from '@/src/utils/notificationUtils';
 import { checkInBeer } from '@/src/api/beerService';
 import { getSessionData } from '@/src/api/sessionManager';
 import { router } from 'expo-router';
 import { UntappdWebView } from './UntappdWebView';
 import { useBeerFilters } from '@/hooks/useBeerFilters';
+import { useDataRefresh } from '@/hooks/useDataRefresh';
 import { FilterBar } from './beer/FilterBar';
 import { BeerList } from './beer/BeerList';
 
@@ -37,7 +36,6 @@ export const Beerfinder = () => {
   const colorScheme = useColorScheme();
   const [availableBeers, setAvailableBeers] = useState<Beer[]>([]);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [checkinLoading, setCheckinLoading] = useState(false);
   const [queueModalVisible, setQueueModalVisible] = useState(false);
@@ -85,79 +83,22 @@ export const Beerfinder = () => {
       setError('Failed to load beers. Please check your internet connection and try again.');
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
   };
 
+  // Use the shared data refresh hook
+  const { refreshing, handleRefresh } = useDataRefresh({
+    onDataReloaded: async () => {
+      const freshBeers = await getBeersNotInMyBeers();
+      const filteredData = freshBeers.filter(beer => beer.brew_name && beer.brew_name.trim() !== '');
+      setAvailableBeers(filteredData);
+      setError(null);
+    },
+    componentName: 'Beerfinder',
+  });
+
   useEffect(() => {
     loadBeers();
-  }, []);
-
-  const handleRefresh = useCallback(async () => {
-    try {
-      setRefreshing(true);
-      console.log('Manual refresh initiated by user in Beerfinder');
-
-      const apiUrlsConfigured = await areApiUrlsConfigured();
-      if (!apiUrlsConfigured) {
-        Alert.alert(
-          'API URLs Not Configured',
-          'Please log in via the Settings screen to configure API URLs before refreshing.'
-        );
-        setRefreshing(false);
-        return;
-      }
-
-      const result = await manualRefreshAllData();
-
-      if (result.hasErrors) {
-        if (result.allNetworkErrors) {
-          Alert.alert(
-            'Server Connection Error',
-            'Unable to connect to the server. Please check your internet connection and try again later.',
-            [{ text: 'OK' }]
-          );
-        } else {
-          const errorMessages: string[] = [];
-
-          if (!result.allBeersResult.success && result.allBeersResult.error) {
-            const allBeersError = getUserFriendlyErrorMessage(result.allBeersResult.error);
-            errorMessages.push(`All Beer data: ${allBeersError}`);
-          }
-
-          if (!result.myBeersResult.success && result.myBeersResult.error) {
-            const myBeersError = getUserFriendlyErrorMessage(result.myBeersResult.error);
-            errorMessages.push(`Beerfinder data: ${myBeersError}`);
-          }
-
-          Alert.alert(
-            'Data Refresh Error',
-            `There were problems refreshing beer data:\n\n${errorMessages.join('\n\n')}`,
-            [{ text: 'OK' }]
-          );
-        }
-      }
-
-      try {
-        const freshBeers = await getBeersNotInMyBeers();
-        const filteredData = freshBeers.filter(beer => beer.brew_name && beer.brew_name.trim() !== '');
-        setAvailableBeers(filteredData);
-        setError(null);
-
-        if (!result.hasErrors) {
-          console.log('All data refreshed successfully from Beerfinder tab');
-        }
-      } catch (localError: any) {
-        console.error('Error loading local beer data after refresh:', localError);
-        setError('Failed to load beer data from local storage.');
-      }
-    } catch (error: any) {
-      console.error('Error in unified refresh from Beerfinder:', error);
-      setError('Failed to refresh beer data. Please try again later.');
-      Alert.alert('Error', 'Failed to refresh beer data. Please try again later.');
-    } finally {
-      setRefreshing(false);
-    }
   }, []);
 
   const handleCheckIn = async (item: Beer) => {
