@@ -43,10 +43,11 @@ export const applyFilters = (beers: Beer[], options: FilterOptions): Beer[] => {
 
   // Apply Draft filter
   if (options.isDraft) {
-    filtered = filtered.filter(beer =>
-      beer.brew_container &&
-      beer.brew_container.toLowerCase() === 'draft'
-    );
+    filtered = filtered.filter(beer => {
+      if (!beer.brew_container) return false;
+      const container = beer.brew_container.toLowerCase();
+      return container.includes('draft') || container.includes('draught');
+    });
   }
 
   // Apply Heavies filter (porter, stout, barleywine, quad, tripel)

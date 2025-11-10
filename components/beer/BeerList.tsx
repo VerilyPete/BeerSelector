@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { StyleSheet, FlatList, RefreshControl } from 'react-native';
 import { ThemedView } from '../ThemedView';
 import { ThemedText } from '../ThemedText';
@@ -41,6 +41,17 @@ export const BeerList: React.FC<BeerListProps> = ({
 }) => {
   const tintColor = useThemeColor({}, 'tint');
 
+  // Memoize renderItem to prevent unnecessary re-renders of FlatList items
+  const renderItem = useCallback(({ item }: { item: Beer }) => (
+    <BeerItem
+      beer={item}
+      isExpanded={expandedId === item.id}
+      onToggle={onToggleExpand}
+      dateLabel={dateLabel}
+      renderActions={renderItemActions ? () => renderItemActions(item) : undefined}
+    />
+  ), [expandedId, onToggleExpand, dateLabel, renderItemActions]);
+
   if (!loading && beers.length === 0) {
     return (
       <ThemedView style={styles.emptyContainer}>
@@ -53,15 +64,7 @@ export const BeerList: React.FC<BeerListProps> = ({
     <FlatList
       data={beers}
       keyExtractor={(item) => item.id}
-      renderItem={({ item }) => (
-        <BeerItem
-          beer={item}
-          isExpanded={expandedId === item.id}
-          onToggle={onToggleExpand}
-          dateLabel={dateLabel}
-          renderActions={renderItemActions ? () => renderItemActions(item) : undefined}
-        />
-      )}
+      renderItem={renderItem}
       contentContainerStyle={styles.listContent}
       refreshControl={
         <RefreshControl

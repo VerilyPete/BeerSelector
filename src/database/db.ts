@@ -45,26 +45,18 @@ export const setupDatabase = async (): Promise<void> => {
     throw new Error(`Database setup failed: ${databaseInitializer.getErrorMessage()}`);
   }
 
-  // If initialization is in progress, wait for it to complete
+  // If initialization is in progress, wait for it to complete using event-based waiting
   if (databaseInitializer.isInitializing()) {
     console.log('Database setup already in progress, waiting...');
-    let attempts = 0;
-    while (databaseInitializer.isInitializing() && attempts < 10) {
-      await new Promise(resolve => setTimeout(resolve, 200));
-      attempts++;
-    }
-
-    if (databaseInitializer.isReady()) {
+    try {
+      await databaseInitializer.waitUntilReady(30000);
       console.log('Database setup completed while waiting');
       return;
-    }
-
-    if (databaseInitializer.isInitializing()) {
-      throw new Error('Timed out waiting for database setup to complete');
-    }
-
-    if (databaseInitializer.isError()) {
-      throw new Error(`Database setup failed: ${databaseInitializer.getErrorMessage()}`);
+    } catch (error) {
+      if (databaseInitializer.isError()) {
+        throw new Error(`Database setup failed: ${databaseInitializer.getErrorMessage()}`);
+      }
+      throw error;
     }
   }
 

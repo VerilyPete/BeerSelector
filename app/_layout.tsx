@@ -75,8 +75,6 @@ export default function RootLayout() {
 
               // Set initial route to settings
               setInitialRoute('/settings');
-              // Navigate immediately to settings
-              router.replace('/settings');
             } else {
               // Normal app startup flow
               setInitialRoute('(tabs)');

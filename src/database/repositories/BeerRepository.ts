@@ -35,69 +35,87 @@ export class BeerRepository {
     }
 
     try {
-      const database = await getDatabase();
-
-      // Always refresh the allbeers table with the latest data
-      // Clear existing data first, then insert fresh records in batches
-      await database.withTransactionAsync(async () => {
-        const before = await database.getFirstAsync<{ count: number }>('SELECT COUNT(*) as count FROM allbeers');
-        await database.runAsync('DELETE FROM allbeers');
-        console.log(`Cleared allbeers table (removed ${before?.count ?? 0} rows)`);
-      });
-
-      console.log(`Starting import of ${beers.length} beers...`);
-
-      // Process in larger batches using transactions
-      const batchSize = 50;
-
-      for (let i = 0; i < beers.length; i += batchSize) {
-        const batch = beers.slice(i, i + batchSize);
-
-        // Use withTransactionAsync for each batch
-        await database.withTransactionAsync(async () => {
-          for (const beer of batch) {
-            if (!beer.id) continue; // Skip entries without an ID
-
-            await database.runAsync(
-              `INSERT OR REPLACE INTO allbeers (
-                id, added_date, brew_name, brewer, brewer_loc,
-                brew_style, brew_container, review_count, review_rating, brew_description
-              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-              [
-                beer.id,
-                beer.added_date || '',
-                beer.brew_name || '',
-                beer.brewer || '',
-                beer.brewer_loc || '',
-                beer.brew_style || '',
-                beer.brew_container || '',
-                beer.review_count || '',
-                beer.review_rating || '',
-                beer.brew_description || ''
-              ]
-            );
-          }
-        });
-
-        // Log progress for larger batches
-        if ((i + batchSize) % 200 === 0 || i + batchSize >= beers.length) {
-          console.log(`Imported ${Math.min(i + batchSize, beers.length)} of ${beers.length} beers...`);
-        }
-      }
-
-      // Verify final row count
-      try {
-        const after = await database.getFirstAsync<{ count: number }>('SELECT COUNT(*) as count FROM allbeers');
-        console.log(`Beer import complete! allbeers now has ${after?.count ?? 0} rows`);
-      } catch (e) {
-        console.log('Beer import complete! (row count query failed)');
-      }
-    } catch (error) {
-      console.error('Error populating beer database:', error);
-      throw error;
+      await this._insertManyInternal(beers);
     } finally {
       // Always release the lock
       databaseLockManager.releaseLock('BeerRepository.insertMany');
+    }
+  }
+
+  /**
+   * Insert multiple beers without acquiring a lock
+   *
+   * UNSAFE: This method does NOT acquire a database lock.
+   * Only use when already holding a master lock (e.g., in sequential refresh).
+   *
+   * @param beers - Array of Beer objects to insert
+   */
+  async insertManyUnsafe(beers: Beer[]): Promise<void> {
+    await this._insertManyInternal(beers);
+  }
+
+  /**
+   * Internal implementation of beer insertion (shared by locked and unlocked variants)
+   *
+   * @param beers - Array of Beer objects to insert
+   */
+  private async _insertManyInternal(beers: Beer[]): Promise<void> {
+    const database = await getDatabase();
+
+    // Always refresh the allbeers table with the latest data
+    // Clear existing data first, then insert fresh records in batches
+    await database.withTransactionAsync(async () => {
+      const before = await database.getFirstAsync<{ count: number }>('SELECT COUNT(*) as count FROM allbeers');
+      await database.runAsync('DELETE FROM allbeers');
+      console.log(`Cleared allbeers table (removed ${before?.count ?? 0} rows)`);
+    });
+
+    console.log(`Starting import of ${beers.length} beers...`);
+
+    // Process in larger batches using transactions
+    const batchSize = 50;
+
+    for (let i = 0; i < beers.length; i += batchSize) {
+      const batch = beers.slice(i, i + batchSize);
+
+      // Use withTransactionAsync for each batch
+      await database.withTransactionAsync(async () => {
+        for (const beer of batch) {
+          if (!beer.id) continue; // Skip entries without an ID
+
+          await database.runAsync(
+            `INSERT OR REPLACE INTO allbeers (
+              id, added_date, brew_name, brewer, brewer_loc,
+              brew_style, brew_container, review_count, review_rating, brew_description
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+              beer.id,
+              beer.added_date || '',
+              beer.brew_name || '',
+              beer.brewer || '',
+              beer.brewer_loc || '',
+              beer.brew_style || '',
+              beer.brew_container || '',
+              beer.review_count || '',
+              beer.review_rating || '',
+              beer.brew_description || ''
+            ]
+          );
+        }
+      });
+
+      // Log progress for larger batches
+      if ((i + batchSize) % 200 === 0 || i + batchSize >= beers.length) {
+        console.log(`Imported ${Math.min(i + batchSize, beers.length)} of ${beers.length} beers...`);
+      }
+    }
+
+    // Verify final row count
+    try {
+      const after = await database.getFirstAsync<{ count: number }>('SELECT COUNT(*) as count FROM allbeers');
+      console.log(`Beer import complete! allbeers now has ${after?.count ?? 0} rows`);
+    } catch (e) {
+      console.log('Beer import complete! (row count query failed)');
     }
   }
 
