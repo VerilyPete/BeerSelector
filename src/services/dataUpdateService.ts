@@ -454,53 +454,66 @@ export async function sequentialRefreshAllData(): Promise<ManualRefreshResult> {
   await databaseLockManager.acquireLock('refresh-all-data-sequential');
 
   try {
-    // Execute operations sequentially - each completes before next starts
-    // Wrap each operation in try-catch to handle errors gracefully
+    // Execute operations sequentially using unsafe repository methods
+    // Since we hold the master lock, nested lock acquisition is unnecessary
     console.log('Sequential refresh: starting all beers fetch');
     let allBeersResult: DataUpdateResult;
     try {
-      allBeersResult = await fetchAllImpl();
+      const allBeers = await fetchBeersFromAPI();
+      await beerRepository.insertManyUnsafe(allBeers);
+      await setPreference('all_beers_last_update', new Date().toISOString());
+      await setPreference('all_beers_last_check', new Date().toISOString());
+      allBeersResult = {
+        success: true,
+        dataUpdated: true,
+        itemCount: allBeers.length
+      };
     } catch (error) {
       console.error('Sequential refresh: all beers fetch failed:', error);
       allBeersResult = {
         success: false,
         dataUpdated: false,
-        error: {
-          type: ApiErrorType.UNKNOWN_ERROR,
-          message: error instanceof Error ? error.message : 'Unknown error during all beers fetch'
-        }
+        error: createErrorResponse(error)
       };
     }
 
     console.log('Sequential refresh: starting my beers fetch');
     let myBeersResult: DataUpdateResult;
     try {
-      myBeersResult = await fetchMyImpl();
+      const myBeers = await fetchMyBeersFromAPI();
+      await myBeersRepository.insertManyUnsafe(myBeers);
+      await setPreference('my_beers_last_update', new Date().toISOString());
+      await setPreference('my_beers_last_check', new Date().toISOString());
+      myBeersResult = {
+        success: true,
+        dataUpdated: true,
+        itemCount: myBeers.length
+      };
     } catch (error) {
       console.error('Sequential refresh: my beers fetch failed:', error);
       myBeersResult = {
         success: false,
         dataUpdated: false,
-        error: {
-          type: ApiErrorType.UNKNOWN_ERROR,
-          message: error instanceof Error ? error.message : 'Unknown error during my beers fetch'
-        }
+        error: createErrorResponse(error)
       };
     }
 
     console.log('Sequential refresh: starting rewards fetch');
     let rewardsResult: DataUpdateResult;
     try {
-      rewardsResult = await fetchRewardsImpl();
+      const rewards = await fetchRewardsFromAPI();
+      await rewardsRepository.insertManyUnsafe(rewards);
+      rewardsResult = {
+        success: true,
+        dataUpdated: true,
+        itemCount: rewards.length
+      };
     } catch (error) {
       console.error('Sequential refresh: rewards fetch failed:', error);
       rewardsResult = {
         success: false,
         dataUpdated: false,
-        error: {
-          type: ApiErrorType.UNKNOWN_ERROR,
-          message: error instanceof Error ? error.message : 'Unknown error during rewards fetch'
-        }
+        error: createErrorResponse(error)
       };
     }
 
@@ -678,17 +691,18 @@ export const refreshAllDataFromAPI = async (): Promise<{
 
   try {
     // Execute sequentially to avoid lock contention
+    // Use unsafe repository methods since we already hold master lock
     console.log('Fetching all beers from API...');
     const allBeers = await fetchBeersFromAPI();
-    await beerRepository.insertMany(allBeers);
+    await beerRepository.insertManyUnsafe(allBeers);
 
     console.log('Fetching my beers from API...');
     const myBeers = await fetchMyBeersFromAPI();
-    await myBeersRepository.insertMany(myBeers);
+    await myBeersRepository.insertManyUnsafe(myBeers);
 
     console.log('Fetching rewards from API...');
     const rewards = await fetchRewardsFromAPI();
-    await rewardsRepository.insertMany(rewards);
+    await rewardsRepository.insertManyUnsafe(rewards);
 
     console.log(`Refreshed all data: ${allBeers.length} beers, ${myBeers.length} tasted beers, ${rewards.length} rewards`);
 

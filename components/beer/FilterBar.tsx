@@ -21,7 +21,7 @@ type FilterBarProps = {
   showHeaviesAndIpa?: boolean; // TastedBrewList doesn't have these filters
 };
 
-export const FilterBar: React.FC<FilterBarProps> = ({
+const FilterBarComponent: React.FC<FilterBarProps> = ({
   filters,
   sortBy,
   onToggleFilter,
@@ -165,3 +165,7 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
 });
+
+// Export memoized component to prevent unnecessary re-renders
+// Default shallow comparison is sufficient for this component's props
+export const FilterBar = React.memo(FilterBarComponent);

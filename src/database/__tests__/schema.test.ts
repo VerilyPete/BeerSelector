@@ -2,7 +2,7 @@
  * Tests for database schema and table creation
  */
 
-import { setupDatabase, initDatabase } from '../db';
+import { setupDatabase, initDatabase, resetDatabaseState } from '../db';
 import * as connection from '../connection';
 
 // Mock the connection module
@@ -32,6 +32,12 @@ describe('Database Schema', () => {
   beforeEach(() => {
     jest.clearAllMocks();
 
+    // Use real timers for these tests
+    jest.useRealTimers();
+
+    // Reset database state machine
+    resetDatabaseState();
+
     // Mock getDatabase to return our mock database
     (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
 
@@ -52,6 +58,8 @@ describe('Database Schema', () => {
   afterEach(() => {
     consoleLogSpy.mockRestore();
     consoleErrorSpy.mockRestore();
+    // Restore fake timers
+    jest.useFakeTimers();
   });
 
   describe('setupDatabase', () => {

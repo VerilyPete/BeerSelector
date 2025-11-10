@@ -65,7 +65,7 @@ const formatDateString = (dateStr: string): string => {
   }
 };
 
-export const BeerItem: React.FC<BeerItemProps> = ({
+const BeerItemComponent: React.FC<BeerItemProps> = ({
   beer,
   isExpanded,
   onToggle,
@@ -76,7 +76,7 @@ export const BeerItem: React.FC<BeerItemProps> = ({
   const cardColor = useThemeColor({}, 'background');
   const borderColor = useThemeColor({ light: '#e0e0e0', dark: '#333' }, 'text');
 
-  // Determine which date to show and how to format it
+  // Format date for display
   const displayDate = beer.tasted_date
     ? formatDateString(beer.tasted_date)
     : formatDate(beer.added_date);
@@ -157,3 +157,6 @@ const styles = StyleSheet.create({
     opacity: 0.8,
   },
 });
+
+// Export memoized component to prevent unnecessary re-renders
+export const BeerItem = React.memo(BeerItemComponent);

@@ -38,49 +38,72 @@ export class RewardsRepository {
     }
 
     try {
-      const database = await getDatabase();
-
-      // Use a transaction for the entire operation
-      await database.withTransactionAsync(async () => {
-        // Clear existing rewards
-        await database.runAsync('DELETE FROM rewards');
-        console.log('Cleared existing rewards from the table');
-
-        // Batch insert new rewards
-        const batchSize = 100;
-        for (let i = 0; i < rewards.length; i += batchSize) {
-          const batch = rewards.slice(i, i + batchSize);
-
-          const placeholders = batch.map(() => '(?, ?, ?)').join(',');
-          const values: any[] = [];
-
-          batch.forEach(reward => {
-            values.push(
-              reward.reward_id || '',
-              reward.redeemed || '0',
-              reward.reward_type || ''
-            );
-          });
-
-          await database.runAsync(
-            `INSERT OR REPLACE INTO rewards (
-              reward_id,
-              redeemed,
-              reward_type
-            ) VALUES ${placeholders}`,
-            values
-          );
-        }
-      });
-
-      console.log(`Successfully populated rewards table with ${rewards.length} rewards`);
-    } catch (error) {
-      console.error('Error populating rewards table:', error);
-      throw error;
+      await this._insertManyInternal(rewards);
     } finally {
       // Always release the lock
       databaseLockManager.releaseLock('RewardsRepository.insertMany');
     }
+  }
+
+  /**
+   * Insert multiple rewards without acquiring a lock
+   *
+   * UNSAFE: This method does NOT acquire a database lock.
+   * Only use when already holding a master lock (e.g., in sequential refresh).
+   *
+   * @param rewards - Array of Reward objects to insert
+   */
+  async insertManyUnsafe(rewards: Reward[]): Promise<void> {
+    if (!rewards || rewards.length === 0) {
+      console.log('No rewards to populate');
+      return;
+    }
+
+    await this._insertManyInternal(rewards);
+  }
+
+  /**
+   * Internal implementation of rewards insertion (shared by locked and unlocked variants)
+   *
+   * @param rewards - Array of Reward objects to insert
+   */
+  private async _insertManyInternal(rewards: Reward[]): Promise<void> {
+    const database = await getDatabase();
+
+    // Use a transaction for the entire operation
+    await database.withTransactionAsync(async () => {
+      // Clear existing rewards
+      await database.runAsync('DELETE FROM rewards');
+      console.log('Cleared existing rewards from the table');
+
+      // Batch insert new rewards
+      const batchSize = 100;
+      for (let i = 0; i < rewards.length; i += batchSize) {
+        const batch = rewards.slice(i, i + batchSize);
+
+        const placeholders = batch.map(() => '(?, ?, ?)').join(',');
+        const values: any[] = [];
+
+        batch.forEach(reward => {
+          values.push(
+            reward.reward_id || '',
+            reward.redeemed || '0',
+            reward.reward_type || ''
+          );
+        });
+
+        await database.runAsync(
+          `INSERT OR REPLACE INTO rewards (
+            reward_id,
+            redeemed,
+            reward_type
+          ) VALUES ${placeholders}`,
+          values
+        );
+      }
+    });
+
+    console.log(`Successfully populated rewards table with ${rewards.length} rewards`);
   }
 
   /**

@@ -15,7 +15,8 @@ import {
   getUntappdCookie,
   setUntappdCookie,
   acquireLock,
-  releaseLock
+  releaseLock,
+  resetDatabaseState
 } from '../db';
 import { Beer, Beerfinder } from '../types';
 
@@ -58,6 +59,10 @@ describe('Database Operations', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    // Use real timers for these tests
+    jest.useRealTimers();
+    // Reset database state machine
+    resetDatabaseState();
 
     // Reset the database instance
     dbInstance = null;
@@ -72,6 +77,11 @@ describe('Database Operations', () => {
 
     mockGetFirstAsync.mockReset();
     mockGetAllAsync.mockReset();
+  });
+
+  afterEach(() => {
+    // Restore fake timers
+    jest.useFakeTimers();
   });
 
   describe('initDatabase', () => {
