@@ -8,6 +8,8 @@ import { ThemedView } from '@/components/ThemedView';
 import { ThemedText } from '@/components/ThemedText';
 import { areApiUrlsConfigured } from '@/src/database/db';
 import { checkAndRefreshOnAppOpen } from '@/src/services/dataUpdateService';
+import ErrorBoundary from '@/components/ErrorBoundary';
+import { logError } from '@/src/utils/errorLogger';
 
 export default function TastedBrewsScreen() {
   const [apiUrlsSet, setApiUrlsSet] = useState<boolean | null>(null);
@@ -70,7 +72,18 @@ export default function TastedBrewsScreen() {
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea} edges={['top', 'right', 'left']}>
         <ThemedText type="title" style={styles.title}>Tasted Brews</ThemedText>
-        <TastedBrewList />
+        <ErrorBoundary
+          fallbackMessage="Failed to load tasted brews. Please try again."
+          onError={(error, errorInfo) => {
+            logError(error, {
+              operation: 'TastedBrewList render',
+              component: 'TastedBrewsScreen',
+              additionalData: { componentStack: errorInfo.componentStack },
+            });
+          }}
+        >
+          <TastedBrewList />
+        </ErrorBoundary>
       </SafeAreaView>
     </ThemedView>
   );

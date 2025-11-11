@@ -7,6 +7,8 @@ import { beerRepository } from '../database/repositories/BeerRepository';
 import { myBeersRepository } from '../database/repositories/MyBeersRepository';
 import { rewardsRepository } from '../database/repositories/RewardsRepository';
 import { databaseLockManager } from '../database/DatabaseLockManager';
+import { validateBrewInStockResponse, validateBeerArray, validateRewardsResponse } from '../api/validators';
+import { logError, logWarning } from '../utils/errorLogger';
 
 /**
  * Result of a data update operation
@@ -27,7 +29,10 @@ export async function fetchAndUpdateAllBeers(): Promise<DataUpdateResult> {
     // Get the API URL from preferences
     const apiUrl = await getPreference('all_beers_api_url');
     if (!apiUrl) {
-      console.error('All beers API URL not set');
+      logError('All beers API URL not set', {
+        operation: 'fetchAndUpdateAllBeers',
+        component: 'dataUpdateService',
+      });
       return {
         success: false,
         dataUpdated: false,
@@ -49,7 +54,11 @@ export async function fetchAndUpdateAllBeers(): Promise<DataUpdateResult> {
       response = await fetch(apiUrl, { signal: controller.signal });
       clearTimeout(timeoutId);
     } catch (fetchError) {
-      console.error('Network error fetching all beers data:', fetchError);
+      logError(fetchError, {
+        operation: 'fetchAndUpdateAllBeers',
+        component: 'dataUpdateService',
+        additionalData: { message: 'Network error fetching all beers data' },
+      });
 
       // Check if it's an abort error (timeout) - treat as network error for consolidated messaging
       if (fetchError instanceof Error && fetchError.name === 'AbortError') {
@@ -74,7 +83,11 @@ export async function fetchAndUpdateAllBeers(): Promise<DataUpdateResult> {
 
     // If the response is not OK, something went wrong
     if (!response.ok) {
-      console.error(`Failed to fetch all beers data: ${response.status} ${response.statusText}`);
+      logError(`Failed to fetch all beers data: ${response.status} ${response.statusText}`, {
+        operation: 'fetchAndUpdateAllBeers',
+        component: 'dataUpdateService',
+        additionalData: { status: response.status, statusText: response.statusText },
+      });
       return {
         success: false,
         dataUpdated: false,
@@ -91,7 +104,11 @@ export async function fetchAndUpdateAllBeers(): Promise<DataUpdateResult> {
     try {
       data = await response.json();
     } catch (parseError) {
-      console.error('Error parsing all beers data:', parseError);
+      logError(parseError, {
+        operation: 'fetchAndUpdateAllBeers',
+        component: 'dataUpdateService',
+        additionalData: { message: 'Error parsing all beers data' },
+      });
       return {
         success: false,
         dataUpdated: false,
@@ -109,38 +126,83 @@ export async function fetchAndUpdateAllBeers(): Promise<DataUpdateResult> {
       console.log(`All beers API response is an array with ${data.length} items`);
     }
 
-    // Extract the brewInStock array from the response
-    let allBeers: Beer[] = [];
-    if (data && Array.isArray(data) && data.length >= 2 && data[1] && data[1].brewInStock) {
-      allBeers = data[1].brewInStock;
-      console.log(`Found brewInStock with ${allBeers.length} beers`);
-    } else {
-      console.error('Invalid all beers data format: missing brewInStock');
+    // Validate the API response structure
+    const responseValidation = validateBrewInStockResponse(data);
+    if (!responseValidation.isValid) {
+      logError('Invalid API response structure for all beers', {
+        operation: 'fetchAndUpdateAllBeers',
+        component: 'dataUpdateService',
+        additionalData: {
+          errors: responseValidation.errors,
+        },
+      });
       return {
         success: false,
         dataUpdated: false,
         error: {
           type: ApiErrorType.VALIDATION_ERROR,
-          message: 'Invalid data format received from server: missing beer data'
+          message: `Invalid data format received from server: ${responseValidation.errors.join(', ')}`
         }
       };
     }
 
-    // Update the database
-    await beerRepository.insertMany(allBeers);
+    // Extract and validate the beers
+    const allBeers = responseValidation.data!;
+    console.log(`Found brewInStock with ${allBeers.length} beers`);
+
+    // Validate individual beer records before insertion
+    const validationResult = validateBeerArray(allBeers);
+
+    if (validationResult.invalidBeers.length > 0) {
+      logWarning(`Skipping ${validationResult.invalidBeers.length} invalid beers out of ${validationResult.summary.total}`, {
+        operation: 'fetchAndUpdateAllBeers',
+        component: 'dataUpdateService',
+        additionalData: {
+          summary: validationResult.summary,
+          sampleInvalidBeer: validationResult.invalidBeers[0],
+        },
+      });
+    }
+
+    // Only insert valid beers
+    if (validationResult.validBeers.length === 0) {
+      logError('No valid beers found in API response', {
+        operation: 'fetchAndUpdateAllBeers',
+        component: 'dataUpdateService',
+        additionalData: {
+          totalRecords: allBeers.length,
+          invalidCount: validationResult.invalidBeers.length,
+        },
+      });
+      return {
+        success: false,
+        dataUpdated: false,
+        error: {
+          type: ApiErrorType.VALIDATION_ERROR,
+          message: 'No valid beer data received from server'
+        }
+      };
+    }
+
+    // Update the database with valid beers only
+    await beerRepository.insertMany(validationResult.validBeers);
 
     // Update the last update timestamp
     await setPreference('all_beers_last_update', new Date().toISOString());
     await setPreference('all_beers_last_check', new Date().toISOString());
 
-    console.log(`Updated all beers data with ${allBeers.length} beers`);
+    console.log(`Updated all beers data with ${validationResult.validBeers.length} valid beers (skipped ${validationResult.invalidBeers.length} invalid)`);
     return {
       success: true,
       dataUpdated: true,
-      itemCount: allBeers.length
+      itemCount: validationResult.validBeers.length
     };
   } catch (error) {
-    console.error('Error updating all beers data:', error);
+    logError(error, {
+      operation: 'fetchAndUpdateAllBeers',
+      component: 'dataUpdateService',
+      additionalData: { message: 'Error updating all beers data' },
+    });
     return {
       success: false,
       dataUpdated: false,
@@ -176,7 +238,10 @@ export async function fetchAndUpdateMyBeers(): Promise<DataUpdateResult> {
     // Get the API URL from preferences
     const apiUrl = await getPreference('my_beers_api_url');
     if (!apiUrl) {
-      console.error('My beers API URL not set');
+      logError('My beers API URL not set', {
+        operation: 'fetchAndUpdateMyBeers',
+        component: 'dataUpdateService',
+      });
       return {
         success: false,
         dataUpdated: false,
@@ -198,7 +263,11 @@ export async function fetchAndUpdateMyBeers(): Promise<DataUpdateResult> {
       response = await fetch(apiUrl, { signal: controller.signal });
       clearTimeout(timeoutId);
     } catch (fetchError) {
-      console.error('Network error fetching my beers data:', fetchError);
+      logError(fetchError, {
+        operation: 'fetchAndUpdateMyBeers',
+        component: 'dataUpdateService',
+        additionalData: { message: 'Network error fetching my beers data' },
+      });
 
       // Check if it's an abort error (timeout) - treat as network error for consolidated messaging
       if (fetchError instanceof Error && fetchError.name === 'AbortError') {
@@ -223,7 +292,11 @@ export async function fetchAndUpdateMyBeers(): Promise<DataUpdateResult> {
 
     // If the response is not OK, something went wrong
     if (!response.ok) {
-      console.error(`Failed to fetch my beers data: ${response.status} ${response.statusText}`);
+      logError(`Failed to fetch my beers data: ${response.status} ${response.statusText}`, {
+        operation: 'fetchAndUpdateMyBeers',
+        component: 'dataUpdateService',
+        additionalData: { status: response.status, statusText: response.statusText },
+      });
       return {
         success: false,
         dataUpdated: false,
@@ -240,7 +313,11 @@ export async function fetchAndUpdateMyBeers(): Promise<DataUpdateResult> {
     try {
       data = await response.json();
     } catch (parseError) {
-      console.error('Error parsing my beers data:', parseError);
+      logError(parseError, {
+        operation: 'fetchAndUpdateMyBeers',
+        component: 'dataUpdateService',
+        additionalData: { message: 'Error parsing my beers data' },
+      });
       return {
         success: false,
         dataUpdated: false,
@@ -264,7 +341,10 @@ export async function fetchAndUpdateMyBeers(): Promise<DataUpdateResult> {
       myBeers = data[1].tasted_brew_current_round;
       console.log(`Found tasted_brew_current_round with ${myBeers.length} beers`);
     } else {
-      console.error('Invalid my beers data format: missing tasted_brew_current_round');
+      logError('Invalid my beers data format: missing tasted_brew_current_round', {
+        operation: 'fetchAndUpdateMyBeers',
+        component: 'dataUpdateService',
+      });
       return {
         success: false,
         dataUpdated: false,
@@ -328,7 +408,11 @@ export async function fetchAndUpdateMyBeers(): Promise<DataUpdateResult> {
       itemCount: validBeers.length
     };
   } catch (error) {
-    console.error('Error updating my beers data:', error);
+    logError(error, {
+      operation: 'fetchAndUpdateMyBeers',
+      component: 'dataUpdateService',
+      additionalData: { message: 'Error updating my beers data' },
+    });
     return {
       success: false,
       dataUpdated: false,
@@ -356,7 +440,11 @@ export async function shouldRefreshData(lastCheckKey: string, intervalHours: num
 
     return hoursSinceLastCheck >= intervalHours;
   } catch (error) {
-    console.error(`Error checking if data should be refreshed (${lastCheckKey}):`, error);
+    logError(error, {
+      operation: 'shouldRefreshData',
+      component: 'dataUpdateService',
+      additionalData: { lastCheckKey, message: 'Error checking if data should be refreshed' },
+    });
     return true; // If there's an error, refresh to be safe
   }
 }
@@ -409,7 +497,11 @@ export async function fetchAndUpdateRewards(): Promise<DataUpdateResult> {
       itemCount: rewards.length
     };
   } catch (error) {
-    console.error('Error updating rewards data:', error);
+    logError(error, {
+      operation: 'fetchAndUpdateRewards',
+      component: 'dataUpdateService',
+      additionalData: { message: 'Error updating rewards data' },
+    });
     return {
       success: false,
       dataUpdated: false,
@@ -460,16 +552,35 @@ export async function sequentialRefreshAllData(): Promise<ManualRefreshResult> {
     let allBeersResult: DataUpdateResult;
     try {
       const allBeers = await fetchBeersFromAPI();
-      await beerRepository.insertManyUnsafe(allBeers);
+
+      // Validate beers before insertion
+      const validationResult = validateBeerArray(allBeers);
+
+      if (validationResult.invalidBeers.length > 0) {
+        logWarning(`Sequential refresh: Skipping ${validationResult.invalidBeers.length} invalid beers`, {
+          operation: 'sequentialRefreshAllData',
+          component: 'dataUpdateService',
+          additionalData: { summary: validationResult.summary },
+        });
+      }
+
+      if (validationResult.validBeers.length === 0) {
+        throw new Error('No valid beers found in API response');
+      }
+
+      await beerRepository.insertManyUnsafe(validationResult.validBeers);
       await setPreference('all_beers_last_update', new Date().toISOString());
       await setPreference('all_beers_last_check', new Date().toISOString());
       allBeersResult = {
         success: true,
         dataUpdated: true,
-        itemCount: allBeers.length
+        itemCount: validationResult.validBeers.length
       };
     } catch (error) {
-      console.error('Sequential refresh: all beers fetch failed:', error);
+      logError(error, {
+        operation: 'sequentialRefreshAllData - all beers',
+        component: 'dataUpdateService',
+      });
       allBeersResult = {
         success: false,
         dataUpdated: false,
@@ -481,16 +592,32 @@ export async function sequentialRefreshAllData(): Promise<ManualRefreshResult> {
     let myBeersResult: DataUpdateResult;
     try {
       const myBeers = await fetchMyBeersFromAPI();
-      await myBeersRepository.insertManyUnsafe(myBeers);
+
+      // Validate myBeers before insertion
+      const validationResult = validateBeerArray(myBeers);
+
+      if (validationResult.invalidBeers.length > 0) {
+        logWarning(`Sequential refresh: Skipping ${validationResult.invalidBeers.length} invalid my beers`, {
+          operation: 'sequentialRefreshAllData',
+          component: 'dataUpdateService',
+          additionalData: { summary: validationResult.summary },
+        });
+      }
+
+      // Allow empty myBeers array (user may have no tasted beers)
+      await myBeersRepository.insertManyUnsafe(validationResult.validBeers);
       await setPreference('my_beers_last_update', new Date().toISOString());
       await setPreference('my_beers_last_check', new Date().toISOString());
       myBeersResult = {
         success: true,
         dataUpdated: true,
-        itemCount: myBeers.length
+        itemCount: validationResult.validBeers.length
       };
     } catch (error) {
-      console.error('Sequential refresh: my beers fetch failed:', error);
+      logError(error, {
+        operation: 'sequentialRefreshAllData - my beers',
+        component: 'dataUpdateService',
+      });
       myBeersResult = {
         success: false,
         dataUpdated: false,
@@ -509,7 +636,10 @@ export async function sequentialRefreshAllData(): Promise<ManualRefreshResult> {
         itemCount: rewards.length
       };
     } catch (error) {
-      console.error('Sequential refresh: rewards fetch failed:', error);
+      logError(error, {
+        operation: 'sequentialRefreshAllData - rewards',
+        component: 'dataUpdateService',
+      });
       rewardsResult = {
         success: false,
         dataUpdated: false,
@@ -584,7 +714,11 @@ export async function manualRefreshAllData(): Promise<ManualRefreshResult> {
     // This avoids the lock contention that occurred with parallel Promise.allSettled()
     return await sequentialRefreshAllData();
   } catch (error) {
-    console.error('Error in unified manual refresh:', error);
+    logError(error, {
+      operation: 'manualRefreshAllData',
+      component: 'dataUpdateService',
+      additionalData: { message: 'Error in unified manual refresh' },
+    });
     const errorResponse = createErrorResponse(error);
 
     return {
@@ -623,7 +757,11 @@ export async function checkAndRefreshOnAppOpen(minIntervalHours: number = 12): P
       updated = updated || allBeersResult.dataUpdated;
 
       if (!allBeersResult.success && allBeersResult.error) {
-        console.error('Error refreshing all beers data:', allBeersResult.error);
+        logError(allBeersResult.error, {
+          operation: 'checkAndRefreshOnAppOpen',
+          component: 'dataUpdateService',
+          additionalData: { message: 'Error refreshing all beers data' },
+        });
         errors.push(allBeersResult.error);
       }
     } else {
@@ -638,7 +776,11 @@ export async function checkAndRefreshOnAppOpen(minIntervalHours: number = 12): P
       updated = updated || myBeersResult.dataUpdated;
 
       if (!myBeersResult.success && myBeersResult.error) {
-        console.error('Error refreshing my beers data:', myBeersResult.error);
+        logError(myBeersResult.error, {
+          operation: 'checkAndRefreshOnAppOpen',
+          component: 'dataUpdateService',
+          additionalData: { message: 'Error refreshing my beers data' },
+        });
         errors.push(myBeersResult.error);
       }
     } else {
@@ -650,12 +792,20 @@ export async function checkAndRefreshOnAppOpen(minIntervalHours: number = 12): P
     }
 
     if (errors.length > 0) {
-      console.error('Errors during automatic data refresh:', errors);
+      logError('Errors during automatic data refresh', {
+        operation: 'checkAndRefreshOnAppOpen',
+        component: 'dataUpdateService',
+        additionalData: { errorCount: errors.length, errors },
+      });
     }
 
     return { updated, errors };
   } catch (error) {
-    console.error('Error checking for refresh on app open:', error);
+    logError(error, {
+      operation: 'checkAndRefreshOnAppOpen',
+      component: 'dataUpdateService',
+      additionalData: { message: 'Error checking for refresh on app open' },
+    });
     const errorResponse = createErrorResponse(error);
     return {
       updated: false,
@@ -693,20 +843,48 @@ export const refreshAllDataFromAPI = async (): Promise<{
     // Execute sequentially to avoid lock contention
     // Use unsafe repository methods since we already hold master lock
     console.log('Fetching all beers from API...');
-    const allBeers = await fetchBeersFromAPI();
-    await beerRepository.insertManyUnsafe(allBeers);
+    const allBeersRaw = await fetchBeersFromAPI();
+    const allBeersValidation = validateBeerArray(allBeersRaw);
+
+    if (allBeersValidation.invalidBeers.length > 0) {
+      logWarning(`Skipping ${allBeersValidation.invalidBeers.length} invalid all beers`, {
+        operation: 'refreshAllDataFromAPI',
+        component: 'dataUpdateService',
+        additionalData: { summary: allBeersValidation.summary },
+      });
+    }
+
+    if (allBeersValidation.validBeers.length === 0) {
+      throw new Error('No valid all beers found in API response');
+    }
+
+    await beerRepository.insertManyUnsafe(allBeersValidation.validBeers);
 
     console.log('Fetching my beers from API...');
-    const myBeers = await fetchMyBeersFromAPI();
-    await myBeersRepository.insertManyUnsafe(myBeers);
+    const myBeersRaw = await fetchMyBeersFromAPI();
+    const myBeersValidation = validateBeerArray(myBeersRaw);
+
+    if (myBeersValidation.invalidBeers.length > 0) {
+      logWarning(`Skipping ${myBeersValidation.invalidBeers.length} invalid my beers`, {
+        operation: 'refreshAllDataFromAPI',
+        component: 'dataUpdateService',
+        additionalData: { summary: myBeersValidation.summary },
+      });
+    }
+
+    await myBeersRepository.insertManyUnsafe(myBeersValidation.validBeers);
 
     console.log('Fetching rewards from API...');
     const rewards = await fetchRewardsFromAPI();
     await rewardsRepository.insertManyUnsafe(rewards);
 
-    console.log(`Refreshed all data: ${allBeers.length} beers, ${myBeers.length} tasted beers, ${rewards.length} rewards`);
+    console.log(`Refreshed all data: ${allBeersValidation.validBeers.length} beers, ${myBeersValidation.validBeers.length} tasted beers, ${rewards.length} rewards`);
 
-    return { allBeers, myBeers, rewards };
+    return {
+      allBeers: allBeersValidation.validBeers,
+      myBeers: myBeersValidation.validBeers,
+      rewards
+    };
   } finally {
     // Always release the master lock
     databaseLockManager.releaseLock('refresh-all-from-api');
