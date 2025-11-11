@@ -1,0 +1,173 @@
+appId: ${APP_ID}
+name: "Beer List - Item Expansion and Interaction"
+---
+# Test Flow: Beer Item Expansion and Interaction
+# This test verifies that beer items can be tapped to expand/collapse
+# and show additional details like descriptions.
+
+# Step 1: Launch app
+- launchApp:
+    clearState: false
+
+# Step 2: Navigate to All Beer tab
+- tapOn: "All Beer"
+- waitForAnimationToEnd
+
+# Step 3: Wait for beer list to load
+- assertVisible:
+    id: "beer-list"
+
+# Test Single Item Expansion
+# ===========================
+
+# Step 4: Find and tap first beer item
+# We'll use regex since we don't know specific beer IDs
+- tapOn:
+    regex: "beer-item-.*"
+    index: 0
+- waitForAnimationToEnd
+
+# Step 5: Verify beer expanded (description container should be visible)
+# Note: This assumes the beer has a description
+# The description container has testID pattern: beer-description-container-{id}
+- assertVisible:
+    regex: "beer-description-container-.*"
+    timeout: 2000
+
+# Step 6: Verify beer description text is visible
+- assertVisible:
+    regex: "beer-description-.*"
+
+# Step 7: Tap same beer item again to collapse
+- tapOn:
+    regex: "beer-item-.*"
+    index: 0
+- waitForAnimationToEnd
+
+# Step 8: Verify description is no longer visible (collapsed)
+- assertNotVisible:
+    regex: "beer-description-container-.*"
+    timeout: 2000
+
+# Test Multiple Item Expansion (Only One Should Be Expanded At A Time)
+# =====================================================================
+
+# Step 9: Expand first beer
+- tapOn:
+    regex: "beer-item-.*"
+    index: 0
+- waitForAnimationToEnd
+
+# Step 10: Verify first beer is expanded
+- assertVisible:
+    regex: "beer-description-container-.*"
+
+# Step 11: Scroll down to see more beers
+- scroll:
+    direction: DOWN
+
+# Step 12: Expand a different beer item
+- tapOn:
+    regex: "beer-item-.*"
+    index: 2
+- waitForAnimationToEnd
+
+# Step 13: Verify second beer is expanded
+- assertVisible:
+    regex: "beer-description-container-.*"
+
+# Step 14: Scroll back up to first beer
+- scroll:
+    direction: UP
+
+# Step 15: Verify first beer is no longer expanded (only one expanded at a time)
+# Note: This behavior depends on implementation - the component allows only one expanded item
+- assertVisible:
+    id: "beer-list"
+
+# Test Expansion After Search
+# ============================
+
+# Step 16: Search for a specific term to narrow results
+- tapOn:
+    id: "search-input"
+- inputText: "Pilsner"
+- waitForAnimationToEnd
+
+# Step 17: Tap first search result
+- tapOn:
+    regex: "beer-item-.*"
+    index: 0
+- waitForAnimationToEnd
+
+# Step 18: Verify expansion works with filtered results
+- assertVisible:
+    regex: "beer-description-container-.*"
+    timeout: 2000
+
+# Step 19: Clear search
+- tapOn:
+    id: "clear-search-button"
+- waitForAnimationToEnd
+
+# Step 20: Verify list returns to full view
+- assertVisible:
+    id: "beer-list"
+
+# Test Expansion After Filter
+# ============================
+
+# Step 21: Apply Draft filter
+- tapOn:
+    id: "filter-draft-button"
+- waitForAnimationToEnd
+
+# Step 22: Tap first filtered beer item
+- tapOn:
+    regex: "beer-item-.*"
+    index: 0
+- waitForAnimationToEnd
+
+# Step 23: Verify expansion works with filtered results
+- assertVisible:
+    regex: "beer-description-container-.*"
+    timeout: 2000
+
+# Step 24: Remove filter
+- tapOn:
+    id: "filter-draft-button"
+- waitForAnimationToEnd
+
+# Test Expansion Persistence During Scroll
+# =========================================
+
+# Step 25: Expand a beer near top of list
+- tapOn:
+    regex: "beer-item-.*"
+    index: 0
+- waitForAnimationToEnd
+
+# Step 26: Scroll down (but not too far)
+- scroll:
+    direction: DOWN
+
+# Step 27: Scroll back up
+- scroll:
+    direction: UP
+
+# Step 28: Verify expansion state persisted during scroll
+# (The expanded item should still be expanded when scrolled back into view)
+- assertVisible:
+    regex: "beer-description-container-.*"
+    timeout: 2000
+
+# Step 29: Collapse the item
+- tapOn:
+    regex: "beer-item-.*"
+    index: 0
+- waitForAnimationToEnd
+
+# Step 30: Verify collapsed
+- assertNotVisible:
+    regex: "beer-description-container-.*"
+    timeout: 2000

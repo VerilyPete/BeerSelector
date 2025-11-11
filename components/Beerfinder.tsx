@@ -7,13 +7,14 @@ import { useThemeColor } from '@/hooks/useThemeColor';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { SearchBar } from './SearchBar';
 import { checkInBeer } from '@/src/api/beerService';
-import { getSessionData } from '@/src/api/sessionManager';
 import { router } from 'expo-router';
 import { UntappdWebView } from './UntappdWebView';
 import { useBeerFilters } from '@/hooks/useBeerFilters';
 import { useDataRefresh } from '@/hooks/useDataRefresh';
 import { FilterBar } from './beer/FilterBar';
 import { BeerList } from './beer/BeerList';
+import { parseQueuedBeersFromHtml, QueuedBeer } from '@/src/utils/htmlParser';
+import { getQueuedBeers, deleteQueuedBeer as deleteQueuedBeerApi } from '@/src/api/queueService';
 
 type Beer = {
   id: string;
@@ -26,11 +27,6 @@ type Beer = {
   added_date: string;
 };
 
-type QueuedBeer = {
-  name: string;
-  date: string;
-  id: string;
-};
 
 export const Beerfinder = () => {
   const colorScheme = useColorScheme();
@@ -41,6 +37,7 @@ export const Beerfinder = () => {
   const [queueModalVisible, setQueueModalVisible] = useState(false);
   const [queuedBeers, setQueuedBeers] = useState<QueuedBeer[]>([]);
   const [loadingQueues, setLoadingQueues] = useState(false);
+  const [queueError, setQueueError] = useState<string | null>(null);
   const [deletingBeerId, setDeletingBeerId] = useState<string | null>(null);
   const [untappdModalVisible, setUntappdModalVisible] = useState(false);
   const [selectedBeerName, setSelectedBeerName] = useState('');
@@ -137,56 +134,22 @@ export const Beerfinder = () => {
   const viewQueues = async () => {
     try {
       setLoadingQueues(true);
+      setQueueError(null); // Clear any previous errors
 
-      let sessionData = await getSessionData();
-
-      if (!sessionData || !sessionData.memberId || !sessionData.storeId || !sessionData.storeName || !sessionData.sessionId) {
-        console.log('Session data invalid or missing, attempting auto-login');
-        Alert.alert('Error', 'Your session has expired. Please log in again in the Settings tab.');
-        setLoadingQueues(false);
-        return;
-      }
-
-      const { memberId, storeId, storeName, sessionId, username, firstName, lastName, email, cardNum } = sessionData;
-
-      console.log('Making API request with session data:', {
-        memberId, storeId, storeName, sessionId: sessionId.substring(0, 5) + '...'
-      });
-
-      const headers = {
-        'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
-        'accept-language': 'en-US,en;q=0.9',
-        'cache-control': 'max-age=0',
-        'referer': 'https://tapthatapp.beerknurd.com/member-dash.php',
-        'Cookie': `store__id=${storeId}; PHPSESSID=${sessionId}; store_name=${encodeURIComponent(storeName)}; member_id=${memberId}; username=${encodeURIComponent(username || '')}; first_name=${encodeURIComponent(firstName || '')}; last_name=${encodeURIComponent(lastName || '')}; email=${encodeURIComponent(email || '')}; cardNum=${cardNum || ''}`
-      };
-
-      const response = await fetch('https://tapthatapp.beerknurd.com/memberQueues.php', {
-        method: 'GET',
-        headers: headers
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch queues with status: ${response.status}`);
-      }
-
-      const html = await response.text();
-      const parsedBeers = parseQueuedBeersFromHtml(html);
-
-      if (parsedBeers.length === 0 && html.includes('Firestone Walker Parabola')) {
-        console.log('Adding hardcoded beer from example');
-        parsedBeers.push({
-          name: 'Firestone Walker Parabola (BTL)',
-          date: 'Apr 08, 2025 @ 03:10:18pm',
-          id: '1885490'
-        });
-      }
+      // Use the queue service to fetch queued beers
+      const parsedBeers = await getQueuedBeers();
 
       setQueuedBeers(parsedBeers);
+      setQueueError(null); // Success - clear error
       setQueueModalVisible(true);
     } catch (error: any) {
       console.error('View queues error:', error);
-      Alert.alert('Error', `Failed to view queues: ${error.message}`);
+
+      // Set appropriate error message
+      const errorMessage = error.message || 'Failed to load queue. Please try again.';
+      setQueueError(errorMessage);
+
+      Alert.alert('Error', errorMessage);
     } finally {
       setLoadingQueues(false);
     }
@@ -207,41 +170,20 @@ export const Beerfinder = () => {
             onPress: async () => {
               setDeletingBeerId(beerId);
 
-              let sessionData = await getSessionData();
-
-              if (!sessionData || !sessionData.memberId || !sessionData.storeId || !sessionData.storeName || !sessionData.sessionId) {
-                console.log('Session data invalid or missing');
-                Alert.alert('Error', 'Your session has expired. Please log in again in the Settings tab.');
-                setDeletingBeerId(null);
-                return;
-              }
-
-              const { memberId, storeId, storeName, sessionId, username, firstName, lastName, email, cardNum } = sessionData;
-
-              console.log(`Deleting queued beer ID: ${beerId}`);
-
-              const headers = {
-                'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
-                'accept-language': 'en-US,en;q=0.9',
-                'referer': 'https://tapthatapp.beerknurd.com/memberQueues.php',
-                'Cookie': `store__id=${storeId}; PHPSESSID=${sessionId}; store_name=${encodeURIComponent(storeName)}; member_id=${memberId}; username=${encodeURIComponent(username || '')}; first_name=${encodeURIComponent(firstName || '')}; last_name=${encodeURIComponent(lastName || '')}; email=${encodeURIComponent(email || '')}; cardNum=${cardNum || ''}`
-              };
-
               try {
-                const response = await fetch(`https://tapthatapp.beerknurd.com/deleteQueuedBrew.php?cid=${beerId}`, {
-                  method: 'GET',
-                  headers: headers
-                });
+                // Use the queue service to delete the beer
+                const success = await deleteQueuedBeerApi(beerId);
 
-                if (!response.ok) {
-                  throw new Error(`Failed to delete beer with status: ${response.status}`);
+                if (success) {
+                  // Refresh the queue list
+                  await viewQueues();
+                  Alert.alert('Success', `Successfully removed ${beerName} from your queue!`);
+                } else {
+                  Alert.alert('Error', 'Failed to delete beer. Please try again.');
                 }
-
-                await viewQueues();
-                Alert.alert('Success', `Successfully removed ${beerName} from your queue!`);
               } catch (error: any) {
                 console.error('Delete queued beer error:', error);
-                Alert.alert('Error', `Failed to delete beer: ${error.message}`);
+                Alert.alert('Error', error.message || 'Failed to delete beer. Please try again.');
               } finally {
                 setDeletingBeerId(null);
               }
@@ -257,49 +199,6 @@ export const Beerfinder = () => {
     }
   };
 
-  const parseQueuedBeersFromHtml = (html: string): QueuedBeer[] => {
-    const beers: QueuedBeer[] = [];
-
-    try {
-      console.log('Parsing HTML for queued beers');
-
-      const beerEntryRegex = /<h3 class="brewName">(.*?)<div class="brew_added_date">(.*?)<\/div><\/h3>[\s\S]*?<a href="deleteQueuedBrew\.php\?cid=(\d+)"/g;
-      let directMatch;
-
-      while ((directMatch = beerEntryRegex.exec(html)) !== null) {
-        const fullName = directMatch[1].trim();
-        const date = directMatch[2].trim();
-        const id = directMatch[3];
-
-        console.log(`Direct match - Found queued beer: ${fullName}, ${date}, ID: ${id}`);
-        beers.push({ name: fullName, date, id });
-      }
-
-      if (beers.length === 0) {
-        const beerSectionRegex = /<h3 class="brewName">([\s\S]*?)<\/div><\/h3>([\s\S]*?)<a href="deleteQueuedBrew\.php\?cid=(\d+)"/g;
-        let sectionMatch;
-
-        while ((sectionMatch = beerSectionRegex.exec(html)) !== null) {
-          let nameSection = sectionMatch[1];
-          const id = sectionMatch[3];
-
-          const dateMatch = nameSection.match(/<div class="brew_added_date">(.*?)<\/div>/);
-          let date = dateMatch ? dateMatch[1].trim() : 'Date unavailable';
-
-          const name = nameSection.replace(/<div class="brew_added_date">.*?<\/div>/, '').trim();
-
-          console.log(`Section match - Found queued beer: ${name}, ${date}, ID: ${id}`);
-          beers.push({ name, date, id });
-        }
-      }
-
-      console.log(`Total queued beers found: ${beers.length}`);
-    } catch (error) {
-      console.error('Error parsing HTML for queued beers:', error);
-    }
-
-    return beers;
-  };
 
   const handleUntappdSearch = (beerName: string) => {
     setSelectedBeerName(beerName);
@@ -364,7 +263,28 @@ export const Beerfinder = () => {
         <View style={[styles.modalContent, { backgroundColor: cardColor, borderColor }]}>
           <ThemedText style={styles.modalTitle}>Queued Brews</ThemedText>
 
-          {queuedBeers.length === 0 ? (
+          {queueError ? (
+            <View style={styles.queueErrorContainer}>
+              <ThemedText style={styles.queueErrorText}>
+                {queueError}
+              </ThemedText>
+              <TouchableOpacity
+                style={[styles.retryButton, {
+                  backgroundColor: colorScheme === 'dark' ? '#E91E63' : activeButtonColor
+                }]}
+                onPress={viewQueues}
+                disabled={loadingQueues}
+              >
+                {loadingQueues ? (
+                  <ActivityIndicator size="small" color={colorScheme === 'dark' ? '#FFFFFF' : 'white'} />
+                ) : (
+                  <ThemedText style={[styles.retryButtonText, { color: 'white' }]}>
+                    Try Again
+                  </ThemedText>
+                )}
+              </TouchableOpacity>
+            </View>
+          ) : queuedBeers.length === 0 ? (
             <ThemedText style={styles.noQueuesText}>
               No beer currently in queue
             </ThemedText>
@@ -613,6 +533,27 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'center',
     marginVertical: 24,
+  },
+  queueErrorContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 24,
+  },
+  queueErrorText: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 16,
+    color: '#f5222d',
+  },
+  retryButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    marginTop: 8,
+  },
+  retryButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   queuesList: {
     marginVertical: 10,

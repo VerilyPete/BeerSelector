@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { StyleSheet, TouchableOpacity, View, Switch, Alert, TextInput, ScrollView, ActivityIndicator, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -67,12 +67,12 @@ export default function SettingsScreen() {
       // If router.canGoBack() throws, we can't go back
       setCanGoBack(false);
     }
-    
+
     // Auto-open login dialog if action=login is in URL params
     if (action === 'login') {
       handleLogin();
     }
-  }, [action]);
+  }, [action, loadPreferences]);
 
   // Function to check Untappd login status
   const checkUntappdLoginStatus = async () => {
@@ -86,7 +86,7 @@ export default function SettingsScreen() {
   };
 
   // Function to load preferences from the database
-  const loadPreferences = async () => {
+  const loadPreferences = useCallback(async () => {
     try {
       setLoading(true);
       const prefs = await getAllPreferences();
@@ -106,10 +106,10 @@ export default function SettingsScreen() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   // Function to handle refreshing all data from APIs
-  const handleRefresh = async () => {
+  const handleRefresh = useCallback(async () => {
     try {
       setRefreshing(true);
 
@@ -154,12 +154,12 @@ export default function SettingsScreen() {
         // Show success message with counts
         const allBeersCount = result.allBeersResult.itemCount || 0;
         const myBeersCount = result.myBeersResult.itemCount || 0;
-        
+
         // Check if user is in visitor mode to customize message
         const isVisitor = await getPreference('is_visitor_mode') === 'true';
-        
+
         let successMessage = `Beer data refreshed successfully!\n\nAll Beer: ${allBeersCount} beers\n`;
-        
+
         if (!isVisitor) {
           successMessage += `Beerfinder: ${myBeersCount} beers`;
         } else {
@@ -182,7 +182,7 @@ export default function SettingsScreen() {
       // Set refreshing to false at the end, in both success and error cases
       setRefreshing(false);
     }
-  };
+  }, []);
 
   // Function to handle the login process using WebView
   const handleLogin = async () => {
@@ -211,15 +211,47 @@ export default function SettingsScreen() {
   // Track processed URLs to avoid re-injecting JavaScript
   const processedUrlsRef = useRef<Set<string>>(new Set());
 
-  // Handle WebView navigation state changes
-  const handleWebViewNavigationStateChange = (navState: WebViewNavigation) => {
-    // Only process when page has finished loading
-    if (navState.loading) {
+  // Handle WebView navigation state changes (simplified - no JS injection here)
+  const handleWebViewNavigationStateChange = useCallback((navState: WebViewNavigation) => {
+    // Just log navigation state, don't inject JavaScript here
+    if (!navState.loading) {
+      console.log('Flying Saucer WebView finished loading:', navState.url);
+    }
+  }, []);
+
+  // Handle WebView load end - inject JavaScript once per page load
+  const handleWebViewLoadEnd = useCallback(() => {
+    if (!webViewRef.current) {
       return;
     }
 
+    setLoginLoading(false);
+
+    // Get the current URL with error handling
+    webViewRef.current.injectJavaScript(`
+      (function() {
+        try {
+          if (!window.ReactNativeWebView || !window.ReactNativeWebView.postMessage) {
+            console.error('ReactNativeWebView bridge not available');
+            return false;
+          }
+
+          window.ReactNativeWebView.postMessage(JSON.stringify({
+            type: 'URL_CHECK',
+            url: window.location.href
+          }));
+        } catch (error) {
+          console.error('URL_CHECK injection error:', error);
+        }
+        return true;
+      })();
+    `);
+  }, []);
+
+  // Handle specific page JavaScript injection
+  const injectPageSpecificJavaScript = useCallback((url: string) => {
     // Create a unique key for this URL
-    const urlKey = navState.url;
+    const urlKey = url;
 
     // If we've already processed this URL, skip it
     if (processedUrlsRef.current.has(urlKey)) {
@@ -227,102 +259,97 @@ export default function SettingsScreen() {
     }
 
     // If we're on the member dashboard page
-    if (navState.url.includes('member-dash.php')) {
+    if (url.includes('member-dash.php')) {
       // Mark as processed
       processedUrlsRef.current.add(urlKey);
 
-      // Inject JavaScript to extract the API URLs and cookies
+      // Inject simplified JavaScript using regex on outerHTML
       if (webViewRef.current) {
         webViewRef.current.injectJavaScript(`
           (function() {
-            // Try to find variables in the page
-            let userJsonUrl = null;
-            let storeJsonUrl = null;
-
-            // Look for PHP variables in script tags
-            const scripts = document.querySelectorAll('script');
-            for (const script of scripts) {
-              const content = script.textContent || script.innerText;
-
-              // Look for user_json_url
-              const userMatch = content.match(/\\$user_json_url\\s*=\\s*["']([^"']+)["']/);
-              if (userMatch && userMatch[1]) {
-                userJsonUrl = userMatch[1];
+            try {
+              if (!window.ReactNativeWebView || !window.ReactNativeWebView.postMessage) {
+                console.error('ReactNativeWebView bridge not available');
+                return false;
               }
 
-              // Look for store_json_url
-              const storeMatch = content.match(/\\$store_json_url\\s*=\\s*["']([^"']+)["']/);
-              if (storeMatch && storeMatch[1]) {
-                storeJsonUrl = storeMatch[1];
-              }
-            }
+              // Get the page HTML for regex matching
+              const html = document.documentElement.outerHTML;
 
-            // Also look for URLs in the page source
-            const html = document.documentElement.outerHTML;
-
-            if (!userJsonUrl) {
+              // Extract URLs using regex directly on HTML
               const memberJsonMatch = html.match(/https:\\/\\/[^"'\\s]+bk-member-json\\.php\\?uid=\\d+/i);
-              if (memberJsonMatch) {
-                userJsonUrl = memberJsonMatch[0];
-              }
-            }
-
-            if (!storeJsonUrl) {
               const storeJsonMatch = html.match(/https:\\/\\/[^"'\\s]+bk-store-json\\.php\\?sid=\\d+/i);
-              if (storeJsonMatch) {
-                storeJsonUrl = storeJsonMatch[0];
+
+              const userJsonUrl = memberJsonMatch ? memberJsonMatch[0] : null;
+              const storeJsonUrl = storeJsonMatch ? storeJsonMatch[0] : null;
+
+              // Parse cookies from document.cookie
+              const cookies = {};
+              if (document.cookie) {
+                document.cookie.split(';').forEach(cookie => {
+                  const parts = cookie.split('=');
+                  if (parts.length >= 2) {
+                    const name = parts[0].trim();
+                    const value = parts.slice(1).join('=').trim();
+                    if (name && value) {
+                      cookies[name] = decodeURIComponent(value);
+                    }
+                  }
+                });
               }
+
+              // Send the results back to React Native
+              window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'URLs',
+                userJsonUrl,
+                storeJsonUrl,
+                cookies: cookies
+              }));
+            } catch (error) {
+              // Send error back to React Native for logging
+              window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'JS_INJECTION_ERROR',
+                error: error.toString(),
+                location: 'member-dash'
+              }));
             }
 
-            // Parse cookies from document.cookie
-            const cookies = {};
-            if (document.cookie) {
-              document.cookie.split(';').forEach(cookie => {
-                const [name, value] = cookie.split('=').map(c => c.trim());
-                if (name && value) {
-                  cookies[name] = decodeURIComponent(value);
-                }
-              });
-            }
-
-            // Send the results back to React Native
-            window.ReactNativeWebView.postMessage(JSON.stringify({
-              type: 'URLs',
-              userJsonUrl,
-              storeJsonUrl,
-              html: html.substring(0, 1000), // Send a portion of HTML for debugging
-              cookies: cookies
-            }));
-
-            true; // Return statement needed for Android
+            return true;
           })();
         `);
       }
     }
     // Check if user selected visitor mode
-    else if (navState.url.includes('visitor.php')) {
+    else if (url.includes('visitor.php')) {
       // Mark as processed
       processedUrlsRef.current.add(urlKey);
 
-      console.log('Visitor mode detected in WebView at URL:', navState.url);
+      console.log('Visitor mode detected in WebView at URL:', url);
 
       // Extract cookies and store information for visitor mode
       if (webViewRef.current) {
         webViewRef.current.injectJavaScript(`
           (function() {
-            // Extract cookies for visitor mode, focus on getting the store ID
             try {
-              const cookies = document.cookie.split(';').reduce((acc, cookie) => {
-                const [name, value] = cookie.trim().split('=');
-                if (name && value) {
-                  acc[name] = value;
-                }
-                return acc;
-              }, {});
+              if (!window.ReactNativeWebView || !window.ReactNativeWebView.postMessage) {
+                console.error('ReactNativeWebView bridge not available');
+                return false;
+              }
 
-              console.log('In WebView - Cookies found:', document.cookie);
+              const cookies = {};
+              if (document.cookie) {
+                document.cookie.split(';').forEach(cookie => {
+                  const parts = cookie.trim().split('=');
+                  if (parts.length >= 2) {
+                    const name = parts[0];
+                    const value = parts.slice(1).join('=');
+                    if (name && value) {
+                      cookies[name] = value;
+                    }
+                  }
+                });
+              }
 
-              // Send the data back to React Native
               window.ReactNativeWebView.postMessage(JSON.stringify({
                 type: 'VISITOR_LOGIN',
                 cookies: cookies,
@@ -330,23 +357,22 @@ export default function SettingsScreen() {
                 rawCookies: document.cookie
               }));
             } catch (error) {
-              console.error('Error in visitor cookie extraction:', error);
-              // Send error back to React Native
               window.ReactNativeWebView.postMessage(JSON.stringify({
-                type: 'VISITOR_LOGIN_ERROR',
-                error: error.toString()
+                type: 'JS_INJECTION_ERROR',
+                error: error.toString(),
+                location: 'visitor'
               }));
             }
 
-            true; // Return statement needed for Android
+            return true;
           })();
         `);
       }
     }
-  };
+  }, []);
 
   // Handle Untappd WebView navigation state changes
-  const handleUntappdWebViewNavigationStateChange = (navState: WebViewNavigation) => {
+  const handleUntappdWebViewNavigationStateChange = useCallback((navState: WebViewNavigation) => {
     // Log navigation for debugging
     console.log('Untappd WebView navigating to:', navState.url);
 
@@ -431,12 +457,53 @@ export default function SettingsScreen() {
         }
       }
     }
-  };
+  }, []);
 
   // Handle messages from WebView
-  const handleWebViewMessage = async (event: WebViewMessageEvent) => {
+  const handleWebViewMessage = useCallback(async (event: WebViewMessageEvent) => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
+
+      // Handle JavaScript injection errors
+      if (data.type === 'JS_INJECTION_ERROR') {
+        console.error('JavaScript injection failed:', data.error, 'at', data.location);
+        Alert.alert(
+          'Login Error',
+          'There was an error processing the login page. Please try again.',
+          [{ text: 'OK', onPress: closeWebView }]
+        );
+        return;
+      }
+
+      // Handle URL check from onLoadEnd
+      if (data.type === 'URL_CHECK') {
+        // Verify the URL hasn't changed before injecting page-specific JS
+        if (webViewRef.current) {
+          webViewRef.current.injectJavaScript(`
+            (function() {
+              try {
+                if (window.location.href === ${JSON.stringify(data.url)}) {
+                  window.ReactNativeWebView.postMessage(JSON.stringify({
+                    type: 'URL_VERIFIED',
+                    url: window.location.href
+                  }));
+                } else {
+                  console.warn('URL changed during load, skipping injection');
+                }
+              } catch (error) {
+                console.error('URL verification error:', error);
+              }
+              return true;
+            })();
+          `);
+        }
+        return;
+      }
+
+      if (data.type === 'URL_VERIFIED') {
+        injectPageSpecificJavaScript(data.url);
+        return;
+      }
 
       if (data.type === 'URLs') {
         const { userJsonUrl, storeJsonUrl, cookies } = data;
@@ -485,6 +552,9 @@ export default function SettingsScreen() {
 
           // Reload preferences to update the UI
           loadPreferences();
+
+          // Clear processed URLs for next login session
+          processedUrlsRef.current.clear();
 
           // Show success message
           Alert.alert(
@@ -575,7 +645,10 @@ export default function SettingsScreen() {
             
             // Reload preferences to update the UI
             loadPreferences();
-            
+
+            // Clear processed URLs for next login session
+            processedUrlsRef.current.clear();
+
             // Show success message
             Alert.alert(
               'Visitor Mode Active',
@@ -613,10 +686,10 @@ export default function SettingsScreen() {
       console.error('Error handling WebView message:', error);
       setLoginLoading(false);
     }
-  };
+  }, [injectPageSpecificJavaScript, webviewVisible, handleRefresh, loadPreferences]);
 
   // Handle messages from Untappd WebView
-  const handleUntappdWebViewMessage = (event: WebViewMessageEvent) => {
+  const handleUntappdWebViewMessage = useCallback((event: WebViewMessageEvent) => {
     try {
       console.log('Received message from Untappd WebView');
       const data = JSON.parse(event.nativeEvent.data);
@@ -704,10 +777,11 @@ export default function SettingsScreen() {
       console.error('Error handling Untappd WebView message:', error);
       setUntappdLoginLoading(false);
     }
-  };
+  }, []);
 
   // Function to close the WebView and cancel login
   const closeWebView = () => {
+    processedUrlsRef.current.clear();
     setWebviewVisible(false);
     setLoginLoading(false);
     Alert.alert('Login Cancelled', 'The login process was cancelled.');
@@ -773,6 +847,8 @@ export default function SettingsScreen() {
         visible={webviewVisible}
         animationType="slide"
         onRequestClose={closeWebView}
+        accessibilityLabel="Flying Saucer login modal"
+        accessibilityViewIsModal={true}
       >
         <SafeAreaView style={{ flex: 1 }}>
           <View style={styles.webViewHeader}>
@@ -787,6 +863,10 @@ export default function SettingsScreen() {
             source={{ uri: 'https://tapthatapp.beerknurd.com/kiosk.php' }}
             onNavigationStateChange={handleWebViewNavigationStateChange}
             onMessage={handleWebViewMessage}
+            onLoadStart={() => setLoginLoading(true)}
+            onLoadEnd={handleWebViewLoadEnd}
+            accessible={true}
+            accessibilityLabel="Flying Saucer login page"
             onError={(syntheticEvent) => {
               const { nativeEvent } = syntheticEvent;
               console.error('WebView error:', nativeEvent);
@@ -799,13 +879,26 @@ export default function SettingsScreen() {
             javaScriptEnabled={true}
             domStorageEnabled={true}
             sharedCookiesEnabled={true}
-            scalesPageToFit={false}
+            thirdPartyCookiesEnabled={true}
+            originWhitelist={['https://*.beerknurd.com']}
+            allowsInlineMediaPlayback={true}
+            mediaPlaybackRequiresUserAction={false}
+            applicationNameForUserAgent="BeerSelector/1.0"
+            incognito={false}
+            scalesPageToFit={true}
             scrollEnabled={true}
             bounces={false}
             allowsBackForwardNavigationGestures={false}
             androidLayerType="hardware"
             cacheEnabled={true}
-            cacheMode="LOAD_DEFAULT"
+            cacheMode="LOAD_CACHE_ELSE_NETWORK"
+            startInLoadingState={true}
+            renderLoading={() => (
+              <View style={styles.webViewLoadingContainer}>
+                <ActivityIndicator size="large" color="#007AFF" />
+                <ThemedText style={styles.webViewLoadingText}>Loading Flying Saucer...</ThemedText>
+              </View>
+            )}
           />
         </SafeAreaView>
       </Modal>
@@ -815,6 +908,8 @@ export default function SettingsScreen() {
         visible={untappdWebviewVisible}
         animationType="slide"
         onRequestClose={closeUntappdWebView}
+        accessibilityLabel="Untappd login modal"
+        accessibilityViewIsModal={true}
       >
         <SafeAreaView style={{ flex: 1 }}>
           <View style={styles.webViewHeader}>
@@ -829,6 +924,8 @@ export default function SettingsScreen() {
             source={{ uri: 'https://untappd.com/login' }}
             onNavigationStateChange={handleUntappdWebViewNavigationStateChange}
             onMessage={handleUntappdWebViewMessage}
+            accessible={true}
+            accessibilityLabel="Untappd login page"
             style={{ flex: 1 }}
             javaScriptEnabled={true}
             domStorageEnabled={true}
@@ -839,6 +936,9 @@ export default function SettingsScreen() {
             applicationNameForUserAgent="Untappd"
             incognito={false}
             mediaPlaybackRequiresUserAction={false}
+            cacheMode="LOAD_CACHE_ELSE_NETWORK"
+            cacheEnabled={true}
+            androidLayerType="hardware"
             onLoadStart={() => setUntappdWebViewLoading(true)}
             onLoadEnd={() => {
               setUntappdWebViewLoading(false);

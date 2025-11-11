@@ -54,14 +54,15 @@ export const BeerList: React.FC<BeerListProps> = ({
 
   if (!loading && beers.length === 0) {
     return (
-      <ThemedView style={styles.emptyContainer}>
-        <ThemedText style={styles.emptyText}>{emptyMessage}</ThemedText>
+      <ThemedView style={styles.emptyContainer} testID="beer-list-empty">
+        <ThemedText style={styles.emptyText} testID="beer-list-empty-message">{emptyMessage}</ThemedText>
       </ThemedView>
     );
   }
 
   return (
     <FlatList
+      testID="beer-list"
       data={beers}
       keyExtractor={(item) => item.id}
       renderItem={renderItem}

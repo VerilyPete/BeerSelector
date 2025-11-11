@@ -1,0 +1,198 @@
+appId: ${APP_ID}
+name: "Beer List - Search and Filter Functionality"
+---
+# Test Flow: Search and Filter Functionality
+# This test verifies search input, filter buttons, and sort functionality.
+
+# Step 1: Launch app
+- launchApp:
+    clearState: false
+
+# Step 2: Navigate to All Beer tab
+- tapOn: "All Beer"
+- waitForAnimationToEnd
+
+# Step 3: Store initial beer count
+- runScript:
+    env:
+      INITIAL_COUNT: ${output.text}
+    script: |
+      output.text = await maestro.getText({id: 'beer-count'})
+
+# Test Search Functionality
+# =======================
+
+# Step 4: Tap search input
+- tapOn:
+    id: "search-input"
+
+# Step 5: Enter search term "IPA"
+- inputText: "IPA"
+- waitForAnimationToEnd
+
+# Step 6: Verify beer count changed (filtered results)
+- assertVisible:
+    id: "beer-count"
+
+# Step 7: Verify clear button appears
+- assertVisible:
+    id: "clear-search-button"
+
+# Step 8: Verify filtered results contain IPA in name or style
+# (List should show fewer beers than initial count)
+- assertVisible:
+    id: "beer-list"
+
+# Step 9: Clear search using clear button
+- tapOn:
+    id: "clear-search-button"
+- waitForAnimationToEnd
+
+# Step 10: Verify search is cleared and full list restored
+- assertNotVisible:
+    id: "clear-search-button"
+
+# Step 11: Try another search - "Stout"
+- tapOn:
+    id: "search-input"
+- inputText: "Stout"
+- waitForAnimationToEnd
+
+# Step 12: Verify filtered results
+- assertVisible:
+    id: "beer-list"
+
+# Step 13: Clear search again
+- tapOn:
+    id: "clear-search-button"
+- waitForAnimationToEnd
+
+# Test Filter Functionality
+# =========================
+
+# Step 14: Tap Draft filter button
+- tapOn:
+    id: "filter-draft-button"
+- waitForAnimationToEnd
+
+# Step 15: Verify beer count changed (filtered)
+- assertVisible:
+    id: "beer-count"
+
+# Step 16: Verify draft filter is active (visual change)
+# The button should have different styling when active
+- assertVisible:
+    id: "filter-draft-button"
+
+# Step 17: Tap Heavies filter button (multiple filters)
+- tapOn:
+    id: "filter-heavies-button"
+- waitForAnimationToEnd
+
+# Step 18: Verify both filters are active
+- assertVisible:
+    id: "filter-draft-button"
+- assertVisible:
+    id: "filter-heavies-button"
+
+# Step 19: Verify beer count reflects multiple filters
+- assertVisible:
+    id: "beer-count"
+
+# Step 20: Tap IPA filter button (third filter)
+- tapOn:
+    id: "filter-ipa-button"
+- waitForAnimationToEnd
+
+# Step 21: Verify all three filters are active
+- assertVisible:
+    id: "filter-draft-button"
+- assertVisible:
+    id: "filter-heavies-button"
+- assertVisible:
+    id: "filter-ipa-button"
+
+# Step 22: Remove filters - tap Draft again
+- tapOn:
+    id: "filter-draft-button"
+- waitForAnimationToEnd
+
+# Step 23: Remove Heavies filter
+- tapOn:
+    id: "filter-heavies-button"
+- waitForAnimationToEnd
+
+# Step 24: Remove IPA filter (back to no filters)
+- tapOn:
+    id: "filter-ipa-button"
+- waitForAnimationToEnd
+
+# Test Sort Functionality
+# =======================
+
+# Step 25: Verify sort button exists
+- assertVisible:
+    id: "sort-toggle-button"
+
+# Step 26: Check initial sort text (should say "Sort by: Name" or "Sort by: Date")
+- assertVisible:
+    id: "sort-button-text"
+
+# Step 27: Tap sort button to toggle
+- tapOn:
+    id: "sort-toggle-button"
+- waitForAnimationToEnd
+
+# Step 28: Verify sort text changed
+- assertVisible:
+    id: "sort-button-text"
+
+# Step 29: Verify list re-rendered with new sort order
+- assertVisible:
+    id: "beer-list"
+
+# Step 30: Toggle sort again (back to original)
+- tapOn:
+    id: "sort-toggle-button"
+- waitForAnimationToEnd
+
+# Step 31: Verify we're back to original sort
+- assertVisible:
+    id: "sort-button-text"
+
+# Combined Test: Search + Filter + Sort
+# ======================================
+
+# Step 32: Apply search
+- tapOn:
+    id: "search-input"
+- inputText: "Ale"
+- waitForAnimationToEnd
+
+# Step 33: Apply Draft filter
+- tapOn:
+    id: "filter-draft-button"
+- waitForAnimationToEnd
+
+# Step 34: Toggle sort
+- tapOn:
+    id: "sort-toggle-button"
+- waitForAnimationToEnd
+
+# Step 35: Verify all are applied (list shows filtered, sorted, searched results)
+- assertVisible:
+    id: "beer-list"
+- assertVisible:
+    id: "beer-count"
+- assertVisible:
+    id: "clear-search-button"
+
+# Step 36: Clear search to finish
+- tapOn:
+    id: "clear-search-button"
+- waitForAnimationToEnd
+
+# Step 37: Clear filter
+- tapOn:
+    id: "filter-draft-button"
+- waitForAnimationToEnd

@@ -81,3 +81,9 @@ app-example
 # Test coverage reports
 coverage/
 reports/
+
+# E2E test results and artifacts
+test-results/
+.maestro/recordings/
+.flashlight/reports/
+*.junit.xml

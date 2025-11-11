@@ -1,0 +1,93 @@
+appId: ${APP_ID}
+name: "Beer List - Rendering and Scrolling"
+---
+# Test Flow: Beer List Rendering and Scrolling
+# This test verifies that the beer list loads and renders correctly,
+# with proper scrolling behavior and virtualization.
+
+# Step 1: Launch app and wait for initialization
+- launchApp:
+    clearState: false
+
+# Step 2: Wait for database initialization
+- waitForAnimationToEnd:
+    timeout: 10000
+
+# Step 3: Navigate to All Beer tab (if not already there)
+- tapOn: "All Beer"
+- waitForAnimationToEnd
+
+# Step 4: Verify beer list container is visible
+- assertVisible:
+    id: "all-beers-container"
+
+# Step 5: Verify search bar is present
+- assertVisible:
+    id: "search-bar"
+
+# Step 6: Verify filter bar is present
+- assertVisible:
+    id: "filter-bar"
+
+# Step 7: Verify beer count is displayed
+- assertVisible:
+    id: "beer-count"
+
+# Step 8: Verify at least some beers are loaded (beer count > 0)
+- assertVisible:
+    id: "beer-list"
+
+# Step 9: Verify first beer item is visible
+# Note: We can't assert specific beer IDs without knowing the data
+# but we can verify the list contains beer items
+- assertVisible:
+    regex: "beer-item-.*"
+
+# Step 10: Test scroll performance - scroll down slowly
+- scrollUntilVisible:
+    element:
+      regex: "beer-item-.*"
+    direction: DOWN
+    timeout: 5000
+    speed: 40  # Slow scroll to test frame rate
+
+# Step 11: Scroll to bottom of list (test virtualization)
+- repeat:
+    times: 5
+    commands:
+      - scroll:
+          direction: DOWN
+      - waitForAnimationToEnd:
+          timeout: 500
+
+# Step 12: Scroll back to top
+- repeat:
+    times: 5
+    commands:
+      - scroll:
+          direction: UP
+      - waitForAnimationToEnd:
+          timeout: 500
+
+# Step 13: Verify we're back at top (first items visible)
+- assertVisible:
+    id: "search-bar"
+
+# Step 14: Test pull-to-refresh gesture
+- swipe:
+    direction: DOWN
+    from:
+      id: "beer-list"
+    duration: 1000
+
+# Step 15: Wait for refresh to complete
+- waitForAnimationToEnd:
+    timeout: 15000  # API call may take time
+
+# Step 16: Verify list is still visible after refresh
+- assertVisible:
+    id: "beer-list"
+
+# Step 17: Verify beer count is still displayed
+- assertVisible:
+    id: "beer-count"

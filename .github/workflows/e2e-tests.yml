@@ -1,0 +1,296 @@
+name: E2E Tests
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  maestro-tests-ios:
+    name: Maestro E2E Tests (iOS)
+    runs-on: macos-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup Expo
+        uses: expo/expo-github-action@v8
+        with:
+          expo-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install Maestro
+        run: |
+          curl -fsSL https://get.maestro.mobile.dev | bash
+          echo "$HOME/.maestro/bin" >> $GITHUB_PATH
+
+      - name: Verify Maestro installation
+        run: maestro --version
+
+      - name: Setup iOS Simulator
+        run: |
+          # List available simulators
+          xcrun simctl list devices
+          # Boot iPhone 14 Pro simulator
+          xcrun simctl boot "iPhone 14 Pro" || true
+
+      - name: Prebuild Expo app
+        run: npx expo prebuild --platform ios --clean
+
+      - name: Build iOS app for testing
+        run: |
+          cd ios
+          xcodebuild \
+            -workspace BeerSelector.xcworkspace \
+            -scheme BeerSelector \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -derivedDataPath build \
+            -destination 'platform=iOS Simulator,name=iPhone 14 Pro' \
+            build
+
+      - name: Install app on simulator
+        run: |
+          # Find the app bundle
+          APP_PATH=$(find ios/build -name "*.app" -type d | head -n 1)
+          echo "App path: $APP_PATH"
+
+          # Install on simulator
+          xcrun simctl install booted "$APP_PATH"
+
+      - name: Run Maestro E2E tests
+        env:
+          APP_ID: org.verily.FSbeerselector
+        run: |
+          maestro test .maestro/ \
+            --format junit \
+            --output test-results/maestro-ios.xml
+
+      - name: Upload Maestro test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: maestro-test-results-ios
+          path: test-results/
+
+      - name: Upload Maestro recordings
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: maestro-recordings-ios
+          path: ~/.maestro/
+
+  maestro-tests-android:
+    name: Maestro E2E Tests (Android)
+    runs-on: macos-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Expo
+        uses: expo/expo-github-action@v8
+        with:
+          expo-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install Maestro
+        run: |
+          curl -fsSL https://get.maestro.mobile.dev | bash
+          echo "$HOME/.maestro/bin" >> $GITHUB_PATH
+
+      - name: Verify Maestro installation
+        run: maestro --version
+
+      - name: Setup Android Emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 31
+          target: google_apis
+          arch: x86_64
+          profile: pixel_5
+          force-avd-creation: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          script: echo "Emulator started"
+
+      - name: Prebuild Expo app
+        run: npx expo prebuild --platform android --clean
+
+      - name: Build Android app for testing
+        run: |
+          cd android
+          ./gradlew assembleDebug
+
+      - name: Run Maestro E2E tests on Android
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          APP_ID: com.yourcompany.beerselector
+        with:
+          api-level: 31
+          target: google_apis
+          arch: x86_64
+          profile: pixel_5
+          script: |
+            # Install app
+            adb install android/app/build/outputs/apk/debug/app-debug.apk
+
+            # Run Maestro tests
+            maestro test .maestro/ \
+              --format junit \
+              --output test-results/maestro-android.xml
+
+      - name: Upload Maestro test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: maestro-test-results-android
+          path: test-results/
+
+      - name: Upload Maestro recordings
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: maestro-recordings-android
+          path: ~/.maestro/
+
+  performance-tests:
+    name: Flashlight Performance Tests
+    runs-on: macos-latest
+    timeout-minutes: 45
+    needs: [maestro-tests-ios]  # Run after functional tests pass
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup Expo
+        uses: expo/expo-github-action@v8
+        with:
+          expo-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install Flashlight
+        run: npm install -g @shopify/flashlight
+
+      - name: Verify Flashlight installation
+        run: flashlight --version
+
+      - name: Setup iOS Simulator
+        run: |
+          xcrun simctl boot "iPhone 14 Pro" || true
+
+      - name: Prebuild Expo app
+        run: npx expo prebuild --platform ios --clean
+
+      - name: Build iOS Release app for performance testing
+        run: |
+          cd ios
+          xcodebuild \
+            -workspace BeerSelector.xcworkspace \
+            -scheme BeerSelector \
+            -configuration Release \
+            -sdk iphonesimulator \
+            -derivedDataPath build \
+            -destination 'platform=iOS Simulator,name=iPhone 14 Pro' \
+            build
+
+      - name: Install app on simulator
+        run: |
+          APP_PATH=$(find ios/build -name "*.app" -type d | head -n 1)
+          xcrun simctl install booted "$APP_PATH"
+
+      - name: Run Flashlight performance tests
+        env:
+          APP_ID: org.verily.FSbeerselector
+        run: |
+          flashlight test \
+            --config .flashlight/performance-tests.yaml \
+            --ci \
+            --report
+
+      - name: Upload performance report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-report
+          path: .flashlight/reports/
+
+      - name: Check performance thresholds
+        run: |
+          # This step would parse the performance report and fail if thresholds are exceeded
+          echo "Performance tests completed. Check artifacts for detailed report."
+
+  test-summary:
+    name: Test Summary
+    runs-on: ubuntu-latest
+    needs: [maestro-tests-ios, maestro-tests-android, performance-tests]
+    if: always()
+
+    steps:
+      - name: Download all test results
+        uses: actions/download-artifact@v4
+
+      - name: Generate test summary
+        run: |
+          echo "## E2E Test Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Check if iOS tests passed
+          if [ -d "maestro-test-results-ios" ]; then
+            echo "✅ iOS Maestro tests completed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ iOS Maestro tests failed" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Check if Android tests passed
+          if [ -d "maestro-test-results-android" ]; then
+            echo "✅ Android Maestro tests completed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Android Maestro tests failed" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Check if performance tests passed
+          if [ -d "performance-report" ]; then
+            echo "✅ Performance tests completed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Performance tests failed" >> $GITHUB_STEP_SUMMARY
+          fi

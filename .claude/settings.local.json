@@ -1,0 +1,34 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm test:*)",
+      "Bash(npx jest:*)",
+      "Bash(./node_modules/.bin/jest:*)",
+      "Bash(node --version:*)",
+      "Bash(apt-get update:*)",
+      "Bash(apt-get install:*)",
+      "Bash(curl:*)",
+      "Bash(bash)",
+      "Bash(export NVM_DIR=\"$HOME/.nvm\")",
+      "Bash([ -s \"$NVM_DIR/nvm.sh\" ])",
+      "Bash(. \"$NVM_DIR/nvm.sh\")",
+      "Bash(nvm install:*)",
+      "Bash(cat:*)",
+      "Bash(nvm --version:*)",
+      "Bash(nvm use:*)",
+      "Bash(npm --version:*)",
+      "Bash(npm install)",
+      "Bash(source ~/.nvm/nvm.sh)",
+      "Bash(jobs)",
+      "Bash(git checkout:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git config:*)",
+      "Bash(npm run test:ci:*)",
+      "Bash(pod install:*)",
+      "Bash(npx tsc:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

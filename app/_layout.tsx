@@ -10,7 +10,6 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { initializeBeerDatabase, getPreference, setPreference } from '@/src/database/db';
-import { manualRefreshAllData, fetchAndUpdateRewards } from '@/src/services/dataUpdateService';
 
 // Disable react-devtools connection to port 8097
 if (__DEV__) {
@@ -79,34 +78,10 @@ export default function RootLayout() {
               // Normal app startup flow
               setInitialRoute('(tabs)');
 
-              // Only check for updates if API URLs are configured
-              if (allBeersApiUrl || myBeersApiUrl) {
-                // Always refresh core data on app open, and refresh rewards as well
-                try {
-                  // Kick off core data refresh and rewards refresh in parallel
-                  const refreshPromises: Promise<any>[] = [];
-                  refreshPromises.push(manualRefreshAllData());
-                  refreshPromises.push(fetchAndUpdateRewards());
-
-                  Promise.allSettled(refreshPromises).then(results => {
-                    const coreResult = results[0];
-                    if (coreResult.status === 'fulfilled') {
-                      const value: any = coreResult.value;
-                      if (value && !value.hasErrors) {
-                        console.log('Core data refreshed successfully on app open');
-                      } else if (value && value.hasErrors) {
-                        console.warn('Core data refresh completed with errors on app open');
-                      }
-                    }
-                  }).catch(err => {
-                    console.error('Error during startup data refresh:', err);
-                  });
-                } catch (e) {
-                  console.error('Failed to initiate startup data refresh:', e);
-                }
-              } else {
-                console.log('API URLs not configured, skipping automatic data refresh');
-              }
+              // Initial data load is handled by initializeBeerDatabase() above
+              // (all beers, my beers, and rewards are fetched during initialization)
+              // User-triggered refreshes will still work via pull-to-refresh gestures
+              console.log('Database initialization complete - initial data already loaded');
             }
           } catch (dbError) {
             console.error('Database initialization failed, retrying once:', dbError);
