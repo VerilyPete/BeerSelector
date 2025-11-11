@@ -19,6 +19,8 @@ import { useThemeColor } from '@/hooks/useThemeColor';
 import { areApiUrlsConfigured } from '@/src/database/db';
 import { isVisitorMode } from '@/src/api/authService';
 import { getPreference } from '@/src/database/db';
+import ErrorBoundary from '@/components/ErrorBoundary';
+import { logError } from '@/src/utils/errorLogger';
 
 export function BeerListScreen() {
   const colorScheme = useColorScheme() ?? 'light';
@@ -59,7 +61,18 @@ export function BeerListScreen() {
           )}
         </View>
         <View style={{flex: 1}}>
-          <AllBeers />
+          <ErrorBoundary
+            fallbackMessage="Failed to load beer list. Please try again."
+            onError={(error, errorInfo) => {
+              logError(error, {
+                operation: 'AllBeers render',
+                component: 'BeerListScreen',
+                additionalData: { componentStack: errorInfo.componentStack },
+              });
+            }}
+          >
+            <AllBeers />
+          </ErrorBoundary>
         </View>
       </SafeAreaView>
     </ThemedView>

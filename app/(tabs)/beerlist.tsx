@@ -4,6 +4,8 @@ import { BeerListScreen } from './index';
 import { areApiUrlsConfigured, refreshBeersFromAPI, setPreference } from '@/src/database/db';
 import { isVisitorMode } from '@/src/api/authService';
 import { checkAndRefreshOnAppOpen } from '@/src/services/dataUpdateService';
+import ErrorBoundary from '@/components/ErrorBoundary';
+import { logError } from '@/src/utils/errorLogger';
 
 export default function TabOneScreen() {
   const [apiUrlsSet, setApiUrlsSet] = useState<boolean | null>(null);
@@ -72,6 +74,19 @@ export default function TabOneScreen() {
   if (!apiUrlsSet) {
     return null; // We're redirecting, so no need to render anything
   }
-  
-  return <BeerListScreen />;
+
+  return (
+    <ErrorBoundary
+      fallbackMessage="Failed to load Beerfinder screen. Please try again."
+      onError={(error, errorInfo) => {
+        logError(error, {
+          operation: 'BeerListScreen render',
+          component: 'TabOneScreen',
+          additionalData: { componentStack: errorInfo.componentStack },
+        });
+      }}
+    >
+      <BeerListScreen />
+    </ErrorBoundary>
+  );
 } 
