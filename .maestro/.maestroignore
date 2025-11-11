@@ -1,0 +1,35 @@
+# Maestro ignore file
+# Files and patterns to ignore during E2E testing
+
+# Node modules
+node_modules/
+
+# Build artifacts
+ios/build/
+android/build/
+android/app/build/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Test results
+test-results/
+coverage/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS files
+.DS_Store
+Thumbs.db

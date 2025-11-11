@@ -1,0 +1,29 @@
+# Maestro Configuration for BeerSelector
+# This file defines environment variables and settings for Maestro tests
+
+env:
+  # App ID for iOS and Android
+  APP_ID_IOS: "org.verily.FSbeerselector"
+  APP_ID_ANDROID: "com.yourcompany.beerselector"
+
+  # Default to iOS for local testing
+  APP_ID: ${APP_ID_IOS}
+
+# Test suite configuration
+flows:
+  - 01-beer-list-rendering.yaml
+  - 02-search-and-filter.yaml
+  - 03-beer-item-expansion.yaml
+  - 04-empty-states.yaml
+  - 05-navigation-and-tabs.yaml
+
+# Performance thresholds
+performance:
+  # Target FPS for smooth scrolling
+  minFPS: 55
+
+  # Maximum acceptable frame time (in ms)
+  maxFrameTime: 18
+
+  # Maximum acceptable interaction delay (in ms)
+  maxInteractionDelay: 300

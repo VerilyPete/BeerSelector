@@ -1,29 +1,81 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuites name="jest tests" tests="12" failures="0" errors="0" time="1.921">
-  <testsuite name="Sequential Refresh Coordination" errors="0" failures="0" skipped="0" timestamp="2025-11-09T05:34:18" time="1.428" tests="12">
-    <testcase classname="Sequential Refresh Coordination sequentialRefreshAllData should execute refresh operations sequentially, not in parallel" name="Sequential Refresh Coordination sequentialRefreshAllData should execute refresh operations sequentially, not in parallel" time="0.003">
+<testsuites name="jest tests" tests="27" failures="2" errors="0" time="3.873">
+  <testsuite name="dataUpdateService integration tests" errors="0" failures="0" skipped="0" timestamp="2025-11-11T15:36:18" time="2.607" tests="12">
+    <testcase classname="dataUpdateService integration tests fetchAndUpdateAllBeers should process valid allbeers.json data correctly" name="dataUpdateService integration tests fetchAndUpdateAllBeers should process valid allbeers.json data correctly" time="0.009">
     </testcase>
-    <testcase classname="Sequential Refresh Coordination sequentialRefreshAllData should use a master lock to coordinate all operations" name="Sequential Refresh Coordination sequentialRefreshAllData should use a master lock to coordinate all operations" time="0">
+    <testcase classname="dataUpdateService integration tests fetchAndUpdateAllBeers should handle missing API URL" name="dataUpdateService integration tests fetchAndUpdateAllBeers should handle missing API URL" time="0.001">
     </testcase>
-    <testcase classname="Sequential Refresh Coordination sequentialRefreshAllData should properly queue multiple simultaneous refresh requests" name="Sequential Refresh Coordination sequentialRefreshAllData should properly queue multiple simultaneous refresh requests" time="0.003">
+    <testcase classname="dataUpdateService integration tests fetchAndUpdateAllBeers should handle failed fetch" name="dataUpdateService integration tests fetchAndUpdateAllBeers should handle failed fetch" time="0.001">
     </testcase>
-    <testcase classname="Sequential Refresh Coordination sequentialRefreshAllData should release master lock even if an operation fails" name="Sequential Refresh Coordination sequentialRefreshAllData should release master lock even if an operation fails" time="0.001">
+    <testcase classname="dataUpdateService integration tests fetchAndUpdateAllBeers should handle invalid data format" name="dataUpdateService integration tests fetchAndUpdateAllBeers should handle invalid data format" time="0.001">
     </testcase>
-    <testcase classname="Sequential Refresh Coordination sequentialRefreshAllData should complete faster than parallel execution with lock contention" name="Sequential Refresh Coordination sequentialRefreshAllData should complete faster than parallel execution with lock contention" time="0.001">
+    <testcase classname="dataUpdateService integration tests fetchAndUpdateAllBeers should handle fetch throwing an exception" name="dataUpdateService integration tests fetchAndUpdateAllBeers should handle fetch throwing an exception" time="0.001">
     </testcase>
-    <testcase classname="Sequential Refresh Coordination sequentialRefreshAllData should use unsafe repository methods to avoid nested lock acquisition" name="Sequential Refresh Coordination sequentialRefreshAllData should use unsafe repository methods to avoid nested lock acquisition" time="0">
+    <testcase classname="dataUpdateService integration tests fetchAndUpdateMyBeers should process valid mybeers.json data correctly" name="dataUpdateService integration tests fetchAndUpdateMyBeers should process valid mybeers.json data correctly" time="0.003">
     </testcase>
-    <testcase classname="Sequential Refresh Coordination Comparison: Parallel vs Sequential demonstrates current parallel execution causes lock queueing" name="Sequential Refresh Coordination Comparison: Parallel vs Sequential demonstrates current parallel execution causes lock queueing" time="0.001">
+    <testcase classname="dataUpdateService integration tests fetchAndUpdateMyBeers should handle missing API URL" name="dataUpdateService integration tests fetchAndUpdateMyBeers should handle missing API URL" time="0.001">
     </testcase>
-    <testcase classname="Sequential Refresh Coordination Production Integration Tests (CI-4) manualRefreshAllData should use sequential execution pattern" name="Sequential Refresh Coordination Production Integration Tests (CI-4) manualRefreshAllData should use sequential execution pattern" time="0">
+    <testcase classname="dataUpdateService integration tests fetchAndUpdateMyBeers should handle failed fetch" name="dataUpdateService integration tests fetchAndUpdateMyBeers should handle failed fetch" time="0.005">
     </testcase>
-    <testcase classname="Sequential Refresh Coordination Production Integration Tests (CI-4) manualRefreshAllData should use only one master lock" name="Sequential Refresh Coordination Production Integration Tests (CI-4) manualRefreshAllData should use only one master lock" time="0.001">
+    <testcase classname="dataUpdateService integration tests fetchAndUpdateMyBeers should handle invalid data format" name="dataUpdateService integration tests fetchAndUpdateMyBeers should handle invalid data format" time="0">
     </testcase>
-    <testcase classname="Sequential Refresh Coordination Production Integration Tests (CI-4) manualRefreshAllData should handle multiple simultaneous calls without lock contention" name="Sequential Refresh Coordination Production Integration Tests (CI-4) manualRefreshAllData should handle multiple simultaneous calls without lock contention" time="0.001">
+    <testcase classname="dataUpdateService integration tests fetchAndUpdateMyBeers should handle empty tasted beers array (new user or round rollover)" name="dataUpdateService integration tests fetchAndUpdateMyBeers should handle empty tasted beers array (new user or round rollover)" time="0.001">
     </testcase>
-    <testcase classname="Sequential Refresh Coordination Production Integration Tests (CI-5) refreshAllDataFromAPI should use sequential execution pattern" name="Sequential Refresh Coordination Production Integration Tests (CI-5) refreshAllDataFromAPI should use sequential execution pattern" time="0">
+    <testcase classname="dataUpdateService integration tests fetchAndUpdateMyBeers should handle data with no valid beers" name="dataUpdateService integration tests fetchAndUpdateMyBeers should handle data with no valid beers" time="0.001">
     </testcase>
-    <testcase classname="Sequential Refresh Coordination Production Integration Tests (CI-5) refreshAllDataFromAPI should use only one master lock" name="Sequential Refresh Coordination Production Integration Tests (CI-5) refreshAllDataFromAPI should use only one master lock" time="0.001">
+    <testcase classname="dataUpdateService integration tests fetchAndUpdateMyBeers should handle fetch throwing an exception" name="dataUpdateService integration tests fetchAndUpdateMyBeers should handle fetch throwing an exception" time="0">
+    </testcase>
+  </testsuite>
+  <testsuite name="dataUpdateService" errors="0" failures="0" skipped="0" timestamp="2025-11-11T15:36:18" time="2.607" tests="13">
+    <testcase classname="dataUpdateService fetchAndUpdateAllBeers should return failure result if API URL is not set" name="dataUpdateService fetchAndUpdateAllBeers should return failure result if API URL is not set" time="0.005">
+    </testcase>
+    <testcase classname="dataUpdateService fetchAndUpdateAllBeers should return failure result if fetch fails" name="dataUpdateService fetchAndUpdateAllBeers should return failure result if fetch fails" time="0.002">
+    </testcase>
+    <testcase classname="dataUpdateService fetchAndUpdateAllBeers should return failure result if response is not an array" name="dataUpdateService fetchAndUpdateAllBeers should return failure result if response is not an array" time="0.001">
+    </testcase>
+    <testcase classname="dataUpdateService fetchAndUpdateAllBeers should return failure result if response does not contain brewInStock" name="dataUpdateService fetchAndUpdateAllBeers should return failure result if response does not contain brewInStock" time="0">
+    </testcase>
+    <testcase classname="dataUpdateService fetchAndUpdateAllBeers should successfully update all beers" name="dataUpdateService fetchAndUpdateAllBeers should successfully update all beers" time="0.002">
+    </testcase>
+    <testcase classname="dataUpdateService fetchAndUpdateAllBeers should handle errors during update" name="dataUpdateService fetchAndUpdateAllBeers should handle errors during update" time="0">
+    </testcase>
+    <testcase classname="dataUpdateService fetchAndUpdateMyBeers should return failure result if API URL is not set" name="dataUpdateService fetchAndUpdateMyBeers should return failure result if API URL is not set" time="0.001">
+    </testcase>
+    <testcase classname="dataUpdateService fetchAndUpdateMyBeers should return failure result if fetch fails" name="dataUpdateService fetchAndUpdateMyBeers should return failure result if fetch fails" time="0">
+    </testcase>
+    <testcase classname="dataUpdateService fetchAndUpdateMyBeers should return failure result if response is not an array" name="dataUpdateService fetchAndUpdateMyBeers should return failure result if response is not an array" time="0.001">
+    </testcase>
+    <testcase classname="dataUpdateService fetchAndUpdateMyBeers should return failure result if response does not contain tasted_brew_current_round" name="dataUpdateService fetchAndUpdateMyBeers should return failure result if response does not contain tasted_brew_current_round" time="0">
+    </testcase>
+    <testcase classname="dataUpdateService fetchAndUpdateMyBeers should return success with 0 items if no valid beers with IDs are found" name="dataUpdateService fetchAndUpdateMyBeers should return success with 0 items if no valid beers with IDs are found" time="0.001">
+    </testcase>
+    <testcase classname="dataUpdateService fetchAndUpdateMyBeers should successfully update my beers" name="dataUpdateService fetchAndUpdateMyBeers should successfully update my beers" time="0.001">
+    </testcase>
+    <testcase classname="dataUpdateService fetchAndUpdateMyBeers should handle errors during update" name="dataUpdateService fetchAndUpdateMyBeers should handle errors during update" time="0.003">
+    </testcase>
+  </testsuite>
+  <testsuite name="manualRefreshAllData" errors="0" failures="2" skipped="0" timestamp="2025-11-11T15:36:21" time="0.4" tests="2">
+    <testcase classname="manualRefreshAllData refreshes core endpoints and returns no errors when both succeed" name="manualRefreshAllData refreshes core endpoints and returns no errors when both succeed" time="0.003">
+      <failure>Error: expect(received).toBe(expected) // Object.is equality
+
+Expected: false
+Received: true
+    at Object.toBe (/workspace/BeerSelector/src/services/__tests__/dataUpdateService.manualRefresh.test.ts:37:30)
+    at Generator.next (&lt;anonymous&gt;)
+    at asyncGeneratorStep (/workspace/BeerSelector/node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+    at _next (/workspace/BeerSelector/node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)</failure>
+    </testcase>
+    <testcase classname="manualRefreshAllData handles partial failure and sets hasErrors" name="manualRefreshAllData handles partial failure and sets hasErrors" time="0.001">
+      <failure>Error: expect(received).toBe(expected) // Object.is equality
+
+Expected: true
+Received: false
+    at Object.toBe (/workspace/BeerSelector/src/services/__tests__/dataUpdateService.manualRefresh.test.ts:55:42)
+    at Generator.next (&lt;anonymous&gt;)
+    at asyncGeneratorStep (/workspace/BeerSelector/node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+    at _next (/workspace/BeerSelector/node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)</failure>
     </testcase>
   </testsuite>
 </testsuites>

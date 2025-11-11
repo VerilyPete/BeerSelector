@@ -1,0 +1,307 @@
+# Flashlight Performance Test Configuration for BeerSelector
+# Tests scroll performance, navigation timing, and app responsiveness
+
+# Test Suite: Beer List Performance
+tests:
+  # Test 1: Beer List Scroll Performance
+  - name: "Beer List Scroll Performance"
+    description: "Measures FPS and frame drops during list scrolling"
+    app_id: ${APP_ID}
+    flows:
+      - name: "Scroll Beer List"
+        steps:
+          - action: launch
+            clearState: false
+
+          - action: navigate
+            to: "All Beer"
+
+          - action: waitForAnimationToEnd
+            timeout: 5000
+
+          # Scroll down slowly to measure frame rate
+          - action: scroll
+            element: "beer-list"
+            direction: DOWN
+            duration: 3000
+            measurePerformance: true
+
+          # Scroll up slowly
+          - action: scroll
+            element: "beer-list"
+            direction: UP
+            duration: 3000
+            measurePerformance: true
+
+          # Fast scroll down
+          - action: scroll
+            element: "beer-list"
+            direction: DOWN
+            duration: 1000
+            measurePerformance: true
+
+          # Fast scroll up
+          - action: scroll
+            element: "beer-list"
+            direction: UP
+            duration: 1000
+            measurePerformance: true
+
+    thresholds:
+      minFPS: 55
+      maxFrameTime: 18  # milliseconds (60fps = ~16.67ms per frame)
+      maxFrameDrops: 5  # Allow up to 5 dropped frames
+
+  # Test 2: Search and Filter Performance
+  - name: "Search and Filter Performance"
+    description: "Measures responsiveness of search and filter operations"
+    app_id: ${APP_ID}
+    flows:
+      - name: "Search Performance"
+        steps:
+          - action: launch
+            clearState: false
+
+          - action: navigate
+            to: "All Beer"
+
+          - action: waitForAnimationToEnd
+            timeout: 5000
+
+          # Measure search input responsiveness
+          - action: tap
+            element: "search-input"
+            measureInteractionDelay: true
+
+          - action: inputText
+            text: "IPA"
+            measurePerformance: true
+
+          - action: waitForAnimationToEnd
+            timeout: 500
+
+          # Measure filter button responsiveness
+          - action: tap
+            element: "filter-draft-button"
+            measureInteractionDelay: true
+
+          - action: waitForAnimationToEnd
+            timeout: 500
+
+          # Measure sort toggle responsiveness
+          - action: tap
+            element: "sort-toggle-button"
+            measureInteractionDelay: true
+
+          - action: waitForAnimationToEnd
+            timeout: 500
+
+    thresholds:
+      maxInteractionDelay: 300  # milliseconds
+      maxRenderTime: 200  # milliseconds
+
+  # Test 3: Beer Item Expansion Performance
+  - name: "Beer Item Expansion Performance"
+    description: "Measures performance of expanding/collapsing beer items"
+    app_id: ${APP_ID}
+    flows:
+      - name: "Item Expansion"
+        steps:
+          - action: launch
+            clearState: false
+
+          - action: navigate
+            to: "All Beer"
+
+          - action: waitForAnimationToEnd
+            timeout: 5000
+
+          # Tap first beer item
+          - action: tap
+            element:
+              regex: "beer-item-.*"
+              index: 0
+            measureInteractionDelay: true
+
+          - action: waitForAnimationToEnd
+            timeout: 500
+
+          # Collapse
+          - action: tap
+            element:
+              regex: "beer-item-.*"
+              index: 0
+            measureInteractionDelay: true
+
+          - action: waitForAnimationToEnd
+            timeout: 500
+
+          # Expand and collapse multiple items rapidly
+          - action: tap
+            element:
+              regex: "beer-item-.*"
+              index: 1
+            measureInteractionDelay: true
+
+          - action: waitForAnimationToEnd
+            timeout: 500
+
+          - action: tap
+            element:
+              regex: "beer-item-.*"
+              index: 2
+            measureInteractionDelay: true
+
+          - action: waitForAnimationToEnd
+            timeout: 500
+
+    thresholds:
+      maxInteractionDelay: 200  # milliseconds
+      maxAnimationTime: 300  # milliseconds
+
+  # Test 4: App Startup Performance
+  - name: "App Startup Performance"
+    description: "Measures cold and warm start times"
+    app_id: ${APP_ID}
+    flows:
+      - name: "Cold Start"
+        steps:
+          - action: launch
+            clearState: true
+            measureStartupTime: true
+
+          - action: waitForAnimationToEnd
+            timeout: 10000
+
+          - action: assertVisible
+            element: "all-beers-container"
+
+      - name: "Warm Start"
+        steps:
+          - action: background
+
+          - action: wait
+            duration: 2000
+
+          - action: foreground
+            measureStartupTime: true
+
+          - action: waitForAnimationToEnd
+            timeout: 5000
+
+          - action: assertVisible
+            element: "all-beers-container"
+
+    thresholds:
+      maxColdStartTime: 3000  # milliseconds (3 seconds)
+      maxWarmStartTime: 1000  # milliseconds (1 second)
+
+  # Test 5: Navigation Performance
+  - name: "Tab Navigation Performance"
+    description: "Measures tab switching performance"
+    app_id: ${APP_ID}
+    flows:
+      - name: "Tab Switching"
+        steps:
+          - action: launch
+            clearState: false
+
+          - action: navigate
+            to: "All Beer"
+
+          - action: waitForAnimationToEnd
+            timeout: 5000
+
+          # Measure tab navigation
+          - action: tap
+            element: "Beerfinder"
+            measureInteractionDelay: true
+
+          - action: waitForAnimationToEnd
+            timeout: 3000
+
+          - action: tap
+            element: "All Beer"
+            measureInteractionDelay: true
+
+          - action: waitForAnimationToEnd
+            timeout: 3000
+
+          - action: tap
+            element: "Tasted Brews"
+            measureInteractionDelay: true
+
+          - action: waitForAnimationToEnd
+            timeout: 3000
+
+          - action: tap
+            element: "All Beer"
+            measureInteractionDelay: true
+
+          - action: waitForAnimationToEnd
+            timeout: 3000
+
+    thresholds:
+      maxNavigationTime: 500  # milliseconds
+      maxInteractionDelay: 300  # milliseconds
+
+  # Test 6: Pull-to-Refresh Performance
+  - name: "Pull-to-Refresh Performance"
+    description: "Measures refresh gesture and API call performance"
+    app_id: ${APP_ID}
+    flows:
+      - name: "Refresh"
+        steps:
+          - action: launch
+            clearState: false
+
+          - action: navigate
+            to: "All Beer"
+
+          - action: waitForAnimationToEnd
+            timeout: 5000
+
+          # Measure pull-to-refresh
+          - action: swipe
+            direction: DOWN
+            from:
+              element: "beer-list"
+            duration: 1000
+            measurePerformance: true
+
+          - action: waitForAnimationToEnd
+            timeout: 15000
+
+          - action: assertVisible
+            element: "beer-list"
+
+    thresholds:
+      maxRefreshTime: 10000  # milliseconds (10 seconds for API call)
+      minFPS: 55  # FPS during refresh animation
+
+# Performance baseline configuration
+baseline:
+  # Expected performance on target devices
+  device_profiles:
+    - name: "iPhone 12 Pro"
+      minFPS: 60
+      maxInteractionDelay: 200
+
+    - name: "iPhone SE (2nd gen)"
+      minFPS: 55
+      maxInteractionDelay: 300
+
+    - name: "Android Pixel 5"
+      minFPS: 55
+      maxInteractionDelay: 300
+
+    - name: "Android Samsung S20"
+      minFPS: 58
+      maxInteractionDelay: 250
+
+# Reporting configuration
+reporting:
+  format: json
+  outputPath: ".flashlight/reports"
+  generateCharts: true
+  compareBaseline: true

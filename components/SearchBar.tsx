@@ -22,9 +22,10 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   const borderColor = useThemeColor({ light: '#ddd', dark: '#444' }, 'text');
 
   return (
-    <View style={[styles.container, { backgroundColor, borderColor }]}>
+    <View style={[styles.container, { backgroundColor, borderColor }]} testID="search-bar">
       <IconSymbol name="magnifyingglass" size={18} color={iconColor} style={styles.searchIcon} />
       <TextInput
+        testID="search-input"
         style={[styles.input, { color: textColor }]}
         value={searchText}
         onChangeText={onSearchChange}
@@ -35,7 +36,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
         clearButtonMode="never"
       />
       {searchText.length > 0 && (
-        <TouchableOpacity onPress={onClear} style={styles.clearButton} testID="clear-button">
+        <TouchableOpacity onPress={onClear} style={styles.clearButton} testID="clear-search-button">
           <IconSymbol name="xmark.circle.fill" size={20} color={iconColor} />
         </TouchableOpacity>
       )}

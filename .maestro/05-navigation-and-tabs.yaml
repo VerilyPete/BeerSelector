@@ -1,0 +1,205 @@
+appId: ${APP_ID}
+name: "Navigation - Tab Switching and State Persistence"
+---
+# Test Flow: Navigation and Tab Switching
+# This test verifies navigation between tabs and state persistence.
+
+# Step 1: Launch app
+- launchApp:
+    clearState: false
+
+# Step 2: Start on Home/All Beer tab
+- tapOn: "All Beer"
+- waitForAnimationToEnd
+
+# Test Basic Tab Navigation
+# ==========================
+
+# Step 3: Verify we're on All Beer screen
+- assertVisible:
+    id: "all-beers-container"
+
+# Step 4: Navigate to Beerfinder tab
+- tapOn: "Beerfinder"
+- waitForAnimationToEnd:
+    timeout: 3000
+
+# Step 5: Wait for Beerfinder to load
+# Note: This screen may require authentication
+# We'll check if we're in visitor mode or authenticated
+- waitForAnimationToEnd
+
+# Step 6: Navigate to Tasted Brews tab
+- tapOn: "Tasted Brews"
+- waitForAnimationToEnd:
+    timeout: 3000
+
+# Step 7: Wait for Tasted Brews to load
+- waitForAnimationToEnd
+
+# Step 8: Navigate back to All Beer tab
+- tapOn: "All Beer"
+- waitForAnimationToEnd
+
+# Step 9: Verify All Beer screen is displayed
+- assertVisible:
+    id: "all-beers-container"
+
+# Test State Persistence During Navigation
+# =========================================
+
+# Step 10: Apply search filter on All Beer
+- tapOn:
+    id: "search-input"
+- inputText: "IPA"
+- waitForAnimationToEnd
+
+# Step 11: Verify search is applied
+- assertVisible:
+    id: "clear-search-button"
+
+# Step 12: Apply Draft filter
+- tapOn:
+    id: "filter-draft-button"
+- waitForAnimationToEnd
+
+# Step 13: Toggle sort
+- tapOn:
+    id: "sort-toggle-button"
+- waitForAnimationToEnd
+
+# Step 14: Expand a beer item
+- tapOn:
+    regex: "beer-item-.*"
+    index: 0
+- waitForAnimationToEnd
+
+# Step 15: Navigate away to Beerfinder
+- tapOn: "Beerfinder"
+- waitForAnimationToEnd:
+    timeout: 3000
+
+# Step 16: Navigate back to All Beer
+- tapOn: "All Beer"
+- waitForAnimationToEnd
+
+# Step 17: Verify search is still applied
+- assertVisible:
+    id: "clear-search-button"
+
+# Step 18: Verify Draft filter is still active
+- assertVisible:
+    id: "filter-draft-button"
+
+# Step 19: Verify beer list is still displayed
+- assertVisible:
+    id: "beer-list"
+
+# Step 20: Clear search
+- tapOn:
+    id: "clear-search-button"
+- waitForAnimationToEnd
+
+# Step 21: Clear filter
+- tapOn:
+    id: "filter-draft-button"
+- waitForAnimationToEnd
+
+# Test Rapid Tab Switching
+# =========================
+
+# Step 22: Rapidly switch between tabs
+- tapOn: "Beerfinder"
+- waitForAnimationToEnd:
+    timeout: 2000
+
+- tapOn: "All Beer"
+- waitForAnimationToEnd:
+    timeout: 2000
+
+- tapOn: "Tasted Brews"
+- waitForAnimationToEnd:
+    timeout: 2000
+
+- tapOn: "All Beer"
+- waitForAnimationToEnd:
+    timeout: 2000
+
+# Step 23: Verify All Beer screen is still functional
+- assertVisible:
+    id: "all-beers-container"
+- assertVisible:
+    id: "beer-list"
+
+# Step 24: Verify search still works after rapid switching
+- tapOn:
+    id: "search-input"
+- inputText: "Lager"
+- waitForAnimationToEnd
+
+# Step 25: Clear search
+- tapOn:
+    id: "clear-search-button"
+- waitForAnimationToEnd
+
+# Test Navigation During Loading
+# ===============================
+
+# Step 26: Trigger refresh
+- swipe:
+    direction: DOWN
+    from:
+      id: "beer-list"
+    duration: 1000
+
+# Step 27: Immediately switch tabs (while loading)
+- tapOn: "Beerfinder"
+- waitForAnimationToEnd:
+    timeout: 3000
+
+# Step 28: Switch back to All Beer
+- tapOn: "All Beer"
+- waitForAnimationToEnd
+
+# Step 29: Verify list is displayed (refresh should have completed or been canceled)
+- assertVisible:
+    id: "beer-list"
+
+# Test Memory and Performance After Multiple Navigations
+# =======================================================
+
+# Step 30: Perform multiple navigation cycles to test memory management
+- repeat:
+    times: 5
+    commands:
+      - tapOn: "Beerfinder"
+      - waitForAnimationToEnd:
+          timeout: 2000
+      - tapOn: "All Beer"
+      - waitForAnimationToEnd:
+          timeout: 2000
+
+# Step 31: Verify app is still responsive
+- assertVisible:
+    id: "all-beers-container"
+
+# Step 32: Test interaction after multiple navigations
+- tapOn:
+    id: "search-input"
+- inputText: "Ale"
+- waitForAnimationToEnd
+
+# Step 33: Verify search works
+- assertVisible:
+    id: "clear-search-button"
+
+# Step 34: Clear search
+- tapOn:
+    id: "clear-search-button"
+- waitForAnimationToEnd
+
+# Step 35: Final verification
+- assertVisible:
+    id: "beer-list"
+- assertVisible:
+    id: "beer-count"

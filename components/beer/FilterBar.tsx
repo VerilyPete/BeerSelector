@@ -40,7 +40,7 @@ const FilterBarComponent: React.FC<FilterBarProps> = ({
   const activeBgColor = colorScheme === 'dark' && isAnyFilterActive ? '#FFC107' : activeButtonColor;
 
   return (
-    <View style={styles.filterContainer}>
+    <View style={styles.filterContainer} testID="filter-bar">
       <TouchableOpacity
         style={[
           styles.filterButton,
@@ -50,6 +50,7 @@ const FilterBarComponent: React.FC<FilterBarProps> = ({
         ]}
         onPress={() => onToggleFilter('isDraft')}
         activeOpacity={0.7}
+        testID="filter-draft-button"
       >
         <ThemedText
           style={[
@@ -74,6 +75,7 @@ const FilterBarComponent: React.FC<FilterBarProps> = ({
             ]}
             onPress={() => onToggleFilter('isHeavies')}
             activeOpacity={0.7}
+            testID="filter-heavies-button"
           >
             <ThemedText
               style={[
@@ -96,6 +98,7 @@ const FilterBarComponent: React.FC<FilterBarProps> = ({
             ]}
             onPress={() => onToggleFilter('isIpa')}
             activeOpacity={0.7}
+            testID="filter-ipa-button"
           >
             <ThemedText
               style={[
@@ -115,8 +118,9 @@ const FilterBarComponent: React.FC<FilterBarProps> = ({
         style={styles.sortButton}
         onPress={onToggleSort}
         activeOpacity={0.7}
+        testID="sort-toggle-button"
       >
-        <ThemedText style={styles.sortButtonText}>
+        <ThemedText style={styles.sortButtonText} testID="sort-button-text">
           Sort by: {sortBy === 'date' ? 'Name' : 'Date'}
         </ThemedText>
         <IconSymbol

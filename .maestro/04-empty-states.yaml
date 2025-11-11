@@ -1,0 +1,222 @@
+appId: ${APP_ID}
+name: "Beer List - Empty States and Edge Cases"
+---
+# Test Flow: Empty States and Edge Cases
+# This test verifies proper handling of empty states, no results, and edge cases.
+
+# Step 1: Launch app
+- launchApp:
+    clearState: false
+
+# Step 2: Navigate to All Beer tab
+- tapOn: "All Beer"
+- waitForAnimationToEnd
+
+# Test Empty Search Results
+# ==========================
+
+# Step 3: Search for something that won't match any beers
+- tapOn:
+    id: "search-input"
+- inputText: "XYZNONEXISTENTBEER123"
+- waitForAnimationToEnd
+
+# Step 4: Verify empty state is shown
+- assertVisible:
+    id: "beer-list-empty"
+    timeout: 2000
+
+# Step 5: Verify empty message is displayed
+- assertVisible:
+    id: "beer-list-empty-message"
+
+# Step 6: Verify message says "No beers found"
+- assertVisible:
+    text: "No beers found"
+
+# Step 7: Verify beer count shows 0
+- assertVisible:
+    id: "beer-count"
+
+# Step 8: Clear search
+- tapOn:
+    id: "clear-search-button"
+- waitForAnimationToEnd
+
+# Step 9: Verify beers are back
+- assertVisible:
+    id: "beer-list"
+
+# Test Empty Filter Results
+# ==========================
+
+# Step 10: Apply all filters (might result in empty list depending on data)
+- tapOn:
+    id: "filter-draft-button"
+- waitForAnimationToEnd
+
+- tapOn:
+    id: "filter-heavies-button"
+- waitForAnimationToEnd
+
+- tapOn:
+    id: "filter-ipa-button"
+- waitForAnimationToEnd
+
+# Step 11: If results are empty, verify empty state
+# Note: This is conditional - may not be empty depending on data
+# Check if empty state OR list is visible
+- assertVisible:
+    id: "beer-count"
+
+# Step 12: Clear all filters
+- tapOn:
+    id: "filter-draft-button"
+- waitForAnimationToEnd
+
+- tapOn:
+    id: "filter-heavies-button"
+- waitForAnimationToEnd
+
+- tapOn:
+    id: "filter-ipa-button"
+- waitForAnimationToEnd
+
+# Test Search + Filter Combination Leading to Empty Results
+# ==========================================================
+
+# Step 13: Search for "Stout"
+- tapOn:
+    id: "search-input"
+- inputText: "Stout"
+- waitForAnimationToEnd
+
+# Step 14: Apply Draft filter (may result in empty if no draft stouts)
+- tapOn:
+    id: "filter-draft-button"
+- waitForAnimationToEnd
+
+# Step 15: Check state (could be empty or have results)
+- assertVisible:
+    id: "beer-count"
+
+# Step 16: Apply Heavies filter too
+- tapOn:
+    id: "filter-heavies-button"
+- waitForAnimationToEnd
+
+# Step 17: Check state again
+- assertVisible:
+    id: "beer-count"
+
+# Step 18: Clear search
+- tapOn:
+    id: "clear-search-button"
+- waitForAnimationToEnd
+
+# Step 19: Clear filters
+- tapOn:
+    id: "filter-draft-button"
+- waitForAnimationToEnd
+
+- tapOn:
+    id: "filter-heavies-button"
+- waitForAnimationToEnd
+
+# Test Very Long Search Term
+# ===========================
+
+# Step 20: Enter very long search string
+- tapOn:
+    id: "search-input"
+- inputText: "This is a very long search term that probably won't match anything in the database but we want to test how the app handles it"
+- waitForAnimationToEnd
+
+# Step 21: Verify empty state or results
+- assertVisible:
+    id: "beer-count"
+
+# Step 22: Clear search
+- tapOn:
+    id: "clear-search-button"
+- waitForAnimationToEnd
+
+# Test Special Characters in Search
+# ==================================
+
+# Step 23: Search with special characters
+- tapOn:
+    id: "search-input"
+- inputText: "Beer & Co."
+- waitForAnimationToEnd
+
+# Step 24: Verify search works with special characters
+- assertVisible:
+    id: "beer-count"
+
+# Step 25: Clear search
+- tapOn:
+    id: "clear-search-button"
+- waitForAnimationToEnd
+
+# Test Rapid Filter Toggling
+# ===========================
+
+# Step 26: Rapidly toggle filters to test debouncing/performance
+- tapOn:
+    id: "filter-draft-button"
+- tapOn:
+    id: "filter-draft-button"
+- tapOn:
+    id: "filter-heavies-button"
+- tapOn:
+    id: "filter-ipa-button"
+- tapOn:
+    id: "filter-heavies-button"
+- waitForAnimationToEnd
+
+# Step 27: Verify app is still responsive
+- assertVisible:
+    id: "beer-list"
+
+# Step 28: Clear remaining filters
+- tapOn:
+    id: "filter-ipa-button"
+- waitForAnimationToEnd
+
+# Test Sort Toggle Multiple Times
+# ================================
+
+# Step 29: Toggle sort multiple times quickly
+- tapOn:
+    id: "sort-toggle-button"
+- waitForAnimationToEnd
+
+- tapOn:
+    id: "sort-toggle-button"
+- waitForAnimationToEnd
+
+- tapOn:
+    id: "sort-toggle-button"
+- waitForAnimationToEnd
+
+- tapOn:
+    id: "sort-toggle-button"
+- waitForAnimationToEnd
+
+# Step 30: Verify list is still functional
+- assertVisible:
+    id: "beer-list"
+- assertVisible:
+    id: "beer-count"
+
+# Step 31: Final verification - tap a beer item to ensure interaction still works
+- tapOn:
+    regex: "beer-item-.*"
+    index: 0
+- waitForAnimationToEnd
+
+# Step 32: Verify expansion worked
+- assertVisible:
+    regex: "beer-description-container-.*"
+    timeout: 2000

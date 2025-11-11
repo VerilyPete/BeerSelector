@@ -85,6 +85,7 @@ const BeerItemComponent: React.FC<BeerItemProps> = ({
     <TouchableOpacity
       onPress={() => onToggle(beer.id)}
       activeOpacity={0.8}
+      testID={`beer-item-${beer.id}`}
     >
       <View style={[
         styles.beerItem,
@@ -94,25 +95,25 @@ const BeerItemComponent: React.FC<BeerItemProps> = ({
         },
         isExpanded && styles.expandedItem
       ]}>
-        <ThemedText type="defaultSemiBold" style={styles.beerName}>
+        <ThemedText type="defaultSemiBold" style={styles.beerName} testID={`beer-name-${beer.id}`}>
           {beer.brew_name || 'Unnamed Beer'}
         </ThemedText>
-        <ThemedText>
+        <ThemedText testID={`beer-brewer-${beer.id}`}>
           {beer.brewer} {beer.brewer_loc ? `• ${beer.brewer_loc}` : ''}
         </ThemedText>
-        <ThemedText>
+        <ThemedText testID={`beer-style-${beer.id}`}>
           {beer.brew_style} {beer.brew_container ? `• ${beer.brew_container}` : ''}
         </ThemedText>
-        <ThemedText style={styles.dateAdded}>
+        <ThemedText style={styles.dateAdded} testID={`beer-date-${beer.id}`}>
           {dateLabel}: {displayDate}
         </ThemedText>
 
         {isExpanded && beer.brew_description && (
-          <View style={[styles.descriptionContainer, { borderTopColor: borderColor }]}>
+          <View style={[styles.descriptionContainer, { borderTopColor: borderColor }]} testID={`beer-description-container-${beer.id}`}>
             <ThemedText type="defaultSemiBold" style={styles.descriptionTitle}>
               Description:
             </ThemedText>
-            <ThemedText style={styles.description}>
+            <ThemedText style={styles.description} testID={`beer-description-${beer.id}`}>
               {beer.brew_description.replace(/<\/?p>/g, '').replace(/<\/?br ?\/?>/, '\n')}
             </ThemedText>
             {renderActions && renderActions()}
