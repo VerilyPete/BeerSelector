@@ -98,6 +98,14 @@ describe('DatabaseInitializer', () => {
         initializer.setReady();
       }).toThrow('Cannot transition to READY from ERROR');
     });
+
+    it('should not allow re-initializing when already INITIALIZING', () => {
+      initializer.setInitializing();
+
+      expect(() => {
+        initializer.setInitializing();
+      }).toThrow('Cannot transition to INITIALIZING from INITIALIZING (already initializing)');
+    });
   });
 
   describe('Error messages', () => {
