@@ -191,25 +191,18 @@ export default function HomeScreen() {
       // First check if we're in visitor mode - force refresh to ensure we have latest value
       const visitorMode = await isVisitorMode(true);
       setInVisitorMode(visitorMode);
-      
-      // Then check API URLs, but handle visitor mode specially
-      const allBeersUrl = await getPreference('all_beers_api_url');
-      const myBeersUrl = await getPreference('my_beers_api_url');
-      
-      // For visitor mode, we only need all_beers_api_url to be set
-      // The my_beers_api_url can be a dummy value
-      const isConfigured = visitorMode 
-        ? !!allBeersUrl // In visitor mode, only need all_beers_api_url
-        : !!allBeersUrl && !!myBeersUrl; // Regular mode needs both URLs
-      
+
+      // Use centralized helper to check API URLs (same logic as _layout.tsx)
+      const isConfigured = await areApiUrlsConfigured();
+
       setApiUrlsSet(isConfigured);
-      
+
       if (!isConfigured) {
-        // Log different messages depending on mode
+        // Log for debugging - _layout.tsx handles initial routing
         if (visitorMode) {
           console.log('Warning: All beers API URL not configured in visitor mode');
         } else {
-          console.log('API URLs not configured, redirecting to settings');
+          console.log('Warning: API URLs not configured, showing login prompt');
         }
       }
     } catch (error) {
