@@ -1,81 +1,63 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuites name="jest tests" tests="27" failures="2" errors="0" time="3.873">
-  <testsuite name="dataUpdateService integration tests" errors="0" failures="0" skipped="0" timestamp="2025-11-11T15:36:18" time="2.607" tests="12">
-    <testcase classname="dataUpdateService integration tests fetchAndUpdateAllBeers should process valid allbeers.json data correctly" name="dataUpdateService integration tests fetchAndUpdateAllBeers should process valid allbeers.json data correctly" time="0.009">
+<testsuites name="jest tests" tests="29" failures="0" errors="0" time="1.173">
+  <testsuite name="Database Lifecycle Management" errors="0" failures="0" skipped="0" timestamp="2025-11-12T06:33:32" time="0.625" tests="29">
+    <testcase classname="Database Lifecycle Management Database Opening should open database successfully" name="Database Lifecycle Management Database Opening should open database successfully" time="0.002">
     </testcase>
-    <testcase classname="dataUpdateService integration tests fetchAndUpdateAllBeers should handle missing API URL" name="dataUpdateService integration tests fetchAndUpdateAllBeers should handle missing API URL" time="0.001">
+    <testcase classname="Database Lifecycle Management Database Opening should reuse existing database connection" name="Database Lifecycle Management Database Opening should reuse existing database connection" time="0">
     </testcase>
-    <testcase classname="dataUpdateService integration tests fetchAndUpdateAllBeers should handle failed fetch" name="dataUpdateService integration tests fetchAndUpdateAllBeers should handle failed fetch" time="0.001">
+    <testcase classname="Database Lifecycle Management Database Opening should throw error if database open fails" name="Database Lifecycle Management Database Opening should throw error if database open fails" time="0.013">
     </testcase>
-    <testcase classname="dataUpdateService integration tests fetchAndUpdateAllBeers should handle invalid data format" name="dataUpdateService integration tests fetchAndUpdateAllBeers should handle invalid data format" time="0.001">
+    <testcase classname="Database Lifecycle Management WAL Mode Enablement should enable WAL mode when opening database" name="Database Lifecycle Management WAL Mode Enablement should enable WAL mode when opening database" time="0">
     </testcase>
-    <testcase classname="dataUpdateService integration tests fetchAndUpdateAllBeers should handle fetch throwing an exception" name="dataUpdateService integration tests fetchAndUpdateAllBeers should handle fetch throwing an exception" time="0.001">
+    <testcase classname="Database Lifecycle Management WAL Mode Enablement should set PRAGMA synchronous to NORMAL" name="Database Lifecycle Management WAL Mode Enablement should set PRAGMA synchronous to NORMAL" time="0.001">
     </testcase>
-    <testcase classname="dataUpdateService integration tests fetchAndUpdateMyBeers should process valid mybeers.json data correctly" name="dataUpdateService integration tests fetchAndUpdateMyBeers should process valid mybeers.json data correctly" time="0.003">
+    <testcase classname="Database Lifecycle Management WAL Mode Enablement should verify WAL mode was enabled successfully" name="Database Lifecycle Management WAL Mode Enablement should verify WAL mode was enabled successfully" time="0">
     </testcase>
-    <testcase classname="dataUpdateService integration tests fetchAndUpdateMyBeers should handle missing API URL" name="dataUpdateService integration tests fetchAndUpdateMyBeers should handle missing API URL" time="0.001">
+    <testcase classname="Database Lifecycle Management WAL Mode Enablement should warn if WAL mode enablement fails" name="Database Lifecycle Management WAL Mode Enablement should warn if WAL mode enablement fails" time="0.001">
     </testcase>
-    <testcase classname="dataUpdateService integration tests fetchAndUpdateMyBeers should handle failed fetch" name="dataUpdateService integration tests fetchAndUpdateMyBeers should handle failed fetch" time="0.005">
+    <testcase classname="Database Lifecycle Management WAL Mode Enablement should handle missing journal_mode in response" name="Database Lifecycle Management WAL Mode Enablement should handle missing journal_mode in response" time="0">
     </testcase>
-    <testcase classname="dataUpdateService integration tests fetchAndUpdateMyBeers should handle invalid data format" name="dataUpdateService integration tests fetchAndUpdateMyBeers should handle invalid data format" time="0">
+    <testcase classname="Database Lifecycle Management WAL Mode Enablement should not re-execute PRAGMA on connection reuse" name="Database Lifecycle Management WAL Mode Enablement should not re-execute PRAGMA on connection reuse" time="0.001">
     </testcase>
-    <testcase classname="dataUpdateService integration tests fetchAndUpdateMyBeers should handle empty tasted beers array (new user or round rollover)" name="dataUpdateService integration tests fetchAndUpdateMyBeers should handle empty tasted beers array (new user or round rollover)" time="0.001">
+    <testcase classname="Database Lifecycle Management WAL Mode Enablement should handle PRAGMA execution errors gracefully" name="Database Lifecycle Management WAL Mode Enablement should handle PRAGMA execution errors gracefully" time="0">
     </testcase>
-    <testcase classname="dataUpdateService integration tests fetchAndUpdateMyBeers should handle data with no valid beers" name="dataUpdateService integration tests fetchAndUpdateMyBeers should handle data with no valid beers" time="0.001">
+    <testcase classname="Database Lifecycle Management Database Closing should close database connection successfully" name="Database Lifecycle Management Database Closing should close database connection successfully" time="0">
     </testcase>
-    <testcase classname="dataUpdateService integration tests fetchAndUpdateMyBeers should handle fetch throwing an exception" name="dataUpdateService integration tests fetchAndUpdateMyBeers should handle fetch throwing an exception" time="0">
+    <testcase classname="Database Lifecycle Management Database Closing should nullify database reference after close" name="Database Lifecycle Management Database Closing should nullify database reference after close" time="0">
     </testcase>
-  </testsuite>
-  <testsuite name="dataUpdateService" errors="0" failures="0" skipped="0" timestamp="2025-11-11T15:36:18" time="2.607" tests="13">
-    <testcase classname="dataUpdateService fetchAndUpdateAllBeers should return failure result if API URL is not set" name="dataUpdateService fetchAndUpdateAllBeers should return failure result if API URL is not set" time="0.005">
+    <testcase classname="Database Lifecycle Management Database Closing should handle close when database is not open" name="Database Lifecycle Management Database Closing should handle close when database is not open" time="0.001">
     </testcase>
-    <testcase classname="dataUpdateService fetchAndUpdateAllBeers should return failure result if fetch fails" name="dataUpdateService fetchAndUpdateAllBeers should return failure result if fetch fails" time="0.002">
+    <testcase classname="Database Lifecycle Management Database Closing should handle close errors gracefully" name="Database Lifecycle Management Database Closing should handle close errors gracefully" time="0">
     </testcase>
-    <testcase classname="dataUpdateService fetchAndUpdateAllBeers should return failure result if response is not an array" name="dataUpdateService fetchAndUpdateAllBeers should return failure result if response is not an array" time="0.001">
+    <testcase classname="Database Lifecycle Management Database Closing should log close operation" name="Database Lifecycle Management Database Closing should log close operation" time="0">
     </testcase>
-    <testcase classname="dataUpdateService fetchAndUpdateAllBeers should return failure result if response does not contain brewInStock" name="dataUpdateService fetchAndUpdateAllBeers should return failure result if response does not contain brewInStock" time="0">
+    <testcase classname="Database Lifecycle Management Database Closing should log successful close" name="Database Lifecycle Management Database Closing should log successful close" time="0">
     </testcase>
-    <testcase classname="dataUpdateService fetchAndUpdateAllBeers should successfully update all beers" name="dataUpdateService fetchAndUpdateAllBeers should successfully update all beers" time="0.002">
+    <testcase classname="Database Lifecycle Management Database Closing should log errors during close" name="Database Lifecycle Management Database Closing should log errors during close" time="0">
     </testcase>
-    <testcase classname="dataUpdateService fetchAndUpdateAllBeers should handle errors during update" name="dataUpdateService fetchAndUpdateAllBeers should handle errors during update" time="0">
+    <testcase classname="Database Lifecycle Management Connection Reuse After Close/Reopen Cycle should open new connection after close" name="Database Lifecycle Management Connection Reuse After Close/Reopen Cycle should open new connection after close" time="0.001">
     </testcase>
-    <testcase classname="dataUpdateService fetchAndUpdateMyBeers should return failure result if API URL is not set" name="dataUpdateService fetchAndUpdateMyBeers should return failure result if API URL is not set" time="0.001">
+    <testcase classname="Database Lifecycle Management Connection Reuse After Close/Reopen Cycle should re-enable WAL mode after reopen" name="Database Lifecycle Management Connection Reuse After Close/Reopen Cycle should re-enable WAL mode after reopen" time="0">
     </testcase>
-    <testcase classname="dataUpdateService fetchAndUpdateMyBeers should return failure result if fetch fails" name="dataUpdateService fetchAndUpdateMyBeers should return failure result if fetch fails" time="0">
+    <testcase classname="Database Lifecycle Management Connection Reuse After Close/Reopen Cycle should handle multiple close/open cycles" name="Database Lifecycle Management Connection Reuse After Close/Reopen Cycle should handle multiple close/open cycles" time="0.001">
     </testcase>
-    <testcase classname="dataUpdateService fetchAndUpdateMyBeers should return failure result if response is not an array" name="dataUpdateService fetchAndUpdateMyBeers should return failure result if response is not an array" time="0.001">
+    <testcase classname="Database Lifecycle Management Forced Close Option should support force close without waiting" name="Database Lifecycle Management Forced Close Option should support force close without waiting" time="0">
     </testcase>
-    <testcase classname="dataUpdateService fetchAndUpdateMyBeers should return failure result if response does not contain tasted_brew_current_round" name="dataUpdateService fetchAndUpdateMyBeers should return failure result if response does not contain tasted_brew_current_round" time="0">
+    <testcase classname="Database Lifecycle Management Forced Close Option should log warning when force closing" name="Database Lifecycle Management Forced Close Option should log warning when force closing" time="0">
     </testcase>
-    <testcase classname="dataUpdateService fetchAndUpdateMyBeers should return success with 0 items if no valid beers with IDs are found" name="dataUpdateService fetchAndUpdateMyBeers should return success with 0 items if no valid beers with IDs are found" time="0.001">
+    <testcase classname="Database Lifecycle Management Database State Validation should verify database is closed after closeDatabaseConnection" name="Database Lifecycle Management Database State Validation should verify database is closed after closeDatabaseConnection" time="0.001">
     </testcase>
-    <testcase classname="dataUpdateService fetchAndUpdateMyBeers should successfully update my beers" name="dataUpdateService fetchAndUpdateMyBeers should successfully update my beers" time="0.001">
+    <testcase classname="Database Lifecycle Management Database State Validation should handle rapid open/close sequences" name="Database Lifecycle Management Database State Validation should handle rapid open/close sequences" time="0">
     </testcase>
-    <testcase classname="dataUpdateService fetchAndUpdateMyBeers should handle errors during update" name="dataUpdateService fetchAndUpdateMyBeers should handle errors during update" time="0.003">
+    <testcase classname="Database Lifecycle Management Error Recovery should recover from failed close by allowing reopen" name="Database Lifecycle Management Error Recovery should recover from failed close by allowing reopen" time="0">
     </testcase>
-  </testsuite>
-  <testsuite name="manualRefreshAllData" errors="0" failures="2" skipped="0" timestamp="2025-11-11T15:36:21" time="0.4" tests="2">
-    <testcase classname="manualRefreshAllData refreshes core endpoints and returns no errors when both succeed" name="manualRefreshAllData refreshes core endpoints and returns no errors when both succeed" time="0.003">
-      <failure>Error: expect(received).toBe(expected) // Object.is equality
-
-Expected: false
-Received: true
-    at Object.toBe (/workspace/BeerSelector/src/services/__tests__/dataUpdateService.manualRefresh.test.ts:37:30)
-    at Generator.next (&lt;anonymous&gt;)
-    at asyncGeneratorStep (/workspace/BeerSelector/node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
-    at _next (/workspace/BeerSelector/node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
-    at processTicksAndRejections (node:internal/process/task_queues:95:5)</failure>
+    <testcase classname="Database Lifecycle Management Error Recovery should handle WAL mode failure on reopen" name="Database Lifecycle Management Error Recovery should handle WAL mode failure on reopen" time="0.001">
     </testcase>
-    <testcase classname="manualRefreshAllData handles partial failure and sets hasErrors" name="manualRefreshAllData handles partial failure and sets hasErrors" time="0.001">
-      <failure>Error: expect(received).toBe(expected) // Object.is equality
-
-Expected: true
-Received: false
-    at Object.toBe (/workspace/BeerSelector/src/services/__tests__/dataUpdateService.manualRefresh.test.ts:55:42)
-    at Generator.next (&lt;anonymous&gt;)
-    at asyncGeneratorStep (/workspace/BeerSelector/node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
-    at _next (/workspace/BeerSelector/node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
-    at processTicksAndRejections (node:internal/process/task_queues:95:5)</failure>
+    <testcase classname="Database Lifecycle Management Database Lock Manager Integration (CI-HP6-1) should allow lock acquisition after database reopens following shutdown" name="Database Lifecycle Management Database Lock Manager Integration (CI-HP6-1) should allow lock acquisition after database reopens following shutdown" time="0.001">
+    </testcase>
+    <testcase classname="Database Lifecycle Management Database Lock Manager Integration (CI-HP6-1) should reset shutdown state when getDatabase is called after close" name="Database Lifecycle Management Database Lock Manager Integration (CI-HP6-1) should reset shutdown state when getDatabase is called after close" time="0">
+    </testcase>
+    <testcase classname="Database Lifecycle Management Database Lock Manager Integration (CI-HP6-1) should handle multiple background/foreground cycles without lock issues" name="Database Lifecycle Management Database Lock Manager Integration (CI-HP6-1) should handle multiple background/foreground cycles without lock issues" time="0.001">
     </testcase>
   </testsuite>
 </testsuites>

@@ -98,13 +98,19 @@ export const areApiUrlsConfigured = async (): Promise<boolean> => {
     const allBeersApiUrl = await getPreference('all_beers_api_url');
     const myBeersApiUrl = await getPreference('my_beers_api_url');
 
+    console.log(`[areApiUrlsConfigured] isVisitor: ${isVisitor}, allBeersUrl: ${allBeersApiUrl ? 'SET' : 'NOT SET'}, myBeersUrl: ${myBeersApiUrl ? 'SET' : 'NOT SET'}`);
+
     // In visitor mode, we only need the all_beers_api_url to be set
     if (isVisitor) {
-      return !!allBeersApiUrl; // Just need the all beers URL
+      const result = !!allBeersApiUrl;
+      console.log(`[areApiUrlsConfigured] Visitor mode - returning: ${result}`);
+      return result;
     }
 
     // For normal mode, both URLs must be set
-    return !!allBeersApiUrl && !!myBeersApiUrl;
+    const result = !!allBeersApiUrl && !!myBeersApiUrl;
+    console.log(`[areApiUrlsConfigured] Normal mode - returning: ${result}`);
+    return result;
   } catch (error) {
     console.error('Error checking API URLs:', error);
     return false;

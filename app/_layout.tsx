@@ -5,11 +5,12 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState, useRef } from 'react';
 import 'react-native-reanimated';
-import { LogBox, Alert } from 'react-native';
+import { LogBox, Alert, AppState, AppStateStatus } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { useColorScheme } from '@/hooks/useColorScheme';
-import { initializeBeerDatabase, getPreference, setPreference } from '@/src/database/db';
+import { initializeBeerDatabase, getPreference, setPreference, areApiUrlsConfigured } from '@/src/database/db';
+import { getDatabase, closeDatabaseConnection } from '@/src/database/connection';
 
 // Disable react-devtools connection to port 8097
 if (__DEV__) {
@@ -47,6 +48,7 @@ export default function RootLayout() {
   });
   const [initialRoute, setInitialRoute] = useState<string | null>(null);
   const initializationStarted = useRef(false);
+  const lifecycleOperationInProgress = useRef(false);
 
   useEffect(() => {
     async function prepare() {
@@ -67,13 +69,12 @@ export default function RootLayout() {
           dbInitialized = true;
           console.log('Database initialized successfully');
 
-          // Check if API URLs are set
-          const allBeersApiUrl = await getPreference('all_beers_api_url');
-          const myBeersApiUrl = await getPreference('my_beers_api_url');
+          // Check if API URLs are set using centralized helper
+          const apiUrlsConfigured = await areApiUrlsConfigured();
           const isFirstLaunch = await getPreference('first_launch');
 
           // If API URLs are empty or it's first launch, set initial route to settings
-          if ((!allBeersApiUrl || !myBeersApiUrl || isFirstLaunch === 'true') && loaded) {
+          if (!apiUrlsConfigured || isFirstLaunch === 'true') {
               console.log('API URLs not set or first launch, redirecting to settings page');
               // Mark that it's no longer the first launch
               if (isFirstLaunch === 'true') {
@@ -114,10 +115,7 @@ export default function RootLayout() {
             }
           }
 
-
-        if (loaded) {
-          await SplashScreen.hideAsync();
-        }
+        // Do NOT hide splash screen here - it will be hidden after navigation completes
       } catch (error) {
         console.error('Error during app initialization:', error);
         // Continue anyway to allow the app to start
@@ -127,6 +125,65 @@ export default function RootLayout() {
 
     prepare();
   }, [loaded]);
+
+  // Database lifecycle management - close on background, reopen on foreground
+  useEffect(() => {
+    const handleAppStateChange = async (nextAppState: AppStateStatus) => {
+      if (lifecycleOperationInProgress.current) {
+        console.warn('Database lifecycle operation already in progress, skipping...');
+        return;
+      }
+
+      lifecycleOperationInProgress.current = true;
+      try {
+        if (nextAppState === 'background') {
+          console.log('App backgrounding, closing database...');
+          try {
+            await closeDatabaseConnection();
+          } catch (error) {
+            console.error('Error closing database on background:', error);
+          }
+        } else if (nextAppState === 'active') {
+          console.log('App foregrounding, reopening database...');
+          try {
+            await getDatabase();
+          } catch (error) {
+            console.error('Error reopening database on foreground:', error);
+          }
+        }
+      } finally {
+        lifecycleOperationInProgress.current = false;
+      }
+    };
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
+
+  // Navigate to initial route once determined and hide splash screen
+  useEffect(() => {
+    if (loaded && initialRoute) {
+      console.log(`Navigating to initial route: ${initialRoute}`);
+      router.replace(initialRoute as any);
+
+      // Hide splash screen after navigation starts
+      // Small delay ensures the new screen has begun rendering
+      const hideSplash = async () => {
+        try {
+          await SplashScreen.hideAsync();
+          console.log('Splash screen hidden successfully');
+        } catch (error) {
+          console.warn('Error hiding splash screen:', error);
+        }
+      };
+
+      // Use a small timeout to ensure navigation has started
+      setTimeout(hideSplash, 150);
+    }
+  }, [loaded, initialRoute]);
 
   // Wait until we've determined the initial route
   if (!loaded || !initialRoute) {

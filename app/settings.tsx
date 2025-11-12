@@ -208,14 +208,20 @@ export default function SettingsScreen() {
     }
   };
 
-  // Track processed URLs to avoid re-injecting JavaScript
+  // Track processed URLs to avoid re-injecting JavaScript and duplicate logs
   const processedUrlsRef = useRef<Set<string>>(new Set());
+  const lastLoggedUrlRef = useRef<{ url: string; timestamp: number }>({ url: '', timestamp: 0 });
 
   // Handle WebView navigation state changes (simplified - no JS injection here)
   const handleWebViewNavigationStateChange = useCallback((navState: WebViewNavigation) => {
-    // Just log navigation state, don't inject JavaScript here
-    if (!navState.loading) {
+    // Prevent duplicate logs for same URL within 500ms (React Strict Mode causes double calls)
+    const now = Date.now();
+    const isDuplicate = navState.url === lastLoggedUrlRef.current.url &&
+                       (now - lastLoggedUrlRef.current.timestamp) < 500;
+
+    if (!navState.loading && !isDuplicate) {
       console.log('Flying Saucer WebView finished loading:', navState.url);
+      lastLoggedUrlRef.current = { url: navState.url, timestamp: now };
     }
   }, []);
 

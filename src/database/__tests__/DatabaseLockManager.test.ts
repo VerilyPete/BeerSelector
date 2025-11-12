@@ -605,4 +605,213 @@ describe('DatabaseLockManager', () => {
       lockManager.releaseLock('operation-1');
     });
   });
+
+  describe('Graceful Shutdown', () => {
+    it('should prepare for shutdown successfully when lock is free', async () => {
+      const result = await lockManager.prepareForShutdown(5000);
+
+      expect(result).toBe(true);
+    });
+
+    it('should wait for active operation to complete before shutdown', async () => {
+      // Acquire lock
+      await lockManager.acquireLock('active-operation');
+
+      // Start shutdown process
+      const shutdownPromise = lockManager.prepareForShutdown(5000);
+
+      // Advance time but don't release yet
+      jest.advanceTimersByTime(1000);
+      await Promise.resolve();
+
+      // Release lock
+      lockManager.releaseLock('active-operation');
+
+      // Advance time for polling
+      jest.advanceTimersByTime(200);
+      await Promise.resolve();
+
+      // Shutdown should succeed
+      const result = await shutdownPromise;
+      expect(result).toBe(true);
+    });
+
+    it('should timeout if operation takes too long during shutdown', async () => {
+      // Acquire lock
+      await lockManager.acquireLock('long-running-operation');
+
+      // Start shutdown with short timeout
+      const shutdownPromise = lockManager.prepareForShutdown(1000);
+
+      // Advance time past timeout without releasing
+      jest.advanceTimersByTime(1100);
+      await Promise.resolve();
+      await Promise.resolve();
+
+      // Shutdown should fail (timeout)
+      const result = await shutdownPromise;
+      expect(result).toBe(false);
+
+      // Clean up
+      lockManager.releaseLock('long-running-operation');
+    });
+
+    it('should prevent new lock acquisitions after shutdown initiated', async () => {
+      // Start shutdown (don't await, just initiate)
+      const shutdownPromise = lockManager.prepareForShutdown(5000);
+
+      // Advance time to let shutdown flag be set
+      await Promise.resolve();
+
+      // Try to acquire lock - should be rejected
+      await expect(lockManager.acquireLock('new-operation')).rejects.toThrow(
+        'Cannot acquire lock: database is shutting down'
+      );
+
+      // Clean up - let shutdown complete
+      jest.advanceTimersByTime(100);
+      await shutdownPromise;
+    });
+
+    it('should warn when forcing shutdown with lock held', async () => {
+      const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
+
+      // Acquire lock
+      await lockManager.acquireLock('active-operation');
+
+      // Try to shutdown
+      const shutdownPromise = lockManager.prepareForShutdown(500);
+
+      // Advance time past timeout
+      jest.advanceTimersByTime(600);
+      await Promise.resolve();
+
+      const result = await shutdownPromise;
+
+      // Should timeout and warn
+      expect(result).toBe(false);
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        expect.stringMatching(/shutdown.*timeout.*lock.*still.*held/i)
+      );
+
+      consoleWarnSpy.mockRestore();
+      lockManager.releaseLock('active-operation');
+    });
+
+    it('should warn when shutting down with non-empty queue', async () => {
+      const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
+
+      // Acquire lock
+      await lockManager.acquireLock('operation-1');
+
+      // Queue some operations
+      lockManager.acquireLock('operation-2');
+      lockManager.acquireLock('operation-3');
+
+      // Try to shutdown
+      const shutdownPromise = lockManager.prepareForShutdown(500);
+
+      // Advance time past timeout
+      jest.advanceTimersByTime(600);
+      await Promise.resolve();
+
+      await shutdownPromise;
+
+      // Should warn about queue
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        expect.stringMatching(/shutdown.*queue.*not.*empty/i)
+      );
+
+      consoleWarnSpy.mockRestore();
+      lockManager.releaseLock('operation-1');
+    });
+
+    it('should log when entering shutdown state', async () => {
+      const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
+
+      await lockManager.prepareForShutdown(5000);
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringMatching(/preparing.*shutdown/i)
+      );
+
+      consoleLogSpy.mockRestore();
+    });
+
+    it('should handle shutdown when already in shutdown state', async () => {
+      // First shutdown
+      await lockManager.prepareForShutdown(5000);
+
+      // Second shutdown should succeed immediately
+      const result = await lockManager.prepareForShutdown(5000);
+      expect(result).toBe(true);
+    });
+
+    it('should poll lock status during shutdown', async () => {
+      // Acquire lock
+      await lockManager.acquireLock('operation');
+
+      // Start shutdown
+      const shutdownPromise = lockManager.prepareForShutdown(5000);
+
+      // Advance time by polling intervals
+      jest.advanceTimersByTime(100); // First poll
+      await Promise.resolve();
+
+      expect(lockManager.isLocked()).toBe(true);
+
+      jest.advanceTimersByTime(100); // Second poll
+      await Promise.resolve();
+
+      // Release lock
+      lockManager.releaseLock('operation');
+
+      jest.advanceTimersByTime(100); // Final poll
+      await Promise.resolve();
+
+      // Should complete successfully
+      const result = await shutdownPromise;
+      expect(result).toBe(true);
+    });
+
+    it('should use custom timeout when provided', async () => {
+      // Acquire lock
+      await lockManager.acquireLock('operation');
+
+      // Start shutdown with very short timeout
+      const shutdownPromise = lockManager.prepareForShutdown(200);
+
+      // Advance time past custom timeout
+      jest.advanceTimersByTime(250);
+      await Promise.resolve();
+
+      // Should timeout
+      const result = await shutdownPromise;
+      expect(result).toBe(false);
+
+      lockManager.releaseLock('operation');
+    });
+
+    it('should use default timeout (5 seconds) when not specified', async () => {
+      // Acquire lock
+      await lockManager.acquireLock('operation');
+
+      // Start shutdown with default timeout
+      const shutdownPromise = lockManager.prepareForShutdown();
+
+      // Advance time to just before default timeout (5s)
+      jest.advanceTimersByTime(4900);
+      await Promise.resolve();
+
+      // Should still be waiting
+      lockManager.releaseLock('operation');
+
+      jest.advanceTimersByTime(100);
+      await Promise.resolve();
+
+      // Should succeed
+      const result = await shutdownPromise;
+      expect(result).toBe(true);
+    });
+  });
 });

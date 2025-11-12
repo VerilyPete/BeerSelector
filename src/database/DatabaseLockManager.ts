@@ -56,6 +56,7 @@ export class DatabaseLockManager {
   private recentWaitTimes: number[] = []; // Track recent queue wait times
   private readonly MAX_WAIT_TIME_HISTORY = 10; // Keep last 10 wait times
   private readonly QUEUE_WARNING_THRESHOLD = 5; // Warn if queue exceeds this length
+  private isShuttingDown: boolean = false; // Flag to indicate shutdown state
 
   /**
    * Attempt to acquire the database lock
@@ -75,6 +76,12 @@ export class DatabaseLockManager {
    */
   async acquireLock(operationName: string, timeoutMs?: number): Promise<boolean> {
     return new Promise((resolve, reject) => {
+      // Check if shutting down
+      if (this.isShuttingDown) {
+        reject(new Error('Cannot acquire lock: database is shutting down'));
+        return;
+      }
+
       // If lock is not held, acquire immediately
       if (!this.lockHeld) {
         this._grantLock(operationName, resolve);
@@ -309,6 +316,79 @@ export class DatabaseLockManager {
       queueLength: this.queue.length,
       queueWaitTimes: [...this.recentWaitTimes], // Return a copy
     };
+  }
+
+  /**
+   * Prepare the database lock manager for shutdown
+   *
+   * This method waits for any active operations to complete before allowing
+   * the database to be closed safely. It polls the lock status every 100ms
+   * and returns true if all operations complete within the timeout period.
+   *
+   * After calling this method, new lock acquisitions will be rejected.
+   *
+   * @param timeoutMs - Maximum time to wait for operations to complete (default: 5000ms)
+   * @returns Promise<boolean> - true if shutdown is safe, false if timeout occurred
+   */
+  async prepareForShutdown(timeoutMs: number = 5000): Promise<boolean> {
+    console.log('Preparing database lock manager for shutdown...');
+
+    // Already shutting down, return success immediately
+    if (this.isShuttingDown && !this.lockHeld) {
+      return true;
+    }
+
+    // Set shutdown flag to prevent new lock acquisitions
+    this.isShuttingDown = true;
+
+    const startTime = Date.now();
+    const pollInterval = 100; // Poll every 100ms
+
+    // Wait for lock to be released
+    while (this.lockHeld) {
+      const elapsed = Date.now() - startTime;
+
+      if (elapsed >= timeoutMs) {
+        console.warn(
+          `Shutdown timeout: lock is still held by '${this.currentOperation}' after ${timeoutMs}ms`
+        );
+
+        // Warn if queue is not empty
+        if (this.queue.length > 0) {
+          console.warn(
+            `Shutdown warning: queue is not empty (${this.queue.length} operations pending)`
+          );
+        }
+
+        return false;
+      }
+
+      // Wait for poll interval
+      await new Promise(resolve => setTimeout(resolve, pollInterval));
+    }
+
+    // Warn if queue is not empty even though lock is free
+    if (this.queue.length > 0) {
+      console.warn(
+        `Shutdown warning: queue is not empty (${this.queue.length} operations pending)`
+      );
+    }
+
+    console.log('Database lock manager prepared for shutdown successfully');
+    return true;
+  }
+
+  /**
+   * Reset the shutdown state to allow new operations
+   *
+   * Called when the database is reopened after being closed (e.g., app foreground)
+   * to allow new lock acquisitions.
+   *
+   * @internal Only called by connection.ts during database reopen
+   */
+  resetShutdownState(): void {
+    console.log('Database lock manager: Resetting shutdown state');
+    this.isShuttingDown = false;
   }
 }
 
