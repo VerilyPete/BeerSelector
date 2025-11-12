@@ -72,6 +72,10 @@ export class DatabaseInitializer {
       throw new Error(`Cannot transition to INITIALIZING from ${this.state}`);
     }
 
+    if (this.state === DatabaseInitializationState.INITIALIZING) {
+      throw new Error(`Cannot transition to INITIALIZING from ${this.state} (already initializing)`);
+    }
+
     const previousState = this.state;
     this.state = DatabaseInitializationState.INITIALIZING;
     this.errorMessage = null;

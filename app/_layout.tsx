@@ -3,7 +3,7 @@ import { useFonts } from 'expo-font';
 import { Stack, router } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import 'react-native-reanimated';
 import { LogBox, Alert } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -46,9 +46,17 @@ export default function RootLayout() {
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
   const [initialRoute, setInitialRoute] = useState<string | null>(null);
+  const initializationStarted = useRef(false);
 
   useEffect(() => {
     async function prepare() {
+      // Prevent duplicate initialization
+      if (initializationStarted.current) {
+        console.log('[DUPLICATE PREVENTED] Initialization already started (useRef guard caught duplicate useEffect run), skipping...');
+        return;
+      }
+      initializationStarted.current = true;
+
       try {
         // Initialize database with retry mechanism
         let dbInitialized = false;
