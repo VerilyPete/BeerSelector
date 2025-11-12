@@ -2,21 +2,13 @@ import React from 'react';
 import { StyleSheet, View, TouchableOpacity } from 'react-native';
 import { ThemedText } from '../ThemedText';
 import { useThemeColor } from '@/hooks/useThemeColor';
+import { Beer, Beerfinder } from '@/src/types/beer';
 
-type Beer = {
-  id: string;
-  brew_name: string;
-  brewer: string;
-  brewer_loc: string;
-  brew_style: string;
-  brew_container: string;
-  brew_description: string;
-  added_date: string;
-  tasted_date?: string; // For tasted beers
-};
+// Union type to accept both Beer and Beerfinder
+type DisplayableBeer = Beer | Beerfinder;
 
 type BeerItemProps = {
-  beer: Beer;
+  beer: DisplayableBeer;
   isExpanded: boolean;
   onToggle: (id: string) => void;
   dateLabel?: string; // e.g., "Date Added" or "Tasted"
@@ -77,9 +69,9 @@ const BeerItemComponent: React.FC<BeerItemProps> = ({
   const borderColor = useThemeColor({ light: '#e0e0e0', dark: '#333' }, 'text');
 
   // Format date for display
-  const displayDate = beer.tasted_date
-    ? formatDateString(beer.tasted_date)
-    : formatDate(beer.added_date);
+  const displayDate = (beer as any).tasted_date
+    ? formatDateString((beer as any).tasted_date)
+    : formatDate(beer.added_date || '');
 
   return (
     <TouchableOpacity

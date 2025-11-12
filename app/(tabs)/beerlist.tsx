@@ -1,7 +1,7 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { BeerListScreen } from './index';
-import { areApiUrlsConfigured, refreshBeersFromAPI, setPreference } from '@/src/database/db';
+import { areApiUrlsConfigured } from '@/src/database/preferences';
 import { isVisitorMode } from '@/src/api/authService';
 import { checkAndRefreshOnAppOpen } from '@/src/services/dataUpdateService';
 import ErrorBoundary from '@/components/ErrorBoundary';

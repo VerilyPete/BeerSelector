@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { StyleSheet, View, FlatList, RefreshControl, ActivityIndicator, Text, TouchableOpacity, Alert, Platform } from 'react-native';
-import { getAllRewards, fetchAndPopulateRewards, getPreference } from '@/src/database/db';
+import { rewardsRepository } from '@/src/database/repositories/RewardsRepository';
+import { fetchRewardsFromAPI } from '@/src/api/beerApi';
 import { ThemedText } from './ThemedText';
 import { ThemedView } from './ThemedView';
 import { useThemeColor } from '@/hooks/useThemeColor';
@@ -43,17 +44,17 @@ export const Rewards = () => {
   const loadRewards = async () => {
     try {
       setLoading(true);
-      
+
       // First check if user is in visitor mode
       const visitorMode = await checkVisitorMode();
-      
+
       if (visitorMode) {
         // In visitor mode, don't fetch rewards
         setRewards([]);
         setError(null);
       } else {
-        // Normal mode, load rewards
-        const data = await getAllRewards();
+        // Normal mode, load rewards using repository
+        const data = await rewardsRepository.getAll();
         setRewards(data);
         setError(null);
       }
@@ -73,15 +74,17 @@ export const Rewards = () => {
   const handleRefresh = useCallback(async () => {
     try {
       setRefreshing(true);
-      
+
       // Check visitor mode first
       const visitorMode = await checkVisitorMode();
-      
+
       if (!visitorMode) {
         // Only refresh rewards if not in visitor mode
-        await fetchAndPopulateRewards();
+        // Fetch fresh rewards from API and insert using repository
+        const freshRewards = await fetchRewardsFromAPI();
+        await rewardsRepository.insertMany(freshRewards);
       }
-      
+
       // Reload rewards (will handle visitor mode internally)
       loadRewards();
     } catch (error) {

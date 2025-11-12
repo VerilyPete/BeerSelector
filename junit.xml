@@ -1,7 +1,409 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuites name="jest tests" tests="29" failures="0" errors="0" time="1.173">
-  <testsuite name="Database Lifecycle Management" errors="0" failures="0" skipped="0" timestamp="2025-11-12T06:33:32" time="0.625" tests="29">
-    <testcase classname="Database Lifecycle Management Database Opening should open database successfully" name="Database Lifecycle Management Database Opening should open database successfully" time="0.002">
+<testsuites name="jest tests" tests="244" failures="0" errors="0" time="4.399">
+  <testsuite name="Database State Machine Integration" errors="0" failures="0" skipped="0" timestamp="2025-11-12T21:26:55" time="2.575" tests="15">
+    <testcase classname="Database State Machine Integration setupDatabase with state machine should transition from UNINITIALIZED to INITIALIZING to READY" name="Database State Machine Integration setupDatabase with state machine should transition from UNINITIALIZED to INITIALIZING to READY" time="0.005">
+    </testcase>
+    <testcase classname="Database State Machine Integration setupDatabase with state machine should return immediately if already READY" name="Database State Machine Integration setupDatabase with state machine should return immediately if already READY" time="0.001">
+    </testcase>
+    <testcase classname="Database State Machine Integration setupDatabase with state machine should use state machine for initialization tracking" name="Database State Machine Integration setupDatabase with state machine should use state machine for initialization tracking" time="0.001">
+    </testcase>
+    <testcase classname="Database State Machine Integration setupDatabase with state machine should transition to ERROR state on setup failure" name="Database State Machine Integration setupDatabase with state machine should transition to ERROR state on setup failure" time="0.013">
+    </testcase>
+    <testcase classname="Database State Machine Integration setupDatabase with state machine should allow retry after ERROR state" name="Database State Machine Integration setupDatabase with state machine should allow retry after ERROR state" time="0.003">
+    </testcase>
+    <testcase classname="Database State Machine Integration setupDatabase with state machine should throw error message if setup is in ERROR state during wait" name="Database State Machine Integration setupDatabase with state machine should throw error message if setup is in ERROR state during wait" time="0.004">
+    </testcase>
+    <testcase classname="Database State Machine Integration resetDatabaseState should reset state machine to UNINITIALIZED" name="Database State Machine Integration resetDatabaseState should reset state machine to UNINITIALIZED" time="0.001">
+    </testcase>
+    <testcase classname="Database State Machine Integration resetDatabaseState should allow setup after reset" name="Database State Machine Integration resetDatabaseState should allow setup after reset" time="0">
+    </testcase>
+    <testcase classname="Database State Machine Integration No module-level flags should not use databaseInitialized flag (should use state machine)" name="Database State Machine Integration No module-level flags should not use databaseInitialized flag (should use state machine)" time="0">
+    </testcase>
+    <testcase classname="Database State Machine Integration Event-based waiting (CI-6 fix) should resolve waiter when setReady is called" name="Database State Machine Integration Event-based waiting (CI-6 fix) should resolve waiter when setReady is called" time="0.103">
+    </testcase>
+    <testcase classname="Database State Machine Integration Event-based waiting (CI-6 fix) should wait for concurrent initialization without polling" name="Database State Machine Integration Event-based waiting (CI-6 fix) should wait for concurrent initialization without polling" time="0.502">
+    </testcase>
+    <testcase classname="Database State Machine Integration Event-based waiting (CI-6 fix) should resolve immediately if already ready" name="Database State Machine Integration Event-based waiting (CI-6 fix) should resolve immediately if already ready" time="0.001">
+    </testcase>
+    <testcase classname="Database State Machine Integration Event-based waiting (CI-6 fix) should timeout after 30 seconds if initialization never completes" name="Database State Machine Integration Event-based waiting (CI-6 fix) should timeout after 30 seconds if initialization never completes" time="0.162">
+    </testcase>
+    <testcase classname="Database State Machine Integration Event-based waiting (CI-6 fix) should handle multiple concurrent waiters" name="Database State Machine Integration Event-based waiting (CI-6 fix) should handle multiple concurrent waiters" time="0.304">
+    </testcase>
+    <testcase classname="Database State Machine Integration Event-based waiting (CI-6 fix) should reject all waiters if initialization fails" name="Database State Machine Integration Event-based waiting (CI-6 fix) should reject all waiters if initialization fails" time="0.053">
+    </testcase>
+  </testsuite>
+  <testsuite name="initializeBeerDatabase" errors="0" failures="0" skipped="0" timestamp="2025-11-12T21:26:57" time="0.178" tests="16">
+    <testcase classname="initializeBeerDatabase Happy Path should complete initialization successfully when API URLs configured and not visitor mode" name="initializeBeerDatabase Happy Path should complete initialization successfully when API URLs configured and not visitor mode" time="0.007">
+    </testcase>
+    <testcase classname="initializeBeerDatabase Happy Path should fetch and populate all beers synchronously" name="initializeBeerDatabase Happy Path should fetch and populate all beers synchronously" time="0.001">
+    </testcase>
+    <testcase classname="initializeBeerDatabase API Configuration should exit early when API URLs not configured" name="initializeBeerDatabase API Configuration should exit early when API URLs not configured" time="0">
+    </testcase>
+    <testcase classname="initializeBeerDatabase Visitor Mode should skip My Beers import when in visitor mode" name="initializeBeerDatabase Visitor Mode should skip My Beers import when in visitor mode" time="0.002">
+    </testcase>
+    <testcase classname="initializeBeerDatabase Visitor Mode should skip Rewards import when in visitor mode" name="initializeBeerDatabase Visitor Mode should skip Rewards import when in visitor mode" time="0.004">
+    </testcase>
+    <testcase classname="initializeBeerDatabase Visitor Mode should still fetch all beers in visitor mode" name="initializeBeerDatabase Visitor Mode should still fetch all beers in visitor mode" time="0">
+    </testcase>
+    <testcase classname="initializeBeerDatabase Error Handling should handle setupDatabase errors and propagate them" name="initializeBeerDatabase Error Handling should handle setupDatabase errors and propagate them" time="0.013">
+    </testcase>
+    <testcase classname="initializeBeerDatabase Error Handling should continue when My Beers background import fails" name="initializeBeerDatabase Error Handling should continue when My Beers background import fails" time="0.003">
+    </testcase>
+    <testcase classname="initializeBeerDatabase Error Handling should continue when Rewards background import fails" name="initializeBeerDatabase Error Handling should continue when Rewards background import fails" time="0.004">
+    </testcase>
+    <testcase classname="initializeBeerDatabase Error Handling should log error but continue when all beers fetch fails" name="initializeBeerDatabase Error Handling should log error but continue when all beers fetch fails" time="0.001">
+    </testcase>
+    <testcase classname="initializeBeerDatabase Error Handling should handle multiple simultaneous failures gracefully" name="initializeBeerDatabase Error Handling should handle multiple simultaneous failures gracefully" time="0.004">
+    </testcase>
+    <testcase classname="initializeBeerDatabase Background Import Timing should schedule My Beers import with 100ms delay" name="initializeBeerDatabase Background Import Timing should schedule My Beers import with 100ms delay" time="0.004">
+    </testcase>
+    <testcase classname="initializeBeerDatabase Background Import Timing should schedule Rewards import with 200ms delay" name="initializeBeerDatabase Background Import Timing should schedule Rewards import with 200ms delay" time="0.005">
+    </testcase>
+    <testcase classname="initializeBeerDatabase Background Import Timing should schedule My Beers before Rewards (staggered timing)" name="initializeBeerDatabase Background Import Timing should schedule My Beers before Rewards (staggered timing)" time="0.006">
+    </testcase>
+    <testcase classname="initializeBeerDatabase Background Import Timing should execute all beers fetch before any background imports" name="initializeBeerDatabase Background Import Timing should execute all beers fetch before any background imports" time="0.006">
+    </testcase>
+    <testcase classname="initializeBeerDatabase Integration should complete full initialization flow with all components" name="initializeBeerDatabase Integration should complete full initialization flow with all components" time="0.006">
+    </testcase>
+  </testsuite>
+  <testsuite name="Database Transactions" errors="0" failures="0" skipped="0" timestamp="2025-11-12T21:26:58" time="0.185" tests="27">
+    <testcase classname="Database Transactions withDatabaseTransaction should execute operation within transaction successfully" name="Database Transactions withDatabaseTransaction should execute operation within transaction successfully" time="0.001">
+    </testcase>
+    <testcase classname="Database Transactions withDatabaseTransaction should rollback transaction on operation failure" name="Database Transactions withDatabaseTransaction should rollback transaction on operation failure" time="0.016">
+    </testcase>
+    <testcase classname="Database Transactions withDatabaseTransaction should pass database to operation callback" name="Database Transactions withDatabaseTransaction should pass database to operation callback" time="0">
+    </testcase>
+    <testcase classname="Database Transactions withDatabaseTransaction should handle multiple operations in single transaction" name="Database Transactions withDatabaseTransaction should handle multiple operations in single transaction" time="0">
+    </testcase>
+    <testcase classname="Database Transactions withDatabaseTransaction should rollback all operations if any operation fails" name="Database Transactions withDatabaseTransaction should rollback all operations if any operation fails" time="0.001">
+    </testcase>
+    <testcase classname="Database Transactions withDatabaseTransaction should return operation result on success" name="Database Transactions withDatabaseTransaction should return operation result on success" time="0">
+    </testcase>
+    <testcase classname="Database Transactions withDatabaseTransaction should handle operation returning undefined" name="Database Transactions withDatabaseTransaction should handle operation returning undefined" time="0.001">
+    </testcase>
+    <testcase classname="Database Transactions withDatabaseTransaction should handle concurrent transaction attempts gracefully" name="Database Transactions withDatabaseTransaction should handle concurrent transaction attempts gracefully" time="0">
+    </testcase>
+    <testcase classname="Database Transactions withDatabaseTransaction should propagate error details from failed operation" name="Database Transactions withDatabaseTransaction should propagate error details from failed operation" time="0.001">
+    </testcase>
+    <testcase classname="Database Transactions withDatabaseTransaction should handle operation with complex return type" name="Database Transactions withDatabaseTransaction should handle operation with complex return type" time="0.001">
+    </testcase>
+    <testcase classname="Database Transactions withBatchInsert should insert all valid records and skip invalid ones" name="Database Transactions withBatchInsert should insert all valid records and skip invalid ones" time="0.001">
+    </testcase>
+    <testcase classname="Database Transactions withBatchInsert should handle all valid records" name="Database Transactions withBatchInsert should handle all valid records" time="0">
+    </testcase>
+    <testcase classname="Database Transactions withBatchInsert should handle all invalid records" name="Database Transactions withBatchInsert should handle all invalid records" time="0.001">
+    </testcase>
+    <testcase classname="Database Transactions withBatchInsert should handle empty record array" name="Database Transactions withBatchInsert should handle empty record array" time="0">
+    </testcase>
+    <testcase classname="Database Transactions withBatchInsert should rollback if insert fails mid-batch" name="Database Transactions withBatchInsert should rollback if insert fails mid-batch" time="0.001">
+    </testcase>
+    <testcase classname="Database Transactions withBatchInsert should handle validation with multiple error messages" name="Database Transactions withBatchInsert should handle validation with multiple error messages" time="0">
+    </testcase>
+    <testcase classname="Database Transactions withReplaceData should delete all old data and insert new data" name="Database Transactions withReplaceData should delete all old data and insert new data" time="0.001">
+    </testcase>
+    <testcase classname="Database Transactions withReplaceData should delete with condition and insert new data" name="Database Transactions withReplaceData should delete with condition and insert new data" time="0">
+    </testcase>
+    <testcase classname="Database Transactions withReplaceData should handle empty new records array" name="Database Transactions withReplaceData should handle empty new records array" time="0">
+    </testcase>
+    <testcase classname="Database Transactions withReplaceData should rollback if delete fails" name="Database Transactions withReplaceData should rollback if delete fails" time="0.001">
+    </testcase>
+    <testcase classname="Database Transactions withReplaceData should rollback if insert fails after delete" name="Database Transactions withReplaceData should rollback if insert fails after delete" time="0">
+    </testcase>
+    <testcase classname="Database Transactions withReplaceData should handle large dataset replacement" name="Database Transactions withReplaceData should handle large dataset replacement" time="0.005">
+    </testcase>
+    <testcase classname="Database Transactions Real-world transaction scenarios should handle beer insertion with validation" name="Database Transactions Real-world transaction scenarios should handle beer insertion with validation" time="0">
+    </testcase>
+    <testcase classname="Database Transactions Real-world transaction scenarios should rollback beer insertion on constraint violation" name="Database Transactions Real-world transaction scenarios should rollback beer insertion on constraint violation" time="0.001">
+    </testcase>
+    <testcase classname="Database Transactions Real-world transaction scenarios should handle multi-table update transaction" name="Database Transactions Real-world transaction scenarios should handle multi-table update transaction" time="0">
+    </testcase>
+    <testcase classname="Database Transactions Real-world transaction scenarios should handle delete old and insert new data transaction" name="Database Transactions Real-world transaction scenarios should handle delete old and insert new data transaction" time="0.001">
+    </testcase>
+    <testcase classname="Database Transactions Real-world transaction scenarios should ensure all-or-nothing behavior for data refresh" name="Database Transactions Real-world transaction scenarios should ensure all-or-nothing behavior for data refresh" time="0">
+    </testcase>
+  </testsuite>
+  <testsuite name="Preference Functions" errors="0" failures="0" skipped="0" timestamp="2025-11-12T21:26:58" time="0.123" tests="21">
+    <testcase classname="Preference Functions getPreference should return preference value when it exists" name="Preference Functions getPreference should return preference value when it exists" time="0.001">
+    </testcase>
+    <testcase classname="Preference Functions getPreference should return null when preference does not exist" name="Preference Functions getPreference should return null when preference does not exist" time="0">
+    </testcase>
+    <testcase classname="Preference Functions getPreference should return null on database error" name="Preference Functions getPreference should return null on database error" time="0">
+    </testcase>
+    <testcase classname="Preference Functions getPreference should handle empty string key" name="Preference Functions getPreference should handle empty string key" time="0">
+    </testcase>
+    <testcase classname="Preference Functions getPreference should handle special characters in key" name="Preference Functions getPreference should handle special characters in key" time="0">
+    </testcase>
+    <testcase classname="Preference Functions setPreference should insert new preference with description" name="Preference Functions setPreference should insert new preference with description" time="0.001">
+    </testcase>
+    <testcase classname="Preference Functions setPreference should update existing preference value and preserve description" name="Preference Functions setPreference should update existing preference value and preserve description" time="0">
+    </testcase>
+    <testcase classname="Preference Functions setPreference should set empty description when updating non-existent preference without description" name="Preference Functions setPreference should set empty description when updating non-existent preference without description" time="0">
+    </testcase>
+    <testcase classname="Preference Functions setPreference should handle empty string value" name="Preference Functions setPreference should handle empty string value" time="0">
+    </testcase>
+    <testcase classname="Preference Functions setPreference should handle special characters in value" name="Preference Functions setPreference should handle special characters in value" time="0.001">
+    </testcase>
+    <testcase classname="Preference Functions setPreference should throw error when database operation fails" name="Preference Functions setPreference should throw error when database operation fails" time="0.01">
+    </testcase>
+    <testcase classname="Preference Functions setPreference should handle description update when providing new description" name="Preference Functions setPreference should handle description update when providing new description" time="0">
+    </testcase>
+    <testcase classname="Preference Functions setPreference should handle undefined description parameter" name="Preference Functions setPreference should handle undefined description parameter" time="0.001">
+    </testcase>
+    <testcase classname="Preference Functions getAllPreferences should return all preferences ordered by key" name="Preference Functions getAllPreferences should return all preferences ordered by key" time="0">
+    </testcase>
+    <testcase classname="Preference Functions getAllPreferences should return empty array when no preferences exist" name="Preference Functions getAllPreferences should return empty array when no preferences exist" time="0">
+    </testcase>
+    <testcase classname="Preference Functions getAllPreferences should return empty array on database error" name="Preference Functions getAllPreferences should return empty array on database error" time="0.001">
+    </testcase>
+    <testcase classname="Preference Functions getAllPreferences should handle null return from database" name="Preference Functions getAllPreferences should handle null return from database" time="0">
+    </testcase>
+    <testcase classname="Preference Functions getAllPreferences should return preferences with empty descriptions" name="Preference Functions getAllPreferences should return preferences with empty descriptions" time="0">
+    </testcase>
+    <testcase classname="Preference Functions getAllPreferences should preserve preference ordering by key" name="Preference Functions getAllPreferences should preserve preference ordering by key" time="0">
+    </testcase>
+    <testcase classname="Preference Functions Integration scenarios should handle set and get preference workflow" name="Preference Functions Integration scenarios should handle set and get preference workflow" time="0">
+    </testcase>
+    <testcase classname="Preference Functions Integration scenarios should handle multiple preference updates" name="Preference Functions Integration scenarios should handle multiple preference updates" time="0.001">
+    </testcase>
+  </testsuite>
+  <testsuite name="DatabaseLockManager" errors="0" failures="0" skipped="0" timestamp="2025-11-12T21:26:58" time="0.103" tests="32">
+    <testcase classname="DatabaseLockManager module exports (HP-2 Step 6a) should export DatabaseLockManager class from locks.ts" name="DatabaseLockManager module exports (HP-2 Step 6a) should export DatabaseLockManager class from locks.ts" time="0.001">
+    </testcase>
+    <testcase classname="DatabaseLockManager module exports (HP-2 Step 6a) should export singleton databaseLockManager instance from locks.ts" name="DatabaseLockManager module exports (HP-2 Step 6a) should export singleton databaseLockManager instance from locks.ts" time="0">
+    </testcase>
+    <testcase classname="DatabaseLockManager module exports (HP-2 Step 6a) should allow creating new instances of DatabaseLockManager" name="DatabaseLockManager module exports (HP-2 Step 6a) should allow creating new instances of DatabaseLockManager" time="0">
+    </testcase>
+    <testcase classname="DatabaseLockManager acquireLock should successfully acquire lock when available" name="DatabaseLockManager acquireLock should successfully acquire lock when available" time="0.001">
+    </testcase>
+    <testcase classname="DatabaseLockManager acquireLock should log lock acquisition" name="DatabaseLockManager acquireLock should log lock acquisition" time="0">
+    </testcase>
+    <testcase classname="DatabaseLockManager releaseLock should release the lock" name="DatabaseLockManager releaseLock should release the lock" time="0">
+    </testcase>
+    <testcase classname="DatabaseLockManager releaseLock should log lock release" name="DatabaseLockManager releaseLock should log lock release" time="0">
+    </testcase>
+    <testcase classname="DatabaseLockManager releaseLock should handle releasing lock when not held" name="DatabaseLockManager releaseLock should handle releasing lock when not held" time="0.003">
+    </testcase>
+    <testcase classname="DatabaseLockManager concurrent operations should handle rapid acquire/release cycles" name="DatabaseLockManager concurrent operations should handle rapid acquire/release cycles" time="0">
+    </testcase>
+    <testcase classname="DatabaseLockManager error scenarios should handle errors without leaving lock in bad state" name="DatabaseLockManager error scenarios should handle errors without leaving lock in bad state" time="0">
+    </testcase>
+    <testcase classname="DatabaseLockManager isLocked should return false when no lock is held" name="DatabaseLockManager isLocked should return false when no lock is held" time="0">
+    </testcase>
+    <testcase classname="DatabaseLockManager isLocked should return true when lock is held" name="DatabaseLockManager isLocked should return true when lock is held" time="0.001">
+    </testcase>
+    <testcase classname="DatabaseLockManager isLocked should return false after lock is released" name="DatabaseLockManager isLocked should return false after lock is released" time="0">
+    </testcase>
+    <testcase classname="DatabaseLockManager getQueueLength (HP-2 Step 6a edge cases) should return 0 when queue is empty" name="DatabaseLockManager getQueueLength (HP-2 Step 6a edge cases) should return 0 when queue is empty" time="0">
+    </testcase>
+    <testcase classname="DatabaseLockManager getQueueLength (HP-2 Step 6a edge cases) should return correct queue length when operations are waiting" name="DatabaseLockManager getQueueLength (HP-2 Step 6a edge cases) should return correct queue length when operations are waiting" time="0">
+    </testcase>
+    <testcase classname="DatabaseLockManager getCurrentOperation (HP-2 Step 6a edge cases) should return null when no lock is held" name="DatabaseLockManager getCurrentOperation (HP-2 Step 6a edge cases) should return null when no lock is held" time="0.001">
+    </testcase>
+    <testcase classname="DatabaseLockManager getCurrentOperation (HP-2 Step 6a edge cases) should return current operation name" name="DatabaseLockManager getCurrentOperation (HP-2 Step 6a edge cases) should return current operation name" time="0">
+    </testcase>
+    <testcase classname="DatabaseLockManager getCurrentOperation (HP-2 Step 6a edge cases) should return null after lock is released" name="DatabaseLockManager getCurrentOperation (HP-2 Step 6a edge cases) should return null after lock is released" time="0">
+    </testcase>
+    <testcase classname="DatabaseLockManager concurrent access patterns (HP-2 Step 6a) should handle 10 concurrent lock requests sequentially" name="DatabaseLockManager concurrent access patterns (HP-2 Step 6a) should handle 10 concurrent lock requests sequentially" time="0.001">
+    </testcase>
+    <testcase classname="DatabaseLockManager concurrent access patterns (HP-2 Step 6a) should maintain correct state with rapid queue/dequeue" name="DatabaseLockManager concurrent access patterns (HP-2 Step 6a) should maintain correct state with rapid queue/dequeue" time="0">
+    </testcase>
+    <testcase classname="DatabaseLockManager singleton instance (HP-2 Step 6a) should use same singleton instance across imports" name="DatabaseLockManager singleton instance (HP-2 Step 6a) should use same singleton instance across imports" time="0">
+    </testcase>
+    <testcase classname="DatabaseLockManager singleton instance (HP-2 Step 6a) should maintain state in singleton instance" name="DatabaseLockManager singleton instance (HP-2 Step 6a) should maintain state in singleton instance" time="0.001">
+    </testcase>
+    <testcase classname="DatabaseLockManager lock metrics (HP-2 Step 8) should return correct metrics when no lock held" name="DatabaseLockManager lock metrics (HP-2 Step 8) should return correct metrics when no lock held" time="0">
+    </testcase>
+    <testcase classname="DatabaseLockManager lock metrics (HP-2 Step 8) should return current operation in metrics" name="DatabaseLockManager lock metrics (HP-2 Step 8) should return current operation in metrics" time="0">
+    </testcase>
+    <testcase classname="DatabaseLockManager lock metrics (HP-2 Step 8) should return queue length in metrics" name="DatabaseLockManager lock metrics (HP-2 Step 8) should return queue length in metrics" time="0">
+    </testcase>
+    <testcase classname="DatabaseLockManager lock metrics (HP-2 Step 8) should track queue wait times" name="DatabaseLockManager lock metrics (HP-2 Step 8) should track queue wait times" time="0.001">
+    </testcase>
+    <testcase classname="DatabaseLockManager lock metrics (HP-2 Step 8) should limit wait time history to 10 entries" name="DatabaseLockManager lock metrics (HP-2 Step 8) should limit wait time history to 10 entries" time="0">
+    </testcase>
+    <testcase classname="DatabaseLockManager lock metrics (HP-2 Step 8) should return a copy of wait times array" name="DatabaseLockManager lock metrics (HP-2 Step 8) should return a copy of wait times array" time="0">
+    </testcase>
+    <testcase classname="DatabaseLockManager debug logging (HP-2 Step 8) should enable debug logging" name="DatabaseLockManager debug logging (HP-2 Step 8) should enable debug logging" time="0.001">
+    </testcase>
+    <testcase classname="DatabaseLockManager debug logging (HP-2 Step 8) should log detailed lock acquisition when debug enabled" name="DatabaseLockManager debug logging (HP-2 Step 8) should log detailed lock acquisition when debug enabled" time="0">
+    </testcase>
+    <testcase classname="DatabaseLockManager debug logging (HP-2 Step 8) should log wait time when debug enabled for queued operations" name="DatabaseLockManager debug logging (HP-2 Step 8) should log wait time when debug enabled for queued operations" time="0">
+    </testcase>
+    <testcase classname="DatabaseLockManager queue warning (HP-2 Step 8) should warn when queue length exceeds threshold" name="DatabaseLockManager queue warning (HP-2 Step 8) should warn when queue length exceeds threshold" time="0">
+    </testcase>
+  </testsuite>
+  <testsuite name="Database Schema" errors="0" failures="0" skipped="0" timestamp="2025-11-12T21:26:58" time="0.126" tests="17">
+    <testcase classname="Database Schema setupDatabase should create all required tables" name="Database Schema setupDatabase should create all required tables" time="0.001">
+    </testcase>
+    <testcase classname="Database Schema setupDatabase should create allbeers table with correct columns" name="Database Schema setupDatabase should create allbeers table with correct columns" time="0.001">
+    </testcase>
+    <testcase classname="Database Schema setupDatabase should create tasted_brew_current_round table with correct columns" name="Database Schema setupDatabase should create tasted_brew_current_round table with correct columns" time="0.001">
+    </testcase>
+    <testcase classname="Database Schema setupDatabase should create rewards table with correct columns" name="Database Schema setupDatabase should create rewards table with correct columns" time="0.001">
+    </testcase>
+    <testcase classname="Database Schema setupDatabase should create preferences table with correct columns" name="Database Schema setupDatabase should create preferences table with correct columns" time="0">
+    </testcase>
+    <testcase classname="Database Schema setupDatabase should create untappd table with correct columns" name="Database Schema setupDatabase should create untappd table with correct columns" time="0.003">
+    </testcase>
+    <testcase classname="Database Schema setupDatabase should initialize default preferences if table is empty" name="Database Schema setupDatabase should initialize default preferences if table is empty" time="0">
+    </testcase>
+    <testcase classname="Database Schema setupDatabase should not reinitialize preferences if table already has data" name="Database Schema setupDatabase should not reinitialize preferences if table already has data" time="0.001">
+    </testcase>
+    <testcase classname="Database Schema setupDatabase should handle errors gracefully" name="Database Schema setupDatabase should handle errors gracefully" time="0.012">
+    </testcase>
+    <testcase classname="Database Schema setupDatabase should use a transaction for table creation" name="Database Schema setupDatabase should use a transaction for table creation" time="0.001">
+    </testcase>
+    <testcase classname="Database Schema setupDatabase should log setup completion" name="Database Schema setupDatabase should log setup completion" time="0">
+    </testcase>
+    <testcase classname="Database Schema initDatabase should call getDatabase from connection module" name="Database Schema initDatabase should call getDatabase from connection module" time="0">
+    </testcase>
+    <testcase classname="Database Schema initDatabase should return the same database instance" name="Database Schema initDatabase should return the same database instance" time="0.001">
+    </testcase>
+    <testcase classname="Database Schema Table Schema Verification should have 5 tables total" name="Database Schema Table Schema Verification should have 5 tables total" time="0">
+    </testcase>
+    <testcase classname="Database Schema Table Schema Verification should use TEXT type for all columns" name="Database Schema Table Schema Verification should use TEXT type for all columns" time="0">
+    </testcase>
+    <testcase classname="Database Schema Table Schema Verification should use PRIMARY KEY for id columns" name="Database Schema Table Schema Verification should use PRIMARY KEY for id columns" time="0.001">
+    </testcase>
+    <testcase classname="Database Schema Table Schema Verification should use IF NOT EXISTS for all tables" name="Database Schema Table Schema Verification should use IF NOT EXISTS for all tables" time="0">
+    </testcase>
+  </testsuite>
+  <testsuite name="DatabaseLockManager" errors="0" failures="0" skipped="0" timestamp="2025-11-12T21:26:55" time="3.406" tests="37">
+    <testcase classname="DatabaseLockManager Basic lock acquisition should acquire lock when available" name="DatabaseLockManager Basic lock acquisition should acquire lock when available" time="0.006">
+    </testcase>
+    <testcase classname="DatabaseLockManager Basic lock acquisition should release lock successfully" name="DatabaseLockManager Basic lock acquisition should release lock successfully" time="0">
+    </testcase>
+    <testcase classname="DatabaseLockManager Basic lock acquisition should check lock status correctly" name="DatabaseLockManager Basic lock acquisition should check lock status correctly" time="0">
+    </testcase>
+    <testcase classname="DatabaseLockManager Queue mechanism (FIFO) should queue lock requests and process in FIFO order" name="DatabaseLockManager Queue mechanism (FIFO) should queue lock requests and process in FIFO order" time="0">
+    </testcase>
+    <testcase classname="DatabaseLockManager Queue mechanism (FIFO) should handle multiple simultaneous lock requests" name="DatabaseLockManager Queue mechanism (FIFO) should handle multiple simultaneous lock requests" time="0.001">
+    </testcase>
+    <testcase classname="DatabaseLockManager Queue mechanism (FIFO) should propagate lock to next waiter on release" name="DatabaseLockManager Queue mechanism (FIFO) should propagate lock to next waiter on release" time="0">
+    </testcase>
+    <testcase classname="DatabaseLockManager Queue mechanism (FIFO) should track queue length correctly" name="DatabaseLockManager Queue mechanism (FIFO) should track queue length correctly" time="0.001">
+    </testcase>
+    <testcase classname="DatabaseLockManager Timeout handling with fake timers should auto-release lock after timeout" name="DatabaseLockManager Timeout handling with fake timers should auto-release lock after timeout" time="0.001">
+    </testcase>
+    <testcase classname="DatabaseLockManager Timeout handling with fake timers should log warning when lock is forcibly released" name="DatabaseLockManager Timeout handling with fake timers should log warning when lock is forcibly released" time="0.001">
+    </testcase>
+    <testcase classname="DatabaseLockManager Timeout handling with fake timers should clear timeout when lock is released normally" name="DatabaseLockManager Timeout handling with fake timers should clear timeout when lock is released normally" time="0.001">
+    </testcase>
+    <testcase classname="DatabaseLockManager Concurrent operations should prevent concurrent database operations" name="DatabaseLockManager Concurrent operations should prevent concurrent database operations" time="0">
+    </testcase>
+    <testcase classname="DatabaseLockManager Concurrent operations should handle rapid lock requests without race conditions" name="DatabaseLockManager Concurrent operations should handle rapid lock requests without race conditions" time="0.003">
+    </testcase>
+    <testcase classname="DatabaseLockManager Error recovery should allow new operations after failed operation" name="DatabaseLockManager Error recovery should allow new operations after failed operation" time="0">
+    </testcase>
+    <testcase classname="DatabaseLockManager Error recovery should handle multiple releases gracefully" name="DatabaseLockManager Error recovery should handle multiple releases gracefully" time="0">
+    </testcase>
+    <testcase classname="DatabaseLockManager Operation tracking should track current operation name" name="DatabaseLockManager Operation tracking should track current operation name" time="0">
+    </testcase>
+    <testcase classname="DatabaseLockManager Operation tracking should update current operation as queue processes" name="DatabaseLockManager Operation tracking should update current operation as queue processes" time="0">
+    </testcase>
+    <testcase classname="DatabaseLockManager Logging should log lock acquisition" name="DatabaseLockManager Logging should log lock acquisition" time="0.001">
+    </testcase>
+    <testcase classname="DatabaseLockManager Logging should log lock release" name="DatabaseLockManager Logging should log lock release" time="0">
+    </testcase>
+    <testcase classname="DatabaseLockManager Logging should log when waiting for lock" name="DatabaseLockManager Logging should log when waiting for lock" time="0.001">
+    </testcase>
+    <testcase classname="DatabaseLockManager Lock acquisition timeout (Step 5d) should reject promise if lock not acquired within custom timeout" name="DatabaseLockManager Lock acquisition timeout (Step 5d) should reject promise if lock not acquired within custom timeout" time="0.021">
+    </testcase>
+    <testcase classname="DatabaseLockManager Lock acquisition timeout (Step 5d) should use default 30-second timeout if not specified" name="DatabaseLockManager Lock acquisition timeout (Step 5d) should use default 30-second timeout if not specified" time="0.001">
+    </testcase>
+    <testcase classname="DatabaseLockManager Lock acquisition timeout (Step 5d) should have separate acquisition timeout (30s) and hold timeout (15s)" name="DatabaseLockManager Lock acquisition timeout (Step 5d) should have separate acquisition timeout (30s) and hold timeout (15s)" time="0">
+    </testcase>
+    <testcase classname="DatabaseLockManager Lock acquisition timeout (Step 5d) should clear acquisition timeout if lock is granted before timeout" name="DatabaseLockManager Lock acquisition timeout (Step 5d) should clear acquisition timeout if lock is granted before timeout" time="0">
+    </testcase>
+    <testcase classname="DatabaseLockManager Lock acquisition timeout (Step 5d) should remove timed-out operation from queue" name="DatabaseLockManager Lock acquisition timeout (Step 5d) should remove timed-out operation from queue" time="0.001">
+    </testcase>
+    <testcase classname="DatabaseLockManager Lock acquisition timeout (Step 5d) should handle multiple queued operations with different timeouts" name="DatabaseLockManager Lock acquisition timeout (Step 5d) should handle multiple queued operations with different timeouts" time="0.001">
+    </testcase>
+    <testcase classname="DatabaseLockManager Lock acquisition timeout (Step 5d) should log warning when acquisition timeout occurs" name="DatabaseLockManager Lock acquisition timeout (Step 5d) should log warning when acquisition timeout occurs" time="0.001">
+    </testcase>
+    <testcase classname="DatabaseLockManager Graceful Shutdown should prepare for shutdown successfully when lock is free" name="DatabaseLockManager Graceful Shutdown should prepare for shutdown successfully when lock is free" time="0">
+    </testcase>
+    <testcase classname="DatabaseLockManager Graceful Shutdown should wait for active operation to complete before shutdown" name="DatabaseLockManager Graceful Shutdown should wait for active operation to complete before shutdown" time="0.101">
+    </testcase>
+    <testcase classname="DatabaseLockManager Graceful Shutdown should timeout if operation takes too long during shutdown" name="DatabaseLockManager Graceful Shutdown should timeout if operation takes too long during shutdown" time="1.014">
+    </testcase>
+    <testcase classname="DatabaseLockManager Graceful Shutdown should prevent new lock acquisitions after shutdown initiated" name="DatabaseLockManager Graceful Shutdown should prevent new lock acquisitions after shutdown initiated" time="0.006">
+    </testcase>
+    <testcase classname="DatabaseLockManager Graceful Shutdown should warn when forcing shutdown with lock held" name="DatabaseLockManager Graceful Shutdown should warn when forcing shutdown with lock held" time="0.507">
+    </testcase>
+    <testcase classname="DatabaseLockManager Graceful Shutdown should warn when shutting down with non-empty queue" name="DatabaseLockManager Graceful Shutdown should warn when shutting down with non-empty queue" time="0.504">
+    </testcase>
+    <testcase classname="DatabaseLockManager Graceful Shutdown should log when entering shutdown state" name="DatabaseLockManager Graceful Shutdown should log when entering shutdown state" time="0.001">
+    </testcase>
+    <testcase classname="DatabaseLockManager Graceful Shutdown should handle shutdown when already in shutdown state" name="DatabaseLockManager Graceful Shutdown should handle shutdown when already in shutdown state" time="0">
+    </testcase>
+    <testcase classname="DatabaseLockManager Graceful Shutdown should poll lock status during shutdown" name="DatabaseLockManager Graceful Shutdown should poll lock status during shutdown" time="0.1">
+    </testcase>
+    <testcase classname="DatabaseLockManager Graceful Shutdown should use custom timeout when provided" name="DatabaseLockManager Graceful Shutdown should use custom timeout when provided" time="0.203">
+    </testcase>
+    <testcase classname="DatabaseLockManager Graceful Shutdown should use default timeout (5 seconds) when not specified" name="DatabaseLockManager Graceful Shutdown should use default timeout (5 seconds) when not specified" time="0.1">
+    </testcase>
+  </testsuite>
+  <testsuite name="Database Data Validation" errors="0" failures="0" skipped="0" timestamp="2025-11-12T21:26:58" time="0.152" tests="28">
+    <testcase classname="Database Data Validation validateBeerForInsertion should validate a complete valid beer object" name="Database Data Validation validateBeerForInsertion should validate a complete valid beer object" time="0.001">
+    </testcase>
+    <testcase classname="Database Data Validation validateBeerForInsertion should validate beer with minimal required fields" name="Database Data Validation validateBeerForInsertion should validate beer with minimal required fields" time="0">
+    </testcase>
+    <testcase classname="Database Data Validation validateBeerForInsertion should reject beer missing id field" name="Database Data Validation validateBeerForInsertion should reject beer missing id field" time="0">
+    </testcase>
+    <testcase classname="Database Data Validation validateBeerForInsertion should reject beer missing brew_name field" name="Database Data Validation validateBeerForInsertion should reject beer missing brew_name field" time="0">
+    </testcase>
+    <testcase classname="Database Data Validation validateBeerForInsertion should reject beer with null id" name="Database Data Validation validateBeerForInsertion should reject beer with null id" time="0.001">
+    </testcase>
+    <testcase classname="Database Data Validation validateBeerForInsertion should reject beer with undefined id" name="Database Data Validation validateBeerForInsertion should reject beer with undefined id" time="0">
+    </testcase>
+    <testcase classname="Database Data Validation validateBeerForInsertion should reject beer with empty brew_name" name="Database Data Validation validateBeerForInsertion should reject beer with empty brew_name" time="0">
+    </testcase>
+    <testcase classname="Database Data Validation validateBeerForInsertion should reject beer with whitespace-only brew_name" name="Database Data Validation validateBeerForInsertion should reject beer with whitespace-only brew_name" time="0.003">
+    </testcase>
+    <testcase classname="Database Data Validation validateBeerForInsertion should reject null beer object" name="Database Data Validation validateBeerForInsertion should reject null beer object" time="0">
+    </testcase>
+    <testcase classname="Database Data Validation validateBeerForInsertion should reject undefined beer object" name="Database Data Validation validateBeerForInsertion should reject undefined beer object" time="0">
+    </testcase>
+    <testcase classname="Database Data Validation validateBeerForInsertion should reject non-object beer" name="Database Data Validation validateBeerForInsertion should reject non-object beer" time="0">
+    </testcase>
+    <testcase classname="Database Data Validation validateBeerForInsertion should accept beer with numeric string id" name="Database Data Validation validateBeerForInsertion should accept beer with numeric string id" time="0.001">
+    </testcase>
+    <testcase classname="Database Data Validation validateBeerForInsertion should accept beer with special characters in name" name="Database Data Validation validateBeerForInsertion should accept beer with special characters in name" time="0">
+    </testcase>
+    <testcase classname="Database Data Validation validateBeerForInsertion should accept beer with additional optional fields" name="Database Data Validation validateBeerForInsertion should accept beer with additional optional fields" time="0">
+    </testcase>
+    <testcase classname="Database Data Validation validateBeerForInsertion should collect multiple validation errors" name="Database Data Validation validateBeerForInsertion should collect multiple validation errors" time="0">
+    </testcase>
+    <testcase classname="Database Data Validation validateBeersForInsertion should validate array of all valid beers" name="Database Data Validation validateBeersForInsertion should validate array of all valid beers" time="0.001">
+    </testcase>
+    <testcase classname="Database Data Validation validateBeersForInsertion should separate valid and invalid beers" name="Database Data Validation validateBeersForInsertion should separate valid and invalid beers" time="0">
+    </testcase>
+    <testcase classname="Database Data Validation validateBeersForInsertion should provide detailed error information for invalid beers" name="Database Data Validation validateBeersForInsertion should provide detailed error information for invalid beers" time="0">
+    </testcase>
+    <testcase classname="Database Data Validation validateBeersForInsertion should handle empty array" name="Database Data Validation validateBeersForInsertion should handle empty array" time="0">
+    </testcase>
+    <testcase classname="Database Data Validation validateBeersForInsertion should handle array with all invalid beers" name="Database Data Validation validateBeersForInsertion should handle array with all invalid beers" time="0">
+    </testcase>
+    <testcase classname="Database Data Validation validateBeersForInsertion should preserve order of valid beers" name="Database Data Validation validateBeersForInsertion should preserve order of valid beers" time="0">
+    </testcase>
+    <testcase classname="Database Data Validation validateBeersForInsertion should generate correct summary" name="Database Data Validation validateBeersForInsertion should generate correct summary" time="0.001">
+    </testcase>
+    <testcase classname="Database Data Validation validateBeersForInsertion should handle large dataset efficiently" name="Database Data Validation validateBeersForInsertion should handle large dataset efficiently" time="0.001">
+    </testcase>
+    <testcase classname="Database Data Validation validateBeersForInsertion should handle mixed valid/invalid in large dataset" name="Database Data Validation validateBeersForInsertion should handle mixed valid/invalid in large dataset" time="0">
+    </testcase>
+    <testcase classname="Database Data Validation ValidationSummary type should have correct structure" name="Database Data Validation ValidationSummary type should have correct structure" time="0">
+    </testcase>
+    <testcase classname="Database Data Validation Integration with real API data patterns should validate Flying Saucer API response structure" name="Database Data Validation Integration with real API data patterns should validate Flying Saucer API response structure" time="0.001">
+    </testcase>
+    <testcase classname="Database Data Validation Integration with real API data patterns should handle API returning beers with extra fields" name="Database Data Validation Integration with real API data patterns should handle API returning beers with extra fields" time="0">
+    </testcase>
+    <testcase classname="Database Data Validation Integration with real API data patterns should handle API returning beers with missing optional fields" name="Database Data Validation Integration with real API data patterns should handle API returning beers with missing optional fields" time="0">
+    </testcase>
+  </testsuite>
+  <testsuite name="Database Lifecycle Management" errors="0" failures="0" skipped="0" timestamp="2025-11-12T21:26:58" time="0.185" tests="29">
+    <testcase classname="Database Lifecycle Management Database Opening should open database successfully" name="Database Lifecycle Management Database Opening should open database successfully" time="0.001">
     </testcase>
     <testcase classname="Database Lifecycle Management Database Opening should reuse existing database connection" name="Database Lifecycle Management Database Opening should reuse existing database connection" time="0">
     </testcase>
@@ -9,7 +411,7 @@
     </testcase>
     <testcase classname="Database Lifecycle Management WAL Mode Enablement should enable WAL mode when opening database" name="Database Lifecycle Management WAL Mode Enablement should enable WAL mode when opening database" time="0">
     </testcase>
-    <testcase classname="Database Lifecycle Management WAL Mode Enablement should set PRAGMA synchronous to NORMAL" name="Database Lifecycle Management WAL Mode Enablement should set PRAGMA synchronous to NORMAL" time="0.001">
+    <testcase classname="Database Lifecycle Management WAL Mode Enablement should set PRAGMA synchronous to NORMAL" name="Database Lifecycle Management WAL Mode Enablement should set PRAGMA synchronous to NORMAL" time="0">
     </testcase>
     <testcase classname="Database Lifecycle Management WAL Mode Enablement should verify WAL mode was enabled successfully" name="Database Lifecycle Management WAL Mode Enablement should verify WAL mode was enabled successfully" time="0">
     </testcase>
@@ -17,25 +419,25 @@
     </testcase>
     <testcase classname="Database Lifecycle Management WAL Mode Enablement should handle missing journal_mode in response" name="Database Lifecycle Management WAL Mode Enablement should handle missing journal_mode in response" time="0">
     </testcase>
-    <testcase classname="Database Lifecycle Management WAL Mode Enablement should not re-execute PRAGMA on connection reuse" name="Database Lifecycle Management WAL Mode Enablement should not re-execute PRAGMA on connection reuse" time="0.001">
+    <testcase classname="Database Lifecycle Management WAL Mode Enablement should not re-execute PRAGMA on connection reuse" name="Database Lifecycle Management WAL Mode Enablement should not re-execute PRAGMA on connection reuse" time="0">
     </testcase>
-    <testcase classname="Database Lifecycle Management WAL Mode Enablement should handle PRAGMA execution errors gracefully" name="Database Lifecycle Management WAL Mode Enablement should handle PRAGMA execution errors gracefully" time="0">
+    <testcase classname="Database Lifecycle Management WAL Mode Enablement should handle PRAGMA execution errors gracefully" name="Database Lifecycle Management WAL Mode Enablement should handle PRAGMA execution errors gracefully" time="0.001">
     </testcase>
     <testcase classname="Database Lifecycle Management Database Closing should close database connection successfully" name="Database Lifecycle Management Database Closing should close database connection successfully" time="0">
     </testcase>
-    <testcase classname="Database Lifecycle Management Database Closing should nullify database reference after close" name="Database Lifecycle Management Database Closing should nullify database reference after close" time="0">
+    <testcase classname="Database Lifecycle Management Database Closing should nullify database reference after close" name="Database Lifecycle Management Database Closing should nullify database reference after close" time="0.001">
     </testcase>
-    <testcase classname="Database Lifecycle Management Database Closing should handle close when database is not open" name="Database Lifecycle Management Database Closing should handle close when database is not open" time="0.001">
+    <testcase classname="Database Lifecycle Management Database Closing should handle close when database is not open" name="Database Lifecycle Management Database Closing should handle close when database is not open" time="0">
     </testcase>
     <testcase classname="Database Lifecycle Management Database Closing should handle close errors gracefully" name="Database Lifecycle Management Database Closing should handle close errors gracefully" time="0">
     </testcase>
-    <testcase classname="Database Lifecycle Management Database Closing should log close operation" name="Database Lifecycle Management Database Closing should log close operation" time="0">
+    <testcase classname="Database Lifecycle Management Database Closing should log close operation" name="Database Lifecycle Management Database Closing should log close operation" time="0.001">
     </testcase>
     <testcase classname="Database Lifecycle Management Database Closing should log successful close" name="Database Lifecycle Management Database Closing should log successful close" time="0">
     </testcase>
-    <testcase classname="Database Lifecycle Management Database Closing should log errors during close" name="Database Lifecycle Management Database Closing should log errors during close" time="0">
+    <testcase classname="Database Lifecycle Management Database Closing should log errors during close" name="Database Lifecycle Management Database Closing should log errors during close" time="0.001">
     </testcase>
-    <testcase classname="Database Lifecycle Management Connection Reuse After Close/Reopen Cycle should open new connection after close" name="Database Lifecycle Management Connection Reuse After Close/Reopen Cycle should open new connection after close" time="0.001">
+    <testcase classname="Database Lifecycle Management Connection Reuse After Close/Reopen Cycle should open new connection after close" name="Database Lifecycle Management Connection Reuse After Close/Reopen Cycle should open new connection after close" time="0">
     </testcase>
     <testcase classname="Database Lifecycle Management Connection Reuse After Close/Reopen Cycle should re-enable WAL mode after reopen" name="Database Lifecycle Management Connection Reuse After Close/Reopen Cycle should re-enable WAL mode after reopen" time="0">
     </testcase>
@@ -43,21 +445,67 @@
     </testcase>
     <testcase classname="Database Lifecycle Management Forced Close Option should support force close without waiting" name="Database Lifecycle Management Forced Close Option should support force close without waiting" time="0">
     </testcase>
-    <testcase classname="Database Lifecycle Management Forced Close Option should log warning when force closing" name="Database Lifecycle Management Forced Close Option should log warning when force closing" time="0">
+    <testcase classname="Database Lifecycle Management Forced Close Option should log warning when force closing" name="Database Lifecycle Management Forced Close Option should log warning when force closing" time="0.002">
     </testcase>
     <testcase classname="Database Lifecycle Management Database State Validation should verify database is closed after closeDatabaseConnection" name="Database Lifecycle Management Database State Validation should verify database is closed after closeDatabaseConnection" time="0.001">
     </testcase>
     <testcase classname="Database Lifecycle Management Database State Validation should handle rapid open/close sequences" name="Database Lifecycle Management Database State Validation should handle rapid open/close sequences" time="0">
     </testcase>
-    <testcase classname="Database Lifecycle Management Error Recovery should recover from failed close by allowing reopen" name="Database Lifecycle Management Error Recovery should recover from failed close by allowing reopen" time="0">
+    <testcase classname="Database Lifecycle Management Error Recovery should recover from failed close by allowing reopen" name="Database Lifecycle Management Error Recovery should recover from failed close by allowing reopen" time="0.001">
     </testcase>
-    <testcase classname="Database Lifecycle Management Error Recovery should handle WAL mode failure on reopen" name="Database Lifecycle Management Error Recovery should handle WAL mode failure on reopen" time="0.001">
+    <testcase classname="Database Lifecycle Management Error Recovery should handle WAL mode failure on reopen" name="Database Lifecycle Management Error Recovery should handle WAL mode failure on reopen" time="0">
     </testcase>
-    <testcase classname="Database Lifecycle Management Database Lock Manager Integration (CI-HP6-1) should allow lock acquisition after database reopens following shutdown" name="Database Lifecycle Management Database Lock Manager Integration (CI-HP6-1) should allow lock acquisition after database reopens following shutdown" time="0.001">
+    <testcase classname="Database Lifecycle Management Database Lock Manager Integration (CI-HP6-1) should allow lock acquisition after database reopens following shutdown" name="Database Lifecycle Management Database Lock Manager Integration (CI-HP6-1) should allow lock acquisition after database reopens following shutdown" time="0">
     </testcase>
-    <testcase classname="Database Lifecycle Management Database Lock Manager Integration (CI-HP6-1) should reset shutdown state when getDatabase is called after close" name="Database Lifecycle Management Database Lock Manager Integration (CI-HP6-1) should reset shutdown state when getDatabase is called after close" time="0">
+    <testcase classname="Database Lifecycle Management Database Lock Manager Integration (CI-HP6-1) should reset shutdown state when getDatabase is called after close" name="Database Lifecycle Management Database Lock Manager Integration (CI-HP6-1) should reset shutdown state when getDatabase is called after close" time="0.001">
     </testcase>
-    <testcase classname="Database Lifecycle Management Database Lock Manager Integration (CI-HP6-1) should handle multiple background/foreground cycles without lock issues" name="Database Lifecycle Management Database Lock Manager Integration (CI-HP6-1) should handle multiple background/foreground cycles without lock issues" time="0.001">
+    <testcase classname="Database Lifecycle Management Database Lock Manager Integration (CI-HP6-1) should handle multiple background/foreground cycles without lock issues" name="Database Lifecycle Management Database Lock Manager Integration (CI-HP6-1) should handle multiple background/foreground cycles without lock issues" time="0">
+    </testcase>
+  </testsuite>
+  <testsuite name="DatabaseInitializer" errors="0" failures="0" skipped="0" timestamp="2025-11-12T21:26:58" time="0.128" tests="22">
+    <testcase classname="DatabaseInitializer Initial state should start in UNINITIALIZED state" name="DatabaseInitializer Initial state should start in UNINITIALIZED state" time="0">
+    </testcase>
+    <testcase classname="DatabaseInitializer Initial state should not be ready initially" name="DatabaseInitializer Initial state should not be ready initially" time="0">
+    </testcase>
+    <testcase classname="DatabaseInitializer Initial state should not be initializing initially" name="DatabaseInitializer Initial state should not be initializing initially" time="0">
+    </testcase>
+    <testcase classname="DatabaseInitializer Initial state should not be in error state initially" name="DatabaseInitializer Initial state should not be in error state initially" time="0.001">
+    </testcase>
+    <testcase classname="DatabaseInitializer State transitions should transition from UNINITIALIZED to INITIALIZING" name="DatabaseInitializer State transitions should transition from UNINITIALIZED to INITIALIZING" time="0">
+    </testcase>
+    <testcase classname="DatabaseInitializer State transitions should transition from INITIALIZING to READY" name="DatabaseInitializer State transitions should transition from INITIALIZING to READY" time="0">
+    </testcase>
+    <testcase classname="DatabaseInitializer State transitions should transition from UNINITIALIZED to ERROR" name="DatabaseInitializer State transitions should transition from UNINITIALIZED to ERROR" time="0">
+    </testcase>
+    <testcase classname="DatabaseInitializer State transitions should transition from INITIALIZING to ERROR" name="DatabaseInitializer State transitions should transition from INITIALIZING to ERROR" time="0">
+    </testcase>
+    <testcase classname="DatabaseInitializer State transitions should allow re-initialization from ERROR state" name="DatabaseInitializer State transitions should allow re-initialization from ERROR state" time="0">
+    </testcase>
+    <testcase classname="DatabaseInitializer State transitions should transition from ERROR to READY on successful retry" name="DatabaseInitializer State transitions should transition from ERROR to READY on successful retry" time="0">
+    </testcase>
+    <testcase classname="DatabaseInitializer Invalid state transitions should not allow setting READY without INITIALIZING first" name="DatabaseInitializer Invalid state transitions should not allow setting READY without INITIALIZING first" time="0.01">
+    </testcase>
+    <testcase classname="DatabaseInitializer Invalid state transitions should not allow re-initializing when already READY" name="DatabaseInitializer Invalid state transitions should not allow re-initializing when already READY" time="0.001">
+    </testcase>
+    <testcase classname="DatabaseInitializer Invalid state transitions should not allow setting READY when in ERROR state" name="DatabaseInitializer Invalid state transitions should not allow setting READY when in ERROR state" time="0">
+    </testcase>
+    <testcase classname="DatabaseInitializer Invalid state transitions should not allow re-initializing when already INITIALIZING" name="DatabaseInitializer Invalid state transitions should not allow re-initializing when already INITIALIZING" time="0.001">
+    </testcase>
+    <testcase classname="DatabaseInitializer Error messages should store error message when transitioning to ERROR" name="DatabaseInitializer Error messages should store error message when transitioning to ERROR" time="0">
+    </testcase>
+    <testcase classname="DatabaseInitializer Error messages should clear error message when successfully initializing" name="DatabaseInitializer Error messages should clear error message when successfully initializing" time="0">
+    </testcase>
+    <testcase classname="DatabaseInitializer Error messages should return null for error message when not in ERROR state" name="DatabaseInitializer Error messages should return null for error message when not in ERROR state" time="0">
+    </testcase>
+    <testcase classname="DatabaseInitializer State queries should correctly report INITIALIZING state" name="DatabaseInitializer State queries should correctly report INITIALIZING state" time="0.001">
+    </testcase>
+    <testcase classname="DatabaseInitializer State queries should correctly report READY state" name="DatabaseInitializer State queries should correctly report READY state" time="0">
+    </testcase>
+    <testcase classname="DatabaseInitializer State queries should correctly report ERROR state" name="DatabaseInitializer State queries should correctly report ERROR state" time="0">
+    </testcase>
+    <testcase classname="DatabaseInitializer State transitions logging should log state transitions" name="DatabaseInitializer State transitions logging should log state transitions" time="0.001">
+    </testcase>
+    <testcase classname="DatabaseInitializer State transitions logging should log errors when transitioning to ERROR state" name="DatabaseInitializer State transitions logging should log errors when transitioning to ERROR state" time="0">
     </testcase>
   </testsuite>
 </testsuites>

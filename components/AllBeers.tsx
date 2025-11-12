@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, View, TouchableOpacity } from 'react-native';
-import { getAllBeers } from '@/src/database/db';
+import { beerRepository } from '@/src/database/repositories/BeerRepository';
 import { ThemedText } from './ThemedText';
 import { LoadingIndicator } from './LoadingIndicator';
 import { useThemeColor } from '@/hooks/useThemeColor';
@@ -10,24 +10,14 @@ import { useDataRefresh } from '@/hooks/useDataRefresh';
 import { FilterBar } from './beer/FilterBar';
 import { BeerList } from './beer/BeerList';
 import { UntappdWebView } from './UntappdWebView';
-
-type Beer = {
-  id: string;
-  brew_name: string;
-  brewer: string;
-  brewer_loc: string;
-  brew_style: string;
-  brew_container: string;
-  brew_description: string;
-  added_date: string;
-};
+import { Beer } from '@/src/types/beer';
 
 export const AllBeers = () => {
   const [allBeers, setAllBeers] = useState<Beer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [untappdModalVisible, setUntappdModalVisible] = useState(false);
-  const [selectedBeerName, setSelectedBeerName] = useState('');
+  const [selectedBeerName] = useState('');
 
   // Use the shared filtering hook
   const {
@@ -48,7 +38,7 @@ export const AllBeers = () => {
   const loadBeers = async () => {
     try {
       setLoading(true);
-      const data = await getAllBeers();
+      const data = await beerRepository.getAll();
       // Filter out any beers with empty or null brew_name
       const filteredData = data.filter(beer => beer.brew_name && beer.brew_name.trim() !== '');
       setAllBeers(filteredData);
@@ -64,7 +54,7 @@ export const AllBeers = () => {
   // Use the shared data refresh hook
   const { refreshing, handleRefresh } = useDataRefresh({
     onDataReloaded: async () => {
-      const freshBeers = await getAllBeers();
+      const freshBeers = await beerRepository.getAll();
       const filteredData = freshBeers.filter(beer => beer.brew_name && beer.brew_name.trim() !== '');
       setAllBeers(filteredData);
       setError(null);

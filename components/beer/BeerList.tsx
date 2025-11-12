@@ -4,20 +4,13 @@ import { ThemedView } from '../ThemedView';
 import { ThemedText } from '../ThemedText';
 import { BeerItem } from './BeerItem';
 import { useThemeColor } from '@/hooks/useThemeColor';
+import { Beer, Beerfinder } from '@/src/types/beer';
 
-type Beer = {
-  id: string;
-  brew_name: string;
-  brewer: string;
-  brewer_loc: string;
-  brew_style: string;
-  brew_container: string;
-  brew_description: string;
-  added_date: string;
-};
+// Union type to accept both Beer and Beerfinder
+type DisplayableBeer = Beer | Beerfinder;
 
 type BeerListProps = {
-  beers: Beer[];
+  beers: DisplayableBeer[];
   loading: boolean;
   refreshing: boolean;
   onRefresh: () => void;
@@ -25,7 +18,7 @@ type BeerListProps = {
   expandedId: string | null;
   onToggleExpand: (id: string) => void;
   dateLabel?: string;
-  renderItemActions?: (beer: Beer) => React.ReactNode;
+  renderItemActions?: (beer: DisplayableBeer) => React.ReactNode;
 };
 
 export const BeerList: React.FC<BeerListProps> = ({
@@ -42,7 +35,7 @@ export const BeerList: React.FC<BeerListProps> = ({
   const tintColor = useThemeColor({}, 'tint');
 
   // Memoize renderItem to prevent unnecessary re-renders of FlatList items
-  const renderItem = useCallback(({ item }: { item: Beer }) => (
+  const renderItem = useCallback(({ item }: { item: DisplayableBeer }) => (
     <BeerItem
       beer={item}
       isExpanded={expandedId === item.id}

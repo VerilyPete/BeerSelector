@@ -2,7 +2,7 @@ import { autoLogin, login, logout, handleTapThatAppLogin } from '../authService'
 import { saveSessionData, clearSessionData } from '../sessionManager';
 import { getApiClient } from '../apiClientInstance';
 import { ApiError, SessionData } from '../../types/api';
-import { getPreference, setPreference } from '../../database/db';
+import { getPreference, setPreference } from '../../database/preferences';
 import { refreshAllDataFromAPI } from '../../services/dataUpdateService';
 
 // Mock dependencies

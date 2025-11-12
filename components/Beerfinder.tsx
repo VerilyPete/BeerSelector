@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, View, TouchableOpacity, Alert, ActivityIndicator, Modal, FlatList } from 'react-native';
-import { getBeersNotInMyBeers, fetchAndPopulateMyBeers } from '@/src/database/db';
+import { beerRepository } from '@/src/database/repositories/BeerRepository';
+import { myBeersRepository } from '@/src/database/repositories/MyBeersRepository';
+import { fetchMyBeersFromAPI } from '@/src/api/beerApi';
 import { ThemedText } from './ThemedText';
 import { LoadingIndicator } from './LoadingIndicator';
 import { useThemeColor } from '@/hooks/useThemeColor';
@@ -13,19 +15,9 @@ import { useBeerFilters } from '@/hooks/useBeerFilters';
 import { useDataRefresh } from '@/hooks/useDataRefresh';
 import { FilterBar } from './beer/FilterBar';
 import { BeerList } from './beer/BeerList';
-import { parseQueuedBeersFromHtml, QueuedBeer } from '@/src/utils/htmlParser';
+import { QueuedBeer } from '@/src/utils/htmlParser';
 import { getQueuedBeers, deleteQueuedBeer as deleteQueuedBeerApi } from '@/src/api/queueService';
-
-type Beer = {
-  id: string;
-  brew_name: string;
-  brewer: string;
-  brewer_loc: string;
-  brew_style: string;
-  brew_container: string;
-  brew_description: string;
-  added_date: string;
-};
+import { Beer } from '@/src/types/beer';
 
 
 export const Beerfinder = () => {
@@ -66,12 +58,13 @@ export const Beerfinder = () => {
 
       // Try to fetch My Beers data if it hasn't been loaded yet
       try {
-        await fetchAndPopulateMyBeers();
+        const freshMyBeers = await fetchMyBeersFromAPI();
+        await myBeersRepository.insertMany(freshMyBeers);
       } catch (err) {
         console.log('Failed to fetch My Beers data, continuing with local data:', err);
       }
 
-      const data = await getBeersNotInMyBeers();
+      const data = await beerRepository.getUntasted();
       const filteredData = data.filter(beer => beer.brew_name && beer.brew_name.trim() !== '');
       setAvailableBeers(filteredData);
       setError(null);
@@ -86,7 +79,7 @@ export const Beerfinder = () => {
   // Use the shared data refresh hook
   const { refreshing, handleRefresh } = useDataRefresh({
     onDataReloaded: async () => {
-      const freshBeers = await getBeersNotInMyBeers();
+      const freshBeers = await beerRepository.getUntasted();
       const filteredData = freshBeers.filter(beer => beer.brew_name && beer.brew_name.trim() !== '');
       setAvailableBeers(filteredData);
       setError(null);

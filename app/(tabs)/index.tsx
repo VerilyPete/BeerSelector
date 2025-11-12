@@ -16,9 +16,8 @@ import { ThemedView } from '@/components/ThemedView';
 import { AllBeers } from '@/components/AllBeers';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useThemeColor } from '@/hooks/useThemeColor';
-import { areApiUrlsConfigured } from '@/src/database/db';
+import { areApiUrlsConfigured, getPreference } from '@/src/database/preferences';
 import { isVisitorMode } from '@/src/api/authService';
-import { getPreference } from '@/src/database/db';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { logError } from '@/src/utils/errorLogger';
 

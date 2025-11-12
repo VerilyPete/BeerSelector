@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, View, TouchableOpacity } from 'react-native';
-import { getMyBeers } from '@/src/database/db';
+import { myBeersRepository } from '@/src/database/repositories/MyBeersRepository';
+import { fetchMyBeersFromAPI } from '@/src/api/beerApi';
 import { ThemedText } from './ThemedText';
 import { LoadingIndicator } from './LoadingIndicator';
 import { useThemeColor } from '@/hooks/useThemeColor';
@@ -9,21 +10,10 @@ import { useBeerFilters } from '@/hooks/useBeerFilters';
 import { useDataRefresh } from '@/hooks/useDataRefresh';
 import { FilterBar } from './beer/FilterBar';
 import { BeerList } from './beer/BeerList';
-
-type Beer = {
-  id: string;
-  brew_name: string;
-  brewer: string;
-  brewer_loc: string;
-  brew_style: string;
-  brew_container: string;
-  brew_description: string;
-  added_date: string;
-  tasted_date?: string;
-};
+import { Beerfinder } from '@/src/types/beer';
 
 export const TastedBrewList = () => {
-  const [tastedBeers, setTastedBeers] = useState<Beer[]>([]);
+  const [tastedBeers, setTastedBeers] = useState<Beerfinder[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -52,22 +42,22 @@ export const TastedBrewList = () => {
       // Try to fetch My Beers data if it hasn't been loaded yet
       try {
         console.log('TastedBrewList: Attempting to fetch and populate My Beers data...');
-        const { fetchAndPopulateMyBeers } = await import('@/src/database/db');
-        await fetchAndPopulateMyBeers();
+        const freshMyBeers = await fetchMyBeersFromAPI();
+        await myBeersRepository.insertMany(freshMyBeers);
         console.log('TastedBrewList: Successfully fetched and populated My Beers data');
       } catch (err) {
         console.log('TastedBrewList: Failed to fetch My Beers data, continuing with local data:', err);
       }
 
       console.log('TastedBrewList: Retrieving tasted beers from database...');
-      const data = await getMyBeers();
+      const data = await myBeersRepository.getAll();
       console.log(`TastedBrewList: Retrieved ${data.length} tasted beers from database`);
 
       // Filter out any beers with empty or null brew_name
       const filteredData = data.filter(beer => beer.brew_name && beer.brew_name.trim() !== '');
       console.log(`TastedBrewList: After filtering, ${filteredData.length} valid tasted beers remain`);
 
-      setTastedBeers(filteredData as Beer[]);
+      setTastedBeers(filteredData as Beerfinder[]);
       setError(null);
     } catch (err) {
       console.error('TastedBrewList: Failed to load tasted beers:', err);
@@ -80,8 +70,8 @@ export const TastedBrewList = () => {
   // Use the shared data refresh hook
   const { refreshing, handleRefresh } = useDataRefresh({
     onDataReloaded: async () => {
-      const freshBeers = await getMyBeers();
-      setTastedBeers(freshBeers as Beer[]);
+      const freshBeers = await myBeersRepository.getAll();
+      setTastedBeers(freshBeers as Beerfinder[]);
       setError(null);
     },
     componentName: 'TastedBrewList',

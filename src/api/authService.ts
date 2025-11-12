@@ -1,6 +1,6 @@
 import { saveSessionData, clearSessionData } from './sessionManager';
 import { getApiClient } from './apiClientInstance';
-import { getPreference, setPreference } from '../database/db';
+import { getPreference, setPreference } from '../database/preferences';
 import { refreshAllDataFromAPI } from '../services/dataUpdateService';
 import { SessionData, ApiError, ApiResponse, LoginResult, isSessionData } from '../types/api';
 
