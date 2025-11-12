@@ -1,16 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
+import { Beer, Beerfinder } from '@/src/types/beer';
 
-type Beer = {
-  id: string;
-  brew_name: string;
-  brewer: string;
-  brewer_loc: string;
-  brew_style: string;
-  brew_container: string;
-  brew_description: string;
-  added_date: string;
-  tasted_date?: string;
-};
+// Union type to allow both Beer and Beerfinder
+type FilterableBeer = Beer | Beerfinder;
 
 type SortOption = 'date' | 'name';
 
@@ -27,7 +19,7 @@ type FilterOptions = FilterState & {
 type DateSortField = 'added_date' | 'tasted_date';
 
 // Exported for testing
-export const applyFilters = (beers: Beer[], options: FilterOptions): Beer[] => {
+export const applyFilters = <T extends FilterableBeer>(beers: T[], options: FilterOptions): T[] => {
   let filtered = beers;
 
   // Apply search text filter
@@ -74,7 +66,7 @@ export const applyFilters = (beers: Beer[], options: FilterOptions): Beer[] => {
 };
 
 // Exported for testing
-export const applySorting = (beers: Beer[], sortBy: SortOption, dateField: DateSortField = 'added_date'): Beer[] => {
+export const applySorting = <T extends FilterableBeer>(beers: T[], sortBy: SortOption, dateField: DateSortField = 'added_date'): T[] => {
   const sorted = [...beers];
 
   if (sortBy === 'name') {
@@ -84,8 +76,8 @@ export const applySorting = (beers: Beer[], sortBy: SortOption, dateField: DateS
     if (dateField === 'tasted_date') {
       // Parse dates in format MM/DD/YYYY for tasted_date
       sorted.sort((a, b) => {
-        const partsA = (a.tasted_date || '').split('/');
-        const partsB = (b.tasted_date || '').split('/');
+        const partsA = ((a as any).tasted_date || '').split('/');
+        const partsB = ((b as any).tasted_date || '').split('/');
 
         if (partsA.length === 3 && partsB.length === 3) {
           // Create Date objects with year, month (0-based), day
@@ -120,7 +112,7 @@ export const applySorting = (beers: Beer[], sortBy: SortOption, dateField: DateS
   return sorted;
 };
 
-export const useBeerFilters = (beers: Beer[], dateField: DateSortField = 'added_date') => {
+export const useBeerFilters = <T extends FilterableBeer>(beers: T[], dateField: DateSortField = 'added_date') => {
   const [filters, setFilters] = useState<FilterState>({
     isDraft: false,
     isHeavies: false,

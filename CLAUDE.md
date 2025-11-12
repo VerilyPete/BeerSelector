@@ -43,12 +43,27 @@ npm run lint             # Run ESLint
 
 ### Database Layer (expo-sqlite 15.1.4)
 
-The app uses SQLite for offline-first data storage with the following key patterns:
+The app uses SQLite for offline-first data storage with a **repository pattern**:
 
-- **Connection Management**: Single database instance (`beers.db`) managed through `src/database/db.ts`
+- **Connection Management**: Single database instance (`beers.db`) managed through `src/database/connection.ts`
 - **Transaction API**: ALWAYS use `withTransactionAsync()` instead of the old `transaction()` method (expo-sqlite 15.1+ requirement)
+- **Repository Pattern**: All database operations go through repositories (BeerRepository, MyBeersRepository, RewardsRepository)
 - **Concurrency Locks**: Database operations use locks (`dbOperationInProgress`) to prevent concurrent modifications
 - **Initialization Flow**: Database setup happens in `app/_layout.tsx` with retry logic before app renders
+
+**IMPORTANT - Repository Pattern (HP-7 COMPLETED)**:
+- ❌ **DO NOT import from `src/database/db.ts`** - This file is deprecated
+- ✅ **USE repositories directly**:
+  ```typescript
+  import { beerRepository } from '@/src/database/repositories/BeerRepository';
+  import { myBeersRepository } from '@/src/database/repositories/MyBeersRepository';
+  import { rewardsRepository } from '@/src/database/repositories/RewardsRepository';
+  ```
+- ✅ **USE preferences module for settings**:
+  ```typescript
+  import { getPreference, setPreference, areApiUrlsConfigured } from '@/src/database/preferences';
+  ```
+- See `MIGRATION_GUIDE_REPOSITORIES.md` for complete migration examples
 
 **Main Tables**:
 - `allbeers` - Complete beer catalog from Flying Saucer API
@@ -198,10 +213,18 @@ if (isBeer(data)) {
 
 ## Key Files Reference
 
+### Data Access Layer (Primary)
+- `src/database/repositories/` - Data access via repository pattern (use these directly)
+  - `BeerRepository.ts` - All beers CRUD operations with lock management
+  - `MyBeersRepository.ts` - Tasted beers (Beerfinder) operations with lock management
+  - `RewardsRepository.ts` - UFO Club rewards operations with lock management
+- `src/database/db.ts` - Database initialization orchestration + Untappd cookie management (alpha feature)
+- `src/database/preferences.ts` - App preferences management
+
+### Core Application Files
 - `app/_layout.tsx` - App initialization, database setup, auto-refresh
-- `src/database/db.ts` - All database operations (200+ lines)
-- `src/services/dataUpdateService.ts` - Data fetching and refresh logic
-- `src/api/authService.ts` - Authentication flow
+- `src/services/dataUpdateService.ts` - Data fetching and refresh logic with sequential coordination
+- `src/api/authService.ts` - Authentication flow (member and visitor modes)
 - `app/settings.tsx` - Settings UI with login/logout (400+ lines)
 - `.cursor/rules/expo-rules.mdc` - Development guidelines
 

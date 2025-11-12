@@ -6,7 +6,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { TastedBrewList } from '@/components/TastedBrewList';
 import { ThemedView } from '@/components/ThemedView';
 import { ThemedText } from '@/components/ThemedText';
-import { areApiUrlsConfigured } from '@/src/database/db';
+import { areApiUrlsConfigured } from '@/src/database/preferences';
 import { checkAndRefreshOnAppOpen } from '@/src/services/dataUpdateService';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { logError } from '@/src/utils/errorLogger';

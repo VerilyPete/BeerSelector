@@ -7,7 +7,7 @@ import { Beerfinder } from '@/components/Beerfinder';
 import { ThemedView } from '@/components/ThemedView';
 import { ThemedText } from '@/components/ThemedText';
 import { useThemeColor } from '@/hooks/useThemeColor';
-import { areApiUrlsConfigured } from '@/src/database/db';
+import { areApiUrlsConfigured } from '@/src/database/preferences';
 import { checkAndRefreshOnAppOpen } from '@/src/services/dataUpdateService';
 
 export default function MyBeersScreen() {

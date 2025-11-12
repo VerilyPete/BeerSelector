@@ -1,38 +1,69 @@
 /**
- * Database Compatibility Layer
+ * Database Orchestration & Specialized Features
  *
- * This file provides backwards-compatible exports that delegate to the new repository pattern.
- * Extracted as part of HP-1 refactoring to reduce monolithic db.ts from 918 lines to ~300 lines.
+ * This file contains:
+ * 1. Database initialization and orchestration (initializeBeerDatabase)
+ * 2. Untappd cookie management (alpha feature)
  *
- * Architecture:
- * - All database operations delegated to repositories (BeerRepository, MyBeersRepository, RewardsRepository)
- * - No duplicate INSERT/UPDATE/DELETE logic (DRY principle)
- * - Thin wrapper for backwards compatibility with existing imports
+ * For data access operations, use repositories directly:
+ * - beerRepository (src/database/repositories/BeerRepository.ts)
+ * - myBeersRepository (src/database/repositories/MyBeersRepository.ts)
+ * - rewardsRepository (src/database/repositories/RewardsRepository.ts)
+ * - preferences module (src/database/preferences.ts)
  */
 
 import * as SQLite from 'expo-sqlite';
-import { Beer, Beerfinder } from './types';
-import { Reward, UntappdCookie } from './types';
+import { UntappdCookie } from './types';
 import { getDatabase } from './connection';
-import { getPreference, setPreference, getAllPreferences, areApiUrlsConfigured as _areApiUrlsConfigured } from './preferences';
+import { getPreference, setPreference, areApiUrlsConfigured } from './preferences';
 import { setupTables } from './schema';
-import { databaseLockManager } from './locks';
-import {
-  fetchBeersFromAPI as _fetchBeersFromAPI,
-  fetchMyBeersFromAPI as _fetchMyBeersFromAPI,
-  fetchRewardsFromAPI as _fetchRewardsFromAPI,
-} from '../api/beerApi';
+import { databaseInitializer } from './initializationState';
+import { fetchBeersFromAPI, fetchMyBeersFromAPI, fetchRewardsFromAPI } from '../api/beerApi';
 import { beerRepository } from './repositories/BeerRepository';
 import { myBeersRepository } from './repositories/MyBeersRepository';
 import { rewardsRepository } from './repositories/RewardsRepository';
-import { databaseInitializer } from './initializationState';
 
-// Initialize database (wrapper for backwards compatibility)
+// ============================================================================
+// DATABASE INITIALIZATION CONFIGURATION
+// ============================================================================
+
+/**
+ * Maximum time to wait for database schema setup to complete.
+ * Set to 30 seconds to account for slow devices or complex migrations.
+ * If setup exceeds this timeout, the app will fail to initialize properly.
+ */
+const DATABASE_INITIALIZATION_TIMEOUT_MS = 30000;
+
+/**
+ * Delay before starting background import of user's tasted beers.
+ * Set to 100ms to allow the critical all-beers fetch to complete first,
+ * ensuring UI is responsive before background operations begin.
+ */
+const MY_BEERS_IMPORT_DELAY_MS = 100;
+
+/**
+ * Delay before starting background import of user rewards.
+ * Set to 200ms (after My Beers) to stagger background operations
+ * and prevent concurrent API calls from overwhelming the server or network.
+ */
+const REWARDS_IMPORT_DELAY_MS = 200;
+
+// ============================================================================
+// DATABASE INITIALIZATION
+// ============================================================================
+
+/**
+ * Initialize database connection
+ * @returns Database instance
+ */
 export const initDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
   return await getDatabase();
 };
 
-// Create tables if they don't exist
+/**
+ * Create tables if they don't exist
+ * Handles state management to prevent duplicate initialization
+ */
 export const setupDatabase = async (): Promise<void> => {
   // If already ready, return immediately
   if (databaseInitializer.isReady()) {
@@ -49,7 +80,7 @@ export const setupDatabase = async (): Promise<void> => {
   if (databaseInitializer.isInitializing()) {
     console.log('Database setup already in progress, waiting...');
     try {
-      await databaseInitializer.waitUntilReady(30000);
+      await databaseInitializer.waitUntilReady(DATABASE_INITIALIZATION_TIMEOUT_MS);
       console.log('Database setup completed while waiting');
       return;
     } catch (error) {
@@ -86,12 +117,95 @@ export const setupDatabase = async (): Promise<void> => {
   }
 };
 
-// Helper functions to get and set preferences
-// These functions have been moved to src/database/preferences.ts
-// Re-export them here for backwards compatibility
-export { getPreference, setPreference, getAllPreferences } from './preferences';
+/**
+ * Initialize the beer database on app startup
+ * Orchestrates the complete database setup and initial data loading
+ *
+ * Flow:
+ * 1. Setup database schema (tables, indexes)
+ * 2. Check if API URLs are configured
+ * 3. Fetch and populate all beers (blocking - needed immediately)
+ * 4. Schedule My Beers import (non-blocking, skipped in visitor mode)
+ * 5. Schedule Rewards import (non-blocking, skipped in visitor mode)
+ */
+export const initializeBeerDatabase = async (): Promise<void> => {
+  console.log('Initializing beer database...');
 
-// Helper functions for Untappd cookies
+  try {
+    // First, make sure the database schema is set up
+    await setupDatabase();
+
+    // Check if API URLs are configured
+    const apiUrlsConfigured = await areApiUrlsConfigured();
+    if (!apiUrlsConfigured) {
+      console.log('API URLs not configured, database initialization will be limited');
+      return;
+    }
+
+    // Check for visitor mode to handle differently
+    const isVisitorMode = await getPreference('is_visitor_mode') === 'true';
+
+    // Schedule My Beers import in background (non-blocking)
+    if (!isVisitorMode) {
+      setTimeout(async () => {
+        try {
+          const myBeers = await fetchMyBeersFromAPI();
+          await myBeersRepository.insertMany(myBeers);
+        } catch (error) {
+          console.error('Error in scheduled My Beers import:', error);
+        }
+      }, MY_BEERS_IMPORT_DELAY_MS);
+    } else {
+      console.log('In visitor mode - skipping scheduled My Beers import');
+    }
+
+    // Schedule rewards import (non-blocking)
+    if (!isVisitorMode) {
+      setTimeout(async () => {
+        try {
+          const rewards = await fetchRewardsFromAPI();
+          await rewardsRepository.insertMany(rewards);
+        } catch (error) {
+          console.error('Error in scheduled Rewards import:', error);
+        }
+      }, REWARDS_IMPORT_DELAY_MS);
+    } else {
+      console.log('In visitor mode - skipping scheduled Rewards import');
+    }
+
+    // Fetch all beers (blocking - we need this immediately for the UI)
+    try {
+      const beers = await fetchBeersFromAPI();
+      await beerRepository.insertMany(beers);
+    } catch (error) {
+      console.error('Error fetching and populating all beers:', error);
+    }
+
+    console.log('Beer database initialization completed');
+  } catch (error) {
+    console.error('Error initializing beer database:', error);
+    throw error;
+  }
+};
+
+/**
+ * Reset database initialization state
+ * Used for manual refresh or testing scenarios
+ */
+export const resetDatabaseState = (): void => {
+  databaseInitializer.reset();
+  console.log('Database state reset');
+};
+
+// ============================================================================
+// UNTAPPD COOKIE MANAGEMENT (ALPHA FEATURE)
+// ============================================================================
+
+/**
+ * Get a single Untappd cookie by key
+ * @param key Cookie key
+ * @returns Cookie value or null if not found
+ */
 export const getUntappdCookie = async (key: string): Promise<string | null> => {
   const database = await initDatabase();
 
@@ -108,6 +222,12 @@ export const getUntappdCookie = async (key: string): Promise<string | null> => {
   }
 };
 
+/**
+ * Set a single Untappd cookie
+ * @param key Cookie key
+ * @param value Cookie value
+ * @param description Optional description
+ */
 export const setUntappdCookie = async (key: string, value: string, description?: string): Promise<void> => {
   const database = await initDatabase();
 
@@ -136,6 +256,10 @@ export const setUntappdCookie = async (key: string, value: string, description?:
   }
 };
 
+/**
+ * Get all Untappd cookies
+ * @returns Array of Untappd cookies
+ */
 export const getAllUntappdCookies = async (): Promise<UntappdCookie[]> => {
   const database = await initDatabase();
 
@@ -151,6 +275,10 @@ export const getAllUntappdCookies = async (): Promise<UntappdCookie[]> => {
   }
 };
 
+/**
+ * Check if user is logged into Untappd
+ * @returns True if logged in, false otherwise
+ */
 export const isUntappdLoggedIn = async (): Promise<boolean> => {
   const cookies = await getAllUntappdCookies();
 
@@ -173,227 +301,9 @@ export const isUntappdLoggedIn = async (): Promise<boolean> => {
   return loginDetectedViaUI || loginDetectedByApp || sessionCookiePresent;
 };
 
-// Re-export API fetch functions from beerApi module for backwards compatibility
-export const fetchBeersFromAPI = _fetchBeersFromAPI;
-
-// Insert beers into database using transactions
-// DELEGATES TO REPOSITORY - NO DUPLICATE INSERT LOGIC
-export const populateBeersTable = async (beers: Beer[]): Promise<void> => {
-  return await beerRepository.insertMany(beers);
-};
-
-// Initialize the database on app startup
-export const initializeBeerDatabase = async (): Promise<void> => {
-  console.log('Initializing beer database...');
-
-  try {
-    // First, make sure the database schema is set up
-    await setupDatabase();
-
-    // Check if API URLs are configured
-    const apiUrlsConfigured = await areApiUrlsConfigured();
-    if (!apiUrlsConfigured) {
-      console.log('API URLs not configured, database initialization will be limited');
-      return;
-    }
-
-    // Check for visitor mode to handle differently
-    const isVisitorMode = await getPreference('is_visitor_mode') === 'true';
-
-    // Schedule My Beers import in background (idempotent, uses lock manager)
-    if (!isVisitorMode) {
-      // Use setTimeout to make My Beers import non-blocking
-      setTimeout(async () => {
-        try {
-          await fetchAndPopulateMyBeers();
-        } catch (error) {
-          console.error('Error in scheduled My Beers import:', error);
-        }
-      }, 100);
-    } else {
-      console.log('In visitor mode - skipping scheduled My Beers import');
-    }
-
-    // Schedule rewards import - only if not in visitor mode
-    if (!isVisitorMode) {
-      setTimeout(async () => {
-        try {
-          await fetchAndPopulateRewards();
-        } catch (error) {
-          console.error('Error in scheduled Rewards import:', error);
-        }
-      }, 200);
-    } else {
-      console.log('In visitor mode - skipping scheduled Rewards import');
-    }
-
-    // Fetch all beers (this is blocking because we need it immediately)
-    try {
-      const beers = await fetchBeersFromAPI();
-      await populateBeersTable(beers);
-    } catch (error) {
-      console.error('Error fetching and populating all beers:', error);
-    }
-
-    console.log('Beer database initialization completed');
-  } catch (error) {
-    console.error('Error initializing beer database:', error);
-    throw error;
-  }
-};
-
-// Re-export My Beers API fetch function for backwards compatibility
-export const fetchMyBeersFromAPI = _fetchMyBeersFromAPI;
-
-// Insert Beerfinder beers into database using transactions
-// DELEGATES TO REPOSITORY - NO DUPLICATE INSERT LOGIC
-export const populateMyBeersTable = async (beers: Beerfinder[]): Promise<void> => {
-  return await myBeersRepository.insertMany(beers);
-};
-
-// Fetch and populate My Beers
-// NOTE: This function is idempotent - it can be called multiple times safely
-// The lock manager ensures only one operation runs at a time
-export const fetchAndPopulateMyBeers = async (): Promise<void> => {
-  // Check for visitor mode first and exit early without acquiring lock
-  const isVisitorMode = await getPreference('is_visitor_mode') === 'true';
-  if (isVisitorMode) {
-    console.log('In visitor mode - skipping fetchAndPopulateMyBeers');
-    return;
-  }
-
-  // Acquire lock - if another call is in progress, this will queue
-  if (!await databaseLockManager.acquireLock('fetchAndPopulateMyBeers')) {
-    throw new Error('Failed to acquire database lock for fetching and populating My Beers');
-  }
-
-  try {
-    const myBeers = await fetchMyBeersFromAPI();
-    // Use UNSAFE method since we're already holding the lock
-    await myBeersRepository.insertManyUnsafe(myBeers);
-  } finally {
-    databaseLockManager.releaseLock('fetchAndPopulateMyBeers');
-  }
-};
-
-// Refresh beers from API
-// DELEGATES TO REPOSITORY - NO DUPLICATE INSERT LOGIC
-export const refreshBeersFromAPI = async (): Promise<Beer[]> => {
-  if (!await databaseLockManager.acquireLock('refreshBeersFromAPI')) {
-    throw new Error('Failed to acquire database lock for refreshing beers');
-  }
-
-  try {
-    // Fetch fresh data from API
-    const beers = await fetchBeersFromAPI();
-    console.log(`Fetched ${beers.length} beers from API. Refreshing database...`);
-
-    // Delegate to repository for insertion
-    await beerRepository.insertMany(beers);
-
-    console.log('Database refresh complete!');
-
-    // Return the refreshed beers
-    return await beerRepository.getAll();
-  } catch (error) {
-    console.error('Error refreshing beer database:', error);
-    throw error;
-  } finally {
-    databaseLockManager.releaseLock('refreshBeersFromAPI');
-  }
-};
-
-// Get all beers from the database
-// DELEGATES TO REPOSITORY
-export const getAllBeers = async (): Promise<Beer[]> => {
-  return await beerRepository.getAll();
-};
-
-// Get beer by ID
-// DELEGATES TO REPOSITORY
-export const getBeerById = async (id: string): Promise<Beer | null> => {
-  return await beerRepository.getById(id);
-};
-
-// Search beers by name, brewer, style, or description
-// DELEGATES TO REPOSITORY
-export const searchBeers = async (query: string): Promise<Beer[]> => {
-  return await beerRepository.search(query);
-};
-
-// Get beers by style
-// DELEGATES TO REPOSITORY
-export const getBeersByStyle = async (style: string): Promise<Beer[]> => {
-  return await beerRepository.getByStyle(style);
-};
-
-// Get beers by brewer
-// DELEGATES TO REPOSITORY
-export const getBeersByBrewer = async (brewer: string): Promise<Beer[]> => {
-  return await beerRepository.getByBrewer(brewer);
-};
-
-// Get all tasted beers (Beerfinder beers)
-// DELEGATES TO REPOSITORY
-export const getMyBeers = async (): Promise<Beerfinder[]> => {
-  return await myBeersRepository.getAll();
-};
-
-// Get all available beers that are not in My Beers
-// DELEGATES TO REPOSITORY
-export const getBeersNotInMyBeers = async (): Promise<Beer[]> => {
-  return await beerRepository.getUntasted();
-};
-
-// Reset database initialization state (for manual refresh)
-export const resetDatabaseState = (): void => {
-  databaseInitializer.reset();
-  console.log('Database state reset');
-};
-
-// Re-export areApiUrlsConfigured from preferences for backwards compatibility
-export const areApiUrlsConfigured = _areApiUrlsConfigured;
-
-// Fetch rewards from API
-// Re-export Rewards API fetch function for backwards compatibility
-export const fetchRewardsFromAPI = _fetchRewardsFromAPI;
-
-// Populate the rewards table
-// DELEGATES TO REPOSITORY - NO DUPLICATE INSERT LOGIC
-export const populateRewardsTable = async (rewards: Reward[]): Promise<void> => {
-  return await rewardsRepository.insertMany(rewards);
-};
-
-// Fetch and populate rewards
-export const fetchAndPopulateRewards = async (): Promise<void> => {
-  try {
-    // Check if API URL is configured
-    const apiUrlsConfigured = await areApiUrlsConfigured();
-    if (!apiUrlsConfigured) {
-      console.log('API URLs not configured, skipping rewards fetch');
-      return;
-    }
-
-    // Fetch rewards from API
-    const rewards = await fetchRewardsFromAPI();
-
-    // Delegate to repository for insertion
-    await rewardsRepository.insertMany(rewards);
-
-    console.log('Rewards fetch and populate completed successfully');
-  } catch (error) {
-    console.error('Error fetching and populating rewards:', error);
-    throw error;
-  }
-};
-
-// Get all rewards
-// DELEGATES TO REPOSITORY
-export const getAllRewards = async (): Promise<Reward[]> => {
-  return await rewardsRepository.getAll();
-};
-
-// Clear Untappd cookies
+/**
+ * Clear all Untappd cookies
+ */
 export async function clearUntappdCookies(): Promise<void> {
   try {
     const db = await initDatabase();

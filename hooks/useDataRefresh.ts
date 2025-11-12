@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { Alert } from 'react-native';
-import { areApiUrlsConfigured } from '@/src/database/db';
+import { areApiUrlsConfigured } from '@/src/database/preferences';
 import { manualRefreshAllData } from '@/src/services/dataUpdateService';
 import { getUserFriendlyErrorMessage } from '@/src/utils/notificationUtils';
 

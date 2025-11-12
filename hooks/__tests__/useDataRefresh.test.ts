@@ -1,12 +1,12 @@
 import { renderHook, act, waitFor } from '@testing-library/react-native';
 import { Alert } from 'react-native';
 import { useDataRefresh } from '../useDataRefresh';
-import { areApiUrlsConfigured } from '@/src/database/db';
+import { areApiUrlsConfigured } from '@/src/database/preferences';
 import { manualRefreshAllData } from '@/src/services/dataUpdateService';
 import { ApiErrorType } from '@/src/utils/notificationUtils';
 
 // Mock dependencies
-jest.mock('@/src/database/db');
+jest.mock('@/src/database/preferences');
 jest.mock('@/src/services/dataUpdateService');
 jest.mock('react-native/Libraries/Alert/Alert', () => ({
   alert: jest.fn(),

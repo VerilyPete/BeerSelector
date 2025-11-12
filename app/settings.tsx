@@ -11,9 +11,9 @@ import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { useColorScheme } from '@/hooks/useColorScheme';
-import { getAllPreferences, getPreference, setPreference, setUntappdCookie, isUntappdLoggedIn, initDatabase, clearUntappdCookies } from '@/src/database/db';
-import { manualRefreshAllData, refreshAllDataFromAPI } from '@/src/services/dataUpdateService';
-import { LoadingIndicator } from '@/components/LoadingIndicator';
+import { getAllPreferences, getPreference, setPreference } from '@/src/database/preferences';
+import { setUntappdCookie, isUntappdLoggedIn, clearUntappdCookies } from '@/src/database/db';
+import { manualRefreshAllData } from '@/src/services/dataUpdateService';
 import Constants from 'expo-constants';
 import { createMockSession } from '@/src/api/mockSession';
 import { getUserFriendlyErrorMessage } from '@/src/utils/notificationUtils';
@@ -55,25 +55,6 @@ export default function SettingsScreen() {
   const [canGoBack, setCanGoBack] = useState(false);
   const [untappdLoggedInStatus, setUntappdLoggedInStatus] = useState(false);
 
-  // Load preferences on component mount and check if we can go back
-  useEffect(() => {
-    loadPreferences();
-    checkUntappdLoginStatus();
-
-    // Check if this is the initial route or if we can go back
-    try {
-      setCanGoBack(router.canGoBack());
-    } catch (error) {
-      // If router.canGoBack() throws, we can't go back
-      setCanGoBack(false);
-    }
-
-    // Auto-open login dialog if action=login is in URL params
-    if (action === 'login') {
-      handleLogin();
-    }
-  }, [action, loadPreferences]);
-
   // Function to check Untappd login status
   const checkUntappdLoginStatus = async () => {
     try {
@@ -107,6 +88,25 @@ export default function SettingsScreen() {
       setLoading(false);
     }
   }, []);
+
+  // Load preferences on component mount and check if we can go back
+  useEffect(() => {
+    loadPreferences();
+    checkUntappdLoginStatus();
+
+    // Check if this is the initial route or if we can go back
+    try {
+      setCanGoBack(router.canGoBack());
+    } catch (error) {
+      // If router.canGoBack() throws, we can't go back
+      setCanGoBack(false);
+    }
+
+    // Auto-open login dialog if action=login is in URL params
+    if (action === 'login') {
+      handleLogin();
+    }
+  }, [action, loadPreferences]);
 
   // Function to handle refreshing all data from APIs
   const handleRefresh = useCallback(async () => {

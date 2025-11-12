@@ -9,7 +9,8 @@ import { LogBox, Alert, AppState, AppStateStatus } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { useColorScheme } from '@/hooks/useColorScheme';
-import { initializeBeerDatabase, getPreference, setPreference, areApiUrlsConfigured } from '@/src/database/db';
+import { initializeBeerDatabase } from '@/src/database/db';
+import { getPreference, setPreference, areApiUrlsConfigured } from '@/src/database/preferences';
 import { getDatabase, closeDatabaseConnection } from '@/src/database/connection';
 
 // Disable react-devtools connection to port 8097
