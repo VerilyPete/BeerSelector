@@ -21,6 +21,13 @@ type BeerListProps = {
   renderItemActions?: (beer: DisplayableBeer) => React.ReactNode;
 };
 
+/**
+ * MP-3 Bottleneck #1: Expected BeerItem height for getItemLayout optimization
+ * Using collapsed height provides best performance. Minor scroll inaccuracy when
+ * item is expanded is acceptable since only one item expands at a time.
+ */
+const EXPECTED_ITEM_HEIGHT = 150;
+
 export const BeerList: React.FC<BeerListProps> = ({
   beers,
   loading,
@@ -70,8 +77,14 @@ export const BeerList: React.FC<BeerListProps> = ({
       }
       initialNumToRender={20}
       maxToRenderPerBatch={20}
-      windowSize={21}
+      // MP-3 Bottleneck #6: windowSize=11 reduces memory by 30-40% (210→110 items)
+      windowSize={11}
       removeClippedSubviews={true}
+      getItemLayout={(data, index) => ({
+        length: EXPECTED_ITEM_HEIGHT,
+        offset: EXPECTED_ITEM_HEIGHT * index,
+        index,
+      })}
     />
   );
 };

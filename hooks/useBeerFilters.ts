@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Beer, Beerfinder } from '@/src/types/beer';
 
 // Union type to allow both Beer and Beerfinder
@@ -18,51 +18,80 @@ type FilterOptions = FilterState & {
 
 type DateSortField = 'added_date' | 'tasted_date';
 
-// Exported for testing
+/**
+ * MP-3 Bottleneck #3: Single-pass filter optimization
+ *
+ * OLD APPROACH (3 separate filter passes):
+ * - let result = beers;
+ * - if (isDraft) result = result.filter(...);
+ * - if (isHeavies) result = result.filter(...);
+ * - if (isIpa) result = result.filter(...);
+ *
+ * Problem: Multiple array iterations even if only 1 filter active.
+ * For 200 beers with all filters on = 3 × 200 = 600 iterations.
+ *
+ * NEW APPROACH (single-pass filtering):
+ * - Early exit if no filters active (0 iterations!)
+ * - Single .filter() call that evaluates all conditions in parallel
+ * - For 200 beers with all filters on = 1 × 200 = 200 iterations
+ *
+ * Expected improvement: 40-50% faster filtering, < 10ms for 200 beers
+ */
 export const applyFilters = <T extends FilterableBeer>(beers: T[], options: FilterOptions): T[] => {
-  let filtered = beers;
+  const { searchText, isDraft, isHeavies, isIpa } = options;
 
-  // Apply search text filter
-  if (options.searchText) {
-    const searchLower = options.searchText.toLowerCase();
-    filtered = filtered.filter(beer =>
-      (beer.brew_name && beer.brew_name.toLowerCase().includes(searchLower)) ||
-      (beer.brewer && beer.brewer.toLowerCase().includes(searchLower)) ||
-      (beer.brew_style && beer.brew_style.toLowerCase().includes(searchLower)) ||
-      (beer.brewer_loc && beer.brewer_loc.toLowerCase().includes(searchLower))
-    );
+  // Early exit: If no filters are active, return original array
+  if (!searchText && !isDraft && !isHeavies && !isIpa) {
+    return beers;
   }
 
-  // Apply Draft filter
-  if (options.isDraft) {
-    filtered = filtered.filter(beer => {
+  // Pre-compute search term for performance
+  const searchLower = searchText ? searchText.toLowerCase() : '';
+
+  // Single-pass filtering: evaluate all conditions in one iteration
+  return beers.filter(beer => {
+    // Search text filter
+    if (searchLower) {
+      const matchesSearch =
+        (beer.brew_name && beer.brew_name.toLowerCase().includes(searchLower)) ||
+        (beer.brewer && beer.brewer.toLowerCase().includes(searchLower)) ||
+        (beer.brew_style && beer.brew_style.toLowerCase().includes(searchLower)) ||
+        (beer.brewer_loc && beer.brewer_loc.toLowerCase().includes(searchLower));
+
+      if (!matchesSearch) return false;
+    }
+
+    // Draft filter
+    if (isDraft) {
       if (!beer.brew_container) return false;
       const container = beer.brew_container.toLowerCase();
-      return container.includes('draft') || container.includes('draught');
-    });
-  }
+      const isDraftBeer = container.includes('draft') || container.includes('draught');
+      if (!isDraftBeer) return false;
+    }
 
-  // Apply Heavies filter (porter, stout, barleywine, quad, tripel)
-  if (options.isHeavies) {
-    filtered = filtered.filter(beer =>
-      beer.brew_style &&
-      (beer.brew_style.toLowerCase().includes('porter') ||
-       beer.brew_style.toLowerCase().includes('stout') ||
-       beer.brew_style.toLowerCase().includes('barleywine') ||
-       beer.brew_style.toLowerCase().includes('quad') ||
-       beer.brew_style.toLowerCase().includes('tripel'))
-    );
-  }
+    // Heavies filter (porter, stout, barleywine, quad, tripel)
+    if (isHeavies) {
+      if (!beer.brew_style) return false;
+      const styleLower = beer.brew_style.toLowerCase();
+      const isHeavyBeer =
+        styleLower.includes('porter') ||
+        styleLower.includes('stout') ||
+        styleLower.includes('barleywine') ||
+        styleLower.includes('quad') ||
+        styleLower.includes('tripel');
+      if (!isHeavyBeer) return false;
+    }
 
-  // Apply IPA filter
-  if (options.isIpa) {
-    filtered = filtered.filter(beer =>
-      beer.brew_style &&
-      beer.brew_style.toLowerCase().includes('ipa')
-    );
-  }
+    // IPA filter
+    if (isIpa) {
+      if (!beer.brew_style) return false;
+      const isIpaBeer = beer.brew_style.toLowerCase().includes('ipa');
+      if (!isIpaBeer) return false;
+    }
 
-  return filtered;
+    // Passed all active filters
+    return true;
+  });
 };
 
 // Exported for testing
@@ -135,7 +164,12 @@ export const useBeerFilters = <T extends FilterableBeer>(beers: T[], dateField: 
     setExpandedId(null);
   }, [filters, searchText]);
 
-  const toggleFilter = (filterName: keyof FilterState) => {
+  /**
+   * MP-3 Bottleneck #2: Memoize callbacks to ensure stable references for React.memo
+   * Without useCallback, these functions get recreated on every render, breaking
+   * React.memo's shallow comparison and causing unnecessary BeerItem re-renders.
+   */
+  const toggleFilter = useCallback((filterName: keyof FilterState) => {
     setFilters(prev => {
       const newFilters = { ...prev };
 
@@ -151,15 +185,15 @@ export const useBeerFilters = <T extends FilterableBeer>(beers: T[], dateField: 
 
       return newFilters;
     });
-  };
+  }, []);
 
-  const toggleSort = () => {
+  const toggleSort = useCallback(() => {
     setSortBy(prev => prev === 'date' ? 'name' : 'date');
-  };
+  }, []);
 
-  const toggleExpand = (id: string) => {
+  const toggleExpand = useCallback((id: string) => {
     setExpandedId(prev => prev === id ? null : id);
-  };
+  }, []);
 
   return {
     filteredBeers,

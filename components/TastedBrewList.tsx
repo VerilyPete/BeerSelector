@@ -1,21 +1,29 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { StyleSheet, View, TouchableOpacity } from 'react-native';
 import { myBeersRepository } from '@/src/database/repositories/MyBeersRepository';
 import { fetchMyBeersFromAPI } from '@/src/api/beerApi';
 import { ThemedText } from './ThemedText';
-import { LoadingIndicator } from './LoadingIndicator';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { SearchBar } from './SearchBar';
 import { useBeerFilters } from '@/hooks/useBeerFilters';
 import { useDataRefresh } from '@/hooks/useDataRefresh';
 import { FilterBar } from './beer/FilterBar';
 import { BeerList } from './beer/BeerList';
+import { SkeletonLoader } from './beer/SkeletonLoader';
 import { Beerfinder } from '@/src/types/beer';
+import { useDebounce } from '@/hooks/useDebounce';
 
 export const TastedBrewList = () => {
   const [tastedBeers, setTastedBeers] = useState<Beerfinder[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  /**
+   * MP-3 Bottleneck #4: Local search state for immediate UI updates
+   * Debounced version used for filtering to reduce excessive re-renders
+   */
+  const [localSearchText, setLocalSearchText] = useState('');
+  const debouncedSearchText = useDebounce(localSearchText, 300);
 
   // Use the shared filtering hook (no Heavies/IPA filters needed for tasted beers)
   // Pass 'tasted_date' to sort by the date the beer was tasted instead of added_date
@@ -81,13 +89,22 @@ export const TastedBrewList = () => {
     loadBeers();
   }, []);
 
-  const handleSearchChange = (text: string) => {
-    setSearchText(text);
-  };
+  // Sync debounced search text with hook's search state
+  useEffect(() => {
+    setSearchText(debouncedSearchText);
+  }, [debouncedSearchText, setSearchText]);
 
-  const clearSearch = () => {
-    setSearchText('');
-  };
+  /**
+   * MP-3 Bottleneck #5: Memoized event handlers for stable references
+   * MP-3 Bottleneck #4: Update local search for immediate UI, debouncing handles filtering
+   */
+  const handleSearchChange = useCallback((text: string) => {
+    setLocalSearchText(text);
+  }, []);
+
+  const clearSearch = useCallback(() => {
+    setLocalSearchText('');
+  }, []);
 
   const emptyMessage = searchText
     ? "No tasted beer matches your search criteria."
@@ -95,8 +112,20 @@ export const TastedBrewList = () => {
 
   return (
     <View style={styles.container}>
-      {loading ? (
-        <LoadingIndicator />
+      {/* Show skeleton during initial load (when loading=true and no beers yet) */}
+      {loading && tastedBeers.length === 0 ? (
+        <>
+          {/* MP-3 Step 3b: Show search bar even during loading for better UX */}
+          <View style={styles.filtersContainer}>
+            <SearchBar
+              searchText={localSearchText}
+              onSearchChange={handleSearchChange}
+              onClear={clearSearch}
+              placeholder="Search tasted beer..."
+            />
+          </View>
+          <SkeletonLoader count={20} />
+        </>
       ) : error ? (
         <View style={styles.centered}>
           <ThemedText style={styles.errorText}>{error}</ThemedText>
@@ -113,7 +142,7 @@ export const TastedBrewList = () => {
         <>
           <View style={styles.filtersContainer}>
             <SearchBar
-              searchText={searchText}
+              searchText={localSearchText}
               onSearchChange={handleSearchChange}
               onClear={clearSearch}
               placeholder="Search tasted beer..."

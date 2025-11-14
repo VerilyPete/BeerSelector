@@ -80,3 +80,7 @@ global.console = {
 
 // Mock timers
 jest.useFakeTimers();
+
+// Polyfill setImmediate for React Native animations
+global.setImmediate = global.setImmediate || ((fn, ...args) => global.setTimeout(fn, 0, ...args));
+global.clearImmediate = global.clearImmediate || ((id) => global.clearTimeout(id));

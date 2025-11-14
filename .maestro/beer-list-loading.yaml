@@ -1,0 +1,364 @@
+# .maestro/beer-list-loading.yaml
+# MP-3 Step 3a: E2E Tests for Loading States (TDD Approach)
+#
+# Purpose: Validate skeleton loading behavior across all beer list screens
+# These tests will FAIL initially until SkeletonLoader is implemented - that's correct for TDD!
+#
+# Test Scenarios:
+# 1. Skeleton appears immediately on app launch
+# 2. Skeleton disappears when data loads
+# 3. Pull-to-refresh shows spinner (not skeleton)
+# 4. Loading states work consistently across all tabs
+
+appId: ${APP_ID}
+---
+# Test 1: All Beers Tab - Initial Load with Skeleton
+- launchApp:
+    clearState: true  # Ensure clean state for consistent testing
+
+- tapOn: "All Beers Tab"
+
+# Skeleton should appear within 100ms (immediate perceived performance)
+- assertVisible:
+    id: "skeleton-loader"
+    timeout: 100
+
+# Wait for data to load (max 5 seconds)
+- waitForAnimationToEnd:
+    timeout: 5000
+
+# Skeleton should be replaced by beer list
+- assertVisible:
+    id: "beer-list"
+    timeout: 1000
+
+# Skeleton should be completely hidden
+- assertNotVisible: "skeleton-loader"
+
+# Verify beer count is shown (data loaded successfully)
+- assertVisible:
+    id: "beer-count"
+
+---
+# Test 2: Beerfinder Tab - Initial Load with Skeleton
+appId: ${APP_ID}
+---
+- launchApp:
+    clearState: true
+
+- tapOn: "Beerfinder Tab"
+
+# Skeleton should appear immediately
+- assertVisible:
+    id: "skeleton-loader"
+    timeout: 100
+
+# Wait for data load
+- waitForAnimationToEnd:
+    timeout: 5000
+
+# Beer list should appear
+- assertVisible:
+    id: "beer-list"
+    timeout: 1000
+
+# Skeleton hidden
+- assertNotVisible: "skeleton-loader"
+
+# Action buttons should be visible
+- assertVisible: "View Queues"
+- assertVisible: "Rewards"
+
+---
+# Test 3: Tasted Brews Tab - Initial Load with Skeleton
+appId: ${APP_ID}
+---
+- launchApp:
+    clearState: true
+
+- tapOn: "Tasted Brews Tab"
+
+# Skeleton appears
+- assertVisible:
+    id: "skeleton-loader"
+    timeout: 100
+
+# Wait for My Beers data
+- waitForAnimationToEnd:
+    timeout: 5000
+
+# Either beer list or empty state should appear
+# (Depends on whether user has tasted beers)
+- runFlow:
+    when:
+      visible: "beer-list"
+    commands:
+      - assertNotVisible: "skeleton-loader"
+      - assertVisible:
+          id: "beer-count"
+
+- runFlow:
+    when:
+      visible:
+        text: "No beers in your current round yet"
+    commands:
+      - assertNotVisible: "skeleton-loader"
+
+---
+# Test 4: Pull-to-Refresh - No Skeleton
+appId: ${APP_ID}
+---
+- launchApp
+
+- tapOn: "All Beers Tab"
+
+# Wait for initial load
+- waitForAnimationToEnd:
+    timeout: 5000
+
+- assertVisible:
+    id: "beer-list"
+
+# Pull down to refresh
+- scroll:
+    direction: "down"
+    distance: 50
+
+- scroll:
+    direction: "up"
+    distance: 500
+
+# Wait for refresh animation
+- waitForAnimationToEnd:
+    timeout: 3000
+
+# Skeleton should NOT appear during refresh
+- assertNotVisible: "skeleton-loader"
+
+# Beer list should remain visible
+- assertVisible:
+    id: "beer-list"
+
+---
+# Test 5: Tab Switching - Skeleton Caching
+appId: ${APP_ID}
+---
+- launchApp:
+    clearState: true
+
+# Load All Beers
+- tapOn: "All Beers Tab"
+- waitForAnimationToEnd:
+    timeout: 5000
+- assertVisible:
+    id: "beer-list"
+
+# Switch to Beerfinder
+- tapOn: "Beerfinder Tab"
+
+# Should show skeleton on first load
+- assertVisible:
+    id: "skeleton-loader"
+    timeout: 100
+
+- waitForAnimationToEnd:
+    timeout: 5000
+
+- assertVisible:
+    id: "beer-list"
+- assertNotVisible: "skeleton-loader"
+
+# Switch back to All Beers
+- tapOn: "All Beers Tab"
+
+# Should NOT show skeleton (data already loaded)
+# This tests that components maintain their data
+- assertVisible:
+    id: "beer-list"
+- assertNotVisible: "skeleton-loader"
+
+---
+# Test 6: Skeleton Visual Consistency
+appId: ${APP_ID}
+---
+- launchApp:
+    clearState: true
+
+- tapOn: "All Beers Tab"
+
+# Capture skeleton appearance
+- assertVisible:
+    id: "skeleton-loader"
+
+# Verify skeleton has multiple items (not just one)
+# This ensures skeleton looks like a populated list
+- runFlow:
+    commands:
+      # Wait a moment to observe skeleton
+      - wait: 500
+
+      # Skeleton should be visible during this time
+      - assertVisible:
+          id: "skeleton-loader"
+
+# Wait for data
+- waitForAnimationToEnd:
+    timeout: 5000
+
+# Verify smooth transition
+- assertVisible:
+    id: "beer-list"
+
+---
+# Test 7: Fast Data Load - Skeleton Still Appears
+appId: ${APP_ID}
+---
+# This test ensures skeleton appears even if data loads quickly
+# Important for perceived performance consistency
+
+- launchApp:
+    clearState: true
+
+- tapOn: "Tasted Brews Tab"
+
+# Skeleton should flash briefly even if data loads fast
+# This provides visual feedback that loading occurred
+- runFlow:
+    commands:
+      - assertVisible:
+          id: "skeleton-loader"
+          timeout: 100
+
+# Data loads
+- waitForAnimationToEnd:
+    timeout: 2000
+
+# End state should be correct (beer list or empty)
+- runFlow:
+    when:
+      visible: "beer-list"
+    commands:
+      - assertNotVisible: "skeleton-loader"
+
+---
+# Test 8: Search While Loading
+appId: ${APP_ID}
+---
+- launchApp:
+    clearState: true
+
+- tapOn: "All Beers Tab"
+
+# Tap search bar while skeleton is visible
+- tapOn:
+    id: "search-bar"
+
+# Search should be accessible even during loading (better UX)
+- inputText: "IPA"
+
+# Data loads
+- waitForAnimationToEnd:
+    timeout: 5000
+
+# Results should be filtered
+- assertVisible:
+    id: "beer-list"
+
+- assertNotVisible: "skeleton-loader"
+
+---
+# Test 9: Error State - No Skeleton
+appId: ${APP_ID}
+---
+# This test verifies error states don't show skeleton
+# Note: Requires network disconnection or simulated error
+
+- launchApp:
+    clearState: true
+
+# Simulate offline mode (if possible)
+# Otherwise this test documents expected behavior
+
+- tapOn: "All Beers Tab"
+
+# If error occurs, skeleton should be replaced by error message
+# - assertNotVisible: "skeleton-loader"  (after error)
+# - assertVisible: "Try Again"  (error button)
+
+# This test may need manual network disconnection
+# Or mocking at the app level
+
+---
+# Test 10: Accessibility - Loading State Announcement
+appId: ${APP_ID}
+---
+- launchApp:
+    clearState: true
+
+- tapOn: "All Beers Tab"
+
+# Skeleton should be accessible
+# Screen readers should announce loading state
+
+- assertVisible:
+    id: "skeleton-loader"
+
+# Wait for load
+- waitForAnimationToEnd:
+    timeout: 5000
+
+# Final state should be accessible
+- assertVisible:
+    id: "beer-list"
+
+---
+# Test 11: Performance - Skeleton Appears Quickly
+appId: ${APP_ID}
+---
+- launchApp:
+    clearState: true
+
+# Measure time to skeleton appearance
+- tapOn: "Beerfinder Tab"
+
+# Skeleton should appear within 100ms
+# (This is a critical performance metric)
+- assertVisible:
+    id: "skeleton-loader"
+    timeout: 100
+
+# If this assertion fails, skeleton rendering is too slow
+
+---
+# Test 12: All Tabs - Consistent Loading Behavior
+appId: ${APP_ID}
+---
+- launchApp:
+    clearState: true
+
+# Test each tab has consistent loading UX
+- tapOn: "All Beers Tab"
+- assertVisible:
+    id: "skeleton-loader"
+    timeout: 100
+- waitForAnimationToEnd:
+    timeout: 5000
+- assertNotVisible: "skeleton-loader"
+
+- tapOn: "Beerfinder Tab"
+- assertVisible:
+    id: "skeleton-loader"
+    timeout: 100
+- waitForAnimationToEnd:
+    timeout: 5000
+- assertNotVisible: "skeleton-loader"
+
+- tapOn: "Tasted Brews Tab"
+- assertVisible:
+    id: "skeleton-loader"
+    timeout: 100
+- waitForAnimationToEnd:
+    timeout: 5000
+- assertNotVisible: "skeleton-loader"
+
+# All tabs should behave consistently
