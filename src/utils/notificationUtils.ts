@@ -20,7 +20,7 @@ export interface ErrorResponse {
   type: ApiErrorType;
   message: string;
   statusCode?: number;
-  originalError?: any;
+  originalError?: unknown;
 }
 
 /**
@@ -70,7 +70,7 @@ export function showInfoAlert(title: string, message: string, onOk?: () => void)
  * @param error The error object
  * @returns A user-friendly error message
  */
-export function formatApiErrorForUser(error: any): string {
+export function formatApiErrorForUser(error: unknown): string {
   // If it's already a string, just return it
   if (typeof error === 'string') {
     return error;
@@ -108,7 +108,7 @@ export function formatApiErrorForUser(error: any): string {
  * @param error The original error
  * @returns A standardized error response
  */
-export function createErrorResponse(error: any): ErrorResponse {
+export function createErrorResponse(error: unknown): ErrorResponse {
   // Default error response
   const errorResponse: ErrorResponse = {
     type: ApiErrorType.UNKNOWN_ERROR,

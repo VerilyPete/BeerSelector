@@ -54,7 +54,7 @@ export const checkInBeer = async (beer: Beer): Promise<CheckInResponse> => {
     };
 
     // Use the ApiClient to make the request
-    const response = await apiClient.post<any>('/addToQueue.php', requestData);
+    const response = await apiClient.post<Record<string, unknown>>('/addToQueue.php', requestData);
 
     // If the request was successful but returned no data
     if (response.success && (!response.data || Object.keys(response.data).length === 0)) {

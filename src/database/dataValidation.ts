@@ -5,6 +5,10 @@
  * Provides detailed validation results with operation summaries.
  */
 
+import { Beer } from '../types/beer';
+import { Reward } from '../types/database';
+import { allBeersRowSchema, rewardRowSchema } from './schemaTypes';
+
 /**
  * Result of validating a single beer object
  */
@@ -25,10 +29,10 @@ export interface ValidationSummary {
 /**
  * Result of validating multiple beer objects
  */
-export interface BeersValidationResult {
-  validBeers: any[];
+export interface BeersValidationResult<T = Beer> {
+  validBeers: T[];
   invalidBeers: Array<{
-    beer: any;
+    beer: unknown;
     errors: string[];
   }>;
   summary: ValidationSummary;
@@ -55,7 +59,7 @@ export interface BeersValidationResult {
  *   });
  * }
  */
-export function validateBeerForInsertion(beer: any): BeerValidationResult {
+export function validateBeerForInsertion(beer: unknown): BeerValidationResult {
   const errors: string[] = [];
 
   // Check for null/undefined beer object
@@ -70,19 +74,23 @@ export function validateBeerForInsertion(beer: any): BeerValidationResult {
     return { isValid: false, errors };
   }
 
+  // Legacy validation for backward compatibility with existing tests
+  // TODO: Remove this once all validation migrates to Zod schemas (allBeersRowSchema)
+  const beerObj = beer as Record<string, unknown>;
+
   // Validate required field: id
-  if (!('id' in beer)) {
+  if (!('id' in beerObj)) {
     errors.push('Missing required field: id');
-  } else if (beer.id === null || beer.id === undefined) {
+  } else if (beerObj.id === null || beerObj.id === undefined) {
     errors.push('Field id is null or undefined');
   }
 
   // Validate required field: brew_name
-  if (!('brew_name' in beer)) {
+  if (!('brew_name' in beerObj)) {
     errors.push('Missing required field: brew_name');
-  } else if (beer.brew_name === null || beer.brew_name === undefined) {
+  } else if (beerObj.brew_name === null || beerObj.brew_name === undefined) {
     errors.push('Field brew_name is null or undefined');
-  } else if (typeof beer.brew_name === 'string' && beer.brew_name.trim() === '') {
+  } else if (typeof beerObj.brew_name === 'string' && beerObj.brew_name.trim() === '') {
     errors.push('Field brew_name is empty string');
   }
 
@@ -122,15 +130,15 @@ export function validateBeerForInsertion(beer: any): BeerValidationResult {
  *   additionalData: summary
  * });
  */
-export function validateBeersForInsertion(beers: any[]): BeersValidationResult {
-  const validBeers: any[] = [];
-  const invalidBeers: Array<{ beer: any; errors: string[] }> = [];
+export function validateBeersForInsertion(beers: unknown[]): BeersValidationResult<Beer> {
+  const validBeers: Beer[] = [];
+  const invalidBeers: Array<{ beer: unknown; errors: string[] }> = [];
 
   for (const beer of beers) {
     const validationResult = validateBeerForInsertion(beer);
 
     if (validationResult.isValid) {
-      validBeers.push(beer);
+      validBeers.push(beer as Beer);
     } else {
       invalidBeers.push({
         beer,
@@ -160,7 +168,7 @@ export function validateBeersForInsertion(beers: any[]): BeersValidationResult {
  * @param reward - The reward object to validate
  * @returns Validation result with error details
  */
-export function validateRewardForInsertion(reward: any): BeerValidationResult {
+export function validateRewardForInsertion(reward: unknown): BeerValidationResult {
   const errors: string[] = [];
 
   // Check for null/undefined reward object
@@ -175,11 +183,17 @@ export function validateRewardForInsertion(reward: any): BeerValidationResult {
     return { isValid: false, errors };
   }
 
-  // Rewards validation can be more lenient since structure varies
-  // Just ensure it's a valid object
+  // Use Zod schema for validation
+  const result = rewardRowSchema.safeParse(reward);
+  if (!result.success) {
+    result.error.issues.forEach(issue => {
+      errors.push(`${issue.path.join('.')}: ${issue.message}`);
+    });
+  }
+
   return {
-    isValid: true,
-    errors: [],
+    isValid: errors.length === 0,
+    errors,
   };
 }
 
@@ -189,17 +203,17 @@ export function validateRewardForInsertion(reward: any): BeerValidationResult {
  * @param rewards - Array of reward objects to validate
  * @returns Object with valid rewards, invalid rewards with errors, and summary
  */
-export function validateRewardsForInsertion(rewards: any[]): BeersValidationResult {
-  const validBeers: any[] = [];
-  const invalidBeers: Array<{ beer: any; errors: string[] }> = [];
+export function validateRewardsForInsertion(rewards: unknown[]): BeersValidationResult<Reward> {
+  const validRewards: Reward[] = [];
+  const invalidRewards: Array<{ beer: unknown; errors: string[] }> = [];
 
   for (const reward of rewards) {
     const validationResult = validateRewardForInsertion(reward);
 
     if (validationResult.isValid) {
-      validBeers.push(reward);
+      validRewards.push(reward as Reward);
     } else {
-      invalidBeers.push({
+      invalidRewards.push({
         beer: reward,
         errors: validationResult.errors,
       });
@@ -207,12 +221,12 @@ export function validateRewardsForInsertion(rewards: any[]): BeersValidationResu
   }
 
   return {
-    validBeers,
-    invalidBeers,
+    validBeers: validRewards,
+    invalidBeers: invalidRewards,
     summary: {
       total: rewards.length,
-      valid: validBeers.length,
-      invalid: invalidBeers.length,
+      valid: validRewards.length,
+      invalid: invalidRewards.length,
     },
   };
 }

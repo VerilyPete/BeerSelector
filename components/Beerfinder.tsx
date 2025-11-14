@@ -103,19 +103,19 @@ export const Beerfinder = () => {
       } else {
         Alert.alert('Check-In Failed', result.error || 'Unable to check in beer. Please try again.');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Check-in error:', error);
 
       let errorMessage;
 
-      if (error.message && error.message.includes('Please log in again')) {
+      if (error instanceof Error && error.message && error.message.includes('Please log in again')) {
         errorMessage = 'Login session expired. Attempting to recover your session...';
       } else if (error instanceof SyntaxError && error.message.includes('JSON Parse error')) {
         Alert.alert('Success', `Successfully checked in ${item.brew_name}!`);
         setCheckinLoading(false);
         return;
       } else {
-        errorMessage = `Failed to check in: ${error.message}`;
+        errorMessage = `Failed to check in: ${error instanceof Error ? error.message : 'Unknown error'}`;
       }
 
       Alert.alert('Error', errorMessage);
@@ -135,11 +135,11 @@ export const Beerfinder = () => {
       setQueuedBeers(parsedBeers);
       setQueueError(null); // Success - clear error
       setQueueModalVisible(true);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('View queues error:', error);
 
       // Set appropriate error message
-      const errorMessage = error.message || 'Failed to load queue. Please try again.';
+      const errorMessage = error instanceof Error ? error.message : 'Failed to load queue. Please try again.';
       setQueueError(errorMessage);
 
       Alert.alert('Error', errorMessage);
@@ -174,9 +174,9 @@ export const Beerfinder = () => {
                 } else {
                   Alert.alert('Error', 'Failed to delete beer. Please try again.');
                 }
-              } catch (error: any) {
+              } catch (error: unknown) {
                 console.error('Delete queued beer error:', error);
-                Alert.alert('Error', error.message || 'Failed to delete beer. Please try again.');
+                Alert.alert('Error', error instanceof Error ? error.message : 'Failed to delete beer. Please try again.');
               } finally {
                 setDeletingBeerId(null);
               }
@@ -185,9 +185,9 @@ export const Beerfinder = () => {
           }
         ]
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Delete queued beer error:', error);
-      Alert.alert('Error', `Failed to delete beer: ${error.message}`);
+      Alert.alert('Error', `Failed to delete beer: ${error instanceof Error ? error.message : 'Unknown error'}`);
       setDeletingBeerId(null);
     }
   };

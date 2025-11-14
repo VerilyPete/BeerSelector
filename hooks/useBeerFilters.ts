@@ -76,8 +76,10 @@ export const applySorting = <T extends FilterableBeer>(beers: T[], sortBy: SortO
     if (dateField === 'tasted_date') {
       // Parse dates in format MM/DD/YYYY for tasted_date
       sorted.sort((a, b) => {
-        const partsA = ((a as any).tasted_date || '').split('/');
-        const partsB = ((b as any).tasted_date || '').split('/');
+        const tastedDateA = 'tasted_date' in a ? (a.tasted_date as string) : '';
+        const tastedDateB = 'tasted_date' in b ? (b.tasted_date as string) : '';
+        const partsA = tastedDateA.split('/');
+        const partsB = tastedDateB.split('/');
 
         if (partsA.length === 3 && partsB.length === 3) {
           // Create Date objects with year, month (0-based), day

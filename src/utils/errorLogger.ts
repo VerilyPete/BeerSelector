@@ -37,7 +37,7 @@ export interface ErrorContext {
   /** User ID if available (for tracking user-specific issues) */
   userId?: string;
   /** Additional contextual data (API URLs, record counts, etc.) */
-  additionalData?: Record<string, any>;
+  additionalData?: Record<string, unknown>;
 }
 
 /**
@@ -68,7 +68,7 @@ const SENSITIVE_KEYS = [
 /**
  * Sanitizes sensitive data from an object by redacting values
  */
-function sanitizeData(data: any): any {
+function sanitizeData(data: unknown): unknown {
   if (data === null || data === undefined) {
     return data;
   }
@@ -81,7 +81,7 @@ function sanitizeData(data: any): any {
     return data.map(item => sanitizeData(item));
   }
 
-  const sanitized: any = {};
+  const sanitized: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(data)) {
     const lowerKey = key.toLowerCase();
     if (SENSITIVE_KEYS.some(sensitive => lowerKey.includes(sensitive))) {
@@ -288,11 +288,11 @@ export function logInfo(message: string, context?: ErrorContext): void {
  * );
  * await safeFetchBeers(); // Errors are logged before being thrown
  */
-export function withErrorLogging<T extends (...args: any[]) => Promise<any>>(
+export function withErrorLogging<T extends (...args: never[]) => Promise<unknown>>(
   fn: T,
   context: ErrorContext
 ): T {
-  return (async (...args: any[]) => {
+  return (async (...args: Parameters<T>) => {
     try {
       return await fn(...args);
     } catch (error) {

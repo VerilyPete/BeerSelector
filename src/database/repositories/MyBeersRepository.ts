@@ -8,6 +8,14 @@
 import { getDatabase } from '../connection';
 import { Beerfinder } from '../../types/beer';
 import { databaseLockManager } from '../locks';
+import {
+  TastedBrewRow,
+  TableInfo,
+  ColumnInfo,
+  isTastedBrewRow,
+  tastedBrewRowToBeerfinder,
+  isCountResult
+} from '../schemaTypes';
 
 /**
  * Repository class for tasted beers (Beerfinder) operations
@@ -258,6 +266,7 @@ export class MyBeersRepository {
    *
    * Includes debugging logic to check table structure when empty.
    * Orders by id.
+   * Validates all rows with type guards and filters out invalid data.
    *
    * @returns Array of Beerfinder objects
    */
@@ -266,17 +275,24 @@ export class MyBeersRepository {
 
     try {
       console.log('DB: Executing query to get tasted beers from tasted_brew_current_round table');
-      const beers = await database.getAllAsync<any>(
+      const rows = await database.getAllAsync<TastedBrewRow>(
         'SELECT * FROM tasted_brew_current_round ORDER BY id'
       );
-      console.log(`DB: Retrieved ${beers.length} tasted beers from database`);
+      console.log(`DB: Retrieved ${rows.length} tasted beers from database`);
+
+      // Validate and convert each row
+      const validBeers = rows
+        .filter(row => isTastedBrewRow(row))
+        .map(row => tastedBrewRowToBeerfinder(row));
+
+      console.log(`DB: ${validBeers.length} valid tasted beers after validation`);
 
       // Check if we have any beers
-      if (beers.length === 0) {
+      if (validBeers.length === 0) {
         console.log('DB: No tasted beers found in the database. Checking table existence...');
 
         // Check if the table exists and has the expected structure
-        const tableInfo = await database.getAllAsync<any>(
+        const tableInfo = await database.getAllAsync<TableInfo>(
           "SELECT name FROM sqlite_master WHERE type='table' AND name='tasted_brew_current_round'"
         );
 
@@ -284,14 +300,14 @@ export class MyBeersRepository {
           console.log('DB: Table tasted_brew_current_round does not exist!');
         } else {
           console.log('DB: Table tasted_brew_current_round exists. Checking column structure...');
-          const columnInfo = await database.getAllAsync<any>(
+          const columnInfo = await database.getAllAsync<ColumnInfo>(
             "PRAGMA table_info(tasted_brew_current_round)"
           );
           console.log('DB: Table structure:', JSON.stringify(columnInfo));
         }
       }
 
-      return beers;
+      return validBeers;
     } catch (error) {
       console.error('Error getting Beerfinder beers:', error);
       throw error;
@@ -301,17 +317,26 @@ export class MyBeersRepository {
   /**
    * Get a tasted beer by its ID
    *
+   * Validates the result with type guards before returning.
+   *
    * @param id - The beer ID to search for
-   * @returns Beerfinder object if found, null otherwise
+   * @returns Beerfinder object if found and valid, null otherwise
    */
   async getById(id: string): Promise<Beerfinder | null> {
     const database = await getDatabase();
 
     try {
-      return await database.getFirstAsync(
+      const row = await database.getFirstAsync<TastedBrewRow>(
         'SELECT * FROM tasted_brew_current_round WHERE id = ?',
         [id]
       );
+
+      // Validate and convert the row
+      if (row && isTastedBrewRow(row)) {
+        return tastedBrewRowToBeerfinder(row);
+      }
+
+      return null;
     } catch (error) {
       console.error('Error getting tasted beer by ID:', error);
       throw error;
@@ -342,6 +367,8 @@ export class MyBeersRepository {
   /**
    * Get the count of tasted beers
    *
+   * Validates the count result with type guards.
+   *
    * @returns Number of tasted beers in the table
    */
   async getCount(): Promise<number> {
@@ -351,7 +378,13 @@ export class MyBeersRepository {
       const result = await database.getFirstAsync<{ count: number }>(
         'SELECT COUNT(*) as count FROM tasted_brew_current_round'
       );
-      return result?.count ?? 0;
+
+      // Validate the count result
+      if (result && isCountResult(result)) {
+        return result.count;
+      }
+
+      return 0;
     } catch (error) {
       console.error('Error getting tasted beers count:', error);
       throw error;

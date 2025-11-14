@@ -8,6 +8,12 @@
 import { getDatabase } from '../connection';
 import { Reward } from '../../types/database';
 import { databaseLockManager } from '../locks';
+import {
+  isRewardRow,
+  rewardRowToReward,
+  RewardRow,
+  isCountResult
+} from '../schemaTypes';
 
 /**
  * Repository class for Reward entity operations
@@ -82,7 +88,7 @@ export class RewardsRepository {
         const batch = rewards.slice(i, i + batchSize);
 
         const placeholders = batch.map(() => '(?, ?, ?)').join(',');
-        const values: any[] = [];
+        const values: (string | number)[] = [];
 
         batch.forEach(reward => {
           values.push(
@@ -111,15 +117,21 @@ export class RewardsRepository {
    *
    * Returns empty array on error instead of throwing.
    * Orders by reward_id.
+   * Validates all rows with type guards and filters out invalid data.
    *
    * @returns Array of Reward objects
    */
   async getAll(): Promise<Reward[]> {
     const database = await getDatabase();
     try {
-      return await database.getAllAsync(
+      const rows = await database.getAllAsync<RewardRow>(
         'SELECT * FROM rewards ORDER BY reward_id'
       );
+
+      // Validate and convert each row
+      return rows
+        .filter(row => isRewardRow(row))
+        .map(row => rewardRowToReward(row));
     } catch (error) {
       console.error('Error getting rewards:', error);
       return [];
@@ -129,17 +141,26 @@ export class RewardsRepository {
   /**
    * Get a reward by its ID
    *
+   * Validates the result with type guards before returning.
+   *
    * @param id - The reward ID to search for
-   * @returns Reward object if found, null otherwise
+   * @returns Reward object if found and valid, null otherwise
    */
   async getById(id: string): Promise<Reward | null> {
     const database = await getDatabase();
 
     try {
-      return await database.getFirstAsync(
+      const row = await database.getFirstAsync<RewardRow>(
         'SELECT * FROM rewards WHERE reward_id = ?',
         [id]
       );
+
+      // Validate and convert the row
+      if (row && isRewardRow(row)) {
+        return rewardRowToReward(row);
+      }
+
+      return null;
     } catch (error) {
       console.error('Error getting reward by ID:', error);
       throw error;
@@ -149,6 +170,8 @@ export class RewardsRepository {
   /**
    * Get rewards by type
    *
+   * Validates all rows with type guards and filters out invalid data.
+   *
    * @param type - Reward type to filter by (e.g., 'plate', 'shirt', 'glass')
    * @returns Array of Reward objects matching the type
    */
@@ -156,10 +179,15 @@ export class RewardsRepository {
     const database = await getDatabase();
 
     try {
-      return await database.getAllAsync(
+      const rows = await database.getAllAsync<RewardRow>(
         'SELECT * FROM rewards WHERE reward_type = ? ORDER BY reward_id',
         [type]
       );
+
+      // Validate and convert each row
+      return rows
+        .filter(row => isRewardRow(row))
+        .map(row => rewardRowToReward(row));
     } catch (error) {
       console.error('Error getting rewards by type:', error);
       throw error;
@@ -170,6 +198,7 @@ export class RewardsRepository {
    * Get all redeemed rewards
    *
    * Returns rewards where redeemed = 'true'
+   * Validates all rows with type guards and filters out invalid data.
    *
    * @returns Array of redeemed Reward objects
    */
@@ -177,9 +206,14 @@ export class RewardsRepository {
     const database = await getDatabase();
 
     try {
-      return await database.getAllAsync(
+      const rows = await database.getAllAsync<RewardRow>(
         "SELECT * FROM rewards WHERE redeemed = 'true' ORDER BY reward_id"
       );
+
+      // Validate and convert each row
+      return rows
+        .filter(row => isRewardRow(row))
+        .map(row => rewardRowToReward(row));
     } catch (error) {
       console.error('Error getting redeemed rewards:', error);
       throw error;
@@ -191,6 +225,7 @@ export class RewardsRepository {
    *
    * Returns rewards where redeemed = 'false' or '0'
    * Handles both string representations of false.
+   * Validates all rows with type guards and filters out invalid data.
    *
    * @returns Array of unredeemed Reward objects
    */
@@ -198,9 +233,14 @@ export class RewardsRepository {
     const database = await getDatabase();
 
     try {
-      return await database.getAllAsync(
+      const rows = await database.getAllAsync<RewardRow>(
         "SELECT * FROM rewards WHERE redeemed = 'false' OR redeemed = '0' ORDER BY reward_id"
       );
+
+      // Validate and convert each row
+      return rows
+        .filter(row => isRewardRow(row))
+        .map(row => rewardRowToReward(row));
     } catch (error) {
       console.error('Error getting unredeemed rewards:', error);
       throw error;
@@ -227,6 +267,8 @@ export class RewardsRepository {
   /**
    * Get the count of rewards
    *
+   * Validates the count result with type guards.
+   *
    * @returns Number of rewards in the table
    */
   async getCount(): Promise<number> {
@@ -236,7 +278,13 @@ export class RewardsRepository {
       const result = await database.getFirstAsync<{ count: number }>(
         'SELECT COUNT(*) as count FROM rewards'
       );
-      return result?.count ?? 0;
+
+      // Validate the count result
+      if (result && isCountResult(result)) {
+        return result.count;
+      }
+
+      return 0;
     } catch (error) {
       console.error('Error getting rewards count:', error);
       throw error;

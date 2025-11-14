@@ -9,7 +9,7 @@ import { getPreference } from '../database/preferences';
  * @param delay - Initial delay between retries in ms (default: 1000)
  * @returns Promise with the JSON response
  */
-export const fetchWithRetry = async (url: string, retries = 3, delay = 1000): Promise<any> => {
+export const fetchWithRetry = async (url: string, retries = 3, delay = 1000): Promise<unknown> => {
   // Special handling for none:// protocol which is used as a placeholder in visitor mode
   if (url.startsWith('none://')) {
     console.log(`Detected none:// protocol URL: ${url}. Returning empty data instead of making network request.`);
@@ -70,7 +70,7 @@ export const fetchBeersFromAPI = async (): Promise<Beer[]> => {
     // Check for common beer properties in the response at different levels
     if (data) {
       // Try to find any array that looks like it contains beer objects
-      const findBeersArray = (obj: any): Beer[] | null => {
+      const findBeersArray = (obj: unknown): Beer[] | null => {
         // If we have an array, check if it looks like beers
         if (Array.isArray(obj)) {
           // Check if this looks like an array of beers
@@ -191,15 +191,19 @@ export const fetchMyBeersFromAPI = async (): Promise<Beerfinder[]> => {
       }
 
       // Validate the beers array - check for missing IDs
-      const validBeers = beers.filter((beer: any) => beer && beer.id);
-      const invalidBeers = beers.filter((beer: any) => !beer || !beer.id);
+      const validBeers = beers.filter((beer: unknown): beer is Beerfinder =>
+        typeof beer === 'object' && beer !== null && 'id' in beer && beer.id !== null && beer.id !== undefined
+      );
+      const invalidBeers = beers.filter((beer: unknown) =>
+        !beer || typeof beer !== 'object' || !('id' in beer) || beer.id === null || beer.id === undefined
+      );
 
       console.log(`DB: Found ${validBeers.length} valid beers with IDs and ${invalidBeers.length} invalid beers without IDs`);
 
       // Log details about invalid beers for debugging
       if (invalidBeers.length > 0) {
         console.log('DB: Invalid beers details:');
-        invalidBeers.forEach((beer: any, index: number) => {
+        invalidBeers.forEach((beer: unknown, index: number) => {
           console.log(`DB: Invalid beer ${index}:`, JSON.stringify(beer));
         });
       }

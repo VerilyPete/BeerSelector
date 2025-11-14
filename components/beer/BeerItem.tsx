@@ -69,8 +69,9 @@ const BeerItemComponent: React.FC<BeerItemProps> = ({
   const borderColor = useThemeColor({ light: '#e0e0e0', dark: '#333' }, 'text');
 
   // Format date for display
-  const displayDate = (beer as any).tasted_date
-    ? formatDateString((beer as any).tasted_date)
+  // Check if beer has tasted_date (Beerfinder type) or added_date (Beer type)
+  const displayDate = 'tasted_date' in beer && beer.tasted_date
+    ? formatDateString(beer.tasted_date)
     : formatDate(beer.added_date || '');
 
   return (
