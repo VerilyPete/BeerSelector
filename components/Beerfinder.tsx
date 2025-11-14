@@ -1,10 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { StyleSheet, View, TouchableOpacity, Alert, ActivityIndicator, Modal, FlatList } from 'react-native';
 import { beerRepository } from '@/src/database/repositories/BeerRepository';
 import { myBeersRepository } from '@/src/database/repositories/MyBeersRepository';
 import { fetchMyBeersFromAPI } from '@/src/api/beerApi';
 import { ThemedText } from './ThemedText';
-import { LoadingIndicator } from './LoadingIndicator';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { SearchBar } from './SearchBar';
@@ -15,9 +14,11 @@ import { useBeerFilters } from '@/hooks/useBeerFilters';
 import { useDataRefresh } from '@/hooks/useDataRefresh';
 import { FilterBar } from './beer/FilterBar';
 import { BeerList } from './beer/BeerList';
+import { SkeletonLoader } from './beer/SkeletonLoader';
 import { QueuedBeer } from '@/src/utils/htmlParser';
 import { getQueuedBeers, deleteQueuedBeer as deleteQueuedBeerApi } from '@/src/api/queueService';
 import { Beer } from '@/src/types/beer';
+import { useDebounce } from '@/hooks/useDebounce';
 
 
 export const Beerfinder = () => {
@@ -33,6 +34,13 @@ export const Beerfinder = () => {
   const [deletingBeerId, setDeletingBeerId] = useState<string | null>(null);
   const [untappdModalVisible, setUntappdModalVisible] = useState(false);
   const [selectedBeerName, setSelectedBeerName] = useState('');
+
+  /**
+   * MP-3 Bottleneck #4: Local search state for immediate UI updates
+   * Debounced version used for filtering to reduce excessive re-renders
+   */
+  const [localSearchText, setLocalSearchText] = useState('');
+  const debouncedSearchText = useDebounce(localSearchText, 300);
 
   // Use the shared filtering hook
   const {
@@ -91,7 +99,15 @@ export const Beerfinder = () => {
     loadBeers();
   }, []);
 
-  const handleCheckIn = async (item: Beer) => {
+  // Sync debounced search text with hook's search state
+  useEffect(() => {
+    setSearchText(debouncedSearchText);
+  }, [debouncedSearchText, setSearchText]);
+
+  /**
+   * MP-3 Bottleneck #5: Memoized event handlers for stable references
+   */
+  const handleCheckIn = useCallback(async (item: Beer) => {
     try {
       setCheckinLoading(true);
       const result = await checkInBeer(item);
@@ -122,9 +138,9 @@ export const Beerfinder = () => {
     } finally {
       setCheckinLoading(false);
     }
-  };
+  }, []);
 
-  const viewQueues = async () => {
+  const viewQueues = useCallback(async () => {
     try {
       setLoadingQueues(true);
       setQueueError(null); // Clear any previous errors
@@ -146,9 +162,9 @@ export const Beerfinder = () => {
     } finally {
       setLoadingQueues(false);
     }
-  };
+  }, []);
 
-  const deleteQueuedBeer = async (beerId: string, beerName: string) => {
+  const deleteQueuedBeer = useCallback(async (beerId: string, beerName: string) => {
     try {
       Alert.alert(
         "Confirm Deletion",
@@ -190,21 +206,24 @@ export const Beerfinder = () => {
       Alert.alert('Error', `Failed to delete beer: ${error instanceof Error ? error.message : 'Unknown error'}`);
       setDeletingBeerId(null);
     }
-  };
+  }, [viewQueues]);
 
 
-  const handleUntappdSearch = (beerName: string) => {
+  const handleUntappdSearch = useCallback((beerName: string) => {
     setSelectedBeerName(beerName);
     setUntappdModalVisible(true);
-  };
+  }, []);
 
-  const handleSearchChange = (text: string) => {
-    setSearchText(text);
-  };
+  /**
+   * MP-3 Bottleneck #4: Update local search for immediate UI, debouncing handles filtering
+   */
+  const handleSearchChange = useCallback((text: string) => {
+    setLocalSearchText(text);
+  }, []);
 
-  const clearSearch = () => {
-    setSearchText('');
-  };
+  const clearSearch = useCallback(() => {
+    setLocalSearchText('');
+  }, []);
 
   const renderBeerActions = (item: Beer) => (
     <View style={styles.buttonContainer}>
@@ -337,8 +356,47 @@ export const Beerfinder = () => {
 
   return (
     <View style={styles.container}>
-      {loading ? (
-        <LoadingIndicator />
+      {/* Show skeleton during initial load (when loading=true and no beers yet) */}
+      {loading && availableBeers.length === 0 ? (
+        <>
+          {/* MP-3 Step 3b: Show action buttons even during loading */}
+          <View style={styles.filtersContainer}>
+            <View style={styles.buttonsContainer}>
+              <TouchableOpacity
+                style={[styles.actionButton, {
+                  backgroundColor: colorScheme === 'dark' ? '#E91E63' : activeButtonColor,
+                  marginRight: 8
+                }]}
+                onPress={viewQueues}
+                disabled={loadingQueues}
+              >
+                {loadingQueues ? (
+                  <ActivityIndicator size="small" color={colorScheme === 'dark' ? '#FFFFFF' : 'white'} />
+                ) : (
+                  <ThemedText style={[styles.actionButtonText, {
+                    color: colorScheme === 'dark' ? '#FFFFFF' : 'white'
+                  }]}>
+                    View Queues
+                  </ThemedText>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.actionButton, {
+                  backgroundColor: colorScheme === 'dark' ? '#E91E63' : activeButtonColor
+                }]}
+                onPress={() => router.push("/screens/rewards" as any)}
+              >
+                <ThemedText style={[styles.actionButtonText, {
+                  color: colorScheme === 'dark' ? '#FFFFFF' : 'white'
+                }]}>
+                  Rewards
+                </ThemedText>
+              </TouchableOpacity>
+            </View>
+          </View>
+          <SkeletonLoader count={20} />
+        </>
       ) : error ? (
         <View style={styles.centered}>
           <ThemedText style={styles.errorText}>{error}</ThemedText>
@@ -389,7 +447,7 @@ export const Beerfinder = () => {
             </View>
 
             <SearchBar
-              searchText={searchText}
+              searchText={localSearchText}
               onSearchChange={handleSearchChange}
               onClear={clearSearch}
               placeholder="Search available beer..."

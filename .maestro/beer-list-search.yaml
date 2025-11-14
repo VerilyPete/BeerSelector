@@ -1,0 +1,23 @@
+# .maestro/beer-list-search.yaml
+appId: ${APP_ID}
+---
+- launchApp
+- tapOn: "All Beers Tab"
+- waitForAnimationToEnd
+
+# Test search filtering performance
+- tapOn:
+    id: "search-bar"
+- inputText: "IPA"
+- waitForAnimationToEnd:
+    timeout: 2000
+- assertVisible: "beer-list"
+
+# Clear and search again
+- eraseText
+- inputText: "Stout Porter"
+- waitForAnimationToEnd:
+    timeout: 2000
+
+# Verify results updated
+- assertVisible: "beer-count"

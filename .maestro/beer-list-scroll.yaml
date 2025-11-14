@@ -1,0 +1,23 @@
+# .maestro/beer-list-scroll.yaml
+appId: ${APP_ID}
+---
+- launchApp
+- tapOn: "All Beers Tab"
+- assertVisible: "all-beers-container"
+
+# Wait for list to load
+- waitForAnimationToEnd
+
+# Test scroll performance with 200+ items
+- scroll:
+    direction: "down"
+    duration: 3000
+- scroll:
+    direction: "down"
+    duration: 3000
+- scroll:
+    direction: "up"
+    duration: 3000
+
+# Verify no crashes or freezes
+- assertVisible: "beer-count"

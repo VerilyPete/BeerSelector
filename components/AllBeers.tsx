@@ -1,8 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { StyleSheet, View, TouchableOpacity } from 'react-native';
 import { beerRepository } from '@/src/database/repositories/BeerRepository';
 import { ThemedText } from './ThemedText';
-import { LoadingIndicator } from './LoadingIndicator';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { SearchBar } from './SearchBar';
 import { useBeerFilters } from '@/hooks/useBeerFilters';
@@ -10,7 +9,9 @@ import { useDataRefresh } from '@/hooks/useDataRefresh';
 import { FilterBar } from './beer/FilterBar';
 import { BeerList } from './beer/BeerList';
 import { UntappdWebView } from './UntappdWebView';
+import { SkeletonLoader } from './beer/SkeletonLoader';
 import { Beer } from '@/src/types/beer';
+import { useDebounce } from '@/hooks/useDebounce';
 
 export const AllBeers = () => {
   const [allBeers, setAllBeers] = useState<Beer[]>([]);
@@ -18,6 +19,13 @@ export const AllBeers = () => {
   const [error, setError] = useState<string | null>(null);
   const [untappdModalVisible, setUntappdModalVisible] = useState(false);
   const [selectedBeerName] = useState('');
+
+  /**
+   * MP-3 Bottleneck #4: Local search state for immediate UI updates
+   * Debounced version used for filtering to reduce excessive re-renders
+   */
+  const [localSearchText, setLocalSearchText] = useState('');
+  const debouncedSearchText = useDebounce(localSearchText, 300);
 
   // Use the shared filtering hook
   const {
@@ -32,10 +40,15 @@ export const AllBeers = () => {
     toggleExpand,
   } = useBeerFilters(allBeers);
 
+  // Sync debounced search text with hook's search state
+  useEffect(() => {
+    setSearchText(debouncedSearchText);
+  }, [debouncedSearchText, setSearchText]);
+
   // Theme colors
   const activeButtonColor = useThemeColor({}, 'tint');
 
-  const loadBeers = async () => {
+  const loadBeers = useCallback(async () => {
     try {
       setLoading(true);
       const data = await beerRepository.getAll();
@@ -49,7 +62,7 @@ export const AllBeers = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   // Use the shared data refresh hook
   const { refreshing, handleRefresh } = useDataRefresh({
@@ -64,20 +77,36 @@ export const AllBeers = () => {
 
   useEffect(() => {
     loadBeers();
+  }, [loadBeers]);
+
+  /**
+   * MP-3 Bottleneck #5: Memoized event handlers for stable references
+   * Bottleneck #4: Update local search for immediate UI, debouncing handles filtering
+   */
+  const handleSearchChange = useCallback((text: string) => {
+    setLocalSearchText(text);
   }, []);
 
-  const handleSearchChange = (text: string) => {
-    setSearchText(text);
-  };
-
-  const clearSearch = () => {
-    setSearchText('');
-  };
+  const clearSearch = useCallback(() => {
+    setLocalSearchText('');
+  }, []);
 
   return (
     <View style={styles.container} testID="all-beers-container">
-      {loading ? (
-        <LoadingIndicator />
+      {/* Show skeleton during initial load (when loading=true and no beers yet) */}
+      {loading && allBeers.length === 0 ? (
+        <>
+          {/* MP-3 Step 3b: Show search bar even during loading for better UX */}
+          <View style={styles.filtersContainer}>
+            <SearchBar
+              searchText={localSearchText}
+              onSearchChange={handleSearchChange}
+              onClear={clearSearch}
+              placeholder="Search beer..."
+            />
+          </View>
+          <SkeletonLoader count={20} />
+        </>
       ) : error ? (
         <View style={styles.centered} testID="error-container">
           <ThemedText style={styles.errorText} testID="error-message">{error}</ThemedText>
@@ -95,7 +124,7 @@ export const AllBeers = () => {
         <>
           <View style={styles.filtersContainer}>
             <SearchBar
-              searchText={searchText}
+              searchText={localSearchText}
               onSearchChange={handleSearchChange}
               onClear={clearSearch}
               placeholder="Search beer..."

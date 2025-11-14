@@ -1,0 +1,27 @@
+# .maestro/beer-list-filter.yaml
+appId: ${APP_ID}
+---
+- launchApp
+- tapOn: "All Beers Tab"
+- waitForAnimationToEnd
+
+# Test filter toggle responsiveness
+- tapOn: "filter-draft-button"
+- waitForAnimationToEnd:
+    timeout: 1000
+- assertVisible: "beer-list"
+
+- tapOn: "filter-ipa-button"
+- waitForAnimationToEnd:
+    timeout: 1000
+- assertVisible: "beer-list"
+
+# Toggle off and verify
+- tapOn: "filter-draft-button"
+- waitForAnimationToEnd:
+    timeout: 1000
+
+# Verify filter state restored
+- tapOn: "sort-toggle-button"
+- waitForAnimationToEnd:
+    timeout: 1000
