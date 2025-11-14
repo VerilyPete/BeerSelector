@@ -21,12 +21,12 @@ import { logError, logInfo } from '../utils/errorLogger';
 /**
  * Result of a database operation
  */
-export interface DatabaseOperationResult {
+export interface DatabaseOperationResult<T = unknown> {
   success: boolean;
   recordsAffected?: number;
-  data?: any;
-  validRecords?: any[];
-  invalidRecords?: any[];
+  data?: T;
+  validRecords?: T[];
+  invalidRecords?: unknown[];
   summary?: {
     valid: number;
     invalid: number;
@@ -87,15 +87,16 @@ export async function withDatabaseTransaction<T = DatabaseOperationResult>(
       operation: 'withDatabaseTransaction',
     });
 
-    const result = await database.withTransactionAsync(async () => {
-      return await operation(database);
+    let result: T;
+    await database.withTransactionAsync(async () => {
+      result = await operation(database);
     });
 
     logInfo('Database transaction committed successfully', {
       operation: 'withDatabaseTransaction',
     });
 
-    return result;
+    return result!;
   } catch (error) {
     // Transaction automatically rolls back on error
     logError(error, {

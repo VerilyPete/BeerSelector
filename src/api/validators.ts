@@ -34,7 +34,7 @@ export interface ValidationResult<T> {
  *   console.error('Invalid API response:', result.errors);
  * }
  */
-export function validateBrewInStockResponse(response: any): ValidationResult<any[]> {
+export function validateBrewInStockResponse(response: unknown): ValidationResult<unknown[]> {
   const errors: string[] = [];
 
   // Check for null/undefined
@@ -101,7 +101,7 @@ export function validateBrewInStockResponse(response: any): ValidationResult<any
  *   console.warn('Skipping invalid beer:', result.errors);
  * }
  */
-export function validateBeer(beer: any): ValidationResult<any> {
+export function validateBeer(beer: unknown): ValidationResult<unknown> {
   const errors: string[] = [];
 
   // Check for null/undefined
@@ -155,17 +155,17 @@ export function validateBeer(beer: any): ValidationResult<any> {
  * console.log(`Validated ${summary.total} beers: ${summary.valid} valid, ${summary.invalid} invalid`);
  * await insertBeersIntoDatabase(validBeers);
  */
-export function validateBeerArray(beers: any[]): {
-  validBeers: any[];
-  invalidBeers: Array<{ beer: any; errors: string[] }>;
+export function validateBeerArray(beers: unknown[]): {
+  validBeers: unknown[];
+  invalidBeers: Array<{ beer: unknown; errors: string[] }>;
   summary: {
     total: number;
     valid: number;
     invalid: number;
   };
 } {
-  const validBeers: any[] = [];
-  const invalidBeers: Array<{ beer: any; errors: string[] }> = [];
+  const validBeers: unknown[] = [];
+  const invalidBeers: Array<{ beer: unknown; errors: string[] }> = [];
 
   for (const beer of beers) {
     const result = validateBeer(beer);
@@ -198,7 +198,7 @@ export function validateBeerArray(beers: any[]): {
  * @param response - The API response to validate
  * @returns Validation result with rewards array if valid
  */
-export function validateRewardsResponse(response: any): ValidationResult<any[]> {
+export function validateRewardsResponse(response: unknown): ValidationResult<unknown[]> {
   const errors: string[] = [];
 
   // Check for null/undefined

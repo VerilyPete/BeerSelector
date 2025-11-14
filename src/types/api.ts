@@ -69,7 +69,7 @@ export interface LoginResult {
   success: boolean;
   error?: string;
   message?: string;
-  data?: any;
+  data?: unknown;
   sessionData?: SessionData;
   statusCode?: number;
   isVisitorMode?: boolean; // Indicates if the user is in visitor mode
@@ -80,7 +80,7 @@ export interface LoginResult {
  * @param obj The object to check
  * @returns True if the object is a SessionData, false otherwise
  */
-export function isSessionData(obj: any): obj is SessionData {
+export function isSessionData(obj: unknown): obj is SessionData {
   if (!obj) return false;
   return typeof obj.memberId === 'string' &&
     typeof obj.storeId === 'string' &&
@@ -93,7 +93,7 @@ export function isSessionData(obj: any): obj is SessionData {
  * @param obj The object to check
  * @returns True if the object is an ApiResponse, false otherwise
  */
-export function isApiResponse<T>(obj: any): obj is ApiResponse<T> {
+export function isApiResponse<T>(obj: unknown): obj is ApiResponse<T> {
   if (!obj) return false;
   return typeof obj.success === 'boolean' &&
     typeof obj.statusCode === 'number' &&
@@ -105,7 +105,7 @@ export function isApiResponse<T>(obj: any): obj is ApiResponse<T> {
  * @param obj The object to check
  * @returns True if the object is a LoginResult, false otherwise
  */
-export function isLoginResult(obj: any): obj is LoginResult {
+export function isLoginResult(obj: unknown): obj is LoginResult {
   if (!obj) return false;
   return typeof obj.success === 'boolean';
 }

@@ -180,9 +180,9 @@ export const Rewards = () => {
         console.error('Failed to queue reward:', responseText);
         Alert.alert('Error', `Failed to queue the reward. Status: ${response.status}`);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error queuing reward:', err);
-      Alert.alert('Error', `Failed to queue the reward: ${err.message}`);
+      Alert.alert('Error', `Failed to queue the reward: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setQueueingRewards(prev => ({ ...prev, [rewardId]: false }));
     }

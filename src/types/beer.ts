@@ -66,7 +66,7 @@ export interface CheckInResponse {
  * @param obj The object to check
  * @returns True if the object is a Beer, false otherwise
  */
-export function isBeer(obj: any): obj is Beer {
+export function isBeer(obj: unknown): obj is Beer {
   if (!obj) return false;
   return typeof obj.id === 'string' &&
     typeof obj.brew_name === 'string';
@@ -77,7 +77,7 @@ export function isBeer(obj: any): obj is Beer {
  * @param obj The object to check
  * @returns True if the object is a Beerfinder, false otherwise
  */
-export function isBeerfinder(obj: any): obj is Beerfinder {
+export function isBeerfinder(obj: unknown): obj is Beerfinder {
   if (!obj) return false;
   return isBeer(obj) && (
     obj.roh_lap !== undefined ||
@@ -92,7 +92,7 @@ export function isBeerfinder(obj: any): obj is Beerfinder {
  * @param obj The object to check
  * @returns True if the object is a BeerDetails, false otherwise
  */
-export function isBeerDetails(obj: any): obj is BeerDetails {
+export function isBeerDetails(obj: unknown): obj is BeerDetails {
   if (!obj) return false;
   return isBeer(obj) && (
     obj.abv !== undefined ||
@@ -110,7 +110,7 @@ export function isBeerDetails(obj: any): obj is BeerDetails {
  * @param obj The object to check
  * @returns True if the object is a CheckInResponse, false otherwise
  */
-export function isCheckInResponse(obj: any): obj is CheckInResponse {
+export function isCheckInResponse(obj: unknown): obj is CheckInResponse {
   if (!obj) return false;
   return typeof obj.success === 'boolean';
 }

@@ -5,6 +5,11 @@
 
 import { Preference } from './types';
 import { getDatabase } from './connection';
+import {
+  isPreferenceRow,
+  preferenceRowToPreference,
+  PreferenceRow
+} from './schemaTypes';
 
 /**
  * Get a preference value by key
@@ -64,17 +69,21 @@ export const setPreference = async (key: string, value: string, description?: st
 
 /**
  * Get all preferences from the database
+ * Validates all rows with type guards and filters out invalid data.
  * @returns Array of all preferences, ordered by key. Returns empty array on error.
  */
 export const getAllPreferences = async (): Promise<Preference[]> => {
   const database = await getDatabase();
 
   try {
-    const preferences = await database.getAllAsync<{ key: string, value: string, description: string }>(
+    const rows = await database.getAllAsync<PreferenceRow>(
       'SELECT key, value, description FROM preferences ORDER BY key'
     );
 
-    return preferences || [];
+    // Validate and convert each row
+    return rows
+      .filter(row => isPreferenceRow(row))
+      .map(row => preferenceRowToPreference(row));
   } catch (error) {
     console.error('Error getting all preferences:', error);
     return [];

@@ -8,6 +8,11 @@
 import { getDatabase } from '../connection';
 import { Beer } from '../../types/beer';
 import { databaseLockManager } from '../locks';
+import {
+  isAllBeersRow,
+  allBeersRowToBeer,
+  AllBeersRow
+} from '../schemaTypes';
 
 /**
  * Repository class for Beer entity operations
@@ -124,6 +129,7 @@ export class BeerRepository {
    *
    * Filters out beers with null or empty brew_name.
    * Orders by added_date DESC.
+   * Validates all rows with type guards and filters out invalid data.
    *
    * @returns Array of Beer objects
    */
@@ -131,9 +137,14 @@ export class BeerRepository {
     const database = await getDatabase();
 
     try {
-      return await database.getAllAsync(
+      const rows = await database.getAllAsync<AllBeersRow>(
         'SELECT * FROM allbeers WHERE brew_name IS NOT NULL AND brew_name != "" ORDER BY added_date DESC'
       );
+
+      // Validate and convert each row
+      return rows
+        .filter(row => isAllBeersRow(row))
+        .map(row => allBeersRowToBeer(row));
     } catch (error) {
       console.error('Error getting beers from database:', error);
       throw error;
@@ -143,17 +154,26 @@ export class BeerRepository {
   /**
    * Get a beer by its ID
    *
+   * Validates the result with type guards before returning.
+   *
    * @param id - The beer ID to search for
-   * @returns Beer object if found, null otherwise
+   * @returns Beer object if found and valid, null otherwise
    */
   async getById(id: string): Promise<Beer | null> {
     const database = await getDatabase();
 
     try {
-      return await database.getFirstAsync(
+      const row = await database.getFirstAsync<AllBeersRow>(
         'SELECT * FROM allbeers WHERE id = ?',
         [id]
       );
+
+      // Validate and convert the row
+      if (row && isAllBeersRow(row)) {
+        return allBeersRowToBeer(row);
+      }
+
+      return null;
     } catch (error) {
       console.error('Error getting beer by ID:', error);
       throw error;
@@ -165,6 +185,7 @@ export class BeerRepository {
    *
    * If query is empty, returns all beers.
    * Uses LIKE operator for partial matching.
+   * Validates all rows with type guards and filters out invalid data.
    *
    * @param query - Search query string
    * @returns Array of matching Beer objects
@@ -178,7 +199,7 @@ export class BeerRepository {
     const searchTerm = `%${query.trim()}%`;
 
     try {
-      return await database.getAllAsync(
+      const rows = await database.getAllAsync<AllBeersRow>(
         `SELECT * FROM allbeers
          WHERE brew_name IS NOT NULL AND brew_name != "" AND
          (brew_name LIKE ?
@@ -188,6 +209,11 @@ export class BeerRepository {
          ORDER BY added_date DESC`,
         [searchTerm, searchTerm, searchTerm, searchTerm]
       );
+
+      // Validate and convert each row
+      return rows
+        .filter(row => isAllBeersRow(row))
+        .map(row => allBeersRowToBeer(row));
     } catch (error) {
       console.error('Error searching beers:', error);
       throw error;
@@ -197,6 +223,8 @@ export class BeerRepository {
   /**
    * Get beers by style
    *
+   * Validates all rows with type guards and filters out invalid data.
+   *
    * @param style - Beer style to filter by
    * @returns Array of Beer objects matching the style
    */
@@ -204,10 +232,15 @@ export class BeerRepository {
     const database = await getDatabase();
 
     try {
-      return await database.getAllAsync(
+      const rows = await database.getAllAsync<AllBeersRow>(
         'SELECT * FROM allbeers WHERE brew_name IS NOT NULL AND brew_name != "" AND brew_style = ? ORDER BY added_date DESC',
         [style]
       );
+
+      // Validate and convert each row
+      return rows
+        .filter(row => isAllBeersRow(row))
+        .map(row => allBeersRowToBeer(row));
     } catch (error) {
       console.error('Error getting beers by style:', error);
       throw error;
@@ -217,6 +250,8 @@ export class BeerRepository {
   /**
    * Get beers by brewer
    *
+   * Validates all rows with type guards and filters out invalid data.
+   *
    * @param brewer - Brewer name to filter by
    * @returns Array of Beer objects from the specified brewer
    */
@@ -224,10 +259,15 @@ export class BeerRepository {
     const database = await getDatabase();
 
     try {
-      return await database.getAllAsync(
+      const rows = await database.getAllAsync<AllBeersRow>(
         'SELECT * FROM allbeers WHERE brew_name IS NOT NULL AND brew_name != "" AND brewer = ? ORDER BY added_date DESC',
         [brewer]
       );
+
+      // Validate and convert each row
+      return rows
+        .filter(row => isAllBeersRow(row))
+        .map(row => allBeersRowToBeer(row));
     } catch (error) {
       console.error('Error getting beers by brewer:', error);
       throw error;
@@ -239,6 +279,7 @@ export class BeerRepository {
    *
    * Returns beers from allbeers table that don't have a matching
    * ID in the tasted_brew_current_round table.
+   * Validates all rows with type guards and filters out invalid data.
    *
    * @returns Array of untasted Beer objects
    */
@@ -246,13 +287,18 @@ export class BeerRepository {
     const database = await getDatabase();
 
     try {
-      return await database.getAllAsync(`
+      const rows = await database.getAllAsync<AllBeersRow>(`
         SELECT * FROM allbeers
         WHERE brew_name IS NOT NULL
         AND brew_name != ""
         AND id NOT IN (SELECT id FROM tasted_brew_current_round)
         ORDER BY added_date DESC
       `);
+
+      // Validate and convert each row
+      return rows
+        .filter(row => isAllBeersRow(row))
+        .map(row => allBeersRowToBeer(row));
     } catch (error) {
       console.error('Error getting beers not in My Beers:', error);
       throw error;

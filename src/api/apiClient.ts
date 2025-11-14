@@ -216,7 +216,7 @@ export class ApiClient {
     }
   }
 
-  public async request<T = any>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
+  public async request<T = unknown>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
     const sessionData = await this.getSession();
     const headers = this.getHeaders(sessionData);
 
@@ -289,7 +289,7 @@ export class ApiClient {
     }
   }
 
-  public async post<T = any>(endpoint: string, data: Record<string, any>): Promise<ApiResponse<T>> {
+  public async post<T = unknown>(endpoint: string, data: Record<string, unknown>): Promise<ApiResponse<T>> {
     const formData = new URLSearchParams();
     for (const [key, value] of Object.entries(data)) {
       if (value !== undefined && value !== null) {
@@ -303,7 +303,7 @@ export class ApiClient {
     });
   }
 
-  public async get<T = any>(endpoint: string, queryParams?: Record<string, any>): Promise<ApiResponse<T>> {
+  public async get<T = unknown>(endpoint: string, queryParams?: Record<string, unknown>): Promise<ApiResponse<T>> {
     let url = endpoint;
 
     // Add query parameters if provided

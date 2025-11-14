@@ -161,11 +161,11 @@ export const useDataRefresh = ({
         if (!result.hasErrors) {
           console.log(`All data refreshed successfully from ${componentName} tab`);
         }
-      } catch (localError: any) {
+      } catch (localError: unknown) {
         console.error('Error loading local beer data after refresh:', localError);
         setError('Failed to load beer data from local storage.');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(`Error in unified refresh from ${componentName}:`, error);
       setError('Failed to refresh beer data. Please try again later.');
       Alert.alert('Error', 'Failed to refresh beer data. Please try again later.');
