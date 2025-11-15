@@ -2,39 +2,27 @@ import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { BeerListScreen } from './index';
 import { areApiUrlsConfigured } from '@/src/database/preferences';
-import { isVisitorMode } from '@/src/api/authService';
 import { checkAndRefreshOnAppOpen } from '@/src/services/dataUpdateService';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { logError } from '@/src/utils/errorLogger';
 
 export default function TabOneScreen() {
   const [apiUrlsSet, setApiUrlsSet] = useState<boolean | null>(null);
-  const [visitorMode, setVisitorMode] = useState(false);
-  
+
   // Check if API URLs are configured on component mount
   useEffect(() => {
     const checkApiUrls = async () => {
       const isConfigured = await areApiUrlsConfigured();
       setApiUrlsSet(isConfigured);
-      
+
       // If API URLs aren't set, redirect to settings
       if (!isConfigured) {
         console.log('API URLs not configured, redirecting to settings');
         router.replace('/settings');
       }
     };
-    
+
     checkApiUrls();
-  }, []);
-  
-  // Add effect to check visitor mode
-  useEffect(() => {
-    const checkVisitorMode = async () => {
-      const visitor = await isVisitorMode(true); // Force refresh
-      setVisitorMode(visitor);
-    };
-    
-    checkVisitorMode();
   }, []);
   
   // Add focus effect to refresh beer data when tab becomes active

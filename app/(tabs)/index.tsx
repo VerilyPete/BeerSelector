@@ -1,59 +1,28 @@
-import { StyleSheet, Text, View, TouchableOpacity, Alert } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity } from 'react-native';
 import React, { useState, useEffect, useCallback } from 'react';
-import Animated, {
-  interpolate,
-  useAnimatedScrollHandler,
-  useAnimatedStyle,
-  useSharedValue,
-} from 'react-native-reanimated';
 import { router, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { IconSymbol } from '@/components/ui/IconSymbol';
-import { StatusBar } from 'expo-status-bar';
 
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { AllBeers } from '@/components/AllBeers';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useThemeColor } from '@/hooks/useThemeColor';
-import { areApiUrlsConfigured, getPreference } from '@/src/database/preferences';
-import { isVisitorMode } from '@/src/api/authService';
+import { areApiUrlsConfigured } from '@/src/database/preferences';
+import { useAppContext } from '@/context/AppContext';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { logError } from '@/src/utils/errorLogger';
 
 export function BeerListScreen() {
-  const colorScheme = useColorScheme() ?? 'light';
-  const backgroundColor = useThemeColor({}, 'background');
-  const [visitorMode, setVisitorMode] = useState(false);
-  
-  // Function to check visitor mode
-  const checkVisitorMode = useCallback(async () => {
-    const isVisitor = await isVisitorMode(true);
-    setVisitorMode(isVisitor);
-  }, []);
-  
-  // Check for visitor mode on mount
-  useEffect(() => {
-    checkVisitorMode();
-  }, [checkVisitorMode]);
-  
-  // Recheck when screen comes into focus
-  useFocusEffect(
-    useCallback(() => {
-      console.log('Beer list screen focused, checking visitor mode');
-      checkVisitorMode();
-      return () => {
-        // cleanup if needed
-      };
-    }, [checkVisitorMode])
-  );
+  const { session } = useAppContext();
 
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={{flex: 1}} edges={['top', 'right', 'left']}>
         <View style={styles.headerContainer}>
           <ThemedText type="title" style={styles.title}>All Beer</ThemedText>
-          {visitorMode && (
+          {session.isVisitor && (
             <View style={styles.visitorBadge}>
               <ThemedText style={styles.visitorText}>Guest</ThemedText>
             </View>
@@ -181,16 +150,15 @@ export default function HomeScreen() {
   const backgroundColor = useThemeColor({}, 'background');
   const buttonColor = useThemeColor({}, 'tint');
   const colorScheme = useColorScheme() ?? 'light';
+  const { session } = useAppContext();
   const [apiUrlsSet, setApiUrlsSet] = useState<boolean | null>(null);
-  const [inVisitorMode, setInVisitorMode] = useState(false);
+
+  // Use session.isVisitor from context instead of local state
+  const inVisitorMode = session.isVisitor;
 
   // Function to check settings
   const checkSettings = useCallback(async () => {
     try {
-      // First check if we're in visitor mode - force refresh to ensure we have latest value
-      const visitorMode = await isVisitorMode(true);
-      setInVisitorMode(visitorMode);
-
       // Use centralized helper to check API URLs (same logic as _layout.tsx)
       const isConfigured = await areApiUrlsConfigured();
 
@@ -198,7 +166,7 @@ export default function HomeScreen() {
 
       if (!isConfigured) {
         // Log for debugging - _layout.tsx handles initial routing
-        if (visitorMode) {
+        if (inVisitorMode) {
           console.log('Warning: All beers API URL not configured in visitor mode');
         } else {
           console.log('Warning: API URLs not configured, showing login prompt');
@@ -207,9 +175,8 @@ export default function HomeScreen() {
     } catch (error) {
       console.error('Error checking settings:', error);
       setApiUrlsSet(false);
-      setInVisitorMode(false);
     }
-  }, []);
+  }, [inVisitorMode]);
 
   // Initial settings check on mount
   useEffect(() => {

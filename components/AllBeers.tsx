@@ -12,13 +12,13 @@ import { UntappdWebView } from './UntappdWebView';
 import { SkeletonLoader } from './beer/SkeletonLoader';
 import { Beer } from '@/src/types/beer';
 import { useDebounce } from '@/hooks/useDebounce';
+import { useAppContext } from '@/context/AppContext';
 
 export const AllBeers = () => {
-  const [allBeers, setAllBeers] = useState<Beer[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // MP-4 Step 2: Use context for beer data instead of local state
+  const { beers, loading, errors, setAllBeers, setLoadingBeers, setBeerError } = useAppContext();
+
   const [untappdModalVisible, setUntappdModalVisible] = useState(false);
-  const [selectedBeerName] = useState('');
 
   /**
    * MP-3 Bottleneck #4: Local search state for immediate UI updates
@@ -27,7 +27,7 @@ export const AllBeers = () => {
   const [localSearchText, setLocalSearchText] = useState('');
   const debouncedSearchText = useDebounce(localSearchText, 300);
 
-  // Use the shared filtering hook
+  // Use the shared filtering hook with data from context
   const {
     filteredBeers,
     filters,
@@ -38,7 +38,7 @@ export const AllBeers = () => {
     toggleFilter,
     toggleSort,
     toggleExpand,
-  } = useBeerFilters(allBeers);
+  } = useBeerFilters(beers.allBeers);
 
   // Sync debounced search text with hook's search state
   useEffect(() => {
@@ -50,19 +50,19 @@ export const AllBeers = () => {
 
   const loadBeers = useCallback(async () => {
     try {
-      setLoading(true);
+      setLoadingBeers(true);
       const data = await beerRepository.getAll();
       // Filter out any beers with empty or null brew_name
       const filteredData = data.filter(beer => beer.brew_name && beer.brew_name.trim() !== '');
       setAllBeers(filteredData);
-      setError(null);
+      setBeerError(null);
     } catch (err) {
       console.error('Failed to load beers:', err);
-      setError('Failed to load beers. Please try again later.');
+      setBeerError('Failed to load beers. Please try again later.');
     } finally {
-      setLoading(false);
+      setLoadingBeers(false);
     }
-  }, []);
+  }, [setLoadingBeers, setAllBeers, setBeerError]);
 
   // Use the shared data refresh hook
   const { refreshing, handleRefresh } = useDataRefresh({
@@ -70,7 +70,7 @@ export const AllBeers = () => {
       const freshBeers = await beerRepository.getAll();
       const filteredData = freshBeers.filter(beer => beer.brew_name && beer.brew_name.trim() !== '');
       setAllBeers(filteredData);
-      setError(null);
+      setBeerError(null);
     },
     componentName: 'AllBeers',
   });
@@ -94,7 +94,7 @@ export const AllBeers = () => {
   return (
     <View style={styles.container} testID="all-beers-container">
       {/* Show skeleton during initial load (when loading=true and no beers yet) */}
-      {loading && allBeers.length === 0 ? (
+      {loading.isLoadingBeers && beers.allBeers.length === 0 ? (
         <>
           {/* MP-3 Step 3b: Show search bar even during loading for better UX */}
           <View style={styles.filtersContainer}>
@@ -107,9 +107,9 @@ export const AllBeers = () => {
           </View>
           <SkeletonLoader count={20} />
         </>
-      ) : error ? (
+      ) : errors.beerError ? (
         <View style={styles.centered} testID="error-container">
-          <ThemedText style={styles.errorText} testID="error-message">{error}</ThemedText>
+          <ThemedText style={styles.errorText} testID="error-message">{errors.beerError}</ThemedText>
           <TouchableOpacity
             style={[styles.refreshButton, { backgroundColor: activeButtonColor }]}
             onPress={loadBeers}
@@ -145,7 +145,7 @@ export const AllBeers = () => {
 
           <BeerList
             beers={filteredBeers}
-            loading={loading}
+            loading={loading.isLoadingBeers}
             refreshing={refreshing}
             onRefresh={handleRefresh}
             emptyMessage="No beers found"
@@ -156,7 +156,7 @@ export const AllBeers = () => {
           <UntappdWebView
             visible={untappdModalVisible}
             onClose={() => setUntappdModalVisible(false)}
-            beerName={selectedBeerName}
+            beerName=""
           />
         </>
       )}

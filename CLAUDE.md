@@ -156,16 +156,30 @@ File-based routing with tabs:
 - `__tests__/` - Component snapshot tests
 - `src/api/__tests__/` - API service tests
 - `src/database/__tests__/` - Database operation tests
-- `src/services/__tests__/` - Service function tests (unit + integration)
+- `src/services/__tests__/` - Service function tests (unit tests only)
+- `context/__tests__/` - Context and state management tests
 
-**Integration Tests**: Use real JSON data from `allbeers.json` and `mybeers.json` in project root to test against actual API response structures.
+**Testing Strategy**:
+- ✅ **Jest**: Use for unit tests only (functions, hooks, utilities)
+- ✅ **Maestro/Flashlight**: Use for ALL integration and E2E tests
+- ❌ **DO NOT use Jest for integration tests** - React Native testing environment causes timeouts
+
+**Why Maestro for Integration Tests**:
+- Jest integration tests consistently timeout in React Native environment
+- Maestro provides reliable cross-platform E2E testing
+- Flashlight offers performance profiling capabilities
+- Better suited for testing actual app flows and user interactions
 
 **Mock Strategy**:
 - Expo modules mocked in `__mocks__/` directory
-- SQLite operations mocked in database tests
-- API calls mocked with jest.fn()
+- SQLite operations mocked in database tests (unit tests)
+- API calls mocked with jest.fn() (unit tests)
+- Real data from `allbeers.json` and `mybeers.json` for service-level tests
 
-**Important**: Component integration tests were removed due to React Native testing environment issues. Focus on service-level integration tests instead.
+**Important Notes**:
+- Component integration tests were removed due to React Native testing environment issues
+- Focus on unit tests in Jest, comprehensive integration tests in Maestro
+- Plan to implement Maestro test suite as part of MP-5 (Missing Integration Tests)
 
 ### Type System
 

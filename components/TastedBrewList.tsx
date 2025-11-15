@@ -1,7 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { StyleSheet, View, TouchableOpacity } from 'react-native';
-import { myBeersRepository } from '@/src/database/repositories/MyBeersRepository';
-import { fetchMyBeersFromAPI } from '@/src/api/beerApi';
 import { ThemedText } from './ThemedText';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { SearchBar } from './SearchBar';
@@ -12,11 +10,11 @@ import { BeerList } from './beer/BeerList';
 import { SkeletonLoader } from './beer/SkeletonLoader';
 import { Beerfinder } from '@/src/types/beer';
 import { useDebounce } from '@/hooks/useDebounce';
+import { useAppContext } from '@/context/AppContext';
 
 export const TastedBrewList = () => {
-  const [tastedBeers, setTastedBeers] = useState<Beerfinder[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // MP-4 Step 2: Use context for beer data instead of local state
+  const { beers, loading, errors } = useAppContext();
 
   /**
    * MP-3 Bottleneck #4: Local search state for immediate UI updates
@@ -25,7 +23,7 @@ export const TastedBrewList = () => {
   const [localSearchText, setLocalSearchText] = useState('');
   const debouncedSearchText = useDebounce(localSearchText, 300);
 
-  // Use the shared filtering hook (no Heavies/IPA filters needed for tasted beers)
+  // Use the shared filtering hook with tasted beers from context
   // Pass 'tasted_date' to sort by the date the beer was tasted instead of added_date
   const {
     filteredBeers,
@@ -37,57 +35,19 @@ export const TastedBrewList = () => {
     toggleFilter,
     toggleSort,
     toggleExpand,
-  } = useBeerFilters(tastedBeers, 'tasted_date');
+  } = useBeerFilters(beers.tastedBeers, 'tasted_date');
 
   // Theme colors
   const activeButtonColor = useThemeColor({}, 'tint');
 
-  const loadBeers = async () => {
-    try {
-      setLoading(true);
-      console.log('TastedBrewList: Loading tasted beers...');
-
-      // Try to fetch My Beers data if it hasn't been loaded yet
-      try {
-        console.log('TastedBrewList: Attempting to fetch and populate My Beers data...');
-        const freshMyBeers = await fetchMyBeersFromAPI();
-        await myBeersRepository.insertMany(freshMyBeers);
-        console.log('TastedBrewList: Successfully fetched and populated My Beers data');
-      } catch (err) {
-        console.log('TastedBrewList: Failed to fetch My Beers data, continuing with local data:', err);
-      }
-
-      console.log('TastedBrewList: Retrieving tasted beers from database...');
-      const data = await myBeersRepository.getAll();
-      console.log(`TastedBrewList: Retrieved ${data.length} tasted beers from database`);
-
-      // Filter out any beers with empty or null brew_name
-      const filteredData = data.filter(beer => beer.brew_name && beer.brew_name.trim() !== '');
-      console.log(`TastedBrewList: After filtering, ${filteredData.length} valid tasted beers remain`);
-
-      setTastedBeers(filteredData as Beerfinder[]);
-      setError(null);
-    } catch (err) {
-      console.error('TastedBrewList: Failed to load tasted beers:', err);
-      setError('Failed to load tasted beers. Please check your internet connection and try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   // Use the shared data refresh hook
+  // Note: Data loading now happens in _layout.tsx via AppContext
   const { refreshing, handleRefresh } = useDataRefresh({
     onDataReloaded: async () => {
-      const freshBeers = await myBeersRepository.getAll();
-      setTastedBeers(freshBeers as Beerfinder[]);
-      setError(null);
+      // Data refresh is handled by _layout.tsx, no need to update local state
     },
     componentName: 'TastedBrewList',
   });
-
-  useEffect(() => {
-    loadBeers();
-  }, []);
 
   // Sync debounced search text with hook's search state
   useEffect(() => {
@@ -113,7 +73,7 @@ export const TastedBrewList = () => {
   return (
     <View style={styles.container}>
       {/* Show skeleton during initial load (when loading=true and no beers yet) */}
-      {loading && tastedBeers.length === 0 ? (
+      {loading.isLoadingBeers && beers.tastedBeers.length === 0 ? (
         <>
           {/* MP-3 Step 3b: Show search bar even during loading for better UX */}
           <View style={styles.filtersContainer}>
@@ -126,12 +86,12 @@ export const TastedBrewList = () => {
           </View>
           <SkeletonLoader count={20} />
         </>
-      ) : error ? (
+      ) : errors.beerError ? (
         <View style={styles.centered}>
-          <ThemedText style={styles.errorText}>{error}</ThemedText>
+          <ThemedText style={styles.errorText}>{errors.beerError}</ThemedText>
           <TouchableOpacity
             style={[styles.refreshButton, { backgroundColor: activeButtonColor }]}
-            onPress={loadBeers}
+            onPress={handleRefresh}
           >
             <ThemedText style={[styles.buttonText, { color: 'white' }]}>
               Try Again
@@ -164,7 +124,7 @@ export const TastedBrewList = () => {
 
           <BeerList
             beers={filteredBeers}
-            loading={loading}
+            loading={loading.isLoadingBeers}
             refreshing={refreshing}
             onRefresh={handleRefresh}
             emptyMessage={emptyMessage}
