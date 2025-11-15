@@ -350,6 +350,43 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   }, [loadSessionFromStorage]);
 
   /**
+   * Load beer data from database on mount
+   */
+  useEffect(() => {
+    const loadBeerData = async () => {
+      try {
+        setLoading(prev => ({ ...prev, isLoadingBeers: true }));
+
+        // Import repositories dynamically to avoid circular dependencies
+        const { beerRepository } = await import('@/src/database/repositories/BeerRepository');
+        const { myBeersRepository } = await import('@/src/database/repositories/MyBeersRepository');
+        const { rewardsRepository } = await import('@/src/database/repositories/RewardsRepository');
+
+        // Load all beers
+        const allBeersData = await beerRepository.getAll();
+        setBeers(prev => ({ ...prev, allBeers: allBeersData }));
+
+        // Load tasted beers (my beers)
+        const tastedBeersData = await myBeersRepository.getAll();
+        setBeers(prev => ({ ...prev, tastedBeers: tastedBeersData }));
+
+        // Load rewards
+        const rewardsData = await rewardsRepository.getAll();
+        setBeers(prev => ({ ...prev, rewards: rewardsData }));
+
+        console.log(`[AppContext] Loaded beer data: ${allBeersData.length} all beers, ${tastedBeersData.length} tasted beers, ${rewardsData.length} rewards`);
+      } catch (error) {
+        console.error('[AppContext] Error loading beer data:', error);
+        setBeerError('Failed to load beer data from database');
+      } finally {
+        setLoading(prev => ({ ...prev, isLoadingBeers: false }));
+      }
+    };
+
+    loadBeerData();
+  }, []); // Empty deps - load only on mount
+
+  /**
    * Update session state after login
    */
   const updateSession = useCallback((sessionData: SessionData, isVisitor: boolean) => {
