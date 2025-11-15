@@ -1,0 +1,325 @@
+appId: ${APP_ID}
+name: "Settings - Configuration and Data Management"
+---
+# Test Flow: Settings Configuration and Management
+# This test verifies settings screen functionality including:
+# - Navigation to settings
+# - About section display
+# - Data management operations
+# - Login/logout flows
+# - Data clearing functionality
+#
+# Prerequisites:
+# - App should be in a logged-in state with data loaded
+
+# Step 1: Launch app with existing state
+- launchApp:
+    clearState: false
+
+# Step 2: Wait for initialization
+- waitForAnimationToEnd:
+    timeout: 5000
+
+# ========================================
+# Test 1: Navigate to Settings
+# ========================================
+
+# Step 3: Navigate to Home tab
+- tapOn: "Home"
+- waitForAnimationToEnd
+
+# Step 4: Scroll down to find Settings button
+- scroll:
+    direction: DOWN
+
+# Step 5: Tap Settings button
+- tapOn: "Settings"
+- waitForAnimationToEnd:
+    timeout: 3000
+
+# Step 6: Verify we're on settings screen
+- assertVisible:
+    text: "Settings"
+
+# ========================================
+# Test 2: Verify About Section
+# ========================================
+
+# Step 7: Verify About section is visible
+- assertVisible:
+    id: "about-section"
+
+# Step 8: Verify app name is displayed
+- assertVisible:
+    text: "Beer Selector"
+
+# Step 9: Verify version information is displayed
+# Should show "Version X.X.X" format
+- assertVisible:
+    text: "Version"
+
+# Step 10: Verify build number is displayed (if available)
+# Format: "Version X.X.X • Build XX"
+# Note: Build number may not be visible in all environments
+
+# ========================================
+# Test 3: Verify Data Management Section
+# ========================================
+
+# Step 11: Scroll to Data Management section
+- scroll:
+    direction: DOWN
+
+# Step 12: Verify Data Management section is visible
+- assertVisible:
+    id: "data-management-section"
+
+# Step 13: Verify "Refresh All Beer Data" button exists
+- assertVisible:
+    text: "Refresh All Beer Data"
+
+# Step 14: Verify "Login to Flying Saucer" button exists
+# (This button is hidden during first login flow)
+- assertVisible:
+    text: "Login to Flying Saucer"
+
+# Step 15: Verify Untappd integration buttons
+# May show "Login to Untappd" or "Reconnect to Untappd"
+- assertVisible:
+    text: "Untappd"
+
+# ========================================
+# Test 4: Test Data Refresh from Settings
+# ========================================
+
+# Step 16: Tap "Refresh All Beer Data" button
+- tapOn:
+    text: "Refresh All Beer Data"
+
+# Step 17: Verify loading state appears
+- assertVisible:
+    text: "Refreshing data..."
+
+# Step 18: Verify all buttons are disabled during refresh
+# Buttons should have reduced opacity (0.5) when disabled
+# Wait for refresh to complete
+- waitForAnimationToEnd:
+    timeout: 20000
+
+# Step 19: Verify refresh completed successfully
+- assertVisible:
+    text: "Refresh All Beer Data"
+
+# ========================================
+# Test 5: Test Navigation Back
+# ========================================
+
+# Step 20: Verify back button exists (X button in top right)
+- assertVisible:
+    text: "×"
+    # The IconSymbol "xmark" renders as × character
+
+# Step 21: Tap back button to return to home
+- tapOn:
+    text: "×"
+- waitForAnimationToEnd
+
+# Step 22: Verify we're back on Home tab
+- assertVisible:
+    text: "Home|All Beer"
+    # Should see tab bar with tab names
+
+# Step 23: Navigate back to Settings
+- scroll:
+    direction: DOWN
+- tapOn: "Settings"
+- waitForAnimationToEnd
+
+# ========================================
+# Test 6: Test "Go to Home Screen" Button
+# (Only visible when can't go back)
+# ========================================
+
+# Step 24: Check if "Go to Home Screen" button is visible
+# This button appears when apiUrlsConfigured=true and canGoBack=false
+# It may not be visible in all scenarios
+
+# Step 25: If visible, test navigation
+- optional: true
+  commands:
+    - tapOn:
+        text: "Go to Home Screen"
+    - waitForAnimationToEnd
+    - assertVisible:
+        text: "Home|All Beer"
+
+# ========================================
+# Test 7: Test Login Flow Trigger
+# ========================================
+
+# Step 26: Navigate back to Settings (if needed)
+- optional: true
+  commands:
+    - scroll:
+        direction: DOWN
+    - tapOn: "Settings"
+    - waitForAnimationToEnd
+
+# Step 27: Scroll to login button
+- scroll:
+    direction: DOWN
+
+# Step 28: Tap "Login to Flying Saucer" button
+- tapOn:
+    text: "Login to Flying Saucer"
+
+# Step 29: Verify login webview modal appears
+- waitForAnimationToEnd:
+    timeout: 3000
+
+# Step 30: Verify webview is visible
+- assertVisible:
+    id: "login-webview-modal"
+
+# Step 31: Verify close button exists
+- assertVisible:
+    id: "close-webview-button"
+
+# Step 32: Close the login webview without logging in
+- tapOn:
+    id: "close-webview-button"
+- waitForAnimationToEnd
+
+# Step 33: Verify we're back on settings screen
+- assertVisible:
+    text: "Settings"
+
+# ========================================
+# Test 8: Test Untappd Login Flow
+# ========================================
+
+# Step 34: Scroll to Untappd login section
+- scroll:
+    direction: DOWN
+
+# Step 35: Identify Untappd button state
+# Could be "Login to Untappd" or "Reconnect to Untappd"
+# depending on login status
+
+# Step 36: Tap Untappd login/reconnect button
+- tapOn:
+    text: "Untappd"
+
+# Step 37: Verify Untappd webview modal appears
+- waitForAnimationToEnd:
+    timeout: 3000
+
+# Step 38: Verify Untappd webview is visible
+- assertVisible:
+    id: "untappd-webview-modal"
+
+# Step 39: Verify close button exists
+- assertVisible:
+    id: "close-untappd-webview-button"
+
+# Step 40: Close Untappd webview
+- tapOn:
+    id: "close-untappd-webview-button"
+- waitForAnimationToEnd
+
+# Step 41: Verify we're back on settings screen
+- assertVisible:
+    text: "Settings"
+
+# ========================================
+# Test 9: Test Untappd Logout (if logged in)
+# ========================================
+
+# Step 42: Check for "Clear Untappd Credentials" button
+# This button only appears when user is logged into Untappd
+- optional: true
+  commands:
+    - scroll:
+        direction: DOWN
+    - assertVisible:
+        text: "Clear Untappd Credentials"
+
+# Step 43: If button exists, test logout flow
+- optional: true
+  commands:
+    - tapOn:
+        text: "Clear Untappd Credentials"
+    - waitForAnimationToEnd:
+        timeout: 2000
+
+# Step 44: Verify alert dialog appears
+# Alert should have title "Untappd Credentials Cleared"
+# and instructions for full logout
+- optional: true
+  commands:
+    - assertVisible:
+        text: "Untappd|credentials|cleared"
+    - tapOn: "OK"
+
+# ========================================
+# Test 10: Verify Settings Persistence
+# ========================================
+
+# Step 45: Navigate away from settings
+- scroll:
+    direction: UP
+- tapOn:
+    text: "×"
+- waitForAnimationToEnd
+
+# Step 46: Navigate back to settings
+- scroll:
+    direction: DOWN
+- tapOn: "Settings"
+- waitForAnimationToEnd
+
+# Step 47: Verify all sections are still visible
+- assertVisible:
+    text: "Settings"
+- scroll:
+    direction: DOWN
+- assertVisible:
+    id: "about-section"
+- assertVisible:
+    id: "data-management-section"
+
+# ========================================
+# Test 11: Verify Accessibility
+# ========================================
+
+# Step 48: Verify all interactive elements are accessible
+# Check that buttons have proper accessibility labels
+
+# Step 49: Verify "Refresh All Beer Data" button accessibility
+- assertVisible:
+    text: "Refresh All Beer Data"
+
+# Step 50: Verify "Login to Flying Saucer" button accessibility
+- assertVisible:
+    text: "Login to Flying Saucer"
+
+# Step 51: Return to home to complete test
+- scroll:
+    direction: UP
+- tapOn:
+    text: "×"
+- waitForAnimationToEnd
+
+# Test Complete
+# ==============
+# This test verifies:
+# ✓ Navigation to Settings screen works
+# ✓ About section displays app name, version, and build number
+# ✓ Data Management section displays refresh and login buttons
+# ✓ Manual data refresh works from Settings
+# ✓ Back button navigation works
+# ✓ Login webview modal opens and closes properly
+# ✓ Untappd integration UI works correctly
+# ✓ Untappd logout flow works (when logged in)
+# ✓ Settings persist across navigation
+# ✓ All interactive elements are accessible

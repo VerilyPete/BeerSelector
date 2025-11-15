@@ -329,7 +329,7 @@ export const Beerfinder = () => {
   );
 
   return (
-    <View style={styles.container}>
+    <View testID="beerfinder-container" style={styles.container}>
       {/* Show skeleton during initial load (when loading=true and no beers yet) */}
       {loading.isLoadingBeers && beers.allBeers.length === 0 ? (
         <>

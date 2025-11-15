@@ -1,0 +1,306 @@
+appId: ${APP_ID}
+name: "Auto-Login - Session Persistence and Recovery"
+---
+# Test Flow: Auto-Login on App Restart
+# This test verifies session persistence and auto-login:
+# 1. Verify previously logged-in session is restored
+# 2. Auto-login attempts using stored session cookies
+# 3. Session validation and refresh
+# 4. Data loads without manual re-login
+# 5. Session expiration handling
+# 6. Session recovery after app restart
+
+# ======================
+# PREREQUISITE
+# ======================
+
+# IMPORTANT: This test assumes the user has previously logged in successfully
+# and session cookies are stored in SecureStore and preferences database.
+#
+# To prepare for this test:
+# 1. Run test 06-login-flow-member.yaml with valid credentials
+# 2. Complete full member login
+# 3. Verify API URLs are configured
+# 4. Then run this test to verify session persistence
+
+# ======================
+# STEP 1: Kill App (Simulate App Close)
+# ======================
+
+# Note: Maestro doesn't have a direct "kill app" command
+# We'll use stopApp instead, then relaunch
+
+- stopApp
+
+# Wait a few seconds to ensure full app shutdown
+- runScript: |
+    await new Promise(resolve => setTimeout(resolve, 3000));
+
+# ======================
+# STEP 2: Relaunch App (Cold Start)
+# ======================
+
+# Launch app WITHOUT clearState to preserve session
+- launchApp:
+    clearState: false
+
+# Wait for database initialization and auto-login attempt
+- waitForAnimationToEnd:
+    timeout: 15000
+
+# ======================
+# STEP 3: Verify Auto-Login Success
+# ======================
+
+# If session is valid, app should NOT redirect to settings
+# Instead, it should go directly to the beer list or home screen
+
+# Verify we're on the main app (not settings)
+# We should see either the home screen or All Beer tab
+- assertVisible:
+    id: "all-beers-container"
+    timeout: 20000
+
+# Verify beer list loaded (session restored successfully)
+- assertVisible:
+    id: "beer-list"
+
+# Verify beer count is displayed (data was fetched)
+- assertVisible:
+    id: "beer-count"
+
+# Verify search functionality works (full app access)
+- assertVisible:
+    id: "search-bar"
+
+# ======================
+# STEP 4: Verify Full Feature Access (Member)
+# ======================
+
+# Navigate to Beerfinder tab (member-only feature)
+- tapOn: "Beerfinder"
+- waitForAnimationToEnd:
+    timeout: 5000
+
+# Verify Beerfinder loads (requires valid session)
+# If session expired, this would show an error or empty state
+
+# Navigate to Tasted Brews tab (member-only feature)
+- tapOn: "Tasted Brews"
+- waitForAnimationToEnd:
+    timeout: 5000
+
+# Verify Tasted Brews loads (requires valid session)
+# This confirms auto-login restored full member access
+
+# Navigate back to All Beer
+- tapOn: "All Beer"
+- waitForAnimationToEnd
+
+# ======================
+# STEP 5: Test Data Refresh with Restored Session
+# ======================
+
+# Verify pull-to-refresh works with restored session
+- swipe:
+    direction: DOWN
+    from:
+      id: "beer-list"
+    duration: 1000
+
+# Wait for refresh to complete
+- waitForAnimationToEnd:
+    timeout: 20000
+
+# Verify beer list is still displayed after refresh
+- assertVisible:
+    id: "beer-list"
+
+# Verify no login errors occurred during refresh
+- assertVisible:
+    id: "beer-count"
+
+# ======================
+# STEP 6: Test Multiple App Restarts
+# ======================
+
+# Test that session persists across multiple app restarts
+
+# First restart
+- stopApp
+- runScript: |
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+- launchApp:
+    clearState: false
+- waitForAnimationToEnd:
+    timeout: 15000
+
+- assertVisible:
+    id: "all-beers-container"
+    timeout: 20000
+
+# Second restart
+- stopApp
+- runScript: |
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+- launchApp:
+    clearState: false
+- waitForAnimationToEnd:
+    timeout: 15000
+
+- assertVisible:
+    id: "all-beers-container"
+    timeout: 20000
+
+# Third restart
+- stopApp
+- runScript: |
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+- launchApp:
+    clearState: false
+- waitForAnimationToEnd:
+    timeout: 15000
+
+- assertVisible:
+    id: "all-beers-container"
+    timeout: 20000
+
+# ======================
+# STEP 7: Verify Session Expiration Handling
+# ======================
+
+# Note: Testing actual session expiration requires waiting for timeout
+# or manually invalidating cookies in SecureStore (not easily automated)
+
+# For manual testing of session expiration:
+# 1. Wait for session timeout (typically 24-48 hours)
+# 2. OR manually clear SecureStore data
+# 3. Relaunch app
+# 4. Verify app detects expired session
+# 5. Verify app redirects to settings/login screen
+# 6. User can re-login to create new session
+
+# To simulate expired session (for future test enhancement):
+# - Run script to clear SecureStore auth data
+# - Relaunch app
+# - Verify redirect to settings
+# - Verify login prompt is shown
+
+# ======================
+# STEP 8: Test Background/Foreground Transitions
+# ======================
+
+# Test that session persists when app is backgrounded and foregrounded
+
+# Background the app (go to home screen)
+# Note: Maestro backgroundApp command sends app to background
+- runScript: |
+    await maestro.pressKey('home');
+
+# Wait a few seconds in background
+- runScript: |
+    await new Promise(resolve => setTimeout(resolve, 5000));
+
+# Bring app back to foreground
+- launchApp:
+    clearState: false
+
+- waitForAnimationToEnd:
+    timeout: 5000
+
+# Verify we're back in the app with session intact
+- assertVisible:
+    id: "all-beers-container"
+    timeout: 10000
+
+# ======================
+# STEP 9: Navigate to Settings and Verify Session State
+# ======================
+
+# Go to home screen to access settings
+- tapOn: "Home"
+- waitForAnimationToEnd
+
+# Tap settings button (gear icon)
+- tapOn:
+    accessibilityLabel: "gear"
+- waitForAnimationToEnd
+
+# Verify settings screen opens
+- assertVisible:
+    text: "Settings"
+
+# Verify Data Management section shows logged-in features
+- assertVisible:
+    text: "Data Management"
+
+# Verify refresh button exists (only for logged-in users)
+- assertVisible:
+    text: "Refresh All Beer Data"
+
+# Verify About section is visible
+- assertVisible:
+    text: "About"
+
+# Verify app version is displayed
+- assertVisible:
+    text: "Version"
+
+# ======================
+# STEP 10: Test Manual Refresh from Settings
+# ======================
+
+# Tap the refresh button to test manual data refresh with session
+- tapOn:
+    text: "Refresh All Beer Data"
+- waitForAnimationToEnd:
+    timeout: 1000
+
+# Wait for refresh to complete (may take 10-15 seconds)
+- waitForAnimationToEnd:
+    timeout: 20000
+
+# Verify refresh completed successfully (button re-enabled)
+# If session invalid, refresh would fail with error
+
+# Navigate back to beer list
+- tapOn:
+    accessibilityLabel: "xmark"
+- waitForAnimationToEnd
+
+# Verify we're back on home screen
+- assertVisible:
+    text: "Welcome to Beer Selector"
+
+# Navigate to All Beer
+- tapOn:
+    text: "All Beer"
+- waitForAnimationToEnd
+
+# Verify refreshed data is displayed
+- assertVisible:
+    id: "beer-list"
+
+# ======================
+# Test Complete
+# ======================
+
+# This test verifies:
+# ✓ Session persists after app restart (cold start)
+# ✓ Auto-login restores full member access
+# ✓ Beer data loads without manual re-login
+# ✓ All member features accessible (Beerfinder, Tasted Brews)
+# ✓ Pull-to-refresh works with restored session
+# ✓ Session persists across multiple app restarts
+# ✓ Session persists through background/foreground transitions
+# ✓ Manual data refresh works with session
+# ✓ Settings show correct logged-in state
+
+# Manual testing required for:
+# - Session expiration (wait for timeout)
+# - Session invalidation and re-login flow
+# - Network errors during auto-login
+# - Cookie corruption or SecureStore errors

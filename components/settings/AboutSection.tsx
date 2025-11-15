@@ -74,6 +74,7 @@ export default function AboutSection({
 
       {/* App Name */}
       <ThemedText
+        testID="app-name-text"
         style={styles.appName}
         accessibilityLabel="Beer Selector application"
         accessibilityRole="text"
@@ -83,6 +84,7 @@ export default function AboutSection({
 
       {/* Version and Build Information */}
       <ThemedText
+        testID="version-text"
         style={styles.versionText}
         accessibilityLabel={`Version ${version}${buildNumber ? `, Build ${buildNumber}` : ''}`}
         accessibilityRole="text"
