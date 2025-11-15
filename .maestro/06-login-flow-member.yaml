@@ -1,0 +1,235 @@
+appId: ${APP_ID}
+name: "Login Flow - UFO Club Member Authentication"
+---
+# Test Flow: UFO Club Member Login
+# This test verifies the complete login flow for a UFO Club member:
+# 1. First launch detection and redirect to settings
+# 2. Login button interaction
+# 3. WebView login process
+# 4. Session persistence
+# 5. Data refresh after login
+# 6. Logout functionality
+
+# ======================
+# STEP 1: First Launch
+# ======================
+
+# Launch app with cleared state to simulate first install
+- launchApp:
+    clearState: true
+
+# Wait for app initialization (database setup)
+- waitForAnimationToEnd:
+    timeout: 10000
+
+# Verify we're redirected to settings screen (first launch behavior)
+- assertVisible:
+    text: "Settings"
+    timeout: 5000
+
+# Verify welcome message is shown for first-time users
+- assertVisible:
+    text: "Welcome to Beer Selector"
+
+# Verify instructional text
+- assertVisible:
+    text: "Please log in to your UFO Club account or as a Visitor to start using the app."
+
+# ======================
+# STEP 2: Initiate Login
+# ======================
+
+# Verify login button exists and is accessible
+- assertVisible:
+    text: "Login to Flying Saucer"
+
+# Tap the login button to open WebView
+- tapOn:
+    text: "Login to Flying Saucer"
+- waitForAnimationToEnd:
+    timeout: 2000
+
+# Verify WebView modal opens
+- assertVisible:
+    testID: "login-webview-modal"
+    timeout: 5000
+
+# Verify WebView header is shown
+- assertVisible:
+    text: "Flying Saucer Login"
+
+# Verify close button exists (user can cancel)
+- assertVisible:
+    testID: "close-webview-button"
+
+# Wait for WebView to load the login page (kiosk.php)
+# This may take several seconds depending on network
+- waitForAnimationToEnd:
+    timeout: 15000
+
+# ======================
+# STEP 3: WebView Login Process
+# ======================
+
+# Note: The actual login form interaction depends on the Flying Saucer website
+# In a real test environment, you would:
+# 1. Wait for the login form to load
+# 2. Enter credentials (test account)
+# 3. Submit the form
+# 4. Wait for redirect to member dashboard
+
+# For now, we'll verify the WebView loaded successfully
+# and the user can interact with it
+
+# Verify the WebView is still visible (didn't crash)
+- assertVisible:
+    testID: "login-webview-modal"
+
+# In a real test with valid credentials, the WebView would:
+# - Navigate to member-dash.php after successful login
+# - JavaScript injection would extract session cookies and API URLs
+# - App would save session data and close the WebView
+# - Alert would show "Login Successful"
+
+# ======================
+# STEP 4: Test Login Cancellation
+# ======================
+
+# Test that user can cancel login process
+- tapOn:
+    testID: "close-webview-button"
+- waitForAnimationToEnd:
+    timeout: 2000
+
+# Verify we're back on settings screen
+- assertVisible:
+    text: "Settings"
+
+# Verify WebView is dismissed
+- assertNotVisible:
+    testID: "login-webview-modal"
+
+# ======================
+# STEP 5: Retry Login (Success Path)
+# ======================
+
+# Tap login button again
+- tapOn:
+    text: "Login to Flying Saucer"
+- waitForAnimationToEnd:
+    timeout: 2000
+
+# Verify WebView opens again
+- assertVisible:
+    testID: "login-webview-modal"
+    timeout: 5000
+
+# Wait for page to load
+- waitForAnimationToEnd:
+    timeout: 15000
+
+# NOTE: In a real E2E test with a test account, you would:
+# 1. Locate username/password fields in WebView
+# 2. Enter test credentials
+# 3. Submit form
+# 4. Wait for success alert: "Login Successful"
+# 5. Tap "OK" on alert
+# 6. Verify navigation to home screen
+
+# For manual testing or with test credentials, the flow would be:
+# - User logs in via WebView
+# - Session cookies are extracted and saved
+# - API URLs are configured automatically
+# - Data is refreshed (all beers, tasted beers, rewards)
+# - User is redirected to home screen or beer list
+
+# ======================
+# STEP 6: Post-Login Verification (if login succeeds)
+# ======================
+
+# After successful login, these assertions would run:
+# Note: These are commented out as they require actual login credentials
+# Uncomment when running with test account
+
+# - assertVisible:
+#     text: "Login Successful"
+#     timeout: 30000
+
+# - tapOn:
+#     text: "OK"
+
+# - waitForAnimationToEnd:
+#     timeout: 5000
+
+# # Verify we're on the home screen or All Beer tab
+# - assertVisible:
+#     id: "all-beers-container"
+#     timeout: 10000
+
+# # Verify beer data was loaded
+# - assertVisible:
+#     id: "beer-list"
+
+# # Verify beer count is displayed (non-zero)
+# - assertVisible:
+#     id: "beer-count"
+
+# ======================
+# STEP 7: Settings Access After Login
+# ======================
+
+# # Navigate to settings to test logout
+# - tapOn: "Settings"
+# - waitForAnimationToEnd
+
+# # Verify settings screen shows logged-in state
+# - assertVisible:
+#     text: "Settings"
+
+# # Verify Data Management section is visible
+# - assertVisible:
+#     text: "Data Management"
+
+# # Verify refresh button exists (only available when logged in)
+# - assertVisible:
+#     text: "Refresh All Beer Data"
+
+# ======================
+# STEP 8: Logout Test
+# ======================
+
+# # Tap "Login to Flying Saucer" button to open login WebView
+# # (This allows user to log out or switch accounts)
+# - tapOn:
+#     text: "Login to Flying Saucer"
+# - waitForAnimationToEnd:
+#     timeout: 2000
+
+# # Verify WebView opens
+# - assertVisible:
+#     testID: "login-webview-modal"
+
+# # User would manually log out in WebView
+# # Then close WebView
+# - tapOn:
+#     testID: "close-webview-button"
+# - waitForAnimationToEnd
+
+# ======================
+# Test Complete
+# ======================
+
+# This test verifies:
+# ✓ First launch detection
+# ✓ Redirect to settings screen
+# ✓ Login button accessibility
+# ✓ WebView modal opens
+# ✓ WebView can be dismissed
+# ✓ Login cancellation works
+# ✓ Login flow can be retried
+
+# To fully test successful login:
+# - Set up test Flying Saucer account credentials
+# - Configure WebView form interaction (username/password input)
+# - Add post-login assertions
+# - Test data refresh and navigation

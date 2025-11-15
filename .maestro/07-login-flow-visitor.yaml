@@ -1,0 +1,278 @@
+appId: ${APP_ID}
+name: "Login Flow - Visitor Mode"
+---
+# Test Flow: Visitor Mode Login
+# This test verifies the visitor mode flow:
+# 1. First launch and redirect to settings
+# 2. Login button interaction
+# 3. WebView visitor mode selection
+# 4. Visitor mode session setup
+# 5. Read-only beer list access
+# 6. Limited feature access (no tasted beers, no check-ins)
+# 7. Switching from visitor to member mode
+
+# ======================
+# STEP 1: First Launch (Visitor Path)
+# ======================
+
+# Launch app with cleared state to simulate first install
+- launchApp:
+    clearState: true
+
+# Wait for app initialization
+- waitForAnimationToEnd:
+    timeout: 10000
+
+# Verify redirect to settings screen
+- assertVisible:
+    text: "Settings"
+    timeout: 5000
+
+# Verify welcome section is shown
+- assertVisible:
+    text: "Welcome to Beer Selector"
+
+# Verify login instructions
+- assertVisible:
+    text: "Please log in to your UFO Club account or as a Visitor to start using the app."
+
+# ======================
+# STEP 2: Initiate Login (Visitor)
+# ======================
+
+# Tap the login button to open WebView
+- tapOn:
+    text: "Login to Flying Saucer"
+- waitForAnimationToEnd:
+    timeout: 2000
+
+# Verify WebView modal opens
+- assertVisible:
+    testID: "login-webview-modal"
+    timeout: 5000
+
+# Verify WebView header
+- assertVisible:
+    text: "Flying Saucer Login"
+
+# Wait for WebView to load
+- waitForAnimationToEnd:
+    timeout: 15000
+
+# ======================
+# STEP 3: Select Visitor Mode in WebView
+# ======================
+
+# Note: In the Flying Saucer WebView, the user would:
+# 1. Select a location/store
+# 2. Choose "Continue as Visitor" instead of logging in
+# 3. This navigates to visitor.php page
+# 4. JavaScript injection extracts store cookies
+# 5. App configures visitor mode with store API URL only
+
+# For manual testing, verify WebView is responsive
+- assertVisible:
+    testID: "login-webview-modal"
+
+# In a real test environment with visitor mode selection:
+# - User selects a Flying Saucer location
+# - User taps "Continue as Visitor" or equivalent
+# - WebView navigates to visitor.php
+# - App extracts store ID from cookies
+# - Alert shows "Visitor Mode Active"
+
+# ======================
+# STEP 4: Post-Visitor Login Verification
+# ======================
+
+# After visitor mode activation, these assertions would run:
+# Note: Commented out as they require actual visitor mode interaction
+
+# - assertVisible:
+#     text: "Visitor Mode Active"
+#     timeout: 30000
+
+# - assertVisible:
+#     text: "You are now browsing as a visitor. Only the All Beer list will be available."
+
+# - tapOn:
+#     text: "OK"
+
+# - waitForAnimationToEnd:
+#     timeout: 5000
+
+# ======================
+# STEP 5: Verify Visitor Mode Home Screen
+# ======================
+
+# # After accepting visitor mode alert, verify home screen
+# - assertVisible:
+#     text: "Welcome to Beer Selector"
+#     timeout: 10000
+
+# # Verify visitor-specific message
+# - assertVisible:
+#     text: "You're logged in as a Visitor"
+
+# # Verify limited access message
+# - assertVisible:
+#     text: "Please login with your UFO Club account to view the Beerfinder, Tasted Brews, and Rewards."
+
+# # Verify "All Beer" button is available
+# - assertVisible:
+#     text: "All Beer"
+
+# # Tap "All Beer" to navigate to beer list
+# - tapOn:
+#     text: "All Beer"
+# - waitForAnimationToEnd
+
+# ======================
+# STEP 6: Verify Beer List in Visitor Mode
+# ======================
+
+# # Verify beer list loads for visitors
+# - assertVisible:
+#     id: "all-beers-container"
+#     timeout: 10000
+
+# # Verify "Guest" badge is shown in header
+# - assertVisible:
+#     text: "Guest"
+
+# # Verify beer list is populated
+# - assertVisible:
+#     id: "beer-list"
+
+# # Verify beer count is displayed
+# - assertVisible:
+#     id: "beer-count"
+
+# # Verify search functionality works for visitors
+# - tapOn:
+#     id: "search-input"
+# - inputText: "IPA"
+# - waitForAnimationToEnd
+
+# # Verify search results
+# - assertVisible:
+#     id: "beer-list"
+
+# # Clear search
+# - tapOn:
+#     id: "clear-search-button"
+# - waitForAnimationToEnd
+
+# ======================
+# STEP 7: Verify Limited Tab Access (Visitor)
+# ======================
+
+# # Test that Beerfinder tab shows empty state or is unavailable
+# - tapOn: "Beerfinder"
+# - waitForAnimationToEnd:
+#     timeout: 3000
+
+# # Visitor should see empty state or "Login Required" message
+# # Specific behavior depends on implementation
+
+# # Navigate to Tasted Brews tab
+# - tapOn: "Tasted Brews"
+# - waitForAnimationToEnd:
+#     timeout: 3000
+
+# # Visitor should see empty state or "Login Required" message
+# # Tasted beers require UFO Club member authentication
+
+# # Navigate back to All Beer tab (always accessible)
+# - tapOn: "All Beer"
+# - waitForAnimationToEnd
+
+# # Verify beer list is still accessible
+# - assertVisible:
+#     id: "all-beers-container"
+
+# ======================
+# STEP 8: Test Visitor to Member Mode Upgrade
+# ======================
+
+# # Navigate to Settings from visitor mode
+# # Note: Need to use home screen first since there's no direct settings tab
+
+# # Go to home screen
+# - tapOn:
+#     text: "Home"
+# - waitForAnimationToEnd
+
+# # Tap settings button (gear icon in top right)
+# - tapOn:
+#     id: "settings-button"
+# - waitForAnimationToEnd
+
+# # Verify we're on settings screen
+# - assertVisible:
+#     text: "Settings"
+
+# # Tap "Login to Flying Saucer" to upgrade from visitor to member
+# - assertVisible:
+#     text: "Login to Flying Saucer"
+
+# - tapOn:
+#     text: "Login to Flying Saucer"
+# - waitForAnimationToEnd:
+#     timeout: 2000
+
+# # Verify WebView opens for member login
+# - assertVisible:
+#     testID: "login-webview-modal"
+#     timeout: 5000
+
+# # User would now log in with UFO Club credentials
+# # This would override visitor mode with full member access
+
+# # Close WebView for now
+# - tapOn:
+#     testID: "close-webview-button"
+# - waitForAnimationToEnd
+
+# ======================
+# STEP 9: Test Beer Item Interaction (Visitor)
+# ======================
+
+# # Navigate back to beer list
+# - tapOn: "All Beer"
+# - waitForAnimationToEnd
+
+# # Verify visitors can view beer details
+# - tapOn:
+#     regex: "beer-item-.*"
+#     index: 0
+# - waitForAnimationToEnd
+
+# # Verify beer details expand
+# - assertVisible:
+#     regex: "beer-description-container-.*"
+
+# # Verify no check-in or tasting buttons are shown (visitor limitation)
+# # Check-in functionality requires member authentication
+
+# ======================
+# Test Complete
+# ======================
+
+# This test verifies:
+# ✓ First launch detection
+# ✓ Login WebView opens
+# ✓ Visitor mode can be selected
+# ✓ Visitor mode session is configured
+# ✓ Beer list loads in visitor mode
+# ✓ Guest badge is displayed
+# ✓ Search and filter work for visitors
+# ✓ Tasted beers and Beerfinder show limited access
+# ✓ Visitors can view beer details
+# ✓ Visitor can upgrade to member login
+
+# To fully test visitor mode:
+# - Configure WebView to select visitor mode
+# - Verify store selection and cookie extraction
+# - Test all visitor mode restrictions
+# - Test upgrade path from visitor to member

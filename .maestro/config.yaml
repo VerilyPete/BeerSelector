@@ -16,6 +16,15 @@ flows:
   - 03-beer-item-expansion.yaml
   - 04-empty-states.yaml
   - 05-navigation-and-tabs.yaml
+  - 06-login-flow-member.yaml
+  - 07-login-flow-visitor.yaml
+  - 08-auto-login.yaml
+  - 09-refresh-functionality.yaml
+  - 10-settings-configuration.yaml
+  - 11-settings-first-launch.yaml
+  - 12-offline-scenarios.yaml
+  - 13-network-timeout-recovery.yaml
+  - 14-api-error-handling.yaml
 
 # Performance thresholds
 performance:

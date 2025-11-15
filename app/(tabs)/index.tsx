@@ -18,12 +18,12 @@ export function BeerListScreen() {
   const { session } = useAppContext();
 
   return (
-    <ThemedView style={styles.container}>
+    <ThemedView testID="all-beers-container" style={styles.container}>
       <SafeAreaView style={{flex: 1}} edges={['top', 'right', 'left']}>
         <View style={styles.headerContainer}>
           <ThemedText type="title" style={styles.title}>All Beer</ThemedText>
           {session.isVisitor && (
-            <View style={styles.visitorBadge}>
+            <View testID="visitor-mode-badge" style={styles.visitorBadge}>
               <ThemedText style={styles.visitorText}>Guest</ThemedText>
             </View>
           )}
@@ -241,6 +241,7 @@ export default function HomeScreen() {
         <SafeAreaView style={styles.homeContentContainer} edges={['top', 'right', 'left']}>
           {/* Settings button in top right */}
           <TouchableOpacity
+            testID="settings-nav-button"
             style={styles.settingsButton}
             onPress={() => router.navigate('/settings')}
           >
@@ -268,6 +269,7 @@ export default function HomeScreen() {
       <SafeAreaView style={styles.homeContentContainer} edges={['top', 'right', 'left']}>
         {/* Settings button in top right */}
         <TouchableOpacity
+          testID="settings-nav-button"
           style={styles.settingsButton}
           onPress={() => router.navigate('/settings')}
         >

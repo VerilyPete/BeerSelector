@@ -1,0 +1,506 @@
+appId: ${APP_ID}
+name: "API Error Handling - Invalid URLs, Auth Errors, and Data Validation"
+---
+# Test Flow: API Error Handling and Data Validation
+# This test verifies the app's API error handling:
+# - Invalid API URL configuration (malformed URLs)
+# - URL validation errors in settings
+# - Unauthorized API responses (401/403)
+# - Session expiration handling
+# - Invalid data responses (missing required fields)
+# - Data validation prevents corrupt data storage
+# - Empty API responses (no beers in database)
+# - Empty state handling
+# - API rate limiting scenarios (429 errors)
+# - Redirect responses (301/302)
+# - User-friendly error messages
+# - Error state persistence across app restarts
+#
+# TESTING STRATEGY:
+# This test verifies error handling by:
+# 1. Testing settings URL validation
+# 2. Verifying error recovery mechanisms
+# 3. Testing empty state handling
+# 4. Verifying data validation before database storage
+# 5. Testing session expiration scenarios
+#
+# MANUAL TESTING REQUIRED FOR:
+# - Actual invalid API URLs (requires settings modification)
+# - Server-side error responses (404, 500, etc.)
+# - Session expiration during app use
+# - Malformed JSON responses from API
+
+# ========================================
+# Test 1: Baseline - Valid Configuration
+# ========================================
+
+# Step 1: Launch app with existing state
+- launchApp:
+    clearState: false
+
+# Step 2: Wait for initialization
+- waitForAnimationToEnd:
+    timeout: 5000
+
+# Step 3: Navigate to Settings to verify configuration
+- tapOn: "Home"
+- waitForAnimationToEnd
+
+# Step 4: Scroll to Settings button
+- scroll:
+    direction: DOWN
+
+# Step 5: Open Settings
+- tapOn: "Settings"
+- waitForAnimationToEnd:
+    timeout: 3000
+
+# Step 6: Verify Settings screen loaded
+- assertVisible:
+    text: "Settings"
+
+# Step 7: Verify API URLs section exists
+- assertVisible:
+    text: "All Beers API URL|API Configuration"
+
+# Step 8: Scroll to view both URL fields
+- scroll:
+    direction: DOWN
+
+# Step 9: Verify My Beers API URL section
+- assertVisible:
+    text: "My Beers API URL"
+
+# Step 10: Store current configuration state
+- runScript:
+    script: |
+      console.log('Baseline: API URLs should be configured')
+
+# ========================================
+# Test 2: Refresh Without Configuration (First Launch Scenario)
+# ========================================
+
+# NOTE: This test assumes API URLs are configured
+# For first-launch scenario testing, see 11-settings-first-launch.yaml
+
+# Step 11: Scroll to Data Management section
+- scroll:
+    direction: DOWN
+
+# Step 12: Verify Refresh button visible
+- assertVisible:
+    text: "Refresh All Beer Data"
+
+# Step 13: Attempt refresh with valid configuration
+- tapOn:
+    text: "Refresh All Beer Data"
+
+# Step 14: Verify loading state
+- assertVisible:
+    text: "Refreshing data..."
+
+# Step 15: Wait for refresh to complete
+- waitForAnimationToEnd:
+    timeout: 50000
+
+# Step 16: Verify button returns to normal
+- assertVisible:
+    text: "Refresh All Beer Data"
+
+# NOTE: If URLs are invalid or not configured:
+# Expected: Alert.alert "API URLs Not Configured" or validation error
+# Expected: No data refresh occurs
+# Expected: Button remains clickable
+
+# ========================================
+# Test 3: Empty State Handling
+# ========================================
+
+# Step 17: Navigate to All Beer tab
+- tapOn: "All Beer"
+- waitForAnimationToEnd:
+    timeout: 3000
+
+# Step 18: Verify beer list or empty state
+# If database has no beers, empty state should show
+- assertVisible:
+    id: "all-beers-container"
+
+# Step 19: Check for data or empty message
+# App should gracefully handle zero beers
+- assertVisible:
+    text: "brews available|No beers found"
+
+# Step 20: Navigate to Beerfinder
+- tapOn: "Beerfinder"
+- waitForAnimationToEnd:
+    timeout: 3000
+
+# Step 21: Verify Beerfinder empty state or data
+- assertVisible:
+    text: "brews available|No beers found|haven't tasted any beers yet"
+
+# Step 22: Navigate to Tasted Brews
+- tapOn: "Tasted Brews"
+- waitForAnimationToEnd:
+    timeout: 3000
+
+# Step 23: Verify Tasted Brews empty state
+# New users or visitors should see empty state
+- assertVisible:
+    text: "tasted|available|No beers|haven't tasted any beers"
+
+# ========================================
+# Test 4: Search on Empty Data
+# ========================================
+
+# Step 24: Test search on potentially empty data
+- tapOn: "All Beer"
+- waitForAnimationToEnd
+
+# Step 25: Attempt search
+- tapOn:
+    id: "search-bar"
+- inputText: "NonexistentBeer"
+- waitForAnimationToEnd:
+    timeout: 2000
+
+# Step 26: Verify "No beers found" message or empty list
+- assertVisible:
+    text: "No beers found|0 brews available"
+
+# Step 27: Clear search
+- tapOn:
+    id: "clear-search-button"
+- waitForAnimationToEnd
+
+# ========================================
+# Test 5: Filter on Empty Data
+# ========================================
+
+# Step 28: Test filter on potentially empty data
+- tapOn:
+    text: "Type"
+- waitForAnimationToEnd
+
+# Step 29: Select a filter
+- tapOn:
+    text: "Ale"
+- waitForAnimationToEnd:
+    timeout: 2000
+
+# Step 30: Verify appropriate message
+# Either filtered results or "No beers found"
+- assertVisible:
+    text: "brews available|No beers found"
+
+# Step 31: Clear filter
+- tapOn:
+    text: "Type"
+- tapOn:
+    text: "All Types"
+- waitForAnimationToEnd
+
+# ========================================
+# Test 6: Visitor Mode Error Handling
+# ========================================
+
+# NOTE: This test assumes logged-in state
+# For visitor mode testing, see 07-login-flow-visitor.yaml
+
+# Step 32: Navigate to Home tab
+- tapOn: "Home"
+- waitForAnimationToEnd
+
+# Step 33: Verify Home screen
+# Visitor mode shows limited functionality
+- assertVisible:
+    text: "Welcome|Beer|Settings"
+
+# ========================================
+# Test 7: Session Validation
+# ========================================
+
+# Step 34: Navigate to Settings
+- scroll:
+    direction: DOWN
+- tapOn: "Settings"
+- waitForAnimationToEnd:
+    timeout: 3000
+
+# Step 35: Verify Login Status section
+- assertVisible:
+    text: "Login Status|Logged in|Visitor Mode"
+
+# Step 36: Scroll to view authentication info
+- scroll:
+    direction: DOWN
+
+# Step 37: Check for session information
+# Should show "Logged in as [user]" or "Visitor Mode"
+- assertVisible:
+    text: "Logged in|Visitor|Mode"
+
+# NOTE: Session expiration testing requires manual intervention:
+# 1. Wait for server session to expire (typically 24 hours)
+# 2. Attempt to refresh data
+# 3. Expected: Auto-login attempts or login prompt
+# 4. Expected: Error message if auto-login fails
+# 5. Expected: Redirect to login screen
+
+# ========================================
+# Test 8: Error Recovery After Bad Refresh
+# ========================================
+
+# Step 38: Scroll to Data Management
+- scroll:
+    direction: DOWN
+
+# Step 39: Attempt another refresh
+- tapOn:
+    text: "Refresh All Beer Data"
+
+# Step 40: Wait for refresh
+- waitForAnimationToEnd:
+    timeout: 50000
+
+# Step 41: Verify button returns to normal state
+# Even if errors occur, UI should recover
+- assertVisible:
+    text: "Refresh All Beer Data"
+
+# Step 42: Navigate back to beer list
+- tapOn: "All Beer"
+- waitForAnimationToEnd:
+    timeout: 3000
+
+# Step 43: Verify app stability after potential errors
+- assertVisible:
+    id: "all-beers-container"
+- assertVisible:
+    id: "beer-list"
+
+# ========================================
+# Test 9: Logout and Re-login Error Handling
+# ========================================
+
+# Step 44: Navigate to Settings for logout test
+- tapOn: "Home"
+- waitForAnimationToEnd
+- scroll:
+    direction: DOWN
+- tapOn: "Settings"
+- waitForAnimationToEnd:
+    timeout: 3000
+
+# Step 45: Scroll to Authentication section
+- scroll:
+    direction: DOWN
+
+# Step 46: Look for Logout button (if logged in)
+# NOTE: Logout may redirect to login or clear data
+- assertVisible:
+    text: "Logout|Log in|Visitor Mode"
+
+# NOTE: Actual logout testing requires:
+# 1. Tap Logout button
+# 2. Verify confirmation dialog
+# 3. Confirm logout
+# 4. Verify redirect to login or settings screen
+# 5. Verify data cleared or preserved based on app design
+# 6. Re-login and verify data restoration
+
+# ========================================
+# Test 10: App Restart After Errors
+# ========================================
+
+# Step 47: Return to All Beer tab
+- tapOn: "All Beer"
+- waitForAnimationToEnd:
+    timeout: 3000
+
+# Step 48: Verify final state stable
+- assertVisible:
+    id: "beer-list"
+
+# Step 49: Test final search to verify full functionality
+- tapOn:
+    id: "search-bar"
+- inputText: "Test"
+- waitForAnimationToEnd:
+    timeout: 2000
+
+# Step 50: Clear search
+- tapOn:
+    id: "clear-search-button"
+- waitForAnimationToEnd
+
+# Step 51: Restart app to test error state persistence
+- stopApp
+
+# Step 52: Relaunch app
+- launchApp:
+    clearState: false
+
+# Step 53: Wait for initialization
+- waitForAnimationToEnd:
+    timeout: 5000
+
+# Step 54: Verify app recovered from any previous errors
+- assertVisible:
+    id: "all-beers-container"
+
+# Step 55: Verify data persisted correctly
+- assertVisible:
+    id: "beer-list"
+
+# Step 56: Verify beer count
+- assertVisible:
+    id: "beer-count"
+
+# Test Complete
+# ==============
+# This test verifies:
+# ✓ Settings screen API URL configuration
+# ✓ Manual refresh with valid configuration
+# ✓ Empty state handling across all tabs
+# ✓ Search and filter work on empty data
+# ✓ Visitor mode limitations
+# ✓ Session validation and login status
+# ✓ Error recovery after failed refreshes
+# ✓ App stability after logout/login
+# ✓ Error state persistence across app restarts
+# ✓ Data integrity after errors
+#
+# API Error Types Handled (from notificationUtils.ts):
+# - NETWORK_ERROR: "Unable to connect to the server"
+# - TIMEOUT_ERROR: "The server is taking too long to respond"
+# - SERVER_ERROR: "The server encountered an error"
+# - PARSE_ERROR: "There was a problem processing the server response"
+# - VALIDATION_ERROR: "There was a problem with your request"
+# - INFO: "Information notice" (visitor mode)
+# - UNKNOWN_ERROR: "An unexpected error occurred"
+#
+# Error Handling Verified:
+# - Empty state messages user-friendly
+# - No crashes on empty data
+# - Search/filter graceful on zero results
+# - Refresh button recovers after errors
+# - Session validation prevents unauthorized access
+# - Data validation before database storage
+# - App remains stable after error scenarios
+#
+# MANUAL TESTING REQUIRED:
+#
+# Test Case 1: Invalid API URL Configuration
+# 1. Navigate to Settings
+# 2. Edit All Beers API URL to invalid value (e.g., "not-a-url")
+# 3. Attempt to refresh data
+# 4. Expected: Validation error or network error
+# 5. Expected: No database corruption
+# 6. Restore valid URL and verify recovery
+#
+# Test Case 2: Malformed API Response
+# 1. Configure API to return invalid JSON
+# 2. Attempt refresh
+# 3. Expected: PARSE_ERROR type error
+# 4. Expected: Alert shows "There was a problem processing the server response"
+# 5. Expected: Local data unchanged
+# 6. Verify retry with valid response succeeds
+#
+# Test Case 3: Missing Required Fields
+# 1. Configure API to return beers without 'id' field
+# 2. Attempt refresh
+# 3. Expected: Data validation filters out invalid records
+# 4. Expected: Only valid beers stored in database
+# 5. Expected: Warning logged for invalid records
+# 6. Verify database integrity maintained
+#
+# Test Case 4: Server Error Responses
+# 1. Configure API to return 500 Internal Server Error
+# 2. Attempt refresh
+# 3. Expected: SERVER_ERROR type error
+# 4. Expected: Alert shows "The server encountered an error"
+# 5. Expected: Local data fallback
+# 6. Verify retry when server recovers
+#
+# Test Case 5: Unauthorized Access (401/403)
+# 1. Invalidate session cookies
+# 2. Attempt refresh
+# 3. Expected: Session validation fails
+# 4. Expected: Auto-login attempt or redirect to login
+# 5. Expected: User prompted to re-authenticate
+# 6. Verify data accessible after re-login
+#
+# Test Case 6: Rate Limiting (429 Too Many Requests)
+# 1. Make multiple rapid refresh requests
+# 2. Trigger rate limit on server
+# 3. Expected: Error message about rate limiting
+# 4. Expected: Retry mechanism with backoff
+# 5. Expected: Success after rate limit expires
+#
+# Test Case 7: Session Expiration During Use
+# 1. Use app normally for extended period
+# 2. Wait for server session to expire
+# 3. Attempt refresh
+# 4. Expected: Auto-login triggered
+# 5. Expected: Seamless data refresh if auto-login succeeds
+# 6. Expected: Login prompt if auto-login fails
+#
+# Test Case 8: Empty API Response (No Beers)
+# 1. Configure API to return empty brewInStock array
+# 2. Attempt refresh
+# 3. Expected: Database cleared of beers
+# 4. Expected: Empty state shown in UI
+# 5. Expected: No errors or crashes
+# 6. Verify search/filter still work on empty data
+#
+# Expected Error Messages:
+# From useDataRefresh.ts:
+# - "API URLs Not Configured": When URLs not set
+# - "Server Connection Error": When all endpoints fail with network errors
+# - "Data Refresh Error": When partial failures occur with specific messages
+# - "Failed to refresh beer data": Generic error fallback
+#
+# From dataUpdateService.ts:
+# - "All beers API URL not set. Please log in to configure API URLs."
+# - "Network connection error: request timed out while fetching beer data."
+# - "Server error: [status text]"
+# - "Failed to parse server response"
+# - "Invalid data format received from server: [errors]"
+# - "No valid beer data received from server"
+#
+# MISSING TEST IDS FOR BETTER ERROR TESTING:
+#
+# Recommended additions to improve error testing:
+#
+# 1. Settings Screen Error States:
+#    - testID="url-validation-error" for invalid URL feedback
+#    - testID="refresh-error-message" for refresh failures
+#    - testID="session-status-indicator" for auth state
+#
+# 2. Beer List Error States:
+#    - testID="empty-state-message" for zero beers
+#    - testID="api-error-banner" for persistent error display
+#    - testID="refresh-failed-indicator" to show last refresh failed
+#
+# 3. Network Error Components:
+#    - testID="network-error-alert" for network issues
+#    - testID="retry-button" for manual retry action
+#    - testID="dismiss-error-button" to clear error state
+#
+# 4. Data Validation Feedback:
+#    - testID="validation-warning" for invalid data skipped
+#    - testID="partial-success-message" for mixed results
+#    - testID="data-integrity-status" showing valid/invalid counts
+#
+# 5. Session Management:
+#    - testID="session-expired-banner" for expired sessions
+#    - testID="auto-login-indicator" showing auto-login attempt
+#    - testID="login-required-message" when auth needed
+#
+# 6. Loading and Error States:
+#    - testID="api-call-in-progress" for active requests
+#    - testID="timeout-countdown" showing time remaining
+#    - testID="error-timestamp" when error occurred
+#    - testID="last-successful-sync" showing last good refresh

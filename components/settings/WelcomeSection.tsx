@@ -74,6 +74,7 @@ export default function WelcomeSection({
 
         {/* Login Button */}
         <TouchableOpacity
+          testID="login-button"
           style={[
             styles.loginButton,
             (loginLoading || refreshing) && styles.loginButtonDisabled,

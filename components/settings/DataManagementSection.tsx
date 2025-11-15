@@ -104,6 +104,7 @@ export default function DataManagementSection({
       {/* Refresh Button - only show when API URLs are configured */}
       {apiUrlsConfigured && (
         <TouchableOpacity
+          testID="refresh-all-data-button"
           style={[
             styles.button,
             { backgroundColor: buttonBackgroundColor },
@@ -134,6 +135,7 @@ export default function DataManagementSection({
       {/* Login Button - hidden during first login flow */}
       {!isFirstLogin && (
         <TouchableOpacity
+          testID="login-button"
           style={[
             styles.button,
             { backgroundColor: buttonBackgroundColor },
@@ -152,6 +154,7 @@ export default function DataManagementSection({
 
       {/* Untappd Login/Reconnect Button */}
       <TouchableOpacity
+        testID="untappd-login-button"
         style={[
           styles.button,
           { backgroundColor: buttonBackgroundColor },
@@ -174,6 +177,7 @@ export default function DataManagementSection({
       {/* Untappd Logout Button - only show when logged in */}
       {isUntappdLoggedIn && (
         <TouchableOpacity
+          testID="logout-button"
           style={[
             styles.button,
             styles.secondaryButton,

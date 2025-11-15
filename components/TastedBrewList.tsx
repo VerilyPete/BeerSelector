@@ -71,7 +71,7 @@ export const TastedBrewList = () => {
     : "No beers in your current round yet. Start exploring and log some brews!";
 
   return (
-    <View style={styles.container}>
+    <View testID="tasted-brews-container" style={styles.container}>
       {/* Show skeleton during initial load (when loading=true and no beers yet) */}
       {loading.isLoadingBeers && beers.tastedBeers.length === 0 ? (
         <>

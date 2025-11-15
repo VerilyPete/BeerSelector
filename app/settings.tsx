@@ -130,6 +130,7 @@ export default function SettingsScreen() {
         {/* Back button - only show if not first login and we can go back */}
         {!isFirstLogin && canGoBack && (
           <TouchableOpacity
+            testID="back-button"
             style={styles.backButton}
             onPress={() => router.back()}
           >

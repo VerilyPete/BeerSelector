@@ -1,0 +1,357 @@
+appId: ${APP_ID}
+name: "Settings - First Launch Configuration Flow"
+---
+# Test Flow: First Launch Settings Configuration
+# This test verifies the first-time user experience including:
+# - Automatic redirect to settings on first launch
+# - Welcome message display
+# - Initial login flow
+# - Visitor mode access
+# - API URL configuration (if applicable)
+#
+# Prerequisites:
+# - App installed but never launched (clearState: true)
+
+# Step 1: Launch app with clean state (simulate first install)
+- launchApp:
+    clearState: true
+
+# Step 2: Wait for app initialization
+# First launch may take longer due to database setup
+- waitForAnimationToEnd:
+    timeout: 10000
+
+# ========================================
+# Test 1: Verify First Launch Redirect
+# ========================================
+
+# Step 3: Verify app automatically redirects to settings
+# On first launch with no API URLs configured, app should
+# redirect to settings screen automatically
+- assertVisible:
+    text: "Settings"
+
+# Step 4: Verify no back button is visible
+# On first launch, user cannot navigate away until configured
+# The back button (×) should not be visible
+- assertNotVisible:
+    text: "×"
+
+# ========================================
+# Test 2: Verify Welcome Section
+# ========================================
+
+# Step 5: Verify Welcome section is displayed
+- assertVisible:
+    id: "welcome-section"
+
+# Step 6: Verify welcome message is shown
+- assertVisible:
+    text: "Welcome to Beer Selector"
+
+# Step 7: Verify instructions are displayed
+- assertVisible:
+    text: "Please log in to your UFO Club account or as a Visitor"
+
+# Step 8: Verify login button is present in welcome section
+- assertVisible:
+    text: "Login to Flying Saucer"
+
+# ========================================
+# Test 3: Verify About Section (Always Visible)
+# ========================================
+
+# Step 9: Scroll to About section
+- scroll:
+    direction: DOWN
+
+# Step 10: Verify About section is visible
+- assertVisible:
+    id: "about-section"
+
+# Step 11: Verify app name and version
+- assertVisible:
+    text: "Beer Selector"
+- assertVisible:
+    text: "Version"
+
+# ========================================
+# Test 4: Test Login Flow from Welcome Section
+# ========================================
+
+# Step 12: Scroll back to top to find login button
+- scroll:
+    direction: UP
+
+# Step 13: Tap "Login to Flying Saucer" button from welcome section
+- tapOn:
+    text: "Login to Flying Saucer"
+
+# Step 14: Wait for login webview to appear
+- waitForAnimationToEnd:
+    timeout: 5000
+
+# Step 15: Verify login webview modal is displayed
+- assertVisible:
+    id: "login-webview-modal"
+
+# Step 16: Verify close button exists in webview
+- assertVisible:
+    id: "close-webview-button"
+
+# ========================================
+# Test 5: Test Visitor Mode Selection
+# ========================================
+
+# Step 17: In the webview, look for visitor mode option
+# The webview should load Flying Saucer login page
+# which includes a "Continue as Visitor" button
+
+# Step 18: Wait for page to load completely
+- waitForAnimationToEnd:
+    timeout: 5000
+
+# Step 19: Look for visitor mode button or link
+# This may appear as "Continue as Visitor", "Visitor", or "Guest"
+- assertVisible:
+    text: "Visitor|Guest|Continue as"
+
+# Step 20: Tap on visitor mode option
+- tapOn:
+    text: "Visitor|Guest|Continue as"
+- waitForAnimationToEnd:
+    timeout: 5000
+
+# Step 21: Verify webview closes after visitor selection
+# The webview should close and return to main app
+
+# Step 22: Wait for data refresh to complete
+# After selecting visitor mode, app should fetch data
+- waitForAnimationToEnd:
+    timeout: 20000
+
+# Step 23: Verify app navigates to beer list
+# After successful visitor mode setup, app should show beer list
+- assertVisible:
+    text: "All Beer|Home"
+
+# ========================================
+# Test 6: Verify Visitor Mode Limitations
+# ========================================
+
+# Step 24: Verify All Beer tab is accessible
+- tapOn: "All Beer"
+- waitForAnimationToEnd
+
+# Step 25: Verify beer list loads in visitor mode
+- assertVisible:
+    id: "beer-list"
+
+# Step 26: Verify Beerfinder tab is hidden in visitor mode
+# In visitor mode, Beerfinder should not be visible
+- assertNotVisible:
+    text: "Beerfinder"
+
+# Step 27: Verify Tasted Brews tab is hidden in visitor mode
+- assertNotVisible:
+    text: "Tasted Brews"
+
+# Step 28: Verify Home tab is still accessible
+- tapOn: "Home"
+- waitForAnimationToEnd
+
+# ========================================
+# Test 7: Access Settings from Visitor Mode
+# ========================================
+
+# Step 29: Navigate to settings from home
+- scroll:
+    direction: DOWN
+- tapOn: "Settings"
+- waitForAnimationToEnd
+
+# Step 30: Verify settings screen is accessible
+- assertVisible:
+    text: "Settings"
+
+# Step 31: Verify back button NOW exists (not first launch anymore)
+- assertVisible:
+    text: "×"
+
+# Step 32: Verify Welcome section is no longer displayed
+# After initial configuration, welcome section should be hidden
+- assertNotVisible:
+    id: "welcome-section"
+
+# Step 33: Verify Data Management section is visible
+- scroll:
+    direction: DOWN
+- assertVisible:
+    id: "data-management-section"
+
+# Step 34: Verify "Login to Flying Saucer" button exists
+# User can upgrade from visitor to full member
+- assertVisible:
+    text: "Login to Flying Saucer"
+
+# ========================================
+# Test 8: Test Upgrade from Visitor to Member
+# ========================================
+
+# Step 35: Tap "Login to Flying Saucer" to upgrade account
+- tapOn:
+    text: "Login to Flying Saucer"
+- waitForAnimationToEnd:
+    timeout: 5000
+
+# Step 36: Verify login webview appears
+- assertVisible:
+    id: "login-webview-modal"
+
+# Step 37: Close webview without logging in (for this test)
+- tapOn:
+    id: "close-webview-button"
+- waitForAnimationToEnd
+
+# Step 38: Verify we're back on settings
+- assertVisible:
+    text: "Settings"
+
+# ========================================
+# Test 9: Test Data Refresh in Visitor Mode
+# ========================================
+
+# Step 39: Scroll to refresh button
+- scroll:
+    direction: DOWN
+
+# Step 40: Tap "Refresh All Beer Data"
+- tapOn:
+    text: "Refresh All Beer Data"
+
+# Step 41: Verify loading state appears
+- assertVisible:
+    text: "Refreshing data..."
+
+# Step 42: Wait for refresh to complete
+- waitForAnimationToEnd:
+    timeout: 20000
+
+# Step 43: Verify refresh completed
+- assertVisible:
+    text: "Refresh All Beer Data"
+
+# ========================================
+# Test 10: Navigate Back to Beer List
+# ========================================
+
+# Step 44: Tap back button
+- scroll:
+    direction: UP
+- tapOn:
+    text: "×"
+- waitForAnimationToEnd
+
+# Step 45: Verify we're on home screen
+- assertVisible:
+    text: "Home"
+
+# Step 46: Navigate to All Beer tab
+- tapOn: "All Beer"
+- waitForAnimationToEnd
+
+# Step 47: Verify beer data is visible
+- assertVisible:
+    id: "beer-list"
+- assertVisible:
+    id: "beer-count"
+
+# ========================================
+# Test 11: Test "Go to Home Screen" Button
+# ========================================
+
+# Step 48: Navigate back to settings
+- tapOn: "Home"
+- scroll:
+    direction: DOWN
+- tapOn: "Settings"
+- waitForAnimationToEnd
+
+# Step 49: Close settings and navigate away
+- tapOn:
+    text: "×"
+- waitForAnimationToEnd
+
+# Step 50: Simulate scenario where back navigation is not available
+# Navigate to settings via URL param (if supported)
+# For now, just verify "Go to Home Screen" button exists
+
+# Step 51: Navigate back to settings
+- scroll:
+    direction: DOWN
+- tapOn: "Settings"
+- waitForAnimationToEnd
+
+# Step 52: Scroll to check for "Go to Home Screen" button
+- scroll:
+    direction: DOWN
+
+# Step 53: If "Go to Home Screen" button visible, test it
+- optional: true
+  commands:
+    - tapOn:
+        text: "Go to Home Screen"
+    - waitForAnimationToEnd
+    - assertVisible:
+        text: "All Beer|Home"
+
+# ========================================
+# Test 12: Verify First Launch Complete
+# ========================================
+
+# Step 54: Verify app is fully functional after first launch
+- tapOn: "All Beer"
+- waitForAnimationToEnd
+
+# Step 55: Verify search functionality works
+- tapOn:
+    id: "search-input"
+- inputText: "IPA"
+- waitForAnimationToEnd
+
+# Step 56: Clear search
+- tapOn:
+    id: "clear-search-button"
+- waitForAnimationToEnd
+
+# Step 57: Verify pull-to-refresh works
+- swipe:
+    direction: DOWN
+    from:
+      id: "beer-list"
+    duration: 800
+- waitForAnimationToEnd:
+    timeout: 20000
+
+# Step 58: Verify app is stable and responsive
+- assertVisible:
+    id: "beer-list"
+- assertVisible:
+    id: "beer-count"
+
+# Test Complete
+# ==============
+# This test verifies:
+# ✓ App redirects to settings on first launch
+# ✓ Welcome section displays with instructions
+# ✓ Login webview opens from welcome section
+# ✓ Visitor mode can be selected from login page
+# ✓ App loads beer data in visitor mode
+# ✓ Beerfinder and Tasted Brews tabs are hidden in visitor mode
+# ✓ Settings screen is accessible in visitor mode
+# ✓ Welcome section disappears after initial setup
+# ✓ Back button appears after first launch complete
+# ✓ User can upgrade from visitor to member mode
+# ✓ Data refresh works in visitor mode
+# ✓ "Go to Home Screen" navigation works
+# ✓ App is fully functional after first launch setup
