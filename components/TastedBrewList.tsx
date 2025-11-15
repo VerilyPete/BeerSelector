@@ -14,7 +14,7 @@ import { useAppContext } from '@/context/AppContext';
 
 export const TastedBrewList = () => {
   // MP-4 Step 2: Use context for beer data instead of local state
-  const { beers, loading, errors } = useAppContext();
+  const { beers, loading, errors, setTastedBeers, setAllBeers, setRewards } = useAppContext();
 
   /**
    * MP-3 Bottleneck #4: Local search state for immediate UI updates
@@ -41,10 +41,24 @@ export const TastedBrewList = () => {
   const activeButtonColor = useThemeColor({}, 'tint');
 
   // Use the shared data refresh hook
-  // Note: Data loading now happens in _layout.tsx via AppContext
+  // Reload data from database into AppContext after refresh completes
   const { refreshing, handleRefresh } = useDataRefresh({
     onDataReloaded: async () => {
-      // Data refresh is handled by _layout.tsx, no need to update local state
+      // Reload all data from database into AppContext
+      const { beerRepository } = await import('@/src/database/repositories/BeerRepository');
+      const { myBeersRepository } = await import('@/src/database/repositories/MyBeersRepository');
+      const { rewardsRepository } = await import('@/src/database/repositories/RewardsRepository');
+
+      const [allBeersData, tastedBeersData, rewardsData] = await Promise.all([
+        beerRepository.getAll(),
+        myBeersRepository.getAll(),
+        rewardsRepository.getAll(),
+      ]);
+
+      setAllBeers(allBeersData);
+      setTastedBeers(tastedBeersData);
+      setRewards(rewardsData);
+      console.log(`[TastedBrewList] Reloaded: ${tastedBeersData.length} tasted beers`);
     },
     componentName: 'TastedBrewList',
   });
