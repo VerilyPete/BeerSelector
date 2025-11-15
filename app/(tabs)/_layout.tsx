@@ -1,5 +1,5 @@
-import { Tabs, useFocusEffect } from 'expo-router';
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { Tabs } from 'expo-router';
+import React, { useEffect } from 'react';
 import { Platform } from 'react-native';
 
 import { HapticTab } from '@/components/HapticTab';
@@ -7,47 +7,14 @@ import { IconSymbol } from '@/components/ui/IconSymbol';
 import TabBarBackground from '@/components/ui/TabBarBackground';
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
-import { isVisitorMode } from '@/src/api/authService';
+import { useAppContext } from '@/context/AppContext';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
-  const [isInVisitorMode, setIsInVisitorMode] = useState(false);
-  
-  // Function to check visitor mode
-  const checkVisitorMode = useCallback(async () => {
-    try {
-      // Only log in development
-      if (__DEV__) {
-        console.log('TabLayout checking visitor mode...');
-      }
-      const visitorMode = await isVisitorMode(true); // Force refresh to ensure we have latest status
-      console.log('Visitor mode status:', visitorMode);
-      setIsInVisitorMode(visitorMode);
-    } catch (error) {
-      console.error('Error checking visitor mode:', error);
-      setIsInVisitorMode(false);
-    }
-  }, []);
-  
-  // Check visitor mode on component mount
-  useEffect(() => {
-    checkVisitorMode();
-  }, [checkVisitorMode]);
-  
-  // Only recheck on focus if we've been away for a while (helps reduce frequent checks)
-  const lastCheckTime = useRef(Date.now());
-  
-  useFocusEffect(
-    useCallback(() => {
-      // Always check visitor mode status when tabs gain focus
-      if (__DEV__) {
-        console.log('Tab layout focused, rechecking visitor mode');
-      }
-      checkVisitorMode();
-      lastCheckTime.current = Date.now();
-      return () => {};
-    }, [checkVisitorMode])
-  );
+  const { session } = useAppContext();
+
+  // Use session.isVisitor from context (single source of truth)
+  const isInVisitorMode = session.isVisitor;
 
   // For debugging purposes
   useEffect(() => {

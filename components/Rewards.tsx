@@ -8,7 +8,7 @@ import { useThemeColor } from '@/hooks/useThemeColor';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getSessionData } from '@/src/api/sessionManager';
 import Constants from 'expo-constants';
-import { isVisitorMode } from '@/src/api/authService';
+import { useAppContext } from '@/context/AppContext';
 
 type Reward = {
   reward_id: string;
@@ -17,12 +17,11 @@ type Reward = {
 };
 
 export const Rewards = () => {
-  const [rewards, setRewards] = useState<Reward[]>([]);
-  const [loading, setLoading] = useState(true);
+  // MP-4 Step 2: Use context for rewards data instead of local state
+  const { session, beers, loading, errors } = useAppContext();
+
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [queueingRewards, setQueueingRewards] = useState<Record<string, boolean>>({});
-  const [isVisitor, setIsVisitor] = useState(false);
 
   const cardColor = useThemeColor({}, 'background');
   const borderColor = useThemeColor({ light: '#e0e0e0', dark: '#333' }, 'text');
@@ -30,70 +29,27 @@ export const Rewards = () => {
   const buttonColor = useThemeColor({ light: '#4caf50', dark: '#4caf50' }, 'text');
   const buttonTextColor = useThemeColor({ light: '#FFFFFF', dark: '#FFFFFF' }, 'text');
 
-  const checkVisitorMode = useCallback(async () => {
-    try {
-      const visitorMode = await isVisitorMode(true);
-      setIsVisitor(visitorMode);
-      return visitorMode;
-    } catch (err) {
-      console.error('Error checking visitor mode:', err);
-      return false;
-    }
-  }, []);
-
-  const loadRewards = async () => {
-    try {
-      setLoading(true);
-
-      // First check if user is in visitor mode
-      const visitorMode = await checkVisitorMode();
-
-      if (visitorMode) {
-        // In visitor mode, don't fetch rewards
-        setRewards([]);
-        setError(null);
-      } else {
-        // Normal mode, load rewards using repository
-        const data = await rewardsRepository.getAll();
-        setRewards(data);
-        setError(null);
-      }
-    } catch (err) {
-      console.error('Failed to load rewards:', err);
-      setError('Failed to load rewards. Please try again later.');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
-
-  useEffect(() => {
-    loadRewards();
-  }, []);
+  // Note: Data loading now happens in _layout.tsx via AppContext
+  // No need for loadRewards function or useEffect
 
   const handleRefresh = useCallback(async () => {
     try {
       setRefreshing(true);
 
-      // Check visitor mode first
-      const visitorMode = await checkVisitorMode();
-
-      if (!visitorMode) {
+      if (!session.isVisitor) {
         // Only refresh rewards if not in visitor mode
         // Fetch fresh rewards from API and insert using repository
         const freshRewards = await fetchRewardsFromAPI();
         await rewardsRepository.insertMany(freshRewards);
       }
 
-      // Reload rewards (will handle visitor mode internally)
-      loadRewards();
+      // Data refresh is handled by _layout.tsx via AppContext
     } catch (error) {
       console.error('Error refreshing rewards:', error);
-      setError('Failed to refresh rewards. Please try again later.');
     } finally {
       setRefreshing(false);
     }
-  }, [checkVisitorMode]);
+  }, [session.isVisitor]);
 
   const queueReward = async (rewardId: string, rewardType: string) => {
     try {
@@ -229,7 +185,7 @@ export const Rewards = () => {
     );
   };
 
-  if (loading && !refreshing) {
+  if (loading.isLoadingRewards && !refreshing) {
     return (
       <ThemedView style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={textColor} />
@@ -237,10 +193,10 @@ export const Rewards = () => {
     );
   }
 
-  if (error) {
+  if (errors.rewardsError) {
     return (
       <ThemedView style={styles.errorContainer}>
-        <ThemedText style={styles.errorText}>{error}</ThemedText>
+        <ThemedText style={styles.errorText}>{errors.rewardsError}</ThemedText>
       </ThemedView>
     );
   }
@@ -248,7 +204,7 @@ export const Rewards = () => {
   return (
     <ThemedView style={styles.container}>
       <FlatList
-        data={rewards}
+        data={beers.rewards}
         renderItem={renderRewardItem}
         keyExtractor={(item) => item.reward_id}
         contentContainerStyle={[
@@ -257,7 +213,7 @@ export const Rewards = () => {
         ]}
         ListEmptyComponent={
           <ThemedView style={styles.emptyContainer}>
-            {isVisitor ? (
+            {session.isVisitor ? (
               <ThemedText style={styles.emptyText}>
                 Rewards are not available in visitor mode.
                 Please log in to view your rewards.

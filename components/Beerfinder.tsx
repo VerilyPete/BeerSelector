@@ -1,8 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { StyleSheet, View, TouchableOpacity, Alert, ActivityIndicator, Modal, FlatList } from 'react-native';
-import { beerRepository } from '@/src/database/repositories/BeerRepository';
-import { myBeersRepository } from '@/src/database/repositories/MyBeersRepository';
-import { fetchMyBeersFromAPI } from '@/src/api/beerApi';
 import { ThemedText } from './ThemedText';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { useColorScheme } from '@/hooks/useColorScheme';
@@ -19,13 +16,14 @@ import { QueuedBeer } from '@/src/utils/htmlParser';
 import { getQueuedBeers, deleteQueuedBeer as deleteQueuedBeerApi } from '@/src/api/queueService';
 import { Beer } from '@/src/types/beer';
 import { useDebounce } from '@/hooks/useDebounce';
+import { useAppContext } from '@/context/AppContext';
 
 
 export const Beerfinder = () => {
+  // MP-4 Step 2: Use context for beer data instead of local state
+  const { beers, loading, errors } = useAppContext();
+
   const colorScheme = useColorScheme();
-  const [availableBeers, setAvailableBeers] = useState<Beer[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [checkinLoading, setCheckinLoading] = useState(false);
   const [queueModalVisible, setQueueModalVisible] = useState(false);
   const [queuedBeers, setQueuedBeers] = useState<QueuedBeer[]>([]);
@@ -42,7 +40,13 @@ export const Beerfinder = () => {
   const [localSearchText, setLocalSearchText] = useState('');
   const debouncedSearchText = useDebounce(localSearchText, 300);
 
-  // Use the shared filtering hook
+  // Use the shared filtering hook with untasted beers from context
+  // Note: We need to compute untasted beers locally until context provides this
+  const untastedBeers = beers.allBeers.filter(beer => {
+    const tastedIds = new Set(beers.tastedBeers.map(b => b.id));
+    return !tastedIds.has(beer.id);
+  });
+
   const {
     filteredBeers,
     filters,
@@ -53,51 +57,21 @@ export const Beerfinder = () => {
     toggleFilter,
     toggleSort,
     toggleExpand,
-  } = useBeerFilters(availableBeers);
+  } = useBeerFilters(untastedBeers);
 
   // Theme colors
   const activeButtonColor = useThemeColor({}, 'tint');
   const cardColor = useThemeColor({}, 'background');
   const borderColor = useThemeColor({ light: '#e0e0e0', dark: '#333' }, 'text');
 
-  const loadBeers = async () => {
-    try {
-      setLoading(true);
-
-      // Try to fetch My Beers data if it hasn't been loaded yet
-      try {
-        const freshMyBeers = await fetchMyBeersFromAPI();
-        await myBeersRepository.insertMany(freshMyBeers);
-      } catch (err) {
-        console.log('Failed to fetch My Beers data, continuing with local data:', err);
-      }
-
-      const data = await beerRepository.getUntasted();
-      const filteredData = data.filter(beer => beer.brew_name && beer.brew_name.trim() !== '');
-      setAvailableBeers(filteredData);
-      setError(null);
-    } catch (err) {
-      console.error('Failed to load beers:', err);
-      setError('Failed to load beers. Please check your internet connection and try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   // Use the shared data refresh hook
+  // Note: Data loading now happens in _layout.tsx via AppContext
   const { refreshing, handleRefresh } = useDataRefresh({
     onDataReloaded: async () => {
-      const freshBeers = await beerRepository.getUntasted();
-      const filteredData = freshBeers.filter(beer => beer.brew_name && beer.brew_name.trim() !== '');
-      setAvailableBeers(filteredData);
-      setError(null);
+      // Data refresh is handled by _layout.tsx, no need to update local state
     },
     componentName: 'Beerfinder',
   });
-
-  useEffect(() => {
-    loadBeers();
-  }, []);
 
   // Sync debounced search text with hook's search state
   useEffect(() => {
@@ -357,7 +331,7 @@ export const Beerfinder = () => {
   return (
     <View style={styles.container}>
       {/* Show skeleton during initial load (when loading=true and no beers yet) */}
-      {loading && availableBeers.length === 0 ? (
+      {loading.isLoadingBeers && beers.allBeers.length === 0 ? (
         <>
           {/* MP-3 Step 3b: Show action buttons even during loading */}
           <View style={styles.filtersContainer}>
@@ -397,12 +371,12 @@ export const Beerfinder = () => {
           </View>
           <SkeletonLoader count={20} />
         </>
-      ) : error ? (
+      ) : errors.beerError ? (
         <View style={styles.centered}>
-          <ThemedText style={styles.errorText}>{error}</ThemedText>
+          <ThemedText style={styles.errorText}>{errors.beerError}</ThemedText>
           <TouchableOpacity
             style={[styles.refreshButton, { backgroundColor: activeButtonColor }]}
-            onPress={loadBeers}
+            onPress={handleRefresh}
           >
             <ThemedText style={[styles.buttonText, { color: 'white' }]}>
               Try Again
@@ -468,7 +442,7 @@ export const Beerfinder = () => {
 
           <BeerList
             beers={filteredBeers}
-            loading={loading}
+            loading={loading.isLoadingBeers}
             refreshing={refreshing}
             onRefresh={handleRefresh}
             emptyMessage="No beer found"
