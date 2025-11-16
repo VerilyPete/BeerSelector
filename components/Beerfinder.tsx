@@ -5,7 +5,6 @@ import { useThemeColor } from '@/hooks/useThemeColor';
 import { useUntappdColor } from '@/hooks/useUntappdColor';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { SearchBar } from './SearchBar';
-import { checkInBeer } from '@/src/api/beerService';
 import { router } from 'expo-router';
 import { UntappdWebView } from './UntappdWebView';
 import { useBeerFilters } from '@/hooks/useBeerFilters';
@@ -18,6 +17,7 @@ import { getQueuedBeers, deleteQueuedBeer as deleteQueuedBeerApi } from '@/src/a
 import { Beer } from '@/src/types/beer';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useAppContext } from '@/context/AppContext';
+import { useQueuedCheckIn } from '@/hooks/useQueuedCheckIn';
 
 
 export const Beerfinder = () => {
@@ -25,7 +25,7 @@ export const Beerfinder = () => {
   const { beers, loading, errors } = useAppContext();
 
   const colorScheme = useColorScheme();
-  const [checkinLoading, setCheckinLoading] = useState(false);
+  const { queuedCheckIn, isLoading: checkinLoading } = useQueuedCheckIn();
   const [queueModalVisible, setQueueModalVisible] = useState(false);
   const [queuedBeers, setQueuedBeers] = useState<QueuedBeer[]>([]);
   const [loadingQueues, setLoadingQueues] = useState(false);
@@ -82,39 +82,11 @@ export const Beerfinder = () => {
 
   /**
    * MP-3 Bottleneck #5: Memoized event handlers for stable references
+   * MP-7 Step 2: Use queued check-in with offline support
    */
   const handleCheckIn = useCallback(async (item: Beer) => {
-    try {
-      setCheckinLoading(true);
-      const result = await checkInBeer(item);
-
-      console.log('Check-in result:', result);
-
-      if (result.success) {
-        Alert.alert('Success', `Successfully checked in ${item.brew_name}!`);
-      } else {
-        Alert.alert('Check-In Failed', result.error || 'Unable to check in beer. Please try again.');
-      }
-    } catch (error: unknown) {
-      console.error('Check-in error:', error);
-
-      let errorMessage;
-
-      if (error instanceof Error && error.message && error.message.includes('Please log in again')) {
-        errorMessage = 'Login session expired. Attempting to recover your session...';
-      } else if (error instanceof SyntaxError && error.message.includes('JSON Parse error')) {
-        Alert.alert('Success', `Successfully checked in ${item.brew_name}!`);
-        setCheckinLoading(false);
-        return;
-      } else {
-        errorMessage = `Failed to check in: ${error instanceof Error ? error.message : 'Unknown error'}`;
-      }
-
-      Alert.alert('Error', errorMessage);
-    } finally {
-      setCheckinLoading(false);
-    }
-  }, []);
+    await queuedCheckIn(item);
+  }, [queuedCheckIn]);
 
   const viewQueues = useCallback(async () => {
     try {
