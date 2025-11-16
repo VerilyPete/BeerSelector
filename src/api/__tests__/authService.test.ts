@@ -16,9 +16,10 @@ jest.mock('../apiClientInstance', () => ({
 }));
 
 // Mock database functions
-jest.mock('../../database/db', () => ({
+jest.mock('../../database/preferences', () => ({
   getPreference: jest.fn().mockResolvedValue(null),
   setPreference: jest.fn().mockResolvedValue(undefined),
+  areApiUrlsConfigured: jest.fn().mockResolvedValue(true),
 }));
 
 // Mock dataUpdateService functions

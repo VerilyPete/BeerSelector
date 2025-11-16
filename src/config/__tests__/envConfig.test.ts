@@ -21,6 +21,14 @@ describe('Environment Variable Configuration', () => {
   beforeEach(() => {
     // Reset modules to get fresh config instance
     jest.resetModules();
+
+    // Clear all EXPO_PUBLIC_* environment variables to prevent .env.development from interfering
+    Object.keys(process.env).forEach(key => {
+      if (key.startsWith('EXPO_PUBLIC_')) {
+        delete process.env[key];
+      }
+    });
+
     // Clone process.env for each test
     process.env = { ...originalEnv };
   });
