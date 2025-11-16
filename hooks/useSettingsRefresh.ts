@@ -17,8 +17,9 @@ export interface UseSettingsRefreshReturn {
    * Refresh all beer data from APIs
    * Shows appropriate success/error alerts based on result
    * Specifically designed for settings screen (no data reload callback)
+   * @param silent - If true, suppresses success alerts (errors still shown)
    */
-  handleRefresh: () => Promise<void>;
+  handleRefresh: (silent?: boolean) => Promise<void>;
 }
 
 /**
@@ -71,8 +72,9 @@ export const useSettingsRefresh = (): UseSettingsRefreshReturn => {
   /**
    * Handle refreshing all data from APIs
    * Shows user-friendly alerts based on success/error states
+   * @param silent - If true, suppresses success alerts (errors still shown)
    */
-  const handleRefresh = useCallback(async () => {
+  const handleRefresh = useCallback(async (silent: boolean = false) => {
     try {
       setRefreshing(true);
 
@@ -114,25 +116,34 @@ export const useSettingsRefresh = (): UseSettingsRefreshReturn => {
       }
       // If no errors but data was updated
       else if (result.allBeersResult.dataUpdated || result.myBeersResult.dataUpdated) {
-        // Show success message with counts
-        const allBeersCount = result.allBeersResult.itemCount || 0;
-        const myBeersCount = result.myBeersResult.itemCount || 0;
+        // Only show success alert if not in silent mode
+        if (!silent) {
+          // Show success message with counts
+          const allBeersCount = result.allBeersResult.itemCount || 0;
+          const tastedBeersCount = result.myBeersResult.itemCount || 0;
 
-        // Check if user is in visitor mode to customize message
-        const isVisitor = await getPreference('is_visitor_mode') === 'true';
+          // Check if user is in visitor mode to customize message
+          const isVisitor = await getPreference('is_visitor_mode') === 'true';
 
-        let successMessage = `Beer data refreshed successfully!\n\nAll Beer: ${allBeersCount} beers\n`;
+          let successMessage = `Beer data refreshed successfully!\n\nAll Beers: ${allBeersCount} beers\n`;
 
-        if (!isVisitor) {
-          successMessage += `Beerfinder: ${myBeersCount} beers`;
-        } else {
-          successMessage += 'Visitor mode: Personal data not available';
+          if (!isVisitor) {
+            // Beerfinder = beers available to check-in (All Beers - Tasted Beers)
+            // Optimized: Use counts from refresh result instead of redundant database queries
+            // This is mathematically correct because Beerfinder = All Beers - Tasted Beers
+            const beerfinderCount = allBeersCount - tastedBeersCount;
+
+            successMessage += `Tasted Beers: ${tastedBeersCount} beers\n`;
+            successMessage += `Beerfinder (available): ${beerfinderCount} beers`;
+          } else {
+            successMessage += 'Visitor mode: Personal data not available';
+          }
+
+          Alert.alert('Success', successMessage);
         }
-
-        Alert.alert('Success', successMessage);
       }
       // If no errors and no data was updated
-      else {
+      else if (!silent) {
         Alert.alert('Info', 'No new data available.');
       }
     } catch (err) {

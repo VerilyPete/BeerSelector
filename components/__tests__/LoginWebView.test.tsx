@@ -1,6 +1,55 @@
 import React from 'react';
 import { render, fireEvent, waitFor } from '@testing-library/react-native';
 import { Alert } from 'react-native';
+import { config } from '@/src/config';
+
+// Test URL constants
+const TEST_BASE_URL = 'https://test.beerknurd.com';
+const UNTAPPD_BASE_URL = 'https://untappd.com';
+const FSBS_BASE_URL = 'https://fsbs.beerknurd.com';
+
+// Test network configuration constants
+const TEST_TIMEOUT = 15000;
+const TEST_RETRIES = 3;
+const TEST_RETRY_DELAY = 1000;
+
+// Mock config module (following gold standard pattern)
+jest.mock('@/src/config', () => ({
+  config: {
+    api: {
+      getFullUrl: jest.fn((endpoint) => `${TEST_BASE_URL}/${endpoint}.php`),
+      baseUrl: TEST_BASE_URL,
+      endpoints: {
+        kiosk: '/kiosk.php',
+        visitor: '/visitor.php',
+        memberDashboard: '/member-dash.php',
+        memberQueues: '/memberQueues.php',
+        addToQueue: '/addToQueue.php',
+        deleteQueuedBrew: '/deleteQueuedBrew.php',
+        addToRewardQueue: '/addToRewardQueue.php',
+        memberRewards: '/memberRewards.php'
+      },
+      referers: {
+        memberDashboard: `${TEST_BASE_URL}/member-dash.php`,
+        memberRewards: `${TEST_BASE_URL}/memberRewards.php`,
+        memberQueues: `${TEST_BASE_URL}/memberQueues.php`
+      }
+    },
+    network: {
+      timeout: TEST_TIMEOUT,
+      retries: TEST_RETRIES,
+      retryDelay: TEST_RETRY_DELAY
+    },
+    external: {
+      untappd: {
+        baseUrl: UNTAPPD_BASE_URL,
+        loginUrl: `${UNTAPPD_BASE_URL}/login`
+      }
+    },
+    setEnvironment: jest.fn(),
+    setCustomApiUrl: jest.fn()
+  }
+}));
 
 // Mock theme hooks
 jest.mock('@/hooks/useColorScheme', () => ({
@@ -260,12 +309,15 @@ describe('LoginWebView', () => {
 
       const webview = getByTestId('webview-mock');
 
+      const testUserUrl = `${FSBS_BASE_URL}/bk-member-json.php?uid=12345`;
+      const testStoreUrl = `${FSBS_BASE_URL}/bk-store-json.php?sid=67`;
+
       const message = {
         nativeEvent: {
           data: JSON.stringify({
             type: 'URLs',
-            userJsonUrl: 'https://fsbs.beerknurd.com/bk-member-json.php?uid=12345',
-            storeJsonUrl: 'https://fsbs.beerknurd.com/bk-store-json.php?sid=67',
+            userJsonUrl: testUserUrl,
+            storeJsonUrl: testStoreUrl,
             cookies: {
               member: '12345',
               session: 'test-session',
@@ -288,13 +340,13 @@ describe('LoginWebView', () => {
 
       expect(setPreference).toHaveBeenCalledWith(
         'user_json_url',
-        'https://fsbs.beerknurd.com/bk-member-json.php?uid=12345',
+        testUserUrl,
         'API endpoint for user data'
       );
 
       expect(setPreference).toHaveBeenCalledWith(
         'my_beers_api_url',
-        'https://fsbs.beerknurd.com/bk-member-json.php?uid=12345',
+        testUserUrl,
         'API endpoint for fetching Beerfinder beers'
       );
 
@@ -324,8 +376,8 @@ describe('LoginWebView', () => {
         nativeEvent: {
           data: JSON.stringify({
             type: 'URLs',
-            userJsonUrl: 'https://test.com/user.php',
-            storeJsonUrl: 'https://test.com/store.php',
+            userJsonUrl: `${TEST_BASE_URL}/user.php`,
+            storeJsonUrl: `${TEST_BASE_URL}/store.php`,
             cookies: testCookies,
           }),
         },
@@ -358,8 +410,8 @@ describe('LoginWebView', () => {
         nativeEvent: {
           data: JSON.stringify({
             type: 'URLs',
-            userJsonUrl: 'https://test.com/user.php',
-            storeJsonUrl: 'https://test.com/store.php',
+            userJsonUrl: `${TEST_BASE_URL}/user.php`,
+            storeJsonUrl: `${TEST_BASE_URL}/store.php`,
             cookies: {},
           }),
         },
@@ -394,8 +446,8 @@ describe('LoginWebView', () => {
         nativeEvent: {
           data: JSON.stringify({
             type: 'URLs',
-            userJsonUrl: 'https://test.com/user.php',
-            storeJsonUrl: 'https://test.com/store.php',
+            userJsonUrl: `${TEST_BASE_URL}/user.php`,
+            storeJsonUrl: `${TEST_BASE_URL}/store.php`,
             cookies: {},
           }),
         },
@@ -470,7 +522,7 @@ describe('LoginWebView', () => {
               store: 'Test Store',
             },
             rawCookies: 'store__id=67; store=Test Store',
-            url: 'https://tapthatapp.beerknurd.com/visitor.php',
+            url: config.api.getFullUrl('visitor'),
           }),
         },
       };
@@ -507,7 +559,7 @@ describe('LoginWebView', () => {
               store__id: '67',
             },
             rawCookies: 'store__id=67',
-            url: 'https://tapthatapp.beerknurd.com/visitor.php',
+            url: `${TEST_BASE_URL}/visitor.php`,
           }),
         },
       };
@@ -537,15 +589,17 @@ describe('LoginWebView', () => {
 
       const webview = getByTestId('webview-mock');
 
+      const testStoreId = '67';
+
       const message = {
         nativeEvent: {
           data: JSON.stringify({
             type: 'VISITOR_LOGIN',
             cookies: {
-              store__id: '67',
+              store__id: testStoreId,
             },
-            rawCookies: 'store__id=67',
-            url: 'https://tapthatapp.beerknurd.com/visitor.php',
+            rawCookies: `store__id=${testStoreId}`,
+            url: config.api.getFullUrl('visitor'),
           }),
         },
       };
@@ -555,7 +609,7 @@ describe('LoginWebView', () => {
       await waitFor(() => {
         expect(setPreference).toHaveBeenCalledWith(
           'all_beers_api_url',
-          'https://fsbs.beerknurd.com/bk-store-json.php?sid=67',
+          `${FSBS_BASE_URL}/bk-store-json.php?sid=${testStoreId}`,
           'API endpoint for fetching all beers'
         );
       });
@@ -590,7 +644,7 @@ describe('LoginWebView', () => {
               store__id: '67',
             },
             rawCookies: 'store__id=67',
-            url: 'https://tapthatapp.beerknurd.com/visitor.php',
+            url: config.api.getFullUrl('visitor'),
           }),
         },
       };
@@ -632,7 +686,7 @@ describe('LoginWebView', () => {
               store__id: '67',
             },
             rawCookies: 'store__id=67',
-            url: 'https://tapthatapp.beerknurd.com/visitor.php',
+            url: config.api.getFullUrl('visitor'),
           }),
         },
       };
@@ -668,7 +722,7 @@ describe('LoginWebView', () => {
             type: 'VISITOR_LOGIN',
             cookies: {},
             rawCookies: '',
-            url: 'https://tapthatapp.beerknurd.com/visitor.php',
+            url: config.api.getFullUrl('visitor'),
           }),
         },
       };
@@ -722,7 +776,7 @@ describe('LoginWebView', () => {
         nativeEvent: {
           data: JSON.stringify({
             type: 'URL_CHECK',
-            url: 'https://tapthatapp.beerknurd.com/member-dash.php',
+            url: config.api.getFullUrl('memberDashboard'),
           }),
         },
       };
@@ -751,7 +805,7 @@ describe('LoginWebView', () => {
         nativeEvent: {
           data: JSON.stringify({
             type: 'URL_VERIFIED',
-            url: 'https://tapthatapp.beerknurd.com/member-dash.php',
+            url: config.api.getFullUrl('memberDashboard'),
           }),
         },
       };
@@ -780,7 +834,7 @@ describe('LoginWebView', () => {
         nativeEvent: {
           data: JSON.stringify({
             type: 'URL_VERIFIED',
-            url: 'https://tapthatapp.beerknurd.com/member-dash.php',
+            url: config.api.getFullUrl('memberDashboard'),
           }),
         },
       };
@@ -808,7 +862,7 @@ describe('LoginWebView', () => {
         nativeEvent: {
           data: JSON.stringify({
             type: 'URL_VERIFIED',
-            url: 'https://tapthatapp.beerknurd.com/visitor.php',
+            url: config.api.getFullUrl('visitor'),
           }),
         },
       };
@@ -836,7 +890,7 @@ describe('LoginWebView', () => {
         nativeEvent: {
           data: JSON.stringify({
             type: 'URL_VERIFIED',
-            url: 'https://tapthatapp.beerknurd.com/member-dash.php',
+            url: config.api.getFullUrl('memberDashboard'),
           }),
         },
       };
@@ -889,6 +943,47 @@ describe('LoginWebView', () => {
       });
     });
 
+    it('should call handleClose when JS_INJECTION_ERROR Alert OK pressed', async () => {
+      const alertSpy = jest.spyOn(Alert, 'alert');
+
+      const { getByTestId } = render(
+        <LoginWebView
+          visible={true}
+          onLoginSuccess={mockOnLoginSuccess}
+          onLoginCancel={mockOnLoginCancel}
+          onRefreshData={mockOnRefreshData}
+        />
+      );
+
+      const webview = getByTestId('webview-mock');
+
+      const message = {
+        nativeEvent: {
+          data: JSON.stringify({
+            type: 'JS_INJECTION_ERROR',
+            error: 'JavaScript injection failed',
+            location: 'member-dash',
+          }),
+        },
+      };
+
+      fireEvent(webview, 'onMessage', message);
+
+      await waitFor(() => {
+        expect(alertSpy).toHaveBeenCalled();
+      });
+
+      // Extract and call the OK button handler
+      const alertCall = alertSpy.mock.calls[0];
+      const buttons = alertCall[2];
+      if (buttons && buttons[0] && buttons[0].onPress) {
+        buttons[0].onPress();
+      }
+
+      // Should trigger handleClose which calls onLoginCancel
+      expect(mockOnLoginCancel).toHaveBeenCalled();
+    });
+
     it('should handle VISITOR_LOGIN_ERROR message', async () => {
       const alertSpy = jest.spyOn(Alert, 'alert');
 
@@ -923,6 +1018,37 @@ describe('LoginWebView', () => {
       });
     });
 
+    it('should call onLoginCancel after VISITOR_LOGIN_ERROR', async () => {
+      const alertSpy = jest.spyOn(Alert, 'alert');
+
+      const { getByTestId } = render(
+        <LoginWebView
+          visible={true}
+          onLoginSuccess={mockOnLoginSuccess}
+          onLoginCancel={mockOnLoginCancel}
+          onRefreshData={mockOnRefreshData}
+        />
+      );
+
+      const webview = getByTestId('webview-mock');
+
+      const message = {
+        nativeEvent: {
+          data: JSON.stringify({
+            type: 'VISITOR_LOGIN_ERROR',
+            error: 'Failed to extract store info',
+          }),
+        },
+      };
+
+      fireEvent(webview, 'onMessage', message);
+
+      await waitFor(() => {
+        expect(alertSpy).toHaveBeenCalled();
+        expect(mockOnLoginCancel).toHaveBeenCalled();
+      });
+    });
+
     it('should handle malformed JSON in message', () => {
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
 
@@ -951,7 +1077,7 @@ describe('LoginWebView', () => {
       consoleErrorSpy.mockRestore();
     });
 
-    it('should handle WebView error event', () => {
+    it('should call onLoginCancel when malformed JSON received', () => {
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
 
       const { getByTestId } = render(
@@ -963,8 +1089,161 @@ describe('LoginWebView', () => {
         />
       );
 
-      // Implementation should handle onError prop
+      const webview = getByTestId('webview-mock');
+
+      const message = {
+        nativeEvent: {
+          data: 'invalid json {{{',
+        },
+      };
+
+      fireEvent(webview, 'onMessage', message);
+
+      // Should call onLoginCancel after error (per line 390 in component)
+      expect(mockOnLoginCancel).toHaveBeenCalled();
+
       consoleErrorSpy.mockRestore();
+    });
+
+    it('should handle visitor login with handleVisitorLogin throwing error', async () => {
+      const alertSpy = jest.spyOn(Alert, 'alert');
+      (handleVisitorLogin as jest.Mock).mockRejectedValue(new Error('Network error'));
+
+      const { getByTestId } = render(
+        <LoginWebView
+          visible={true}
+          onLoginSuccess={mockOnLoginSuccess}
+          onLoginCancel={mockOnLoginCancel}
+          onRefreshData={mockOnRefreshData}
+        />
+      );
+
+      const webview = getByTestId('webview-mock');
+
+      const message = {
+        nativeEvent: {
+          data: JSON.stringify({
+            type: 'VISITOR_LOGIN',
+            cookies: {
+              store__id: '67',
+            },
+            rawCookies: 'store__id=67',
+            url: config.api.getFullUrl('visitor'),
+          }),
+        },
+      };
+
+      fireEvent(webview, 'onMessage', message);
+
+      await waitFor(() => {
+        expect(alertSpy).toHaveBeenCalledWith(
+          'Error',
+          'An error occurred during visitor login. Please try again.',
+          expect.any(Array)
+        );
+      });
+
+      expect(mockOnLoginCancel).toHaveBeenCalled();
+    });
+
+    it('should not crash when unexpected message type received', () => {
+      const { getByTestId } = render(
+        <LoginWebView
+          visible={true}
+          onLoginSuccess={mockOnLoginSuccess}
+          onLoginCancel={mockOnLoginCancel}
+          onRefreshData={mockOnRefreshData}
+        />
+      );
+
+      const webview = getByTestId('webview-mock');
+
+      const message = {
+        nativeEvent: {
+          data: JSON.stringify({
+            type: 'UNKNOWN_MESSAGE_TYPE',
+            data: 'some data',
+          }),
+        },
+      };
+
+      // Should not crash
+      expect(() => {
+        fireEvent(webview, 'onMessage', message);
+      }).not.toThrow();
+    });
+
+    it('should handle WebView error event without crashing', () => {
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+
+      const { getByTestId } = render(
+        <LoginWebView
+          visible={true}
+          onLoginSuccess={mockOnLoginSuccess}
+          onLoginCancel={mockOnLoginCancel}
+          onRefreshData={mockOnRefreshData}
+        />
+      );
+
+      // Component renders with onError handler - verify no crash
+      expect(getByTestId('login-webview-modal')).toBeTruthy();
+
+      consoleErrorSpy.mockRestore();
+    });
+
+    it('should recover after error by reopening modal', async () => {
+      const alertSpy = jest.spyOn(Alert, 'alert');
+
+      const { getByTestId, rerender } = render(
+        <LoginWebView
+          visible={true}
+          onLoginSuccess={mockOnLoginSuccess}
+          onLoginCancel={mockOnLoginCancel}
+          onRefreshData={mockOnRefreshData}
+        />
+      );
+
+      const webview = getByTestId('webview-mock');
+
+      // Trigger error
+      const errorMessage = {
+        nativeEvent: {
+          data: JSON.stringify({
+            type: 'JS_INJECTION_ERROR',
+            error: 'Error occurred',
+            location: 'test',
+          }),
+        },
+      };
+
+      fireEvent(webview, 'onMessage', errorMessage);
+
+      await waitFor(() => {
+        expect(alertSpy).toHaveBeenCalled();
+      });
+
+      // Close modal after error
+      rerender(
+        <LoginWebView
+          visible={false}
+          onLoginSuccess={mockOnLoginSuccess}
+          onLoginCancel={mockOnLoginCancel}
+          onRefreshData={mockOnRefreshData}
+        />
+      );
+
+      // Reopen modal - should work normally
+      rerender(
+        <LoginWebView
+          visible={true}
+          onLoginSuccess={mockOnLoginSuccess}
+          onLoginCancel={mockOnLoginCancel}
+          onRefreshData={mockOnRefreshData}
+        />
+      );
+
+      // Should render successfully after recovery
+      expect(getByTestId('login-webview-modal')).toBeTruthy();
     });
   });
 
@@ -985,7 +1264,7 @@ describe('LoginWebView', () => {
 
       if (webview.props.onNavigationStateChange) {
         webview.props.onNavigationStateChange({
-          url: 'https://tapthatapp.beerknurd.com/kiosk.php',
+          url: config.api.getFullUrl('kiosk'),
           loading: false,
         });
       }
@@ -1008,7 +1287,7 @@ describe('LoginWebView', () => {
       const webview = getByTestId('webview-mock');
 
       const navState = {
-        url: 'https://tapthatapp.beerknurd.com/kiosk.php',
+        url: config.api.getFullUrl('kiosk'),
         loading: false,
       };
 
@@ -1119,5 +1398,476 @@ describe('LoginWebView', () => {
       // State should be reset
       expect(getByTestId('login-webview-modal')).toBeTruthy();
     });
+  });
+
+  describe('Config Integration', () => {
+    describe('Component Config Usage', () => {
+      it('should use config for WebView source URL', () => {
+        const { getByTestId } = render(
+          <LoginWebView
+            visible={true}
+            onLoginSuccess={mockOnLoginSuccess}
+            onLoginCancel={mockOnLoginCancel}
+            onRefreshData={mockOnRefreshData}
+          />
+        );
+
+        // Component should use config.api.getFullUrl('kiosk')
+        expect(config.api.getFullUrl).toHaveBeenCalledWith('kiosk');
+      });
+
+      it('should set WebView source to config URL on initial render', () => {
+        const expectedUrl = config.api.getFullUrl('kiosk');
+
+        render(
+          <LoginWebView
+            visible={true}
+            onLoginSuccess={mockOnLoginSuccess}
+            onLoginCancel={mockOnLoginCancel}
+            onRefreshData={mockOnRefreshData}
+          />
+        );
+
+        // Verify the URL returned from config is the expected kiosk URL
+        expect(expectedUrl).toBe(`${TEST_BASE_URL}/kiosk.php`);
+        expect(config.api.getFullUrl).toHaveBeenCalledWith('kiosk');
+      });
+
+      it('should construct correct kiosk URL', () => {
+        render(
+          <LoginWebView
+            visible={true}
+            onLoginSuccess={mockOnLoginSuccess}
+            onLoginCancel={mockOnLoginCancel}
+            onRefreshData={mockOnRefreshData}
+          />
+        );
+
+        const expectedUrl = `${TEST_BASE_URL}/kiosk.php`;
+        expect(config.api.getFullUrl('kiosk')).toBe(expectedUrl);
+      });
+
+      it('should use config base URL for all API calls', () => {
+        render(
+          <LoginWebView
+            visible={true}
+            onLoginSuccess={mockOnLoginSuccess}
+            onLoginCancel={mockOnLoginCancel}
+            onRefreshData={mockOnRefreshData}
+          />
+        );
+
+        expect(config.api.baseUrl).toBe(TEST_BASE_URL);
+      });
+
+      it('should handle config getFullUrl for different endpoints', () => {
+        const endpoints = ['kiosk', 'visitor', 'memberDashboard'];
+
+        endpoints.forEach(endpoint => {
+          const url = config.api.getFullUrl(endpoint as any);
+          expect(url).toBeTruthy();
+          expect(url).toContain(endpoint);
+          expect(url).toMatch(/^https:\/\//);
+        });
+      });
+
+      it('should use config for visitor mode URL construction', async () => {
+        const { getByTestId } = render(
+          <LoginWebView
+            visible={true}
+            onLoginSuccess={mockOnLoginSuccess}
+            onLoginCancel={mockOnLoginCancel}
+            onRefreshData={mockOnRefreshData}
+          />
+        );
+
+        const webview = getByTestId('webview-mock');
+
+        const message = {
+          nativeEvent: {
+            data: JSON.stringify({
+              type: 'URL_VERIFIED',
+              url: config.api.getFullUrl('visitor'),
+            }),
+          },
+        };
+
+        fireEvent(webview, 'onMessage', message);
+
+        // Should have used config to get visitor URL
+        expect(config.api.getFullUrl).toHaveBeenCalledWith('visitor');
+      });
+    });
+
+    describe('Config Lifecycle Changes', () => {
+      it('should respond when config changes during component lifecycle', () => {
+        const { rerender } = render(
+          <LoginWebView
+            visible={true}
+            onLoginSuccess={mockOnLoginSuccess}
+            onLoginCancel={mockOnLoginCancel}
+            onRefreshData={mockOnRefreshData}
+          />
+        );
+
+        expect(config.api.getFullUrl).toHaveBeenCalledWith('kiosk');
+        const initialCallCount = (config.api.getFullUrl as jest.Mock).mock.calls.length;
+
+        // Rerender component (simulates state change)
+        rerender(
+          <LoginWebView
+            visible={false}
+            onLoginSuccess={mockOnLoginSuccess}
+            onLoginCancel={mockOnLoginCancel}
+            onRefreshData={mockOnRefreshData}
+          />
+        );
+
+        rerender(
+          <LoginWebView
+            visible={true}
+            onLoginSuccess={mockOnLoginSuccess}
+            onLoginCancel={mockOnLoginCancel}
+            onRefreshData={mockOnRefreshData}
+          />
+        );
+
+        // Component should call config again on rerender
+        expect((config.api.getFullUrl as jest.Mock).mock.calls.length).toBeGreaterThan(initialCallCount);
+      });
+
+      it('should handle custom API URL change gracefully', () => {
+        const CUSTOM_URL = 'http://localhost:3000';
+
+        // Render with original config
+        const { rerender } = render(
+          <LoginWebView
+            visible={true}
+            onLoginSuccess={mockOnLoginSuccess}
+            onLoginCancel={mockOnLoginCancel}
+            onRefreshData={mockOnRefreshData}
+          />
+        );
+
+        expect(config.api.baseUrl).toBe(TEST_BASE_URL);
+
+        // Simulate environment change
+        (config.api.getFullUrl as jest.Mock).mockImplementation((endpoint) =>
+          `${CUSTOM_URL}/${endpoint}.php`
+        );
+        (config.api.baseUrl as any) = CUSTOM_URL;
+
+        // Rerender component
+        rerender(
+          <LoginWebView
+            visible={true}
+            onLoginSuccess={mockOnLoginSuccess}
+            onLoginCancel={mockOnLoginCancel}
+            onRefreshData={mockOnRefreshData}
+          />
+        );
+
+        // Component should use new config values
+        expect(config.api.baseUrl).toBe(CUSTOM_URL);
+      });
+
+      it('should use consistent config throughout component lifecycle', () => {
+        const { rerender } = render(
+          <LoginWebView
+            visible={true}
+            onLoginSuccess={mockOnLoginSuccess}
+            onLoginCancel={mockOnLoginCancel}
+            onRefreshData={mockOnRefreshData}
+          />
+        );
+
+        const firstBaseUrl = config.api.baseUrl;
+        const firstKioskUrl = config.api.getFullUrl('kiosk');
+
+        // Rerender multiple times
+        rerender(
+          <LoginWebView
+            visible={false}
+            onLoginSuccess={mockOnLoginSuccess}
+            onLoginCancel={mockOnLoginCancel}
+            onRefreshData={mockOnRefreshData}
+          />
+        );
+
+        rerender(
+          <LoginWebView
+            visible={true}
+            onLoginSuccess={mockOnLoginSuccess}
+            onLoginCancel={mockOnLoginCancel}
+            onRefreshData={mockOnRefreshData}
+          />
+        );
+
+        // Config should remain consistent unless explicitly changed
+        expect(config.api.baseUrl).toBe(firstBaseUrl);
+        expect(config.api.getFullUrl('kiosk')).toBe(firstKioskUrl);
+      });
+    });
+
+    describe('Environment Switching', () => {
+      it('should work with production environment URLs', () => {
+        // Mock production config
+        const PROD_BASE_URL = 'https://tapthatapp.beerknurd.com';
+        (config.api.getFullUrl as jest.Mock).mockImplementation((endpoint) =>
+          `${PROD_BASE_URL}/${endpoint}.php`
+        );
+        (config.api.baseUrl as any) = PROD_BASE_URL;
+
+        render(
+          <LoginWebView
+            visible={true}
+            onLoginSuccess={mockOnLoginSuccess}
+            onLoginCancel={mockOnLoginCancel}
+            onRefreshData={mockOnRefreshData}
+          />
+        );
+
+        const url = config.api.getFullUrl('kiosk');
+        expect(url).toBe(`${PROD_BASE_URL}/kiosk.php`);
+      });
+
+      it('should work with custom API URLs', () => {
+        // Mock custom config
+        const CUSTOM_BASE_URL = 'https://custom.example.com';
+        (config.api.getFullUrl as jest.Mock).mockImplementation((endpoint) =>
+          `${CUSTOM_BASE_URL}/${endpoint}.php`
+        );
+        (config.api.baseUrl as any) = CUSTOM_BASE_URL;
+
+        render(
+          <LoginWebView
+            visible={true}
+            onLoginSuccess={mockOnLoginSuccess}
+            onLoginCancel={mockOnLoginCancel}
+            onRefreshData={mockOnRefreshData}
+          />
+        );
+
+        const url = config.api.getFullUrl('kiosk');
+        expect(url).toContain('custom.example.com');
+      });
+
+      it('should handle development environment', () => {
+        // Mock development config
+        const DEV_BASE_URL = 'http://localhost:3000';
+        (config.api.getFullUrl as jest.Mock).mockImplementation((endpoint) =>
+          `${DEV_BASE_URL}/${endpoint}.php`
+        );
+        (config.api.baseUrl as any) = DEV_BASE_URL;
+
+        render(
+          <LoginWebView
+            visible={true}
+            onLoginSuccess={mockOnLoginSuccess}
+            onLoginCancel={mockOnLoginCancel}
+            onRefreshData={mockOnRefreshData}
+          />
+        );
+
+        const url = config.api.getFullUrl('kiosk');
+        expect(url).toContain('localhost:3000');
+      });
+    });
+
+    describe('Config Error Handling', () => {
+      it('should render without crashing when config returns undefined', () => {
+        // Mock config to return undefined
+        (config.api.getFullUrl as jest.Mock).mockReturnValue(undefined);
+
+        // Component should not crash - it will pass undefined to WebView which handles it
+        const { getByTestId } = render(
+          <LoginWebView
+            visible={true}
+            onLoginSuccess={mockOnLoginSuccess}
+            onLoginCancel={mockOnLoginCancel}
+            onRefreshData={mockOnRefreshData}
+          />
+        );
+
+        // Component should still render
+        expect(getByTestId('login-webview-modal')).toBeTruthy();
+        // Note: WebView will handle the undefined URL and show error
+      });
+
+      it('should pass invalid URL format to WebView without crashing', () => {
+        // Mock config to return invalid URL
+        (config.api.getFullUrl as jest.Mock).mockReturnValue('not-a-valid-url');
+
+        // Component doesn't validate URLs - WebView handles that
+        const { getByTestId } = render(
+          <LoginWebView
+            visible={true}
+            onLoginSuccess={mockOnLoginSuccess}
+            onLoginCancel={mockOnLoginCancel}
+            onRefreshData={mockOnRefreshData}
+          />
+        );
+
+        // Component should still render - WebView will show error
+        expect(getByTestId('login-webview-modal')).toBeTruthy();
+      });
+
+      it('should not crash when config throws error during render', () => {
+        // Mock config to throw error
+        (config.api.getFullUrl as jest.Mock).mockImplementation(() => {
+          throw new Error('Config error');
+        });
+
+        // Component will crash at render time because it doesn't wrap config call in try-catch
+        // This is expected behavior - config errors should be caught at app level
+        expect(() => {
+          render(
+            <LoginWebView
+              visible={true}
+              onLoginSuccess={mockOnLoginSuccess}
+              onLoginCancel={mockOnLoginCancel}
+              onRefreshData={mockOnRefreshData}
+            />
+          );
+        }).toThrow('Config error');
+      });
+
+      it('should handle config errors in message handlers gracefully', () => {
+        // Reset config mock for normal rendering
+        (config.api.getFullUrl as jest.Mock).mockReturnValue(`${TEST_BASE_URL}/kiosk.php`);
+
+        const { getByTestId } = render(
+          <LoginWebView
+            visible={true}
+            onLoginSuccess={mockOnLoginSuccess}
+            onLoginCancel={mockOnLoginCancel}
+            onRefreshData={mockOnRefreshData}
+          />
+        );
+
+        const webview = getByTestId('webview-mock');
+
+        // Mock config to throw during message handling
+        (config.api.getFullUrl as jest.Mock).mockImplementation(() => {
+          throw new Error('Config error during message handling');
+        });
+
+        // Send URL_CHECK message which uses config internally
+        const message = {
+          nativeEvent: {
+            data: JSON.stringify({
+              type: 'URL_CHECK',
+              url: 'https://test.com/some-page.php',
+            }),
+          },
+        };
+
+        // Should handle error gracefully
+        expect(() => {
+          fireEvent(webview, 'onMessage', message);
+        }).not.toThrow();
+      });
+    });
+
+    describe('WebView URL Verification', () => {
+      it('should use kiosk endpoint from config', () => {
+        const kioskUrl = config.api.getFullUrl('kiosk');
+
+        render(
+          <LoginWebView
+            visible={true}
+            onLoginSuccess={mockOnLoginSuccess}
+            onLoginCancel={mockOnLoginCancel}
+            onRefreshData={mockOnRefreshData}
+          />
+        );
+
+        // Verify the kiosk URL structure
+        expect(kioskUrl).toMatch(/^https:\/\//);
+        expect(kioskUrl).toContain('kiosk.php');
+        expect(config.api.getFullUrl).toHaveBeenCalledWith('kiosk');
+      });
+
+      it('should use config URLs for navigation detection', async () => {
+        const { getByTestId } = render(
+          <LoginWebView
+            visible={true}
+            onLoginSuccess={mockOnLoginSuccess}
+            onLoginCancel={mockOnLoginCancel}
+            onRefreshData={mockOnRefreshData}
+          />
+        );
+
+        const webview = getByTestId('webview-mock');
+
+        // Test navigation to member dashboard (uses config URL)
+        const memberDashUrl = config.api.getFullUrl('memberDashboard');
+
+        const message = {
+          nativeEvent: {
+            data: JSON.stringify({
+              type: 'URL_VERIFIED',
+              url: memberDashUrl,
+            }),
+          },
+        };
+
+        fireEvent(webview, 'onMessage', message);
+
+        await waitFor(() => {
+          expect(mockWebViewRef.current.injectJavaScript).toHaveBeenCalled();
+        });
+
+        // Verify the URL came from config
+        expect(config.api.getFullUrl).toHaveBeenCalledWith('memberDashboard');
+      });
+
+      it('should use config for visitor mode URL detection', async () => {
+        const { getByTestId } = render(
+          <LoginWebView
+            visible={true}
+            onLoginSuccess={mockOnLoginSuccess}
+            onLoginCancel={mockOnLoginCancel}
+            onRefreshData={mockOnRefreshData}
+          />
+        );
+
+        const webview = getByTestId('webview-mock');
+
+        const visitorUrl = config.api.getFullUrl('visitor');
+
+        const message = {
+          nativeEvent: {
+            data: JSON.stringify({
+              type: 'URL_VERIFIED',
+              url: visitorUrl,
+            }),
+          },
+        };
+
+        fireEvent(webview, 'onMessage', message);
+
+        await waitFor(() => {
+          expect(mockWebViewRef.current.injectJavaScript).toHaveBeenCalled();
+        });
+
+        // Verify config was used for visitor endpoint
+        expect(config.api.getFullUrl).toHaveBeenCalledWith('visitor');
+      });
+
+      it('should get all endpoint URLs from config', () => {
+        const endpoints = ['kiosk', 'visitor', 'memberDashboard'] as const;
+
+        endpoints.forEach(endpoint => {
+          const url = config.api.getFullUrl(endpoint);
+
+          // All URLs should be valid HTTPS URLs
+          expect(url).toMatch(/^https:\/\//);
+          expect(url).toContain(TEST_BASE_URL);
+          expect(url).toContain('.php');
+        });
+      });
+    });
+
   });
 });

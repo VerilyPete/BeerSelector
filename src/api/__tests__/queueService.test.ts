@@ -9,6 +9,7 @@ import { getQueuedBeers, deleteQueuedBeer } from '../queueService';
 import { getSessionData } from '../sessionManager';
 import { parseQueuedBeersFromHtml } from '../../utils/htmlParser';
 import { ApiError } from '../../types/api';
+import { config } from '@/src/config';
 
 // Mock dependencies
 jest.mock('../sessionManager');
@@ -73,7 +74,7 @@ describe('queueService', () => {
 
         // Verify fetch was called with correct URL
         expect(global.fetch).toHaveBeenCalledWith(
-          'https://tapthatapp.beerknurd.com/memberQueues.php',
+          config.api.getFullUrl('memberQueues'),
           expect.objectContaining({
             method: 'GET',
             headers: expect.objectContaining({
@@ -348,7 +349,7 @@ describe('queueService', () => {
 
         // Verify fetch was called with correct URL and cid
         expect(global.fetch).toHaveBeenCalledWith(
-          'https://tapthatapp.beerknurd.com/deleteQueuedBrew.php?cid=1885490',
+          `${config.api.getFullUrl('deleteQueuedBrew')}?cid=1885490`,
           expect.objectContaining({
             method: 'GET',
             headers: expect.objectContaining({
@@ -389,7 +390,7 @@ describe('queueService', () => {
         const fetchCall = (global.fetch as jest.Mock).mock.calls[0];
         const headers = fetchCall[1].headers;
 
-        expect(headers.referer).toBe('https://tapthatapp.beerknurd.com/memberQueues.php');
+        expect(headers.referer).toBe(config.api.referers.memberQueues);
       });
 
       it('should log deletion attempt', async () => {

@@ -304,6 +304,27 @@ export class BeerRepository {
       throw error;
     }
   }
+
+  /**
+   * Clear all beers from the table
+   *
+   * Used for testing or resetting the app to first-run state.
+   */
+  async clear(): Promise<void> {
+    const database = await getDatabase();
+
+    try {
+      await database.withTransactionAsync(async () => {
+        const before = await database.getFirstAsync<{ count: number }>('SELECT COUNT(*) as count FROM allbeers');
+        await database.runAsync('DELETE FROM allbeers');
+        const after = await database.getFirstAsync<{ count: number }>('SELECT COUNT(*) as count FROM allbeers');
+        console.log(`DB: Successfully cleared allbeers table (removed ${before?.count ?? 0} rows, now ${after?.count ?? 0})`);
+      });
+    } catch (error) {
+      console.error('Error clearing all beers:', error);
+      throw error;
+    }
+  }
 }
 
 /**

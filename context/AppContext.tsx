@@ -27,11 +27,60 @@
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from 'react';
+import { Alert } from 'react-native';
 import { getSessionData } from '@/src/api/sessionManager';
 import { isVisitorMode as checkIsVisitorMode } from '@/src/api/authService';
 import type { SessionData } from '@/src/types/api';
 import type { Beer, Beerfinder } from '@/src/types/beer';
 import type { Reward } from '@/src/types/database';
+import { beerRepository } from '@/src/database/repositories/BeerRepository';
+import { myBeersRepository } from '@/src/database/repositories/MyBeersRepository';
+import { rewardsRepository } from '@/src/database/repositories/RewardsRepository';
+
+/**
+ * ==========================================
+ * STATE SYNCHRONIZATION GUIDELINES
+ * ==========================================
+ *
+ * AppContext provides a single source of truth for beer data.
+ * Components must follow these rules to keep context in sync:
+ *
+ * ✅ ALWAYS call refreshBeerData() after:
+ * - rewardsRepository.insertMany()
+ * - beerRepository.insertMany()
+ * - myBeersRepository.insertMany()
+ * - rewardsRepository.clear()
+ * - beerRepository.clear()
+ * - myBeersRepository.clear()
+ * - Any direct database write operation
+ *
+ * ❌ NEVER call refreshBeerData() after:
+ * - Reading from database (getAll, getById, etc.)
+ * - UI-only state changes
+ * - Using high-level refresh functions (they sync internally)
+ *
+ * Example - Manual Sync Required:
+ * ```typescript
+ * const handleAddReward = async (reward: Reward) => {
+ *   await rewardsRepository.add(reward);
+ *   await refreshBeerData(); // ← REQUIRED! Context is now stale
+ * };
+ * ```
+ *
+ * Example - No Sync Needed:
+ * ```typescript
+ * const rewards = await rewardsRepository.getAll(); // Just reading
+ * // No refreshBeerData() needed - context already has this data
+ * ```
+ *
+ * Why Manual Sync?
+ * - Explicit: Clear when sync happens, easier to debug
+ * - Flexible: Component decides when to sync (e.g., batch multiple writes)
+ * - Testable: Easy to mock and verify in tests
+ * - No Magic: Developers understand the data flow
+ *
+ * See docs/STATE_SYNC_GUIDELINES.md for full rationale.
+ */
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -177,6 +226,9 @@ export interface AppContextValue extends AppState {
 
   /** Update rewards list */
   setRewards: (rewards: Reward[]) => void;
+
+  /** Reload all beer data from database (call after data refresh) */
+  refreshBeerData: () => Promise<void>;
 
   // Filter actions
   /** Update search text */
@@ -342,6 +394,31 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     }
   }, [createEmptySession, createSessionFromData]);
 
+  // ============================================================================
+  // SHARED DATABASE LOADING FUNCTION
+  // ============================================================================
+
+  /**
+   * Shared function to load all beer data from database
+   * Used by both mount effect and refreshBeerData()
+   * Avoids code duplication and ensures consistent loading behavior
+   */
+  const loadBeerDataFromDatabase = useCallback(async () => {
+    // Load all data in parallel for better performance
+    const [allBeersData, tastedBeersData, rewardsData] = await Promise.all([
+      beerRepository.getAll(),
+      myBeersRepository.getAll(),
+      rewardsRepository.getAll()
+    ]);
+
+    // Update state with all data at once
+    setBeers({ allBeers: allBeersData, tastedBeers: tastedBeersData, rewards: rewardsData });
+
+    console.log(`[AppContext] Loaded beer data: ${allBeersData.length} all beers, ${tastedBeersData.length} tasted beers, ${rewardsData.length} rewards`);
+
+    return { allBeersData, tastedBeersData, rewardsData };
+  }, []);
+
   /**
    * Load session on mount
    */
@@ -350,41 +427,67 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   }, [loadSessionFromStorage]);
 
   /**
-   * Load beer data from database on mount
+   * Load beer data from database on mount with auto-retry and exponential backoff
    */
   useEffect(() => {
-    const loadBeerData = async () => {
+    let retryCount = 0;
+    const maxRetries = 3;
+    let isCancelled = false;
+    const timers: Set<NodeJS.Timeout> = new Set();
+
+    const loadBeerData = async (): Promise<void> => {
+      if (isCancelled) return;
+
       try {
         setLoading(prev => ({ ...prev, isLoadingBeers: true }));
-
-        // Import repositories dynamically to avoid circular dependencies
-        const { beerRepository } = await import('@/src/database/repositories/BeerRepository');
-        const { myBeersRepository } = await import('@/src/database/repositories/MyBeersRepository');
-        const { rewardsRepository } = await import('@/src/database/repositories/RewardsRepository');
-
-        // Load all beers
-        const allBeersData = await beerRepository.getAll();
-        setBeers(prev => ({ ...prev, allBeers: allBeersData }));
-
-        // Load tasted beers (my beers)
-        const tastedBeersData = await myBeersRepository.getAll();
-        setBeers(prev => ({ ...prev, tastedBeers: tastedBeersData }));
-
-        // Load rewards
-        const rewardsData = await rewardsRepository.getAll();
-        setBeers(prev => ({ ...prev, rewards: rewardsData }));
-
-        console.log(`[AppContext] Loaded beer data: ${allBeersData.length} all beers, ${tastedBeersData.length} tasted beers, ${rewardsData.length} rewards`);
+        await loadBeerDataFromDatabase();
+        setBeerError(null); // Clear error on success
+        console.log('[AppContext] Beer data loaded successfully');
       } catch (error) {
-        console.error('[AppContext] Error loading beer data:', error);
-        setBeerError('Failed to load beer data from database');
+        console.error(`[AppContext] Error loading beer data (attempt ${retryCount + 1}/${maxRetries + 1}):`, error);
+
+        if (retryCount < maxRetries && !isCancelled) {
+          retryCount++;
+          const delay = 1000 * Math.pow(2, retryCount - 1); // 1s, 2s, 4s
+          console.log(`[AppContext] Retrying in ${delay}ms (attempt ${retryCount}/${maxRetries})`);
+
+          const timer = setTimeout(() => {
+            timers.delete(timer);
+            if (!isCancelled) {
+              loadBeerData();
+            }
+          }, delay);
+          timers.add(timer);
+        } else if (!isCancelled) {
+          // Final failure after all retries
+          const errorMessage = 'Failed to load beer data from database';
+          setBeerError(errorMessage);
+
+          // Show toast notification on final failure (only if not cancelled)
+          if (!isCancelled) {
+            Alert.alert(
+              'Data Load Failed',
+              'Unable to load beer data after multiple attempts. Please check your connection and restart the app.',
+              [
+                { text: 'OK', style: 'default' }
+              ]
+            );
+          }
+        }
       } finally {
+        if (isCancelled) return;
         setLoading(prev => ({ ...prev, isLoadingBeers: false }));
       }
     };
 
     loadBeerData();
-  }, []); // Empty deps - load only on mount
+
+    return () => {
+      isCancelled = true;
+      timers.forEach(timer => clearTimeout(timer));
+      timers.clear();
+    };
+  }, [loadBeerDataFromDatabase]); // Depends on shared loading function
 
   /**
    * Update session state after login
@@ -422,6 +525,24 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   const setRewards = useCallback((newRewards: Reward[]) => {
     setBeers((prev) => ({ ...prev, rewards: newRewards }));
   }, []);
+
+  /**
+   * Reload all beer data from database
+   * Call this after data refresh operations to update AppContext state
+   * Uses shared loading function to avoid code duplication
+   */
+  const refreshBeerData = useCallback(async () => {
+    try {
+      setLoading(prev => ({ ...prev, isLoadingBeers: true }));
+      await loadBeerDataFromDatabase();
+      console.log('[AppContext] Refreshed beer data from database');
+    } catch (error) {
+      console.error('[AppContext] Error refreshing beer data:', error);
+      setBeerError('Failed to refresh beer data from database');
+    } finally {
+      setLoading(prev => ({ ...prev, isLoadingBeers: false }));
+    }
+  }, [loadBeerDataFromDatabase]);
 
   // ============================================================================
   // FILTER ACTIONS
@@ -508,6 +629,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     setAllBeers,
     setTastedBeers,
     setRewards,
+    refreshBeerData,
 
     // Filter actions
     setSearchText,
@@ -540,6 +662,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     setAllBeers,
     setTastedBeers,
     setRewards,
+    refreshBeerData,
     setSearchText,
     setSelectedFilters,
     setSortBy,

@@ -8,6 +8,7 @@
 import { getSessionData } from './sessionManager';
 import { parseQueuedBeersFromHtml, QueuedBeer } from '../utils/htmlParser';
 import { ApiError } from '../types/api';
+import { config } from '@/src/config';
 
 /**
  * Retrieves the user's queued beers from the Flying Saucer API.
@@ -56,12 +57,12 @@ export async function getQueuedBeers(): Promise<QueuedBeer[]> {
       'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
       'accept-language': 'en-US,en;q=0.9',
       'cache-control': 'max-age=0',
-      'referer': 'https://tapthatapp.beerknurd.com/member-dash.php',
+      'referer': config.api.referers.memberDashboard,
       'Cookie': `store__id=${storeId}; PHPSESSID=${sessionId}; store_name=${encodeURIComponent(storeName)}; member_id=${memberId}; username=${encodeURIComponent(username || '')}; first_name=${encodeURIComponent(firstName || '')}; last_name=${encodeURIComponent(lastName || '')}; email=${encodeURIComponent(email || '')}; cardNum=${cardNum || ''}`
     };
 
     // Make the API request
-    const response = await fetch('https://tapthatapp.beerknurd.com/memberQueues.php', {
+    const response = await fetch(config.api.getFullUrl('memberQueues'), {
       method: 'GET',
       headers: headers
     });
@@ -135,12 +136,12 @@ export async function deleteQueuedBeer(cid: string): Promise<boolean> {
     const headers = {
       'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
       'accept-language': 'en-US,en;q=0.9',
-      'referer': 'https://tapthatapp.beerknurd.com/memberQueues.php',
+      'referer': config.api.referers.memberQueues,
       'Cookie': `store__id=${storeId}; PHPSESSID=${sessionId}; store_name=${encodeURIComponent(storeName)}; member_id=${memberId}; username=${encodeURIComponent(username || '')}; first_name=${encodeURIComponent(firstName || '')}; last_name=${encodeURIComponent(lastName || '')}; email=${encodeURIComponent(email || '')}; cardNum=${cardNum || ''}`
     };
 
     // Make the API request
-    const response = await fetch(`https://tapthatapp.beerknurd.com/deleteQueuedBrew.php?cid=${cid}`, {
+    const response = await fetch(config.api.getFullUrl('deleteQueuedBrew', { cid }), {
       method: 'GET',
       headers: headers
     });

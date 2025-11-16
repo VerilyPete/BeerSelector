@@ -2,12 +2,10 @@ import { renderHook, act, waitFor } from '@testing-library/react-native';
 import { Alert } from 'react-native';
 import { useLoginFlow } from '../useLoginFlow';
 import { getPreference, setPreference } from '@/src/database/preferences';
-import { handleTapThatAppLogin, handleVisitorLogin } from '@/src/api/authService';
 import { router } from 'expo-router';
 
 // Mock dependencies
 jest.mock('@/src/database/preferences');
-jest.mock('@/src/api/authService');
 jest.mock('react-native/Libraries/Alert/Alert', () => ({
   alert: jest.fn(),
 }));
@@ -20,8 +18,6 @@ jest.mock('expo-router', () => ({
 
 const mockGetPreference = getPreference as jest.MockedFunction<typeof getPreference>;
 const mockSetPreference = setPreference as jest.MockedFunction<typeof setPreference>;
-const mockHandleTapThatAppLogin = handleTapThatAppLogin as jest.MockedFunction<typeof handleTapThatAppLogin>;
-const mockHandleVisitorLogin = handleVisitorLogin as jest.MockedFunction<typeof handleVisitorLogin>;
 const mockAlert = Alert.alert as jest.MockedFunction<typeof Alert.alert>;
 const mockRouterReplace = router.replace as jest.MockedFunction<typeof router.replace>;
 
@@ -35,30 +31,6 @@ describe('useLoginFlow', () => {
     // Default mocks
     mockGetPreference.mockResolvedValue(null);
     mockSetPreference.mockResolvedValue(undefined);
-    mockHandleTapThatAppLogin.mockResolvedValue({
-      success: true,
-      message: 'Login successful',
-      statusCode: 200,
-      isVisitorMode: false,
-      sessionData: {
-        sessionId: 'test-session',
-        memberId: 'test-member',
-        storeId: 'test-store',
-        storeName: 'Test Store',
-      },
-    });
-    mockHandleVisitorLogin.mockResolvedValue({
-      success: true,
-      message: 'Visitor login successful',
-      statusCode: 200,
-      isVisitorMode: true,
-      sessionData: {
-        sessionId: 'visitor-session',
-        memberId: 'visitor',
-        storeId: 'test-store',
-        storeName: 'Test Store',
-      },
-    });
   });
 
   describe('Initialization', () => {
@@ -248,8 +220,8 @@ describe('useLoginFlow', () => {
     });
   });
 
-  describe('handleLoginSuccess - Member Login', () => {
-    it('should successfully complete member login and navigate', async () => {
+  describe('handleLoginSuccess - Modern Path', () => {
+    it('should close WebView and navigate after successful login', async () => {
       const { result } = renderHook(() => useLoginFlow({ onRefreshData }));
 
       act(() => {
@@ -257,21 +229,11 @@ describe('useLoginFlow', () => {
       });
 
       await act(async () => {
-        await result.current.handleLoginSuccess({
-          cookies: 'PHPSESSID=test-session; member_id=test-member',
-        });
+        await result.current.handleLoginSuccess();
       });
-
-      // Should call member login handler
-      // Note: LoginWebView component extracts headers internally before calling handleLoginSuccess
-      expect(mockHandleTapThatAppLogin).toHaveBeenCalledWith(
-        'PHPSESSID=test-session; member_id=test-member',
-        undefined
-      );
 
       // Should close webview
       expect(result.current.loginWebViewVisible).toBe(false);
-      expect(result.current.isLoggingIn).toBe(false);
 
       // Should call onRefreshData
       await waitFor(() => {
@@ -282,9 +244,14 @@ describe('useLoginFlow', () => {
       await waitFor(() => {
         expect(mockRouterReplace).toHaveBeenCalledWith('/(tabs)');
       });
+
+      // Should reset loading state
+      await waitFor(() => {
+        expect(result.current.isLoggingIn).toBe(false);
+      });
     });
 
-    it('should set API URLs configured preference after successful member login', async () => {
+    it('should set API URLs configured preference after successful login', async () => {
       const { result } = renderHook(() => useLoginFlow({ onRefreshData }));
 
       act(() => {
@@ -292,9 +259,7 @@ describe('useLoginFlow', () => {
       });
 
       await act(async () => {
-        await result.current.handleLoginSuccess({
-          cookies: 'PHPSESSID=test-session; member_id=test-member',
-        });
+        await result.current.handleLoginSuccess();
       });
 
       await waitFor(() => {
@@ -306,7 +271,7 @@ describe('useLoginFlow', () => {
       });
     });
 
-    it('should navigate with delay after successful member login', async () => {
+    it('should navigate with delay after successful login', async () => {
       jest.useFakeTimers();
 
       const { result } = renderHook(() => useLoginFlow({ onRefreshData }));
@@ -316,9 +281,7 @@ describe('useLoginFlow', () => {
       });
 
       await act(async () => {
-        await result.current.handleLoginSuccess({
-          cookies: 'PHPSESSID=test-session',
-        });
+        await result.current.handleLoginSuccess();
       });
 
       // Should not navigate immediately
@@ -337,7 +300,7 @@ describe('useLoginFlow', () => {
       jest.useRealTimers();
     });
 
-    it('should handle onRefreshData errors gracefully during member login', async () => {
+    it('should handle onRefreshData errors gracefully', async () => {
       const refreshError = new Error('Refresh failed');
       onRefreshData.mockRejectedValue(refreshError);
 
@@ -348,79 +311,125 @@ describe('useLoginFlow', () => {
       });
 
       await act(async () => {
-        await result.current.handleLoginSuccess({
-          cookies: 'PHPSESSID=test-session',
-        });
+        await result.current.handleLoginSuccess();
       });
 
       // Should still complete login despite refresh error
       expect(result.current.loginWebViewVisible).toBe(false);
-      expect(result.current.isLoggingIn).toBe(false);
-    });
-  });
 
-  describe('handleLoginSuccess - Visitor Login', () => {
-    it('should successfully complete visitor login and navigate', async () => {
+      await waitFor(() => {
+        expect(result.current.isLoggingIn).toBe(false);
+      });
+    });
+
+    it('should work for both member and visitor login types', async () => {
       const { result } = renderHook(() => useLoginFlow({ onRefreshData }));
 
+      // Test visitor login
       act(() => {
         result.current.startVisitorLogin();
       });
 
       await act(async () => {
-        await result.current.handleLoginSuccess({
-          cookies: 'store__id=test-store',
-        });
+        await result.current.handleLoginSuccess();
       });
 
-      // Should call visitor login handler
-      expect(mockHandleVisitorLogin).toHaveBeenCalledWith('store__id=test-store');
-
-      // Should close webview
       expect(result.current.loginWebViewVisible).toBe(false);
-      expect(result.current.isLoggingIn).toBe(false);
 
-      // Should call onRefreshData
-      await waitFor(() => {
-        expect(onRefreshData).toHaveBeenCalled();
-      });
-
-      // Should navigate to home
       await waitFor(() => {
         expect(mockRouterReplace).toHaveBeenCalledWith('/(tabs)');
       });
     });
 
-    it('should set API URLs configured preference after successful visitor login', async () => {
-      const { result } = renderHook(() => useLoginFlow({ onRefreshData }));
+    it('should wait for data refresh to complete before navigation', async () => {
+      jest.useFakeTimers();
+
+      let refreshComplete = false;
+      const delayedRefresh = jest.fn(async () => {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        refreshComplete = true;
+      });
+
+      const { result } = renderHook(() => useLoginFlow({ onRefreshData: delayedRefresh }));
 
       act(() => {
-        result.current.startVisitorLogin();
+        result.current.startMemberLogin();
       });
 
       await act(async () => {
-        await result.current.handleLoginSuccess({
-          cookies: 'store__id=test-store',
-        });
+        await result.current.handleLoginSuccess();
       });
 
+      // Refresh should be called
+      expect(delayedRefresh).toHaveBeenCalled();
+
+      // Navigation should not happen until refresh completes
+      expect(mockRouterReplace).not.toHaveBeenCalled();
+
+      // Fast-forward past navigation delay
+      act(() => {
+        jest.advanceTimersByTime(300);
+      });
+
+      // Should navigate after refresh completes
       await waitFor(() => {
-        expect(mockSetPreference).toHaveBeenCalledWith(
-          'api_urls_configured',
-          'true',
-          expect.any(String)
-        );
+        expect(mockRouterReplace).toHaveBeenCalledWith('/(tabs)');
+      });
+
+      jest.useRealTimers();
+    });
+
+    it('should not navigate if component unmounts during login', async () => {
+      jest.useFakeTimers();
+
+      const { result, unmount } = renderHook(() => useLoginFlow({ onRefreshData }));
+
+      act(() => {
+        result.current.startMemberLogin();
+      });
+
+      await act(async () => {
+        await result.current.handleLoginSuccess();
+      });
+
+      // Unmount during navigation delay
+      unmount();
+
+      // Fast-forward timers
+      act(() => {
+        jest.advanceTimersByTime(300);
+      });
+
+      // Should NOT navigate after unmount
+      expect(mockRouterReplace).not.toHaveBeenCalled();
+
+      jest.useRealTimers();
+    });
+
+    it('should handle login without onRefreshData callback', async () => {
+      const { result } = renderHook(() => useLoginFlow({}));
+
+      act(() => {
+        result.current.startMemberLogin();
+      });
+
+      await act(async () => {
+        await result.current.handleLoginSuccess();
+      });
+
+      // Should complete successfully without callback
+      expect(result.current.loginWebViewVisible).toBe(false);
+
+      await waitFor(() => {
+        expect(mockRouterReplace).toHaveBeenCalledWith('/(tabs)');
       });
     });
   });
 
   describe('handleLoginSuccess - Error Handling', () => {
-    it('should handle member login failure with error message', async () => {
-      mockHandleTapThatAppLogin.mockResolvedValue({
-        success: false,
-        error: 'Invalid credentials',
-        statusCode: 401,
-      });
+    it('should handle general errors gracefully', async () => {
+      const mockError = new Error('Test error');
+      mockSetPreference.mockRejectedValue(mockError);
 
       const { result } = renderHook(() => useLoginFlow({ onRefreshData }));
 
@@ -429,140 +438,21 @@ describe('useLoginFlow', () => {
       });
 
       await act(async () => {
-        await result.current.handleLoginSuccess({
-          cookies: 'invalid-cookies',
-        });
+        await result.current.handleLoginSuccess();
       });
 
       // Should show error alert
-      expect(mockAlert).toHaveBeenCalledWith('Login Error', 'Invalid credentials');
+      expect(mockAlert).toHaveBeenCalledWith(
+        'Login Error',
+        'An error occurred during login. Please try again.'
+      );
 
-      // Should close webview
+      // Should close webview and reset state
       expect(result.current.loginWebViewVisible).toBe(false);
       expect(result.current.isLoggingIn).toBe(false);
 
       // Should NOT navigate
       expect(mockRouterReplace).not.toHaveBeenCalled();
-
-      // Should NOT call onRefreshData
-      expect(onRefreshData).not.toHaveBeenCalled();
-    });
-
-    it('should handle visitor login failure with error message', async () => {
-      mockHandleVisitorLogin.mockResolvedValue({
-        success: false,
-        error: 'Missing store ID',
-        statusCode: 401,
-      });
-
-      const { result } = renderHook(() => useLoginFlow({ onRefreshData }));
-
-      act(() => {
-        result.current.startVisitorLogin();
-      });
-
-      await act(async () => {
-        await result.current.handleLoginSuccess({
-          cookies: 'invalid-cookies',
-        });
-      });
-
-      // Should show error alert
-      expect(mockAlert).toHaveBeenCalledWith('Login Error', 'Missing store ID');
-
-      // Should NOT navigate
-      expect(mockRouterReplace).not.toHaveBeenCalled();
-    });
-
-    it('should handle generic error during member login', async () => {
-      const loginError = new Error('Network error');
-      mockHandleTapThatAppLogin.mockRejectedValue(loginError);
-
-      const { result } = renderHook(() => useLoginFlow({ onRefreshData }));
-
-      act(() => {
-        result.current.startMemberLogin();
-      });
-
-      await act(async () => {
-        await result.current.handleLoginSuccess({
-          cookies: 'PHPSESSID=test-session',
-        });
-      });
-
-      // Should show error alert
-      expect(mockAlert).toHaveBeenCalledWith(
-        'Login Error',
-        'Failed to complete login. Please try again.'
-      );
-
-      // Should close webview
-      expect(result.current.loginWebViewVisible).toBe(false);
-      expect(result.current.isLoggingIn).toBe(false);
-    });
-
-    it('should handle generic error during visitor login', async () => {
-      const loginError = new Error('Network error');
-      mockHandleVisitorLogin.mockRejectedValue(loginError);
-
-      const { result } = renderHook(() => useLoginFlow({ onRefreshData }));
-
-      act(() => {
-        result.current.startVisitorLogin();
-      });
-
-      await act(async () => {
-        await result.current.handleLoginSuccess({
-          cookies: 'store__id=test-store',
-        });
-      });
-
-      // Should show error alert
-      expect(mockAlert).toHaveBeenCalledWith(
-        'Login Error',
-        'Failed to complete login. Please try again.'
-      );
-    });
-
-    it('should handle missing login type error', async () => {
-      const { result } = renderHook(() => useLoginFlow({ onRefreshData }));
-
-      // Don't set login type (selectedLoginType is null)
-      await act(async () => {
-        await result.current.handleLoginSuccess({
-          cookies: 'PHPSESSID=test-session',
-        });
-      });
-
-      // Should show error
-      expect(mockAlert).toHaveBeenCalledWith(
-        'Login Error',
-        'Login type not specified. Please try again.'
-      );
-
-      // Should NOT call any login handlers
-      expect(mockHandleTapThatAppLogin).not.toHaveBeenCalled();
-      expect(mockHandleVisitorLogin).not.toHaveBeenCalled();
-    });
-
-    it('should handle missing cookies error', async () => {
-      const { result } = renderHook(() => useLoginFlow({ onRefreshData }));
-
-      act(() => {
-        result.current.startMemberLogin();
-      });
-
-      await act(async () => {
-        await result.current.handleLoginSuccess({
-          cookies: '',
-        });
-      });
-
-      // Should show error
-      expect(mockAlert).toHaveBeenCalledWith(
-        'Login Error',
-        expect.stringContaining('No cookies received')
-      );
     });
   });
 
@@ -591,13 +481,13 @@ describe('useLoginFlow', () => {
 
       // Complete login
       await act(async () => {
-        await result.current.handleLoginSuccess({
-          cookies: 'PHPSESSID=test-session',
-        });
+        await result.current.handleLoginSuccess();
       });
 
       // State should be reset
-      expect(result.current.isLoggingIn).toBe(false);
+      await waitFor(() => {
+        expect(result.current.isLoggingIn).toBe(false);
+      });
       expect(result.current.loginWebViewVisible).toBe(false);
 
       // Should be able to start new login
@@ -609,14 +499,14 @@ describe('useLoginFlow', () => {
     });
 
     it('should update loading state during async operations', async () => {
-      let resolveLogin: any;
-      const delayedLogin = new Promise((resolve) => {
-        resolveLogin = resolve;
+      let resolveRefresh: any;
+      const delayedRefresh = new Promise((resolve) => {
+        resolveRefresh = resolve;
       });
 
-      mockHandleTapThatAppLogin.mockReturnValue(delayedLogin as any);
+      const customOnRefreshData = jest.fn(() => delayedRefresh);
 
-      const { result } = renderHook(() => useLoginFlow({ onRefreshData }));
+      const { result } = renderHook(() => useLoginFlow({ onRefreshData: customOnRefreshData }));
 
       act(() => {
         result.current.startMemberLogin();
@@ -624,27 +514,15 @@ describe('useLoginFlow', () => {
 
       // Start login process
       act(() => {
-        result.current.handleLoginSuccess({
-          cookies: 'PHPSESSID=test-session',
-        });
+        result.current.handleLoginSuccess();
       });
 
       // Should still be loading during async operation
       expect(result.current.isLoggingIn).toBe(true);
 
-      // Complete login
+      // Complete refresh
       await act(async () => {
-        resolveLogin({
-          success: true,
-          message: 'Login successful',
-          statusCode: 200,
-          sessionData: {
-            sessionId: 'test-session',
-            memberId: 'test-member',
-            storeId: 'test-store',
-            storeName: 'Test Store',
-          },
-        });
+        resolveRefresh();
       });
 
       // Should be done loading
@@ -656,24 +534,10 @@ describe('useLoginFlow', () => {
 
   describe('Edge Cases', () => {
     it('should prevent duplicate login attempts when already logging in', async () => {
-      let resolveLogin: any;
-      const delayedLogin = new Promise((resolve) => {
-        resolveLogin = resolve;
-      });
-
-      mockHandleTapThatAppLogin.mockReturnValue(delayedLogin as any);
-
       const { result } = renderHook(() => useLoginFlow({ onRefreshData }));
 
       act(() => {
         result.current.startMemberLogin();
-      });
-
-      // Start first login
-      act(() => {
-        result.current.handleLoginSuccess({
-          cookies: 'PHPSESSID=session1',
-        });
       });
 
       expect(result.current.isLoggingIn).toBe(true);
@@ -685,43 +549,6 @@ describe('useLoginFlow', () => {
 
       // Should still be on member login (second call should be rejected)
       expect(result.current.selectedLoginType).toBe('member');
-
-      // Complete first login
-      await act(async () => {
-        resolveLogin({
-          success: true,
-          message: 'Login successful',
-          statusCode: 200,
-          sessionData: {
-            sessionId: 'test-session',
-            memberId: 'test-member',
-            storeId: 'test-store',
-            storeName: 'Test Store',
-          },
-        });
-      });
-
-      // Should only have called auth service once
-      expect(mockHandleTapThatAppLogin).toHaveBeenCalledTimes(1);
-      expect(mockHandleVisitorLogin).not.toHaveBeenCalled();
-    });
-
-    it('should handle login without onRefreshData callback', async () => {
-      const { result } = renderHook(() => useLoginFlow({}));
-
-      act(() => {
-        result.current.startMemberLogin();
-      });
-
-      await act(async () => {
-        await result.current.handleLoginSuccess({
-          cookies: 'PHPSESSID=test-session',
-        });
-      });
-
-      // Should complete successfully without callback
-      expect(result.current.loginWebViewVisible).toBe(false);
-      expect(mockRouterReplace).toHaveBeenCalled();
     });
   });
 
@@ -744,7 +571,7 @@ describe('useLoginFlow', () => {
       jest.useRealTimers();
     });
 
-    it('should cleanup timers and prevent state updates after unmount', () => {
+    it('should cleanup timers and prevent state updates after unmount', async () => {
       jest.useFakeTimers();
 
       const { result, unmount } = renderHook(() => useLoginFlow({ onRefreshData }));
@@ -753,10 +580,8 @@ describe('useLoginFlow', () => {
         result.current.startMemberLogin();
       });
 
-      act(() => {
-        result.current.handleLoginSuccess({
-          cookies: 'PHPSESSID=test-session',
-        });
+      await act(async () => {
+        await result.current.handleLoginSuccess();
       });
 
       // Unmount during navigation delay
@@ -785,9 +610,7 @@ describe('useLoginFlow', () => {
       // Try to complete login after unmount
       await act(async () => {
         try {
-          await result.current.handleLoginSuccess({
-            cookies: 'PHPSESSID=test-session',
-          });
+          await result.current.handleLoginSuccess();
         } catch (e) {
           // Expected to possibly throw or fail silently
         }

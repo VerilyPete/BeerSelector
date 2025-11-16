@@ -10,6 +10,7 @@ import { setPreference } from '@/src/database/preferences';
 import { handleVisitorLogin } from '@/src/api/authService';
 import { saveSessionData, extractSessionDataFromResponse } from '@/src/api/sessionManager';
 import { isSessionData } from '@/src/types/api';
+import { config } from '@/src/config';
 
 interface LoginWebViewProps {
   visible: boolean;
@@ -308,23 +309,11 @@ export default function LoginWebView({
             });
           }
 
-          // Refresh the data
-          await onRefreshData();
-
           // Clear processed URLs for next login session
           processedUrlsRef.current.clear();
 
-          // Show success message
-          Alert.alert(
-            'Login Successful',
-            'API URLs have been updated and beer data refreshed. You now have access to the full Beer Selector experience.',
-            [
-              {
-                text: 'OK',
-                onPress: onLoginSuccess
-              }
-            ]
-          );
+          // Call onLoginSuccess which will handle refresh and navigation
+          onLoginSuccess();
         }
       }
       else if (data.type === 'VISITOR_LOGIN_ERROR') {
@@ -372,23 +361,11 @@ export default function LoginWebView({
             // For visitor mode, use empty data placeholder instead of dummy URL to prevent network errors
             await setPreference('my_beers_api_url', 'none://visitor_mode', 'Placeholder URL for visitor mode (not a real endpoint)');
 
-            // Refresh the data
-            await onRefreshData();
-
             // Clear processed URLs for next login session
             processedUrlsRef.current.clear();
 
-            // Show success message
-            Alert.alert(
-              'Visitor Mode Active',
-              'You are now browsing as a visitor. Only the All Beer list will be available.',
-              [
-                {
-                  text: 'OK',
-                  onPress: onLoginSuccess
-                }
-              ]
-            );
+            // Call onLoginSuccess which will handle refresh and navigation
+            onLoginSuccess();
           } else {
             // Show error message
             Alert.alert(
@@ -437,7 +414,7 @@ export default function LoginWebView({
 
         <WebView
           ref={webViewRef}
-          source={{ uri: 'https://tapthatapp.beerknurd.com/kiosk.php' }}
+          source={{ uri: config.api.getFullUrl('kiosk') }}
           onNavigationStateChange={handleWebViewNavigationStateChange}
           onMessage={handleWebViewMessage}
           onLoadStart={() => setInternalLoading(true)}

@@ -3,6 +3,7 @@ import { getCurrentSession } from './sessionValidator';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { ApiClientOptions, SessionData, ApiResponse, ApiError } from '../types/api';
+import { config } from '@/src/config';
 
 // Network detection is handled through fetch API error handling
 // No external network detection module is used
@@ -18,10 +19,10 @@ export class ApiClient {
   private networkStatus: { isConnected: boolean; type: string } | null = null;
 
   private constructor(options: ApiClientOptions = {}) {
-    this.baseUrl = options.baseUrl || 'https://tapthatapp.beerknurd.com';
-    this.retries = options.retries || 3;
-    this.retryDelay = options.retryDelay || 1000;
-    this.timeout = options.timeout || 15000; // 15 seconds default timeout
+    this.baseUrl = options.baseUrl || config.api.baseUrl;
+    this.retries = options.retries || config.network.retries;
+    this.retryDelay = options.retryDelay || config.network.retryDelay;
+    this.timeout = options.timeout || config.network.timeout;
 
     // Initialize network status monitoring
     this.initNetworkMonitoring();
@@ -41,7 +42,7 @@ export class ApiClient {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
 
-      const response = await fetch('https://tapthatapp.beerknurd.com', {
+      const response = await fetch(config.api.baseUrl, {
         method: 'HEAD',
         signal: controller.signal
       });
@@ -130,7 +131,7 @@ export class ApiClient {
       'accept-language': 'en-US,en;q=0.9',
       'content-type': 'application/x-www-form-urlencoded; charset=UTF-8',
       'origin': this.baseUrl,
-      'referer': `${this.baseUrl}/member-dash.php`,
+      'referer': config.api.referers.memberDashboard,
       'sec-ch-ua': '"Chromium";v="134", "Not:A-Brand";v="24", "Google Chrome";v="134"',
       'sec-ch-ua-mobile': '?0',
       'sec-ch-ua-platform': '"macOS"',
@@ -329,7 +330,7 @@ export class ApiClient {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
 
-      const response = await fetch('https://tapthatapp.beerknurd.com', {
+      const response = await fetch(config.api.baseUrl, {
         method: 'HEAD',
         signal: controller.signal
       });

@@ -1,9 +1,13 @@
 /**
  * Comprehensive tests for beerApi module
+ *
+ * This test suite validates the beerApi functions for fetching beers,
+ * tasted beers, and rewards from the Flying Saucer API.
  */
 
 import { fetchWithRetry, fetchBeersFromAPI, fetchMyBeersFromAPI, fetchRewardsFromAPI } from '../beerApi';
 import * as preferences from '../../database/preferences';
+import { config } from '@/src/config';
 
 // Mock the preferences module
 jest.mock('../../database/preferences');
@@ -14,6 +18,10 @@ global.fetch = jest.fn();
 describe('Beer API', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   describe('fetchWithRetry', () => {
@@ -32,10 +40,10 @@ describe('Beer API', () => {
         json: async () => mockData
       });
 
-      const resultPromise = fetchWithRetry('https://example.com/api');
+      const resultPromise = fetchWithRetry(config.api.baseUrl);
       const result = await resultPromise;
 
-      expect(global.fetch).toHaveBeenCalledWith('https://example.com/api');
+      expect(global.fetch).toHaveBeenCalledWith(config.api.baseUrl);
       expect(result).toEqual(mockData);
     });
 
@@ -58,7 +66,7 @@ describe('Beer API', () => {
           json: async () => mockData
         });
 
-      const resultPromise = fetchWithRetry('https://example.com/api', 2, 10);
+      const resultPromise = fetchWithRetry(config.api.baseUrl, 2, 10);
 
       // Fast-forward time to trigger retry
       await jest.advanceTimersByTimeAsync(15);
@@ -69,10 +77,36 @@ describe('Beer API', () => {
       expect(result).toEqual(mockData);
     });
 
+    it('should retry with config network settings', async () => {
+      const mockData = { brewInStock: [] };
+
+      // First call fails, second succeeds
+      (global.fetch as jest.Mock)
+        .mockRejectedValueOnce(new Error('Network error'))
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => mockData
+        });
+
+      const resultPromise = fetchWithRetry(
+        config.api.baseUrl,
+        config.network.retries,
+        config.network.retryDelay
+      );
+
+      // Fast-forward time to trigger retry
+      await jest.advanceTimersByTimeAsync(config.network.retryDelay + 100);
+
+      const result = await resultPromise;
+
+      expect(global.fetch).toHaveBeenCalledTimes(2);
+      expect(result).toEqual(mockData);
+    });
+
     it('should throw error after exhausting retries', async () => {
       (global.fetch as jest.Mock).mockRejectedValue(new Error('Network error'));
 
-      const resultPromise = fetchWithRetry('https://example.com/api', 1, 10);
+      const resultPromise = fetchWithRetry(config.api.baseUrl, 1, 10);
 
       await expect(resultPromise).rejects.toThrow('Network error');
       expect(global.fetch).toHaveBeenCalledTimes(1);
@@ -85,7 +119,7 @@ describe('Beer API', () => {
         statusText: 'Not Found'
       });
 
-      const resultPromise = fetchWithRetry('https://example.com/api', 1, 10);
+      const resultPromise = fetchWithRetry(config.api.baseUrl, 1, 10);
 
       await expect(resultPromise).rejects.toThrow('Failed to fetch: 404 Not Found');
     });
@@ -111,7 +145,7 @@ describe('Beer API', () => {
         { brewInStock: mockBeers }
       ];
 
-      (preferences.getPreference as jest.Mock).mockResolvedValue('https://example.com/api');
+      (preferences.getPreference as jest.Mock).mockResolvedValue(config.api.baseUrl);
       (global.fetch as jest.Mock).mockResolvedValueOnce({
         ok: true,
         json: async () => mockResponse
@@ -133,7 +167,7 @@ describe('Beer API', () => {
         }
       };
 
-      (preferences.getPreference as jest.Mock).mockResolvedValue('https://example.com/api');
+      (preferences.getPreference as jest.Mock).mockResolvedValue(config.api.baseUrl);
       (global.fetch as jest.Mock).mockResolvedValueOnce({
         ok: true,
         json: async () => mockResponse
@@ -147,7 +181,7 @@ describe('Beer API', () => {
     it('should throw error when no beer data found in response', async () => {
       const mockResponse = { someOtherData: 'value' };
 
-      (preferences.getPreference as jest.Mock).mockResolvedValue('https://example.com/api');
+      (preferences.getPreference as jest.Mock).mockResolvedValue(config.api.baseUrl);
       (global.fetch as jest.Mock).mockResolvedValueOnce({
         ok: true,
         json: async () => mockResponse
@@ -157,7 +191,7 @@ describe('Beer API', () => {
     });
 
     it('should propagate fetch errors', async () => {
-      (preferences.getPreference as jest.Mock).mockResolvedValue('https://example.com/api');
+      (preferences.getPreference as jest.Mock).mockResolvedValue(config.api.baseUrl);
       (global.fetch as jest.Mock).mockRejectedValueOnce(new Error('Network error'));
 
       await expect(fetchBeersFromAPI()).rejects.toThrow('Network error');
@@ -216,7 +250,7 @@ describe('Beer API', () => {
 
       (preferences.getPreference as jest.Mock).mockImplementation((key: string) => {
         if (key === 'is_visitor_mode') return Promise.resolve('false');
-        if (key === 'my_beers_api_url') return Promise.resolve('https://example.com/mybeers');
+        if (key === 'my_beers_api_url') return Promise.resolve(config.api.getFullUrl('memberDashboard'));
         return Promise.resolve(null);
       });
       (global.fetch as jest.Mock).mockResolvedValueOnce({
@@ -239,7 +273,7 @@ describe('Beer API', () => {
 
       (preferences.getPreference as jest.Mock).mockImplementation((key: string) => {
         if (key === 'is_visitor_mode') return Promise.resolve('false');
-        if (key === 'my_beers_api_url') return Promise.resolve('https://example.com/mybeers');
+        if (key === 'my_beers_api_url') return Promise.resolve(config.api.getFullUrl('memberDashboard'));
         return Promise.resolve(null);
       });
       (global.fetch as jest.Mock).mockResolvedValueOnce({
@@ -266,7 +300,7 @@ describe('Beer API', () => {
 
       (preferences.getPreference as jest.Mock).mockImplementation((key: string) => {
         if (key === 'is_visitor_mode') return Promise.resolve('false');
-        if (key === 'my_beers_api_url') return Promise.resolve('https://example.com/mybeers');
+        if (key === 'my_beers_api_url') return Promise.resolve(config.api.getFullUrl('memberDashboard'));
         return Promise.resolve(null);
       });
       (global.fetch as jest.Mock).mockResolvedValueOnce({
@@ -286,7 +320,7 @@ describe('Beer API', () => {
 
       (preferences.getPreference as jest.Mock).mockImplementation((key: string) => {
         if (key === 'is_visitor_mode') return Promise.resolve('false');
-        if (key === 'my_beers_api_url') return Promise.resolve('https://example.com/mybeers');
+        if (key === 'my_beers_api_url') return Promise.resolve(config.api.getFullUrl('memberDashboard'));
         return Promise.resolve(null);
       });
       (global.fetch as jest.Mock).mockResolvedValueOnce({
@@ -300,7 +334,7 @@ describe('Beer API', () => {
     it('should propagate fetch errors', async () => {
       (preferences.getPreference as jest.Mock).mockImplementation((key: string) => {
         if (key === 'is_visitor_mode') return Promise.resolve('false');
-        if (key === 'my_beers_api_url') return Promise.resolve('https://example.com/mybeers');
+        if (key === 'my_beers_api_url') return Promise.resolve(config.api.getFullUrl('memberDashboard'));
         return Promise.resolve(null);
       });
       (global.fetch as jest.Mock).mockRejectedValueOnce(new Error('Network error'));
@@ -348,7 +382,7 @@ describe('Beer API', () => {
 
       (preferences.getPreference as jest.Mock).mockImplementation((key: string) => {
         if (key === 'is_visitor_mode') return Promise.resolve('false');
-        if (key === 'my_beers_api_url') return Promise.resolve('https://example.com/mybeers');
+        if (key === 'my_beers_api_url') return Promise.resolve(config.api.getFullUrl('memberRewards'));
         return Promise.resolve(null);
       });
       (global.fetch as jest.Mock).mockResolvedValueOnce({
@@ -367,7 +401,7 @@ describe('Beer API', () => {
 
       (preferences.getPreference as jest.Mock).mockImplementation((key: string) => {
         if (key === 'is_visitor_mode') return Promise.resolve('false');
-        if (key === 'my_beers_api_url') return Promise.resolve('https://example.com/mybeers');
+        if (key === 'my_beers_api_url') return Promise.resolve(config.api.getFullUrl('memberRewards'));
         return Promise.resolve(null);
       });
       (global.fetch as jest.Mock).mockResolvedValueOnce({
@@ -381,12 +415,221 @@ describe('Beer API', () => {
     it('should propagate fetch errors', async () => {
       (preferences.getPreference as jest.Mock).mockImplementation((key: string) => {
         if (key === 'is_visitor_mode') return Promise.resolve('false');
-        if (key === 'my_beers_api_url') return Promise.resolve('https://example.com/mybeers');
+        if (key === 'my_beers_api_url') return Promise.resolve(config.api.getFullUrl('memberRewards'));
         return Promise.resolve(null);
       });
       (global.fetch as jest.Mock).mockRejectedValueOnce(new Error('Network error'));
 
       await expect(fetchRewardsFromAPI()).rejects.toThrow('Network error');
+    });
+  });
+
+  describe('Config Integration', () => {
+    describe('URL Construction', () => {
+      it('should use config base URL when available', async () => {
+        const mockBeers = [{ id: '1', brew_name: 'Test Beer' }];
+        const mockResponse = [
+          {},
+          { brewInStock: mockBeers }
+        ];
+
+        (preferences.getPreference as jest.Mock).mockResolvedValue(config.api.baseUrl);
+        (global.fetch as jest.Mock).mockResolvedValueOnce({
+          ok: true,
+          json: async () => mockResponse
+        });
+
+        await fetchBeersFromAPI();
+
+        // Verify fetch was called with config URL
+        expect(global.fetch).toHaveBeenCalledWith(config.api.baseUrl);
+      });
+
+      it('should use config endpoint URLs for different API calls', async () => {
+        const mockBeers = [{ id: '1', brew_name: 'Test Beer' }];
+        const mockResponse = [
+          {},
+          { tasted_brew_current_round: mockBeers },
+          {}
+        ];
+
+        (preferences.getPreference as jest.Mock).mockImplementation((key: string) => {
+          if (key === 'is_visitor_mode') return Promise.resolve('false');
+          if (key === 'my_beers_api_url') return Promise.resolve(config.api.getFullUrl('memberDashboard'));
+          return Promise.resolve(null);
+        });
+        (global.fetch as jest.Mock).mockResolvedValueOnce({
+          ok: true,
+          json: async () => mockResponse
+        });
+
+        await fetchMyBeersFromAPI();
+
+        // Verify fetch was called with config-constructed URL
+        expect(global.fetch).toHaveBeenCalledWith(config.api.getFullUrl('memberDashboard'));
+      });
+    });
+
+    describe('Network Configuration', () => {
+      beforeEach(() => {
+        jest.useFakeTimers();
+      });
+
+      afterEach(() => {
+        jest.useRealTimers();
+      });
+
+      it('should respect config network timeout settings', async () => {
+        // Network timeout is configured in config module
+        const mockData = { brewInStock: [] };
+
+        (global.fetch as jest.Mock).mockResolvedValueOnce({
+          ok: true,
+          json: async () => mockData
+        });
+
+        await fetchWithRetry(config.api.baseUrl);
+
+        // Verify timeout configuration is available
+        expect(config.network.timeout).toBeGreaterThan(0);
+        expect(config.network.timeout).toBe(15000); // Default timeout
+      });
+
+      it('should use config retry settings for network errors', async () => {
+        const mockData = { brewInStock: [] };
+
+        // First call fails, subsequent calls succeed
+        (global.fetch as jest.Mock)
+          .mockRejectedValueOnce(new Error('Network error'))
+          .mockResolvedValueOnce({
+            ok: true,
+            json: async () => mockData
+          });
+
+        const resultPromise = fetchWithRetry(
+          config.api.baseUrl,
+          config.network.retries,
+          config.network.retryDelay
+        );
+
+        // Fast-forward time to trigger retry
+        await jest.advanceTimersByTimeAsync(config.network.retryDelay + 100);
+
+        const result = await resultPromise;
+
+        // Verify config values are used
+        expect(config.network.retries).toBe(3);
+        expect(config.network.retryDelay).toBe(1000);
+        expect(result).toEqual(mockData);
+      });
+    });
+
+    describe('Environment Switching', () => {
+      beforeEach(() => {
+        // Reset to default environment before each test
+        config.setEnvironment('production');
+      });
+
+      afterEach(() => {
+        // Reset to default environment after each test
+        config.setEnvironment('production');
+      });
+
+      it('should use production URLs when environment is production', async () => {
+        config.setEnvironment('production');
+
+        // Verify production base URL
+        expect(config.api.baseUrl).toBe('https://tapthatapp.beerknurd.com');
+      });
+
+      it('should use development URLs when environment is development', async () => {
+        config.setEnvironment('development');
+
+        // Verify development base URL (currently same as production)
+        expect(config.api.baseUrl).toBe('https://tapthatapp.beerknurd.com');
+      });
+
+      it('should use custom URL when set', async () => {
+        const customUrl = 'https://staging.example.com';
+        config.setCustomApiUrl(customUrl);
+
+        // Verify custom URL is used
+        expect(config.api.baseUrl).toBe(customUrl);
+
+        // Reset to production
+        config.setEnvironment('production');
+      });
+
+      it('should validate URL format when setting custom URL', () => {
+        // Invalid URLs should throw error
+        expect(() => {
+          config.setCustomApiUrl('not-a-valid-url');
+        }).toThrow();
+
+        // Valid URLs should work
+        expect(() => {
+          config.setCustomApiUrl('https://valid.example.com');
+        }).not.toThrow();
+
+        // Reset to production
+        config.setEnvironment('production');
+      });
+    });
+
+    describe('Config Validation', () => {
+      it('should have valid config structure', () => {
+        // Verify config has required properties
+        expect(config).toHaveProperty('api');
+        expect(config).toHaveProperty('network');
+        expect(config).toHaveProperty('external');
+
+        // Verify API config
+        expect(config.api).toHaveProperty('baseUrl');
+        expect(config.api).toHaveProperty('endpoints');
+        expect(config.api).toHaveProperty('referers');
+        expect(config.api).toHaveProperty('getFullUrl');
+
+        // Verify network config
+        expect(config.network).toHaveProperty('timeout');
+        expect(config.network).toHaveProperty('retries');
+        expect(config.network).toHaveProperty('retryDelay');
+      });
+
+      it('should have valid endpoint URLs', () => {
+        // Verify all endpoints resolve to valid URLs
+        const endpoints = [
+          'memberDashboard',
+          'memberRewards',
+          'memberQueues',
+          'deleteQueuedBrew',
+          'addToQueue'
+        ];
+
+        endpoints.forEach(endpoint => {
+          const url = config.api.getFullUrl(endpoint as any);
+          expect(url).toMatch(/^https?:\/\//);
+          expect(url).toBeTruthy();
+        });
+      });
+
+      it('should have valid referer URLs', () => {
+        // Verify all referers are valid URLs
+        expect(config.api.referers.memberDashboard).toMatch(/^https?:\/\//);
+        expect(config.api.referers.memberRewards).toMatch(/^https?:\/\//);
+        expect(config.api.referers.memberQueues).toMatch(/^https?:\/\//);
+      });
+
+      it('should have valid network configuration values', () => {
+        // Verify network values are positive integers
+        expect(config.network.timeout).toBeGreaterThan(0);
+        expect(config.network.retries).toBeGreaterThan(0);
+        expect(config.network.retryDelay).toBeGreaterThan(0);
+
+        // Verify reasonable values
+        expect(config.network.timeout).toBeLessThanOrEqual(60000); // Max 60s
+        expect(config.network.retries).toBeLessThanOrEqual(10); // Max 10 retries
+        expect(config.network.retryDelay).toBeLessThanOrEqual(5000); // Max 5s initial delay
+      });
     });
   });
 });
