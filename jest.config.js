@@ -20,7 +20,8 @@ module.exports = {
     '!**/allbeers.json',
     '!**/mybeers.json',
     '!**/__mocks__/**',
-    '!**/scripts/**'
+    '!**/scripts/**',
+    '!**/docs/TEST_TEMPLATE_CONFIG_MODULE.ts'
   ],
   setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
   testMatch: ['**/__tests__/**/*.test.[jt]s?(x)', '**/?(*.)+(spec|test).[jt]s?(x)'],
