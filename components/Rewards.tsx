@@ -9,6 +9,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { getSessionData } from '@/src/api/sessionManager';
 import Constants from 'expo-constants';
 import { useAppContext } from '@/context/AppContext';
+import { config } from '@/src/config';
 
 type Reward = {
   reward_id: string;
@@ -18,7 +19,7 @@ type Reward = {
 
 export const Rewards = () => {
   // MP-4 Step 2: Use context for rewards data instead of local state
-  const { session, beers, loading, errors } = useAppContext();
+  const { session, beers, loading, errors, refreshBeerData } = useAppContext();
 
   const [refreshing, setRefreshing] = useState(false);
   const [queueingRewards, setQueueingRewards] = useState<Record<string, boolean>>({});
@@ -38,18 +39,28 @@ export const Rewards = () => {
 
       if (!session.isVisitor) {
         // Only refresh rewards if not in visitor mode
-        // Fetch fresh rewards from API and insert using repository
-        const freshRewards = await fetchRewardsFromAPI();
-        await rewardsRepository.insertMany(freshRewards);
-      }
 
-      // Data refresh is handled by _layout.tsx via AppContext
+        // Step 1: Fetch fresh rewards from Flying Saucer API
+        const freshRewards = await fetchRewardsFromAPI();
+
+        // Step 2: Write to database using repository
+        await rewardsRepository.insertMany(freshRewards);
+
+        // Step 3: CRITICAL - Manual sync required!
+        // Why: We just modified the database, so AppContext state is now stale.
+        // AppContext provides single source of truth for UI components.
+        // Without this sync, the UI won't reflect the new rewards data.
+        // See docs/STATE_SYNC_GUIDELINES.md for full explanation.
+        await refreshBeerData();
+
+        console.log('Rewards refreshed and AppContext synced');
+      }
     } catch (error) {
       console.error('Error refreshing rewards:', error);
     } finally {
       setRefreshing(false);
     }
-  }, [session.isVisitor]);
+  }, [session.isVisitor, refreshBeerData]);
 
   const queueReward = async (rewardId: string, rewardType: string) => {
     try {
@@ -82,8 +93,8 @@ export const Rewards = () => {
         'accept': '*/*',
         'accept-language': 'en-US,en;q=0.9',
         'content-type': 'application/x-www-form-urlencoded; charset=UTF-8',
-        'origin': 'https://tapthatapp.beerknurd.com',
-        'referer': 'https://tapthatapp.beerknurd.com/memberRewards.php', // Changed to match the curl example
+        'origin': config.api.baseUrl,
+        'referer': config.api.referers.memberRewards,
         'sec-ch-ua': '"Chromium";v="134", "Not:A-Brand";v="24", "Google Chrome";v="134"',
         'sec-ch-ua-mobile': '?0',
         'sec-ch-ua-platform': '"macOS"',
@@ -94,13 +105,13 @@ export const Rewards = () => {
         'x-requested-with': 'XMLHttpRequest',
         'Cookie': `store__id=${storeId}; PHPSESSID=${sessionId}; store_name=${encodeURIComponent(storeName)}; member_id=${memberId}; username=${encodeURIComponent(username || '')}; first_name=${encodeURIComponent(firstName || '')}; last_name=${encodeURIComponent(lastName || '')}; email=${encodeURIComponent(email || '')}; cardNum=${cardNum || ''}`
       };
-      
+
       console.log('Making API call with session data:', {
         memberId, storeId, storeName, sessionId: sessionId.substring(0, 5) + '...'
       });
-      
+
       // Make the API call
-      const response = await fetch('https://tapthatapp.beerknurd.com/addToRewardQueue.php', {
+      const response = await fetch(config.api.getFullUrl('addToRewardQueue'), {
         method: 'POST',
         headers: headers,
         body: formData,
@@ -193,10 +204,10 @@ export const Rewards = () => {
     );
   }
 
-  if (errors.rewardsError) {
+  if (errors.rewardError) {
     return (
       <ThemedView style={styles.errorContainer}>
-        <ThemedText style={styles.errorText}>{errors.rewardsError}</ThemedText>
+        <ThemedText style={styles.errorText}>{errors.rewardError}</ThemedText>
       </ThemedView>
     );
   }

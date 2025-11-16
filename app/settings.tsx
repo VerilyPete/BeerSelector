@@ -11,7 +11,6 @@ import { ThemedView } from '@/components/ThemedView';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { clearUntappdCookies } from '@/src/database/db';
-import { createMockSession } from '@/src/api/mockSession';
 
 // Import extracted components
 import LoginWebView from '@/components/LoginWebView';
@@ -19,12 +18,14 @@ import UntappdLoginWebView from '@/components/UntappdLoginWebView';
 import AboutSection from '@/components/settings/AboutSection';
 import DataManagementSection from '@/components/settings/DataManagementSection';
 import WelcomeSection from '@/components/settings/WelcomeSection';
+import DeveloperSection from '@/components/settings/DeveloperSection';
 
 // Import custom hooks
 import { useLoginFlow } from '@/hooks/useLoginFlow';
 import { useUntappdLogin } from '@/hooks/useUntappdLogin';
 import { useSettingsState } from '@/hooks/useSettingsState';
 import { useSettingsRefresh } from '@/hooks/useSettingsRefresh';
+import { useAppContext } from '@/context/AppContext';
 
 export default function SettingsScreen() {
   // Theme colors
@@ -34,6 +35,9 @@ export default function SettingsScreen() {
 
   // URL search params
   const { action } = useLocalSearchParams<{ action?: string }>();
+
+  // App context for refreshing beer data and session
+  const { refreshBeerData, refreshSession } = useAppContext();
 
   // Custom hooks for state management
   const {
@@ -53,8 +57,13 @@ export default function SettingsScreen() {
     handleLoginCancel,
   } = useLoginFlow({
     onRefreshData: async () => {
-      await handleRefresh();
+      // Silent mode: suppress success alerts during automatic login refresh
+      await handleRefresh(true);
       await loadPreferences();
+      // Reload session to update visitor mode status
+      await refreshSession();
+      // Reload beer data into AppContext after refresh
+      await refreshBeerData();
     },
   });
 
@@ -91,17 +100,6 @@ export default function SettingsScreen() {
         'Failed to clear Untappd credentials. Please try again.',
         [{ text: 'OK' }]
       );
-    }
-  };
-
-  // Dev-only: Create mock session
-  const handleCreateMockSession = async () => {
-    try {
-      await createMockSession();
-      Alert.alert('Success', 'Mock session created successfully!');
-    } catch (error) {
-      console.error('Failed to create mock session:', error);
-      Alert.alert('Error', 'Failed to create mock session.');
     }
   };
 
@@ -175,17 +173,8 @@ export default function SettingsScreen() {
               />
             )}
 
-            {/* Development Section */}
-            {Constants.expoConfig?.extra?.NODE_ENV === 'development' && (
-              <View style={[styles.section, { backgroundColor: cardColor }]}>
-                <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>Development</ThemedText>
-                <View style={styles.infoContainer}>
-                  <TouchableOpacity style={styles.devButton} onPress={handleCreateMockSession}>
-                    <ThemedText style={styles.buttonText}>Create Mock Session</ThemedText>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )}
+            {/* Developer Tools Section - Only visible in development mode */}
+            <DeveloperSection cardColor={cardColor} tintColor={tintColor} />
           </View>
         </ScrollView>
       </SafeAreaView>
@@ -242,15 +231,6 @@ const styles = StyleSheet.create({
   },
   infoContainer: {
     paddingTop: 8,
-  },
-  devButton: {
-    backgroundColor: '#E91E63',
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 48,
   },
   buttonText: {
     color: '#FFFFFF',

@@ -6,6 +6,36 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 BeerSelector is a React Native mobile app built with Expo SDK 52 for beer enthusiasts to browse taplists, track tastings, and manage their Flying Saucer UFO Club experience. The app supports both authenticated UFO Club members and visitor mode with limited access.
 
+### UFO Club Business Logic
+
+**The 200 Beer Challenge:**
+- Users work toward drinking 200 unique beers at Flying Saucer locations
+- **All Beers**: Complete taplist at current location
+- **Tasted Beers**: Beers user has already checked in (stored in `tasted_brew_current_round` table)
+- **Beerfinder**: Beers available to check-in = All Beers that are NOT in Tasted Beers
+- When users reach 200 tasted beers, the tasted list resets to 0 and they start a new round
+- Users can only check-in beers that aren't already on their tasted brew list
+
+**Key Rule**: Beerfinder count = All Beers - Tasted Beers (set difference, not simple subtraction)
+
+### Visitor Mode vs Member Mode
+
+**Visitor Mode (Guest Login):**
+- Limited access for users without UFO Club membership
+- **Can access**: All Beers list only (view taplist at current location)
+- **Cannot access**: Tasted Brews tab, Beerfinder tab, Rewards
+- No tasted brews to sync from database
+- No check-in functionality
+- No personal data or tracking
+
+**Member Mode (UFO Club Login):**
+- Full access to all features
+- Can view All Beers, Tasted Brews, Beerfinder, and Rewards
+- Can check-in beers and track progress toward 200
+- Personal data syncs from Flying Saucer API
+
+**Implementation**: Check `is_visitor_mode` preference to conditionally show/hide tabs and features
+
 ## Common Commands
 
 ### Development
@@ -38,6 +68,25 @@ npm run lint             # Run ESLint
 # Increment build number in Xcode project
 ./scripts/increment-build.sh
 ```
+
+### Environment Configuration
+
+The app supports environment variables for dynamic configuration without code changes. See `docs/ENVIRONMENT_VARIABLES.md` for complete documentation.
+
+```bash
+# Quick setup
+cp .env.example .env.development
+# Edit .env.development with your settings
+npm start
+```
+
+**Available environments**: development, staging, production
+**Key variables**: API URLs, network timeouts, external service URLs
+
+See also:
+- `docs/ENVIRONMENT_VARIABLES.md` - Complete environment variable guide
+- `.env.example` - Template with all available variables
+- `src/config/` - Configuration module
 
 ## Architecture
 
@@ -82,6 +131,74 @@ await database.withTransactionAsync(async () => {
 // Use type guards for data validation
 import { isBeer, isPreference } from './database/types';
 ```
+
+### Configuration Module
+
+The app uses a centralized configuration system in `src/config/config.ts` that provides a single source of truth for all API endpoints, URLs, and app settings.
+
+**Key Features**:
+- Environment-based configuration (development, staging, production)
+- Support for environment variables via `.env` files
+- Dynamic URL construction for all API endpoints
+- Type-safe endpoint and referer management
+
+**Usage Patterns**:
+```typescript
+import { config } from '@/src/config';
+
+// Get full URL for an endpoint
+const url = config.api.getFullUrl('memberQueues');
+// Returns: https://tapthatapp.beerknurd.com/memberQueues.php
+
+// Access endpoint paths
+const endpoint = config.api.endpoints.addToQueue;
+// Returns: /addToQueue.php
+
+// Access referer URLs
+const referer = config.api.referers.memberDashboard;
+// Returns: https://tapthatapp.beerknurd.com/member-dash.php
+
+// Get base URL
+const baseUrl = config.api.baseUrl;
+
+// Network configuration
+const timeout = config.network.timeout;
+const retries = config.network.retries;
+
+// External services
+const untappdUrl = config.external.untappd.loginUrl;
+```
+
+**Available Endpoints**:
+- `memberQueues` - User's queued beers
+- `deleteQueuedBrew` - Delete a queued beer
+- `addToQueue` - Add beer to queue (check-in)
+- `addToRewardQueue` - Add reward beer to queue
+- `memberDashboard` - Member dashboard page
+- `memberRewards` - Rewards listing page
+- `kiosk` - Login/kiosk page
+- `visitor` - Visitor mode page
+
+**Available Referers**:
+- `memberDashboard` - For API requests from member dashboard
+- `memberRewards` - For API requests from rewards page
+- `memberQueues` - For API requests from queues page
+
+**IMPORTANT**:
+- ❌ **DO NOT hardcode URLs** - Always use the config module
+- ✅ **USE config.api.getFullUrl()** for constructing full URLs
+- ✅ **USE config.api.endpoints** for endpoint paths
+- ✅ **USE config.api.referers** for HTTP referer headers
+
+**Environment Configuration**:
+Set environment variables in `.env.development`, `.env.staging`, or `.env.production`:
+```bash
+EXPO_PUBLIC_API_BASE_URL=https://your-api-server.com
+EXPO_PUBLIC_API_TIMEOUT=15000
+EXPO_PUBLIC_API_RETRIES=3
+```
+
+See `docs/ENVIRONMENT_VARIABLES.md` for complete configuration options.
 
 ### API & Authentication Layer
 
@@ -160,9 +277,10 @@ File-based routing with tabs:
 - `context/__tests__/` - Context and state management tests
 
 **Testing Strategy**:
-- ✅ **Jest**: Use for unit tests only (functions, hooks, utilities)
+- ✅ **Jest**: Use for unit tests only (functions, utilities, pure logic)
 - ✅ **Maestro/Flashlight**: Use for ALL integration and E2E tests
 - ❌ **DO NOT use Jest for integration tests** - React Native testing environment causes timeouts
+- ❌ **DO NOT write unit tests for React Native hooks** - Hooks that use React Native context (useColorScheme, useThemeColor, etc.) cause timeouts in Jest. Test these hooks indirectly through component tests or Maestro E2E tests.
 
 **Why Maestro for Integration Tests**:
 - Jest integration tests consistently timeout in React Native environment
@@ -180,6 +298,28 @@ File-based routing with tabs:
 - Component integration tests were removed due to React Native testing environment issues
 - Focus on unit tests in Jest, comprehensive integration tests in Maestro
 - Plan to implement Maestro test suite as part of MP-5 (Missing Integration Tests)
+
+**What to Test Where**:
+```typescript
+// ✅ Jest Unit Tests - Pure logic hooks
+export function useBeerFilters() {
+  // Pure logic, no RN dependencies - safe to test with Jest
+}
+
+// ❌ DO NOT unit test - React Native hooks
+export function useUntappdColor() {
+  // Uses useColorScheme(), useThemeColor() - will timeout
+  // Instead: Test through component tests or Maestro
+}
+
+// ✅ Jest Component Tests - Test RN hooks indirectly
+it('should use pink color in dark mode', () => {
+  render(<MyComponent />); // Tests useUntappdColor() indirectly
+});
+
+// ✅ Maestro E2E - Integration testing
+# Test that verifies theme switching works end-to-end
+```
 
 ### Type System
 

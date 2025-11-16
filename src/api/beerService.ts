@@ -6,6 +6,7 @@ import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { ApiResponse, ApiError, SessionData } from '../types/api';
 import { Beer, Beerfinder, CheckInRequestData, CheckInResponse, isBeer, isBeerfinder } from '../types/beer';
+import { config } from '@/src/config';
 
 const apiClient = ApiClient.getInstance();
 
@@ -54,7 +55,10 @@ export const checkInBeer = async (beer: Beer): Promise<CheckInResponse> => {
     };
 
     // Use the ApiClient to make the request
-    const response = await apiClient.post<Record<string, unknown>>('/addToQueue.php', requestData);
+    const response = await apiClient.post<Record<string, unknown>>(
+      config.api.endpoints.addToQueue,
+      requestData
+    );
 
     // If the request was successful but returned no data
     if (response.success && (!response.data || Object.keys(response.data).length === 0)) {

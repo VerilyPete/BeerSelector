@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Alert } from 'react-native';
 import { router } from 'expo-router';
-import { handleTapThatAppLogin, handleVisitorLogin } from '@/src/api/authService';
 import { setPreference } from '@/src/database/preferences';
 
 /**
@@ -49,13 +48,14 @@ export interface UseLoginFlowReturn {
   startVisitorLogin: () => void;
 
   /**
-   * Handle successful login with cookies received from WebView
-   * Routes to appropriate auth handler based on selectedLoginType
-   * Shows success alert, calls onRefreshData, and navigates to home after 300ms
-   *
-   * @param params - Object containing cookies string from WebView
+   * Handle successful login after WebView completes authentication
+   * WebView has already extracted cookies, validated session, and saved preferences
+   * This handler coordinates the post-login flow:
+   * 1. Close WebView
+   * 2. Refresh data from database
+   * 3. Navigate to home screen
    */
-  handleLoginSuccess: (params: { cookies: string }) => Promise<void>;
+  handleLoginSuccess: () => Promise<void>;
 
   /**
    * Handle user canceling the login process
@@ -65,21 +65,23 @@ export interface UseLoginFlowReturn {
 }
 
 /**
+ * Navigation delay constant
+ * Allows time for state updates to propagate before navigation
+ */
+const NAVIGATION_DELAY_MS = 300;
+
+/**
  * Custom hook to manage login flow state and logic for Flying Saucer authentication
  *
  * This hook handles both UFO Club member login and visitor mode login flows:
  *
- * **Member Login Flow:**
- * 1. User calls startMemberLogin() → Shows WebView with member login page
- * 2. WebView captures cookies after successful login
- * 3. handleLoginSuccess() → Calls handleTapThatAppLogin() with cookies
- * 4. Shows success alert → Calls onRefreshData() → Navigates to home after 300ms
- *
- * **Visitor Login Flow:**
- * 1. User calls startVisitorLogin() → Shows WebView with visitor login page
- * 2. WebView captures cookies after store selection
- * 3. handleLoginSuccess() → Calls handleVisitorLogin() with cookies
- * 4. Shows success alert → Calls onRefreshData() → Navigates to home after 300ms
+ * **Modern Login Flow (LoginWebView):**
+ * 1. User calls startMemberLogin() or startVisitorLogin() → Shows WebView
+ * 2. WebView handles authentication internally (cookies, session validation, preferences)
+ * 3. handleLoginSuccess() → Post-login coordinator:
+ *    - Closes WebView
+ *    - Calls onRefreshData() to fetch latest data
+ *    - Navigates to home screen after 300ms delay
  *
  * **Key Features:**
  * - Prevents duplicate login attempts via isLoggingIn flag
@@ -87,6 +89,7 @@ export interface UseLoginFlowReturn {
  * - 300ms navigation delay with proper timer cleanup
  * - Comprehensive error handling with user-friendly alerts
  * - Supports optional data refresh callback
+ * - Ensures data refresh completes BEFORE navigation starts
  *
  * **Cleanup Pattern:**
  * The hook uses an `isMounted` ref to track component lifecycle and prevent
@@ -205,152 +208,66 @@ export const useLoginFlow = ({
   }, []);
 
   /**
-   * Handle successful login with cookies from WebView
-   *
-   * Flow:
-   * 1. Validate login type and cookies (if provided)
-   * 2. Call appropriate auth handler (member or visitor) if cookies provided
-   * 3. Close WebView
-   * 4. On success: show alert, call onRefreshData, navigate after 300ms
-   * 5. On error: show error alert, keep WebView open for retry
-   *
-   * @param params - Optional object containing cookies string from WebView
-   *                 When called from LoginWebView, params is undefined (cookies handled internally)
+   * Called after LoginWebView completes authentication internally.
+   * WebView has already extracted cookies, validated session, and saved preferences.
+   * This handler coordinates the post-login flow:
+   * 1. Close WebView
+   * 2. Refresh data from database
+   * 3. Navigate to home screen
    */
-  const handleLoginSuccess = useCallback(async (params?: { cookies: string }) => {
+  const handleLoginSuccess = useCallback(async () => {
     try {
-      // LoginWebView handles authentication internally, so params may be undefined
-      // In that case, we just close the WebView and refresh data
-      if (!params) {
-        console.log('Login handled internally by WebView, proceeding with post-login flow');
+      console.log('Login handled internally by WebView, proceeding with post-login flow');
 
-        // Close webview
-        if (isMounted.current) {
-          setLoginWebViewVisible(false);
-        }
-
-        // Set API URLs configured preference
-        await setPreference('api_urls_configured', 'true', 'Flag indicating API URLs are configured');
-
-        // Call onRefreshData if provided
-        if (onRefreshData) {
-          try {
-            await onRefreshData();
-          } catch (refreshError) {
-            console.error('Error refreshing data after login:', refreshError);
-          }
-        }
-
-        // Reset loading state
-        if (isMounted.current) {
-          setIsLoggingIn(false);
-        }
-
-        return;
-      }
-
-      const { cookies } = params;
-
-      // Validate login type is set
-      if (!selectedLoginType) {
-        Alert.alert('Login Error', 'Login type not specified. Please try again.');
-        if (isMounted.current) {
-          setIsLoggingIn(false);
-          setLoginWebViewVisible(false);
-        }
-        return;
-      }
-
-      // Validate cookies are present
-      if (!cookies || cookies.trim() === '') {
-        Alert.alert('Login Error', 'No cookies received from login. Please try again.');
-        if (isMounted.current) {
-          setIsLoggingIn(false);
-          setLoginWebViewVisible(false);
-        }
-        return;
-      }
-
-      // Call appropriate auth handler based on login type
-      let result;
-      if (selectedLoginType === 'member') {
-        // Note: LoginWebView component extracts headers internally from WebView navigation state
-        // and passes them to the auth service. The hook only receives cookies.
-        result = await handleTapThatAppLogin(cookies, undefined);
-      } else {
-        result = await handleVisitorLogin(cookies);
-      }
-
-      // Check if login was successful
-      if (!result.success) {
-        // Show error to user
-        Alert.alert('Login Error', result.error || 'Login failed. Please try again.');
-
-        // Close webview and reset state
-        if (isMounted.current) {
-          setIsLoggingIn(false);
-          setLoginWebViewVisible(false);
-        }
-        return;
-      }
-
-      // Login successful - close webview immediately
+      // Close webview
       if (isMounted.current) {
         setLoginWebViewVisible(false);
       }
 
-      // Set API URLs configured preference
-      await setPreference('api_urls_configured', 'true', 'Flag indicating API URLs are configured');
+      // Set API URLs configured preference (non-critical, log if fails)
+      try {
+        await setPreference('api_urls_configured', 'true', 'Flag indicating API URLs are configured');
+      } catch (prefError) {
+        console.warn('Failed to set api_urls_configured preference:', prefError);
+        // Continue with login flow even if preference fails
+      }
 
-      // Show success alert
-      Alert.alert(
-        'Login Successful',
-        selectedLoginType === 'member'
-          ? 'You have successfully logged in to your UFO Club account.'
-          : 'You have successfully logged in as a visitor.'
-      );
-
-      // Call onRefreshData if provided (don't block on errors)
+      // Call onRefreshData if provided - WAIT for completion before navigating
       if (onRefreshData) {
         try {
+          console.log('Starting data refresh after login...');
           await onRefreshData();
+          console.log('Data refresh completed after login');
         } catch (refreshError) {
           console.error('Error refreshing data after login:', refreshError);
           // Continue with navigation even if refresh fails
         }
       }
 
-      // Navigate to home after 300ms delay with cleanup
-      const timer = setTimeout(() => {
-        if (isMounted.current) {
-          router.replace('/(tabs)');
-        }
-        pendingTimers.current.delete(timer);
-      }, 300);
-
-      pendingTimers.current.add(timer);
-
-      // Reset loading state
+      // IMPORTANT: Navigate only AFTER refresh completes
+      // Reset login state immediately, navigation happens after delay
       if (isMounted.current) {
         setIsLoggingIn(false);
       }
 
+      const timer = setTimeout(() => {
+        if (isMounted.current) {
+          console.log('Navigating to home screen after successful login');
+          router.replace('/(tabs)');
+        }
+        pendingTimers.current.delete(timer);
+      }, NAVIGATION_DELAY_MS);
+
+      pendingTimers.current.add(timer);
     } catch (error) {
-      console.error('Error during login:', error);
-
-      // Show generic error message
-      Alert.alert(
-        'Login Error',
-        'Failed to complete login. Please try again.'
-      );
-
-      // Close webview and reset state
+      console.error('Error in handleLoginSuccess:', error);
+      Alert.alert('Login Error', 'An error occurred during login. Please try again.');
       if (isMounted.current) {
         setIsLoggingIn(false);
         setLoginWebViewVisible(false);
       }
     }
-  }, [selectedLoginType, onRefreshData]);
+  }, [onRefreshData]);
 
   return {
     isLoggingIn,

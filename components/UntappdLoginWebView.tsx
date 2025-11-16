@@ -7,6 +7,7 @@ import { ThemedText } from '@/components/ThemedText';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { setUntappdCookie } from '@/src/database/db';
+import { config } from '@/src/config';
 
 interface UntappdLoginWebViewProps {
   visible: boolean;
@@ -238,7 +239,7 @@ export default function UntappdLoginWebView({
 
         <WebView
           ref={untappdWebViewRef}
-          source={{ uri: 'https://untappd.com/login' }}
+          source={{ uri: config.external.untappd.loginUrl }}
           onNavigationStateChange={handleUntappdWebViewNavigationStateChange}
           onMessage={handleUntappdWebViewMessage}
           accessible={true}

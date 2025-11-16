@@ -1,8 +1,10 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { StyleSheet, View, TouchableOpacity } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { beerRepository } from '@/src/database/repositories/BeerRepository';
 import { ThemedText } from './ThemedText';
 import { useThemeColor } from '@/hooks/useThemeColor';
+import { useUntappdColor } from '@/hooks/useUntappdColor';
 import { SearchBar } from './SearchBar';
 import { useBeerFilters } from '@/hooks/useBeerFilters';
 import { useDataRefresh } from '@/hooks/useDataRefresh';
@@ -19,6 +21,7 @@ export const AllBeers = () => {
   const { beers, loading, errors, setAllBeers, setLoadingBeers, setBeerError } = useAppContext();
 
   const [untappdModalVisible, setUntappdModalVisible] = useState(false);
+  const [selectedBeerName, setSelectedBeerName] = useState('');
 
   /**
    * MP-3 Bottleneck #4: Local search state for immediate UI updates
@@ -47,6 +50,7 @@ export const AllBeers = () => {
 
   // Theme colors
   const activeButtonColor = useThemeColor({}, 'tint');
+  const untappdColor = useUntappdColor();
 
   const loadBeers = useCallback(async () => {
     try {
@@ -90,6 +94,37 @@ export const AllBeers = () => {
   const clearSearch = useCallback(() => {
     setLocalSearchText('');
   }, []);
+
+  const handleUntappdSearch = useCallback((beerName: string) => {
+    // Add haptic feedback for iOS
+    if (process.env.EXPO_OS === 'ios') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+    setSelectedBeerName(beerName);
+    setUntappdModalVisible(true);
+  }, []);
+
+  // No useCallback wrapper - matches Beerfinder pattern
+  // Function is called during render for each visible item, memoization doesn't help
+  const renderBeerActions = (item: Beer) => (
+    <View style={styles.buttonContainer}>
+      <TouchableOpacity
+        style={[styles.checkInButton, {
+          backgroundColor: untappdColor,
+          width: '48%'
+        }]}
+        onPress={() => handleUntappdSearch(item.brew_name)}
+        activeOpacity={0.7}
+        accessible={true}
+        accessibilityLabel={`Check ${item.brew_name} on Untappd`}
+        accessibilityRole="button"
+      >
+        <ThemedText style={styles.checkInButtonText}>
+          Check Untappd
+        </ThemedText>
+      </TouchableOpacity>
+    </View>
+  );
 
   return (
     <View style={styles.container} testID="all-beers-container">
@@ -151,12 +186,13 @@ export const AllBeers = () => {
             emptyMessage="No beers found"
             expandedId={expandedId}
             onToggleExpand={toggleExpand}
+            renderItemActions={renderBeerActions}
           />
 
           <UntappdWebView
             visible={untappdModalVisible}
             onClose={() => setUntappdModalVisible(false)}
-            beerName=""
+            beerName={selectedBeerName}
           />
         </>
       )}
@@ -197,5 +233,22 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     fontWeight: '600',
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 16,
+  },
+  checkInButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkInButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: 'white',
   },
 });

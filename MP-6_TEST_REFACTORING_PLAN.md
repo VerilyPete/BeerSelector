@@ -10,9 +10,12 @@ This plan outlines the systematic refactoring of BeerSelector tests to leverage 
 - Implement environment-specific test scenarios
 - Improve test isolation and reliability
 
-**Total Effort:** 32 hours (4 weeks at 8 hours/week)
-**Total Steps:** 20 actionable implementation steps
+**Total Effort:** 37.5 hours (4-5 weeks at 8 hours/week)
+**Total Steps:** 25 actionable implementation steps (20 original + 5 from Phase 3 code review)
 **Impact:** 60-80% reduction in config-related bugs, 10x improvement in test setup efficiency
+
+**Phase 3 Code Review Integration:**
+Phase 3 was completed with a 9/10 code review score. The reviewer identified 4 MEDIUM and 1 LOW priority improvements that have been integrated into Phase 4 as Steps 4.8-4.12, adding 5.5 hours of work focused on deduplicating tests, improving error handling, and adding missing coverage.
 
 ## Prerequisites
 
@@ -670,6 +673,29 @@ it('should handle invalid config gracefully', async () => {
 
 ## Phase 4: Advanced Testing & Documentation (Week 4)
 
+**Progress:** 0/12 steps complete (0%)
+**Estimated Effort:** 13.5 hours
+**Priority:** High (Steps 4.1-4.2, 4.8-4.10), Medium (Steps 4.3-4.4, 4.6), Low (Steps 4.5, 4.7, 4.11-4.12)
+
+### Phase 4 Overview
+
+Phase 4 focuses on creating dedicated config module tests, comprehensive validation, and addressing deferred items from the Phase 3 code review. This phase includes both planned steps (4.1-4.7) and code review-driven improvements (4.8-4.12).
+
+**Original Steps (4.1-4.7):** Advanced testing and documentation
+**New Steps (4.8-4.12):** Phase 3 code review deferred items
+
+**Key Objectives:**
+1. Create comprehensive config module test suites
+2. Validate environment variable loading
+3. Test error scenarios and edge cases
+4. Deduplicate redundant config tests from component files
+5. Improve error handling test quality
+6. Add missing config integration coverage
+7. Update documentation
+8. Clean up deprecated patterns
+
+---
+
 ### Step 4.1: Create Environment Variable Loading Tests
 **File:** Create `src/config/__tests__/envVarLoading.test.ts`
 **Objective:** Test all environment variable loading scenarios
@@ -904,6 +930,396 @@ describe.each<AppEnvironment>(['development', 'staging', 'production'])(
 
 ---
 
+### Step 4.8: Deduplicate Config Validation Tests (Phase 3 Code Review Item)
+**Files:** `LoginWebView.test.tsx`, `UntappdLoginWebView.test.tsx`, `settings.integration.test.tsx`
+**Objective:** Remove redundant config validation tests from component files
+**Effort:** 1 hour
+**Priority:** Medium
+**Source:** Phase 3 Code Review Issue #5
+
+**Background:**
+Phase 3 code review identified that all three component test files contain nearly identical tests validating config URL construction, environment switching, and network settings. These tests validate the config module itself rather than component usage of config.
+
+**Current Redundancy:**
+- All three files test "should construct valid URLs for all endpoints"
+- All three files test "should use correct base URL"
+- All three files test environment switching behavior
+- Total redundant tests: ~15 tests duplicated across files
+
+**Changes Required:**
+1. **Create** `src/config/__tests__/config.test.ts` (if not already created in Steps 4.1-4.3)
+2. **Move** config validation logic from component tests to config tests:
+   - URL construction for all endpoints
+   - Base URL validation
+   - Environment switching validation
+   - Network configuration validation
+3. **Keep** in component tests:
+   - Tests verifying component uses config correctly
+   - Tests verifying component receives config values
+   - Component-specific config error handling
+4. **Remove** from component tests:
+   - Generic config functionality tests
+   - Config URL construction tests (move to config.test.ts)
+   - Config environment switching tests (move to config.test.ts)
+
+**Before/After Example:**
+```typescript
+// ❌ Remove from LoginWebView.test.tsx (duplicates config testing)
+it('should construct valid URLs for all endpoints', () => {
+  const endpoints = ['kiosk', 'visitor', 'memberDashboard'];
+  endpoints.forEach(endpoint => {
+    const url = config.api.getFullUrl(endpoint);
+    expect(url).toBeTruthy();
+    expect(url).toMatch(/^https?:\/\//);
+  });
+});
+
+// ✅ Keep in LoginWebView.test.tsx (tests component behavior)
+it('should use config for WebView source URL', () => {
+  const { getByTestId } = render(<LoginWebView visible={true} {...props} />);
+
+  await waitFor(() => {
+    expect(config.api.getFullUrl).toHaveBeenCalledWith('kiosk');
+  });
+});
+
+// ✅ Move to src/config/__tests__/config.test.ts
+describe('URL Construction', () => {
+  it('should construct valid URLs for all endpoints', () => {
+    const endpoints = ['kiosk', 'visitor', 'memberDashboard'];
+    endpoints.forEach(endpoint => {
+      const url = config.api.getFullUrl(endpoint);
+      expect(url).toBeTruthy();
+      expect(url).toMatch(/^https?:\/\//);
+    });
+  });
+});
+```
+
+**Success Criteria:**
+- Config validation tests moved to dedicated config test file
+- Component tests only verify component usage of config
+- No redundant config tests across component files
+- All tests still passing
+- Test count reduced by ~15 tests (redundancy eliminated)
+
+**Dependencies:** Steps 4.1-4.3 (config test files created)
+
+---
+
+### Step 4.9: Improve Error Handling Test Assertions (Phase 3 Code Review Item)
+**Files:** `LoginWebView.test.tsx`, `UntappdLoginWebView.test.tsx`
+**Objective:** Enhance error handling tests to verify user-facing behavior
+**Effort:** 30 minutes
+**Priority:** Medium
+**Source:** Phase 3 Code Review Issue #6
+
+**Background:**
+Phase 3 code review identified that current error handling tests only verify that errors throw, but don't test how components handle errors from a user perspective (error messages, graceful degradation, recovery).
+
+**Current Weakness:**
+```typescript
+// ❌ Weak - Only tests that error propagates
+it('should handle config throwing error', () => {
+  (config.api.getFullUrl as jest.Mock).mockImplementation(() => {
+    throw new Error('Config error');
+  });
+
+  expect(() => {
+    render(<LoginWebView ... />);
+  }).toThrow('Config error');
+});
+```
+
+**Changes Required:**
+1. **Enhance error tests** to verify user-facing behavior:
+   - Alert messages shown to user
+   - Graceful degradation (fallback UI)
+   - Component doesn't crash
+   - Recovery scenarios (retry, reload)
+
+2. **Add missing error scenarios:**
+   - Invalid config format
+   - Missing config values
+   - Network errors during config loading
+   - Timeout errors
+
+**Improved Pattern:**
+```typescript
+// ✅ Better - Tests user-facing behavior
+it('should show error message when config fails', () => {
+  const alertSpy = jest.spyOn(Alert, 'alert');
+  (config.api.getFullUrl as jest.Mock).mockReturnValue(undefined);
+
+  render(<LoginWebView visible={true} {...props} />);
+
+  // Verify user sees error message
+  expect(alertSpy).toHaveBeenCalledWith(
+    'Configuration Error',
+    expect.stringContaining('Unable to load')
+  );
+});
+
+it('should display fallback UI when config unavailable', () => {
+  (config.api.getFullUrl as jest.Mock).mockReturnValue(undefined);
+
+  const { queryByText } = render(<LoginWebView visible={true} {...props} />);
+
+  // Verify fallback UI is shown
+  expect(queryByText(/Configuration Error/i)).toBeTruthy();
+  expect(queryByText(/Please check settings/i)).toBeTruthy();
+});
+
+it('should allow retry after config error', () => {
+  const alertSpy = jest.spyOn(Alert, 'alert');
+  (config.api.getFullUrl as jest.Mock)
+    .mockReturnValueOnce(undefined)
+    .mockReturnValueOnce('https://test.com/kiosk.php');
+
+  const { rerender } = render(<LoginWebView visible={true} {...props} />);
+
+  expect(alertSpy).toHaveBeenCalled();
+
+  // Retry
+  rerender(<LoginWebView visible={true} {...props} />);
+
+  // Should succeed on retry
+  expect(queryByText(/Configuration Error/i)).toBeNull();
+});
+```
+
+**Success Criteria:**
+- Error tests verify Alert messages shown to users
+- Tests verify graceful degradation (fallback UI)
+- Tests verify recovery scenarios (retry)
+- Component doesn't crash on config errors
+- All error scenarios covered
+
+**Dependencies:** None
+
+---
+
+### Step 4.10: Add Missing Config Integration Test Coverage (Phase 3 Code Review Item)
+**Files:** Component test files
+**Objective:** Add tests for config integration scenarios not currently covered
+**Effort:** 1 hour
+**Priority:** Medium
+**Source:** Phase 3 Code Review Issue #7
+
+**Background:**
+Phase 3 code review identified several config integration scenarios that are not currently tested:
+1. Config changes during component lifecycle
+2. Config validation errors from invalid endpoint names
+3. Referer header usage from config.api.referers
+4. Actual WebView source URL verification
+
+**Missing Test Coverage:**
+
+**1. Config Changes During Lifecycle:**
+```typescript
+it('should update when config.setEnvironment() is called', () => {
+  config.setEnvironment('production');
+  const { rerender } = render(<LoginWebView visible={true} {...props} />);
+
+  expect(config.api.getFullUrl).toHaveBeenCalledWith('kiosk');
+
+  // Change environment
+  config.setEnvironment('development');
+  rerender(<LoginWebView visible={true} {...props} />);
+
+  // Verify component responds to config change
+  expect(config.api.getFullUrl).toHaveBeenCalledTimes(2);
+});
+
+it('should handle custom API URL changes', () => {
+  const { rerender } = render(<LoginWebView visible={true} {...props} />);
+
+  config.setCustomApiUrl('http://localhost:3000');
+  rerender(<LoginWebView visible={true} {...props} />);
+
+  // Verify component uses new URL
+  expect(config.api.baseUrl).toBe('http://localhost:3000');
+});
+```
+
+**2. Endpoint Validation:**
+```typescript
+it('should validate endpoint names exist in config', () => {
+  const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+
+  (config.api.getFullUrl as jest.Mock).mockImplementation((endpoint) => {
+    if (!config.api.endpoints[endpoint]) {
+      throw new Error(`Invalid endpoint: ${endpoint}`);
+    }
+    return `${config.api.baseUrl}/${endpoint}.php`;
+  });
+
+  // This should log error or handle gracefully
+  render(<LoginWebView visible={true} {...props} />);
+
+  expect(consoleErrorSpy).not.toHaveBeenCalledWith(
+    expect.stringContaining('Invalid endpoint')
+  );
+});
+```
+
+**3. Referer Header Usage:**
+```typescript
+it('should use config.api.referers for HTTP Referer headers', async () => {
+  const fetchSpy = jest.spyOn(global, 'fetch');
+
+  render(<LoginWebView visible={true} {...props} />);
+
+  await waitFor(() => {
+    expect(fetchSpy).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          'Referer': config.api.referers.memberDashboard
+        })
+      })
+    );
+  });
+});
+```
+
+**4. WebView Source URL Verification:**
+```typescript
+it('should set WebView source to config URL', () => {
+  const expectedUrl = config.api.getFullUrl('kiosk');
+
+  const { getByTestId } = render(<LoginWebView visible={true} {...props} />);
+  const webView = getByTestId('login-webview');
+
+  // Verify WebView source prop uses config URL
+  expect(webView.props.source.uri).toBe(expectedUrl);
+});
+```
+
+**Success Criteria:**
+- Config lifecycle change tests added
+- Endpoint validation tests added
+- Referer header usage tests added
+- WebView source URL verification tests added
+- All new tests passing
+
+**Dependencies:** None
+
+---
+
+### Step 4.11: Investigate Test Count Inconsistency (Phase 3 Code Review Item)
+**Files:** All component test files
+**Objective:** Analyze why settings.integration has 36% more tests than component tests
+**Effort:** 30 minutes (investigation)
+**Priority:** Low
+**Source:** Phase 3 Code Review Issue #8
+
+**Background:**
+Phase 3 completion metrics show:
+- LoginWebView.test.tsx: 58 tests
+- UntappdLoginWebView.test.tsx: 58 tests
+- settings.integration.test.tsx: 79 tests (36% more)
+
+This discrepancy suggests possible redundancy or missing coverage.
+
+**Investigation Tasks:**
+
+1. **Categorize tests in each file:**
+   ```bash
+   # Count tests by category
+   grep -n "describe\|it('should" LoginWebView.test.tsx | wc -l
+   grep -n "describe\|it('should" UntappdLoginWebView.test.tsx | wc -l
+   grep -n "describe\|it('should" settings.integration.test.tsx | wc -l
+   ```
+
+2. **Identify test overlap:**
+   - Do settings tests duplicate component tests?
+   - Are there scenarios tested in settings but not components?
+   - Are there integration-specific tests that should exist?
+
+3. **Analyze test purposes:**
+   - Unit tests (component behavior)
+   - Integration tests (component + settings flow)
+   - Config tests (config module validation)
+   - Redundant tests (duplicates)
+
+4. **Document findings:**
+   - Create breakdown of test categories per file
+   - Identify genuinely missing tests in component files
+   - Identify redundant tests in settings file
+   - Create recommendations for balancing
+
+**Expected Outcomes:**
+
+One of these scenarios:
+1. **Settings tests are redundant** → Remove duplicates, move to component files
+2. **Component tests are missing scenarios** → Add missing tests
+3. **Test counts are justified** → Settings naturally has more integration scenarios
+4. **Mixed** → Some redundancy, some missing coverage
+
+**Deliverable:**
+Create `MP-6_TEST_COUNT_ANALYSIS.md` with:
+- Test breakdown by category for each file
+- Identified redundancy (if any)
+- Identified gaps (if any)
+- Recommendations for next steps
+
+**Success Criteria:**
+- Test count discrepancy explained
+- Redundant tests identified (if any)
+- Missing tests identified (if any)
+- Recommendations documented
+
+**Dependencies:** None
+
+---
+
+### Step 4.12: Simplify Verbose Test Names (Phase 3 Code Review Item)
+**Files:** All component test files
+**Objective:** Simplify overly verbose test names for better readability
+**Effort:** 20 minutes
+**Priority:** Low
+**Source:** Phase 3 Code Review Issue #10
+
+**Background:**
+Phase 3 code review identified some test names that are unnecessarily verbose or contain redundant words.
+
+**Examples to Simplify:**
+
+```typescript
+// ❌ Verbose
+it('should verify config.external.untappd was accessed', () => {});
+it('should verify Untappd URL is properly loaded from config', () => {});
+it('should verify that component uses config for WebView source', () => {});
+
+// ✅ Concise
+it('should access config.external.untappd', () => {});
+it('should load Untappd URL from config', () => {});
+it('should use config for WebView source', () => {});
+```
+
+**Changes Required:**
+1. Remove "verify that" phrases
+2. Remove "properly", "correctly" adjectives (implied by test)
+3. Use active voice consistently
+4. Keep test names clear but concise
+
+**Pattern:**
+- Remove: "should verify that..." → "should..."
+- Remove: "should verify X was accessed" → "should access X"
+- Remove: "properly", "correctly", "successfully" (redundant)
+- Keep: Technical terms, specific config paths, clear intent
+
+**Success Criteria:**
+- Test names are concise (under 60 characters)
+- Test names remain clear and descriptive
+- Consistent naming pattern across all files
+- All tests still passing
+
+**Dependencies:** None
+
+---
+
 ## Phase 5: Performance & Polish (Optional - Week 5)
 
 ### Step 5.1: Add Performance Tests
@@ -1079,20 +1495,33 @@ it('should provide helpful error', () => {
 
 ## Implementation Timeline
 
-**Week 1 (8 hours):** Foundation & Quick Wins
+**Week 1 (8 hours):** Foundation & Quick Wins ✅ COMPLETE
 - Steps 1.1-1.4: Gold standard study, mock server, initial refactors
+- Status: 100% complete (4/4 steps)
 
-**Week 2 (8 hours):** Service & Integration Tests
+**Week 2 (8 hours):** Service & Integration Tests ✅ COMPLETE
 - Steps 2.1-2.3: Service tests, mock server integration
+- Status: 100% complete (3/3 steps)
 
-**Week 3 (8 hours):** Component Tests
+**Week 3 (6 hours):** Component Tests ✅ COMPLETE
 - Steps 3.1-3.3: Component test refactoring
+- Status: 100% complete (3/3 steps)
+- Completed 2 hours under estimate through parallel agent execution
 
-**Week 4 (8 hours):** Advanced Testing & Documentation
-- Steps 4.1-4.7: New test suites, documentation
+**Week 4 (13.5 hours):** Advanced Testing & Documentation ⏸️ READY
+- Steps 4.1-4.7: New test suites, documentation (8 hours)
+- Steps 4.8-4.12: Phase 3 code review deferred items (5.5 hours)
+- Status: 0% complete (0/12 steps)
+- Priority breakdown:
+  - HIGH: Steps 4.1-4.2, 4.8-4.10 (7.5 hours)
+  - MEDIUM: Steps 4.3-4.4, 4.6 (7 hours)
+  - LOW: Steps 4.5, 4.7, 4.11-4.12 (6 hours)
 
 **Week 5 (Optional):** Performance & Polish
-- Steps 5.1-5.2: Performance tests, coverage
+- Steps 5.1-5.2: Performance tests, coverage (2 hours)
+
+**Total Progress:** 10/25 steps complete (40%)
+**Estimated Remaining:** 15.5 hours (13.5 hours Phase 4 + 2 hours Phase 5 optional)
 
 ## Risk Mitigation
 

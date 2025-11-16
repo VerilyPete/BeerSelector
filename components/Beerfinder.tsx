@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { StyleSheet, View, TouchableOpacity, Alert, ActivityIndicator, Modal, FlatList } from 'react-native';
 import { ThemedText } from './ThemedText';
 import { useThemeColor } from '@/hooks/useThemeColor';
+import { useUntappdColor } from '@/hooks/useUntappdColor';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { SearchBar } from './SearchBar';
 import { checkInBeer } from '@/src/api/beerService';
@@ -61,6 +62,7 @@ export const Beerfinder = () => {
 
   // Theme colors
   const activeButtonColor = useThemeColor({}, 'tint');
+  const untappdColor = useUntappdColor();
   const cardColor = useThemeColor({}, 'background');
   const borderColor = useThemeColor({ light: '#e0e0e0', dark: '#333' }, 'text');
 
@@ -203,7 +205,7 @@ export const Beerfinder = () => {
     <View style={styles.buttonContainer}>
       <TouchableOpacity
         style={[styles.checkInButton, {
-          backgroundColor: colorScheme === 'dark' ? '#E91E63' : activeButtonColor,
+          backgroundColor: untappdColor,
           width: '48%'
         }]}
         onPress={() => handleCheckIn(item)}
@@ -223,7 +225,7 @@ export const Beerfinder = () => {
 
       <TouchableOpacity
         style={[styles.checkInButton, {
-          backgroundColor: colorScheme === 'dark' ? '#E91E63' : activeButtonColor,
+          backgroundColor: untappdColor,
           width: '48%'
         }]}
         onPress={() => handleUntappdSearch(item.brew_name)}
@@ -256,7 +258,7 @@ export const Beerfinder = () => {
               </ThemedText>
               <TouchableOpacity
                 style={[styles.retryButton, {
-                  backgroundColor: colorScheme === 'dark' ? '#E91E63' : activeButtonColor
+                  backgroundColor: untappdColor
                 }]}
                 onPress={viewQueues}
                 disabled={loadingQueues}
@@ -315,7 +317,7 @@ export const Beerfinder = () => {
 
           <TouchableOpacity
             style={[styles.closeButton, {
-              backgroundColor: colorScheme === 'dark' ? '#E91E63' : activeButtonColor
+              backgroundColor: untappdColor
             }]}
             onPress={() => setQueueModalVisible(false)}
           >
@@ -338,7 +340,7 @@ export const Beerfinder = () => {
             <View style={styles.buttonsContainer}>
               <TouchableOpacity
                 style={[styles.actionButton, {
-                  backgroundColor: colorScheme === 'dark' ? '#E91E63' : activeButtonColor,
+                  backgroundColor: untappdColor,
                   marginRight: 8
                 }]}
                 onPress={viewQueues}
@@ -357,7 +359,7 @@ export const Beerfinder = () => {
 
               <TouchableOpacity
                 style={[styles.actionButton, {
-                  backgroundColor: colorScheme === 'dark' ? '#E91E63' : activeButtonColor
+                  backgroundColor: untappdColor
                 }]}
                 onPress={() => router.push("/screens/rewards" as any)}
               >
@@ -389,7 +391,7 @@ export const Beerfinder = () => {
             <View style={styles.buttonsContainer}>
               <TouchableOpacity
                 style={[styles.actionButton, {
-                  backgroundColor: colorScheme === 'dark' ? '#E91E63' : activeButtonColor,
+                  backgroundColor: untappdColor,
                   marginRight: 8
                 }]}
                 onPress={viewQueues}
@@ -408,7 +410,7 @@ export const Beerfinder = () => {
 
               <TouchableOpacity
                 style={[styles.actionButton, {
-                  backgroundColor: colorScheme === 'dark' ? '#E91E63' : activeButtonColor
+                  backgroundColor: untappdColor
                 }]}
                 onPress={() => router.push("/screens/rewards" as any)}
               >

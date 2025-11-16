@@ -3,7 +3,9 @@ import { Modal, StyleSheet, View, TouchableOpacity, SafeAreaView } from 'react-n
 import { WebView } from 'react-native-webview';
 import { ThemedText } from './ThemedText';
 import { useThemeColor } from '@/hooks/useThemeColor';
+import { useUntappdColor } from '@/hooks/useUntappdColor';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { config } from '@/src/config';
 
 interface UntappdWebViewProps {
   visible: boolean;
@@ -14,17 +16,11 @@ interface UntappdWebViewProps {
 export const UntappdWebView = ({ visible, onClose, beerName }: UntappdWebViewProps) => {
   const colorScheme = useColorScheme();
   const cardColor = useThemeColor({}, 'background');
-  const activeButtonColor = useThemeColor({}, 'tint');
+  const untappdColor = useUntappdColor();
   const textColor = useThemeColor({}, 'text');
 
-  // Parse out words in parentheses from the beer name
-  const parseBeerName = (name: string): string => {
-    // Remove anything in parentheses (including the parentheses)
-    return name.replace(/\s*\([^)]*\)\s*/g, ' ').trim();
-  };
-
-  const parsedBeerName = parseBeerName(beerName);
-  const searchUrl = `https://untappd.com/search?q=${encodeURIComponent(parsedBeerName)}`;
+  // Use config module to generate search URL
+  const searchUrl = config.external.untappd.searchUrl(beerName);
 
   return (
     <Modal
@@ -38,8 +34,8 @@ export const UntappdWebView = ({ visible, onClose, beerName }: UntappdWebViewPro
           <View style={[styles.header, { borderBottomColor: colorScheme === 'dark' ? '#444' : '#ccc' }]}>
             <ThemedText style={styles.title}>Untappd Search</ThemedText>
             <TouchableOpacity
-              style={[styles.closeButton, { 
-                backgroundColor: colorScheme === 'dark' ? '#E91E63' : activeButtonColor 
+              style={[styles.closeButton, {
+                backgroundColor: untappdColor
               }]}
               onPress={onClose}
             >
