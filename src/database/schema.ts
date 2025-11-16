@@ -85,6 +85,23 @@ export const CREATE_UNTAPPD_TABLE = `
 `;
 
 /**
+ * SQL statement to create the operation_queue table
+ * Stores queued operations for retry when network connection is restored
+ */
+export const CREATE_OPERATION_QUEUE_TABLE = `
+  CREATE TABLE IF NOT EXISTS operation_queue (
+    id TEXT PRIMARY KEY,
+    type TEXT NOT NULL,
+    payload TEXT NOT NULL,
+    timestamp INTEGER NOT NULL,
+    retry_count INTEGER DEFAULT 0,
+    status TEXT DEFAULT 'pending',
+    error_message TEXT,
+    last_retry_timestamp INTEGER
+  )
+`;
+
+/**
  * Default preferences to initialize on first app launch
  */
 export const DEFAULT_PREFERENCES: Preference[] = [
@@ -133,6 +150,21 @@ export const setupTables = async (database: SQLiteDatabase): Promise<void> => {
       await database.execAsync(CREATE_REWARDS_TABLE);
       await database.execAsync(CREATE_PREFERENCES_TABLE);
       await database.execAsync(CREATE_UNTAPPD_TABLE);
+      await database.execAsync(CREATE_OPERATION_QUEUE_TABLE);
+
+      // Create indexes for operation_queue table
+      // These indexes improve query performance for getPendingOperations() and other status/timestamp-based queries
+      await database.execAsync(`
+        CREATE INDEX IF NOT EXISTS idx_operation_queue_status
+        ON operation_queue(status);
+      `);
+
+      await database.execAsync(`
+        CREATE INDEX IF NOT EXISTS idx_operation_queue_timestamp
+        ON operation_queue(timestamp);
+      `);
+
+      console.log('[Database] Created operation_queue indexes');
     });
 
     // Initialize preferences with default values if table is empty

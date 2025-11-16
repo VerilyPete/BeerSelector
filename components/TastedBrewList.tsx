@@ -11,10 +11,18 @@ import { SkeletonLoader } from './beer/SkeletonLoader';
 import { Beerfinder } from '@/src/types/beer';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useAppContext } from '@/context/AppContext';
+import { useOptimisticUpdate } from '@/context/OptimisticUpdateContext';
+import { useOptimisticCheckIn } from '@/hooks/useOptimisticCheckIn';
+import { OptimisticStatusBadge } from './optimistic/OptimisticStatusBadge';
+import { OptimisticUpdateType, CheckInRollbackData } from '@/src/types/optimisticUpdate';
 
 export const TastedBrewList = () => {
   // MP-4 Step 2: Use context for beer data instead of local state
   const { beers, loading, errors, setTastedBeers, setAllBeers, setRewards } = useAppContext();
+
+  // MP-7 Step 3: Optimistic UI updates
+  const { pendingUpdates } = useOptimisticUpdate();
+  const { getPendingBeer, retryCheckIn, rollbackCheckIn } = useOptimisticCheckIn();
 
   /**
    * MP-3 Bottleneck #4: Local search state for immediate UI updates
@@ -79,6 +87,26 @@ export const TastedBrewList = () => {
   const clearSearch = useCallback(() => {
     setLocalSearchText('');
   }, []);
+
+  /**
+   * MP-7 Step 3: Render optimistic status badge for tasted beers
+   */
+  const renderTastedBeerActions = useCallback((item: Beerfinder) => {
+    const pendingStatus = getPendingBeer(item.id);
+
+    if (pendingStatus) {
+      return (
+        <OptimisticStatusBadge
+          status={pendingStatus.status}
+          error={pendingStatus.error}
+          onRetry={() => retryCheckIn(item.id)}
+          onCancel={() => rollbackCheckIn(item.id)}
+        />
+      );
+    }
+
+    return null;
+  }, [getPendingBeer, retryCheckIn, rollbackCheckIn]);
 
   const emptyMessage = searchText
     ? "No tasted beer matches your search criteria."
@@ -145,6 +173,7 @@ export const TastedBrewList = () => {
             expandedId={expandedId}
             onToggleExpand={toggleExpand}
             dateLabel="Tasted"
+            renderItemActions={renderTastedBeerActions}
           />
         </>
       )}
