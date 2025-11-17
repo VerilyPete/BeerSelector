@@ -34,11 +34,33 @@ jobs:
 
       - name: Install Maestro
         run: |
+          # Install Maestro with verbose output
           curl -fsSL https://get.maestro.mobile.dev | bash
+
+          # Verify installation directory exists
+          if [ ! -d "$HOME/.maestro/bin" ]; then
+            echo "Error: Maestro installation directory not found"
+            exit 1
+          fi
+
+          # Verify maestro binary exists
+          if [ ! -f "$HOME/.maestro/bin/maestro" ]; then
+            echo "Error: Maestro binary not found"
+            ls -la "$HOME/.maestro/bin" || true
+            exit 1
+          fi
+
+          # Make sure it's executable
+          chmod +x "$HOME/.maestro/bin/maestro"
+
+          # Add to PATH for this step
+          export PATH="$HOME/.maestro/bin:$PATH"
+
+          # Add to PATH for future steps
           echo "$HOME/.maestro/bin" >> $GITHUB_PATH
 
-      - name: Verify Maestro installation
-        run: maestro --version
+          # Verify installation works
+          maestro --version
 
       - name: Setup iOS Simulator
         run: |
@@ -125,11 +147,33 @@ jobs:
 
       - name: Install Maestro
         run: |
+          # Install Maestro with verbose output
           curl -fsSL https://get.maestro.mobile.dev | bash
+
+          # Verify installation directory exists
+          if [ ! -d "$HOME/.maestro/bin" ]; then
+            echo "Error: Maestro installation directory not found"
+            exit 1
+          fi
+
+          # Verify maestro binary exists
+          if [ ! -f "$HOME/.maestro/bin/maestro" ]; then
+            echo "Error: Maestro binary not found"
+            ls -la "$HOME/.maestro/bin" || true
+            exit 1
+          fi
+
+          # Make sure it's executable
+          chmod +x "$HOME/.maestro/bin/maestro"
+
+          # Add to PATH for this step
+          export PATH="$HOME/.maestro/bin:$PATH"
+
+          # Add to PATH for future steps
           echo "$HOME/.maestro/bin" >> $GITHUB_PATH
 
-      - name: Verify Maestro installation
-        run: maestro --version
+          # Verify installation works
+          maestro --version
 
       - name: Setup Android Emulator
         uses: reactivecircus/android-emulator-runner@v2
