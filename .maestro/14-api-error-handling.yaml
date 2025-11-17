@@ -1,4 +1,4 @@
-appId: ${APP_ID}
+appId: org.verily.FSbeerselector
 name: "API Error Handling - Invalid URLs, Auth Errors, and Data Validation"
 ---
 # Test Flow: API Error Handling and Data Validation

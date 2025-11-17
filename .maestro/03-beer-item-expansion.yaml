@@ -1,4 +1,4 @@
-appId: ${APP_ID}
+appId: org.verily.FSbeerselector
 name: "Beer List - Item Expansion and Interaction"
 ---
 # Test Flow: Beer Item Expansion and Interaction

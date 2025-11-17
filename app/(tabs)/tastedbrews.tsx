@@ -69,7 +69,7 @@ export default function TastedBrewsScreen() {
   }
 
   return (
-    <ThemedView style={styles.container}>
+    <ThemedView style={styles.container} testID="tasted-brews-screen">
       <SafeAreaView style={styles.safeArea} edges={['top', 'right', 'left']}>
         <ThemedText type="title" style={styles.title}>Tasted Brews</ThemedText>
         <ErrorBoundary

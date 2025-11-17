@@ -1,4 +1,4 @@
-appId: ${APP_ID}
+appId: org.verily.FSbeerselector
 name: "Beer List - Empty States and Edge Cases"
 ---
 # Test Flow: Empty States and Edge Cases

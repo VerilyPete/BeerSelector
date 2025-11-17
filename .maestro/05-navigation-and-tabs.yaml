@@ -1,4 +1,4 @@
-appId: ${APP_ID}
+appId: org.verily.FSbeerselector
 name: "Navigation - Tab Switching and State Persistence"
 ---
 # Test Flow: Navigation and Tab Switching

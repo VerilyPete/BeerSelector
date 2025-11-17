@@ -321,6 +321,185 @@ it('should use pink color in dark mode', () => {
 # Test that verifies theme switching works end-to-end
 ```
 
+### Detailed Testing Guidelines (CRITICAL)
+
+Based on systematic analysis of 27 hanging tests, follow these patterns to prevent test suite hangs:
+
+#### ✅ SAFE PATTERNS - Use Jest
+
+**1. Pure Function Tests** - No React Native dependencies
+```typescript
+// ✅ SAFE: Business logic, utilities, data transformations
+it('filters beers correctly', () => {
+  const filtered = applyFilters(beers, { style: 'IPA' });
+  expect(filtered).toHaveLength(5);
+});
+```
+
+**2. Database Operations** - SQLite mocks work well
+```typescript
+// ✅ SAFE: CRUD operations, repository pattern
+it('inserts beer into database', async () => {
+  await beerRepository.insertBeer(mockBeer);
+  const result = await beerRepository.getBeer(mockBeer.id);
+  expect(result).toEqual(mockBeer);
+});
+```
+
+**3. API Service Tests** - HTTP mocks work well
+```typescript
+// ✅ SAFE: Request/response handling
+it('fetches beers from API', async () => {
+  mockFetch.mockResolvedValue({ json: () => mockBeers });
+  const result = await beerApi.getBeers();
+  expect(result).toEqual(mockBeers);
+});
+```
+
+**4. Simple Components** - No RN hook dependencies
+```typescript
+// ✅ SAFE: Components without useColorScheme/useThemeColor
+it('renders beer name', () => {
+  render(<BeerName name="IPA" />);
+  expect(screen.getByText('IPA')).toBeTruthy();
+});
+```
+
+#### ❌ UNSAFE PATTERNS - Will Hang in Jest
+
+**1. renderHook() with React Native Context**
+```typescript
+// ❌ WILL HANG: Hook uses Alert.alert, Appearance, or NetInfo
+it('shows error alert', async () => {
+  const { result } = renderHook(() => useMyHook());
+  // Alert.alert never resolves in jsdom
+});
+
+// ✅ FIX: Test through component or migrate to Maestro
+it('shows error message', () => {
+  render(<MyComponent />); // Tests hook behavior indirectly
+});
+```
+
+**2. Components with Theme Hooks**
+```typescript
+// ❌ WILL HANG: Even with mocks, useThemeColor/useColorScheme cause hangs
+it('renders with theme colors', () => {
+  render(<ThemedComponent />); // Component uses useThemeColor()
+});
+
+// ✅ FIX: Migrate to Maestro E2E test
+# .maestro/theme-test.yaml
+- launchApp
+- assertVisible: "My Component"
+```
+
+**3. Performance/Profiling Tests**
+```typescript
+// ❌ WILL HANG: Profiler API doesn't work in jsdom
+it('measures render performance', () => {
+  const { rerender } = render(<MyComponent />);
+  // Profiler hangs waiting for DevTools
+});
+
+// ✅ FIX: Use Maestro/Flashlight for E2E performance testing
+```
+
+**4. Timer-Based Hook Tests**
+```typescript
+// ❌ WILL HANG: Fake timers + renderHook + RN hook
+it('debounces input', () => {
+  jest.useFakeTimers();
+  const { result } = renderHook(() => useDebounce(value));
+  jest.advanceTimersByTime(500);
+});
+
+// ✅ FIX: Test timer logic separately or use Maestro
+it('debounce logic works', () => {
+  const debounced = createDebounceFunction();
+  expect(debounced.delay).toBe(500);
+});
+```
+
+**5. Integration Tests**
+```typescript
+// ❌ WILL HANG: Multiple async operations in RN context
+it('completes login flow', async () => {
+  render(<LoginScreen />);
+  // WebView, Alert, navigation - too many RN dependencies
+});
+
+// ✅ FIX: Migrate to Maestro for integration testing
+# .maestro/login-flow.yaml
+- launchApp
+- tapOn: "Login"
+- assertVisible: "Welcome"
+```
+
+**6. Native Module Tests**
+```typescript
+// ❌ WILL HANG: NetInfo requires native runtime
+it('detects network status', () => {
+  render(<NetworkProvider><App /></NetworkProvider>);
+  // NetInfo.fetch() never resolves in Node.js
+});
+
+// ✅ FIX: Migrate to Maestro E2E
+```
+
+**7. WebView Tests**
+```typescript
+// ❌ WILL HANG: WebView navigation/cookies don't resolve
+it('handles login callback', async () => {
+  render(<LoginWebView />);
+  // WebView events never fire in jsdom
+});
+
+// ✅ FIX: Migrate to Maestro E2E
+```
+
+#### Prevention Checklist - Before Writing Tests
+
+Ask these questions:
+
+1. **Does this test use `renderHook()`?**
+   - If yes: Does the hook use React Native context (Alert, Appearance, etc.)?
+   - If yes: ❌ Will hang - Use Maestro instead or test through component
+
+2. **Does this test render a component?**
+   - If yes: Does the component use `useThemeColor()` or `useColorScheme()`?
+   - If yes: ❌ Will hang - Remove hook dependency or use Maestro
+
+3. **Is this a performance test?**
+   - If yes: Does it measure render times or re-render counts?
+   - If yes: ❌ Will hang - Use Maestro/Flashlight for E2E performance testing
+
+4. **Does this test use fake timers?**
+   - If yes: Is it combined with `renderHook()` and a React Native hook?
+   - If yes: ❌ Will hang - Test timer logic separately or use Maestro
+
+5. **Is this an integration test?**
+   - If yes: Does it involve multiple async operations in RN context?
+   - If yes: ❌ Will hang - Use Maestro for integration testing
+
+#### Quick Reference Table
+
+| Test Type | Jest | Maestro | Notes |
+|-----------|------|---------|-------|
+| Pure functions | ✅ | ❌ | Business logic, utilities, data transformations |
+| API services | ✅ | ❌ | HTTP clients, request/response handling |
+| Database operations | ✅ | ❌ | CRUD operations, repository pattern |
+| RN hooks (direct) | ❌ | ✅ | Hooks using Alert, Appearance, NetInfo |
+| Component integration | ❌ | ✅ | Multi-component flows, navigation |
+| E2E flows | ❌ | ✅ | Login, checkout, full user journeys |
+| Performance tests | ❌ | ✅ | Render times, FPS, memory usage |
+| Simple components | ✅ | ❌ | Components without RN hook dependencies |
+| Theme-dependent components | ❌ | ✅ | Components using useThemeColor/useColorScheme |
+
+**Reference**: See `JEST_HANGING_TESTS_FINAL_REPORT.md` for complete analysis of 27 hanging test patterns.
+
+**Pre-commit Hook**: A Git hook is installed at `.git/hooks/pre-commit` to prevent committing new hanging test patterns. See `.husky/pre-commit` for implementation.
+
 ### Type System
 
 **Type Guards** (in `src/database/types.ts` and `src/types/`):

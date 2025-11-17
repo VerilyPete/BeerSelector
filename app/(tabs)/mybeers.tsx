@@ -69,7 +69,7 @@ export default function MyBeersScreen() {
   }
 
   return (
-    <ThemedView style={styles.container}>
+    <ThemedView style={styles.container} testID="beerfinder-screen">
       <SafeAreaView style={styles.safeArea} edges={['top', 'right', 'left']}>
         <ThemedText type="title" style={styles.title}>Beerfinder</ThemedText>
         <Beerfinder />

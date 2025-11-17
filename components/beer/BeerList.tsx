@@ -1,5 +1,6 @@
 import React, { useCallback } from 'react';
 import { StyleSheet, FlatList, RefreshControl } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemedView } from '../ThemedView';
 import { ThemedText } from '../ThemedText';
 import { BeerItem } from './BeerItem';
@@ -28,6 +29,12 @@ type BeerListProps = {
  */
 const EXPECTED_ITEM_HEIGHT = 150;
 
+/**
+ * Tab bar height constant (typical Expo Router tab bar)
+ * Combined with safe area insets for accurate bottom padding
+ */
+const TAB_BAR_HEIGHT = 49;
+
 export const BeerList: React.FC<BeerListProps> = ({
   beers,
   loading,
@@ -39,6 +46,7 @@ export const BeerList: React.FC<BeerListProps> = ({
   dateLabel,
   renderItemActions,
 }) => {
+  const insets = useSafeAreaInsets();
   const tintColor = useThemeColor({}, 'tint');
 
   // Memoize renderItem to prevent unnecessary re-renders of FlatList items
@@ -66,7 +74,10 @@ export const BeerList: React.FC<BeerListProps> = ({
       data={beers}
       keyExtractor={(item) => item.id}
       renderItem={renderItem}
-      contentContainerStyle={styles.listContent}
+      contentContainerStyle={[
+        styles.listContent,
+        { paddingBottom: TAB_BAR_HEIGHT + insets.bottom + 16 }
+      ]}
       refreshControl={
         <RefreshControl
           refreshing={refreshing}
@@ -93,6 +104,7 @@ const styles = StyleSheet.create({
   listContent: {
     paddingHorizontal: 16,
     paddingTop: 4,
+    // paddingBottom is calculated dynamically: TAB_BAR_HEIGHT + insets.bottom + 16
   },
   emptyContainer: {
     flex: 1,

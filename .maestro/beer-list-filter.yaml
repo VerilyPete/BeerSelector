@@ -1,5 +1,5 @@
 # .maestro/beer-list-filter.yaml
-appId: ${APP_ID}
+appId: org.verily.FSbeerselector
 ---
 - launchApp
 - tapOn: "All Beers Tab"

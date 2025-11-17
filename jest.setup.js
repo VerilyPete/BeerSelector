@@ -84,3 +84,92 @@ jest.useFakeTimers();
 // Polyfill setImmediate for React Native animations
 global.setImmediate = global.setImmediate || ((fn, ...args) => global.setTimeout(fn, 0, ...args));
 global.clearImmediate = global.clearImmediate || ((id) => global.clearTimeout(id));
+
+// Mock React Native's ScrollView to avoid transform issues with internal specs
+jest.mock('react-native/Libraries/Components/ScrollView/ScrollView', () => {
+  const RealComponent = jest.requireActual('react-native/Libraries/Components/ScrollView/ScrollView');
+  const React = require('react');
+  class ScrollView extends React.Component {
+    scrollTo = jest.fn();
+    scrollToEnd = jest.fn();
+    flashScrollIndicators = jest.fn();
+    
+    render() {
+      const View = require('react-native').View;
+      return React.createElement(View, this.props, this.props.children);
+    }
+  }
+  return ScrollView;
+});
+
+// Mock FlatList to avoid ScrollView dependency issues
+jest.mock('react-native/Libraries/Lists/FlatList', () => {
+  const React = require('react');
+  const { View, Text } = require('react-native');
+  
+  class FlatList extends React.Component {
+    scrollToEnd = jest.fn();
+    scrollToIndex = jest.fn();
+    scrollToItem = jest.fn();
+    scrollToOffset = jest.fn();
+    flashScrollIndicators = jest.fn();
+    
+    render() {
+      const { data, renderItem, ListEmptyComponent, testID } = this.props;
+      
+      if (!data || data.length === 0) {
+        if (ListEmptyComponent) {
+          if (typeof ListEmptyComponent === 'function') {
+            return React.createElement(ListEmptyComponent);
+          }
+          return ListEmptyComponent;
+        }
+        return null;
+      }
+      
+      return React.createElement(
+        View,
+        { testID },
+        data.map((item, index) => {
+          const key = this.props.keyExtractor ? this.props.keyExtractor(item, index) : index;
+          return React.createElement(
+            View,
+            { key },
+            renderItem({ item, index, separators: {} })
+          );
+        })
+      );
+    }
+  }
+  
+  return FlatList;
+});
+
+// Mock expo-haptics
+jest.mock('expo-haptics', () => ({
+  impactAsync: jest.fn().mockResolvedValue(undefined),
+  notificationAsync: jest.fn().mockResolvedValue(undefined),
+  selectionAsync: jest.fn().mockResolvedValue(undefined),
+  ImpactFeedbackStyle: {
+    Light: 'light',
+    Medium: 'medium',
+    Heavy: 'heavy'
+  },
+  NotificationFeedbackType: {
+    Success: 'success',
+    Warning: 'warning',
+    Error: 'error'
+  }
+}));
+
+// Mock react-native-webview
+jest.mock('react-native-webview', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  
+  return {
+    WebView: React.forwardRef((props, ref) => {
+      return React.createElement(View, { ...props, ref }, props.children);
+    })
+  };
+});

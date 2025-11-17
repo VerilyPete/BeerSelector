@@ -1,4 +1,4 @@
-appId: ${APP_ID}
+appId: org.verily.FSbeerselector
 name: "Beer List - Rendering and Scrolling"
 ---
 # Test Flow: Beer List Rendering and Scrolling
