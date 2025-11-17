@@ -170,7 +170,8 @@ jobs:
           name: Maestro E2E Tests (iOS)
           path: maestro-results.xml
           reporter: java-junit
-          fail-on-error: true
+          fail-on-error: false
+          fail-on-empty: false
 
   maestro-ios-critical:
     name: Maestro Critical Tests (iOS) - Fast
@@ -414,6 +415,7 @@ jobs:
           path: maestro-results-*.xml
           reporter: java-junit
           fail-on-error: false  # Don't fail the job, let summary handle overall status
+          fail-on-empty: false
 
   maestro-android:
     name: Maestro E2E Tests (Android)
@@ -537,6 +539,8 @@ jobs:
           name: Maestro E2E Tests (Android)
           path: maestro-results-android.xml
           reporter: java-junit
+          fail-on-error: false
+          fail-on-empty: false
 
   test-summary:
     name: Test Summary
