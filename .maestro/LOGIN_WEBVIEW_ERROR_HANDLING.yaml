@@ -25,8 +25,7 @@ name: "Login WebView - Error Handling & Edge Cases"
 - launchApp:
     clearState: true
 
-- waitForAnimationToEnd:
-    timeout: 10000
+- waitForAnimationToEnd
 
 # Verify we're on settings screen (first launch)
 - assertVisible:
@@ -38,8 +37,7 @@ name: "Login WebView - Error Handling & Edge Cases"
 
 - tapOn:
     text: "Login to Flying Saucer"
-- waitForAnimationToEnd:
-    timeout: 5000
+- waitForAnimationToEnd
 
 # Verify WebView modal is visible
 - assertVisible:
@@ -55,8 +53,7 @@ name: "Login WebView - Error Handling & Edge Cases"
     text: "Flying Saucer Login"
 
 # Wait for WebView to start loading
-- waitForAnimationToEnd:
-    timeout: 3000
+- waitForAnimationToEnd
 
 # ========================================
 # TEST 2: Cancel Login Flow
@@ -65,8 +62,7 @@ name: "Login WebView - Error Handling & Edge Cases"
 # Close the WebView without completing login
 - tapOn:
     id: "close-webview-button"
-- waitForAnimationToEnd:
-    timeout: 2000
+- waitForAnimationToEnd
 
 # Verify WebView is closed
 - assertNotVisible:
@@ -83,16 +79,14 @@ name: "Login WebView - Error Handling & Edge Cases"
 # Open login WebView again
 - tapOn:
     text: "Login to Flying Saucer"
-- waitForAnimationToEnd:
-    timeout: 5000
+- waitForAnimationToEnd
 
 # Verify WebView reopens successfully
 - assertVisible:
     id: "login-webview-modal"
 
 # Wait for page load
-- waitForAnimationToEnd:
-    timeout: 15000
+- waitForAnimationToEnd
 
 # Verify WebView loaded successfully
 - optional: true
@@ -122,8 +116,7 @@ name: "Login WebView - Error Handling & Edge Cases"
 
 # Wait for extended period to simulate slow network
 # WebView should remain stable and not crash
-- waitForAnimationToEnd:
-    timeout: 30000
+- waitForAnimationToEnd0
 
 # Verify WebView is still responsive
 - assertVisible:
@@ -136,8 +129,7 @@ name: "Login WebView - Error Handling & Edge Cases"
 # Close WebView while page is still loading
 - tapOn:
     id: "close-webview-button"
-- waitForAnimationToEnd:
-    timeout: 2000
+- waitForAnimationToEnd
 
 # Verify clean dismissal without errors
 - assertVisible:
@@ -150,22 +142,19 @@ name: "Login WebView - Error Handling & Edge Cases"
 # Test rapid opening and closing to verify state cleanup
 - tapOn:
     text: "Login to Flying Saucer"
-- waitForAnimationToEnd:
-    timeout: 2000
+- waitForAnimationToEnd
 
 - assertVisible:
     id: "login-webview-modal"
 
 - tapOn:
     id: "close-webview-button"
-- waitForAnimationToEnd:
-    timeout: 1000
+- waitForAnimationToEnd
 
 # Immediately reopen
 - tapOn:
     text: "Login to Flying Saucer"
-- waitForAnimationToEnd:
-    timeout: 2000
+- waitForAnimationToEnd
 
 - assertVisible:
     id: "login-webview-modal"
@@ -173,8 +162,7 @@ name: "Login WebView - Error Handling & Edge Cases"
 # Close again
 - tapOn:
     id: "close-webview-button"
-- waitForAnimationToEnd:
-    timeout: 1000
+- waitForAnimationToEnd
 
 # Verify no crashes or state issues
 - assertVisible:
@@ -187,15 +175,13 @@ name: "Login WebView - Error Handling & Edge Cases"
 # Open WebView for visitor login attempt
 - tapOn:
     text: "Login to Flying Saucer"
-- waitForAnimationToEnd:
-    timeout: 5000
+- waitForAnimationToEnd
 
 - assertVisible:
     id: "login-webview-modal"
 
 # Wait for page to load
-- waitForAnimationToEnd:
-    timeout: 15000
+- waitForAnimationToEnd
 
 # Note: In a real scenario, the following would happen:
 # 1. User selects a location
@@ -278,14 +264,12 @@ name: "Login WebView - Error Handling & Edge Cases"
 # For this test, we'll verify the WebView can be closed manually
 - tapOn:
     id: "close-webview-button"
-- waitForAnimationToEnd:
-    timeout: 2000
+- waitForAnimationToEnd
 
 # Verify error recovery - can retry login
 - tapOn:
     text: "Login to Flying Saucer"
-- waitForAnimationToEnd:
-    timeout: 5000
+- waitForAnimationToEnd
 
 - assertVisible:
     id: "login-webview-modal"
@@ -293,8 +277,7 @@ name: "Login WebView - Error Handling & Edge Cases"
 # Close for next test
 - tapOn:
     id: "close-webview-button"
-- waitForAnimationToEnd:
-    timeout: 2000
+- waitForAnimationToEnd
 
 # ========================================
 # TEST 8: Session Persistence After App Restart
@@ -312,8 +295,7 @@ name: "Login WebView - Error Handling & Edge Cases"
 - launchApp:
     clearState: false
 
-- waitForAnimationToEnd:
-    timeout: 10000
+- waitForAnimationToEnd
 
 # Step 8.2: Verify app starts successfully
 # App may redirect to home or beer list if previously configured
@@ -348,8 +330,7 @@ name: "Login WebView - Error Handling & Edge Cases"
 # Open WebView
 - tapOn:
     text: "Login to Flying Saucer"
-- waitForAnimationToEnd:
-    timeout: 5000
+- waitForAnimationToEnd
 
 - assertVisible:
     id: "login-webview-modal"
@@ -361,8 +342,7 @@ name: "Login WebView - Error Handling & Edge Cases"
 - launchApp:
     clearState: false
 
-- waitForAnimationToEnd:
-    timeout: 5000
+- waitForAnimationToEnd
 
 # Verify app recovered gracefully
 # WebView may be closed or still open depending on implementation
@@ -396,8 +376,7 @@ name: "Login WebView - Error Handling & Edge Cases"
 # Open WebView
 - tapOn:
     text: "Login to Flying Saucer"
-- waitForAnimationToEnd:
-    timeout: 5000
+- waitForAnimationToEnd
 
 # Verify close button is accessible
 - assertVisible:
@@ -406,8 +385,7 @@ name: "Login WebView - Error Handling & Edge Cases"
 # Close
 - tapOn:
     id: "close-webview-button"
-- waitForAnimationToEnd:
-    timeout: 2000
+- waitForAnimationToEnd
 
 # Verify login button is still accessible
 - assertVisible:
@@ -424,28 +402,23 @@ name: "Login WebView - Error Handling & Edge Cases"
 # Test 1: Open and cancel
 - tapOn:
     text: "Login to Flying Saucer"
-- waitForAnimationToEnd:
-    timeout: 2000
+- waitForAnimationToEnd
 - tapOn:
     id: "close-webview-button"
-- waitForAnimationToEnd:
-    timeout: 1000
+- waitForAnimationToEnd
 
 # Test 2: Open, wait, then cancel
 - tapOn:
     text: "Login to Flying Saucer"
-- waitForAnimationToEnd:
-    timeout: 5000
+- waitForAnimationToEnd
 - tapOn:
     id: "close-webview-button"
-- waitForAnimationToEnd:
-    timeout: 1000
+- waitForAnimationToEnd
 
 # Test 3: Open, navigate away from settings
 - tapOn:
     text: "Login to Flying Saucer"
-- waitForAnimationToEnd:
-    timeout: 2000
+- waitForAnimationToEnd
 
 # Verify close button still works
 - assertVisible:
@@ -453,8 +426,7 @@ name: "Login WebView - Error Handling & Edge Cases"
 
 - tapOn:
     id: "close-webview-button"
-- waitForAnimationToEnd:
-    timeout: 2000
+- waitForAnimationToEnd
 
 # Final verification - app is stable
 - assertVisible:
@@ -480,8 +452,7 @@ name: "Login WebView - Error Handling & Edge Cases"
 
 - tapOn:
     text: "Login to Flying Saucer"
-- waitForAnimationToEnd:
-    timeout: 5000
+- waitForAnimationToEnd
 
 # WebView should load the kiosk page
 - assertVisible:
@@ -489,8 +460,7 @@ name: "Login WebView - Error Handling & Edge Cases"
 
 # Wait for JavaScript injection to occur
 # (happens automatically on page load)
-- waitForAnimationToEnd:
-    timeout: 10000
+- waitForAnimationToEnd
 
 # Verify WebView didn't crash during JavaScript injection
 - assertVisible:
@@ -503,8 +473,7 @@ name: "Login WebView - Error Handling & Edge Cases"
 # Close
 - tapOn:
     id: "close-webview-button"
-- waitForAnimationToEnd:
-    timeout: 2000
+- waitForAnimationToEnd
 
 # ========================================
 # TEST 13: Missing API URL Handling
