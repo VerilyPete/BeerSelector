@@ -61,10 +61,13 @@ jobs:
       - name: Install Maestro CLI
         run: |
           curl -fsSL https://get.maestro.mobile.dev | bash
+          export PATH="$HOME/.maestro/bin:$PATH"
           echo "$HOME/.maestro/bin" >> $GITHUB_PATH
 
       - name: Verify Maestro installation
-        run: maestro --version
+        run: |
+          export PATH="$HOME/.maestro/bin:$PATH"
+          maestro --version
 
       - name: Setup iOS Simulator
         run: |
@@ -311,10 +314,13 @@ jobs:
       - name: Install Maestro CLI
         run: |
           curl -fsSL https://get.maestro.mobile.dev | bash
+          export PATH="$HOME/.maestro/bin:$PATH"
           echo "$HOME/.maestro/bin" >> $GITHUB_PATH
 
       - name: Verify Maestro installation
-        run: maestro --version
+        run: |
+          export PATH="$HOME/.maestro/bin:$PATH"
+          maestro --version
 
       - name: Setup iOS Simulator
         run: |
@@ -454,10 +460,13 @@ jobs:
       - name: Install Maestro CLI
         run: |
           curl -fsSL https://get.maestro.mobile.dev | bash
+          export PATH="$HOME/.maestro/bin:$PATH"
           echo "$HOME/.maestro/bin" >> $GITHUB_PATH
 
       - name: Verify Maestro installation
-        run: maestro --version
+        run: |
+          export PATH="$HOME/.maestro/bin:$PATH"
+          maestro --version
 
       - name: Setup test environment
         run: |
