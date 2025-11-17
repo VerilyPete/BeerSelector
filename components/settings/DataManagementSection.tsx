@@ -21,13 +21,6 @@ interface DataManagementSectionProps {
   /** Callback to initiate Flying Saucer login */
   onLogin: () => void;
 
-  /** Whether user is logged into Untappd */
-  isUntappdLoggedIn: boolean;
-  /** Callback to login to Untappd */
-  onUntappdLogin: () => void;
-  /** Callback to logout from Untappd */
-  onUntappdLogout: () => void;
-
   /** Whether the app can navigate back (affects home button visibility) */
   canGoBack: boolean;
   /** Callback to navigate to home screen */
@@ -45,14 +38,12 @@ interface DataManagementSectionProps {
  * Manages data-related operations including:
  * - Refreshing beer data from API
  * - Flying Saucer authentication
- * - Untappd integration (login/logout)
  * - Navigation to home screen
  *
  * Renders conditionally based on:
  * - API configuration status
  * - First login state
  * - Navigation stack state
- * - Untappd authentication status
  *
  * All buttons are disabled during refresh operations.
  */
@@ -62,9 +53,6 @@ export default function DataManagementSection({
   onRefresh,
   isFirstLogin,
   onLogin,
-  isUntappdLoggedIn,
-  onUntappdLogin,
-  onUntappdLogout,
   canGoBack,
   onGoHome,
   style,
@@ -73,10 +61,6 @@ export default function DataManagementSection({
   const tintColor = useThemeColor({}, 'tint');
   const buttonBackgroundColor = useThemeColor(
     { light: '#007AFF', dark: '#0A84FF' },
-    'tint'
-  );
-  const secondaryButtonColor = useThemeColor(
-    { light: '#FF3B30', dark: '#FF453A' },
     'tint'
   );
 
@@ -149,49 +133,6 @@ export default function DataManagementSection({
           accessibilityState={{ disabled: refreshing }}
         >
           <ThemedText style={styles.buttonText}>Login to Flying Saucer</ThemedText>
-        </TouchableOpacity>
-      )}
-
-      {/* Untappd Login/Reconnect Button */}
-      <TouchableOpacity
-        testID="untappd-login-button"
-        style={[
-          styles.button,
-          { backgroundColor: buttonBackgroundColor },
-          refreshing && styles.buttonDisabled,
-        ]}
-        onPress={onUntappdLogin}
-        disabled={refreshing}
-        accessibilityRole="button"
-        accessibilityLabel={
-          isUntappdLoggedIn ? 'Reconnect to Untappd' : 'Login to Untappd'
-        }
-        accessibilityHint="Opens Untappd login page for beer tracking integration"
-        accessibilityState={{ disabled: refreshing }}
-      >
-        <ThemedText style={styles.buttonText}>
-          {isUntappdLoggedIn ? 'Reconnect to Untappd' : 'Login to Untappd'}
-        </ThemedText>
-      </TouchableOpacity>
-
-      {/* Untappd Logout Button - only show when logged in */}
-      {isUntappdLoggedIn && (
-        <TouchableOpacity
-          testID="logout-button"
-          style={[
-            styles.button,
-            styles.secondaryButton,
-            { backgroundColor: secondaryButtonColor },
-            refreshing && styles.buttonDisabled,
-          ]}
-          onPress={onUntappdLogout}
-          disabled={refreshing}
-          accessibilityRole="button"
-          accessibilityLabel="Clear Untappd credentials"
-          accessibilityHint="Removes saved Untappd authentication"
-          accessibilityState={{ disabled: refreshing }}
-        >
-          <ThemedText style={styles.buttonText}>Clear Untappd Credentials</ThemedText>
         </TouchableOpacity>
       )}
 

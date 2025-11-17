@@ -1,10 +1,5 @@
-import React from 'react';
-import { Modal, StyleSheet, View, TouchableOpacity, SafeAreaView } from 'react-native';
-import { WebView } from 'react-native-webview';
-import { ThemedText } from './ThemedText';
-import { useThemeColor } from '@/hooks/useThemeColor';
-import { useUntappdColor } from '@/hooks/useUntappdColor';
-import { useColorScheme } from '@/hooks/useColorScheme';
+import React, { useEffect } from 'react';
+import * as WebBrowser from 'expo-web-browser';
 import { config } from '@/src/config';
 
 interface UntappdWebViewProps {
@@ -13,78 +8,46 @@ interface UntappdWebViewProps {
   beerName: string;
 }
 
+/**
+ * UntappdWebView component
+ *
+ * Opens Untappd beer search in SFSafariViewController (iOS) or Chrome Custom Tabs (Android).
+ * This allows users to leverage their existing Untappd session in Safari/Chrome without
+ * needing to log in separately within the app.
+ *
+ * Workflow:
+ * 1. User selects a beer in All Beers or Beerfinder
+ * 2. User clicks "Check Untappd" button
+ * 3. SFSafariViewController opens with Untappd search results
+ * 4. User can immediately check-in, rate, or add photos using their existing login
+ * 5. User closes the browser when done
+ */
 export const UntappdWebView = ({ visible, onClose, beerName }: UntappdWebViewProps) => {
-  const colorScheme = useColorScheme();
-  const cardColor = useThemeColor({}, 'background');
-  const untappdColor = useUntappdColor();
-  const textColor = useThemeColor({}, 'text');
+  useEffect(() => {
+    if (visible && beerName) {
+      // Generate Untappd search URL
+      const searchUrl = config.external.untappd.searchUrl(beerName);
 
-  // Use config module to generate search URL
-  const searchUrl = config.external.untappd.searchUrl(beerName);
+      // Open in SFSafariViewController (iOS) or Chrome Custom Tabs (Android)
+      // This shares cookies with the system browser, so users can use their existing login
+      WebBrowser.openBrowserAsync(searchUrl, {
+        // iOS: Use SFSafariViewController
+        presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET,
+        // Android: Use Chrome Custom Tabs
+        toolbarColor: '#FFC107', // Untappd yellow
+        enableBarCollapsing: true,
+        showTitle: true,
+      }).then(() => {
+        // Browser was dismissed, close our modal state
+        onClose();
+      }).catch((error) => {
+        console.error('Error opening Untappd browser:', error);
+        onClose();
+      });
+    }
+  }, [visible, beerName, onClose]);
 
-  return (
-    <Modal
-      animationType="slide"
-      transparent={true}
-      visible={visible}
-      onRequestClose={onClose}
-    >
-      <SafeAreaView style={styles.modalContainer}>
-        <View style={[styles.modalContent, { backgroundColor: cardColor }]}>
-          <View style={[styles.header, { borderBottomColor: colorScheme === 'dark' ? '#444' : '#ccc' }]}>
-            <ThemedText style={styles.title}>Untappd Search</ThemedText>
-            <TouchableOpacity
-              style={[styles.closeButton, {
-                backgroundColor: untappdColor
-              }]}
-              onPress={onClose}
-            >
-              <ThemedText style={[styles.closeButtonText, { color: 'white' }]}>
-                Close
-              </ThemedText>
-            </TouchableOpacity>
-          </View>
-          <WebView
-            source={{ uri: searchUrl }}
-            style={styles.webview}
-            javaScriptEnabled={true}
-            domStorageEnabled={true}
-          />
-        </View>
-      </SafeAreaView>
-    </Modal>
-  );
-};
-
-const styles = StyleSheet.create({
-  modalContainer: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  modalContent: {
-    flex: 1,
-    margin: 0,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  closeButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  closeButtonText: {
-    fontWeight: '600',
-  },
-  webview: {
-    flex: 1,
-  },
-}); 
+  // This component doesn't render any UI
+  // The browser is presented by the OS
+  return null;
+}; 
