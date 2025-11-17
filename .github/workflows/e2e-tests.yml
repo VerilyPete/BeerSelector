@@ -44,8 +44,8 @@ jobs:
         run: |
           # List available simulators
           xcrun simctl list devices
-          # Boot iPhone 14 Pro simulator
-          xcrun simctl boot "iPhone 14 Pro" || true
+          # Boot iPhone 16 Pro simulator (available on GitHub Actions runners)
+          xcrun simctl boot "iPhone 16 Pro" || true
 
       - name: Prebuild Expo app
         run: npx expo prebuild --platform ios --clean
@@ -59,7 +59,7 @@ jobs:
             -configuration Debug \
             -sdk iphonesimulator \
             -derivedDataPath build \
-            -destination 'platform=iOS Simulator,name=iPhone 14 Pro' \
+            -destination 'platform=iOS Simulator,name=iPhone 16 Pro' \
             build
 
       - name: Install app on simulator
@@ -230,7 +230,7 @@ jobs:
             -configuration Release \
             -sdk iphonesimulator \
             -derivedDataPath build \
-            -destination 'platform=iOS Simulator,name=iPhone 14 Pro' \
+            -destination 'platform=iOS Simulator,name=iPhone 16 Pro' \
             build
 
       - name: Install app on simulator
