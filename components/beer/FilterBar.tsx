@@ -138,13 +138,14 @@ const styles = StyleSheet.create({
   filterContainer: {
     flexDirection: 'row',
     marginBottom: 8,
-    paddingHorizontal: 16,
+    paddingHorizontal: 8,
+    alignItems: 'center',
   },
   filterButton: {
     paddingVertical: 8,
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     borderRadius: 20,
-    marginRight: 8,
+    marginRight: 6,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.2,
     shadowRadius: 2,
@@ -152,21 +153,23 @@ const styles = StyleSheet.create({
   },
   filterButtonText: {
     fontWeight: '600',
+    fontSize: 14,
   },
   sortButton: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(150, 150, 150, 0.1)',
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 20,
+    flexShrink: 1,
   },
   sortButtonText: {
     fontSize: 14,
     fontWeight: '500',
   },
   sortIcon: {
-    marginLeft: 8,
+    marginLeft: 4,
   },
 });
 
