@@ -1,81 +1,68 @@
 /**
  * Tests for sequential refresh coordination to prevent lock contention
  *
- * HP-2 Step 5a: These tests verify that refresh operations are properly
+ * HP-2 Step 5c COMPLETED (November 8, 2025): These tests verify that refresh operations are properly
  * coordinated to avoid database lock contention that occurs when multiple
  * operations try to acquire locks simultaneously.
  *
- * Current Issue (CI-2): manualRefreshAllData() runs 3 operations in parallel
- * using Promise.allSettled(), causing lock contention.
- *
- * Solution (Step 5c): Sequential execution with master lock coordination.
+ * IMPLEMENTATION STATUS: ✅ COMPLETE
+ * - sequentialRefreshAllData() implemented (lines 542-677)
+ * - manualRefreshAllData() delegates to sequential (line 715)
+ * - refreshAllDataFromAPI() uses master lock (lines 839-891)
  */
 
 import { databaseLockManager } from '../../database/DatabaseLockManager';
 
 // Mock database operations
 jest.mock('../../database/db', () => ({
-  getPreference: jest.fn().mockImplementation(async (key: string) => {
-    if (key === 'all_beers_api_url') return 'http://api.example.com/all';
-    if (key === 'my_beers_api_url') return 'http://api.example.com/my';
-    return null;
-  }),
-  setPreference: jest.fn().mockResolvedValue(undefined)
+  getPreference: jest.fn(),
+  setPreference: jest.fn()
 }));
 
 // Mock preferences module
 jest.mock('../../database/preferences', () => ({
-  getPreference: jest.fn().mockImplementation(async (key: string) => {
-    if (key === 'all_beers_api_url') return 'http://api.example.com/all';
-    if (key === 'my_beers_api_url') return 'http://api.example.com/my';
-    return null;
-  }),
-  setPreference: jest.fn().mockResolvedValue(undefined),
-  areApiUrlsConfigured: jest.fn().mockResolvedValue(true)
+  getPreference: jest.fn(),
+  setPreference: jest.fn(),
+  areApiUrlsConfigured: jest.fn()
 }));
 
 // Mock API functions
 jest.mock('../../api/beerApi', () => ({
-  fetchBeersFromAPI: jest.fn().mockResolvedValue([]),
-  fetchMyBeersFromAPI: jest.fn().mockResolvedValue([]),
-  fetchRewardsFromAPI: jest.fn().mockResolvedValue([])
+  fetchBeersFromAPI: jest.fn(),
+  fetchMyBeersFromAPI: jest.fn(),
+  fetchRewardsFromAPI: jest.fn()
 }));
 
 // Mock repositories
 jest.mock('../../database/repositories/BeerRepository', () => ({
   beerRepository: {
-    insertMany: jest.fn().mockResolvedValue(undefined),
-    insertManyUnsafe: jest.fn().mockResolvedValue(undefined)
+    insertMany: jest.fn(),
+    insertManyUnsafe: jest.fn()
   }
 }));
 
 jest.mock('../../database/repositories/MyBeersRepository', () => ({
   myBeersRepository: {
-    insertMany: jest.fn().mockResolvedValue(undefined),
-    insertManyUnsafe: jest.fn().mockResolvedValue(undefined)
+    insertMany: jest.fn(),
+    insertManyUnsafe: jest.fn()
   }
 }));
 
 jest.mock('../../database/repositories/RewardsRepository', () => ({
   rewardsRepository: {
-    insertMany: jest.fn().mockResolvedValue(undefined),
-    insertManyUnsafe: jest.fn().mockResolvedValue(undefined)
+    insertMany: jest.fn(),
+    insertManyUnsafe: jest.fn()
   }
 }));
 
-// Mock the refresh functions
-const mockFetchAll = jest.fn();
-const mockFetchMy = jest.fn();
-const mockFetchRewards = jest.fn();
-
 // Import after mocking
 import {
-  DataUpdateResult,
-  __setRefreshImplementations,
   sequentialRefreshAllData,
   manualRefreshAllData,
   refreshAllDataFromAPI
 } from '../dataUpdateService';
+import { getPreference, setPreference, areApiUrlsConfigured } from '../../database/preferences';
+import { fetchBeersFromAPI, fetchMyBeersFromAPI, fetchRewardsFromAPI } from '../../api/beerApi';
 
 describe('Sequential Refresh Coordination', () => {
   beforeEach(() => {
@@ -94,12 +81,17 @@ describe('Sequential Refresh Coordination', () => {
       // Ignore cleanup errors
     }
 
-    // Hook up the mock implementations
-    __setRefreshImplementations({
-      fetchAll: mockFetchAll as any,
-      fetchMy: mockFetchMy as any,
-      fetchRewards: mockFetchRewards as any
+    // Set default mock implementations
+    (getPreference as jest.Mock).mockImplementation(async (key: string) => {
+      if (key === 'all_beers_api_url') return 'http://api.example.com/all';
+      if (key === 'my_beers_api_url') return 'http://api.example.com/my';
+      return null;
     });
+    (setPreference as jest.Mock).mockResolvedValue(undefined);
+    (areApiUrlsConfigured as jest.Mock).mockResolvedValue(true);
+    (fetchBeersFromAPI as jest.Mock).mockResolvedValue([{ id: '1', brew_name: 'Test Beer', brewer: 'Test Brewery' }]);
+    (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue([{ id: '2', brew_name: 'Tasted Beer', brewer: 'Test Brewery' }]);
+    (fetchRewardsFromAPI as jest.Mock).mockResolvedValue([{ id: 3, name: 'Test Reward' }]);
   });
 
   afterEach(() => {
@@ -121,34 +113,32 @@ describe('Sequential Refresh Coordination', () => {
      * Test 1: Sequential execution prevents lock contention
      *
      * REQUIREMENT: Operations must execute one at a time, not simultaneously
-     * CURRENT BEHAVIOR: Parallel execution via Promise.allSettled() (lines 463-467)
-     * DESIRED BEHAVIOR: Sequential execution - each operation completes before next starts
-     *
-     * This test will FAIL until Step 5c is implemented
+     * IMPLEMENTATION: Lines 542-677 - sequential execution with await
+     * STATUS: ✅ This test verifies Step 5c implementation (sequential refresh coordination)
      */
     it('should execute refresh operations sequentially, not in parallel', async () => {
       // Track when each operation starts and finishes
       const executionLog: string[] = [];
 
-      mockFetchAll.mockImplementation(async () => {
+      (fetchBeersFromAPI as jest.Mock).mockImplementation(async () => {
         executionLog.push('allBeers-start');
-        await Promise.resolve(); // Changed from setTimeout to Promise.resolve for immediate resolution
+        await Promise.resolve();
         executionLog.push('allBeers-end');
-        return { success: true, dataUpdated: true, itemCount: 100 };
+        return [{ id: '1', brew_name: 'Test Beer', brewer: 'Test Brewery' }];
       });
 
-      mockFetchMy.mockImplementation(async () => {
+      (fetchMyBeersFromAPI as jest.Mock).mockImplementation(async () => {
         executionLog.push('myBeers-start');
-        await Promise.resolve(); // Changed from setTimeout to Promise.resolve
+        await Promise.resolve();
         executionLog.push('myBeers-end');
-        return { success: true, dataUpdated: true, itemCount: 50 };
+        return [{ id: '2', brew_name: 'Tasted Beer', brewer: 'Test Brewery' }];
       });
 
-      mockFetchRewards.mockImplementation(async () => {
+      (fetchRewardsFromAPI as jest.Mock).mockImplementation(async () => {
         executionLog.push('rewards-start');
-        await Promise.resolve(); // Changed from setTimeout to Promise.resolve
+        await Promise.resolve();
         executionLog.push('rewards-end');
-        return { success: true, dataUpdated: true, itemCount: 25 };
+        return [{ id: 3, name: 'Test Reward' }];
       });
 
       await sequentialRefreshAllData();
@@ -164,19 +154,17 @@ describe('Sequential Refresh Coordination', () => {
       ]);
 
       // Also verify all three were called
-      expect(mockFetchAll).toHaveBeenCalledTimes(1);
-      expect(mockFetchMy).toHaveBeenCalledTimes(1);
-      expect(mockFetchRewards).toHaveBeenCalledTimes(1);
+      expect(fetchBeersFromAPI).toHaveBeenCalledTimes(1);
+      expect(fetchMyBeersFromAPI).toHaveBeenCalledTimes(1);
+      expect(fetchRewardsFromAPI).toHaveBeenCalledTimes(1);
     });
 
     /**
      * Test 2: Master lock coordinates all operations
      *
      * REQUIREMENT: Single lock acquired once for entire sequence
-     * CURRENT BEHAVIOR: Each operation acquires its own lock (3 separate acquisitions)
-     * DESIRED BEHAVIOR: One master lock held for entire refresh sequence
-     *
-     * This test will FAIL until Step 5c is implemented
+     * IMPLEMENTATION: Line 546 - acquireLock('refresh-all-data-sequential')
+     * STATUS: ✅ This test verifies Step 5c implementation (sequential refresh coordination)
      */
     it('should use a master lock to coordinate all operations', async () => {
       const lockAcquisitionLog: string[] = [];
@@ -188,10 +176,6 @@ describe('Sequential Refresh Coordination', () => {
           lockAcquisitionLog.push(`acquire-${operation}`);
           return originalAcquire(operation);
         });
-
-      mockFetchAll.mockResolvedValue({ success: true, dataUpdated: true, itemCount: 100 });
-      mockFetchMy.mockResolvedValue({ success: true, dataUpdated: true, itemCount: 50 });
-      mockFetchRewards.mockResolvedValue({ success: true, dataUpdated: true, itemCount: 25 });
 
       await sequentialRefreshAllData();
 
@@ -207,17 +191,11 @@ describe('Sequential Refresh Coordination', () => {
      * Test 3: Parallel operations are properly serialized
      *
      * REQUIREMENT: If multiple refresh requests arrive, they must queue properly
-     * CURRENT BEHAVIOR: Lock contention when simultaneous refreshes occur
-     * DESIRED BEHAVIOR: Second request waits for first to complete
-     *
-     * This test will FAIL until Step 5c is implemented
+     * IMPLEMENTATION: Lock manager queues requests when lock is held
+     * STATUS: ✅ This test verifies Step 5c implementation (sequential refresh coordination)
      */
     it('should properly queue multiple simultaneous refresh requests', async () => {
       const completionOrder: number[] = [];
-
-      mockFetchAll.mockResolvedValue({ success: true, dataUpdated: true, itemCount: 100 });
-      mockFetchMy.mockResolvedValue({ success: true, dataUpdated: true, itemCount: 50 });
-      mockFetchRewards.mockResolvedValue({ success: true, dataUpdated: true, itemCount: 25 });
 
       // Start 3 simultaneous refresh requests
       const refresh1 = sequentialRefreshAllData().then(() => completionOrder.push(1));
@@ -230,24 +208,22 @@ describe('Sequential Refresh Coordination', () => {
       expect(completionOrder).toEqual([1, 2, 3]);
 
       // Each refresh calls all three functions once
-      expect(mockFetchAll).toHaveBeenCalledTimes(3);
-      expect(mockFetchMy).toHaveBeenCalledTimes(3);
-      expect(mockFetchRewards).toHaveBeenCalledTimes(3);
+      expect(fetchBeersFromAPI).toHaveBeenCalledTimes(3);
+      expect(fetchMyBeersFromAPI).toHaveBeenCalledTimes(3);
+      expect(fetchRewardsFromAPI).toHaveBeenCalledTimes(3);
     });
 
     /**
      * Test 4: Lock is released even if operation fails
      *
      * REQUIREMENT: Lock must be released in finally block to prevent deadlock
-     * CURRENT BEHAVIOR: Repository operations handle their own locks
-     * DESIRED BEHAVIOR: Master lock released even on error
-     *
-     * This test will FAIL until Step 5c is implemented
+     * IMPLEMENTATION: Line 673-676 - finally block releases lock
+     * STATUS: ✅ This test verifies Step 5c implementation (sequential refresh coordination)
      */
     it('should release master lock even if an operation fails', async () => {
-      mockFetchAll.mockResolvedValue({ success: true, dataUpdated: true, itemCount: 100 });
-      mockFetchMy.mockRejectedValue(new Error('Network error')); // Simulate failure
-      mockFetchRewards.mockResolvedValue({ success: true, dataUpdated: true, itemCount: 25 });
+      (fetchBeersFromAPI as jest.Mock).mockResolvedValue([{ id: '1', brew_name: 'Test Beer', brewer: 'Test Brewery' }]);
+      (fetchMyBeersFromAPI as jest.Mock).mockRejectedValue(new Error('Network error')); // Simulate failure
+      (fetchRewardsFromAPI as jest.Mock).mockResolvedValue([{ id: 3, name: 'Test Reward' }]);
 
       const result = await sequentialRefreshAllData();
 
@@ -265,17 +241,10 @@ describe('Sequential Refresh Coordination', () => {
      * Test 5: Sequential execution is faster than parallel with lock contention
      *
      * REQUIREMENT: Sequential with one lock should be faster than parallel with lock contention
-     * CURRENT BEHAVIOR: Parallel execution but operations queue at lock manager anyway
-     * DESIRED BEHAVIOR: Sequential execution avoids queueing overhead
-     *
-     * This test will FAIL until Step 5c is implemented
+     * IMPLEMENTATION: No queueing overhead with master lock approach
+     * STATUS: ✅ This test verifies Step 5c implementation (sequential refresh coordination)
      */
     it('should complete faster than parallel execution with lock contention', async () => {
-      // Use immediate resolution instead of setTimeout for reliable testing
-      mockFetchAll.mockResolvedValue({ success: true, dataUpdated: true, itemCount: 100 });
-      mockFetchMy.mockResolvedValue({ success: true, dataUpdated: true, itemCount: 50 });
-      mockFetchRewards.mockResolvedValue({ success: true, dataUpdated: true, itemCount: 25 });
-
       const startTime = Date.now();
       await sequentialRefreshAllData();
       const endTime = Date.now();
@@ -290,16 +259,10 @@ describe('Sequential Refresh Coordination', () => {
      * Test 6: Uses unsafe repository methods to avoid nested locks
      *
      * REQUIREMENT: Must use insertManyUnsafe() to avoid acquiring locks inside master lock
-     * CURRENT BEHAVIOR: insertMany() acquires its own lock
-     * DESIRED BEHAVIOR: insertManyUnsafe() skips lock acquisition
-     *
-     * This test will FAIL until Step 5c is implemented
+     * IMPLEMENTATION: Lines 571, 608, 632 - insertManyUnsafe() calls
+     * STATUS: ✅ This test verifies Step 5c implementation (sequential refresh coordination)
      */
     it('should use unsafe repository methods to avoid nested lock acquisition', async () => {
-      mockFetchAll.mockResolvedValue({ success: true, dataUpdated: true, itemCount: 100 });
-      mockFetchMy.mockResolvedValue({ success: true, dataUpdated: true, itemCount: 50 });
-      mockFetchRewards.mockResolvedValue({ success: true, dataUpdated: true, itemCount: 25 });
-
       // Track lock acquisitions
       const lockOperations: string[] = [];
       const acquireSpy = jest.spyOn(databaseLockManager, 'acquireLock')
@@ -349,32 +312,29 @@ describe('Sequential Refresh Coordination', () => {
           // Just track, don't call through
         });
 
-      mockFetchAll.mockImplementation(async () => {
+      const mockOp1 = async () => {
         await databaseLockManager.acquireLock('allBeers');
-        await Promise.resolve(); // Changed from setTimeout for immediate resolution
+        await Promise.resolve();
         databaseLockManager.releaseLock();
-        return { success: true, dataUpdated: true, itemCount: 100 };
-      });
+      };
 
-      mockFetchMy.mockImplementation(async () => {
+      const mockOp2 = async () => {
         await databaseLockManager.acquireLock('myBeers');
-        await Promise.resolve(); // Changed from setTimeout for immediate resolution
+        await Promise.resolve();
         databaseLockManager.releaseLock();
-        return { success: true, dataUpdated: true, itemCount: 50 };
-      });
+      };
 
-      mockFetchRewards.mockImplementation(async () => {
+      const mockOp3 = async () => {
         await databaseLockManager.acquireLock('rewards');
-        await Promise.resolve(); // Changed from setTimeout for immediate resolution
+        await Promise.resolve();
         databaseLockManager.releaseLock();
-        return { success: true, dataUpdated: true, itemCount: 25 };
-      });
+      };
 
       // Simulate current parallel execution
       await Promise.allSettled([
-        mockFetchAll(),
-        mockFetchMy(),
-        mockFetchRewards()
+        mockOp1(),
+        mockOp2(),
+        mockOp3()
       ]);
 
       // With parallel execution, operations QUEUE for locks
@@ -393,33 +353,31 @@ describe('Sequential Refresh Coordination', () => {
      * Test 8: manualRefreshAllData() should delegate to sequentialRefreshAllData()
      *
      * REQUIREMENT: Production code must use the sequential implementation
-     * CURRENT BEHAVIOR: manualRefreshAllData() uses Promise.allSettled() (lines 563-567)
-     * DESIRED BEHAVIOR: manualRefreshAllData() delegates to sequentialRefreshAllData()
-     *
-     * This test will FAIL until CI-4 is fixed
+     * IMPLEMENTATION: Line 715 - delegates to sequentialRefreshAllData()
+     * STATUS: ✅ This test verifies CI-4 fix (manual refresh uses sequential pattern)
      */
     it('manualRefreshAllData should use sequential execution pattern', async () => {
       const executionLog: string[] = [];
 
-      mockFetchAll.mockImplementation(async () => {
+      (fetchBeersFromAPI as jest.Mock).mockImplementation(async () => {
         executionLog.push('allBeers-start');
         await Promise.resolve();
         executionLog.push('allBeers-end');
-        return { success: true, dataUpdated: true, itemCount: 100 };
+        return [{ id: '1', brew_name: 'Test Beer', brewer: 'Test Brewery' }];
       });
 
-      mockFetchMy.mockImplementation(async () => {
+      (fetchMyBeersFromAPI as jest.Mock).mockImplementation(async () => {
         executionLog.push('myBeers-start');
         await Promise.resolve();
         executionLog.push('myBeers-end');
-        return { success: true, dataUpdated: true, itemCount: 50 };
+        return [{ id: '2', brew_name: 'Tasted Beer', brewer: 'Test Brewery' }];
       });
 
-      mockFetchRewards.mockImplementation(async () => {
+      (fetchRewardsFromAPI as jest.Mock).mockImplementation(async () => {
         executionLog.push('rewards-start');
         await Promise.resolve();
         executionLog.push('rewards-end');
-        return { success: true, dataUpdated: true, itemCount: 25 };
+        return [{ id: 3, name: 'Test Reward' }];
       });
 
       await manualRefreshAllData();
@@ -439,10 +397,8 @@ describe('Sequential Refresh Coordination', () => {
      * Test 9: manualRefreshAllData() should use master lock (not multiple locks)
      *
      * REQUIREMENT: Only ONE lock acquisition for entire manual refresh
-     * CURRENT BEHAVIOR: Three separate lock acquisitions cause contention
-     * DESIRED BEHAVIOR: Single master lock for entire sequence
-     *
-     * This test will FAIL until CI-4 is fixed
+     * IMPLEMENTATION: Delegates to sequentialRefreshAllData() which has master lock
+     * STATUS: ✅ This test verifies CI-4 fix (manual refresh uses sequential pattern)
      */
     it('manualRefreshAllData should use only one master lock', async () => {
       const lockAcquisitionLog: string[] = [];
@@ -453,10 +409,6 @@ describe('Sequential Refresh Coordination', () => {
           lockAcquisitionLog.push(`acquire-${operation}`);
           return originalAcquire(operation);
         });
-
-      mockFetchAll.mockResolvedValue({ success: true, dataUpdated: true, itemCount: 100 });
-      mockFetchMy.mockResolvedValue({ success: true, dataUpdated: true, itemCount: 50 });
-      mockFetchRewards.mockResolvedValue({ success: true, dataUpdated: true, itemCount: 25 });
 
       await manualRefreshAllData();
 
@@ -471,17 +423,11 @@ describe('Sequential Refresh Coordination', () => {
      * Test 10: manualRefreshAllData() should not cause lock contention
      *
      * REQUIREMENT: Multiple simultaneous manual refresh calls should queue properly
-     * CURRENT BEHAVIOR: Lock contention when users trigger multiple refreshes
-     * DESIRED BEHAVIOR: Proper queueing via master lock
-     *
-     * This test will FAIL until CI-4 is fixed
+     * IMPLEMENTATION: Uses master lock via sequentialRefreshAllData()
+     * STATUS: ✅ This test verifies CI-4 fix (manual refresh uses sequential pattern)
      */
     it('manualRefreshAllData should handle multiple simultaneous calls without lock contention', async () => {
       const completionOrder: number[] = [];
-
-      mockFetchAll.mockResolvedValue({ success: true, dataUpdated: true, itemCount: 100 });
-      mockFetchMy.mockResolvedValue({ success: true, dataUpdated: true, itemCount: 50 });
-      mockFetchRewards.mockResolvedValue({ success: true, dataUpdated: true, itemCount: 25 });
 
       // Start 2 simultaneous manual refresh requests
       const refresh1 = manualRefreshAllData().then(() => completionOrder.push(1));
@@ -493,9 +439,9 @@ describe('Sequential Refresh Coordination', () => {
       expect(completionOrder).toEqual([1, 2]);
 
       // Each refresh should call all three functions once
-      expect(mockFetchAll).toHaveBeenCalledTimes(2);
-      expect(mockFetchMy).toHaveBeenCalledTimes(2);
-      expect(mockFetchRewards).toHaveBeenCalledTimes(2);
+      expect(fetchBeersFromAPI).toHaveBeenCalledTimes(2);
+      expect(fetchMyBeersFromAPI).toHaveBeenCalledTimes(2);
+      expect(fetchRewardsFromAPI).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -504,36 +450,31 @@ describe('Sequential Refresh Coordination', () => {
      * Test 11: refreshAllDataFromAPI() should use sequential execution
      *
      * REQUIREMENT: refreshAllDataFromAPI() must avoid lock contention
-     * CURRENT BEHAVIOR: Uses Promise.all() at line 714 causing parallel execution
-     * DESIRED BEHAVIOR: Should use sequential pattern with master lock
-     *
-     * FIXED: CI-5 now uses sequential execution via master lock
+     * IMPLEMENTATION: Lines 839-891 - sequential execution with master lock
+     * STATUS: ✅ This test verifies CI-5 fix (refreshAllDataFromAPI uses sequential pattern)
      */
     it('refreshAllDataFromAPI should use sequential execution pattern', async () => {
-      // Import the mocked API functions
-      const { fetchBeersFromAPI, fetchMyBeersFromAPI, fetchRewardsFromAPI } = require('../../api/beerApi');
-
       const executionLog: string[] = [];
 
-      fetchBeersFromAPI.mockImplementation(async () => {
+      (fetchBeersFromAPI as jest.Mock).mockImplementation(async () => {
         executionLog.push('allBeers-start');
         await Promise.resolve();
         executionLog.push('allBeers-end');
-        return [];
+        return [{ id: '1', brew_name: 'Test Beer', brewer: 'Test Brewery' }];
       });
 
-      fetchMyBeersFromAPI.mockImplementation(async () => {
+      (fetchMyBeersFromAPI as jest.Mock).mockImplementation(async () => {
         executionLog.push('myBeers-start');
         await Promise.resolve();
         executionLog.push('myBeers-end');
-        return [];
+        return [{ id: '2', brew_name: 'Tasted Beer', brewer: 'Test Brewery' }];
       });
 
-      fetchRewardsFromAPI.mockImplementation(async () => {
+      (fetchRewardsFromAPI as jest.Mock).mockImplementation(async () => {
         executionLog.push('rewards-start');
         await Promise.resolve();
         executionLog.push('rewards-end');
-        return [];
+        return [{ id: 3, name: 'Test Reward' }];
       });
 
       await refreshAllDataFromAPI();
@@ -553,10 +494,8 @@ describe('Sequential Refresh Coordination', () => {
      * Test 12: refreshAllDataFromAPI() should use master lock
      *
      * REQUIREMENT: Only ONE lock acquisition for entire refresh
-     * CURRENT BEHAVIOR: Each insertMany() acquires its own lock (3 locks)
-     * DESIRED BEHAVIOR: Single master lock for entire sequence
-     *
-     * This test will FAIL until CI-5 is fixed
+     * IMPLEMENTATION: Line 840 - acquireLock('refresh-all-from-api')
+     * STATUS: ✅ This test verifies CI-5 fix (refreshAllDataFromAPI uses sequential pattern)
      */
     it('refreshAllDataFromAPI should use only one master lock', async () => {
       const lockAcquisitionLog: string[] = [];
@@ -567,10 +506,6 @@ describe('Sequential Refresh Coordination', () => {
           lockAcquisitionLog.push(`acquire-${operation}`);
           return originalAcquire(operation);
         });
-
-      mockFetchAll.mockResolvedValue({ success: true, dataUpdated: true, itemCount: 100 });
-      mockFetchMy.mockResolvedValue({ success: true, dataUpdated: true, itemCount: 50 });
-      mockFetchRewards.mockResolvedValue({ success: true, dataUpdated: true, itemCount: 25 });
 
       await refreshAllDataFromAPI();
 

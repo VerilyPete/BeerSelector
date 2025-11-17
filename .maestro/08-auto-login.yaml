@@ -1,4 +1,4 @@
-appId: ${APP_ID}
+appId: org.verily.FSbeerselector
 name: "Auto-Login - Session Persistence and Recovery"
 ---
 # Test Flow: Auto-Login on App Restart

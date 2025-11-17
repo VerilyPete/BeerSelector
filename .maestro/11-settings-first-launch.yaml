@@ -1,4 +1,4 @@
-appId: ${APP_ID}
+appId: org.verily.FSbeerselector
 name: "Settings - First Launch Configuration Flow"
 ---
 # Test Flow: First Launch Settings Configuration
@@ -133,7 +133,7 @@ name: "Settings - First Launch Configuration Flow"
 # Step 23: Verify app navigates to beer list
 # After successful visitor mode setup, app should show beer list
 - assertVisible:
-    text: "All Beer|Home"
+    id: "all-beers-container"
 
 # ========================================
 # Test 6: Verify Visitor Mode Limitations
@@ -303,7 +303,7 @@ name: "Settings - First Launch Configuration Flow"
         text: "Go to Home Screen"
     - waitForAnimationToEnd
     - assertVisible:
-        text: "All Beer|Home"
+        id: "all-beers-container"
 
 # ========================================
 # Test 12: Verify First Launch Complete

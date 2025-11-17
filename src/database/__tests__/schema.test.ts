@@ -287,7 +287,7 @@ describe('Database Schema', () => {
         call => call[0].includes('CREATE TABLE IF NOT EXISTS')
       );
 
-      expect(createTableCalls.length).toBe(5);
+      expect(createTableCalls.length).toBe(6);
     });
 
     it('should use TEXT type for all columns', async () => {

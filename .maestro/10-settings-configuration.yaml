@@ -1,4 +1,4 @@
-appId: ${APP_ID}
+appId: org.verily.FSbeerselector
 name: "Settings - Configuration and Data Management"
 ---
 # Test Flow: Settings Configuration and Management
@@ -125,9 +125,9 @@ name: "Settings - Configuration and Data Management"
 - waitForAnimationToEnd
 
 # Step 22: Verify we're back on Home tab
+# Check for home screen container
 - assertVisible:
-    text: "Home|All Beer"
-    # Should see tab bar with tab names
+    id: "all-beers-container"
 
 # Step 23: Navigate back to Settings
 - scroll:
@@ -151,7 +151,7 @@ name: "Settings - Configuration and Data Management"
         text: "Go to Home Screen"
     - waitForAnimationToEnd
     - assertVisible:
-        text: "Home|All Beer"
+        id: "all-beers-container"
 
 # ========================================
 # Test 7: Test Login Flow Trigger

@@ -1,4 +1,4 @@
-appId: ${APP_ID}
+appId: org.verily.FSbeerselector
 name: "Login Flow - Visitor Mode"
 ---
 # Test Flow: Visitor Mode Login
@@ -48,7 +48,7 @@ name: "Login Flow - Visitor Mode"
 
 # Verify WebView modal opens
 - assertVisible:
-    testID: "login-webview-modal"
+    id: "login-webview-modal"
     timeout: 5000
 
 # Verify WebView header
@@ -72,7 +72,7 @@ name: "Login Flow - Visitor Mode"
 
 # For manual testing, verify WebView is responsive
 - assertVisible:
-    testID: "login-webview-modal"
+    id: "login-webview-modal"
 
 # In a real test environment with visitor mode selection:
 # - User selects a Flying Saucer location

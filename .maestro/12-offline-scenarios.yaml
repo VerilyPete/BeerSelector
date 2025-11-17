@@ -1,4 +1,4 @@
-appId: ${APP_ID}
+appId: org.verily.FSbeerselector
 name: "Offline Mode - Local Data Access and Offline-First Architecture"
 ---
 # Test Flow: Offline Mode Testing

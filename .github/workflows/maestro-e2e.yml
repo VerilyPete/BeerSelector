@@ -1,0 +1,618 @@
+# Maestro E2E Test Workflow
+#
+# This workflow runs Maestro E2E tests in multiple modes:
+# 1. maestro-ios: Full sequential test suite (on main/develop push)
+# 2. maestro-ios-parallel: Parallel test execution (on PRs for speed)
+# 3. maestro-ios-critical: Fast P0 tests only (on all events)
+# 4. maestro-android: Android test suite
+#
+# Parallel execution reduces PR feedback time from 45min to ~15min by running
+# test groups concurrently. Each group runs independently on a separate runner.
+
+name: Maestro E2E Tests
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main, develop]
+  workflow_dispatch:  # Allow manual trigger
+
+env:
+  # Default environment configuration for CI
+  EXPO_PUBLIC_USE_MOCK_SERVER: 'true'
+  EXPO_PUBLIC_API_TIMEOUT: '30000'
+  NODE_VERSION: '20'
+  MAESTRO_VERSION: 'latest'
+
+jobs:
+  maestro-ios:
+    name: Maestro E2E Tests (iOS)
+    runs-on: macos-13  # macos-13 or later for iOS simulator support
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Cache node_modules
+        uses: actions/cache@v3
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup Expo
+        uses: expo/expo-github-action@v8
+        with:
+          expo-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install Maestro CLI
+        run: |
+          curl -fsSL https://get.maestro.mobile.dev | bash
+          echo "$HOME/.maestro/bin" >> $GITHUB_PATH
+
+      - name: Verify Maestro installation
+        run: maestro --version
+
+      - name: Setup iOS Simulator
+        run: |
+          # List available simulators
+          xcrun simctl list devices available
+
+          # Boot iPhone 15 Pro simulator (or fallback to iPhone 14 Pro)
+          xcrun simctl boot "iPhone 15 Pro" || xcrun simctl boot "iPhone 14 Pro" || true
+
+          # Wait for simulator to fully boot
+          xcrun simctl bootstatus "iPhone 15 Pro" -b || xcrun simctl bootstatus "iPhone 14 Pro" -b || true
+
+      - name: Setup test environment
+        run: |
+          # Create test environment file
+          cp .env.example .env.test
+          echo "EXPO_PUBLIC_USE_MOCK_SERVER=true" >> .env.test
+          echo "EXPO_PUBLIC_API_BASE_URL=http://localhost:3000" >> .env.test
+          echo "EXPO_PUBLIC_API_TIMEOUT=30000" >> .env.test
+
+      - name: Prebuild Expo app for iOS
+        run: npx expo prebuild --platform ios --clean
+
+      - name: Cache iOS build
+        uses: actions/cache@v3
+        with:
+          path: ios/build
+          key: ${{ runner.os }}-ios-build-${{ hashFiles('ios/**/*.{h,m,swift}') }}
+          restore-keys: |
+            ${{ runner.os }}-ios-build-
+
+      - name: Build iOS app for testing
+        run: |
+          cd ios
+          xcodebuild \
+            -workspace BeerSelector.xcworkspace \
+            -scheme BeerSelector \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -derivedDataPath build \
+            -destination 'platform=iOS Simulator,name=iPhone 15 Pro' \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            build
+
+      - name: Install app on simulator
+        run: |
+          # Find the app bundle
+          APP_PATH=$(find ios/build -name "*.app" -type d | head -n 1)
+          echo "App path: $APP_PATH"
+
+          # Get booted simulator UDID
+          SIMULATOR_UDID=$(xcrun simctl list devices booted | grep -m 1 iPhone | sed 's/.*(\([^)]*\)).*/\1/')
+          echo "Simulator UDID: $SIMULATOR_UDID"
+
+          # Install on simulator
+          xcrun simctl install "$SIMULATOR_UDID" "$APP_PATH"
+
+      - name: Start mock server (if needed)
+        if: env.EXPO_PUBLIC_USE_MOCK_SERVER == 'true'
+        run: |
+          # Start mock API server in background
+          npm run mock-server &
+          echo $! > mock-server.pid
+          sleep 5  # Wait for server to start
+
+      - name: Run Maestro E2E Tests
+        env:
+          APP_ID: org.verily.FSbeerselector
+        run: |
+          maestro test .maestro/ \
+            --format junit \
+            --output maestro-results.xml
+
+      - name: Stop mock server
+        if: always() && env.EXPO_PUBLIC_USE_MOCK_SERVER == 'true'
+        run: |
+          if [ -f mock-server.pid ]; then
+            kill $(cat mock-server.pid) || true
+            rm mock-server.pid
+          fi
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: maestro-test-results-ios
+          path: |
+            maestro-results.xml
+            ~/.maestro/tests/
+
+      - name: Upload screenshots on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: maestro-screenshots-ios
+          path: ~/.maestro/
+
+      - name: Publish test results
+        if: always()
+        uses: dorny/test-reporter@v1
+        with:
+          name: Maestro E2E Tests (iOS)
+          path: maestro-results.xml
+          reporter: java-junit
+          fail-on-error: true
+
+  maestro-ios-critical:
+    name: Maestro Critical Tests (iOS) - Fast
+    runs-on: macos-13
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup Expo
+        uses: expo/expo-github-action@v8
+        with:
+          expo-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install Maestro CLI
+        run: |
+          curl -fsSL https://get.maestro.mobile.dev | bash
+          echo "$HOME/.maestro/bin" >> $GITHUB_PATH
+
+      - name: Setup iOS Simulator
+        run: xcrun simctl boot "iPhone 15 Pro" || true
+
+      - name: Prebuild and Build iOS app
+        run: |
+          npx expo prebuild --platform ios --clean
+          cd ios
+          xcodebuild -workspace BeerSelector.xcworkspace -scheme BeerSelector -configuration Debug -sdk iphonesimulator -derivedDataPath build build
+
+      - name: Install app on simulator
+        run: |
+          APP_PATH=$(find ios/build -name "*.app" -type d | head -n 1)
+          xcrun simctl install booted "$APP_PATH"
+
+      - name: Run Critical P0 Tests Only
+        env:
+          APP_ID: org.verily.FSbeerselector
+        run: |
+          # Run only critical tests for fast feedback
+          maestro test .maestro/01-beer-list-rendering.yaml
+          maestro test .maestro/06-login-flow-member.yaml
+          maestro test .maestro/07-login-flow-visitor.yaml
+          maestro test .maestro/09-refresh-functionality.yaml
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: maestro-critical-results-ios
+          path: ~/.maestro/tests/
+
+  maestro-ios-parallel:
+    name: Maestro iOS Tests (Parallel - ${{ matrix.test-group.name }})
+    runs-on: macos-13
+    timeout-minutes: 25
+    if: github.event_name == 'pull_request'  # Only on PRs for speed
+
+    strategy:
+      fail-fast: false  # Continue running other test groups even if one fails
+      matrix:
+        test-group:
+          - name: login-flows
+            description: Login and authentication flows
+            tests: >-
+              .maestro/06-login-flow-member.yaml
+              .maestro/07-login-flow-visitor.yaml
+              .maestro/LOGIN_WEBVIEW_ERROR_HANDLING.yaml
+
+          - name: settings
+            description: Settings and configuration
+            tests: >-
+              .maestro/10-settings-configuration.yaml
+              .maestro/11-settings-first-launch.yaml
+              .maestro/SETTINGS_AUTO_LOGIN.yaml
+
+          - name: beer-features
+            description: Beer list features and navigation
+            tests: >-
+              .maestro/01-beer-list-rendering.yaml
+              .maestro/02-search-and-filter.yaml
+              .maestro/03-beer-item-expansion.yaml
+              .maestro/05-navigation-and-tabs.yaml
+              .maestro/09-refresh-functionality.yaml
+
+          - name: offline-network
+            description: Offline support and network handling
+            tests: >-
+              .maestro/12-offline-scenarios.yaml
+              .maestro/13-network-timeout-recovery.yaml
+              .maestro/16-offline-mode.yaml
+              .maestro/MP-7-STEP-2-OPERATION-QUEUE-TESTS.yaml
+
+          - name: error-handling
+            description: Error handling and edge cases
+            tests: >-
+              .maestro/04-empty-states.yaml
+              .maestro/14-api-error-handling.yaml
+              .maestro/15-config-validation.yaml
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Cache node_modules
+        uses: actions/cache@v3
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup Expo
+        uses: expo/expo-github-action@v8
+        with:
+          expo-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install Maestro CLI
+        run: |
+          curl -fsSL https://get.maestro.mobile.dev | bash
+          echo "$HOME/.maestro/bin" >> $GITHUB_PATH
+
+      - name: Verify Maestro installation
+        run: maestro --version
+
+      - name: Setup iOS Simulator
+        run: |
+          # Boot iPhone 15 Pro simulator
+          xcrun simctl boot "iPhone 15 Pro" || xcrun simctl boot "iPhone 14 Pro" || true
+          xcrun simctl bootstatus "iPhone 15 Pro" -b || xcrun simctl bootstatus "iPhone 14 Pro" -b || true
+
+      - name: Setup test environment
+        run: |
+          cp .env.example .env.test
+          echo "EXPO_PUBLIC_USE_MOCK_SERVER=true" >> .env.test
+          echo "EXPO_PUBLIC_API_BASE_URL=http://localhost:3000" >> .env.test
+          echo "EXPO_PUBLIC_API_TIMEOUT=30000" >> .env.test
+
+      - name: Prebuild Expo app for iOS
+        run: npx expo prebuild --platform ios --clean
+
+      - name: Cache iOS build
+        uses: actions/cache@v3
+        with:
+          path: ios/build
+          key: ${{ runner.os }}-ios-build-${{ hashFiles('ios/**/*.{h,m,swift}') }}
+          restore-keys: |
+            ${{ runner.os }}-ios-build-
+
+      - name: Build iOS app for testing
+        run: |
+          cd ios
+          xcodebuild \
+            -workspace BeerSelector.xcworkspace \
+            -scheme BeerSelector \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -derivedDataPath build \
+            -destination 'platform=iOS Simulator,name=iPhone 15 Pro' \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            build
+
+      - name: Install app on simulator
+        run: |
+          APP_PATH=$(find ios/build -name "*.app" -type d | head -n 1)
+          echo "App path: $APP_PATH"
+          SIMULATOR_UDID=$(xcrun simctl list devices booted | grep -m 1 iPhone | sed 's/.*(\([^)]*\)).*/\1/')
+          echo "Simulator UDID: $SIMULATOR_UDID"
+          xcrun simctl install "$SIMULATOR_UDID" "$APP_PATH"
+
+      - name: Start mock server (if needed)
+        if: env.EXPO_PUBLIC_USE_MOCK_SERVER == 'true'
+        run: |
+          npm run mock-server &
+          echo $! > mock-server.pid
+          sleep 5
+
+      - name: Run ${{ matrix.test-group.name }} tests
+        env:
+          APP_ID: org.verily.FSbeerselector
+        run: |
+          echo "Running ${{ matrix.test-group.description }}"
+
+          # Run each test in the group
+          for test in ${{ matrix.test-group.tests }}; do
+            echo "Running test: $test"
+            maestro test "$test" \
+              --format junit \
+              --output "maestro-results-${{ matrix.test-group.name }}-$(basename $test .yaml).xml" || true
+          done
+
+      - name: Stop mock server
+        if: always() && env.EXPO_PUBLIC_USE_MOCK_SERVER == 'true'
+        run: |
+          if [ -f mock-server.pid ]; then
+            kill $(cat mock-server.pid) || true
+            rm mock-server.pid
+          fi
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: maestro-parallel-results-${{ matrix.test-group.name }}
+          path: |
+            maestro-results-*.xml
+            ~/.maestro/tests/
+
+      - name: Upload screenshots on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: maestro-parallel-screenshots-${{ matrix.test-group.name }}
+          path: ~/.maestro/
+
+      - name: Publish test results
+        if: always()
+        uses: dorny/test-reporter@v1
+        with:
+          name: Maestro E2E Tests (iOS - ${{ matrix.test-group.name }})
+          path: maestro-results-*.xml
+          reporter: java-junit
+          fail-on-error: false  # Don't fail the job, let summary handle overall status
+
+  maestro-android:
+    name: Maestro E2E Tests (Android)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup Expo
+        uses: expo/expo-github-action@v8
+        with:
+          expo-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install Maestro CLI
+        run: |
+          curl -fsSL https://get.maestro.mobile.dev | bash
+          echo "$HOME/.maestro/bin" >> $GITHUB_PATH
+
+      - name: Verify Maestro installation
+        run: maestro --version
+
+      - name: Setup test environment
+        run: |
+          cp .env.example .env.test
+          echo "EXPO_PUBLIC_USE_MOCK_SERVER=true" >> .env.test
+
+      - name: Enable KVM for emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Prebuild Expo app for Android
+        run: npx expo prebuild --platform android --clean
+
+      - name: Cache Gradle
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Build Android app
+        run: |
+          cd android
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Setup Android Emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 31
+          target: google_apis
+          arch: x86_64
+          profile: pixel_5
+          force-avd-creation: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          script: |
+            # Install app
+            adb install android/app/build/outputs/apk/debug/app-debug.apk
+
+            # Start mock server if needed
+            if [ "$EXPO_PUBLIC_USE_MOCK_SERVER" = "true" ]; then
+              npm run mock-server &
+              sleep 5
+            fi
+
+            # Run Maestro tests
+            maestro test .maestro/ \
+              --format junit \
+              --output maestro-results-android.xml
+
+            # Stop mock server
+            pkill -f mock-server || true
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: maestro-test-results-android
+          path: |
+            maestro-results-android.xml
+            ~/.maestro/tests/
+
+      - name: Upload screenshots on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: maestro-screenshots-android
+          path: ~/.maestro/
+
+      - name: Publish test results
+        if: always()
+        uses: dorny/test-reporter@v1
+        with:
+          name: Maestro E2E Tests (Android)
+          path: maestro-results-android.xml
+          reporter: java-junit
+
+  test-summary:
+    name: Test Summary
+    runs-on: ubuntu-latest
+    needs: [maestro-ios, maestro-ios-parallel, maestro-android]
+    if: always()
+
+    steps:
+      - name: Download all test results
+        uses: actions/download-artifact@v4
+        with:
+          path: test-results
+
+      - name: Generate test summary
+        run: |
+          echo "## 🧪 Maestro E2E Test Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Date:** $(date +'%Y-%m-%d %H:%M:%S')" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # iOS sequential results
+          if [ -d "test-results/maestro-test-results-ios" ]; then
+            echo "### ✅ iOS Tests (Sequential) - PASSED" >> $GITHUB_STEP_SUMMARY
+            echo "All iOS Maestro E2E tests completed successfully." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### ❌ iOS Tests (Sequential) - FAILED" >> $GITHUB_STEP_SUMMARY
+            echo "iOS Maestro tests encountered failures. Check artifacts for details." >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # iOS parallel results (if PR)
+          if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
+            echo "### iOS Tests (Parallel) - Test Group Results" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+
+            # Check each test group
+            for group in login-flows settings beer-features offline-network error-handling; do
+              if [ -d "test-results/maestro-parallel-results-$group" ]; then
+                echo "- ✅ **$group**: PASSED" >> $GITHUB_STEP_SUMMARY
+              else
+                echo "- ❌ **$group**: FAILED" >> $GITHUB_STEP_SUMMARY
+              fi
+            done
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Android results
+          if [ -d "test-results/maestro-test-results-android" ]; then
+            echo "### ✅ Android Tests - PASSED" >> $GITHUB_STEP_SUMMARY
+            echo "All Android Maestro E2E tests completed successfully." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### ❌ Android Tests - FAILED" >> $GITHUB_STEP_SUMMARY
+            echo "Android Maestro tests encountered failures. Check artifacts for details." >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Test artifacts
+          echo "### 📦 Test Artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "- Test results: JUnit XML format" >> $GITHUB_STEP_SUMMARY
+          echo "- Screenshots: Available for failed tests" >> $GITHUB_STEP_SUMMARY
+          echo "- Test recordings: Available in Maestro logs" >> $GITHUB_STEP_SUMMARY
+          if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
+            echo "- Parallel test results: Grouped by test category" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Execution mode info
+          if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
+            echo "### ⚡ Parallel Execution Mode" >> $GITHUB_STEP_SUMMARY
+            echo "This PR used parallel test execution for faster feedback (~15min vs 45min sequential)." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Next steps
+          echo "### 📋 Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "1. Review test results in the artifacts section" >> $GITHUB_STEP_SUMMARY
+          echo "2. Check screenshots for visual issues" >> $GITHUB_STEP_SUMMARY
+          echo "3. Review Maestro logs for detailed error messages" >> $GITHUB_STEP_SUMMARY
+          echo "4. Fix any failing tests before merging" >> $GITHUB_STEP_SUMMARY

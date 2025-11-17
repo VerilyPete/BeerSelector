@@ -1,4 +1,4 @@
-appId: ${APP_ID}
+appId: org.verily.FSbeerselector
 name: "Login Flow - UFO Club Member Authentication"
 ---
 # Test Flow: UFO Club Member Login
@@ -51,7 +51,7 @@ name: "Login Flow - UFO Club Member Authentication"
 
 # Verify WebView modal opens
 - assertVisible:
-    testID: "login-webview-modal"
+    id: "login-webview-modal"
     timeout: 5000
 
 # Verify WebView header is shown
@@ -60,7 +60,7 @@ name: "Login Flow - UFO Club Member Authentication"
 
 # Verify close button exists (user can cancel)
 - assertVisible:
-    testID: "close-webview-button"
+    id: "close-webview-button"
 
 # Wait for WebView to load the login page (kiosk.php)
 # This may take several seconds depending on network
@@ -83,7 +83,7 @@ name: "Login Flow - UFO Club Member Authentication"
 
 # Verify the WebView is still visible (didn't crash)
 - assertVisible:
-    testID: "login-webview-modal"
+    id: "login-webview-modal"
 
 # In a real test with valid credentials, the WebView would:
 # - Navigate to member-dash.php after successful login
@@ -97,7 +97,7 @@ name: "Login Flow - UFO Club Member Authentication"
 
 # Test that user can cancel login process
 - tapOn:
-    testID: "close-webview-button"
+    id: "close-webview-button"
 - waitForAnimationToEnd:
     timeout: 2000
 
@@ -107,7 +107,7 @@ name: "Login Flow - UFO Club Member Authentication"
 
 # Verify WebView is dismissed
 - assertNotVisible:
-    testID: "login-webview-modal"
+    id: "login-webview-modal"
 
 # ======================
 # STEP 5: Retry Login (Success Path)
@@ -121,7 +121,7 @@ name: "Login Flow - UFO Club Member Authentication"
 
 # Verify WebView opens again
 - assertVisible:
-    testID: "login-webview-modal"
+    id: "login-webview-modal"
     timeout: 5000
 
 # Wait for page to load
@@ -144,76 +144,35 @@ name: "Login Flow - UFO Club Member Authentication"
 # - User is redirected to home screen or beer list
 
 # ======================
-# STEP 6: Post-Login Verification (if login succeeds)
+# STEP 6: Post-Login Verification
 # ======================
 
-# After successful login, these assertions would run:
-# Note: These are commented out as they require actual login credentials
-# Uncomment when running with test account
-
-# - assertVisible:
-#     text: "Login Successful"
-#     timeout: 30000
-
-# - tapOn:
-#     text: "OK"
-
-# - waitForAnimationToEnd:
-#     timeout: 5000
-
-# # Verify we're on the home screen or All Beer tab
-# - assertVisible:
-#     id: "all-beers-container"
-#     timeout: 10000
-
-# # Verify beer data was loaded
-# - assertVisible:
-#     id: "beer-list"
-
-# # Verify beer count is displayed (non-zero)
-# - assertVisible:
-#     id: "beer-count"
-
-# ======================
-# STEP 7: Settings Access After Login
-# ======================
-
-# # Navigate to settings to test logout
-# - tapOn: "Settings"
-# - waitForAnimationToEnd
-
-# # Verify settings screen shows logged-in state
-# - assertVisible:
-#     text: "Settings"
-
-# # Verify Data Management section is visible
-# - assertVisible:
-#     text: "Data Management"
-
-# # Verify refresh button exists (only available when logged in)
-# - assertVisible:
-#     text: "Refresh All Beer Data"
-
-# ======================
-# STEP 8: Logout Test
-# ======================
-
-# # Tap "Login to Flying Saucer" button to open login WebView
-# # (This allows user to log out or switch accounts)
-# - tapOn:
-#     text: "Login to Flying Saucer"
-# - waitForAnimationToEnd:
-#     timeout: 2000
-
-# # Verify WebView opens
-# - assertVisible:
-#     testID: "login-webview-modal"
-
-# # User would manually log out in WebView
-# # Then close WebView
-# - tapOn:
-#     testID: "close-webview-button"
-# - waitForAnimationToEnd
+# Post-login verification requires valid UFO Club test account credentials.
+# These assertions are disabled because automated CI testing doesn't have access
+# to test credentials and cannot complete the login flow.
+#
+# Manual Test Checklist (after successful member login):
+# 1. [ ] Verify "Login Successful" alert appears (within 30s)
+# 2. [ ] Tap "OK" on alert and verify navigation
+# 3. [ ] Verify redirect to All Beer tab
+# 4. [ ] Verify beer list container is visible (testID: "all-beers-container")
+# 5. [ ] Verify beer list loads with data (testID: "beer-list")
+# 6. [ ] Verify beer count displays non-zero value (testID: "beer-count")
+# 7. [ ] Navigate to Settings screen
+# 8. [ ] Verify "Data Management" section appears (logged-in state)
+# 9. [ ] Verify "Refresh All Beer Data" button is enabled
+# 10. [ ] Verify user session persists after app restart
+#
+# To run automated tests with credentials:
+# 1. Create .env.test with TEST_UFO_EMAIL and TEST_UFO_PASSWORD
+# 2. Create dedicated test file: .maestro/06a-login-flow-member-success.yaml
+# 3. Implement WebView form interaction (input username/password fields)
+# 4. Add post-login assertions for data verification
+#
+# Tracking:
+# TODO - Create 06a-login-flow-member-success.yaml for credential-based E2E testing
+# TODO - Set up secure test credentials in CI environment
+# TODO - Implement WebView form interaction helpers for login automation
 
 # ======================
 # Test Complete

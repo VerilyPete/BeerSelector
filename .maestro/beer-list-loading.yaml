@@ -10,7 +10,7 @@
 # 3. Pull-to-refresh shows spinner (not skeleton)
 # 4. Loading states work consistently across all tabs
 
-appId: ${APP_ID}
+appId: org.verily.FSbeerselector
 ---
 # Test 1: All Beers Tab - Initial Load with Skeleton
 - launchApp:
@@ -41,7 +41,7 @@ appId: ${APP_ID}
 
 ---
 # Test 2: Beerfinder Tab - Initial Load with Skeleton
-appId: ${APP_ID}
+appId: org.verily.FSbeerselector
 ---
 - launchApp:
     clearState: true
@@ -71,7 +71,7 @@ appId: ${APP_ID}
 
 ---
 # Test 3: Tasted Brews Tab - Initial Load with Skeleton
-appId: ${APP_ID}
+appId: org.verily.FSbeerselector
 ---
 - launchApp:
     clearState: true
@@ -106,7 +106,7 @@ appId: ${APP_ID}
 
 ---
 # Test 4: Pull-to-Refresh - No Skeleton
-appId: ${APP_ID}
+appId: org.verily.FSbeerselector
 ---
 - launchApp
 
@@ -141,7 +141,7 @@ appId: ${APP_ID}
 
 ---
 # Test 5: Tab Switching - Skeleton Caching
-appId: ${APP_ID}
+appId: org.verily.FSbeerselector
 ---
 - launchApp:
     clearState: true
@@ -179,7 +179,7 @@ appId: ${APP_ID}
 
 ---
 # Test 6: Skeleton Visual Consistency
-appId: ${APP_ID}
+appId: org.verily.FSbeerselector
 ---
 - launchApp:
     clearState: true
@@ -211,7 +211,7 @@ appId: ${APP_ID}
 
 ---
 # Test 7: Fast Data Load - Skeleton Still Appears
-appId: ${APP_ID}
+appId: org.verily.FSbeerselector
 ---
 # This test ensures skeleton appears even if data loads quickly
 # Important for perceived performance consistency
@@ -242,7 +242,7 @@ appId: ${APP_ID}
 
 ---
 # Test 8: Search While Loading
-appId: ${APP_ID}
+appId: org.verily.FSbeerselector
 ---
 - launchApp:
     clearState: true
@@ -268,7 +268,7 @@ appId: ${APP_ID}
 
 ---
 # Test 9: Error State - No Skeleton
-appId: ${APP_ID}
+appId: org.verily.FSbeerselector
 ---
 # This test verifies error states don't show skeleton
 # Note: Requires network disconnection or simulated error
@@ -290,7 +290,7 @@ appId: ${APP_ID}
 
 ---
 # Test 10: Accessibility - Loading State Announcement
-appId: ${APP_ID}
+appId: org.verily.FSbeerselector
 ---
 - launchApp:
     clearState: true
@@ -313,7 +313,7 @@ appId: ${APP_ID}
 
 ---
 # Test 11: Performance - Skeleton Appears Quickly
-appId: ${APP_ID}
+appId: org.verily.FSbeerselector
 ---
 - launchApp:
     clearState: true
@@ -331,7 +331,7 @@ appId: ${APP_ID}
 
 ---
 # Test 12: All Tabs - Consistent Loading Behavior
-appId: ${APP_ID}
+appId: org.verily.FSbeerselector
 ---
 - launchApp:
     clearState: true
