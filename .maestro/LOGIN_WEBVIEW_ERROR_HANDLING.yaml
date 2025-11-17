@@ -42,7 +42,6 @@ name: "Login WebView - Error Handling & Edge Cases"
 # Verify WebView modal is visible
 - assertVisible:
     id: "login-webview-modal"
-    timeout: 5000
 
 # Verify close button exists
 - assertVisible:
@@ -93,7 +92,6 @@ name: "Login WebView - Error Handling & Edge Cases"
   commands:
     - assertVisible:
         text: "Flying Saucer"
-        timeout: 5000
 
 # ========================================
 # TEST 4: Network Timeout Handling
@@ -112,7 +110,6 @@ name: "Login WebView - Error Handling & Edge Cases"
   commands:
     - assertVisible:
         text: "Loading"
-        timeout: 5000
 
 # Wait for extended period to simulate slow network
 # WebView should remain stable and not crash
@@ -201,12 +198,10 @@ name: "Login WebView - Error Handling & Edge Cases"
   commands:
     - assertVisible:
         text: "Login Error"
-        timeout: 5000
     - assertVisible:
         text: "There was an error processing the login page. Please try again."
     - tapOn: "OK"
     - waitForAnimationToEnd:
-        timeout: 2000
     - assertNotVisible: "There was an error processing the login page"
 
 # Scenario 2: Store information extraction fails
@@ -214,12 +209,10 @@ name: "Login WebView - Error Handling & Edge Cases"
   commands:
     - assertVisible:
         text: "Visitor Login Failed"
-        timeout: 10000
     - assertVisible:
         text: "Could not extract the store information needed for visitor mode"
     - tapOn: "OK"
     - waitForAnimationToEnd:
-        timeout: 2000
     - assertNotVisible: "Could not extract the store information"
 
 # Scenario 3: Store ID missing from cookies
@@ -227,12 +220,10 @@ name: "Login WebView - Error Handling & Edge Cases"
   commands:
     - assertVisible:
         text: "Visitor Login Failed"
-        timeout: 10000
     - assertVisible:
         text: "Could not find store ID in cookies"
     - tapOn: "OK"
     - waitForAnimationToEnd:
-        timeout: 2000
     - assertNotVisible: "Could not find store ID in cookies"
 
 # Scenario 4: Visitor login API failure
@@ -240,12 +231,10 @@ name: "Login WebView - Error Handling & Edge Cases"
   commands:
     - assertVisible:
         text: "Visitor Login Failed"
-        timeout: 10000
     - assertVisible:
         text: "Could not log in as visitor"
     - tapOn: "OK"
     - waitForAnimationToEnd:
-        timeout: 2000
     - assertNotVisible: "Could not log in as visitor"
 
 # Scenario 5: Generic exception during visitor login
@@ -253,12 +242,10 @@ name: "Login WebView - Error Handling & Edge Cases"
   commands:
     - assertVisible:
         text: "Error"
-        timeout: 5000
     - assertVisible:
         text: "An error occurred during visitor login"
     - tapOn: "OK"
     - waitForAnimationToEnd:
-        timeout: 2000
     - assertNotVisible: "An error occurred during visitor login"
 
 # For this test, we'll verify the WebView can be closed manually
