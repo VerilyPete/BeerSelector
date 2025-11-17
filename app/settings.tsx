@@ -10,11 +10,8 @@ import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { useColorScheme } from '@/hooks/useColorScheme';
-import { clearUntappdCookies } from '@/src/database/db';
-
 // Import extracted components
 import LoginWebView from '@/components/LoginWebView';
-import UntappdLoginWebView from '@/components/UntappdLoginWebView';
 import AboutSection from '@/components/settings/AboutSection';
 import DataManagementSection from '@/components/settings/DataManagementSection';
 import WelcomeSection from '@/components/settings/WelcomeSection';
@@ -22,7 +19,6 @@ import DeveloperSection from '@/components/settings/DeveloperSection';
 
 // Import custom hooks
 import { useLoginFlow } from '@/hooks/useLoginFlow';
-import { useUntappdLogin } from '@/hooks/useUntappdLogin';
 import { useSettingsState } from '@/hooks/useSettingsState';
 import { useSettingsRefresh } from '@/hooks/useSettingsRefresh';
 import { useAppContext } from '@/context/AppContext';
@@ -67,41 +63,12 @@ export default function SettingsScreen() {
     },
   });
 
-  const {
-    untappdWebViewVisible,
-    isUntappdLoggedIn,
-    startUntappdLogin,
-    handleUntappdLoginSuccess,
-    handleUntappdLoginCancel,
-    checkUntappdLoginStatus,
-  } = useUntappdLogin();
-
   // Auto-open login dialog if action=login is in URL params
   useEffect(() => {
     if (action === 'login') {
       startMemberLogin();
     }
   }, [action, startMemberLogin]);
-
-  // Handle Untappd logout
-  const handleUntappdLogout = async () => {
-    try {
-      await clearUntappdCookies();
-      await checkUntappdLoginStatus();
-      Alert.alert(
-        'Untappd Credentials Cleared',
-        'Your cached Untappd session has been cleared. To fully log out:\n\n1. Press "Check Untappd" while viewing a beer\n2. Manually log out of Untappd from that session\n3. Re-login to Untappd from the settings page',
-        [{ text: 'OK' }]
-      );
-    } catch (error) {
-      console.error('Error clearing Untappd credentials:', error);
-      Alert.alert(
-        'Error',
-        'Failed to clear Untappd credentials. Please try again.',
-        [{ text: 'OK' }]
-      );
-    }
-  };
 
   return (
     <ThemedView style={styles.container}>
@@ -114,14 +81,6 @@ export default function SettingsScreen() {
         onLoginCancel={handleLoginCancel}
         onRefreshData={handleRefresh}
         loading={isLoggingIn}
-      />
-
-      {/* Untappd WebView Modal */}
-      <UntappdLoginWebView
-        visible={untappdWebViewVisible}
-        onLoginSuccess={handleUntappdLoginSuccess}
-        onLoginCancel={handleUntappdLoginCancel}
-        loading={false}
       />
 
       <SafeAreaView style={styles.safeArea} edges={['top', 'right', 'left']}>
@@ -164,9 +123,6 @@ export default function SettingsScreen() {
                 onRefresh={handleRefresh}
                 isFirstLogin={isFirstLogin}
                 onLogin={startMemberLogin}
-                isUntappdLoggedIn={isUntappdLoggedIn}
-                onUntappdLogin={startUntappdLogin}
-                onUntappdLogout={handleUntappdLogout}
                 canGoBack={canGoBack}
                 onGoHome={() => router.replace('/(tabs)')}
                 style={{ backgroundColor: cardColor }}

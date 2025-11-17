@@ -198,11 +198,21 @@ export const resetDatabaseState = (): void => {
 };
 
 // ============================================================================
-// UNTAPPD COOKIE MANAGEMENT (ALPHA FEATURE)
+// UNTAPPD COOKIE MANAGEMENT (DEPRECATED)
+// ============================================================================
+//
+// NOTE: These functions are deprecated as of the migration to SFSafariViewController.
+// The Untappd integration now uses the system browser which shares cookies with Safari,
+// so users can leverage their existing Untappd login without the app managing credentials.
+//
+// These functions are retained for backward compatibility but should not be used in new code.
+// The untappd_cookies table will be removed in a future cleanup.
+//
 // ============================================================================
 
 /**
  * Get a single Untappd cookie by key
+ * @deprecated Use SFSafariViewController integration instead (see UntappdWebView component)
  * @param key Cookie key
  * @returns Cookie value or null if not found
  */
@@ -224,6 +234,7 @@ export const getUntappdCookie = async (key: string): Promise<string | null> => {
 
 /**
  * Set a single Untappd cookie
+ * @deprecated Use SFSafariViewController integration instead (see UntappdWebView component)
  * @param key Cookie key
  * @param value Cookie value
  * @param description Optional description
@@ -258,6 +269,7 @@ export const setUntappdCookie = async (key: string, value: string, description?:
 
 /**
  * Get all Untappd cookies
+ * @deprecated Use SFSafariViewController integration instead (see UntappdWebView component)
  * @returns Array of Untappd cookies
  */
 export const getAllUntappdCookies = async (): Promise<UntappdCookie[]> => {
@@ -277,6 +289,7 @@ export const getAllUntappdCookies = async (): Promise<UntappdCookie[]> => {
 
 /**
  * Check if user is logged into Untappd
+ * @deprecated Use SFSafariViewController integration instead (see UntappdWebView component)
  * @returns True if logged in, false otherwise
  */
 export const isUntappdLoggedIn = async (): Promise<boolean> => {
@@ -303,6 +316,7 @@ export const isUntappdLoggedIn = async (): Promise<boolean> => {
 
 /**
  * Clear all Untappd cookies
+ * @deprecated Use SFSafariViewController integration instead (see UntappdWebView component)
  */
 export async function clearUntappdCookies(): Promise<void> {
   try {
