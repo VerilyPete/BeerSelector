@@ -136,6 +136,9 @@ export interface BeerState {
 
   /** User's rewards from UFO Club */
   rewards: Reward[];
+
+  /** IDs of beers currently in the check-in queue (to prevent double check-ins) */
+  queuedBeerIds: Set<string>;
 }
 
 /**
@@ -230,6 +233,15 @@ export interface AppContextValue extends AppState {
   /** Reload all beer data from database (call after data refresh) */
   refreshBeerData: () => Promise<void>;
 
+  /** Add a beer ID to the queued set (called after successful check-in) */
+  addQueuedBeer: (beerId: string) => void;
+
+  /** Remove a beer ID from the queued set */
+  removeQueuedBeer: (beerId: string) => void;
+
+  /** Sync queued beer IDs from API response */
+  syncQueuedBeerIds: (ids: string[]) => void;
+
   // Filter actions
   /** Update search text */
   setSearchText: (text: string) => void;
@@ -305,6 +317,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     allBeers: [],
     tastedBeers: [],
     rewards: [],
+    queuedBeerIds: new Set(),
   });
 
   // Filter state
@@ -411,8 +424,13 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       rewardsRepository.getAll()
     ]);
 
-    // Update state with all data at once
-    setBeers({ allBeers: allBeersData, tastedBeers: tastedBeersData, rewards: rewardsData });
+    // Update state with all data at once, preserving queuedBeerIds
+    setBeers((prev) => ({
+      allBeers: allBeersData,
+      tastedBeers: tastedBeersData,
+      rewards: rewardsData,
+      queuedBeerIds: prev.queuedBeerIds,
+    }));
 
     console.log(`[AppContext] Loaded beer data: ${allBeersData.length} all beers, ${tastedBeersData.length} tasted beers, ${rewardsData.length} rewards`);
 
@@ -544,6 +562,36 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     }
   }, [loadBeerDataFromDatabase]);
 
+  /**
+   * Add a beer ID to the queued set (prevents double check-ins)
+   */
+  const addQueuedBeer = useCallback((beerId: string) => {
+    setBeers((prev) => {
+      const newSet = new Set(prev.queuedBeerIds);
+      newSet.add(beerId);
+      return { ...prev, queuedBeerIds: newSet };
+    });
+  }, []);
+
+  /**
+   * Remove a beer ID from the queued set
+   */
+  const removeQueuedBeer = useCallback((beerId: string) => {
+    setBeers((prev) => {
+      const newSet = new Set(prev.queuedBeerIds);
+      newSet.delete(beerId);
+      return { ...prev, queuedBeerIds: newSet };
+    });
+  }, []);
+
+  /**
+   * Sync queued beer IDs from API response
+   * Called when viewing queues to keep local state in sync with server
+   */
+  const syncQueuedBeerIds = useCallback((ids: string[]) => {
+    setBeers((prev) => ({ ...prev, queuedBeerIds: new Set(ids) }));
+  }, []);
+
   // ============================================================================
   // FILTER ACTIONS
   // ============================================================================
@@ -630,6 +678,9 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     setTastedBeers,
     setRewards,
     refreshBeerData,
+    addQueuedBeer,
+    removeQueuedBeer,
+    syncQueuedBeerIds,
 
     // Filter actions
     setSearchText,
@@ -663,6 +714,9 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     setTastedBeers,
     setRewards,
     refreshBeerData,
+    addQueuedBeer,
+    removeQueuedBeer,
+    syncQueuedBeerIds,
     setSearchText,
     setSelectedFilters,
     setSortBy,
