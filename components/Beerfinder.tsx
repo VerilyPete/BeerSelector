@@ -22,7 +22,7 @@ import { useQueuedCheckIn } from '@/hooks/useQueuedCheckIn';
 
 export const Beerfinder = () => {
   // MP-4 Step 2: Use context for beer data instead of local state
-  const { beers, loading, errors } = useAppContext();
+  const { beers, loading, errors, syncQueuedBeerIds } = useAppContext();
 
   const colorScheme = useColorScheme();
   const { queuedCheckIn, isLoading: checkinLoading } = useQueuedCheckIn();
@@ -42,10 +42,10 @@ export const Beerfinder = () => {
   const debouncedSearchText = useDebounce(localSearchText, 300);
 
   // Use the shared filtering hook with untasted beers from context
-  // Note: We need to compute untasted beers locally until context provides this
+  // Filter out both tasted beers AND queued beers (to prevent double check-ins)
   const untastedBeers = beers.allBeers.filter(beer => {
     const tastedIds = new Set(beers.tastedBeers.map(b => b.id));
-    return !tastedIds.has(beer.id);
+    return !tastedIds.has(beer.id) && !beers.queuedBeerIds.has(beer.id);
   });
 
   const {
@@ -68,12 +68,34 @@ export const Beerfinder = () => {
 
   // Use the shared data refresh hook
   // Note: Data loading now happens in _layout.tsx via AppContext
-  const { refreshing, handleRefresh } = useDataRefresh({
+  const { refreshing, handleRefresh: baseHandleRefresh } = useDataRefresh({
     onDataReloaded: async () => {
       // Data refresh is handled by _layout.tsx, no need to update local state
     },
     componentName: 'Beerfinder',
   });
+
+  // Wrap refresh to also sync queued beer IDs
+  const handleRefresh = useCallback(async () => {
+    await baseHandleRefresh();
+
+    // Sync queued beer IDs with API to handle external deletions
+    try {
+      const parsedBeers = await getQueuedBeers();
+      const queuedIds = parsedBeers
+        .map(queuedBeer => {
+          const matchingBeer = beers.allBeers.find(beer =>
+            queuedBeer.name.includes(beer.brew_name) || beer.brew_name.includes(queuedBeer.name)
+          );
+          return matchingBeer?.id;
+        })
+        .filter((id): id is string => id !== undefined);
+      syncQueuedBeerIds(queuedIds);
+    } catch (error) {
+      // Silently fail - queue sync is not critical for refresh
+      console.log('[Beerfinder] Failed to sync queued beers on refresh:', error);
+    }
+  }, [baseHandleRefresh, beers.allBeers, syncQueuedBeerIds]);
 
   // Sync debounced search text with hook's search state
   useEffect(() => {
@@ -97,6 +119,20 @@ export const Beerfinder = () => {
       const parsedBeers = await getQueuedBeers();
 
       setQueuedBeers(parsedBeers);
+
+      // Match queue beer names to allBeers to get beer IDs for filtering
+      // Queue returns names like "Beer Name (Draft)" which should match brew_name
+      const queuedBeerIds = parsedBeers
+        .map(queuedBeer => {
+          // Find matching beer by name (queue name may include container type)
+          const matchingBeer = beers.allBeers.find(beer =>
+            queuedBeer.name.includes(beer.brew_name) || beer.brew_name.includes(queuedBeer.name)
+          );
+          return matchingBeer?.id;
+        })
+        .filter((id): id is string => id !== undefined);
+
+      syncQueuedBeerIds(queuedBeerIds);
       setQueueError(null); // Success - clear error
       setQueueModalVisible(true);
     } catch (error: unknown) {
@@ -110,7 +146,7 @@ export const Beerfinder = () => {
     } finally {
       setLoadingQueues(false);
     }
-  }, []);
+  }, [beers.allBeers, syncQueuedBeerIds]);
 
   const deleteQueuedBeer = useCallback(async (beerId: string, beerName: string) => {
     try {

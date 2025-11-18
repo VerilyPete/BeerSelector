@@ -1,38 +1,36 @@
 /**
- * useOptimisticCheckIn Hook - Optimistic UI Updates for Beer Check-Ins
+ * useOptimisticCheckIn Hook - Beer Check-In Queue Management
  *
- * This hook provides optimistic UI updates for beer check-ins with:
- * - Immediate UI feedback (beer moves to tasted list instantly)
- * - Rollback on failure (beer returns to untasted list)
- * - Visual state indicators (pending, syncing, success, failed)
+ * This hook handles beer check-ins by sending requests to the server queue.
+ * Note: Check-ins require employee confirmation before appearing in tasted list.
+ * The tasted brews list only updates when synced from the API after confirmation.
+ *
+ * Features:
  * - Network-aware behavior (queue if offline, execute if online)
- * - Persistence across app restarts
+ * - Session validation before check-in
+ * - Success/failure feedback via alerts
  *
  * @example
  * ```tsx
  * import { useOptimisticCheckIn } from '@/hooks/useOptimisticCheckIn';
  *
- * const { checkInBeer, isChecking, getPendingBeer, retryCheckIn } = useOptimisticCheckIn();
+ * const { checkInBeer, isChecking } = useOptimisticCheckIn();
  *
- * // Check in a beer
+ * // Queue a beer for check-in
  * await checkInBeer(beer);
- *
- * // Check if a beer is pending
- * const pending = getPendingBeer(beer.id);
  * ```
  */
 
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback } from 'react';
 import { Alert } from 'react-native';
 import { useNetwork } from '@/context/NetworkContext';
 import { useOperationQueue } from '@/context/OperationQueueContext';
 import { useOptimisticUpdate } from '@/context/OptimisticUpdateContext';
 import { useAppContext } from '@/context/AppContext';
 import { checkInBeer as checkInBeerApi } from '@/src/api/beerService';
-import { myBeersRepository } from '@/src/database/repositories/MyBeersRepository';
-import { Beer, Beerfinder } from '@/src/types/beer';
+import { Beer } from '@/src/types/beer';
 import { OperationType, CheckInBeerPayload } from '@/src/types/operationQueue';
-import { OptimisticUpdateType, CheckInRollbackData, OptimisticUpdateStatus } from '@/src/types/optimisticUpdate';
+import { OptimisticUpdateType, OptimisticUpdateStatus } from '@/src/types/optimisticUpdate';
 import { getSessionData } from '@/src/api/sessionManager';
 
 export interface UseOptimisticCheckInResult {
@@ -58,57 +56,9 @@ export interface UseOptimisticCheckInResult {
 export const useOptimisticCheckIn = (): UseOptimisticCheckInResult => {
   const [isChecking, setIsChecking] = useState(false);
   const { isConnected, isInternetReachable } = useNetwork();
-  const { queueOperation, onOperationSuccess, onOperationFailure } = useOperationQueue();
-  const {
-    applyOptimisticUpdate,
-    confirmUpdate,
-    rollbackUpdate,
-    pendingUpdates,
-    getUpdateByOperationId,
-    linkOperation,
-  } = useOptimisticUpdate();
-  const { beers, setTastedBeers, refreshBeerData } = useAppContext();
-
-  /**
-   * Register callbacks for operation success/failure
-   */
-  useEffect(() => {
-    // On success: confirm the optimistic update
-    const unsubscribeSuccess = onOperationSuccess(async (operationId) => {
-      const update = getUpdateByOperationId(operationId);
-      if (update) {
-        console.log('[useOptimisticCheckIn] Confirming optimistic update:', update.id);
-        await confirmUpdate(update.id);
-      }
-    });
-
-    // On failure: rollback the optimistic update
-    const unsubscribeFailure = onOperationFailure(async (operationId, operation, error) => {
-      const update = getUpdateByOperationId(operationId);
-      if (update) {
-        console.log('[useOptimisticCheckIn] Rolling back optimistic update:', update.id);
-        const rollbackData = await rollbackUpdate(update.id, error);
-
-        if (rollbackData && rollbackData.type === 'CHECK_IN_BEER') {
-          // Remove beer from tasted list (rollback)
-          await myBeersRepository.delete(rollbackData.beer.id);
-          await refreshBeerData();
-
-          Alert.alert(
-            'Check-In Failed',
-            `${rollbackData.beer.brew_name} could not be checked in: ${error || 'Unknown error'}`,
-            [{ text: 'OK' }]
-          );
-        }
-      }
-    });
-
-    // CRITICAL: Clean up callbacks on unmount or when dependencies change
-    return () => {
-      unsubscribeSuccess();
-      unsubscribeFailure();
-    };
-  }, [onOperationSuccess, onOperationFailure, getUpdateByOperationId, confirmUpdate, rollbackUpdate, refreshBeerData]);
+  const { queueOperation } = useOperationQueue();
+  const { pendingUpdates } = useOptimisticUpdate();
+  const { beers, addQueuedBeer } = useAppContext();
 
   /**
    * Check in a beer with optimistic UI update
@@ -116,9 +66,6 @@ export const useOptimisticCheckIn = (): UseOptimisticCheckInResult => {
   const checkInBeer = useCallback(
     async (beer: Beer): Promise<void> => {
       setIsChecking(true);
-
-      // Declare updateId at function scope so it's accessible in catch block
-      let updateId: string | undefined;
 
       try {
         // Get session data
@@ -146,34 +93,7 @@ export const useOptimisticCheckIn = (): UseOptimisticCheckInResult => {
           return;
         }
 
-        // Step 1: Apply optimistic update immediately
-        console.log('[useOptimisticCheckIn] Applying optimistic update for:', beer.brew_name);
-
-        const rollbackData: CheckInRollbackData = {
-          type: 'CHECK_IN_BEER',
-          beer,
-          wasInAllBeers: true,
-          wasInTastedBeers: false,
-        };
-
-        updateId = await applyOptimisticUpdate({
-          type: OptimisticUpdateType.CHECK_IN_BEER,
-          rollbackData,
-        });
-
-        // Step 2: Add beer to tasted list immediately (optimistic)
-        const tastedBeer: Beerfinder = {
-          ...beer,
-          tasted_date: new Date().toISOString(),
-          roh_lap: sessionData.memberId,
-        };
-
-        await myBeersRepository.insertMany([tastedBeer]);
-        await refreshBeerData();
-
-        console.log('[useOptimisticCheckIn] Beer added to tasted list (optimistic)');
-
-        // Step 3: Check network connectivity
+        // Check network connectivity
         const isOnline = isConnected && isInternetReachable;
 
         if (!isOnline) {
@@ -188,40 +108,32 @@ export const useOptimisticCheckIn = (): UseOptimisticCheckInResult => {
             memberId: sessionData.memberId,
           };
 
-          const operationId = await queueOperation(OperationType.CHECK_IN_BEER, payload);
+          await queueOperation(OperationType.CHECK_IN_BEER, payload);
 
-          // Link optimistic update to queued operation
-          await linkOperation(updateId, operationId);
+          // Add to queued set to remove from Beerfinder list
+          addQueuedBeer(beer.id);
 
           Alert.alert(
             'Queued for Later',
-            `${beer.brew_name} has been added to your tasted list and will sync when you're back online.`,
+            `${beer.brew_name} will be queued when you're back online.`,
             [{ text: 'OK' }]
           );
 
           return;
         }
 
-        // Step 4: Online - execute check-in immediately
+        // Online - execute check-in immediately
         console.log('[useOptimisticCheckIn] Online - executing check-in for:', beer.brew_name);
         const result = await checkInBeerApi(beer);
 
         if (result.success) {
-          // Success - confirm the optimistic update
-          await confirmUpdate(updateId);
-          Alert.alert('Success', `Successfully checked in ${beer.brew_name}!`);
+          // Add to queued set to remove from Beerfinder list
+          addQueuedBeer(beer.id);
+          Alert.alert('Success', `${beer.brew_name} has been queued for check-in!`);
         } else {
-          // Failed - rollback the optimistic update
-          const rollbackData = await rollbackUpdate(updateId, result.error);
-
-          if (rollbackData && rollbackData.type === 'CHECK_IN_BEER') {
-            await myBeersRepository.delete(rollbackData.beer.id);
-            await refreshBeerData();
-          }
-
           Alert.alert(
             'Check-In Failed',
-            result.error || 'Unable to check in beer. Please try again.',
+            result.error || 'Unable to queue beer. Please try again.',
             [{ text: 'OK' }]
           );
         }
@@ -230,29 +142,10 @@ export const useOptimisticCheckIn = (): UseOptimisticCheckInResult => {
 
         // Check if it's a JSON parse error (which often means success on Flying Saucer API)
         if (error instanceof SyntaxError && error.message.includes('JSON Parse error')) {
-          // CRITICAL FIX #3: Confirm the optimistic update (don't leave it in PENDING state)
-          if (updateId) {
-            await confirmUpdate(updateId);
-          }
-          Alert.alert('Success', `Successfully checked in ${beer.brew_name}!`);
+          // Add to queued set to remove from Beerfinder list
+          addQueuedBeer(beer.id);
+          Alert.alert('Success', `${beer.brew_name} has been queued for check-in!`);
           return;
-        }
-
-        // CRITICAL FIX #2: Rollback the optimistic update for generic errors
-        if (updateId) {
-          try {
-            const rollbackData = await rollbackUpdate(
-              updateId,
-              error instanceof Error ? error.message : 'Unknown error'
-            );
-
-            if (rollbackData && rollbackData.type === 'CHECK_IN_BEER') {
-              await myBeersRepository.delete(rollbackData.beer.id);
-              await refreshBeerData();
-            }
-          } catch (rollbackError) {
-            console.error('[useOptimisticCheckIn] Error during rollback:', rollbackError);
-          }
         }
 
         // Show error alert
@@ -266,11 +159,8 @@ export const useOptimisticCheckIn = (): UseOptimisticCheckInResult => {
       isConnected,
       isInternetReachable,
       queueOperation,
-      applyOptimisticUpdate,
-      confirmUpdate,
-      rollbackUpdate,
       beers.tastedBeers,
-      refreshBeerData,
+      addQueuedBeer,
     ]
   );
 
@@ -300,48 +190,24 @@ export const useOptimisticCheckIn = (): UseOptimisticCheckInResult => {
 
   /**
    * Retry a failed check-in
+   * @deprecated No longer applicable - check-ins don't have local state to retry
    */
   const retryCheckIn = useCallback(
-    async (beerId: string): Promise<void> => {
-      const update = pendingUpdates.find((u) => {
-        if (u.type === OptimisticUpdateType.CHECK_IN_BEER && u.rollbackData.type === 'CHECK_IN_BEER') {
-          return u.rollbackData.beer.id === beerId;
-        }
-        return false;
-      });
-
-      if (update && update.rollbackData.type === 'CHECK_IN_BEER') {
-        const beer = update.rollbackData.beer;
-        await checkInBeer(beer);
-      }
+    async (_beerId: string): Promise<void> => {
+      // No-op: check-ins are queued server-side, not stored locally
     },
-    [pendingUpdates, checkInBeer]
+    []
   );
 
   /**
    * Manually rollback a check-in
+   * @deprecated No longer applicable - check-ins don't modify local tasted list
    */
   const rollbackCheckIn = useCallback(
-    async (beerId: string): Promise<void> => {
-      const update = pendingUpdates.find((u) => {
-        if (u.type === OptimisticUpdateType.CHECK_IN_BEER && u.rollbackData.type === 'CHECK_IN_BEER') {
-          return u.rollbackData.beer.id === beerId;
-        }
-        return false;
-      });
-
-      if (update) {
-        const rollbackData = await rollbackUpdate(update.id);
-
-        if (rollbackData && rollbackData.type === 'CHECK_IN_BEER') {
-          await myBeersRepository.delete(rollbackData.beer.id);
-          await refreshBeerData();
-
-          Alert.alert('Rolled Back', `${rollbackData.beer.brew_name} has been removed from your tasted list.`);
-        }
-      }
+    async (_beerId: string): Promise<void> => {
+      // No-op: check-ins don't add to tasted list until employee confirmation
     },
-    [pendingUpdates, rollbackUpdate, refreshBeerData]
+    []
   );
 
   return {
