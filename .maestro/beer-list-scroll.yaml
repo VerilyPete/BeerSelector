@@ -2,6 +2,15 @@
 appId: org.verily.FSbeerselector
 ---
 - launchApp
+
+# Dismiss Expo dev menu if present
+- runFlow:
+    when:
+      visible: "Reload"
+    commands:
+      - pressKey: Escape
+      - waitForAnimationToEnd
+
 - tapOn: "All Beers Tab"
 - assertVisible: "all-beers-container"
 
@@ -9,14 +18,14 @@ appId: org.verily.FSbeerselector
 - waitForAnimationToEnd
 
 # Test scroll performance with 200+ items
-- scroll:
-    direction: "down"
+- swipe:
+    direction: DOWN
     duration: 3000
-- scroll:
-    direction: "down"
+- swipe:
+    direction: DOWN
     duration: 3000
-- scroll:
-    direction: "up"
+- swipe:
+    direction: UP
     duration: 3000
 
 # Verify no crashes or freezes

@@ -15,8 +15,15 @@ name: "Data Refresh - Pull-to-Refresh and Manual Refresh"
     clearState: false
 
 # Step 2: Wait for app initialization
-- waitForAnimationToEnd:
-    timeout: 5000
+- waitForAnimationToEnd
+
+# Dismiss Expo dev menu if present
+- runFlow:
+    when:
+      visible: "Reload"
+    commands:
+      - pressKey: Escape
+      - waitForAnimationToEnd
 
 # ========================================
 # Test 1: Refresh on All Beer Tab
@@ -33,10 +40,7 @@ name: "Data Refresh - Pull-to-Refresh and Manual Refresh"
     id: "beer-list"
 
 # Step 5: Store initial beer count for comparison
-- runScript:
-    env:
-      INITIAL_ALL_BEER_COUNT: ${output.text}
-    script: |
+- evalScript: |
       output.text = await maestro.getText({id: 'beer-count'})
 
 # Step 6: Perform pull-to-refresh gesture
@@ -49,8 +53,7 @@ name: "Data Refresh - Pull-to-Refresh and Manual Refresh"
 
 # Step 7: Wait for refresh to complete
 # API call may take up to 15 seconds (timeout from dataUpdateService)
-- waitForAnimationToEnd:
-    timeout: 20000
+- waitForAnimationToEnd
 
 # Step 8: Verify list is still visible after refresh
 - assertVisible:
@@ -61,7 +64,7 @@ name: "Data Refresh - Pull-to-Refresh and Manual Refresh"
     id: "beer-count"
 
 # Step 10: Scroll down to verify list data rendered
-- scroll:
+- swipe:
     direction: DOWN
 - waitForAnimationToEnd
 
@@ -71,18 +74,14 @@ name: "Data Refresh - Pull-to-Refresh and Manual Refresh"
 
 # Step 11: Navigate to Beerfinder tab (untasted beers)
 - tapOn: "Beerfinder"
-- waitForAnimationToEnd:
-    timeout: 3000
+- waitForAnimationToEnd
 
 # Step 12: Verify beerfinder list is visible
 - assertVisible:
     id: "beer-list"
 
 # Step 13: Store initial untasted beer count
-- runScript:
-    env:
-      INITIAL_BEERFINDER_COUNT: ${output.text}
-    script: |
+- evalScript: |
       output.text = await maestro.getText({id: 'beer-count'})
 
 # Step 14: Perform pull-to-refresh on beerfinder
@@ -93,8 +92,7 @@ name: "Data Refresh - Pull-to-Refresh and Manual Refresh"
     duration: 800
 
 # Step 15: Wait for refresh to complete
-- waitForAnimationToEnd:
-    timeout: 20000
+- waitForAnimationToEnd
 
 # Step 16: Verify list is still visible
 - assertVisible:
@@ -110,8 +108,7 @@ name: "Data Refresh - Pull-to-Refresh and Manual Refresh"
 
 # Step 18: Navigate to Tasted Brews tab
 - tapOn: "Tasted Brews"
-- waitForAnimationToEnd:
-    timeout: 3000
+- waitForAnimationToEnd
 
 # Step 19: Verify tasted brews list or empty state
 # If user has no tasted beers, we'll see empty state
@@ -127,8 +124,7 @@ name: "Data Refresh - Pull-to-Refresh and Manual Refresh"
     duration: 800
 
 # Step 21: Wait for refresh to complete
-- waitForAnimationToEnd:
-    timeout: 20000
+- waitForAnimationToEnd
 
 # Step 22: Verify screen is still responsive
 - assertVisible:
@@ -159,8 +155,7 @@ name: "Data Refresh - Pull-to-Refresh and Manual Refresh"
 
 # Step 26: Wait for first refresh to complete
 # Only one refresh should occur
-- waitForAnimationToEnd:
-    timeout: 20000
+- waitForAnimationToEnd
 
 # Step 27: Verify app is still responsive
 - assertVisible:
@@ -177,20 +172,19 @@ name: "Data Refresh - Pull-to-Refresh and Manual Refresh"
 - waitForAnimationToEnd
 
 # Step 29: Scroll down to find Settings button (if needed)
-- scroll:
+- swipe:
     direction: DOWN
 
 # Step 30: Tap Settings button
 - tapOn: "Settings"
-- waitForAnimationToEnd:
-    timeout: 3000
+- waitForAnimationToEnd
 
 # Step 31: Verify we're on settings screen
 - assertVisible:
     text: "Settings"
 
 # Step 32: Scroll to find Data Management section
-- scroll:
+- swipe:
     direction: DOWN
 
 # Step 33: Verify "Refresh All Beer Data" button exists
@@ -207,8 +201,7 @@ name: "Data Refresh - Pull-to-Refresh and Manual Refresh"
     text: "Refreshing data..."
 
 # Step 36: Wait for refresh to complete
-- waitForAnimationToEnd:
-    timeout: 20000
+- waitForAnimationToEnd
 
 # Step 37: Verify button returns to normal state
 - assertVisible:
@@ -238,8 +231,7 @@ name: "Data Refresh - Pull-to-Refresh and Manual Refresh"
     duration: 800
 
 # Step 41: Wait for completion
-- waitForAnimationToEnd:
-    timeout: 20000
+- waitForAnimationToEnd
 
 # Step 42: Verify app recovered and data is visible
 - assertVisible:

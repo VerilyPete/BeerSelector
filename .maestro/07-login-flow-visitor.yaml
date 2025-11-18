@@ -20,13 +20,19 @@ name: "Login Flow - Visitor Mode"
     clearState: true
 
 # Wait for app initialization
-- waitForAnimationToEnd:
-    timeout: 10000
+- waitForAnimationToEnd
+
+# Dismiss Expo dev menu if present
+- runFlow:
+    when:
+      visible: "Reload"
+    commands:
+      - pressKey: Escape
+      - waitForAnimationToEnd
 
 # Verify redirect to settings screen
 - assertVisible:
     text: "Settings"
-    timeout: 5000
 
 # Verify welcome section is shown
 - assertVisible:
@@ -43,21 +49,18 @@ name: "Login Flow - Visitor Mode"
 # Tap the login button to open WebView
 - tapOn:
     text: "Login to Flying Saucer"
-- waitForAnimationToEnd:
-    timeout: 2000
+- waitForAnimationToEnd
 
 # Verify WebView modal opens
 - assertVisible:
     id: "login-webview-modal"
-    timeout: 5000
 
 # Verify WebView header
 - assertVisible:
     text: "Flying Saucer Login"
 
 # Wait for WebView to load
-- waitForAnimationToEnd:
-    timeout: 15000
+- waitForAnimationToEnd
 
 # ======================
 # STEP 3: Select Visitor Mode in WebView
@@ -98,7 +101,7 @@ name: "Login Flow - Visitor Mode"
 # - tapOn:
 #     text: "OK"
 
-# - waitForAnimationToEnd:
+# - waitForAnimationToEnd
 #     timeout: 5000
 
 # ======================
@@ -169,7 +172,7 @@ name: "Login Flow - Visitor Mode"
 
 # # Test that Beerfinder tab shows empty state or is unavailable
 # - tapOn: "Beerfinder"
-# - waitForAnimationToEnd:
+# - waitForAnimationToEnd
 #     timeout: 3000
 
 # # Visitor should see empty state or "Login Required" message
@@ -177,7 +180,7 @@ name: "Login Flow - Visitor Mode"
 
 # # Navigate to Tasted Brews tab
 # - tapOn: "Tasted Brews"
-# - waitForAnimationToEnd:
+# - waitForAnimationToEnd
 #     timeout: 3000
 
 # # Visitor should see empty state or "Login Required" message
@@ -218,7 +221,7 @@ name: "Login Flow - Visitor Mode"
 
 # - tapOn:
 #     text: "Login to Flying Saucer"
-# - waitForAnimationToEnd:
+# - waitForAnimationToEnd
 #     timeout: 2000
 
 # # Verify WebView opens for member login
@@ -244,13 +247,13 @@ name: "Login Flow - Visitor Mode"
 
 # # Verify visitors can view beer details
 # - tapOn:
-#     regex: "beer-item-.*"
+#     id: "beer-item-.*"
 #     index: 0
 # - waitForAnimationToEnd
 
 # # Verify beer details expand
 # - assertVisible:
-#     regex: "beer-description-container-.*"
+#     id: "beer-description-container-.*"
 
 # # Verify no check-in or tasting buttons are shown (visitor limitation)
 # # Check-in functionality requires member authentication

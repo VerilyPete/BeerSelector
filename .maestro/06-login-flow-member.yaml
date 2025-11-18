@@ -19,13 +19,19 @@ name: "Login Flow - UFO Club Member Authentication"
     clearState: true
 
 # Wait for app initialization (database setup)
-- waitForAnimationToEnd:
-    timeout: 10000
+- waitForAnimationToEnd
+
+# Dismiss Expo dev menu if present
+- runFlow:
+    when:
+      visible: "Reload"
+    commands:
+      - pressKey: Escape
+      - waitForAnimationToEnd
 
 # Verify we're redirected to settings screen (first launch behavior)
 - assertVisible:
     text: "Settings"
-    timeout: 5000
 
 # Verify welcome message is shown for first-time users
 - assertVisible:
@@ -46,13 +52,11 @@ name: "Login Flow - UFO Club Member Authentication"
 # Tap the login button to open WebView
 - tapOn:
     text: "Login to Flying Saucer"
-- waitForAnimationToEnd:
-    timeout: 2000
+- waitForAnimationToEnd
 
 # Verify WebView modal opens
 - assertVisible:
     id: "login-webview-modal"
-    timeout: 5000
 
 # Verify WebView header is shown
 - assertVisible:
@@ -64,8 +68,7 @@ name: "Login Flow - UFO Club Member Authentication"
 
 # Wait for WebView to load the login page (kiosk.php)
 # This may take several seconds depending on network
-- waitForAnimationToEnd:
-    timeout: 15000
+- waitForAnimationToEnd
 
 # ======================
 # STEP 3: WebView Login Process
@@ -98,8 +101,7 @@ name: "Login Flow - UFO Club Member Authentication"
 # Test that user can cancel login process
 - tapOn:
     id: "close-webview-button"
-- waitForAnimationToEnd:
-    timeout: 2000
+- waitForAnimationToEnd
 
 # Verify we're back on settings screen
 - assertVisible:
@@ -116,17 +118,14 @@ name: "Login Flow - UFO Club Member Authentication"
 # Tap login button again
 - tapOn:
     text: "Login to Flying Saucer"
-- waitForAnimationToEnd:
-    timeout: 2000
+- waitForAnimationToEnd
 
 # Verify WebView opens again
 - assertVisible:
     id: "login-webview-modal"
-    timeout: 5000
 
 # Wait for page to load
-- waitForAnimationToEnd:
-    timeout: 15000
+- waitForAnimationToEnd
 
 # NOTE: In a real E2E test with a test account, you would:
 # 1. Locate username/password fields in WebView

@@ -33,7 +33,7 @@ name: "Auto-Login - Session Persistence and Recovery"
 - stopApp
 
 # Wait a few seconds to ensure full app shutdown
-- runScript: |
+- evalScript: |
     await new Promise(resolve => setTimeout(resolve, 3000));
 
 # ======================
@@ -45,8 +45,15 @@ name: "Auto-Login - Session Persistence and Recovery"
     clearState: false
 
 # Wait for database initialization and auto-login attempt
-- waitForAnimationToEnd:
-    timeout: 15000
+- waitForAnimationToEnd
+
+# Dismiss Expo dev menu if present
+- runFlow:
+    when:
+      visible: "Reload"
+    commands:
+      - pressKey: Escape
+      - waitForAnimationToEnd
 
 # ======================
 # STEP 3: Verify Auto-Login Success
@@ -59,7 +66,6 @@ name: "Auto-Login - Session Persistence and Recovery"
 # We should see either the home screen or All Beer tab
 - assertVisible:
     id: "all-beers-container"
-    timeout: 20000
 
 # Verify beer list loaded (session restored successfully)
 - assertVisible:
@@ -79,16 +85,14 @@ name: "Auto-Login - Session Persistence and Recovery"
 
 # Navigate to Beerfinder tab (member-only feature)
 - tapOn: "Beerfinder"
-- waitForAnimationToEnd:
-    timeout: 5000
+- waitForAnimationToEnd
 
 # Verify Beerfinder loads (requires valid session)
 # If session expired, this would show an error or empty state
 
 # Navigate to Tasted Brews tab (member-only feature)
 - tapOn: "Tasted Brews"
-- waitForAnimationToEnd:
-    timeout: 5000
+- waitForAnimationToEnd
 
 # Verify Tasted Brews loads (requires valid session)
 # This confirms auto-login restored full member access
@@ -109,8 +113,7 @@ name: "Auto-Login - Session Persistence and Recovery"
     duration: 1000
 
 # Wait for refresh to complete
-- waitForAnimationToEnd:
-    timeout: 20000
+- waitForAnimationToEnd
 
 # Verify beer list is still displayed after refresh
 - assertVisible:
@@ -128,45 +131,63 @@ name: "Auto-Login - Session Persistence and Recovery"
 
 # First restart
 - stopApp
-- runScript: |
+- evalScript: |
     await new Promise(resolve => setTimeout(resolve, 2000));
 
 - launchApp:
     clearState: false
-- waitForAnimationToEnd:
-    timeout: 15000
+- waitForAnimationToEnd
+
+# Dismiss Expo dev menu if present
+- runFlow:
+    when:
+      visible: "Reload"
+    commands:
+      - pressKey: Escape
+      - waitForAnimationToEnd
 
 - assertVisible:
     id: "all-beers-container"
-    timeout: 20000
 
 # Second restart
 - stopApp
-- runScript: |
+- evalScript: |
     await new Promise(resolve => setTimeout(resolve, 2000));
 
 - launchApp:
     clearState: false
-- waitForAnimationToEnd:
-    timeout: 15000
+- waitForAnimationToEnd
+
+# Dismiss Expo dev menu if present
+- runFlow:
+    when:
+      visible: "Reload"
+    commands:
+      - pressKey: Escape
+      - waitForAnimationToEnd
 
 - assertVisible:
     id: "all-beers-container"
-    timeout: 20000
 
 # Third restart
 - stopApp
-- runScript: |
+- evalScript: |
     await new Promise(resolve => setTimeout(resolve, 2000));
 
 - launchApp:
     clearState: false
-- waitForAnimationToEnd:
-    timeout: 15000
+- waitForAnimationToEnd
+
+# Dismiss Expo dev menu if present
+- runFlow:
+    when:
+      visible: "Reload"
+    commands:
+      - pressKey: Escape
+      - waitForAnimationToEnd
 
 - assertVisible:
     id: "all-beers-container"
-    timeout: 20000
 
 # ======================
 # STEP 7: Verify Session Expiration Handling
@@ -197,24 +218,30 @@ name: "Auto-Login - Session Persistence and Recovery"
 
 # Background the app (go to home screen)
 # Note: Maestro backgroundApp command sends app to background
-- runScript: |
+- evalScript: |
     await maestro.pressKey('home');
 
 # Wait a few seconds in background
-- runScript: |
+- evalScript: |
     await new Promise(resolve => setTimeout(resolve, 5000));
 
 # Bring app back to foreground
 - launchApp:
     clearState: false
 
-- waitForAnimationToEnd:
-    timeout: 5000
+- waitForAnimationToEnd
+
+# Dismiss Expo dev menu if present
+- runFlow:
+    when:
+      visible: "Reload"
+    commands:
+      - pressKey: Escape
+      - waitForAnimationToEnd
 
 # Verify we're back in the app with session intact
 - assertVisible:
     id: "all-beers-container"
-    timeout: 10000
 
 # ======================
 # STEP 9: Navigate to Settings and Verify Session State
@@ -226,7 +253,7 @@ name: "Auto-Login - Session Persistence and Recovery"
 
 # Tap settings button (gear icon)
 - tapOn:
-    accessibilityLabel: "gear"
+    text: "gear"
 - waitForAnimationToEnd
 
 # Verify settings screen opens
@@ -256,19 +283,17 @@ name: "Auto-Login - Session Persistence and Recovery"
 # Tap the refresh button to test manual data refresh with session
 - tapOn:
     text: "Refresh All Beer Data"
-- waitForAnimationToEnd:
-    timeout: 1000
+- waitForAnimationToEnd
 
 # Wait for refresh to complete (may take 10-15 seconds)
-- waitForAnimationToEnd:
-    timeout: 20000
+- waitForAnimationToEnd
 
 # Verify refresh completed successfully (button re-enabled)
 # If session invalid, refresh would fail with error
 
 # Navigate back to beer list
 - tapOn:
-    accessibilityLabel: "xmark"
+    text: "xmark"
 - waitForAnimationToEnd
 
 # Verify we're back on home screen

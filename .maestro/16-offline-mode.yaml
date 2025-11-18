@@ -36,7 +36,6 @@ tags:
       text: ".*"
       matching: contains
     direction: DOWN
-    timeout: 5000
 
 # Enable airplane mode to simulate offline
 - runFlow:
@@ -53,14 +52,13 @@ tags:
     when:
       platform: Android
     commands:
-      # Android: Open quick settings and enable airplane mode
-      - runScript: adb shell cmd connectivity airplane-mode enable
-      - waitForAnimationToEnd: 2000
+      # Android: Enable airplane mode
+      - setAirplaneMode: enabled
+      - waitForAnimationToEnd
 
 # Verify offline indicator appears
 - assertVisible:
     text: "No Internet Connection"
-    timeout: 10000
 
 # Verify we can still view cached beer data when offline
 - assertVisible: "All Beer"
@@ -92,15 +90,15 @@ tags:
       platform: Android
     commands:
       # Android: Disable airplane mode
-      - runScript: adb shell cmd connectivity airplane-mode disable
-      - waitForAnimationToEnd: 2000
+      - setAirplaneMode: disabled
+      - waitForAnimationToEnd
 
 # Wait for network to reconnect
 - waitForAnimationToEnd: 5000
 
 # Verify offline indicator disappears (or becomes hidden)
 # Note: May need to check that it's NOT visible
-- runScript: |
+- evalScript: |
     try {
       output.visible = !maestro.findElement({ text: "No Internet Connection" });
     } catch (e) {

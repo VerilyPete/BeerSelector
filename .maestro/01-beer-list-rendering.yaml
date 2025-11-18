@@ -10,8 +10,15 @@ name: "Beer List - Rendering and Scrolling"
     clearState: false
 
 # Step 2: Wait for database initialization
-- waitForAnimationToEnd:
-    timeout: 10000
+- waitForAnimationToEnd
+
+# Dismiss Expo dev menu if present
+- runFlow:
+    when:
+      visible: "Reload"
+    commands:
+      - pressKey: Escape
+      - waitForAnimationToEnd
 
 # Step 3: Navigate to All Beer tab (if not already there)
 - tapOn: "All Beer"
@@ -41,33 +48,30 @@ name: "Beer List - Rendering and Scrolling"
 # Note: We can't assert specific beer IDs without knowing the data
 # but we can verify the list contains beer items
 - assertVisible:
-    regex: "beer-item-.*"
+    id: "beer-item-.*"
 
 # Step 10: Test scroll performance - scroll down slowly
 - scrollUntilVisible:
     element:
-      regex: "beer-item-.*"
+      id: "beer-item-.*"
     direction: DOWN
-    timeout: 5000
     speed: 40  # Slow scroll to test frame rate
 
 # Step 11: Scroll to bottom of list (test virtualization)
 - repeat:
     times: 5
     commands:
-      - scroll:
+      - swipe:
           direction: DOWN
-      - waitForAnimationToEnd:
-          timeout: 500
+      - waitForAnimationToEnd
 
 # Step 12: Scroll back to top
 - repeat:
     times: 5
     commands:
-      - scroll:
+      - swipe:
           direction: UP
-      - waitForAnimationToEnd:
-          timeout: 500
+      - waitForAnimationToEnd
 
 # Step 13: Verify we're back at top (first items visible)
 - assertVisible:
@@ -81,8 +85,7 @@ name: "Beer List - Rendering and Scrolling"
     duration: 1000
 
 # Step 15: Wait for refresh to complete
-- waitForAnimationToEnd:
-    timeout: 15000  # API call may take time
+- waitForAnimationToEnd
 
 # Step 16: Verify list is still visible after refresh
 - assertVisible:

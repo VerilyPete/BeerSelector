@@ -2,26 +2,31 @@
 appId: org.verily.FSbeerselector
 ---
 - launchApp
+
+# Dismiss Expo dev menu if present
+- runFlow:
+    when:
+      visible: "Reload"
+    commands:
+      - pressKey: Escape
+      - waitForAnimationToEnd
+
 - tapOn: "All Beers Tab"
 - waitForAnimationToEnd
 
 # Test filter toggle responsiveness
 - tapOn: "filter-draft-button"
-- waitForAnimationToEnd:
-    timeout: 1000
+- waitForAnimationToEnd
 - assertVisible: "beer-list"
 
 - tapOn: "filter-ipa-button"
-- waitForAnimationToEnd:
-    timeout: 1000
+- waitForAnimationToEnd
 - assertVisible: "beer-list"
 
 # Toggle off and verify
 - tapOn: "filter-draft-button"
-- waitForAnimationToEnd:
-    timeout: 1000
+- waitForAnimationToEnd
 
 # Verify filter state restored
 - tapOn: "sort-toggle-button"
-- waitForAnimationToEnd:
-    timeout: 1000
+- waitForAnimationToEnd

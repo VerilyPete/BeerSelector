@@ -17,8 +17,15 @@ name: "Settings - Configuration and Data Management"
     clearState: false
 
 # Step 2: Wait for initialization
-- waitForAnimationToEnd:
-    timeout: 5000
+- waitForAnimationToEnd
+
+# Dismiss Expo dev menu if present
+- runFlow:
+    when:
+      visible: "Reload"
+    commands:
+      - pressKey: Escape
+      - waitForAnimationToEnd
 
 # ========================================
 # Test 1: Navigate to Settings
@@ -29,13 +36,11 @@ name: "Settings - Configuration and Data Management"
 - waitForAnimationToEnd
 
 # Step 4: Scroll down to find Settings button
-- scroll:
-    direction: DOWN
+- scroll
 
 # Step 5: Tap Settings button
 - tapOn: "Settings"
-- waitForAnimationToEnd:
-    timeout: 3000
+- waitForAnimationToEnd
 
 # Step 6: Verify we're on settings screen
 - assertVisible:
@@ -67,8 +72,7 @@ name: "Settings - Configuration and Data Management"
 # ========================================
 
 # Step 11: Scroll to Data Management section
-- scroll:
-    direction: DOWN
+- scroll
 
 # Step 12: Verify Data Management section is visible
 - assertVisible:
@@ -103,8 +107,7 @@ name: "Settings - Configuration and Data Management"
 # Step 18: Verify all buttons are disabled during refresh
 # Buttons should have reduced opacity (0.5) when disabled
 # Wait for refresh to complete
-- waitForAnimationToEnd:
-    timeout: 20000
+- waitForAnimationToEnd
 
 # Step 19: Verify refresh completed successfully
 - assertVisible:
@@ -130,8 +133,7 @@ name: "Settings - Configuration and Data Management"
     id: "all-beers-container"
 
 # Step 23: Navigate back to Settings
-- scroll:
-    direction: DOWN
+- scroll
 - tapOn: "Settings"
 - waitForAnimationToEnd
 
@@ -145,37 +147,38 @@ name: "Settings - Configuration and Data Management"
 # It may not be visible in all scenarios
 
 # Step 25: If visible, test navigation
-- optional: true
-  commands:
-    - tapOn:
-        text: "Go to Home Screen"
-    - waitForAnimationToEnd
-    - assertVisible:
-        id: "all-beers-container"
+- runFlow:
+    when:
+      visible: "Go to Home Screen"
+    commands:
+      - tapOn:
+          text: "Go to Home Screen"
+      - waitForAnimationToEnd
+      - assertVisible:
+          id: "all-beers-container"
 
 # ========================================
 # Test 7: Test Login Flow Trigger
 # ========================================
 
 # Step 26: Navigate back to Settings (if needed)
-- optional: true
-  commands:
-    - scroll:
-        direction: DOWN
-    - tapOn: "Settings"
-    - waitForAnimationToEnd
+- runFlow:
+    when:
+      visible: "Settings"
+    commands:
+      - scroll
+      - tapOn: "Settings"
+      - waitForAnimationToEnd
 
 # Step 27: Scroll to login button
-- scroll:
-    direction: DOWN
+- scroll
 
 # Step 28: Tap "Login to Flying Saucer" button
 - tapOn:
     text: "Login to Flying Saucer"
 
 # Step 29: Verify login webview modal appears
-- waitForAnimationToEnd:
-    timeout: 3000
+- waitForAnimationToEnd
 
 # Step 30: Verify webview is visible
 - assertVisible:
@@ -199,8 +202,7 @@ name: "Settings - Configuration and Data Management"
 # ========================================
 
 # Step 34: Scroll to Untappd login section
-- scroll:
-    direction: DOWN
+- scroll
 
 # Step 35: Identify Untappd button state
 # Could be "Login to Untappd" or "Reconnect to Untappd"
@@ -211,8 +213,7 @@ name: "Settings - Configuration and Data Management"
     text: "Untappd"
 
 # Step 37: Verify Untappd webview modal appears
-- waitForAnimationToEnd:
-    timeout: 3000
+- waitForAnimationToEnd
 
 # Step 38: Verify Untappd webview is visible
 - assertVisible:
@@ -237,52 +238,39 @@ name: "Settings - Configuration and Data Management"
 
 # Step 42: Check for "Clear Untappd Credentials" button
 # This button only appears when user is logged into Untappd
-- optional: true
-  commands:
-    - scroll:
-        direction: DOWN
-    - assertVisible:
-        text: "Clear Untappd Credentials"
-
-# Step 43: If button exists, test logout flow
-- optional: true
-  commands:
-    - tapOn:
-        text: "Clear Untappd Credentials"
-    - waitForAnimationToEnd:
-        timeout: 2000
-
-# Step 44: Verify alert dialog appears
-# Alert should have title "Untappd Credentials Cleared"
-# and instructions for full logout
-- optional: true
-  commands:
-    - assertVisible:
-        text: "Untappd|credentials|cleared"
-    - tapOn: "OK"
+- runFlow:
+    when:
+      visible: "Clear Untappd Credentials"
+    commands:
+      - scroll
+      - assertVisible:
+          text: "Clear Untappd Credentials"
+      - tapOn:
+          text: "Clear Untappd Credentials"
+      - waitForAnimationToEnd
+      - assertVisible:
+          text: "Untappd|credentials|cleared"
+      - tapOn: "OK"
 
 # ========================================
 # Test 10: Verify Settings Persistence
 # ========================================
 
 # Step 45: Navigate away from settings
-- scroll:
-    direction: UP
+- scroll
 - tapOn:
     text: "×"
 - waitForAnimationToEnd
 
 # Step 46: Navigate back to settings
-- scroll:
-    direction: DOWN
+- scroll
 - tapOn: "Settings"
 - waitForAnimationToEnd
 
 # Step 47: Verify all sections are still visible
 - assertVisible:
     text: "Settings"
-- scroll:
-    direction: DOWN
+- scroll
 - assertVisible:
     id: "about-section"
 - assertVisible:
@@ -304,8 +292,7 @@ name: "Settings - Configuration and Data Management"
     text: "Login to Flying Saucer"
 
 # Step 51: Return to home to complete test
-- scroll:
-    direction: UP
+- scroll
 - tapOn:
     text: "×"
 - waitForAnimationToEnd

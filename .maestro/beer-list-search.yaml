@@ -2,6 +2,15 @@
 appId: org.verily.FSbeerselector
 ---
 - launchApp
+
+# Dismiss Expo dev menu if present
+- runFlow:
+    when:
+      visible: "Reload"
+    commands:
+      - pressKey: Escape
+      - waitForAnimationToEnd
+
 - tapOn: "All Beers Tab"
 - waitForAnimationToEnd
 
@@ -9,15 +18,13 @@ appId: org.verily.FSbeerselector
 - tapOn:
     id: "search-bar"
 - inputText: "IPA"
-- waitForAnimationToEnd:
-    timeout: 2000
+- waitForAnimationToEnd
 - assertVisible: "beer-list"
 
 # Clear and search again
 - eraseText
 - inputText: "Stout Porter"
-- waitForAnimationToEnd:
-    timeout: 2000
+- waitForAnimationToEnd
 
 # Verify results updated
 - assertVisible: "beer-count"

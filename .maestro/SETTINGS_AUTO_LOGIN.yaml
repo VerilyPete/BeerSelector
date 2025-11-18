@@ -25,8 +25,15 @@ name: "Settings - Auto-Login & Advanced Features"
 - launchApp:
     clearState: false
 
-- waitForAnimationToEnd:
-    timeout: 10000
+- waitForAnimationToEnd
+
+# Dismiss Expo dev menu if present
+- runFlow:
+    when:
+      visible: "Reload"
+    commands:
+      - pressKey: Escape
+      - waitForAnimationToEnd
 
 # ========================================
 # TEST 1: Normal Settings Access
@@ -34,23 +41,19 @@ name: "Settings - Auto-Login & Advanced Features"
 
 # Navigate to home/beer list
 - tapOn: "Home"
-- waitForAnimationToEnd:
-    timeout: 3000
+- waitForAnimationToEnd
 
 # Verify we're on a tab screen
 - assertVisible:
     text: "All Beer"
-- optional: true
-  commands:
-    - assertVisible:
-        id: "home-tab"
+- assertVisible:
+    id: "home-tab"
+    optional: true
 
 # Navigate to settings
-- scroll:
-    direction: DOWN
+- scroll
 - tapOn: "Settings"
-- waitForAnimationToEnd:
-    timeout: 3000
+- waitForAnimationToEnd
 
 # Verify settings screen loaded
 - assertVisible:
@@ -65,8 +68,7 @@ name: "Settings - Auto-Login & Advanced Features"
 # ========================================
 
 # Verify About section
-- scroll:
-    direction: UP
+- scroll
 - assertVisible:
     id: "about-section"
 
@@ -77,8 +79,7 @@ name: "Settings - Auto-Login & Advanced Features"
     text: "Version"
 
 # Scroll to Data Management section
-- scroll:
-    direction: DOWN
+- scroll
 
 # Verify Data Management section exists
 - assertVisible:
@@ -101,68 +102,66 @@ name: "Settings - Auto-Login & Advanced Features"
 # Verify loading state appears
 - assertVisible:
     text: "Refreshing data..."
-    timeout: 2000
 
 # Note: During refresh, buttons should be disabled
 # Visual indication: reduced opacity (0.5)
 # Wait for refresh to complete
-- waitForAnimationToEnd:
-    timeout: 30000
+- waitForAnimationToEnd
 
 # If refresh fails, handle error with specific error message validation
 # NOTE: Multiple error scenarios can occur during refresh - test each one
 
 # Scenario 1: API URLs not configured (user not logged in)
-- optional: true
-  commands:
-    - assertVisible:
-        text: "API URLs Not Configured"
-        timeout: 5000
-    - assertVisible:
-        text: "Please log in via the Settings screen to configure API URLs before refreshing"
-    - tapOn: "OK"
-    - waitForAnimationToEnd:
-        timeout: 2000
-    - assertNotVisible: "API URLs Not Configured"
+- runFlow:
+    when:
+      visible: "API URLs Not Configured"
+    commands:
+      - assertVisible:
+          text: "API URLs Not Configured"
+      - assertVisible:
+          text: "Please log in via the Settings screen to configure API URLs before refreshing"
+      - tapOn: "OK"
+      - waitForAnimationToEnd
+      - assertNotVisible: "API URLs Not Configured"
 
 # Scenario 2: Network connection failure (all endpoints unreachable)
-- optional: true
-  commands:
-    - assertVisible:
-        text: "Server Connection Error"
-        timeout: 5000
-    - assertVisible:
-        text: "Unable to connect to the server. Please check your internet connection and try again later."
-    - tapOn: "OK"
-    - waitForAnimationToEnd:
-        timeout: 2000
-    - assertNotVisible: "Server Connection Error"
+- runFlow:
+    when:
+      visible: "Server Connection Error"
+    commands:
+      - assertVisible:
+          text: "Server Connection Error"
+      - assertVisible:
+          text: "Unable to connect to the server. Please check your internet connection and try again later."
+      - tapOn: "OK"
+      - waitForAnimationToEnd
+      - assertNotVisible: "Server Connection Error"
 
 # Scenario 3: Partial refresh failure (some endpoints fail)
-- optional: true
-  commands:
-    - assertVisible:
-        text: "Data Refresh Error"
-        timeout: 5000
-    - assertVisible:
-        text: "There were problems refreshing beer data"
-    - tapOn: "OK"
-    - waitForAnimationToEnd:
-        timeout: 2000
-    - assertNotVisible: "Data Refresh Error"
+- runFlow:
+    when:
+      visible: "Data Refresh Error"
+    commands:
+      - assertVisible:
+          text: "Data Refresh Error"
+      - assertVisible:
+          text: "There were problems refreshing beer data"
+      - tapOn: "OK"
+      - waitForAnimationToEnd
+      - assertNotVisible: "Data Refresh Error"
 
 # Scenario 4: Generic refresh error (unexpected exception)
-- optional: true
-  commands:
-    - assertVisible:
-        text: "Error"
-        timeout: 5000
-    - assertVisible:
-        text: "Failed to refresh beer data. Please try again later."
-    - tapOn: "OK"
-    - waitForAnimationToEnd:
-        timeout: 2000
-    - assertNotVisible: "Failed to refresh beer data"
+- runFlow:
+    when:
+      visible: "Error"
+    commands:
+      - assertVisible:
+          text: "Error"
+      - assertVisible:
+          text: "Failed to refresh beer data. Please try again later."
+      - tapOn: "OK"
+      - waitForAnimationToEnd
+      - assertNotVisible: "Failed to refresh beer data"
 
 # Verify refresh completed
 # Button text should return to normal
@@ -176,13 +175,11 @@ name: "Settings - Auto-Login & Advanced Features"
 # Open login WebView
 - tapOn:
     text: "Login to Flying Saucer"
-- waitForAnimationToEnd:
-    timeout: 5000
+- waitForAnimationToEnd
 
 # Verify modal opened
 - assertVisible:
     id: "login-webview-modal"
-    timeout: 5000
 
 # Verify WebView components
 - assertVisible:
@@ -191,14 +188,12 @@ name: "Settings - Auto-Login & Advanced Features"
     id: "close-webview-button"
 
 # Wait for WebView to load
-- waitForAnimationToEnd:
-    timeout: 10000
+- waitForAnimationToEnd
 
 # Close the modal
 - tapOn:
     id: "close-webview-button"
-- waitForAnimationToEnd:
-    timeout: 2000
+- waitForAnimationToEnd
 
 # Verify modal is closed
 - assertNotVisible:
@@ -213,8 +208,7 @@ name: "Settings - Auto-Login & Advanced Features"
 # ========================================
 
 # Scroll to Untappd section
-- scroll:
-    direction: DOWN
+- scroll
 
 # Look for Untappd login/reconnect button
 - assertVisible:
@@ -227,27 +221,23 @@ name: "Settings - Auto-Login & Advanced Features"
 # Tap Untappd button (whichever variant is present)
 - tapOn:
     text: "Untappd"
-- waitForAnimationToEnd:
-    timeout: 3000
+- waitForAnimationToEnd
 
 # Verify Untappd WebView modal opens
 - assertVisible:
     id: "untappd-webview-modal"
-    timeout: 5000
 
 # Verify close button exists
 - assertVisible:
     id: "close-untappd-webview-button"
 
 # Wait for Untappd page to load
-- waitForAnimationToEnd:
-    timeout: 10000
+- waitForAnimationToEnd
 
 # Close Untappd modal
 - tapOn:
     id: "close-untappd-webview-button"
-- waitForAnimationToEnd:
-    timeout: 2000
+- waitForAnimationToEnd
 
 # Verify modal closed
 - assertNotVisible:
@@ -262,65 +252,60 @@ name: "Settings - Auto-Login & Advanced Features"
 # ========================================
 
 # Scroll to find logout button
-- scroll:
-    direction: DOWN
+- scroll
 
 # Check for "Clear Untappd Credentials" button
 # This only appears when user is logged into Untappd
-- optional: true
-  commands:
-    # Button exists - user is logged in
-    - assertVisible:
-        text: "Clear Untappd Credentials"
+- runFlow:
+    when:
+      visible: "Clear Untappd Credentials"
+    commands:
+      # Button exists - user is logged in
+      - assertVisible:
+          text: "Clear Untappd Credentials"
 
-    # Tap to logout
-    - tapOn:
-        text: "Clear Untappd Credentials"
-    - waitForAnimationToEnd:
-        timeout: 2000
+      # Tap to logout
+      - tapOn:
+          text: "Clear Untappd Credentials"
+      - waitForAnimationToEnd
 
-    # Verify alert appears
-    # Note: Alert may have message about clearing credentials
+      # Verify alert appears
+      # Note: Alert may have message about clearing credentials
 
-    # Tap OK to dismiss alert (if shown)
-    - optional: true
-      commands:
-        - tapOn: "OK"
-        - waitForAnimationToEnd
+      # Tap OK to dismiss alert (if shown)
+      - tapOn: "OK"
+        optional: true
+      - waitForAnimationToEnd
+        optional: true
 
 # ========================================
 # TEST 7: Navigation - Back Button
 # ========================================
 
 # Scroll to top
-- scroll:
-    direction: UP
+- scroll
 
 # Tap back button (×)
 - tapOn:
     text: "×"
-- waitForAnimationToEnd:
-    timeout: 3000
+- waitForAnimationToEnd
 
 # Verify we navigated away from settings
 # Should be on home or previous screen
 - assertVisible:
     text: "All Beer"
-- optional: true
-  commands:
-    - assertVisible:
-        id: "beer-list"
+- assertVisible:
+    id: "beer-list"
+    optional: true
 
 # ========================================
 # TEST 8: Navigation - "Go to Home Screen"
 # ========================================
 
 # Navigate back to settings
-- scroll:
-    direction: DOWN
+- scroll
 - tapOn: "Settings"
-- waitForAnimationToEnd:
-    timeout: 3000
+- waitForAnimationToEnd
 
 # Verify settings is visible
 - assertVisible:
@@ -330,20 +315,20 @@ name: "Settings - Auto-Login & Advanced Features"
 # This button appears when:
 # - API URLs are configured
 # - Cannot go back (canGoBack=false)
-- scroll:
-    direction: DOWN
+- scroll
 
 # If "Go to Home Screen" exists, test it
-- optional: true
-  commands:
-    - assertVisible:
-        text: "Go to Home Screen"
-    - tapOn:
-        text: "Go to Home Screen"
-    - waitForAnimationToEnd:
-        timeout: 3000
-    - assertVisible:
-        text: "All Beer"
+- runFlow:
+    when:
+      visible: "Go to Home Screen"
+    commands:
+      - assertVisible:
+          text: "Go to Home Screen"
+      - tapOn:
+          text: "Go to Home Screen"
+      - waitForAnimationToEnd
+      - assertVisible:
+          text: "All Beer"
 
 # ========================================
 # TEST 9: Auto-Login via URL Params
@@ -357,11 +342,13 @@ name: "Settings - Auto-Login & Advanced Features"
 # Full deep link testing requires separate test suite
 
 # Navigate to settings normally
-- optional: true
-  commands:
-    - tapOn: "Settings"
-    - waitForAnimationToEnd:
-        timeout: 3000
+- runFlow:
+    when:
+      visible: "All Beer"
+    commands:
+      - scroll
+      - tapOn: "Settings"
+      - waitForAnimationToEnd
 
 # Verify settings loaded
 - assertVisible:
@@ -369,8 +356,7 @@ name: "Settings - Auto-Login & Advanced Features"
 
 # In the app, if action=login is present, login modal auto-opens
 # For manual testing, we verify login button is accessible
-- scroll:
-    direction: DOWN
+- scroll
 - assertVisible:
     text: "Login to Flying Saucer"
 
@@ -383,64 +369,56 @@ name: "Settings - Auto-Login & Advanced Features"
 # - Or EXPO_PUBLIC_SHOW_DEV_FEATURES=true
 
 # Scroll through settings to check for dev section
-- scroll:
-    direction: DOWN
+- scroll
 
 # Check for "Developer Tools" section
-- optional: true
-  commands:
-    # Dev section found
-    - assertVisible:
-        id: "developer-section"
+- runFlow:
+    when:
+      visible: "Developer Tools"
+    commands:
+      # Dev section found
+      - assertVisible:
+          id: "developer-section"
 
-    # Look for mock session button
-    - scroll:
-        direction: DOWN
+      # Look for mock session button
+      - scroll
 
-    # Check for "Create Mock Session" button
-    - optional: true
-      commands:
-        - assertVisible:
-            id: "create-mock-session-button"
+      # Check for "Create Mock Session" button
+      - assertVisible:
+          id: "create-mock-session-button"
+          optional: true
 
 # ========================================
 # TEST 11: State Persistence Across Navigation
 # ========================================
 
 # Navigate away from settings
-- scroll:
-    direction: UP
+- scroll
 - tapOn:
     text: "×"
-- waitForAnimationToEnd:
-    timeout: 3000
+- waitForAnimationToEnd
 
 # Verify navigation worked
 - assertVisible:
     text: "All Beer"
-- optional: true
-  commands:
-    - assertVisible:
-        id: "beer-list"
+- assertVisible:
+    id: "beer-list"
+    optional: true
 
 # Navigate back to settings
-- scroll:
-    direction: DOWN
+- scroll
 - tapOn: "Settings"
-- waitForAnimationToEnd:
-    timeout: 3000
+- waitForAnimationToEnd
 
 # Verify all sections are still present
 - assertVisible:
     text: "Settings"
 
-- scroll:
-    direction: DOWN
+- scroll
 - assertVisible:
     id: "about-section"
 
-- scroll:
-    direction: DOWN
+- scroll
 - assertVisible:
     id: "data-management-section"
 
@@ -457,69 +435,67 @@ name: "Settings - Auto-Login & Advanced Features"
 # Test refresh with potential network issues
 
 # Scroll to refresh button
-- scroll:
-    direction: DOWN
+- scroll
 - tapOn:
     text: "Refresh All Beer Data"
 
 # Wait for operation to complete (or fail)
-- waitForAnimationToEnd:
-    timeout: 30000
+- waitForAnimationToEnd
 
 # If network error occurs, handle it with specific error message validation
 # NOTE: Multiple error scenarios can occur - test each one
 
 # Scenario 1: API URLs not configured
-- optional: true
-  commands:
-    - assertVisible:
-        text: "API URLs Not Configured"
-        timeout: 5000
-    - assertVisible:
-        text: "Please log in via the Settings screen to configure API URLs before refreshing"
-    - tapOn: "OK"
-    - waitForAnimationToEnd:
-        timeout: 2000
-    - assertNotVisible: "API URLs Not Configured"
+- runFlow:
+    when:
+      visible: "API URLs Not Configured"
+    commands:
+      - assertVisible:
+          text: "API URLs Not Configured"
+      - assertVisible:
+          text: "Please log in via the Settings screen to configure API URLs before refreshing"
+      - tapOn: "OK"
+      - waitForAnimationToEnd
+      - assertNotVisible: "API URLs Not Configured"
 
 # Scenario 2: Network connection failure
-- optional: true
-  commands:
-    - assertVisible:
-        text: "Server Connection Error"
-        timeout: 5000
-    - assertVisible:
-        text: "Unable to connect to the server. Please check your internet connection and try again later."
-    - tapOn: "OK"
-    - waitForAnimationToEnd:
-        timeout: 2000
-    - assertNotVisible: "Server Connection Error"
+- runFlow:
+    when:
+      visible: "Server Connection Error"
+    commands:
+      - assertVisible:
+          text: "Server Connection Error"
+      - assertVisible:
+          text: "Unable to connect to the server. Please check your internet connection and try again later."
+      - tapOn: "OK"
+      - waitForAnimationToEnd
+      - assertNotVisible: "Server Connection Error"
 
 # Scenario 3: Partial refresh failure
-- optional: true
-  commands:
-    - assertVisible:
-        text: "Data Refresh Error"
-        timeout: 5000
-    - assertVisible:
-        text: "There were problems refreshing beer data"
-    - tapOn: "OK"
-    - waitForAnimationToEnd:
-        timeout: 2000
-    - assertNotVisible: "Data Refresh Error"
+- runFlow:
+    when:
+      visible: "Data Refresh Error"
+    commands:
+      - assertVisible:
+          text: "Data Refresh Error"
+      - assertVisible:
+          text: "There were problems refreshing beer data"
+      - tapOn: "OK"
+      - waitForAnimationToEnd
+      - assertNotVisible: "Data Refresh Error"
 
 # Scenario 4: Generic refresh error
-- optional: true
-  commands:
-    - assertVisible:
-        text: "Error"
-        timeout: 5000
-    - assertVisible:
-        text: "Failed to refresh beer data. Please try again later."
-    - tapOn: "OK"
-    - waitForAnimationToEnd:
-        timeout: 2000
-    - assertNotVisible: "Failed to refresh beer data"
+- runFlow:
+    when:
+      visible: "Error"
+    commands:
+      - assertVisible:
+          text: "Error"
+      - assertVisible:
+          text: "Failed to refresh beer data. Please try again later."
+      - tapOn: "OK"
+      - waitForAnimationToEnd
+      - assertNotVisible: "Failed to refresh beer data"
 
 # Verify app is still responsive after refresh
 # (whether success or failure)
@@ -537,15 +513,13 @@ name: "Settings - Auto-Login & Advanced Features"
 # Test that loading states are handled properly
 
 # Start a refresh operation
-- scroll:
-    direction: DOWN
+- scroll
 - tapOn:
     text: "Refresh All Beer Data"
 
 # Immediately verify loading state appears
 - assertVisible:
     text: "Refreshing data..."
-    timeout: 2000
 
 # During loading, verify buttons are disabled
 # (they should have reduced opacity and not be tappable)
@@ -553,8 +527,7 @@ name: "Settings - Auto-Login & Advanced Features"
 # But we can verify the loading text is present
 
 # Wait for loading to complete
-- waitForAnimationToEnd:
-    timeout: 30000
+- waitForAnimationToEnd
 
 # Verify loading state is gone
 - assertNotVisible:
@@ -572,8 +545,7 @@ name: "Settings - Auto-Login & Advanced Features"
 # or when API URLs are not configured
 
 # For configured app, welcome section should NOT be visible
-- scroll:
-    direction: UP
+- scroll
 
 # Verify welcome section is hidden
 # (App is already configured from previous tests)
@@ -588,42 +560,35 @@ name: "Settings - Auto-Login & Advanced Features"
 # (simulates user trying different accounts)
 
 # Attempt 1
-- scroll:
-    direction: DOWN
+- scroll
 - tapOn:
     text: "Login to Flying Saucer"
-- waitForAnimationToEnd:
-    timeout: 5000
+- waitForAnimationToEnd
 - assertVisible:
     id: "login-webview-modal"
 - tapOn:
     id: "close-webview-button"
-- waitForAnimationToEnd:
-    timeout: 2000
+- waitForAnimationToEnd
 
 # Attempt 2
 - tapOn:
     text: "Login to Flying Saucer"
-- waitForAnimationToEnd:
-    timeout: 5000
+- waitForAnimationToEnd
 - assertVisible:
     id: "login-webview-modal"
 - tapOn:
     id: "close-webview-button"
-- waitForAnimationToEnd:
-    timeout: 2000
+- waitForAnimationToEnd
 
 # Attempt 3
 - tapOn:
     text: "Login to Flying Saucer"
-- waitForAnimationToEnd:
-    timeout: 5000
+- waitForAnimationToEnd
 - assertVisible:
     id: "login-webview-modal"
 - tapOn:
     id: "close-webview-button"
-- waitForAnimationToEnd:
-    timeout: 2000
+- waitForAnimationToEnd
 
 # Verify app is stable after multiple attempts
 - assertVisible:
@@ -636,8 +601,7 @@ name: "Settings - Auto-Login & Advanced Features"
 # Verify all interactive elements are accessible
 
 # Scroll to top
-- scroll:
-    direction: UP
+- scroll
 
 # Check About section accessibility
 - assertVisible:
@@ -646,8 +610,7 @@ name: "Settings - Auto-Login & Advanced Features"
     text: "Version"
 
 # Check Data Management section accessibility
-- scroll:
-    direction: DOWN
+- scroll
 - assertVisible:
     id: "data-management-section"
 
@@ -671,8 +634,7 @@ name: "Settings - Auto-Login & Advanced Features"
 # Open login modal (don't complete login)
 - tapOn:
     text: "Login to Flying Saucer"
-- waitForAnimationToEnd:
-    timeout: 5000
+- waitForAnimationToEnd
 
 - assertVisible:
     id: "login-webview-modal"
@@ -680,18 +642,15 @@ name: "Settings - Auto-Login & Advanced Features"
 # Close modal
 - tapOn:
     id: "close-webview-button"
-- waitForAnimationToEnd:
-    timeout: 2000
+- waitForAnimationToEnd
 
 # Verify settings screen is still responsive
 - assertVisible:
     text: "Settings"
 
 # Verify can navigate normally
-- scroll:
-    direction: UP
-- scroll:
-    direction: DOWN
+- scroll
+- scroll
 
 # ========================================
 # TEST 18: App Restart Behavior
@@ -708,42 +667,43 @@ name: "Settings - Auto-Login & Advanced Features"
 - launchApp:
     clearState: false
 
-- waitForAnimationToEnd:
-    timeout: 10000
+- waitForAnimationToEnd
+
+# Dismiss Expo dev menu if present
+- runFlow:
+    when:
+      visible: "Reload"
+    commands:
+      - pressKey: Escape
+      - waitForAnimationToEnd
 
 # Verify app starts successfully
 # May land on home/beer list (not settings)
 - assertVisible:
     text: "All Beer"
-- optional: true
-  commands:
-    - assertVisible:
-        text: "Settings"
 
-# Navigate to settings
-- optional: true
-  commands:
-    - scroll:
-        direction: DOWN
-    - tapOn: "Settings"
-    - waitForAnimationToEnd:
-        timeout: 3000
+# Navigate to settings if not already there
+- runFlow:
+    when:
+      visible: "All Beer"
+    commands:
+      - scroll
+      - tapOn: "Settings"
+      - waitForAnimationToEnd
 
 # Verify settings is accessible
 - assertVisible:
     text: "Settings"
 
 # Verify About section
-- scroll:
-    direction: UP
+- scroll
 - assertVisible:
     id: "about-section"
 - assertVisible:
     text: "Version"
 
 # Verify Data Management section
-- scroll:
-    direction: DOWN
+- scroll
 - assertVisible:
     id: "data-management-section"
 
@@ -758,14 +718,12 @@ name: "Settings - Auto-Login & Advanced Features"
 # App should show alerts and remain stable
 
 # Trigger refresh (may encounter config errors)
-- scroll:
-    direction: DOWN
+- scroll
 - tapOn:
     text: "Refresh All Beer Data"
 
 # Wait for operation
-- waitForAnimationToEnd:
-    timeout: 30000
+- waitForAnimationToEnd
 
 # Verify app is stable regardless of outcome
 - assertVisible:
@@ -780,12 +738,10 @@ name: "Settings - Auto-Login & Advanced Features"
 # ========================================
 
 # Navigate away from settings
-- scroll:
-    direction: UP
+- scroll
 - tapOn:
     text: "×"
-- waitForAnimationToEnd:
-    timeout: 3000
+- waitForAnimationToEnd
 
 # Verify successful navigation
 - assertVisible:
@@ -793,8 +749,7 @@ name: "Settings - Auto-Login & Advanced Features"
 
 # Verify app is fully functional
 - tapOn: "All Beer"
-- waitForAnimationToEnd:
-    timeout: 3000
+- waitForAnimationToEnd
 
 # Verify beer list loads
 - assertVisible:
