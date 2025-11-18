@@ -8,15 +8,20 @@ name: "Beer List - Search and Filter Functionality"
 - launchApp:
     clearState: false
 
+# Dismiss Expo dev menu if present
+- runFlow:
+    when:
+      visible: "Reload"
+    commands:
+      - pressKey: Escape
+      - waitForAnimationToEnd
+
 # Step 2: Navigate to All Beer tab
 - tapOn: "All Beer"
 - waitForAnimationToEnd
 
 # Step 3: Store initial beer count
-- runScript:
-    env:
-      INITIAL_COUNT: ${output.text}
-    script: |
+- evalScript: |
       output.text = await maestro.getText({id: 'beer-count'})
 
 # Test Search Functionality

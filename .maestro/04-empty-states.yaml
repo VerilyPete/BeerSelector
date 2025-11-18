@@ -8,6 +8,14 @@ name: "Beer List - Empty States and Edge Cases"
 - launchApp:
     clearState: false
 
+# Dismiss Expo dev menu if present
+- runFlow:
+    when:
+      visible: "Reload"
+    commands:
+      - pressKey: Escape
+      - waitForAnimationToEnd
+
 # Step 2: Navigate to All Beer tab
 - tapOn: "All Beer"
 - waitForAnimationToEnd
@@ -24,7 +32,6 @@ name: "Beer List - Empty States and Edge Cases"
 # Step 4: Verify empty state is shown
 - assertVisible:
     id: "beer-list-empty"
-    timeout: 2000
 
 # Step 5: Verify empty message is displayed
 - assertVisible:
@@ -212,11 +219,10 @@ name: "Beer List - Empty States and Edge Cases"
 
 # Step 31: Final verification - tap a beer item to ensure interaction still works
 - tapOn:
-    regex: "beer-item-.*"
+    id: "beer-item-.*"
     index: 0
 - waitForAnimationToEnd
 
 # Step 32: Verify expansion worked
 - assertVisible:
-    regex: "beer-description-container-.*"
-    timeout: 2000
+    id: "beer-description-container-.*"

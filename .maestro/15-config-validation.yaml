@@ -23,8 +23,15 @@ name: "Config Validation - URL Configuration and Validation"
     clearState: true
 
 # Step 2: Wait for initialization
-- waitForAnimationToEnd:
-    timeout: 5000
+- waitForAnimationToEnd
+
+# Dismiss Expo dev menu if present
+- runFlow:
+    when:
+      visible: "Reload"
+    commands:
+      - pressKey: Escape
+      - waitForAnimationToEnd
 
 # Step 3: App should redirect to Settings on first launch
 # (when API URLs not configured)
@@ -45,36 +52,31 @@ name: "Config Validation - URL Configuration and Validation"
 
 # Step 6: Scroll to find API Configuration section
 # (if visible in development mode)
-- scroll:
-    direction: DOWN
+- scroll
 
 # Step 7: Check for developer section (may be hidden in production)
-- optional: true
-  commands:
-    - assertVisible:
-        id: "developer-section"
+- assertVisible:
+    id: "developer-section"
+    optional: true
 
 # Step 8: If developer section exists, verify environment info
-- optional: true
-  commands:
-    - assertVisible:
-        text: "Development"
+- assertVisible:
+    text: "Development"
+    optional: true
 
 # ========================================
 # Test 3: Login Flow Uses Config URLs
 # ========================================
 
 # Step 9: Scroll to login button
-- scroll:
-    direction: DOWN
+- scroll
 
 # Step 10: Tap "Login to Flying Saucer" button
 - tapOn:
     text: "Login to Flying Saucer"
 
 # Step 11: Wait for WebView to load
-- waitForAnimationToEnd:
-    timeout: 5000
+- waitForAnimationToEnd
 
 # Step 12: Verify login webview modal appears
 - assertVisible:
@@ -98,16 +100,14 @@ name: "Config Validation - URL Configuration and Validation"
 # ========================================
 
 # Step 15: Scroll to Untappd section
-- scroll:
-    direction: DOWN
+- scroll
 
 # Step 16: Tap Untappd login button
 - tapOn:
     text: "Untappd"
 
 # Step 17: Wait for Untappd WebView to load
-- waitForAnimationToEnd:
-    timeout: 5000
+- waitForAnimationToEnd
 
 # Step 18: Verify Untappd webview modal appears
 - assertVisible:
@@ -131,18 +131,16 @@ name: "Config Validation - URL Configuration and Validation"
 # ========================================
 
 # Step 21: Close settings (simulate app backgrounding)
-- scroll:
-    direction: UP
+- scroll
 - tapOn:
     text: "×"
     optional: true
 - waitForAnimationToEnd
 
 # Step 22: Navigate back to settings
-- scroll:
-    direction: DOWN
-    optional: true
+- scroll
 - tapOn: "Settings"
+  optional: true
 - waitForAnimationToEnd
 
 # Step 23: Verify settings still accessible
@@ -150,8 +148,7 @@ name: "Config Validation - URL Configuration and Validation"
     text: "Settings"
 
 # Step 24: Verify login button still works
-- scroll:
-    direction: DOWN
+- scroll
 - assertVisible:
     text: "Login to Flying Saucer"
 
@@ -162,8 +159,7 @@ name: "Config Validation - URL Configuration and Validation"
 # Step 25: Open LoginWebView again
 - tapOn:
     text: "Login to Flying Saucer"
-- waitForAnimationToEnd:
-    timeout: 3000
+- waitForAnimationToEnd
 
 # Step 26: Verify WebView uses config
 - assertVisible:
@@ -175,12 +171,10 @@ name: "Config Validation - URL Configuration and Validation"
 - waitForAnimationToEnd
 
 # Step 28: Open UntappdLoginWebView
-- scroll:
-    direction: DOWN
+- scroll
 - tapOn:
     text: "Untappd"
-- waitForAnimationToEnd:
-    timeout: 3000
+- waitForAnimationToEnd
 
 # Step 29: Verify Untappd WebView uses config
 - assertVisible:
@@ -216,16 +210,14 @@ name: "Config Validation - URL Configuration and Validation"
 # ========================================
 
 # Step 34: Navigate away from settings
-- scroll:
-    direction: UP
+- scroll
 - tapOn:
     text: "×"
     optional: true
 - waitForAnimationToEnd
 
 # Step 35: Return to settings multiple times
-- scroll:
-    direction: DOWN
+- scroll
     optional: true
 - tapOn: "Settings"
 - waitForAnimationToEnd
@@ -233,14 +225,12 @@ name: "Config Validation - URL Configuration and Validation"
 # Step 36: Verify settings still functional
 - assertVisible:
     text: "Settings"
-- scroll:
-    direction: DOWN
+- scroll
 - assertVisible:
     text: "Login to Flying Saucer"
 
 # Step 37: Close settings
-- scroll:
-    direction: UP
+- scroll
 - tapOn:
     text: "×"
     optional: true

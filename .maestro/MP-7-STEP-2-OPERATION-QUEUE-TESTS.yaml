@@ -40,14 +40,12 @@ appId: org.verily.FSbeerselector
 # Should show queued message
 - assertVisible:
     text: "Queued for Later"
-    timeout: 5000
 
 - tapOn: "OK"
 
 # Verify queued operations indicator appears
 - assertVisible:
     text: "Queued Operations"
-    timeout: 5000
 
 # ==============================================================================
 # TEST 2: View Queued Operations
@@ -58,11 +56,9 @@ appId: org.verily.FSbeerselector
 # Should show the queued beer check-in
 - assertVisible:
     text: "Check-in Beer"
-    timeout: 3000
 
 - assertVisible:
     text: "Pending"
-    timeout: 3000
 
 # Close the modal
 - tapOn: "✕"
@@ -111,7 +107,6 @@ appId: org.verily.FSbeerselector
 # Should still show as pending or failed
 - assertVisible:
     text: ".*Pending.*|.*Failed.*"
-    timeout: 3000
 
 # Close modal
 - tapOn: "✕"
@@ -148,7 +143,6 @@ appId: org.verily.FSbeerselector
 # Indicator should disappear
 - assertNotVisible:
     text: "Queued Operations"
-    timeout: 3000
 
 # ==============================================================================
 # CLEANUP: Restore Network

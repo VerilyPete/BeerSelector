@@ -18,8 +18,15 @@ name: "Settings - First Launch Configuration Flow"
 
 # Step 2: Wait for app initialization
 # First launch may take longer due to database setup
-- waitForAnimationToEnd:
-    timeout: 10000
+- waitForAnimationToEnd
+
+# Dismiss Expo dev menu if present
+- runFlow:
+    when:
+      visible: "Reload"
+    commands:
+      - pressKey: Escape
+      - waitForAnimationToEnd
 
 # ========================================
 # Test 1: Verify First Launch Redirect
@@ -62,8 +69,7 @@ name: "Settings - First Launch Configuration Flow"
 # ========================================
 
 # Step 9: Scroll to About section
-- scroll:
-    direction: DOWN
+- scroll
 
 # Step 10: Verify About section is visible
 - assertVisible:
@@ -80,16 +86,14 @@ name: "Settings - First Launch Configuration Flow"
 # ========================================
 
 # Step 12: Scroll back to top to find login button
-- scroll:
-    direction: UP
+- scroll
 
 # Step 13: Tap "Login to Flying Saucer" button from welcome section
 - tapOn:
     text: "Login to Flying Saucer"
 
 # Step 14: Wait for login webview to appear
-- waitForAnimationToEnd:
-    timeout: 5000
+- waitForAnimationToEnd
 
 # Step 15: Verify login webview modal is displayed
 - assertVisible:
@@ -108,8 +112,7 @@ name: "Settings - First Launch Configuration Flow"
 # which includes a "Continue as Visitor" button
 
 # Step 18: Wait for page to load completely
-- waitForAnimationToEnd:
-    timeout: 5000
+- waitForAnimationToEnd
 
 # Step 19: Look for visitor mode button or link
 # This may appear as "Continue as Visitor", "Visitor", or "Guest"
@@ -119,16 +122,14 @@ name: "Settings - First Launch Configuration Flow"
 # Step 20: Tap on visitor mode option
 - tapOn:
     text: "Visitor|Guest|Continue as"
-- waitForAnimationToEnd:
-    timeout: 5000
+- waitForAnimationToEnd
 
 # Step 21: Verify webview closes after visitor selection
 # The webview should close and return to main app
 
 # Step 22: Wait for data refresh to complete
 # After selecting visitor mode, app should fetch data
-- waitForAnimationToEnd:
-    timeout: 20000
+- waitForAnimationToEnd
 
 # Step 23: Verify app navigates to beer list
 # After successful visitor mode setup, app should show beer list
@@ -165,8 +166,7 @@ name: "Settings - First Launch Configuration Flow"
 # ========================================
 
 # Step 29: Navigate to settings from home
-- scroll:
-    direction: DOWN
+- scroll
 - tapOn: "Settings"
 - waitForAnimationToEnd
 
@@ -184,8 +184,7 @@ name: "Settings - First Launch Configuration Flow"
     id: "welcome-section"
 
 # Step 33: Verify Data Management section is visible
-- scroll:
-    direction: DOWN
+- scroll
 - assertVisible:
     id: "data-management-section"
 
@@ -201,8 +200,7 @@ name: "Settings - First Launch Configuration Flow"
 # Step 35: Tap "Login to Flying Saucer" to upgrade account
 - tapOn:
     text: "Login to Flying Saucer"
-- waitForAnimationToEnd:
-    timeout: 5000
+- waitForAnimationToEnd
 
 # Step 36: Verify login webview appears
 - assertVisible:
@@ -222,8 +220,7 @@ name: "Settings - First Launch Configuration Flow"
 # ========================================
 
 # Step 39: Scroll to refresh button
-- scroll:
-    direction: DOWN
+- scroll
 
 # Step 40: Tap "Refresh All Beer Data"
 - tapOn:
@@ -234,8 +231,7 @@ name: "Settings - First Launch Configuration Flow"
     text: "Refreshing data..."
 
 # Step 42: Wait for refresh to complete
-- waitForAnimationToEnd:
-    timeout: 20000
+- waitForAnimationToEnd
 
 # Step 43: Verify refresh completed
 - assertVisible:
@@ -246,8 +242,7 @@ name: "Settings - First Launch Configuration Flow"
 # ========================================
 
 # Step 44: Tap back button
-- scroll:
-    direction: UP
+- scroll
 - tapOn:
     text: "×"
 - waitForAnimationToEnd
@@ -272,8 +267,7 @@ name: "Settings - First Launch Configuration Flow"
 
 # Step 48: Navigate back to settings
 - tapOn: "Home"
-- scroll:
-    direction: DOWN
+- scroll
 - tapOn: "Settings"
 - waitForAnimationToEnd
 
@@ -287,23 +281,23 @@ name: "Settings - First Launch Configuration Flow"
 # For now, just verify "Go to Home Screen" button exists
 
 # Step 51: Navigate back to settings
-- scroll:
-    direction: DOWN
+- scroll
 - tapOn: "Settings"
 - waitForAnimationToEnd
 
 # Step 52: Scroll to check for "Go to Home Screen" button
-- scroll:
-    direction: DOWN
+- scroll
 
 # Step 53: If "Go to Home Screen" button visible, test it
-- optional: true
-  commands:
-    - tapOn:
-        text: "Go to Home Screen"
-    - waitForAnimationToEnd
-    - assertVisible:
-        id: "all-beers-container"
+- runFlow:
+    when:
+      visible: "Go to Home Screen"
+    commands:
+      - tapOn:
+          text: "Go to Home Screen"
+      - waitForAnimationToEnd
+      - assertVisible:
+          id: "all-beers-container"
 
 # ========================================
 # Test 12: Verify First Launch Complete
@@ -330,8 +324,7 @@ name: "Settings - First Launch Configuration Flow"
     from:
       id: "beer-list"
     duration: 800
-- waitForAnimationToEnd:
-    timeout: 20000
+- waitForAnimationToEnd
 
 # Step 58: Verify app is stable and responsive
 - assertVisible:

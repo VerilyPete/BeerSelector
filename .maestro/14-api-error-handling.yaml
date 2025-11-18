@@ -39,21 +39,27 @@ name: "API Error Handling - Invalid URLs, Auth Errors, and Data Validation"
     clearState: false
 
 # Step 2: Wait for initialization
-- waitForAnimationToEnd:
-    timeout: 5000
+- waitForAnimationToEnd
+
+# Dismiss Expo dev menu if present
+- runFlow:
+    when:
+      visible: "Reload"
+    commands:
+      - pressKey: Escape
+      - waitForAnimationToEnd
 
 # Step 3: Navigate to Settings to verify configuration
 - tapOn: "Home"
 - waitForAnimationToEnd
 
 # Step 4: Scroll to Settings button
-- scroll:
+- swipe:
     direction: DOWN
 
 # Step 5: Open Settings
 - tapOn: "Settings"
-- waitForAnimationToEnd:
-    timeout: 3000
+- waitForAnimationToEnd
 
 # Step 6: Verify Settings screen loaded
 - assertVisible:
@@ -64,7 +70,7 @@ name: "API Error Handling - Invalid URLs, Auth Errors, and Data Validation"
     text: "All Beers API URL|API Configuration"
 
 # Step 8: Scroll to view both URL fields
-- scroll:
+- swipe:
     direction: DOWN
 
 # Step 9: Verify My Beers API URL section
@@ -72,8 +78,7 @@ name: "API Error Handling - Invalid URLs, Auth Errors, and Data Validation"
     text: "My Beers API URL"
 
 # Step 10: Store current configuration state
-- runScript:
-    script: |
+- evalScript: |
       console.log('Baseline: API URLs should be configured')
 
 # ========================================
@@ -84,7 +89,7 @@ name: "API Error Handling - Invalid URLs, Auth Errors, and Data Validation"
 # For first-launch scenario testing, see 11-settings-first-launch.yaml
 
 # Step 11: Scroll to Data Management section
-- scroll:
+- swipe:
     direction: DOWN
 
 # Step 12: Verify Refresh button visible
@@ -100,8 +105,7 @@ name: "API Error Handling - Invalid URLs, Auth Errors, and Data Validation"
     text: "Refreshing data..."
 
 # Step 15: Wait for refresh to complete
-- waitForAnimationToEnd:
-    timeout: 50000
+- waitForAnimationToEnd
 
 # Step 16: Verify button returns to normal
 - assertVisible:
@@ -118,8 +122,7 @@ name: "API Error Handling - Invalid URLs, Auth Errors, and Data Validation"
 
 # Step 17: Navigate to All Beer tab
 - tapOn: "All Beer"
-- waitForAnimationToEnd:
-    timeout: 3000
+- waitForAnimationToEnd
 
 # Step 18: Verify beer list or empty state
 # If database has no beers, empty state should show
@@ -133,8 +136,7 @@ name: "API Error Handling - Invalid URLs, Auth Errors, and Data Validation"
 
 # Step 20: Navigate to Beerfinder
 - tapOn: "Beerfinder"
-- waitForAnimationToEnd:
-    timeout: 3000
+- waitForAnimationToEnd
 
 # Step 21: Verify Beerfinder empty state or data
 - assertVisible:
@@ -142,8 +144,7 @@ name: "API Error Handling - Invalid URLs, Auth Errors, and Data Validation"
 
 # Step 22: Navigate to Tasted Brews
 - tapOn: "Tasted Brews"
-- waitForAnimationToEnd:
-    timeout: 3000
+- waitForAnimationToEnd
 
 # Step 23: Verify Tasted Brews empty state
 # New users or visitors should see empty state
@@ -162,8 +163,7 @@ name: "API Error Handling - Invalid URLs, Auth Errors, and Data Validation"
 - tapOn:
     id: "search-bar"
 - inputText: "NonexistentBeer"
-- waitForAnimationToEnd:
-    timeout: 2000
+- waitForAnimationToEnd
 
 # Step 26: Verify "No beers found" message or empty list
 - assertVisible:
@@ -186,8 +186,7 @@ name: "API Error Handling - Invalid URLs, Auth Errors, and Data Validation"
 # Step 29: Select a filter
 - tapOn:
     text: "Ale"
-- waitForAnimationToEnd:
-    timeout: 2000
+- waitForAnimationToEnd
 
 # Step 30: Verify appropriate message
 # Either filtered results or "No beers found"
@@ -222,18 +221,17 @@ name: "API Error Handling - Invalid URLs, Auth Errors, and Data Validation"
 # ========================================
 
 # Step 34: Navigate to Settings
-- scroll:
+- swipe:
     direction: DOWN
 - tapOn: "Settings"
-- waitForAnimationToEnd:
-    timeout: 3000
+- waitForAnimationToEnd
 
 # Step 35: Verify Login Status section
 - assertVisible:
     text: "Login Status|Logged in|Visitor Mode"
 
 # Step 36: Scroll to view authentication info
-- scroll:
+- swipe:
     direction: DOWN
 
 # Step 37: Check for session information
@@ -253,7 +251,7 @@ name: "API Error Handling - Invalid URLs, Auth Errors, and Data Validation"
 # ========================================
 
 # Step 38: Scroll to Data Management
-- scroll:
+- swipe:
     direction: DOWN
 
 # Step 39: Attempt another refresh
@@ -261,8 +259,7 @@ name: "API Error Handling - Invalid URLs, Auth Errors, and Data Validation"
     text: "Refresh All Beer Data"
 
 # Step 40: Wait for refresh
-- waitForAnimationToEnd:
-    timeout: 50000
+- waitForAnimationToEnd
 
 # Step 41: Verify button returns to normal state
 # Even if errors occur, UI should recover
@@ -271,8 +268,7 @@ name: "API Error Handling - Invalid URLs, Auth Errors, and Data Validation"
 
 # Step 42: Navigate back to beer list
 - tapOn: "All Beer"
-- waitForAnimationToEnd:
-    timeout: 3000
+- waitForAnimationToEnd
 
 # Step 43: Verify app stability after potential errors
 - assertVisible:
@@ -287,14 +283,13 @@ name: "API Error Handling - Invalid URLs, Auth Errors, and Data Validation"
 # Step 44: Navigate to Settings for logout test
 - tapOn: "Home"
 - waitForAnimationToEnd
-- scroll:
+- swipe:
     direction: DOWN
 - tapOn: "Settings"
-- waitForAnimationToEnd:
-    timeout: 3000
+- waitForAnimationToEnd
 
 # Step 45: Scroll to Authentication section
-- scroll:
+- swipe:
     direction: DOWN
 
 # Step 46: Look for Logout button (if logged in)
@@ -316,8 +311,7 @@ name: "API Error Handling - Invalid URLs, Auth Errors, and Data Validation"
 
 # Step 47: Return to All Beer tab
 - tapOn: "All Beer"
-- waitForAnimationToEnd:
-    timeout: 3000
+- waitForAnimationToEnd
 
 # Step 48: Verify final state stable
 - assertVisible:
@@ -327,8 +321,7 @@ name: "API Error Handling - Invalid URLs, Auth Errors, and Data Validation"
 - tapOn:
     id: "search-bar"
 - inputText: "Test"
-- waitForAnimationToEnd:
-    timeout: 2000
+- waitForAnimationToEnd
 
 # Step 50: Clear search
 - tapOn:
@@ -343,8 +336,15 @@ name: "API Error Handling - Invalid URLs, Auth Errors, and Data Validation"
     clearState: false
 
 # Step 53: Wait for initialization
-- waitForAnimationToEnd:
-    timeout: 5000
+- waitForAnimationToEnd
+
+# Dismiss Expo dev menu if present
+- runFlow:
+    when:
+      visible: "Reload"
+    commands:
+      - pressKey: Escape
+      - waitForAnimationToEnd
 
 # Step 54: Verify app recovered from any previous errors
 - assertVisible:

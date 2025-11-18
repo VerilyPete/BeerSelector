@@ -35,8 +35,15 @@ name: "Offline Mode - Local Data Access and Offline-First Architecture"
 
 # Step 2: Wait for app initialization
 # Offline mode should not block app startup
-- waitForAnimationToEnd:
-    timeout: 5000
+- waitForAnimationToEnd
+
+# Dismiss Expo dev menu if present
+- runFlow:
+    when:
+      visible: "Reload"
+    commands:
+      - pressKey: Escape
+      - waitForAnimationToEnd
 
 # Step 3: Verify All Beer tab loads with cached data
 # The app should display previously loaded data from SQLite database
@@ -53,10 +60,7 @@ name: "Offline Mode - Local Data Access and Offline-First Architecture"
     id: "beer-count"
 
 # Step 6: Store offline beer count
-- runScript:
-    env:
-      OFFLINE_BEER_COUNT: ${output.text}
-    script: |
+- evalScript: |
       output.text = await maestro.getText({id: 'beer-count'})
       console.log('Offline beer count: ' + output.text)
 
@@ -68,8 +72,7 @@ name: "Offline Mode - Local Data Access and Offline-First Architecture"
 - tapOn:
     id: "search-bar"
 - inputText: "IPA"
-- waitForAnimationToEnd:
-    timeout: 2000
+- waitForAnimationToEnd
 
 # Step 8: Verify search results filtered locally
 # Search should work on cached data without network
@@ -93,8 +96,7 @@ name: "Offline Mode - Local Data Access and Offline-First Architecture"
 # Step 12: Select a beer type filter
 - tapOn:
     text: "Ale"
-- waitForAnimationToEnd:
-    timeout: 2000
+- waitForAnimationToEnd
 
 # Step 13: Verify filter applied to local data
 - assertVisible:
@@ -114,7 +116,7 @@ name: "Offline Mode - Local Data Access and Offline-First Architecture"
 # ========================================
 
 # Step 15: Scroll to find a beer item
-- scroll:
+- swipe:
     direction: DOWN
 
 # Step 16: Tap a beer item to expand details
@@ -124,8 +126,7 @@ name: "Offline Mode - Local Data Access and Offline-First Architecture"
     index: 0
 
 # Step 17: Wait for expansion animation
-- waitForAnimationToEnd:
-    timeout: 2000
+- waitForAnimationToEnd
 
 # Step 18: Verify beer details displayed from local data
 # All beer properties stored in SQLite should render
@@ -152,8 +153,7 @@ name: "Offline Mode - Local Data Access and Offline-First Architecture"
 
 # Step 21: Wait for refresh attempt to timeout
 # The 15-second timeout in dataUpdateService should trigger
-- waitForAnimationToEnd:
-    timeout: 20000
+- waitForAnimationToEnd
 
 # Step 22: Verify app still displays local data
 # Offline-first: show cached data even when refresh fails
@@ -172,8 +172,7 @@ name: "Offline Mode - Local Data Access and Offline-First Architecture"
 
 # Step 23: Navigate to Beerfinder tab while offline
 - tapOn: "Beerfinder"
-- waitForAnimationToEnd:
-    timeout: 3000
+- waitForAnimationToEnd
 
 # Step 24: Verify Beerfinder loads from local database
 - assertVisible:
@@ -183,8 +182,7 @@ name: "Offline Mode - Local Data Access and Offline-First Architecture"
 
 # Step 25: Navigate to Tasted Brews tab
 - tapOn: "Tasted Brews"
-- waitForAnimationToEnd:
-    timeout: 3000
+- waitForAnimationToEnd
 
 # Step 26: Verify Tasted Brews data or empty state
 # Should show cached tasted beers or empty state message
@@ -193,8 +191,7 @@ name: "Offline Mode - Local Data Access and Offline-First Architecture"
 
 # Step 27: Navigate to Home tab
 - tapOn: "Home"
-- waitForAnimationToEnd:
-    timeout: 2000
+- waitForAnimationToEnd
 
 # Step 28: Verify Home tab loads offline
 # Static content should render without network
@@ -206,13 +203,12 @@ name: "Offline Mode - Local Data Access and Offline-First Architecture"
 # ========================================
 
 # Step 29: Scroll to find Settings button
-- scroll:
+- swipe:
     direction: DOWN
 
 # Step 30: Navigate to Settings
 - tapOn: "Settings"
-- waitForAnimationToEnd:
-    timeout: 3000
+- waitForAnimationToEnd
 
 # Step 31: Verify settings screen loads
 - assertVisible:
@@ -223,7 +219,7 @@ name: "Offline Mode - Local Data Access and Offline-First Architecture"
     text: "All Beers API URL|My Beers API URL"
 
 # Step 33: Scroll to Data Management section
-- scroll:
+- swipe:
     direction: DOWN
 
 # Step 34: Attempt manual refresh while offline
@@ -232,8 +228,7 @@ name: "Offline Mode - Local Data Access and Offline-First Architecture"
     text: "Refresh All Beer Data"
 
 # Step 35: Wait for refresh attempt
-- waitForAnimationToEnd:
-    timeout: 20000
+- waitForAnimationToEnd
 
 # NOTE: Error alert expected but data remains accessible
 # Expected: Alert shows network error, button returns to normal state
@@ -265,8 +260,7 @@ name: "Offline Mode - Local Data Access and Offline-First Architecture"
 - tapOn:
     id: "search-bar"
 - inputText: "Lager"
-- waitForAnimationToEnd:
-    timeout: 2000
+- waitForAnimationToEnd
 
 # Step 41: Verify search still works on local data
 - assertVisible:

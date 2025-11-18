@@ -8,6 +8,14 @@ name: "Navigation - Tab Switching and State Persistence"
 - launchApp:
     clearState: false
 
+# Dismiss Expo dev menu if present
+- runFlow:
+    when:
+      visible: "Reload"
+    commands:
+      - pressKey: Escape
+      - waitForAnimationToEnd
+
 # Step 2: Start on Home/All Beer tab
 - tapOn: "All Beer"
 - waitForAnimationToEnd
@@ -21,8 +29,7 @@ name: "Navigation - Tab Switching and State Persistence"
 
 # Step 4: Navigate to Beerfinder tab
 - tapOn: "Beerfinder"
-- waitForAnimationToEnd:
-    timeout: 3000
+- waitForAnimationToEnd
 
 # Step 5: Wait for Beerfinder to load
 # Note: This screen may require authentication
@@ -31,8 +38,7 @@ name: "Navigation - Tab Switching and State Persistence"
 
 # Step 6: Navigate to Tasted Brews tab
 - tapOn: "Tasted Brews"
-- waitForAnimationToEnd:
-    timeout: 3000
+- waitForAnimationToEnd
 
 # Step 7: Wait for Tasted Brews to load
 - waitForAnimationToEnd
@@ -70,14 +76,13 @@ name: "Navigation - Tab Switching and State Persistence"
 
 # Step 14: Expand a beer item
 - tapOn:
-    regex: "beer-item-.*"
+    id: "beer-item-.*"
     index: 0
 - waitForAnimationToEnd
 
 # Step 15: Navigate away to Beerfinder
 - tapOn: "Beerfinder"
-- waitForAnimationToEnd:
-    timeout: 3000
+- waitForAnimationToEnd
 
 # Step 16: Navigate back to All Beer
 - tapOn: "All Beer"
@@ -110,20 +115,16 @@ name: "Navigation - Tab Switching and State Persistence"
 
 # Step 22: Rapidly switch between tabs
 - tapOn: "Beerfinder"
-- waitForAnimationToEnd:
-    timeout: 2000
+- waitForAnimationToEnd
 
 - tapOn: "All Beer"
-- waitForAnimationToEnd:
-    timeout: 2000
+- waitForAnimationToEnd
 
 - tapOn: "Tasted Brews"
-- waitForAnimationToEnd:
-    timeout: 2000
+- waitForAnimationToEnd
 
 - tapOn: "All Beer"
-- waitForAnimationToEnd:
-    timeout: 2000
+- waitForAnimationToEnd
 
 # Step 23: Verify All Beer screen is still functional
 - assertVisible:
@@ -154,8 +155,7 @@ name: "Navigation - Tab Switching and State Persistence"
 
 # Step 27: Immediately switch tabs (while loading)
 - tapOn: "Beerfinder"
-- waitForAnimationToEnd:
-    timeout: 3000
+- waitForAnimationToEnd
 
 # Step 28: Switch back to All Beer
 - tapOn: "All Beer"
@@ -173,11 +173,9 @@ name: "Navigation - Tab Switching and State Persistence"
     times: 5
     commands:
       - tapOn: "Beerfinder"
-      - waitForAnimationToEnd:
-          timeout: 2000
+      - waitForAnimationToEnd
       - tapOn: "All Beer"
-      - waitForAnimationToEnd:
-          timeout: 2000
+      - waitForAnimationToEnd
 
 # Step 31: Verify app is still responsive
 - assertVisible:

@@ -9,6 +9,14 @@ name: "Beer List - Item Expansion and Interaction"
 - launchApp:
     clearState: false
 
+# Dismiss Expo dev menu if present
+- runFlow:
+    when:
+      visible: "Reload"
+    commands:
+      - pressKey: Escape
+      - waitForAnimationToEnd
+
 # Step 2: Navigate to All Beer tab
 - tapOn: "All Beer"
 - waitForAnimationToEnd
@@ -23,7 +31,7 @@ name: "Beer List - Item Expansion and Interaction"
 # Step 4: Find and tap first beer item
 # We'll use regex since we don't know specific beer IDs
 - tapOn:
-    regex: "beer-item-.*"
+    id: "beer-item-.*"
     index: 0
 - waitForAnimationToEnd
 
@@ -31,53 +39,51 @@ name: "Beer List - Item Expansion and Interaction"
 # Note: This assumes the beer has a description
 # The description container has testID pattern: beer-description-container-{id}
 - assertVisible:
-    regex: "beer-description-container-.*"
-    timeout: 2000
+    id: "beer-description-container-.*"
 
 # Step 6: Verify beer description text is visible
 - assertVisible:
-    regex: "beer-description-.*"
+    id: "beer-description-.*"
 
 # Step 7: Tap same beer item again to collapse
 - tapOn:
-    regex: "beer-item-.*"
+    id: "beer-item-.*"
     index: 0
 - waitForAnimationToEnd
 
 # Step 8: Verify description is no longer visible (collapsed)
 - assertNotVisible:
-    regex: "beer-description-container-.*"
-    timeout: 2000
+    id: "beer-description-container-.*"
 
 # Test Multiple Item Expansion (Only One Should Be Expanded At A Time)
 # =====================================================================
 
 # Step 9: Expand first beer
 - tapOn:
-    regex: "beer-item-.*"
+    id: "beer-item-.*"
     index: 0
 - waitForAnimationToEnd
 
 # Step 10: Verify first beer is expanded
 - assertVisible:
-    regex: "beer-description-container-.*"
+    id: "beer-description-container-.*"
 
 # Step 11: Scroll down to see more beers
-- scroll:
+- swipe:
     direction: DOWN
 
 # Step 12: Expand a different beer item
 - tapOn:
-    regex: "beer-item-.*"
+    id: "beer-item-.*"
     index: 2
 - waitForAnimationToEnd
 
 # Step 13: Verify second beer is expanded
 - assertVisible:
-    regex: "beer-description-container-.*"
+    id: "beer-description-container-.*"
 
 # Step 14: Scroll back up to first beer
-- scroll:
+- swipe:
     direction: UP
 
 # Step 15: Verify first beer is no longer expanded (only one expanded at a time)
@@ -96,14 +102,13 @@ name: "Beer List - Item Expansion and Interaction"
 
 # Step 17: Tap first search result
 - tapOn:
-    regex: "beer-item-.*"
+    id: "beer-item-.*"
     index: 0
 - waitForAnimationToEnd
 
 # Step 18: Verify expansion works with filtered results
 - assertVisible:
-    regex: "beer-description-container-.*"
-    timeout: 2000
+    id: "beer-description-container-.*"
 
 # Step 19: Clear search
 - tapOn:
@@ -124,14 +129,13 @@ name: "Beer List - Item Expansion and Interaction"
 
 # Step 22: Tap first filtered beer item
 - tapOn:
-    regex: "beer-item-.*"
+    id: "beer-item-.*"
     index: 0
 - waitForAnimationToEnd
 
 # Step 23: Verify expansion works with filtered results
 - assertVisible:
-    regex: "beer-description-container-.*"
-    timeout: 2000
+    id: "beer-description-container-.*"
 
 # Step 24: Remove filter
 - tapOn:
@@ -143,31 +147,29 @@ name: "Beer List - Item Expansion and Interaction"
 
 # Step 25: Expand a beer near top of list
 - tapOn:
-    regex: "beer-item-.*"
+    id: "beer-item-.*"
     index: 0
 - waitForAnimationToEnd
 
 # Step 26: Scroll down (but not too far)
-- scroll:
+- swipe:
     direction: DOWN
 
 # Step 27: Scroll back up
-- scroll:
+- swipe:
     direction: UP
 
 # Step 28: Verify expansion state persisted during scroll
 # (The expanded item should still be expanded when scrolled back into view)
 - assertVisible:
-    regex: "beer-description-container-.*"
-    timeout: 2000
+    id: "beer-description-container-.*"
 
 # Step 29: Collapse the item
 - tapOn:
-    regex: "beer-item-.*"
+    id: "beer-item-.*"
     index: 0
 - waitForAnimationToEnd
 
 # Step 30: Verify collapsed
 - assertNotVisible:
-    regex: "beer-description-container-.*"
-    timeout: 2000
+    id: "beer-description-container-.*"

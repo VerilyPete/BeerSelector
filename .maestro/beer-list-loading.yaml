@@ -16,21 +16,26 @@ appId: org.verily.FSbeerselector
 - launchApp:
     clearState: true  # Ensure clean state for consistent testing
 
+# Dismiss Expo dev menu if present
+- runFlow:
+    when:
+      visible: "Reload"
+    commands:
+      - pressKey: Escape
+      - waitForAnimationToEnd
+
 - tapOn: "All Beers Tab"
 
 # Skeleton should appear within 100ms (immediate perceived performance)
 - assertVisible:
     id: "skeleton-loader"
-    timeout: 100
 
 # Wait for data to load (max 5 seconds)
-- waitForAnimationToEnd:
-    timeout: 5000
+- waitForAnimationToEnd
 
 # Skeleton should be replaced by beer list
 - assertVisible:
     id: "beer-list"
-    timeout: 1000
 
 # Skeleton should be completely hidden
 - assertNotVisible: "skeleton-loader"
@@ -46,21 +51,26 @@ appId: org.verily.FSbeerselector
 - launchApp:
     clearState: true
 
+# Dismiss Expo dev menu if present
+- runFlow:
+    when:
+      visible: "Reload"
+    commands:
+      - pressKey: Escape
+      - waitForAnimationToEnd
+
 - tapOn: "Beerfinder Tab"
 
 # Skeleton should appear immediately
 - assertVisible:
     id: "skeleton-loader"
-    timeout: 100
 
 # Wait for data load
-- waitForAnimationToEnd:
-    timeout: 5000
+- waitForAnimationToEnd
 
 # Beer list should appear
 - assertVisible:
     id: "beer-list"
-    timeout: 1000
 
 # Skeleton hidden
 - assertNotVisible: "skeleton-loader"
@@ -76,16 +86,22 @@ appId: org.verily.FSbeerselector
 - launchApp:
     clearState: true
 
+# Dismiss Expo dev menu if present
+- runFlow:
+    when:
+      visible: "Reload"
+    commands:
+      - pressKey: Escape
+      - waitForAnimationToEnd
+
 - tapOn: "Tasted Brews Tab"
 
 # Skeleton appears
 - assertVisible:
     id: "skeleton-loader"
-    timeout: 100
 
 # Wait for My Beers data
-- waitForAnimationToEnd:
-    timeout: 5000
+- waitForAnimationToEnd
 
 # Either beer list or empty state should appear
 # (Depends on whether user has tasted beers)
@@ -110,27 +126,33 @@ appId: org.verily.FSbeerselector
 ---
 - launchApp
 
+# Dismiss Expo dev menu if present
+- runFlow:
+    when:
+      visible: "Reload"
+    commands:
+      - pressKey: Escape
+      - waitForAnimationToEnd
+
 - tapOn: "All Beers Tab"
 
 # Wait for initial load
-- waitForAnimationToEnd:
-    timeout: 5000
+- waitForAnimationToEnd
 
 - assertVisible:
     id: "beer-list"
 
 # Pull down to refresh
-- scroll:
-    direction: "down"
-    distance: 50
+- swipe:
+    direction: DOWN
+    duration: 500
 
-- scroll:
-    direction: "up"
-    distance: 500
+- swipe:
+    direction: UP
+    duration: 500
 
 # Wait for refresh animation
-- waitForAnimationToEnd:
-    timeout: 3000
+- waitForAnimationToEnd
 
 # Skeleton should NOT appear during refresh
 - assertNotVisible: "skeleton-loader"
@@ -146,10 +168,17 @@ appId: org.verily.FSbeerselector
 - launchApp:
     clearState: true
 
+# Dismiss Expo dev menu if present
+- runFlow:
+    when:
+      visible: "Reload"
+    commands:
+      - pressKey: Escape
+      - waitForAnimationToEnd
+
 # Load All Beers
 - tapOn: "All Beers Tab"
-- waitForAnimationToEnd:
-    timeout: 5000
+- waitForAnimationToEnd
 - assertVisible:
     id: "beer-list"
 
@@ -159,10 +188,8 @@ appId: org.verily.FSbeerselector
 # Should show skeleton on first load
 - assertVisible:
     id: "skeleton-loader"
-    timeout: 100
 
-- waitForAnimationToEnd:
-    timeout: 5000
+- waitForAnimationToEnd
 
 - assertVisible:
     id: "beer-list"
@@ -184,6 +211,14 @@ appId: org.verily.FSbeerselector
 - launchApp:
     clearState: true
 
+# Dismiss Expo dev menu if present
+- runFlow:
+    when:
+      visible: "Reload"
+    commands:
+      - pressKey: Escape
+      - waitForAnimationToEnd
+
 - tapOn: "All Beers Tab"
 
 # Capture skeleton appearance
@@ -202,8 +237,7 @@ appId: org.verily.FSbeerselector
           id: "skeleton-loader"
 
 # Wait for data
-- waitForAnimationToEnd:
-    timeout: 5000
+- waitForAnimationToEnd
 
 # Verify smooth transition
 - assertVisible:
@@ -219,6 +253,14 @@ appId: org.verily.FSbeerselector
 - launchApp:
     clearState: true
 
+# Dismiss Expo dev menu if present
+- runFlow:
+    when:
+      visible: "Reload"
+    commands:
+      - pressKey: Escape
+      - waitForAnimationToEnd
+
 - tapOn: "Tasted Brews Tab"
 
 # Skeleton should flash briefly even if data loads fast
@@ -227,11 +269,9 @@ appId: org.verily.FSbeerselector
     commands:
       - assertVisible:
           id: "skeleton-loader"
-          timeout: 100
 
 # Data loads
-- waitForAnimationToEnd:
-    timeout: 2000
+- waitForAnimationToEnd
 
 # End state should be correct (beer list or empty)
 - runFlow:
@@ -247,6 +287,14 @@ appId: org.verily.FSbeerselector
 - launchApp:
     clearState: true
 
+# Dismiss Expo dev menu if present
+- runFlow:
+    when:
+      visible: "Reload"
+    commands:
+      - pressKey: Escape
+      - waitForAnimationToEnd
+
 - tapOn: "All Beers Tab"
 
 # Tap search bar while skeleton is visible
@@ -257,8 +305,7 @@ appId: org.verily.FSbeerselector
 - inputText: "IPA"
 
 # Data loads
-- waitForAnimationToEnd:
-    timeout: 5000
+- waitForAnimationToEnd
 
 # Results should be filtered
 - assertVisible:
@@ -275,6 +322,14 @@ appId: org.verily.FSbeerselector
 
 - launchApp:
     clearState: true
+
+# Dismiss Expo dev menu if present
+- runFlow:
+    when:
+      visible: "Reload"
+    commands:
+      - pressKey: Escape
+      - waitForAnimationToEnd
 
 # Simulate offline mode (if possible)
 # Otherwise this test documents expected behavior
@@ -295,6 +350,14 @@ appId: org.verily.FSbeerselector
 - launchApp:
     clearState: true
 
+# Dismiss Expo dev menu if present
+- runFlow:
+    when:
+      visible: "Reload"
+    commands:
+      - pressKey: Escape
+      - waitForAnimationToEnd
+
 - tapOn: "All Beers Tab"
 
 # Skeleton should be accessible
@@ -304,8 +367,7 @@ appId: org.verily.FSbeerselector
     id: "skeleton-loader"
 
 # Wait for load
-- waitForAnimationToEnd:
-    timeout: 5000
+- waitForAnimationToEnd
 
 # Final state should be accessible
 - assertVisible:
@@ -318,6 +380,14 @@ appId: org.verily.FSbeerselector
 - launchApp:
     clearState: true
 
+# Dismiss Expo dev menu if present
+- runFlow:
+    when:
+      visible: "Reload"
+    commands:
+      - pressKey: Escape
+      - waitForAnimationToEnd
+
 # Measure time to skeleton appearance
 - tapOn: "Beerfinder Tab"
 
@@ -325,7 +395,6 @@ appId: org.verily.FSbeerselector
 # (This is a critical performance metric)
 - assertVisible:
     id: "skeleton-loader"
-    timeout: 100
 
 # If this assertion fails, skeleton rendering is too slow
 
@@ -336,29 +405,31 @@ appId: org.verily.FSbeerselector
 - launchApp:
     clearState: true
 
+# Dismiss Expo dev menu if present
+- runFlow:
+    when:
+      visible: "Reload"
+    commands:
+      - pressKey: Escape
+      - waitForAnimationToEnd
+
 # Test each tab has consistent loading UX
 - tapOn: "All Beers Tab"
 - assertVisible:
     id: "skeleton-loader"
-    timeout: 100
-- waitForAnimationToEnd:
-    timeout: 5000
+- waitForAnimationToEnd
 - assertNotVisible: "skeleton-loader"
 
 - tapOn: "Beerfinder Tab"
 - assertVisible:
     id: "skeleton-loader"
-    timeout: 100
-- waitForAnimationToEnd:
-    timeout: 5000
+- waitForAnimationToEnd
 - assertNotVisible: "skeleton-loader"
 
 - tapOn: "Tasted Brews Tab"
 - assertVisible:
     id: "skeleton-loader"
-    timeout: 100
-- waitForAnimationToEnd:
-    timeout: 5000
+- waitForAnimationToEnd
 - assertNotVisible: "skeleton-loader"
 
 # All tabs should behave consistently
