@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuites name="jest tests" tests="12" failures="0" errors="0" time="1.69">
-  <testsuite name="Sequential Refresh Coordination" errors="0" failures="0" skipped="0" timestamp="2025-11-17T18:17:48" time="0.896" tests="12">
-    <testcase classname="Sequential Refresh Coordination sequentialRefreshAllData should execute refresh operations sequentially, not in parallel" name="Sequential Refresh Coordination sequentialRefreshAllData should execute refresh operations sequentially, not in parallel" time="0.008">
+<testsuites name="jest tests" tests="12" failures="0" errors="0" time="1.913">
+  <testsuite name="Sequential Refresh Coordination" errors="0" failures="0" skipped="0" timestamp="2025-11-17T21:56:46" time="0.941" tests="12">
+    <testcase classname="Sequential Refresh Coordination sequentialRefreshAllData should execute refresh operations sequentially, not in parallel" name="Sequential Refresh Coordination sequentialRefreshAllData should execute refresh operations sequentially, not in parallel" time="0.012">
     </testcase>
     <testcase classname="Sequential Refresh Coordination sequentialRefreshAllData should use a master lock to coordinate all operations" name="Sequential Refresh Coordination sequentialRefreshAllData should use a master lock to coordinate all operations" time="0.001">
     </testcase>
     <testcase classname="Sequential Refresh Coordination sequentialRefreshAllData should properly queue multiple simultaneous refresh requests" name="Sequential Refresh Coordination sequentialRefreshAllData should properly queue multiple simultaneous refresh requests" time="0.001">
     </testcase>
-    <testcase classname="Sequential Refresh Coordination sequentialRefreshAllData should release master lock even if an operation fails" name="Sequential Refresh Coordination sequentialRefreshAllData should release master lock even if an operation fails" time="0.019">
+    <testcase classname="Sequential Refresh Coordination sequentialRefreshAllData should release master lock even if an operation fails" name="Sequential Refresh Coordination sequentialRefreshAllData should release master lock even if an operation fails" time="0.017">
     </testcase>
     <testcase classname="Sequential Refresh Coordination sequentialRefreshAllData should complete faster than parallel execution with lock contention" name="Sequential Refresh Coordination sequentialRefreshAllData should complete faster than parallel execution with lock contention" time="0.001">
     </testcase>
@@ -21,9 +21,9 @@
     </testcase>
     <testcase classname="Sequential Refresh Coordination Production Integration Tests (CI-4) manualRefreshAllData should handle multiple simultaneous calls without lock contention" name="Sequential Refresh Coordination Production Integration Tests (CI-4) manualRefreshAllData should handle multiple simultaneous calls without lock contention" time="0.001">
     </testcase>
-    <testcase classname="Sequential Refresh Coordination Production Integration Tests (CI-5) refreshAllDataFromAPI should use sequential execution pattern" name="Sequential Refresh Coordination Production Integration Tests (CI-5) refreshAllDataFromAPI should use sequential execution pattern" time="0.001">
+    <testcase classname="Sequential Refresh Coordination Production Integration Tests (CI-5) refreshAllDataFromAPI should use sequential execution pattern" name="Sequential Refresh Coordination Production Integration Tests (CI-5) refreshAllDataFromAPI should use sequential execution pattern" time="0">
     </testcase>
-    <testcase classname="Sequential Refresh Coordination Production Integration Tests (CI-5) refreshAllDataFromAPI should use only one master lock" name="Sequential Refresh Coordination Production Integration Tests (CI-5) refreshAllDataFromAPI should use only one master lock" time="0.001">
+    <testcase classname="Sequential Refresh Coordination Production Integration Tests (CI-5) refreshAllDataFromAPI should use only one master lock" name="Sequential Refresh Coordination Production Integration Tests (CI-5) refreshAllDataFromAPI should use only one master lock" time="0">
     </testcase>
   </testsuite>
 </testsuites>

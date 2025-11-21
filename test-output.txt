@@ -1,0 +1,2529 @@
+
+> beerselector@1.0.0 test:ci
+> jest --config=jest.config.js --ci --coverage --reporters=default --reporters=jest-junit
+
+FAIL src/__tests__/utils/mockServerExample.test.ts (31.26 s)
+  MockServer Config Integration Example
+    Basic Integration
+      ✓ should use mock server URL from config (11 ms)
+      ✓ should build correct endpoint URLs (1 ms)
+      ✓ should build URLs with query parameters
+      ✓ should handle referer headers correctly (1 ms)
+    Mock Response Testing
+      ✓ should serve configured responses (1 ms)
+      ✓ should track requests made to mock server (1 ms)
+    Error Scenario Testing
+      ✓ should handle 404 responses
+      ✕ should simulate network delays (30002 ms)
+    Dynamic Response Patterns
+      ✓ should support conditional responses
+      ✓ should support sequential responses
+  MockServer Patterns for Flying Saucer API
+    ✓ should handle Flying Saucer nested response format
+    ✓ should handle authentication cookies
+    ✓ should handle visitor mode response
+
+  ● MockServer Config Integration Example › Error Scenario Testing › should simulate network delays
+
+    thrown: "Exceeded timeout of 30000 ms for a test.
+    Add a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout."
+
+      163 |     });
+      164 |
+    > 165 |     it('should simulate network delays', async () => {
+          |     ^
+      166 |       mockServer.setResponse('/slow-endpoint', {
+      167 |         status: 200,
+      168 |         body: { data: 'Eventually returned' },
+
+      at it (src/__tests__/utils/mockServerExample.test.ts:165:5)
+      at describe (src/__tests__/utils/mockServerExample.test.ts:144:3)
+      at Object.describe (src/__tests__/utils/mockServerExample.test.ts:14:1)
+
+FAIL src/services/__tests__/dataRefresh.integration.test.ts
+  Data Refresh Integration Tests
+    Full refresh flow
+      ✕ should successfully refresh all data with real JSON fixtures (4 ms)
+      ✕ should handle visitor mode correctly (no my beers) (2 ms)
+      ○ skipped should refresh data in parallel for performance
+    Partial refresh scenarios
+      ✕ should handle empty all beers response
+      ✕ should handle empty my beers response (new user) (1 ms)
+      ✕ should handle round rollover (200 beers reached) (1 ms)
+    Refresh failure recovery
+      ✓ should throw error when API URLs not configured
+      ✓ should throw error when all beers API fails (3 ms)
+      ✓ should throw error when my beers API fails (1 ms)
+      ✓ should throw error when rewards API fails (1 ms)
+      ✕ should handle database insertion failure (5 ms)
+    Data validation
+      ✕ should handle beers with missing IDs gracefully (1 ms)
+      ✓ should verify all beers from fixture have required fields (54 ms)
+      ✓ should verify my beers from fixture have Beerfinder fields (12 ms)
+
+  ● Data Refresh Integration Tests › Full refresh flow › should successfully refresh all data with real JSON fixtures
+
+    expect(received).toHaveLength(expected)
+
+    Expected length: 195
+    Received length: 194
+    Received array:  [{"added_date": "1743603559", "brew_container": "bottled", "brew_description": "This double porter is brewed with roasted organic Texas pecans, then aged in freshly emptied oak whiskey barrels with coconut for three months. Full-bodied and dark chocolate in color, with a rich caramel-colored foamy head. You\\'ll find notes of chocolate, coffee, coconut, pecans, vanilla, and sweet warming alcohol. 9.5% ABV", "brew_name": "(512) Whiskey Barrel Aged Double Pecan Porter Coconut Surprise (BTL)", "brew_style": "Barrel Aged Imperial Porter", "brewer": "(512) Brewing Co.", "brewer_loc": "Austin, TX", "id": "22186847", "review_count": "0", "review_rating": "0"}, {"added_date": "1741580066", "brew_container": "bottled", "brew_description": "<p>This giant barrel aged stout has been aged on rye and bourbon barrels.&nbsp; Deep jet black with frothy deep khaki head.&nbsp; Aroma of vanilla bean, leather, cocoa and espresso.&nbsp; Boozy warm whiskey notes of molasses and oak hit first and are followed by big dark chocolate flavors.&nbsp; Roasty and dry on the finish.&nbsp; It drinks as big as it's 12.3% heft implies.</p>·
+    ", "brew_name": "11 Below Big Mistake (CAN)", "brew_style": "Barrel Aged Imperial Stout", "brewer": "11 Below Brewing", "brewer_loc": "Houston, TX", "id": "17105399", "review_count": "0", "review_rating": "0"}, {"added_date": "1743519926", "brew_container": "draught", "brew_description": "<p>Amarillo, Simcoe &amp; Mosaic double dry hopped IPA. Huge Aromatics with grapefruit, pine, resin and gauva.&nbsp; Big sticky inital taste gives the beer a big medium full mouthfeel.&nbsp; Agreessive hop character full of tropical fruit and bitter pineapple.</p>·
+    ", "brew_name": "11 Below Hipster Stache", "brew_style": "American IPA", "brewer": "11 Below Brewing", "brewer_loc": "Houston, TX", "id": "18864073", "review_count": "1", "review_rating": "4"}, {"added_date": "1743519919", "brew_container": "draught", "brew_description": "<p>1 Bellow’s new German-style pilsner with brewed with Pils malt and noble hops. Notes of fresh doughy bread, and a hint of spicy floral hop character come through on the nose. Taste is crisp with a cracker malt backbone balanced by a zesty lemon hop flavor. Medium carbonation, and finishes dry with a hint of lemon.</p>·
+    ", "brew_name": "11 Below Lil' Snack", "brew_style": "German Pilsner", "brewer": "11 Below Brewing", "brewer_loc": "Houston, TX", "id": "19520463", "review_count": "0", "review_rating": "0"}, {"added_date": "1715196540", "brew_container": "bottled", "brew_description": "<p>110th blend of the 2018-2019 season. For the first time ever, we have blended raspberry lambic and sour cherry lambic rather than macerating both fruits together in roder to find a balance throughout the increasing fruit varieties. The fruit proportion is 83% raspberry and 17% sour cherries, the lambics originate from 6 different barrels and 5 different brews (25% 3 Fonteinen lambic, 75% Lindemans)</p>\\r\\n", "brew_name": "3 Fonteinen Hommage 18|19 Blend 110 (BTL)", "brew_style": "Fruit Lambic", "brewer": "Brouwerij Drie Fonteinen", "brewer_loc": "Beersel", "id": "20329009", "review_count": "0", "review_rating": "0"}, {"added_date": "1715196540", "brew_container": "bottled", "brew_description": "<p>For this Hommage, we blended a co-maceration of raspberries and sour cherries - but we switched the fruit proprotions - with a small batch of pure frambozenlambik. Consequently, this Hommage is somewhat out of the ordinary. The average weighted maceration time is 5.5 months and the final fruit intensity is 493 grams of whole fruits per liter of Hommage. The proportion of sour cherries is 54% vs 46% raspberries</p>\\r\\n", "brew_name": "3 Fonteinen Hommage 19|20 Blend 10  (BTL)", "brew_style": "Fruit Lambic", "brewer": "Brouwerij Drie Fonteinen", "brewer_loc": "Beersel", "id": "20329012", "review_count": "0", "review_rating": "0"}, {"added_date": "1715196540", "brew_container": "bottled", "brew_description": "13th blend of the 2018-2019 season. For this Oude Kriek, we macerated whole sour cherries on one- and almost-two-year old lambik in stainless steel. The maceration lasted 5.5 months. The lambikken that we used for macerating and blending originate from three different barrels and four different brews. 100% 3 Fonteinen wort. $$$$$$$$</p>", "brew_name": "3 Fonteinen Oude Kreik 19|20 Blend 13 (BTL)", "brew_style": "Fruit Lambic", "brewer": "Brouwerij Drie Fonteinen", "brewer_loc": "Beersel", "id": "21828563", "review_count": "0", "review_rating": "0"}, {"added_date": "1741667213", "brew_container": "draught", "brew_description": "<p>Berries, cherry, a touch of lactic red wine and hints of funk are all evident in the nose and flavor of this wine barrel aged version of 512’s fall offering, Bruin. There is also some nuttiness, tobacco, and a little bit of chocolate in this very complex wild ale. 7.6% abv</p>·
+    ", "brew_name": "512 Wild Bear ", "brew_style": "Wild Ale", "brewer": "(512) Brewing Co.", "brewer_loc": "Austin, TX", "id": "17156820", "review_count": "0", "review_rating": "0"}, {"added_date": "1743001322", "brew_container": "draught", "brew_description": "Pours a pale gold with a bright white head. Aroma is sweet with overtones of pear and apple juice. Light to medium body with a well defined tart flavor. 5% ABV", "brew_name": "Ace Perry", "brew_style": "Cider", "brewer": "California Cider Co.", "brewer_loc": "Sonoma County, CA", "id": "21980285", "review_count": "0", "review_rating": "0"}, {"added_date": "1741975313", "brew_container": "Draught", "brew_description": "Anvil ESB is their interpretation of a traditional British-style pub ale. Deep amber in color, a toasty character from British malts and a touch of kettle caramelization blend seamlessly with a mild English hop profile. Its delicate balance of flavors will keep you coming back pint after pint, making it a complex creation they are proud to call their flagship beer. ABV 5.5", "brew_name": "AleSmith Anvil ESB", "brew_style": "Extra Special Bitter", "brewer": "AleSmith Brewing Co.", "brewer_loc": "San Diego, CA", "id": "13946799", "review_count": "0", "review_rating": "3"}, …]
+
+      73 |
+      74 |       // Verify results
+    > 75 |       expect(result.allBeers).toHaveLength(195); // From allbeers.json
+         |                               ^
+      76 |       expect(result.myBeers).toHaveLength(98);   // From mybeers.json
+      77 |       expect(result.rewards).toHaveLength(1);
+      78 |
+
+      at Object.toHaveLength (src/services/__tests__/dataRefresh.integration.test.ts:75:31)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  ● Data Refresh Integration Tests › Full refresh flow › should handle visitor mode correctly (no my beers)
+
+    expect(received).toHaveLength(expected)
+
+    Expected length: 195
+    Received length: 194
+    Received array:  [{"added_date": "1743603559", "brew_container": "bottled", "brew_description": "This double porter is brewed with roasted organic Texas pecans, then aged in freshly emptied oak whiskey barrels with coconut for three months. Full-bodied and dark chocolate in color, with a rich caramel-colored foamy head. You\\'ll find notes of chocolate, coffee, coconut, pecans, vanilla, and sweet warming alcohol. 9.5% ABV", "brew_name": "(512) Whiskey Barrel Aged Double Pecan Porter Coconut Surprise (BTL)", "brew_style": "Barrel Aged Imperial Porter", "brewer": "(512) Brewing Co.", "brewer_loc": "Austin, TX", "id": "22186847", "review_count": "0", "review_rating": "0"}, {"added_date": "1741580066", "brew_container": "bottled", "brew_description": "<p>This giant barrel aged stout has been aged on rye and bourbon barrels.&nbsp; Deep jet black with frothy deep khaki head.&nbsp; Aroma of vanilla bean, leather, cocoa and espresso.&nbsp; Boozy warm whiskey notes of molasses and oak hit first and are followed by big dark chocolate flavors.&nbsp; Roasty and dry on the finish.&nbsp; It drinks as big as it's 12.3% heft implies.</p>·
+    ", "brew_name": "11 Below Big Mistake (CAN)", "brew_style": "Barrel Aged Imperial Stout", "brewer": "11 Below Brewing", "brewer_loc": "Houston, TX", "id": "17105399", "review_count": "0", "review_rating": "0"}, {"added_date": "1743519926", "brew_container": "draught", "brew_description": "<p>Amarillo, Simcoe &amp; Mosaic double dry hopped IPA. Huge Aromatics with grapefruit, pine, resin and gauva.&nbsp; Big sticky inital taste gives the beer a big medium full mouthfeel.&nbsp; Agreessive hop character full of tropical fruit and bitter pineapple.</p>·
+    ", "brew_name": "11 Below Hipster Stache", "brew_style": "American IPA", "brewer": "11 Below Brewing", "brewer_loc": "Houston, TX", "id": "18864073", "review_count": "1", "review_rating": "4"}, {"added_date": "1743519919", "brew_container": "draught", "brew_description": "<p>1 Bellow’s new German-style pilsner with brewed with Pils malt and noble hops. Notes of fresh doughy bread, and a hint of spicy floral hop character come through on the nose. Taste is crisp with a cracker malt backbone balanced by a zesty lemon hop flavor. Medium carbonation, and finishes dry with a hint of lemon.</p>·
+    ", "brew_name": "11 Below Lil' Snack", "brew_style": "German Pilsner", "brewer": "11 Below Brewing", "brewer_loc": "Houston, TX", "id": "19520463", "review_count": "0", "review_rating": "0"}, {"added_date": "1715196540", "brew_container": "bottled", "brew_description": "<p>110th blend of the 2018-2019 season. For the first time ever, we have blended raspberry lambic and sour cherry lambic rather than macerating both fruits together in roder to find a balance throughout the increasing fruit varieties. The fruit proportion is 83% raspberry and 17% sour cherries, the lambics originate from 6 different barrels and 5 different brews (25% 3 Fonteinen lambic, 75% Lindemans)</p>\\r\\n", "brew_name": "3 Fonteinen Hommage 18|19 Blend 110 (BTL)", "brew_style": "Fruit Lambic", "brewer": "Brouwerij Drie Fonteinen", "brewer_loc": "Beersel", "id": "20329009", "review_count": "0", "review_rating": "0"}, {"added_date": "1715196540", "brew_container": "bottled", "brew_description": "<p>For this Hommage, we blended a co-maceration of raspberries and sour cherries - but we switched the fruit proprotions - with a small batch of pure frambozenlambik. Consequently, this Hommage is somewhat out of the ordinary. The average weighted maceration time is 5.5 months and the final fruit intensity is 493 grams of whole fruits per liter of Hommage. The proportion of sour cherries is 54% vs 46% raspberries</p>\\r\\n", "brew_name": "3 Fonteinen Hommage 19|20 Blend 10  (BTL)", "brew_style": "Fruit Lambic", "brewer": "Brouwerij Drie Fonteinen", "brewer_loc": "Beersel", "id": "20329012", "review_count": "0", "review_rating": "0"}, {"added_date": "1715196540", "brew_container": "bottled", "brew_description": "13th blend of the 2018-2019 season. For this Oude Kriek, we macerated whole sour cherries on one- and almost-two-year old lambik in stainless steel. The maceration lasted 5.5 months. The lambikken that we used for macerating and blending originate from three different barrels and four different brews. 100% 3 Fonteinen wort. $$$$$$$$</p>", "brew_name": "3 Fonteinen Oude Kreik 19|20 Blend 13 (BTL)", "brew_style": "Fruit Lambic", "brewer": "Brouwerij Drie Fonteinen", "brewer_loc": "Beersel", "id": "21828563", "review_count": "0", "review_rating": "0"}, {"added_date": "1741667213", "brew_container": "draught", "brew_description": "<p>Berries, cherry, a touch of lactic red wine and hints of funk are all evident in the nose and flavor of this wine barrel aged version of 512’s fall offering, Bruin. There is also some nuttiness, tobacco, and a little bit of chocolate in this very complex wild ale. 7.6% abv</p>·
+    ", "brew_name": "512 Wild Bear ", "brew_style": "Wild Ale", "brewer": "(512) Brewing Co.", "brewer_loc": "Austin, TX", "id": "17156820", "review_count": "0", "review_rating": "0"}, {"added_date": "1743001322", "brew_container": "draught", "brew_description": "Pours a pale gold with a bright white head. Aroma is sweet with overtones of pear and apple juice. Light to medium body with a well defined tart flavor. 5% ABV", "brew_name": "Ace Perry", "brew_style": "Cider", "brewer": "California Cider Co.", "brewer_loc": "Sonoma County, CA", "id": "21980285", "review_count": "0", "review_rating": "0"}, {"added_date": "1741975313", "brew_container": "Draught", "brew_description": "Anvil ESB is their interpretation of a traditional British-style pub ale. Deep amber in color, a toasty character from British malts and a touch of kettle caramelization blend seamlessly with a mild English hop profile. Its delicate balance of flavors will keep you coming back pint after pint, making it a complex creation they are proud to call their flagship beer. ABV 5.5", "brew_name": "AleSmith Anvil ESB", "brew_style": "Extra Special Bitter", "brewer": "AleSmith Brewing Co.", "brewer_loc": "San Diego, CA", "id": "13946799", "review_count": "0", "review_rating": "3"}, …]
+
+      119 |
+      120 |       // In visitor mode, should still get all beers but empty my beers
+    > 121 |       expect(result.allBeers).toHaveLength(195);
+          |                               ^
+      122 |       expect(result.myBeers).toHaveLength(0);
+      123 |       expect(result.rewards).toHaveLength(0);
+      124 |     });
+
+      at Object.toHaveLength (src/services/__tests__/dataRefresh.integration.test.ts:121:31)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  ● Data Refresh Integration Tests › Partial refresh scenarios › should handle empty all beers response
+
+    No valid all beers found in API response
+
+      856 |
+      857 |     if (allBeersValidation.validBeers.length === 0) {
+    > 858 |       throw new Error('No valid all beers found in API response');
+          |             ^
+      859 |     }
+      860 |
+      861 |     await beerRepository.insertManyUnsafe(allBeersValidation.validBeers);
+
+      at src/services/dataUpdateService.ts:858:13
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  ● Data Refresh Integration Tests › Partial refresh scenarios › should handle empty my beers response (new user)
+
+    expect(received).toHaveLength(expected)
+
+    Expected length: 195
+    Received length: 194
+    Received array:  [{"added_date": "1743603559", "brew_container": "bottled", "brew_description": "This double porter is brewed with roasted organic Texas pecans, then aged in freshly emptied oak whiskey barrels with coconut for three months. Full-bodied and dark chocolate in color, with a rich caramel-colored foamy head. You\\'ll find notes of chocolate, coffee, coconut, pecans, vanilla, and sweet warming alcohol. 9.5% ABV", "brew_name": "(512) Whiskey Barrel Aged Double Pecan Porter Coconut Surprise (BTL)", "brew_style": "Barrel Aged Imperial Porter", "brewer": "(512) Brewing Co.", "brewer_loc": "Austin, TX", "id": "22186847", "review_count": "0", "review_rating": "0"}, {"added_date": "1741580066", "brew_container": "bottled", "brew_description": "<p>This giant barrel aged stout has been aged on rye and bourbon barrels.&nbsp; Deep jet black with frothy deep khaki head.&nbsp; Aroma of vanilla bean, leather, cocoa and espresso.&nbsp; Boozy warm whiskey notes of molasses and oak hit first and are followed by big dark chocolate flavors.&nbsp; Roasty and dry on the finish.&nbsp; It drinks as big as it's 12.3% heft implies.</p>·
+    ", "brew_name": "11 Below Big Mistake (CAN)", "brew_style": "Barrel Aged Imperial Stout", "brewer": "11 Below Brewing", "brewer_loc": "Houston, TX", "id": "17105399", "review_count": "0", "review_rating": "0"}, {"added_date": "1743519926", "brew_container": "draught", "brew_description": "<p>Amarillo, Simcoe &amp; Mosaic double dry hopped IPA. Huge Aromatics with grapefruit, pine, resin and gauva.&nbsp; Big sticky inital taste gives the beer a big medium full mouthfeel.&nbsp; Agreessive hop character full of tropical fruit and bitter pineapple.</p>·
+    ", "brew_name": "11 Below Hipster Stache", "brew_style": "American IPA", "brewer": "11 Below Brewing", "brewer_loc": "Houston, TX", "id": "18864073", "review_count": "1", "review_rating": "4"}, {"added_date": "1743519919", "brew_container": "draught", "brew_description": "<p>1 Bellow’s new German-style pilsner with brewed with Pils malt and noble hops. Notes of fresh doughy bread, and a hint of spicy floral hop character come through on the nose. Taste is crisp with a cracker malt backbone balanced by a zesty lemon hop flavor. Medium carbonation, and finishes dry with a hint of lemon.</p>·
+    ", "brew_name": "11 Below Lil' Snack", "brew_style": "German Pilsner", "brewer": "11 Below Brewing", "brewer_loc": "Houston, TX", "id": "19520463", "review_count": "0", "review_rating": "0"}, {"added_date": "1715196540", "brew_container": "bottled", "brew_description": "<p>110th blend of the 2018-2019 season. For the first time ever, we have blended raspberry lambic and sour cherry lambic rather than macerating both fruits together in roder to find a balance throughout the increasing fruit varieties. The fruit proportion is 83% raspberry and 17% sour cherries, the lambics originate from 6 different barrels and 5 different brews (25% 3 Fonteinen lambic, 75% Lindemans)</p>\\r\\n", "brew_name": "3 Fonteinen Hommage 18|19 Blend 110 (BTL)", "brew_style": "Fruit Lambic", "brewer": "Brouwerij Drie Fonteinen", "brewer_loc": "Beersel", "id": "20329009", "review_count": "0", "review_rating": "0"}, {"added_date": "1715196540", "brew_container": "bottled", "brew_description": "<p>For this Hommage, we blended a co-maceration of raspberries and sour cherries - but we switched the fruit proprotions - with a small batch of pure frambozenlambik. Consequently, this Hommage is somewhat out of the ordinary. The average weighted maceration time is 5.5 months and the final fruit intensity is 493 grams of whole fruits per liter of Hommage. The proportion of sour cherries is 54% vs 46% raspberries</p>\\r\\n", "brew_name": "3 Fonteinen Hommage 19|20 Blend 10  (BTL)", "brew_style": "Fruit Lambic", "brewer": "Brouwerij Drie Fonteinen", "brewer_loc": "Beersel", "id": "20329012", "review_count": "0", "review_rating": "0"}, {"added_date": "1715196540", "brew_container": "bottled", "brew_description": "13th blend of the 2018-2019 season. For this Oude Kriek, we macerated whole sour cherries on one- and almost-two-year old lambik in stainless steel. The maceration lasted 5.5 months. The lambikken that we used for macerating and blending originate from three different barrels and four different brews. 100% 3 Fonteinen wort. $$$$$$$$</p>", "brew_name": "3 Fonteinen Oude Kreik 19|20 Blend 13 (BTL)", "brew_style": "Fruit Lambic", "brewer": "Brouwerij Drie Fonteinen", "brewer_loc": "Beersel", "id": "21828563", "review_count": "0", "review_rating": "0"}, {"added_date": "1741667213", "brew_container": "draught", "brew_description": "<p>Berries, cherry, a touch of lactic red wine and hints of funk are all evident in the nose and flavor of this wine barrel aged version of 512’s fall offering, Bruin. There is also some nuttiness, tobacco, and a little bit of chocolate in this very complex wild ale. 7.6% abv</p>·
+    ", "brew_name": "512 Wild Bear ", "brew_style": "Wild Ale", "brewer": "(512) Brewing Co.", "brewer_loc": "Austin, TX", "id": "17156820", "review_count": "0", "review_rating": "0"}, {"added_date": "1743001322", "brew_container": "draught", "brew_description": "Pours a pale gold with a bright white head. Aroma is sweet with overtones of pear and apple juice. Light to medium body with a well defined tart flavor. 5% ABV", "brew_name": "Ace Perry", "brew_style": "Cider", "brewer": "California Cider Co.", "brewer_loc": "Sonoma County, CA", "id": "21980285", "review_count": "0", "review_rating": "0"}, {"added_date": "1741975313", "brew_container": "Draught", "brew_description": "Anvil ESB is their interpretation of a traditional British-style pub ale. Deep amber in color, a toasty character from British malts and a touch of kettle caramelization blend seamlessly with a mild English hop profile. Its delicate balance of flavors will keep you coming back pint after pint, making it a complex creation they are proud to call their flagship beer. ABV 5.5", "brew_name": "AleSmith Anvil ESB", "brew_style": "Extra Special Bitter", "brewer": "AleSmith Brewing Co.", "brewer_loc": "San Diego, CA", "id": "13946799", "review_count": "0", "review_rating": "3"}, …]
+
+      239 |       const result = await refreshAllDataFromAPI();
+      240 |
+    > 241 |       expect(result.allBeers).toHaveLength(195);
+          |                               ^
+      242 |       expect(result.myBeers).toHaveLength(0);
+      243 |
+      244 |       // Should still call insertMany for empty arrays (to clear old data)
+
+      at Object.toHaveLength (src/services/__tests__/dataRefresh.integration.test.ts:241:31)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  ● Data Refresh Integration Tests › Partial refresh scenarios › should handle round rollover (200 beers reached)
+
+    expect(jest.fn()).toHaveBeenCalledWith(...expected)
+
+    Expected: []
+
+    Number of calls: 0
+
+      274 |
+      275 |       expect(result.myBeers).toHaveLength(0);
+    > 276 |       expect(myBeersRepository.myBeersRepository.insertMany).toHaveBeenCalledWith([]);
+          |                                                              ^
+      277 |     });
+      278 |   });
+      279 |
+
+      at Object.toHaveBeenCalledWith (src/services/__tests__/dataRefresh.integration.test.ts:276:62)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  ● Data Refresh Integration Tests › Refresh failure recovery › should handle database insertion failure
+
+    expect(received).rejects.toThrow()
+
+    Received promise resolved instead of rejected
+    Resolved to value: {"allBeers": [[Object], [Object], [Object], [Object], [Object], [Object], [Object], [Object], [Object], [Object], …], "myBeers": [[Object], [Object], [Object], [Object], [Object], [Object], [Object], [Object], [Object], [Object], …], "rewards": []}
+
+      390 |       );
+      391 |
+    > 392 |       await expect(refreshAllDataFromAPI()).rejects.toThrow('Database write failed');
+          |             ^
+      393 |     });
+      394 |   });
+      395 |
+
+      at expect (node_modules/expect/build/index.js:113:15)
+      at Object.expect (src/services/__tests__/dataRefresh.integration.test.ts:392:13)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:22:7
+      at Object.<anonymous> (node_modules/@babel/runtime/helpers/asyncToGenerator.js:14:12)
+
+  ● Data Refresh Integration Tests › Data validation › should handle beers with missing IDs gracefully
+
+    expect(received).toHaveLength(expected)
+
+    Expected length: 3
+    Received length: 2
+    Received array:  [{"brew_name": "Valid Beer 1", "brewer": "Brewery A", "id": "1"}, {"brew_name": "Valid Beer 2", "brewer": "Brewery C", "id": "2"}]
+
+      427 |
+      428 |       // Should still complete successfully
+    > 429 |       expect(result.allBeers).toHaveLength(3);
+          |                               ^
+      430 |       // Repository will filter out beers without IDs during insertion
+      431 |     });
+      432 |
+
+      at Object.toHaveLength (src/services/__tests__/dataRefresh.integration.test.ts:429:31)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+FAIL src/services/__tests__/refreshCoordination.test.ts
+  Sequential Refresh Coordination
+    sequentialRefreshAllData
+      ✕ should execute refresh operations sequentially, not in parallel (36 ms)
+      ✓ should use a master lock to coordinate all operations (1 ms)
+      ✕ should properly queue multiple simultaneous refresh requests (2 ms)
+      ✕ should release master lock even if an operation fails (1 ms)
+      ✓ should complete faster than parallel execution with lock contention
+      ✓ should use unsafe repository methods to avoid nested lock acquisition (1 ms)
+    Comparison: Parallel vs Sequential
+      ✓ demonstrates current parallel execution causes lock queueing
+    Production Integration Tests (CI-4)
+      ✕ manualRefreshAllData should use sequential execution pattern (1 ms)
+      ✓ manualRefreshAllData should use only one master lock (1 ms)
+      ✕ manualRefreshAllData should handle multiple simultaneous calls without lock contention (1 ms)
+    Production Integration Tests (CI-5)
+      ✕ refreshAllDataFromAPI should use sequential execution pattern
+      ✕ refreshAllDataFromAPI should use only one master lock
+
+  ● Sequential Refresh Coordination › sequentialRefreshAllData › should execute refresh operations sequentially, not in parallel
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 8
+    + Received  + 1
+
+    - Array [
+    -   "allBeers-start",
+    -   "allBeers-end",
+    -   "myBeers-start",
+    -   "myBeers-end",
+    -   "rewards-start",
+    -   "rewards-end",
+    - ]
+    + Array []
+
+      155 |
+      156 |       // Verify sequential execution: each operation must COMPLETE before next starts
+    > 157 |       expect(executionLog).toEqual([
+          |                            ^
+      158 |         'allBeers-start',
+      159 |         'allBeers-end',      // All beers must finish before my beers starts
+      160 |         'myBeers-start',
+
+      at Object.toEqual (src/services/__tests__/refreshCoordination.test.ts:157:28)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  ● Sequential Refresh Coordination › sequentialRefreshAllData › should properly queue multiple simultaneous refresh requests
+
+    expect(jest.fn()).toHaveBeenCalledTimes(expected)
+
+    Expected number of calls: 3
+    Received number of calls: 0
+
+      231 |
+      232 |       // Each refresh calls all three functions once
+    > 233 |       expect(mockFetchAll).toHaveBeenCalledTimes(3);
+          |                            ^
+      234 |       expect(mockFetchMy).toHaveBeenCalledTimes(3);
+      235 |       expect(mockFetchRewards).toHaveBeenCalledTimes(3);
+      236 |     });
+
+      at Object.toHaveBeenCalledTimes (src/services/__tests__/refreshCoordination.test.ts:233:28)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  ● Sequential Refresh Coordination › sequentialRefreshAllData › should release master lock even if an operation fails
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: false
+    Received: true
+
+      254 |       // Should have error but not throw
+      255 |       expect(result.hasErrors).toBe(true);
+    > 256 |       expect(result.myBeersResult.success).toBe(false);
+          |                                            ^
+      257 |
+      258 |       // Lock should be released - verify we can acquire it again
+      259 |       const lockAcquired = await databaseLockManager.acquireLock('test-operation');
+
+      at Object.toBe (src/services/__tests__/refreshCoordination.test.ts:256:44)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  ● Sequential Refresh Coordination › Production Integration Tests (CI-4) › manualRefreshAllData should use sequential execution pattern
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 8
+    + Received  + 1
+
+    - Array [
+    -   "allBeers-start",
+    -   "allBeers-end",
+    -   "myBeers-start",
+    -   "myBeers-end",
+    -   "rewards-start",
+    -   "rewards-end",
+    - ]
+    + Array []
+
+      426 |
+      427 |       // Verify sequential execution (not parallel)
+    > 428 |       expect(executionLog).toEqual([
+          |                            ^
+      429 |         'allBeers-start',
+      430 |         'allBeers-end',
+      431 |         'myBeers-start',
+
+      at Object.toEqual (src/services/__tests__/refreshCoordination.test.ts:428:28)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  ● Sequential Refresh Coordination › Production Integration Tests (CI-4) › manualRefreshAllData should handle multiple simultaneous calls without lock contention
+
+    expect(jest.fn()).toHaveBeenCalledTimes(expected)
+
+    Expected number of calls: 2
+    Received number of calls: 0
+
+      494 |
+      495 |       // Each refresh should call all three functions once
+    > 496 |       expect(mockFetchAll).toHaveBeenCalledTimes(2);
+          |                            ^
+      497 |       expect(mockFetchMy).toHaveBeenCalledTimes(2);
+      498 |       expect(mockFetchRewards).toHaveBeenCalledTimes(2);
+      499 |     });
+
+      at Object.toHaveBeenCalledTimes (src/services/__tests__/refreshCoordination.test.ts:496:28)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  ● Sequential Refresh Coordination › Production Integration Tests (CI-5) › refreshAllDataFromAPI should use sequential execution pattern
+
+    No valid all beers found in API response
+
+      856 |
+      857 |     if (allBeersValidation.validBeers.length === 0) {
+    > 858 |       throw new Error('No valid all beers found in API response');
+          |             ^
+      859 |     }
+      860 |
+      861 |     await beerRepository.insertManyUnsafe(allBeersValidation.validBeers);
+
+      at src/services/dataUpdateService.ts:858:13
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  ● Sequential Refresh Coordination › Production Integration Tests (CI-5) › refreshAllDataFromAPI should use only one master lock
+
+    No valid all beers found in API response
+
+      856 |
+      857 |     if (allBeersValidation.validBeers.length === 0) {
+    > 858 |       throw new Error('No valid all beers found in API response');
+          |             ^
+      859 |     }
+      860 |
+      861 |     await beerRepository.insertManyUnsafe(allBeersValidation.validBeers);
+
+      at src/services/dataUpdateService.ts:858:13
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+FAIL src/api/__tests__/apiClient.test.ts
+  ApiClient
+    get
+      ✓ should make a GET request and return data (10 ms)
+      ✓ should handle query parameters correctly (26 ms)
+      ✓ should handle errors correctly (5 ms)
+      ✓ should use config values for retry settings (1 ms)
+    post
+      ✓ should make a POST request with correct body
+    ApiError
+      ✓ should create an ApiError with correct properties (1 ms)
+      ✓ should mark 5xx errors as retryable
+      ✓ should mark 4xx errors as non-retryable (except 408 and 429) (1 ms)
+    Config Integration
+      URL Configuration
+        ✓ should use config base URL for API client initialization
+        ✓ should construct URLs correctly with config base URL (1 ms)
+        ✓ should use config base URL for POST requests
+      Network Configuration
+        ✓ should respect config retry settings
+        ✕ should respect config timeout settings
+        ✕ should use config network settings for client instantiation (2 ms)
+      Environment Switching
+        ✓ should use production URLs when environment is production
+        ✓ should use development URLs when environment is development (1 ms)
+        ✓ should use custom URL when set
+        ✓ should validate URL format when setting custom URL (9 ms)
+      Config Validation
+        ✓ should have valid config structure (1 ms)
+        ✓ should have valid network configuration values (1 ms)
+        ✓ should provide valid base URL
+        ✕ should have consistent network settings across client instances
+
+  ● ApiClient › Config Integration › Network Configuration › should respect config timeout settings
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: 15000
+    Received: 30000
+
+      231 |
+      232 |         // Verify timeout configuration is available
+    > 233 |         expect(config.network.timeout).toBe(15000);
+          |                                        ^
+      234 |       });
+      235 |
+      236 |       it('should use config network settings for client instantiation', () => {
+
+      at Object.toBe (src/api/__tests__/apiClient.test.ts:233:40)
+
+  ● ApiClient › Config Integration › Network Configuration › should use config network settings for client instantiation
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: 15000
+    Received: 30000
+
+      253 |         expect(config.network.retries).toBe(3);
+      254 |         expect(config.network.retryDelay).toBe(1000);
+    > 255 |         expect(config.network.timeout).toBe(15000);
+          |                                        ^
+      256 |
+      257 |         expect(client1).toBeDefined();
+      258 |         expect(client2).toBeDefined();
+
+      at Object.toBe (src/api/__tests__/apiClient.test.ts:255:40)
+
+  ● ApiClient › Config Integration › Config Validation › should have consistent network settings across client instances
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: 15000
+    Received: 30000
+
+      372 |         expect(config.network.retries).toBe(3);
+      373 |         expect(config.network.retryDelay).toBe(1000);
+    > 374 |         expect(config.network.timeout).toBe(15000);
+          |                                        ^
+      375 |       });
+      376 |     });
+      377 |   });
+
+      at Object.toBe (src/api/__tests__/apiClient.test.ts:374:40)
+
+FAIL src/services/__tests__/dataUpdateService.manualRefresh.test.ts
+  manualRefreshAllData
+    ✕ refreshes core endpoints and returns no errors when both succeed (26 ms)
+    ✕ handles partial failure and sets hasErrors (1 ms)
+
+  ● manualRefreshAllData › refreshes core endpoints and returns no errors when both succeed
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: false
+    Received: true
+
+      35 |     // eslint-disable-next-line no-console
+      36 |     console.log('RESULT OK:', JSON.stringify(result));
+    > 37 |     expect(result.hasErrors).toBe(false);
+         |                              ^
+      38 |     expect(result.allBeersResult.success).toBe(true);
+      39 |     expect(result.myBeersResult.success).toBe(true);
+      40 |     expect(result.rewardsResult.success).toBe(true);
+
+      at Object.toBe (src/services/__tests__/dataUpdateService.manualRefresh.test.ts:37:30)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  ● manualRefreshAllData › handles partial failure and sets hasErrors
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: true
+    Received: false
+
+      53 |     expect(result.hasErrors).toBe(true);
+      54 |     expect(result.allBeersResult.success).toBe(false);
+    > 55 |     expect(result.myBeersResult.success).toBe(true);
+         |                                          ^
+      56 |     expect(result.rewardsResult.success).toBe(true);
+      57 |   });
+      58 | });
+
+      at Object.toBe (src/services/__tests__/dataUpdateService.manualRefresh.test.ts:55:42)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+PASS src/api/__tests__/integration.mockServer.test.ts (12.98 s)
+  API Integration with Mock Server
+    Beer Fetching Integration
+      ✓ should fetch all beers from mock server successfully (14 ms)
+      ✓ should fetch my beers (tasted beers) from mock server successfully (2 ms)
+      ✓ should fetch rewards from mock server successfully (1 ms)
+      ✓ should handle 500 server error from beer endpoint (2545 ms)
+      ✓ should handle 404 not found error (2508 ms)
+      ✓ should timeout on slow response (5004 ms)
+      ✓ should handle empty response data gracefully (4 ms)
+      ✓ should retry on transient network failure and succeed (2511 ms)
+    Authentication Flow Integration
+      ✓ should handle session validation with mock server (1 ms)
+      ✓ should handle cookie-based authentication (2 ms)
+      ✓ should handle 401 authentication failure (3 ms)
+      ✓ should handle visitor mode (no authentication) (3 ms)
+      ✓ should handle session expiration during request (3 ms)
+      ✓ should handle referer header requirement (3 ms)
+    Error Handling Integration
+      ✓ should handle retry exhaustion after multiple failures (29 ms)
+      ✓ should handle malformed JSON response (2 ms)
+      ✓ should handle network timeout with retry (13 ms)
+      ✓ should handle 429 rate limiting (2 ms)
+      ✓ should handle unexpected response format (3 ms)
+      ✓ should handle partial data corruption (1 ms)
+    Config Integration
+      ✓ should use custom API URL from config (2 ms)
+      ✓ should handle environment switching (3 ms)
+      ✓ should respect network timeout settings (1 ms)
+      ✓ should respect retry configuration (90 ms)
+      ✓ should handle none:// protocol URLs for visitor mode (1 ms)
+      ✓ should preserve request headers across retries (2 ms)
+    Flying Saucer API Format Validation
+      ✓ should correctly parse nested brewInStock response (2 ms)
+      ✓ should correctly parse tasted_brew_current_round response (1 ms)
+      ✓ should correctly parse rewards response (2 ms)
+      ✓ should handle null first element in Flying Saucer response (1 ms)
+
+PASS src/api/__tests__/beerApi.test.ts (7.787 s)
+  Beer API
+    fetchWithRetry
+      ✓ should return data on successful fetch (2 ms)
+      ✓ should handle none:// protocol URLs by returning empty data (1 ms)
+      ✓ should retry on fetch failure (3 ms)
+      ✓ should retry with config network settings (3 ms)
+      ✓ should throw error after exhausting retries (20 ms)
+      ✓ should throw error on non-ok HTTP status (7 ms)
+    fetchBeersFromAPI
+      ✓ should return empty array when API URL is not configured
+      ✓ should fetch and return beers in standard brewInStock format (1 ms)
+      ✓ should find beers in nested object structure
+      ✓ should throw error when no beer data found in response
+      ✓ should propagate fetch errors (2505 ms)
+    fetchMyBeersFromAPI
+      ✓ should return empty array in visitor mode (1 ms)
+      ✓ should return empty array when API URL is not configured
+      ✓ should return empty array for none:// protocol URLs
+      ✓ should fetch and return tasted beers (3 ms)
+      ✓ should handle empty tasted beers array as valid state
+      ✓ should filter out beers without IDs (1 ms)
+      ✓ should throw error on invalid response format (1 ms)
+      ✓ should propagate fetch errors (2507 ms)
+    fetchRewardsFromAPI
+      ✓ should return empty array in visitor mode (1 ms)
+      ✓ should return empty array when API URL is not configured
+      ✓ should fetch and return rewards (1 ms)
+      ✓ should throw error on invalid response format (2 ms)
+      ✓ should propagate fetch errors (2510 ms)
+    Config Integration
+      URL Construction
+        ✓ should use config base URL when available
+        ✓ should use config endpoint URLs for different API calls (1 ms)
+      Network Configuration
+        ✓ should respect config network timeout settings (1 ms)
+        ✓ should use config retry settings for network errors (4 ms)
+      Environment Switching
+        ✓ should use production URLs when environment is production
+        ✓ should use development URLs when environment is development
+        ✓ should use custom URL when set (1 ms)
+        ✓ should validate URL format when setting custom URL (12 ms)
+      Config Validation
+        ✓ should have valid config structure (1 ms)
+        ✓ should have valid endpoint URLs (1 ms)
+        ✓ should have valid referer URLs
+        ✓ should have valid network configuration values (1 ms)
+
+PASS src/database/__tests__/DatabaseLockManager.test.ts
+  DatabaseLockManager
+    Basic lock acquisition
+      ✓ should acquire lock when available (1 ms)
+      ✓ should release lock successfully
+      ✓ should check lock status correctly (1 ms)
+    Queue mechanism (FIFO)
+      ✓ should queue lock requests and process in FIFO order
+      ✓ should handle multiple simultaneous lock requests
+      ✓ should propagate lock to next waiter on release (1 ms)
+      ✓ should track queue length correctly (1 ms)
+    Timeout handling with fake timers
+      ✓ should auto-release lock after timeout
+      ✓ should log warning when lock is forcibly released (1 ms)
+      ✓ should clear timeout when lock is released normally (1 ms)
+    Concurrent operations
+      ✓ should prevent concurrent database operations
+      ✓ should handle rapid lock requests without race conditions (1 ms)
+    Error recovery
+      ✓ should allow new operations after failed operation
+      ✓ should handle multiple releases gracefully
+    Operation tracking
+      ✓ should track current operation name (1 ms)
+      ✓ should update current operation as queue processes (1 ms)
+    Logging
+      ✓ should log lock acquisition (1 ms)
+      ✓ should log lock release
+      ✓ should log when waiting for lock
+    Lock acquisition timeout (Step 5d)
+      ✓ should reject promise if lock not acquired within custom timeout (23 ms)
+      ✓ should use default 30-second timeout if not specified (1 ms)
+      ✓ should have separate acquisition timeout (30s) and hold timeout (15s)
+      ✓ should clear acquisition timeout if lock is granted before timeout (1 ms)
+      ✓ should remove timed-out operation from queue (1 ms)
+      ✓ should handle multiple queued operations with different timeouts (1 ms)
+      ✓ should log warning when acquisition timeout occurs (3 ms)
+    Graceful Shutdown
+      ✓ should prepare for shutdown successfully when lock is free
+      ✓ should wait for active operation to complete before shutdown (101 ms)
+      ✓ should timeout if operation takes too long during shutdown (1021 ms)
+      ✓ should prevent new lock acquisitions after shutdown initiated (7 ms)
+      ✓ should warn when forcing shutdown with lock held (509 ms)
+      ✓ should warn when shutting down with non-empty queue (508 ms)
+      ✓ should log when entering shutdown state (2 ms)
+      ✓ should handle shutdown when already in shutdown state (1 ms)
+      ✓ should poll lock status during shutdown (104 ms)
+      ✓ should use custom timeout when provided (204 ms)
+      ✓ should use default timeout (5 seconds) when not specified (102 ms)
+
+PASS src/database/__tests__/db-state-machine-integration.test.ts
+  Database State Machine Integration
+    setupDatabase with state machine
+      ✓ should transition from UNINITIALIZED to INITIALIZING to READY (1 ms)
+      ✓ should return immediately if already READY (1 ms)
+      ✓ should use state machine for initialization tracking
+      ✓ should transition to ERROR state on setup failure (15 ms)
+      ✓ should allow retry after ERROR state (1 ms)
+      ✓ should throw error message if setup is in ERROR state during wait (8 ms)
+    resetDatabaseState
+      ✓ should reset state machine to UNINITIALIZED (1 ms)
+      ✓ should allow setup after reset (1 ms)
+    No module-level flags
+      ✓ should not use databaseInitialized flag (should use state machine) (1 ms)
+    Event-based waiting (CI-6 fix)
+      ✓ should resolve waiter when setReady is called (102 ms)
+      ✓ should wait for concurrent initialization without polling (503 ms)
+      ✓ should resolve immediately if already ready (1 ms)
+      ✓ should timeout after 30 seconds if initialization never completes (156 ms)
+      ✓ should handle multiple concurrent waiters (301 ms)
+      ✓ should reject all waiters if initialization fails (53 ms)
+
+PASS components/beer/__tests__/BeerItem.test.tsx
+  BeerItem
+    ✓ renders collapsed state correctly (243 ms)
+    ✓ renders expanded state with description (8 ms)
+    ✓ calls onToggle with beer id when pressed (8 ms)
+    ✓ formats unix timestamp date correctly (7 ms)
+    ✓ formats MM/DD/YYYY date correctly for tasted beers (6 ms)
+    ✓ handles invalid dates gracefully (4 ms)
+    ✓ handles missing optional fields gracefully (5 ms)
+    ✓ renders custom actions when expanded and provided (6 ms)
+    ✓ handles empty date string (3 ms)
+    ✓ strips <p> and <br> tags from description (3 ms)
+    ✓ uses default date label when not provided (3 ms)
+    ✓ renders fallback for unnamed beer (2 ms)
+
+PASS src/database/repositories/__tests__/validation.integration.test.ts
+  Repository Validation Integration
+    BeerRepository - Malformed Database Data
+      ✓ should filter out beers with missing required fields from database (2 ms)
+      ✓ should throw error when database returns null (current implementation) (23 ms)
+      ✓ should throw error when database returns undefined (current implementation) (1 ms)
+      ✓ should throw error when database returns non-array (current implementation)
+      ✓ should accept numeric IDs and convert to string (schema allows union) (1 ms)
+      ✓ should filter out beers with null values in required fields
+      ✓ should convert numeric IDs to strings (1 ms)
+      ✓ should handle empty array from database
+      ✓ should handle getById with malformed data
+      ✓ should handle getById with null from database (1 ms)
+      ✓ should handle getById with wrong type values
+      ✓ should handle search with malformed results
+    MyBeersRepository - Malformed Database Data
+      ✓ should filter out tasted brews with missing required fields (1 ms)
+      ✓ should throw error when database returns null (current implementation) (10 ms)
+      ✓ should filter out brews with wrong type values
+      ✓ should handle getById with malformed data
+      ✓ should handle getCount with invalid data
+    RewardsRepository - Malformed Database Data
+      ✓ should filter out rewards with missing required fields (1 ms)
+      ✓ should return empty array when database returns null
+      ✓ should filter out rewards with wrong type values (1 ms)
+      ✓ should handle getById with malformed data (1 ms)
+      ✓ should handle getByType with malformed data
+      ✓ should handle getRedeemed with malformed data (1 ms)
+      ✓ should handle getUnredeemed with malformed data
+      ✓ should handle getCount with invalid data
+    Database Error Scenarios
+      ✓ should handle database query throwing error (4 ms)
+      ✓ should throw error on corrupted data (current implementation)
+      ✓ should handle database returning circular reference objects
+    Performance with Large Invalid Datasets
+      ✓ should efficiently filter 10,000 mixed valid/invalid beers (134 ms)
+      ✓ should efficiently handle 10,000 completely invalid beers (184 ms)
+
+PASS src/config/__tests__/validation.errors.test.ts
+  Config Validation Error Tests
+    Invalid URL Formats
+      Protocol Validation
+        ✓ should reject URL without protocol (39 ms)
+        ✓ should reject URL with FTP protocol (1 ms)
+        ✓ should reject URL with file:// protocol (1 ms)
+        ✓ should reject URL with custom protocol
+        ✓ should reject URL with javascript: protocol (1 ms)
+        ✓ should reject protocol-relative URLs
+      Empty and Minimal URLs
+        ✓ should reject empty URL string (1 ms)
+        ✓ should reject whitespace-only URL
+        ✓ should reject URL with only HTTP protocol (1 ms)
+        ✓ should reject URL with only HTTPS protocol (1 ms)
+        ✓ should reject URL with protocol and single slash
+        ✓ should reject URL with protocol but no domain (1 ms)
+      URLs with Spaces and Special Characters
+        ✓ should reject URL with space in domain (3 ms)
+        ✓ should reject URL with space in path (1 ms)
+        ✓ should reject URL with leading space (1 ms)
+        ✓ should reject URL with trailing space (1 ms)
+        ✓ should reject URL with tab character
+        ✓ should reject URL with newline character (1 ms)
+      Malformed URLs
+        ✓ should accept URL with double slashes in path (valid URL)
+        ✓ should accept localhost without dots (valid localhost) (1 ms)
+        ✓ should reject URL with only dots
+        ✓ should accept URL with # (fragment identifier) (1 ms)
+        ✓ should accept URL with @ for authentication
+    URL Edge Cases
+      Query Parameters
+        ✓ should accept URLs with query parameters (1 ms)
+        ✓ should accept URLs with multiple query parameters
+        ✓ should accept URLs with encoded query parameters (1 ms)
+      Ports
+        ✓ should accept URLs with standard HTTP port (1 ms)
+        ✓ should accept URLs with standard HTTPS port
+        ✓ should accept URLs with custom port (1 ms)
+        ✓ should accept URLs with high port number
+      localhost and IP addresses
+        ✓ should accept localhost with HTTP (1 ms)
+        ✓ should accept localhost with port (1 ms)
+        ✓ should accept IPv4 address
+        ✓ should accept IPv4 address with port (1 ms)
+        ✓ should accept 127.0.0.1 loopback (1 ms)
+        ✓ should accept 0.0.0.0 all interfaces
+      URL Normalization
+        ✓ should remove single trailing slash (1 ms)
+        ✓ should remove multiple trailing slashes
+        ✓ should remove trailing slash from path
+        ✓ should preserve path without trailing slash (1 ms)
+        ✓ should normalize mixed trailing slashes
+    Invalid Timeout Values
+      ✓ should reject negative timeout (8 ms)
+      ✓ should reject zero timeout (7 ms)
+      ✓ should reject timeout exactly at upper limit + 1 (8 ms)
+      ✓ should reject extremely large timeout (10 ms)
+      ✓ should accept timeout at lower boundary (1ms) (7 ms)
+      ✓ should accept timeout at upper boundary (60000ms) (8 ms)
+      ✓ should handle non-numeric timeout gracefully (fallback to default) (8 ms)
+      ✓ should handle empty string timeout gracefully (fallback to default) (7 ms)
+      ✓ should handle decimal timeout values (parses to integer) (12 ms)
+    Invalid Retry Counts
+      ✓ should reject negative retry count (8 ms)
+      ✓ should reject retry count exactly at upper limit + 1 (9 ms)
+      ✓ should reject extremely large retry count (8 ms)
+      ✓ should accept zero retries (no retry) (8 ms)
+      ✓ should accept retry count at upper boundary (5) (8 ms)
+      ✓ should handle non-numeric retries gracefully (fallback to default) (7 ms)
+      ✓ should handle decimal retry values (parses to integer) (7 ms)
+    Invalid Retry Delay Values
+      ✓ should reject negative retry delay (8 ms)
+      ✓ should reject zero retry delay (7 ms)
+      ✓ should reject retry delay exactly at upper limit + 1 (8 ms)
+      ✓ should reject extremely large retry delay (7 ms)
+      ✓ should accept retry delay at lower boundary (1ms) (9 ms)
+      ✓ should accept retry delay at upper boundary (10000ms) (7 ms)
+      ✓ should handle non-numeric retry delay gracefully (fallback to default) (8 ms)
+    Invalid Environments
+      ✓ should reject invalid environment name (1 ms)
+      ✓ should reject empty environment name (1 ms)
+      ✓ should reject null environment
+      ✓ should reject undefined environment (1 ms)
+      ✓ should reject uppercase environment name (case-sensitive)
+      ✓ should reject mixed-case environment name (1 ms)
+      ✓ should reject environment with extra whitespace
+      ✓ should reject common but invalid environment names (3 ms)
+    Error Message Quality
+      URL Error Messages
+        ✓ should include invalid URL value in error message
+        ✓ should suggest http:// or https:// for URL without protocol
+        ✓ should provide example URL in error message (1 ms)
+        ✓ should mention URL encoding for space errors
+        ✓ should provide context about what URL is for
+      Network Config Error Messages
+        ✓ should include invalid timeout value in error message (8 ms)
+        ✓ should include valid range in timeout error message (8 ms)
+        ✓ should mention environment variable name in network config errors (8 ms)
+        ✓ should include invalid retry count in error message (12 ms)
+        ✓ should include invalid retry delay in error message (9 ms)
+      Environment Error Messages
+        ✓ should include invalid environment name in error message
+        ✓ should list all valid environments in error message (1 ms)
+        ✓ should mention how to set environment correctly
+    Error Types
+      ✓ should throw InvalidUrlError for URL validation failures (1 ms)
+      ✓ should throw InvalidNetworkConfigError for timeout validation failures (13 ms)
+      ✓ should throw InvalidNetworkConfigError for retry validation failures (8 ms)
+      ✓ should throw InvalidEnvironmentError for environment validation failures (1 ms)
+      ✓ should have correct error name for InvalidUrlError (1 ms)
+      ✓ should have correct error name for InvalidNetworkConfigError (7 ms)
+      ✓ should have correct error name for InvalidEnvironmentError (1 ms)
+    Endpoint Validation Edge Cases
+      ✓ should handle undefined endpoint gracefully
+      ✓ should construct valid URLs for all defined endpoints (1 ms)
+      ✓ should handle query parameters with special characters (14 ms)
+      ✓ should handle empty query parameters object
+    Combined Error Scenarios
+      ✓ should reject multiple invalid configurations at once (7 ms)
+      ✓ should validate environment before applying custom URL (1 ms)
+      ✓ should clear custom URL when switching to invalid environment (1 ms)
+      ✓ should clear custom URL when switching to valid environment
+      ✓ should clear custom URL when switching environments multiple times (1 ms)
+    Boundary Value Testing
+      ✓ should accept timeout exactly at 1ms (minimum) (7 ms)
+      ✓ should accept timeout exactly at 60000ms (maximum) (8 ms)
+      ✓ should accept retries exactly at 0 (minimum) (7 ms)
+      ✓ should accept retries exactly at 5 (maximum) (7 ms)
+      ✓ should accept retry delay exactly at 1ms (minimum) (7 ms)
+      ✓ should accept retry delay exactly at 10000ms (maximum) (9 ms)
+    Error Class Hierarchy
+      ✓ InvalidUrlError should inherit from Error (1 ms)
+      ✓ InvalidNetworkConfigError should inherit from Error (9 ms)
+      ✓ InvalidEnvironmentError should inherit from Error (1 ms)
+      ✓ all custom errors should have Error.captureStackTrace behavior
+
+PASS components/beer/__tests__/BeerList.test.tsx
+  BeerList
+    ✓ renders empty message when no beers and not loading (25 ms)
+    ✓ uses default empty message when not provided (3 ms)
+    ✓ does not render empty message when loading (10 ms)
+    ✓ handles empty beers with custom empty message (2 ms)
+    ✓ shows appropriate empty message for visitor mode (3 ms)
+    ✓ handles null/undefined gracefully (2 ms)
+    ✓ accepts all required props without error (3 ms)
+    ✓ accepts optional props without error (2 ms)
+    ✓ renders component in loading state (2 ms)
+    ✓ handles refreshing state (2 ms)
+    ✓ applies correct empty state styling (2 ms)
+    ✓ provides callback functions without error (2 ms)
+    ✓ handles various empty message formats (3 ms)
+    ✓ accepts valid Beer objects (3 ms)
+    ✓ handles boolean props correctly (5 ms)
+
+PASS src/__tests__/utils/mockServer.test.ts
+  MockServer
+    server lifecycle
+      ✓ should start and stop the server (7 ms)
+      ✓ should start on a specific port
+      ✓ should handle port conflicts gracefully (26 ms)
+      ✓ should throw error if trying to start already running server (38 ms)
+      ✓ should handle multiple stop calls gracefully (1 ms)
+    response configuration
+      ✓ should set and serve static responses (9 ms)
+      ✓ should set multiple responses at once (3 ms)
+      ✓ should return default 404 for unmatched paths (2 ms)
+      ✓ should allow setting custom default response (2 ms)
+      ✓ should support custom headers (2 ms)
+      ✓ should support wildcard patterns (2 ms)
+      ✓ should clear specific responses (2 ms)
+      ✓ should clear all responses (1 ms)
+    request tracking
+      ✓ should track GET requests (3 ms)
+      ✓ should track POST requests with body (2 ms)
+      ✓ should track request headers (1 ms)
+      ✓ should filter requests by path (3 ms)
+      ✓ should get last request (2 ms)
+      ✓ should clear request history (1 ms)
+    delay simulation
+      ✓ should simulate response delay (103 ms)
+      ✓ should handle timeout responses for timeout testing (53 ms)
+    dynamic responses
+      ✓ should support dynamic response handlers (5 ms)
+      ✓ should support sequential responses helper (4 ms)
+      ✓ should support conditional responses helper (4 ms)
+    error scenarios
+      ✓ should handle malformed JSON in request body gracefully (1 ms)
+      ✓ should simulate network errors (2 ms)
+      ✓ should simulate network errors (2 ms)
+      ✓ should simulate network errors (1 ms)
+      ✓ should simulate network errors (1 ms)
+      ✓ should simulate network errors (1 ms)
+      ✓ should simulate network errors (1 ms)
+      ✓ should handle server errors during request processing (2 ms)
+    integration with config module
+      ✓ should work with config.setCustomApiUrl() (1 ms)
+      ✓ should handle referer headers from config (1 ms)
+      ✓ should handle query parameters with config URLs (2 ms)
+  MockServer helpers
+    networkErrorResponse
+      ✓ should create network error response
+    timeoutResponse
+      ✓ should create timeout response with default delay
+      ✓ should create timeout response with custom delay
+  setupMockServer helper
+    ✓ should start server and configure API URL (1 ms)
+    ✓ should start on specific port when provided
+    ✓ should restore environment on cleanup (1 ms)
+    ✓ should work with setResponse and fetch (4 ms)
+  FlyingSaucerResponses presets
+    beers()
+      ✓ should create proper Flying Saucer beers response (1 ms)
+      ✓ should handle empty beers array (1 ms)
+    myBeers()
+      ✓ should create proper tasted beers response (2 ms)
+    rewards()
+      ✓ should create proper rewards response (1 ms)
+    empty()
+      ✓ should create empty brewInStock response (2 ms)
+    error responses
+      ✓ should create 500 server error response (1 ms)
+      ✓ should create 401 not authenticated response (1 ms)
+      ✓ should create 404 not found response (1 ms)
+      ✓ should create 429 rate limited response (1 ms)
+  RequestMatcher
+    toHaveBeenCalled
+      ✓ should pass when endpoint was called (1 ms)
+      ✓ should fail when endpoint was not called (6 ms)
+    toHaveBeenCalledTimes
+      ✓ should pass when call count matches (3 ms)
+      ✓ should fail when call count does not match (1 ms)
+    toHaveBeenCalledWith
+      ✓ should match query parameters (2 ms)
+      ✓ should match request method (1 ms)
+      ✓ should match request body (1 ms)
+      ✓ should match request headers (1 ms)
+      ✓ should fail when parameters do not match (1 ms)
+    not.toHaveBeenCalled
+      ✓ should pass when endpoint was not called
+      ✓ should fail when endpoint was called (1 ms)
+
+PASS src/config/__tests__/envVarLoading.test.ts
+  Environment Variable Loading
+    URL Environment Variables
+      ✓ should load production URL from EXPO_PUBLIC_PROD_API_BASE_URL (11 ms)
+      ✓ should load development URL from EXPO_PUBLIC_DEV_API_BASE_URL (7 ms)
+      ✓ should load staging URL from EXPO_PUBLIC_STAGING_API_BASE_URL (8 ms)
+      ✓ should load default hardcoded URL when no env vars set (8 ms)
+    Network Configuration Variables
+      ✓ should load timeout from EXPO_PUBLIC_API_TIMEOUT (7 ms)
+      ✓ should load retries from EXPO_PUBLIC_API_RETRIES (8 ms)
+      ✓ should load retry delay from EXPO_PUBLIC_API_RETRY_DELAY (10 ms)
+      ✓ should handle invalid timeout gracefully (8 ms)
+      ✓ should handle invalid retries gracefully (7 ms)
+      ✓ should handle empty string for numeric values (6 ms)
+    Trailing Slash Removal
+      ✓ should remove trailing slash from production URL (8 ms)
+      ✓ should remove trailing slash from Untappd URL (6 ms)
+    Precedence Rules
+      ✓ should prioritize environment-specific URL over generic URL (7 ms)
+      ✓ should prioritize env-specific over generic EXPO_PUBLIC_API_BASE_URL (7 ms)
+      ✓ should fall back to hardcoded default when no env vars set (8 ms)
+      ○ skipped should use generic EXPO_PUBLIC_API_BASE_URL when env-specific not set
+    Default Values
+      ✓ should use default timeout when not set (8 ms)
+      ✓ should use default retries when not set (7 ms)
+      ✓ should use default retry delay when not set (7 ms)
+      ✓ should use default Untappd URL when not set (8 ms)
+      ✓ should use default production environment when not set (13 ms)
+    Untappd Configuration
+      ✓ should load Untappd URL from EXPO_PUBLIC_UNTAPPD_BASE_URL (9 ms)
+      ✓ should use Untappd URL for login URL construction (9 ms)
+      ✓ should use Untappd URL for search URL construction (9 ms)
+    Environment Switching
+      ✓ should use correct URL after switching environments (9 ms)
+      ✓ should maintain network config when switching environments (11 ms)
+    Edge Cases
+      ✓ should handle numeric strings with whitespace (12 ms)
+      ✓ should handle float values by parsing as int (12 ms)
+      ✓ should handle minimum valid timeout (8 ms)
+      ✓ should handle maximum valid timeout (8 ms)
+      ✓ should handle zero retries (11 ms)
+      ✓ should treat whitespace-only env var as empty (9 ms)
+      ✓ should handle localhost URLs for development (7 ms)
+      ✓ should handle IP address URLs (7 ms)
+    Type Conversion
+      ✓ should convert string env vars to numbers for timeout (10 ms)
+      ✓ should convert string env vars to numbers for retries (10 ms)
+      ✓ should convert string env vars to numbers for retry delay (7 ms)
+    Multiple Environment Variables
+      ✓ should load all environment-specific URLs when all set (7 ms)
+      ✓ should override all network settings from env vars (10 ms)
+
+PASS src/config/__tests__/envConfig.test.ts
+  Environment Variable Configuration
+    EXPO_PUBLIC_ Environment Variables
+      ✓ should load API base URL from EXPO_PUBLIC_API_BASE_URL (12 ms)
+      ✓ should load development base URL from EXPO_PUBLIC_DEV_API_BASE_URL (10 ms)
+      ✓ should load staging base URL from EXPO_PUBLIC_STAGING_API_BASE_URL (11 ms)
+      ✓ should load production base URL from EXPO_PUBLIC_PROD_API_BASE_URL (7 ms)
+      ✓ should load network timeout from EXPO_PUBLIC_API_TIMEOUT (7 ms)
+      ✓ should load retry count from EXPO_PUBLIC_API_RETRIES (7 ms)
+      ✓ should load retry delay from EXPO_PUBLIC_API_RETRY_DELAY (7 ms)
+      ✓ should load default environment from EXPO_PUBLIC_DEFAULT_ENV (8 ms)
+      ✓ should load Untappd base URL from EXPO_PUBLIC_UNTAPPD_BASE_URL (6 ms)
+    Fallback to Defaults
+      ✓ should use hardcoded default when env var not set (6 ms)
+      ✓ should use default timeout when EXPO_PUBLIC_API_TIMEOUT not set (7 ms)
+      ✓ should use default retries when EXPO_PUBLIC_API_RETRIES not set (7 ms)
+      ✓ should use default environment when EXPO_PUBLIC_DEFAULT_ENV not set (6 ms)
+    Environment Variable Validation
+      ✓ should validate URL format for EXPO_PUBLIC_API_BASE_URL (5 ms)
+      ✓ should validate numeric value for EXPO_PUBLIC_API_TIMEOUT (7 ms)
+      ✓ should validate environment name from EXPO_PUBLIC_DEFAULT_ENV (6 ms)
+      ✓ should remove trailing slash from env var URLs (6 ms)
+    Multiple Environment Variables
+      ✓ should load all environment-specific URLs when all env vars set (10 ms)
+      ✓ should override all network settings from env vars (6 ms)
+    Priority Order
+      ✓ should prioritize environment-specific URL over generic URL (7 ms)
+      ✓ should fall back to generic URL if environment-specific not set (6 ms)
+      ✓ should use hardcoded default if no env vars set (6 ms)
+    Runtime Environment Switching
+      ✓ should use correct URL after switching environments with env vars (7 ms)
+      ✓ should maintain custom API URL override despite env vars (6 ms)
+    Type Safety with Environment Variables
+      ✓ should convert string env vars to numbers for numeric config (6 ms)
+      ✓ should handle boolean-like env vars (7 ms)
+    Environment File Loading
+      ✓ should document which .env file patterns are supported (6 ms)
+
+PASS components/beer/__tests__/FilterBar.test.tsx
+  FilterBar
+    ✓ renders all filter buttons (54 ms)
+    ✓ calls onToggleFilter when Draft button pressed (4 ms)
+    ✓ calls onToggleFilter when Heavies button pressed (4 ms)
+    ✓ calls onToggleFilter when IPA button pressed (4 ms)
+    ✓ calls onToggleSort when sort button pressed (3 ms)
+    ✓ hides Heavies and IPA when showHeaviesAndIpa is false (2 ms)
+    ✓ shows correct sort label for name sorting (4 ms)
+    ✓ shows correct sort label for date sorting (4 ms)
+    ✓ displays Draft filter as active when enabled (4 ms)
+    ✓ displays Heavies filter as active when enabled (4 ms)
+    ✓ displays IPA filter as active when enabled (5 ms)
+    ✓ handles multiple active filters (5 ms)
+    ✓ renders calendar icon when sorting by date (3 ms)
+    ✓ renders textformat icon when sorting by name (3 ms)
+    ✓ shows Heavies and IPA by default when showHeaviesAndIpa prop omitted (5 ms)
+    ✓ filter buttons work independently (5 ms)
+
+PASS src/config/__tests__/configValidation.test.ts
+  Configuration Validation
+    URL Validation
+      Valid URLs
+        ✓ should accept valid HTTP URLs (5 ms)
+        ✓ should accept valid HTTPS URLs (1 ms)
+        ✓ should accept URLs with subdomains
+        ✓ should accept URLs with ports (1 ms)
+        ✓ should accept URLs with paths
+        ✓ should accept URLs with dashes and underscores
+        ✓ should accept localhost URLs for development
+        ✓ should accept IP address URLs (1 ms)
+      Invalid URLs
+        ✓ should reject URLs without protocol (29 ms)
+        ✓ should reject empty URLs (1 ms)
+        ✓ should reject URLs with only protocol
+        ✓ should reject URLs with invalid protocol (1 ms)
+        ✓ should reject URLs with spaces (1 ms)
+        ✓ should reject malformed URLs
+        ✓ should provide helpful error message for invalid URLs (1 ms)
+      URL Normalization
+        ✓ should remove trailing slash from URLs
+        ✓ should remove multiple trailing slashes (1 ms)
+        ✓ should preserve path without trailing slash
+    Network Configuration Validation
+      Timeout Validation
+        ✓ should accept valid timeout values (8 ms)
+        ✓ should reject negative timeout values (7 ms)
+        ✓ should reject zero timeout (9 ms)
+        ✓ should reject extremely large timeout (>60 seconds) (11 ms)
+        ✓ should provide helpful error message for invalid timeout (8 ms)
+      Retries Validation
+        ✓ should accept valid retry values (6 ms)
+        ✓ should accept zero retries (no retries) (7 ms)
+        ✓ should reject negative retry values (8 ms)
+        ✓ should reject excessive retry values (>5) (7 ms)
+        ✓ should provide helpful error message for invalid retries (6 ms)
+      Retry Delay Validation
+        ✓ should accept valid retry delay values (7 ms)
+        ✓ should reject negative retry delay (8 ms)
+        ✓ should reject zero retry delay (8 ms)
+        ✓ should reject excessive retry delay (>10 seconds) (8 ms)
+        ✓ should provide helpful error message for invalid retry delay (8 ms)
+    Environment Validation
+      ✓ should accept valid development environment
+      ✓ should accept valid staging environment
+      ✓ should accept valid production environment (1 ms)
+      ✓ should reject invalid environment name
+      ✓ should reject empty environment name (1 ms)
+      ✓ should be case-sensitive for environment names
+      ✓ should provide helpful error message for invalid environment (1 ms)
+    Missing Configuration
+      ✓ should handle missing API base URL gracefully (7 ms)
+      ✓ should handle missing network config gracefully (10 ms)
+    Error Classes
+      ✓ should use ConfigurationError as base error class (1 ms)
+      ✓ should use InvalidUrlError for URL validation failures
+      ✓ should use MissingConfigError for missing required config (1 ms)
+      ✓ should use InvalidNetworkConfigError for network config failures
+      ✓ should use InvalidEnvironmentError for environment validation failures (1 ms)
+      ✓ should include stack traces for debugging
+    Validation Integration
+      ✓ should validate configuration when setting custom URL (1 ms)
+      ✓ should validate configuration when switching environments
+      ✓ should validate network configuration when accessed (9 ms)
+    Helpful Error Messages
+      ✓ should include invalid value in error message (1 ms)
+      ✓ should suggest how to fix the error
+      ✓ should mention environment variable names when applicable (8 ms)
+      ✓ should list valid options for enum-like values
+    Validation Performance
+      ✓ should not significantly slow down config access (3 ms)
+      ✓ should cache validation results when possible (1 ms)
+    Test Utilities
+      ✓ should allow validation to be bypassed for testing
+
+PASS src/services/__tests__/dataUpdateService.integration.test.ts
+  dataUpdateService integration tests
+    fetchAndUpdateAllBeers
+      ✓ should process valid allbeers.json data correctly (46 ms)
+      ✓ should handle missing API URL (1 ms)
+      ✓ should handle failed fetch
+      ✓ should handle invalid data format (1 ms)
+      ✓ should handle fetch throwing an exception (18 ms)
+    fetchAndUpdateMyBeers
+      ✓ should process valid mybeers.json data correctly (2 ms)
+      ✓ should handle missing API URL
+      ✓ should handle failed fetch (1 ms)
+      ✓ should handle invalid data format (1 ms)
+      ✓ should handle empty tasted beers array (new user or round rollover) (2 ms)
+      ✓ should handle data with no valid beers (1 ms)
+      ✓ should handle fetch throwing an exception
+    Config Integration
+      Environment Switching
+        ✓ should use production URL when environment is production (1 ms)
+        ✓ should use custom URL when set
+      Network Configuration
+        ✓ should respect config timeout settings (1 ms)
+        ✓ should respect config retry settings
+      Multiple Concurrent Requests
+        ✓ should handle multiple all beers fetch requests
+        ✓ should handle multiple my beers fetch requests (1 ms)
+      URL Construction
+        ✓ should construct valid URLs from config base URL
+        ✓ should handle trailing slashes in base URL
+      Config Module Compatibility
+        ✓ should work with config.api.baseUrl value (1 ms)
+        ✓ should respect config network settings
+      Error Handling with Config
+        ✓ should handle timeout with config-aware error messages (1 ms)
+        ✓ should handle network errors with proper error types
+
+PASS src/config/__tests__/performance.test.ts
+  Config Module Performance Benchmarks
+    Config Access Speed Benchmarks
+      ✓ should access config.api.baseUrl in <1μs on average (7 ms)
+      ✓ should access config.environment in <1μs on average
+      ✓ should access config.api.endpoints in <1μs on average (5 ms)
+      ✓ should access config.api.referers in <1μs on average (1 ms)
+      ✓ should call config.getEnvironment() in <1μs on average (1 ms)
+    URL Construction Performance
+      ✓ should construct URL with getFullUrl() in <10μs on average (2 ms)
+      ✓ should construct URL with params in <20μs on average (28 ms)
+      ✓ should construct URL with multiple params in <20μs on average (22 ms)
+      ✓ should handle 100 sequential URL constructions in <10ms (1 ms)
+      ✓ should handle 1000 sequential URL constructions in <10ms (1 ms)
+    Environment Switching Performance
+      ✓ should switch environment in <10μs on average (2 ms)
+      ✓ should switch between all 3 environments efficiently
+      ✓ should maintain performance after environment switch (3 ms)
+      ✓ should not degrade performance with repeated switching (1 ms)
+    Network Configuration Performance
+      ✓ should access config.network.timeout in <5μs on average (4 ms)
+      ✓ should access config.network.retries in <5μs on average (4 ms)
+      ✓ should access config.network.retryDelay in <5μs on average (2 ms)
+      ✓ should access all network config properties efficiently (4 ms)
+    External Services Configuration Performance
+      ✓ should access config.external.untappd.baseUrl in <10μs on average (1 ms)
+      ✓ should access config.external.untappd.loginUrl in <10μs on average (2 ms)
+      ✓ should construct Untappd search URL in <20μs on average (3 ms)
+      ✓ should handle complex beer names efficiently (1 ms)
+    Custom API URL Performance
+      ✓ should set custom API URL in <10μs
+      ✓ should access baseUrl after custom URL set efficiently (2 ms)
+      ✓ should construct URLs with custom baseUrl efficiently (4 ms)
+    Memory and Stability Benchmarks
+      ✓ should not accumulate memory with repeated URL constructions (19 ms)
+      ✓ should not accumulate memory with repeated environment switches (2 ms)
+      ✓ should maintain performance with mixed operations (2 ms)
+    Performance Baselines Documentation
+      ✓ should document current performance characteristics (15 ms)
+    Edge Case Performance
+      ✓ should handle all endpoints efficiently in a loop (1 ms)
+      ✓ should handle alternating operations efficiently
+      ✓ should handle concurrent-like access patterns
+
+PASS src/api/__tests__/beerService.test.ts
+  beerService
+    checkInBeer
+      ✓ should attempt auto-login if session data is missing (9 ms)
+      ○ skipped should successfully check in a beer
+      ○ skipped should handle API errors gracefully
+    getBeerDetails
+      ✓ should handle empty beer ID (1 ms)
+      ○ skipped should return beer details for a valid ID
+    searchBeers
+      ✓ should handle empty search query
+      ○ skipped should search beers with a valid query
+
+PASS src/services/__tests__/dataUpdateService.test.ts
+  dataUpdateService
+    fetchAndUpdateAllBeers
+      ✓ should return failure result if API URL is not set (4 ms)
+      ✓ should return failure result if fetch fails (1 ms)
+      ✓ should return failure result if response is not an array
+      ✓ should return failure result if response does not contain brewInStock (1 ms)
+      ✓ should successfully update all beers (1 ms)
+      ✓ should handle errors during update (19 ms)
+      ✓ should handle fetch timeout with AbortError (1 ms)
+      ✓ should use configured URL from preferences
+      ✓ should filter out invalid beers without IDs (1 ms)
+    fetchAndUpdateMyBeers
+      ✓ should return failure result if API URL is not set (1 ms)
+      ✓ should return failure result if fetch fails
+      ✓ should return failure result if response is not an array
+      ✓ should return failure result if response does not contain tasted_brew_current_round (1 ms)
+      ✓ should return success with 0 items if no valid beers with IDs are found
+      ✓ should successfully update my beers
+      ✓ should handle errors during update (1 ms)
+      ✓ should skip update in visitor mode
+      ✓ should handle empty tasted beers array (1 ms)
+      ✓ should handle fetch timeout with AbortError
+      ✓ should use configured URL from preferences
+    Config Integration
+      Environment Configuration
+        ✓ should work with production config base URL (1 ms)
+        ✓ should work with custom API URL
+      Network Timeout Configuration
+        ✓ should use 15 second timeout for fetch requests
+        ✓ should handle timeout gracefully (1 ms)
+      URL Validation
+        ✓ should handle malformed URLs gracefully (4 ms)
+        ✓ should accept HTTPS URLs
+        ✓ should accept HTTP URLs (1 ms)
+      Config Module Compatibility
+        ✓ should work with config.api.baseUrl value (1 ms)
+        ✓ should respect config network settings for timeout handling
+      Error Handling with Config
+        ✓ should properly categorize network errors (1 ms)
+        ✓ should properly categorize server errors
+        ✓ should properly categorize validation errors
+        ✓ should properly categorize parse errors (1 ms)
+
+PASS src/api/__tests__/queueService.test.ts
+  queueService
+    getQueuedBeers
+      Success Cases
+        ✓ should successfully fetch and parse queued beers (1 ms)
+        ✓ should include all session cookies in request headers (3 ms)
+        ✓ should return empty array when no beers are queued
+        ✓ should log session information (sanitized) (1 ms)
+      Session Validation
+        ✓ should throw ApiError when session data is null (14 ms)
+        ✓ should throw ApiError when memberId is missing (1 ms)
+        ✓ should throw ApiError when storeId is missing
+        ✓ should throw ApiError when storeName is missing
+        ✓ should throw ApiError when sessionId is missing
+        ✓ should throw ApiError with 401 status code for expired session (1 ms)
+      Network Error Handling
+        ✓ should throw error when fetch fails with network error
+        ✓ should throw error when response is not ok (404) (1 ms)
+        ✓ should throw error when response is not ok (500)
+        ✓ should throw error when response is not ok (401 unauthorized) (1 ms)
+        ✓ should log error when network request fails
+      HTML Parsing Errors
+        ✓ should handle parser returning empty array (1 ms)
+        ✓ should propagate parser errors
+        ✓ should handle response.text() throwing error
+      Optional Session Fields
+        ✓ should handle missing optional fields gracefully (1 ms)
+    deleteQueuedBeer
+      Success Cases
+        ✓ should successfully delete a queued beer (7 ms)
+        ✓ should include all session cookies in delete request
+        ✓ should set correct referer header (1 ms)
+        ✓ should log deletion attempt
+        ✓ should handle different cid formats
+      Input Validation
+        ✓ should return false when cid is empty string (1 ms)
+        ✓ should return false when cid is undefined
+        ✓ should return false when cid is null
+      Session Validation
+        ✓ should return false when session data is null (caught and handled)
+        ✓ should return false when memberId is missing (caught and handled)
+        ✓ should return false when storeId is missing (caught and handled) (1 ms)
+        ✓ should return false when storeName is missing (caught and handled)
+        ✓ should return false when sessionId is missing (caught and handled) (1 ms)
+      Network Error Handling
+        ✓ should return false when response is not ok (404)
+        ✓ should return false when response is not ok (500)
+        ✓ should return false when fetch throws network error (1 ms)
+        ✓ should log errors when deletion fails
+      Edge Cases
+        ✓ should handle successful deletion with 204 status
+        ✓ should handle cid with special characters (URL encoded)
+        ✓ should handle very long cid values (1 ms)
+    Integration Between Functions
+      ✓ should handle typical workflow: get queues then delete one
+      ✓ should use the same session data for both operations
+
+PASS src/database/__tests__/schemaTypes.edgeCases.test.ts
+  AllBeersRow Schema - Edge Cases
+    Wrong Type Values
+      ✓ should reject id as boolean (1 ms)
+      ✓ should reject id as array
+      ✓ should reject id as object
+      ✓ should reject id as function
+      ✓ should reject brew_name as number
+      ✓ should reject brew_name as boolean
+      ✓ should reject brew_name as array (1 ms)
+      ✓ should reject brew_name as object
+    String Edge Cases
+      ✓ should accept brew_name with only whitespace (Zod .min(1) checks length, not trim)
+      ✓ should accept id as whitespace-only string (schema checks !== empty, not trim)
+      ✓ should accept very long string (10KB)
+      ✓ should accept empty optional string fields
+      ✓ should accept SQL-like strings in brew_name (not actual SQL injection)
+      ✓ should accept HTML/XSS-like strings in description (1 ms)
+    Unicode and Special Characters
+      ✓ should accept emojis in brew_name
+      ✓ should accept RTL (right-to-left) text
+      ✓ should accept Chinese/Japanese characters
+      ✓ should accept special punctuation and symbols
+      ✓ should accept zero-width characters (1 ms)
+    Number String Edge Cases
+      ✓ should accept numeric strings in review_count
+      ✓ should accept decimal strings in review_rating
+      ✓ should accept negative number strings
+      ✓ should accept non-numeric strings in numeric fields
+    Object and Array Edge Cases
+      ✓ should reject nested object in id (1 ms)
+      ✓ should reject array in brew_name
+      ✓ should strip extra properties (Zod default behavior) (1 ms)
+      ✓ should handle frozen objects
+      ✓ should handle sealed objects
+    Type Guard Edge Cases
+      ✓ should reject NaN values
+      ✓ should reject Infinity values (1 ms)
+      ✓ should reject objects with Symbol keys
+      ✓ should reject objects with getter properties
+  TastedBrewRow Schema - Edge Cases
+    Wrong Type Values
+      ✓ should reject id as number (1 ms)
+      ✓ should reject tasted_date as Date object
+      ✓ should reject roh_lap as number
+    String Edge Cases
+      ✓ should accept various date format strings (1 ms)
+      ✓ should accept empty id should be rejected
+      ✓ should accept review_ratings (plural) but not review_rating
+    Type Guard Edge Cases
+      ✓ should reject objects with only some required fields (1 ms)
+      ✓ should reject primitive values (4 ms)
+  RewardRow Schema - Edge Cases
+    Wrong Type Values
+      ✓ should reject reward_id as number (1 ms)
+      ✓ should reject redeemed as boolean
+    String Edge Cases
+      ✓ should accept "0" and "1" as redeemed values
+      ✓ should accept "true" and "false" strings as redeemed values
+      ✓ should reject empty reward_id
+    Type Guard Edge Cases
+      ✓ should accept valid minimal reward (1 ms)
+      ✓ should reject reward with missing reward_id
+  PreferenceRow Schema - Edge Cases
+    Wrong Type Values
+      ✓ should reject key as number
+      ✓ should reject value as object
+      ✓ should reject value as array
+    String Edge Cases
+      ✓ should reject empty key (1 ms)
+      ✓ should accept empty value (edge case: preference can be empty)
+      ✓ should accept JSON strings as values
+      ✓ should accept URLs as values
+    Type Guard Edge Cases
+      ✓ should require both key and value
+      ✓ should handle description as optional
+  UntappdCookieRow Schema - Edge Cases
+    Wrong Type Values
+      ✓ should reject key as number (1 ms)
+      ✓ should reject value as boolean
+    String Edge Cases
+      ✓ should accept very long cookie values (JWT tokens)
+      ✓ should accept base64 encoded values
+      ✓ should accept cookie values with special characters
+      ✓ should reject empty key
+      ✓ should accept empty value (expired/deleted cookie)
+    Type Guard Edge Cases
+      ✓ should handle missing description gracefully
+      ✓ should reject cookies with only key (1 ms)
+  Array Schema Validation - Edge Cases
+    Large Dataset Validation
+      ✓ should validate array of 10,000 beers efficiently (34 ms)
+      ✓ should stop validation on first error in array (3 ms)
+    Mixed Valid/Invalid Data
+      ✓ should identify all invalid items in small array (1 ms)
+    Empty and Null Arrays
+      ✓ should accept empty array
+      ✓ should reject null instead of array
+      ✓ should reject undefined instead of array
+  Conversion Function Edge Cases
+    allBeersRowToBeer
+      ✓ should convert numeric id to string
+      ✓ should preserve optional undefined fields (1 ms)
+    rewardRowToReward
+      ✓ should convert undefined redeemed to "0"
+      ✓ should convert undefined reward_type to empty string
+    preferenceRowToPreference
+      ✓ should convert undefined description to empty string
+
+PASS src/database/__tests__/db.initialization.test.ts
+  initializeBeerDatabase
+    Happy Path
+      ✓ should complete initialization successfully when API URLs configured and not visitor mode (7 ms)
+      ✓ should fetch and populate all beers synchronously
+    API Configuration
+      ✓ should exit early when API URLs not configured
+    Visitor Mode
+      ✓ should skip My Beers import when in visitor mode (1 ms)
+      ✓ should skip Rewards import when in visitor mode (1 ms)
+      ✓ should still fetch all beers in visitor mode (2 ms)
+    Error Handling
+      ✓ should handle setupDatabase errors and propagate them (15 ms)
+      ✓ should continue when My Beers background import fails (3 ms)
+      ✓ should continue when Rewards background import fails (5 ms)
+      ✓ should log error but continue when all beers fetch fails
+      ✓ should handle multiple simultaneous failures gracefully (5 ms)
+    Background Import Timing
+      ✓ should schedule My Beers import with 100ms delay (4 ms)
+      ✓ should schedule Rewards import with 200ms delay (6 ms)
+      ✓ should schedule My Beers before Rewards (staggered timing) (7 ms)
+      ✓ should execute all beers fetch before any background imports (5 ms)
+    Integration
+      ✓ should complete full initialization flow with all components (7 ms)
+
+PASS src/database/__tests__/schema.test.ts
+  Database Schema
+    setupDatabase
+      ✓ should create all required tables (1 ms)
+      ✓ should create allbeers table with correct columns (1 ms)
+      ✓ should create tasted_brew_current_round table with correct columns (2 ms)
+      ✓ should create rewards table with correct columns
+      ✓ should create preferences table with correct columns (1 ms)
+      ✓ should create untappd table with correct columns
+      ✓ should initialize default preferences if table is empty (1 ms)
+      ✓ should not reinitialize preferences if table already has data
+      ✓ should handle errors gracefully (20 ms)
+      ✓ should use a transaction for table creation (1 ms)
+      ✓ should log setup completion
+    initDatabase
+      ✓ should call getDatabase from connection module
+      ✓ should return the same database instance (1 ms)
+    Table Schema Verification
+      ✓ should have 5 tables total
+      ✓ should use TEXT type for all columns
+      ✓ should use PRIMARY KEY for id columns (1 ms)
+      ✓ should use IF NOT EXISTS for all tables (1 ms)
+
+PASS src/database/repositories/__tests__/RewardsRepository.test.ts
+  RewardsRepository
+    insertMany
+      ✓ should insert multiple rewards in batches (1 ms)
+      ✓ should handle empty array by returning early
+      ✓ should handle null rewards array
+      ✓ should process rewards in batches of 100 (1 ms)
+      ✓ should handle rewards with empty optional fields
+      ✓ should use placeholders for each reward
+      ✓ should throw error on database failure (15 ms)
+      ✓ should log success message after populating
+      ✓ should handle missing reward_id by using empty string (1 ms)
+      ✓ should clear table before inserting
+    getAll
+      ✓ should return all rewards ordered by reward_id (1 ms)
+      ✓ should return empty array when no rewards exist
+      ✓ should return empty array on database error
+      ✓ should handle database returning null
+    getById
+      ✓ should return reward when found (1 ms)
+      ✓ should return null when reward not found
+      ✓ should handle empty reward_id string
+      ✓ should throw error on database failure (1 ms)
+    getByType
+      ✓ should return rewards matching the type
+      ✓ should return empty array when no rewards match type (1 ms)
+      ✓ should handle empty type string
+      ✓ should throw error on database failure
+    getRedeemed
+      ✓ should return rewards that have been redeemed (1 ms)
+      ✓ should return empty array when no redeemed rewards exist
+      ✓ should throw error on database failure (5 ms)
+    getUnredeemed
+      ✓ should return rewards that have not been redeemed
+      ✓ should return empty array when all rewards are redeemed
+      ✓ should handle redeemed stored as "0" (alternative false)
+      ✓ should throw error on database failure (1 ms)
+    clear
+      ✓ should clear all rewards from the table
+      ✓ should log clearing message
+      ✓ should throw error on database failure (1 ms)
+    getCount
+      ✓ should return count of rewards
+      ✓ should return 0 when no rewards exist (1 ms)
+      ✓ should handle null count result
+      ✓ should throw error on database failure
+    error handling
+      ✓ should log error when populate fails (1 ms)
+      ✓ should use transaction for atomic operations
+
+PASS src/database/repositories/__tests__/MyBeersRepository.test.ts
+  MyBeersRepository
+    insertMany
+      ✓ should insert multiple tasted beers in batches (5 ms)
+      ✓ should handle empty array by clearing the table (1 ms)
+      ✓ should filter out beers without IDs
+      ✓ should clear table when all beers are invalid (1 ms)
+      ✓ should process beers in batches of 20 (1 ms)
+      ✓ should handle beers with optional fields missing
+      ✓ should throw error on database failure during insert (16 ms)
+      ✓ should log progress during import (1 ms)
+      ✓ should include all Beerfinder-specific fields in insert
+    getAll
+      ✓ should return all tasted beers ordered by id (1 ms)
+      ✓ should return empty array when no tasted beers exist
+      ✓ should throw error on database failure (1 ms)
+      ✓ should log retrieval of tasted beers (1 ms)
+      ✓ should log when no tasted beers found and check table structure
+    getById
+      ✓ should return tasted beer when found
+      ✓ should return null when beer not found (1 ms)
+      ✓ should handle empty ID string
+      ✓ should throw error on database failure (1 ms)
+    clear
+      ✓ should clear all tasted beers from the table
+      ✓ should log the number of rows removed (1 ms)
+      ✓ should handle clearing empty table
+      ✓ should throw error on database failure (1 ms)
+    getCount
+      ✓ should return count of tasted beers
+      ✓ should return 0 when no beers exist
+      ✓ should handle null count result (1 ms)
+      ✓ should throw error on database failure
+    error handling
+      ✓ should handle individual beer insert errors gracefully
+      ✓ should throw error on transaction failure (1 ms)
+    insertManyUnsafe
+      ✓ should insert beers without acquiring lock
+      ✓ should handle empty array by clearing table
+      ✓ should clear table when all beers invalid
+      ✓ should process beers in batches of 20
+      ✓ should skip beers without IDs during insert
+      ✓ should handle insert errors gracefully
+      ✓ should log final row count
+      ✓ should throw error on transaction failure (1 ms)
+
+PASS src/database/__tests__/dataValidation.security.test.ts
+  Security-Focused Data Validation
+    SQL Injection Patterns
+      ✓ should accept SQL injection attempt in brew_name (validation at schema level) (1 ms)
+      ✓ should accept UNION-based SQL injection pattern
+      ✓ should accept time-based SQL injection pattern
+      ✓ should accept stacked queries pattern
+      ✓ should accept boolean-based blind SQL injection
+      ✓ should accept error-based SQL injection
+    XSS (Cross-Site Scripting) Patterns
+      ✓ should accept script tag in description
+      ✓ should accept event handler XSS pattern
+      ✓ should accept javascript: protocol XSS
+      ✓ should accept data: protocol XSS
+      ✓ should accept SVG-based XSS
+      ✓ should accept encoded XSS pattern
+    Path Traversal Patterns
+      ✓ should accept path traversal in brew_name (1 ms)
+      ✓ should accept Windows path traversal
+      ✓ should accept URL-encoded path traversal
+      ✓ should accept double-encoded path traversal
+    Buffer Overflow Attempts
+      ✓ should accept extremely long string (100KB)
+      ✓ should accept string with 1 million characters (1 ms)
+      ✓ should accept string with many special characters
+      ✓ should accept string with many Unicode characters (1 ms)
+    Command Injection Patterns
+      ✓ should accept shell command in brew_name
+      ✓ should accept backtick command substitution
+      ✓ should accept $() command substitution
+      ✓ should accept pipe command (1 ms)
+      ✓ should accept redirect command
+    Prototype Pollution Attempts
+      ✓ should accept __proto__ in property name (handled at object level)
+      ✓ should accept constructor in property name (1 ms)
+      ✓ should accept prototype in property name
+      ✓ should not pollute Object.prototype when validating
+    Format String Attacks
+      ✓ should accept format string specifiers
+      ✓ should accept printf-style format strings
+    Null Byte Injection
+      ✓ should accept null byte in string (1 ms)
+      ✓ should accept multiple null bytes
+    LDAP Injection Patterns
+      ✓ should accept LDAP filter characters
+      ✓ should accept LDAP wildcards
+    XML/XXE Injection Patterns
+      ✓ should accept XML entities
+      ✓ should accept XML CDATA section
+    NoSQL Injection Patterns
+      ✓ should accept MongoDB query operators (1 ms)
+      ✓ should accept MongoDB $where operator
+    Batch Validation with Malicious Data
+      ✓ should filter out malicious beers only if they fail validation
+      ✓ should handle array of 1000 beers with SQL injection patterns (8 ms)
+      ✓ should handle array of beers with XSS patterns (1 ms)
+    Edge Case Combinations
+      ✓ should accept beer with multiple security patterns combined
+      ✓ should accept beer with security pattern and very long string
+      ✓ should accept beer with security pattern and Unicode (1 ms)
+    Performance with Malicious Data
+      ✓ should validate 10,000 beers with SQL injection patterns quickly (8 ms)
+      ✓ should not hang on deeply nested attack patterns
+
+PASS src/database/repositories/__tests__/BeerRepository.test.ts
+  BeerRepository
+    insertMany
+      ✓ should insert multiple beers in batches (1 ms)
+      ✓ should skip beers without IDs (4 ms)
+      ✓ should process beers in batches of 50 (1 ms)
+      ✓ should handle empty beer array
+      ✓ should handle beers with optional fields missing
+      ✓ should throw error on database failure (15 ms)
+      ✓ should log progress during import
+    getAll
+      ✓ should return all beers ordered by added_date DESC (1 ms)
+      ✓ should return empty array when no beers exist
+      ✓ should filter out beers with null or empty brew_name (1 ms)
+      ✓ should throw error on database failure
+    getById
+      ✓ should return beer when found
+      ✓ should return null when beer not found (1 ms)
+      ✓ should handle empty ID string
+      ✓ should throw error on database failure (1 ms)
+    search
+      ✓ should search beers by name, brewer, style, and description
+      ✓ should return all beers when query is empty (1 ms)
+      ✓ should trim whitespace from query
+      ✓ should handle special characters in search query
+      ✓ should search across all text fields (1 ms)
+      ✓ should throw error on database failure
+    getByStyle
+      ✓ should return beers matching the style (1 ms)
+      ✓ should return empty array when no beers match style
+      ✓ should handle empty style string
+      ✓ should throw error on database failure (1 ms)
+    getByBrewer
+      ✓ should return beers from the specified brewer
+      ✓ should return empty array when no beers match brewer
+      ✓ should handle empty brewer string (1 ms)
+      ✓ should throw error on database failure
+    getUntasted
+      ✓ should return beers not in tasted_brew_current_round table (1 ms)
+      ✓ should return empty array when all beers are tasted
+      ✓ should filter out beers with null or empty brew_name
+      ✓ should order results by added_date DESC
+      ✓ should throw error on database failure (1 ms)
+
+PASS src/config/__tests__/config.test.ts
+  Configuration Module
+    Environment Configuration
+      ✓ should have a default environment set (1 ms)
+      ✓ should be able to get current environment
+      ✓ should be able to switch environments
+    API Configuration
+      Base URL
+        ✓ should have a valid base URL for Flying Saucer API
+        ✓ should not have trailing slash in base URL
+        ✓ should use HTTPS for production (3 ms)
+      Endpoints
+        ✓ should have all required endpoint paths defined (1 ms)
+        ✓ should have endpoint paths starting with / (2 ms)
+        ✓ should be able to get full URL for an endpoint
+        ✓ should handle query parameters when building full URL (9 ms)
+      Referer URLs
+        ✓ should have referer URLs for API calls
+        ✓ should have valid referer URLs (1 ms)
+    Network Configuration
+      ✓ should have network timeout configured
+      ✓ should have retry configuration
+      ✓ should have sensible timeout value (between 5s and 30s)
+      ✓ should have sensible retry attempts (between 1 and 5)
+    External Services Configuration
+      Untappd
+        ✓ should have Untappd base URL configured (1 ms)
+        ✓ should have Untappd login URL
+        ✓ should have Untappd search URL template
+        ✓ should generate correct Untappd search URL with beer name
+    Environment-Specific Configuration
+      ✓ should have different base URLs for different environments
+      ✓ should allow custom API base URL override
+    Type Safety
+      ✓ should export TypeScript types
+      ✓ should have properly typed endpoint keys
+    Validation
+      ✓ should validate URLs are well-formed (1 ms)
+      ✓ should not allow invalid environment values (25 ms)
+    Documentation
+      ✓ should have JSDoc comments on public methods
+
+PASS src/database/__tests__/initializationState.test.ts
+  DatabaseInitializer
+    Initial state
+      ✓ should start in UNINITIALIZED state
+      ✓ should not be ready initially
+      ✓ should not be initializing initially (1 ms)
+      ✓ should not be in error state initially
+    State transitions
+      ✓ should transition from UNINITIALIZED to INITIALIZING
+      ✓ should transition from INITIALIZING to READY
+      ✓ should transition from UNINITIALIZED to ERROR (1 ms)
+      ✓ should transition from INITIALIZING to ERROR
+      ✓ should allow re-initialization from ERROR state
+      ✓ should transition from ERROR to READY on successful retry
+    Invalid state transitions
+      ✓ should not allow setting READY without INITIALIZING first (20 ms)
+      ✓ should not allow re-initializing when already READY (1 ms)
+      ✓ should not allow setting READY when in ERROR state
+      ✓ should not allow re-initializing when already INITIALIZING (1 ms)
+    Error messages
+      ✓ should store error message when transitioning to ERROR
+      ✓ should clear error message when successfully initializing
+      ✓ should return null for error message when not in ERROR state (1 ms)
+    State queries
+      ✓ should correctly report INITIALIZING state (1 ms)
+      ✓ should correctly report READY state
+      ✓ should correctly report ERROR state
+    State transitions logging
+      ✓ should log state transitions (1 ms)
+      ✓ should log errors when transitioning to ERROR state
+
+PASS src/types/__tests__/database-types.test.ts
+  Database Type Guards
+    isPreference
+      ✓ should return true for valid Preference objects
+      ✓ should return false for invalid Preference objects (1 ms)
+    isReward
+      ✓ should return true for valid Reward objects
+      ✓ should return false for invalid Reward objects
+    isUntappdCookie
+      ✓ should return true for valid UntappdCookie objects
+      ✓ should return false for invalid UntappdCookie objects (1 ms)
+
+PASS src/database/repositories/__tests__/type-inference.test.ts
+  Repository Type Inference
+    BeerRepository
+      ✓ should infer correct types without explicit annotations
+      ✓ should accept correct parameter types
+    MyBeersRepository
+      ✓ should infer correct types without explicit annotations
+      ✓ should accept correct parameter types (1 ms)
+    RewardsRepository
+      ✓ should infer correct types without explicit annotations
+      ✓ should accept correct parameter types
+    Cross-Repository Type Safety
+      ✓ should prevent mixing entity types between repositories
+      ✓ should prevent assigning results to wrong entity types
+    Const Assertions and Readonly
+      ✓ should handle const assertions correctly (1 ms)
+    Nullability Checks
+      ✓ should handle null returns correctly
+
+PASS src/utils/__tests__/errorLogger.test.ts
+  Error Logger
+    logError
+      ✓ should log error with basic context (14 ms)
+      ✓ should log error with full context including user state
+      ✓ should log error with string error message
+      ✓ should log error with network error details (5 ms)
+      ✓ should handle errors without message property (1 ms)
+      ✓ should include stack trace when available
+      ✓ should handle null or undefined context (1 ms)
+      ✓ should serialize complex additional data
+      ✓ should include timestamp in log (1 ms)
+    logWarning
+      ✓ should log warning with context
+      ✓ should handle warning without context
+      ✓ should include timestamp in warning
+    logInfo
+      ✓ should log info with context (1 ms)
+      ✓ should handle info without context
+      ✓ should include timestamp in info log
+    Context serialization
+      ✓ should handle circular references in additional data (10 ms)
+      ✓ should sanitize sensitive data in context (1 ms)
+      ✓ should handle undefined and null values in additional data (1 ms)
+    Real-world error scenarios
+      ✓ should log database operation failure
+      ✓ should log API authentication failure (2 ms)
+      ✓ should log data validation failure
+      ✓ should log network timeout (1 ms)
+
+PASS src/database/__tests__/transactions.test.ts
+  Database Transactions
+    withDatabaseTransaction
+      ✓ should execute operation within transaction successfully (1 ms)
+      ✓ should rollback transaction on operation failure (24 ms)
+      ✓ should pass database to operation callback
+      ✓ should handle multiple operations in single transaction (1 ms)
+      ✓ should rollback all operations if any operation fails
+      ✓ should return operation result on success
+      ✓ should handle operation returning undefined
+      ✓ should handle concurrent transaction attempts gracefully
+      ✓ should propagate error details from failed operation (1 ms)
+      ✓ should handle operation with complex return type (1 ms)
+    withBatchInsert
+      ✓ should insert all valid records and skip invalid ones (1 ms)
+      ✓ should handle all valid records (1 ms)
+      ✓ should handle all invalid records
+      ✓ should handle empty record array (1 ms)
+      ✓ should rollback if insert fails mid-batch
+      ✓ should handle validation with multiple error messages (1 ms)
+    withReplaceData
+      ✓ should delete all old data and insert new data (1 ms)
+      ✓ should delete with condition and insert new data
+      ✓ should handle empty new records array
+      ✓ should rollback if delete fails (1 ms)
+      ✓ should rollback if insert fails after delete (1 ms)
+      ✓ should handle large dataset replacement (1 ms)
+    Real-world transaction scenarios
+      ✓ should handle beer insertion with validation
+      ✓ should rollback beer insertion on constraint violation (1 ms)
+      ✓ should handle multi-table update transaction
+      ✓ should handle delete old and insert new data transaction (1 ms)
+      ✓ should ensure all-or-nothing behavior for data refresh
+
+PASS src/database/__tests__/preferences.test.ts
+  Preference Functions
+    getPreference
+      ✓ should return preference value when it exists (1 ms)
+      ✓ should return null when preference does not exist
+      ✓ should return null on database error (1 ms)
+      ✓ should handle empty string key
+      ✓ should handle special characters in key
+    setPreference
+      ✓ should insert new preference with description
+      ✓ should update existing preference value and preserve description (1 ms)
+      ✓ should set empty description when updating non-existent preference without description
+      ✓ should handle empty string value
+      ✓ should handle special characters in value
+      ✓ should throw error when database operation fails (13 ms)
+      ✓ should handle description update when providing new description
+      ✓ should handle undefined description parameter
+    getAllPreferences
+      ✓ should return all preferences ordered by key (1 ms)
+      ✓ should return empty array when no preferences exist
+      ✓ should return empty array on database error
+      ✓ should handle null return from database
+      ✓ should return preferences with empty descriptions (1 ms)
+      ✓ should preserve preference ordering by key
+    Integration scenarios
+      ✓ should handle set and get preference workflow
+      ✓ should handle multiple preference updates
+
+PASS src/__tests__/utils/mockServer.example.test.ts
+  MockServer Usability Examples
+    Example 1: useMockServer() Hook
+      ✓ should automatically setup and cleanup server
+      ✓ should work with FlyingSaucerResponses presets (5 ms)
+      ○ skipped should automatically clear history and responses between tests
+    Example 2: setupMockServer() Helper
+      ✓ should configure API URLs automatically (1 ms)
+      ✓ should work with config-based API calls (5 ms)
+    Example 3: FlyingSaucerResponses Presets
+      ✓ should use beers() preset (4 ms)
+      ✓ should use myBeers() preset (2 ms)
+      ✓ should use rewards() preset (1 ms)
+      ✓ should use empty() preset (1 ms)
+      ✓ should use error presets (5 ms)
+    Example 4: RequestMatcher Fluent API
+      ✓ should use toHaveBeenCalled() (58 ms)
+      ✓ should use toHaveBeenCalledTimes() (2 ms)
+      ✓ should use toHaveBeenCalledWith() for query params (1 ms)
+      ✓ should use toHaveBeenCalledWith() for method
+      ✓ should use toHaveBeenCalledWith() for body (7 ms)
+      ✓ should use toHaveBeenCalledWith() for headers (1 ms)
+      ✓ should use not.toHaveBeenCalled() (1 ms)
+    Example 5: Complete Example
+      ✓ should demonstrate complete workflow (1 ms)
+
+PASS src/database/__tests__/schemaTypes.test.ts
+  AllBeersRow type and schema
+    ✓ should validate valid AllBeersRow with all fields (1 ms)
+    ✓ should validate AllBeersRow with only required fields (id, brew_name)
+    ✓ should reject AllBeersRow missing id (1 ms)
+    ✓ should reject AllBeersRow missing brew_name
+    ✓ should reject AllBeersRow with null id
+    ✓ should reject AllBeersRow with empty string brew_name (1 ms)
+    ✓ should provide type guard for AllBeersRow
+  TastedBrewRow type and schema
+    ✓ should validate valid TastedBrewRow with all fields
+    ✓ should validate TastedBrewRow with only required fields (id, brew_name) (1 ms)
+    ✓ should reject TastedBrewRow missing id
+    ✓ should provide type guard for TastedBrewRow
+  RewardRow type and schema
+    ✓ should validate valid RewardRow with all fields
+    ✓ should validate RewardRow with only required field (reward_id)
+    ✓ should reject RewardRow missing reward_id (1 ms)
+    ✓ should provide type guard for RewardRow
+  PreferenceRow type and schema
+    ✓ should validate valid PreferenceRow with all fields (1 ms)
+    ✓ should validate PreferenceRow with only required fields (key, value)
+    ✓ should reject PreferenceRow missing key
+    ✓ should reject PreferenceRow missing value
+    ✓ should provide type guard for PreferenceRow
+  UntappdCookieRow type and schema
+    ✓ should validate valid UntappdCookieRow with all fields
+    ✓ should validate UntappdCookieRow with only required fields (key, value) (4 ms)
+    ✓ should reject UntappdCookieRow missing key
+    ✓ should provide type guard for UntappdCookieRow (1 ms)
+  Database row to domain model conversions
+    ✓ should convert AllBeersRow to Beer type
+    ✓ should convert TastedBrewRow to Beerfinder type
+    ✓ should convert RewardRow to Reward type
+    ✓ should convert PreferenceRow to Preference type
+  Query result validation
+    ✓ should validate array of AllBeersRow (1 ms)
+    ✓ should reject array with invalid AllBeersRow
+    ✓ should provide detailed error messages for validation failures
+
+PASS src/types/__tests__/typeGuards.edgeCases.test.ts
+  Beer Type Guards - Edge Cases
+    isBeer - Primitive Edge Cases
+      ✓ should reject string primitives (1 ms)
+      ✓ should reject number primitives
+      ✓ should reject boolean primitives
+      ✓ should reject null (1 ms)
+      ✓ should reject undefined
+      ✓ should reject arrays
+      ✓ should reject functions
+      ✓ should reject symbols
+    isBeer - Object Structure Edge Cases
+      ✓ should reject object with id as number
+      ✓ should reject object with id as boolean
+      ✓ should reject object with id as object (1 ms)
+      ✓ should reject object with id as array
+      ✓ should reject object with brew_name as number
+      ✓ should reject object with brew_name as boolean
+      ✓ should reject object with brew_name as array
+      ✓ should reject object with brew_name as object
+    isBeer - Special JavaScript Values
+      ✓ should reject object with NaN as id
+      ✓ should reject object with Infinity as id
+      ✓ should reject object with -Infinity as id
+      ✓ should accept object with empty string id (edge case)
+      ✓ should accept object with empty string brew_name (edge case)
+      ✓ should accept object with whitespace-only strings
+    isBeer - Property Access Edge Cases
+      ✓ should accept object with getters (1 ms)
+      ✓ should accept frozen object
+      ✓ should accept sealed object
+      ✓ should accept object with extra properties
+      ✓ should reject object with Symbol properties only (1 ms)
+      ✓ should accept object with non-enumerable properties
+    isBeer - Unicode and Special Characters
+      ✓ should accept object with emoji in brew_name
+      ✓ should accept object with RTL text
+      ✓ should accept object with Chinese characters
+      ✓ should accept object with zero-width characters
+  isBeerfinder - Edge Cases
+    Type Discrimination
+      ✓ should reject regular Beer without Beerfinder properties
+      ✓ should accept Beer with at least one Beerfinder property (1 ms)
+      ✓ should accept Beer with multiple Beerfinder properties
+      ✓ should reject if Beerfinder property is undefined explicitly
+      ✓ should accept if Beerfinder property is null
+      ✓ should accept if Beerfinder property is empty string
+      ✓ should accept object with roh_lap only (1 ms)
+      ✓ should accept object with chit_code only
+  isBeerDetails - Edge Cases
+    Type Discrimination
+      ✓ should reject regular Beer without BeerDetails properties
+      ✓ should accept Beer with at least one BeerDetails property
+      ✓ should accept Beer with multiple BeerDetails properties
+      ✓ should accept object with untappd_ratings_count as 0
+      ✓ should accept object with seasonal as false
+      ✓ should accept object with null BeerDetails property
+  isSessionData - Edge Cases
+    Required Fields Validation
+      ✓ should reject object missing memberId
+      ✓ should reject object missing storeId
+      ✓ should reject object missing storeName
+      ✓ should reject object missing sessionId
+      ✓ should accept object with all required fields plus optional fields
+      ✓ should reject object with required field as null
+      ✓ should reject object with required field as number (1 ms)
+  isApiResponse - Edge Cases
+    Required Fields Validation
+      ✓ should reject object missing success field
+      ✓ should reject object missing statusCode field
+      ✓ should reject object missing data field
+      ✓ should accept object with data as null
+      ✓ should accept object with data as empty object
+      ✓ should accept object with data as array
+      ✓ should reject object with success as string
+      ✓ should reject object with statusCode as string
+      ✓ should accept object with statusCode as 0 (1 ms)
+      ✓ should accept object with optional error field
+  isLoginResult - Edge Cases
+    Required Fields Validation
+      ✓ should reject object missing success field
+      ✓ should accept object with only success field
+      ✓ should accept object with success and all optional fields
+      ✓ should reject object with success as number
+      ✓ should reject object with success as string
+  isPreference - Edge Cases
+    Required Fields Validation
+      ✓ should reject object missing key
+      ✓ should reject object missing value
+      ✓ should reject object missing description
+      ✓ should accept object with all three fields (5 ms)
+      ✓ should accept object with empty strings
+      ✓ should reject object with key as number
+      ✓ should reject object with value as object (1 ms)
+  isReward - Edge Cases
+    Required Fields Validation
+      ✓ should reject object missing reward_id
+      ✓ should reject object missing redeemed
+      ✓ should reject object missing reward_type
+      ✓ should accept object with all three fields
+      ✓ should accept object with redeemed as "0"
+      ✓ should accept object with redeemed as "1"
+      ✓ should accept object with empty strings
+      ✓ should reject object with reward_id as number
+  isUntappdCookie - Edge Cases
+    Required Fields Validation
+      ✓ should reject object missing key (1 ms)
+      ✓ should reject object missing value
+      ✓ should reject object missing description
+      ✓ should accept object with all three fields
+      ✓ should accept object with very long value (JWT token)
+      ✓ should accept object with empty strings
+  isCheckInResponse - Edge Cases
+    Required Fields Validation
+      ✓ should accept object with only success field
+      ✓ should accept object with success false
+      ✓ should accept object with all optional fields
+      ✓ should reject object with success as string (1 ms)
+      ✓ should reject object with success as number
+      ✓ should reject object missing success
+
+PASS src/database/__tests__/dataValidation.test.ts
+  Database Data Validation
+    validateBeerForInsertion
+      ✓ should validate a complete valid beer object
+      ✓ should validate beer with minimal required fields
+      ✓ should reject beer missing id field
+      ✓ should reject beer missing brew_name field
+      ✓ should reject beer with null id
+      ✓ should reject beer with undefined id (1 ms)
+      ✓ should reject beer with empty brew_name
+      ✓ should reject beer with whitespace-only brew_name
+      ✓ should reject null beer object
+      ✓ should reject undefined beer object
+      ✓ should reject non-object beer (1 ms)
+      ✓ should accept beer with numeric string id
+      ✓ should accept beer with special characters in name
+      ✓ should accept beer with additional optional fields (1 ms)
+      ✓ should collect multiple validation errors
+    validateBeersForInsertion
+      ✓ should validate array of all valid beers (1 ms)
+      ✓ should separate valid and invalid beers
+      ✓ should provide detailed error information for invalid beers
+      ✓ should handle empty array (5 ms)
+      ✓ should handle array with all invalid beers
+      ✓ should preserve order of valid beers
+      ✓ should generate correct summary (1 ms)
+      ✓ should handle large dataset efficiently (3 ms)
+      ✓ should handle mixed valid/invalid in large dataset (1 ms)
+    ValidationSummary type
+      ✓ should have correct structure
+    Integration with real API data patterns
+      ✓ should validate Flying Saucer API response structure
+      ✓ should handle API returning beers with extra fields
+      ✓ should handle API returning beers with missing optional fields (1 ms)
+
+PASS src/database/repositories/__tests__/type-safety.test.ts
+  Repository Type Safety
+    BeerRepository Type Safety
+      ✓ getAll() should return Promise<Beer[]> (1 ms)
+      ✓ getById() should return Promise<Beer | null>
+      ✓ search() should return Promise<Beer[]>
+      ✓ insertMany() should only accept Beer[]
+    MyBeersRepository Type Safety
+      ✓ getAll() should return Promise<Beerfinder[]> (1 ms)
+      ✓ getById() should return Promise<Beerfinder | null>
+      ✓ getCount() should return Promise<number>
+      ✓ insertMany() should only accept Beerfinder[]
+    RewardsRepository Type Safety
+      ✓ getAll() should return Promise<Reward[]> (1 ms)
+      ✓ getById() should return Promise<Reward | null>
+      ✓ getByType() should return Promise<Reward[]>
+      ✓ getCount() should return Promise<number>
+      ✓ insertMany() should only accept Reward[] (3 ms)
+    Type Guard Integration
+      ✓ should use type guards to validate data at runtime (1 ms)
+    Compile-Time Type Safety
+      ✓ should enforce return types match repository entity types
+      ✓ should prevent assigning wrong entity types (1 ms)
+
+PASS src/database/__tests__/lifecycle.test.ts
+  Database Lifecycle Management
+    Database Opening
+      ✓ should open database successfully (1 ms)
+      ✓ should reuse existing database connection
+      ✓ should throw error if database open fails (18 ms)
+    WAL Mode Enablement
+      ✓ should enable WAL mode when opening database
+      ✓ should set PRAGMA synchronous to NORMAL
+      ✓ should verify WAL mode was enabled successfully
+      ✓ should warn if WAL mode enablement fails (1 ms)
+      ✓ should handle missing journal_mode in response
+      ✓ should not re-execute PRAGMA on connection reuse
+      ✓ should handle PRAGMA execution errors gracefully (1 ms)
+    Database Closing
+      ✓ should close database connection successfully
+      ✓ should nullify database reference after close
+      ✓ should handle close when database is not open (1 ms)
+      ✓ should handle close errors gracefully
+      ✓ should log close operation
+      ✓ should log successful close
+      ✓ should log errors during close (1 ms)
+    Connection Reuse After Close/Reopen Cycle
+      ✓ should open new connection after close
+      ✓ should re-enable WAL mode after reopen (1 ms)
+      ✓ should handle multiple close/open cycles (1 ms)
+    Forced Close Option
+      ✓ should support force close without waiting
+      ✓ should log warning when force closing
+    Database State Validation
+      ✓ should verify database is closed after closeDatabaseConnection (1 ms)
+      ✓ should handle rapid open/close sequences
+    Error Recovery
+      ✓ should recover from failed close by allowing reopen
+      ✓ should handle WAL mode failure on reopen
+    Database Lock Manager Integration (CI-HP6-1)
+      ✓ should allow lock acquisition after database reopens following shutdown (1 ms)
+      ✓ should reset shutdown state when getDatabase is called after close
+      ✓ should handle multiple background/foreground cycles without lock issues (4 ms)
+
+PASS hooks/__tests__/useBeerFilters.test.ts
+  useBeerFilters - Filter Logic
+    applyFilters
+      Draft Filter
+        ✓ should filter beers by draft container (2 ms)
+        ✓ should return all beers when draft filter is off (1 ms)
+      Heavies Filter
+        ✓ should filter beers by heavy styles (porter, stout, barleywine, quad, tripel)
+        ✓ should handle case-insensitive style matching for heavies
+      IPA Filter
+        ✓ should filter beers by IPA style
+      Combined Filters
+        ✓ should combine Draft and IPA filters
+        ✓ should combine Draft and Heavies filters
+        ✓ should apply both Heavies and IPA as AND if both are true (1 ms)
+      Search Text
+        ✓ should filter beers by search text in brew_name (1 ms)
+        ✓ should filter beers by search text in brewer
+        ✓ should filter beers by search text in brew_style (1 ms)
+        ✓ should filter beers by search text in brewer_loc
+        ✓ should be case-insensitive
+        ✓ should combine search with filters (4 ms)
+      Edge Cases
+        ✓ should handle empty beer list
+        ✓ should handle beers with null/undefined fields
+        ✓ should handle search with no results (1 ms)
+    applySorting
+      ✓ should sort by date descending (most recent first)
+      ✓ should sort by name alphabetically (7 ms)
+      ✓ should handle beers with null/empty names
+      ✓ should handle beers with null/empty dates
+      ✓ should handle empty list (1 ms)
+
+PASS src/api/__tests__/sessionManager.test.ts
+  sessionManager
+    saveSessionData
+      ✓ should save session data to secure storage (1 ms)
+      ✓ should throw error when saving session data fails (14 ms)
+    getSessionData
+      ✓ should return session data from secure storage
+      ✓ should return null when no session data exists
+      ✓ should return null when session data is invalid (1 ms)
+      ✓ should return null when there is an error getting session data
+    clearSessionData
+      ✓ should clear session data from secure storage
+      ✓ should throw error when clearing session data fails (1 ms)
+    hasSession
+      ✓ should return true when session data exists
+      ✓ should return false when no session data exists
+      ✓ should return false when there is an error checking session
+    parseCookies
+      ✓ should parse cookies from set-cookie header
+      ✓ should handle empty cookie header
+      ✓ should handle malformed cookie header (1 ms)
+    extractSessionDataFromResponse
+      ✓ should extract session data from response headers and cookies (3 ms)
+      ✓ should handle missing cookies (1 ms)
+      ✓ should handle malformed URI components
+
+PASS src/database/__tests__/locks.test.ts
+  DatabaseLockManager
+    module exports (HP-2 Step 6a)
+      ✓ should export DatabaseLockManager class from locks.ts
+      ✓ should export singleton databaseLockManager instance from locks.ts
+      ✓ should allow creating new instances of DatabaseLockManager (1 ms)
+    acquireLock
+      ✓ should successfully acquire lock when available
+      ✓ should log lock acquisition
+    releaseLock
+      ✓ should release the lock (1 ms)
+      ✓ should log lock release
+      ✓ should handle releasing lock when not held
+    concurrent operations
+      ✓ should handle rapid acquire/release cycles
+    error scenarios
+      ✓ should handle errors without leaving lock in bad state
+    isLocked
+      ✓ should return false when no lock is held
+      ✓ should return true when lock is held
+      ✓ should return false after lock is released
+    getQueueLength (HP-2 Step 6a edge cases)
+      ✓ should return 0 when queue is empty
+      ✓ should return correct queue length when operations are waiting
+    getCurrentOperation (HP-2 Step 6a edge cases)
+      ✓ should return null when no lock is held
+      ✓ should return current operation name
+      ✓ should return null after lock is released
+    concurrent access patterns (HP-2 Step 6a)
+      ✓ should handle 10 concurrent lock requests sequentially (1 ms)
+      ✓ should maintain correct state with rapid queue/dequeue
+    singleton instance (HP-2 Step 6a)
+      ✓ should use same singleton instance across imports
+      ✓ should maintain state in singleton instance (1 ms)
+    lock metrics (HP-2 Step 8)
+      ✓ should return correct metrics when no lock held
+      ✓ should return current operation in metrics
+      ✓ should return queue length in metrics (1 ms)
+      ✓ should track queue wait times
+      ✓ should limit wait time history to 10 entries (1 ms)
+      ✓ should return a copy of wait times array
+    debug logging (HP-2 Step 8)
+      ✓ should enable debug logging
+      ✓ should log detailed lock acquisition when debug enabled
+      ✓ should log wait time when debug enabled for queued operations (1 ms)
+    queue warning (HP-2 Step 8)
+      ✓ should warn when queue length exceeds threshold
+
+PASS src/types/__tests__/typeGuards.test.ts
+  Type Guards
+    Beer Type Guards
+      isBeer
+        ✓ should return true for valid Beer objects
+        ✓ should return false for invalid Beer objects (1 ms)
+      isBeerfinder
+        ✓ should return true for valid Beerfinder objects
+        ✓ should return false for objects that are not Beerfinder
+      isBeerDetails
+        ✓ should return true for valid BeerDetails objects
+        ✓ should return false for objects that are not BeerDetails
+    API Type Guards
+      isSessionData
+        ✓ should return true for valid SessionData objects
+        ✓ should return false for invalid SessionData objects (1 ms)
+      isApiResponse
+        ✓ should return true for valid ApiResponse objects
+        ✓ should return false for invalid ApiResponse objects
+      isLoginResult
+        ✓ should return true for valid LoginResult objects
+        ✓ should return false for invalid LoginResult objects
+    Database Type Guards
+      isPreference
+        ✓ should return true for valid Preference objects (1 ms)
+        ✓ should return false for invalid Preference objects (2 ms)
+      isReward
+        ✓ should return true for valid Reward objects (1 ms)
+        ✓ should return false for invalid Reward objects
+      isUntappdCookie
+        ✓ should return true for valid UntappdCookie objects
+        ✓ should return false for invalid UntappdCookie objects
+
+PASS src/api/__tests__/validators.test.ts
+  API Response Validators
+    validateBrewInStockResponse
+      ✓ should validate a valid brewInStock response structure
+      ✓ should reject response with missing brewInStock array (1 ms)
+      ✓ should reject response that is not an array
+      ✓ should reject response array with less than 2 elements
+      ✓ should reject response where brewInStock is not an array (1 ms)
+      ✓ should accept empty brewInStock array
+      ✓ should reject null or undefined response
+      ✓ should validate response with multiple beers (1 ms)
+      ✓ should handle response with nested brewInStock structure variations
+    validateBeer
+      ✓ should validate a complete beer object with all required fields (1 ms)
+      ✓ should reject beer object missing id field
+      ✓ should reject beer object missing brew_name field
+      ✓ should reject beer object with null id
+      ✓ should reject beer object with empty brew_name (1 ms)
+      ✓ should reject beer object with whitespace-only brew_name
+      ✓ should reject null or undefined beer object
+      ✓ should reject beer object that is not an object
+      ✓ should accept beer object with only required fields (1 ms)
+      ✓ should accept beer object with additional optional fields
+      ✓ should reject beer object with multiple missing fields
+      ✓ should validate beer object with numeric string id (1 ms)
+      ✓ should validate beer object with special characters in brew_name
+    validateBeerArray
+      ✓ should validate array of valid beers
+      ✓ should provide detailed errors for multiple invalid beers
+    ValidationResult type
+      ✓ should have correct structure for valid result
+      ✓ should have correct structure for invalid result (1 ms)
+
+PASS src/utils/__tests__/htmlParser.test.ts
+  htmlParser - parseQueuedBeersFromHtml
+    Valid HTML with Multiple Beers
+      ✓ should parse HTML with 3 beers correctly (1 ms)
+      ✓ should parse HTML with 5 beers correctly (1 ms)
+      ✓ should correctly extract all beer properties
+    Valid HTML with Single Beer
+      ✓ should parse HTML with exactly 1 beer
+    Valid HTML with Zero Beers (Empty Queue)
+      ✓ should return empty array for HTML with no beers
+      ✓ should return empty array for completely empty string
+      ✓ should return empty array for HTML with only whitespace (1 ms)
+    Malformed HTML
+      ✓ should handle HTML with missing closing tags gracefully
+      ✓ should handle HTML with extra tags between expected elements
+      ✓ should handle HTML with mismatched tags
+    Missing Required Fields
+      ✓ should handle HTML missing beer name (3 ms)
+      ✓ should handle HTML missing date
+      ✓ should only match beers with valid cid in properly structured HTML (1 ms)
+      ✓ should handle HTML with empty date div
+    Special Characters in Beer Names
+      ✓ should handle beer names with apostrophes (1 ms)
+      ✓ should handle beer names with ampersands
+      ✓ should handle beer names with quotes
+      ✓ should handle beer names with dashes and underscores (1 ms)
+      ✓ should handle beer names with numbers
+      ✓ should handle beer names with unicode characters
+    Fallback Regex Pattern
+      ✓ should use fallback regex when primary fails
+      ✓ should handle multiline beer names with fallback
+    Edge Cases
+      ✓ should handle very long beer names
+      ✓ should handle very large cid numbers (1 ms)
+      ✓ should handle different date formats
+      ✓ should handle HTML with mixed valid and invalid beers
+      ✓ should trim whitespace from beer names and dates
+    Type Validation
+      ✓ should return array of objects with correct structure (1 ms)
+      ✓ should return QueuedBeer type objects
+
+PASS src/api/__tests__/sessionValidator.test.ts
+  sessionValidator
+    validateSession
+      ✓ should return session data when valid
+      ✓ should return null when session data is null (1 ms)
+      ✓ should return null when session data fails type guard validation
+      ✓ should return null when session data is missing required fields
+      ✓ should return null when session data has empty required fields (1 ms)
+    getCurrentSession
+      ✓ should return validated session data
+      ✓ should return null when no session data exists
+      ✓ should return null when session data is invalid
+      ✓ should throw ApiError when getSessionData throws an error (9 ms)
+      ✓ should rethrow ApiError when getSessionData throws an ApiError (6 ms)
+
+PASS src/database/repositories/__tests__/OperationQueueRepository.test.ts
+  OperationQueueRepository
+    addOperation
+      ✓ should add operation to database (1 ms)
+      ✓ should serialize payload as JSON
+    getPendingOperations
+      ✓ should retrieve only pending operations (1 ms)
+      ✓ should return empty array if no pending operations
+      ✓ should parse JSON payload correctly
+    updateStatus
+      ✓ should update operation status
+      ✓ should update status with error message (1 ms)
+    incrementRetryCount
+      ✓ should increment retry count and update timestamp
+      ✓ should increment retry count with error message
+    deleteOperation
+      ✓ should delete operation by ID
+    clearAll
+      ✓ should delete all operations (1 ms)
+    getCountByStatus
+      ✓ should return count of operations with given status
+      ✓ should return 0 if no operations found
+      ✓ should return 0 on error
+    getTotalCount
+      ✓ should return total count of all operations
+      ✓ should return 0 if no operations
+    getOperationById
+      ✓ should retrieve single operation by ID
+      ✓ should return null if operation not found (1 ms)
+    deleteSuccessfulOperations
+      ✓ should delete all successful operations
+
+PASS src/types/__tests__/simple-types.test.ts
+  Type Guards
+    isBeer
+      ✓ should return true for valid Beer objects
+      ✓ should return false for invalid Beer objects (1 ms)
+    isBeerfinder
+      ✓ should return true for valid Beerfinder objects
+      ✓ should return false for objects that are not Beerfinder
+
+PASS app/__tests__/databaseLifecycle.test.tsx
+  Database Lifecycle in RootLayout
+    AppState Handler Logic
+      ✓ should call closeDatabaseConnection when app goes to background
+      ✓ should call getDatabase when app comes to foreground (1 ms)
+      ✓ should not close database on inactive state
+    Logging
+      ✓ should log when app backgrounds
+      ✓ should log when app foregrounds
+    Error Handling
+      ✓ should handle close errors when backgrounding (1 ms)
+      ✓ should handle reopen errors when foregrounding
+      ✓ should not throw errors on background failure
+      ✓ should not throw errors on foreground failure
+    State Transition Sequences
+      ✓ should handle background followed by foreground
+      ✓ should handle multiple background/foreground cycles (1 ms)
+      ✓ should handle rapid state changes
+      ✓ should recover from errors and continue handling state changes
+
+PASS src/api/__tests__/simple-api.test.ts
+  ApiError
+    ✓ should create an ApiError with correct properties (1 ms)
+    ✓ should mark 5xx errors as retryable
+    ✓ should mark 4xx errors as non-retryable (except 408 and 429) (1 ms)
+
+PASS src/api/__tests__/sessionService.test.ts
+  sessionService
+    refreshSession
+      ✓ should refresh session successfully
+      ✓ should return null when refresh fails
+      ✓ should handle API errors
+    getValidSession
+      ✓ should return valid session when session exists
+      ✓ should attempt refresh when session is invalid (1 ms)
+      ✓ should return null when session is invalid and refresh fails
+      ✓ should handle errors
+
+PASS src/types/__tests__/beer-types.test.ts
+  Beer Type Guards
+    isBeer
+      ✓ should return true for valid Beer objects
+      ✓ should return false for invalid Beer objects (1 ms)
+    isBeerfinder
+      ✓ should return true for valid Beerfinder objects
+      ✓ should return true for Beer objects with at least one Beerfinder property
+      ✓ should return false for regular Beer objects without Beerfinder properties
+      ✓ should return false for invalid objects (1 ms)
+    isBeerDetails
+      ✓ should return true for valid BeerDetails objects
+      ✓ should return true for Beer objects with at least one BeerDetails property
+      ✓ should return false for regular Beer objects without BeerDetails properties
+      ✓ should return false for invalid objects (1 ms)
+    isCheckInResponse
+      ✓ should return true for valid CheckInResponse objects
+      ✓ should return false for objects without success property (1 ms)
+      ✓ should return false for objects with wrong type for success property
+      ✓ should return false for invalid objects
+
+PASS src/api/__tests__/authService.test.ts
+  authService
+    autoLogin
+      ✓ should return success when auto-login is successful (1 ms)
+      ✓ should return failure when auto-login fails
+      ✓ should handle API errors (1 ms)
+      ✓ should handle unknown errors
+    login
+      ✓ should return success when login is successful
+      ✓ should return failure when login fails (1 ms)
+      ✓ should validate input parameters
+    logout
+      ✓ should return success when logout is successful
+      ✓ should handle API errors during logout
+    handleTapThatAppLogin
+      ✓ should parse cookies string and save session data
+      ✓ should handle cookies object (1 ms)
+      ✓ should return failure when required cookies are missing (1 ms)
+      ✓ should handle malformed cookie values gracefully
+

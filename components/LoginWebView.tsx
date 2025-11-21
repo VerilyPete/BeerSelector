@@ -398,9 +398,8 @@ export default function LoginWebView({
       onRequestClose={handleClose}
       accessibilityLabel="Flying Saucer login modal"
       accessibilityViewIsModal={true}
-      testID="login-webview-modal"
     >
-      <SafeAreaView style={{ flex: 1 }}>
+      <SafeAreaView style={{ flex: 1 }} testID="login-webview-modal">
         <View style={[styles.webViewHeader, { backgroundColor: cardBackgroundColor, borderBottomColor: borderColor }]}>
           <TouchableOpacity
             onPress={handleClose}
