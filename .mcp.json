@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "maestro": {
+      "command": "/opt/maestro/bin/maestro",
+      "args": ["mcp"],
+      "env": {
+        "JAVA_HOME": "/usr/lib/jvm/default-jvm"
+      }
+    }
+  }
+}

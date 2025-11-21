@@ -1,0 +1,14 @@
+hooks/__tests__/
+components/settings/__tests__/
+components/beer/__tests__/
+components/__tests__/
+__tests__/performance/
+src/__tests__/utils/
+src/api/__tests__/
+src/database/repositories/__tests__/
+src/services/__tests__/
+src/database/__tests__/
+src/config/__tests__/
+src/types/__tests__/
+src/utils/__tests__/
+app/__tests__/
