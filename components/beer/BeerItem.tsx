@@ -3,6 +3,8 @@ import { StyleSheet, View, TouchableOpacity } from 'react-native';
 import { ThemedText } from '../ThemedText';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { Beer, Beerfinder } from '@/src/types/beer';
+import { getGlassType } from '@/src/utils/beerGlassType';
+import { GlassIcon } from '../icons/GlassIcon';
 
 // Union type to accept both Beer and Beerfinder
 type DisplayableBeer = Beer | Beerfinder;
@@ -25,7 +27,7 @@ const formatDate = (timestamp: string): string => {
     return date.toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
-      day: 'numeric'
+      day: 'numeric',
     });
   } catch (err) {
     console.error('Error formatting date:', err);
@@ -47,7 +49,7 @@ const formatDateString = (dateStr: string): string => {
       return date.toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'short',
-        day: 'numeric'
+        day: 'numeric',
       });
     }
     return dateStr;
@@ -62,17 +64,22 @@ const BeerItemComponent: React.FC<BeerItemProps> = ({
   isExpanded,
   onToggle,
   dateLabel = 'Date Added',
-  renderActions
+  renderActions,
 }) => {
   // Theme colors
   const cardColor = useThemeColor({}, 'background');
   const borderColor = useThemeColor({ light: '#e0e0e0', dark: '#333' }, 'text');
+  const textColor = useThemeColor({}, 'text');
 
   // Format date for display
   // Check if beer has tasted_date (Beerfinder type) or added_date (Beer type)
-  const displayDate = 'tasted_date' in beer && beer.tasted_date
-    ? formatDateString(beer.tasted_date)
-    : formatDate(beer.added_date || '');
+  const displayDate =
+    'tasted_date' in beer && beer.tasted_date
+      ? formatDateString(beer.tasted_date)
+      : formatDate(beer.added_date || '');
+
+  // Determine glass type based on container and ABV
+  const glassType = getGlassType(beer.brew_container, beer.brew_description);
 
   return (
     <TouchableOpacity
@@ -80,29 +87,41 @@ const BeerItemComponent: React.FC<BeerItemProps> = ({
       activeOpacity={0.8}
       testID={`beer-item-${beer.id}`}
     >
-      <View style={[
-        styles.beerItem,
-        {
-          backgroundColor: cardColor,
-          borderColor: borderColor
-        },
-        isExpanded && styles.expandedItem
-      ]}>
+      <View
+        style={[
+          styles.beerItem,
+          {
+            backgroundColor: cardColor,
+            borderColor: borderColor,
+          },
+          isExpanded && styles.expandedItem,
+        ]}
+      >
         <ThemedText type="defaultSemiBold" style={styles.beerName} testID={`beer-name-${beer.id}`}>
           {beer.brew_name || 'Unnamed Beer'}
         </ThemedText>
         <ThemedText testID={`beer-brewer-${beer.id}`}>
           {beer.brewer} {beer.brewer_loc ? `• ${beer.brewer_loc}` : ''}
         </ThemedText>
-        <ThemedText testID={`beer-style-${beer.id}`}>
-          {beer.brew_style} {beer.brew_container ? `• ${beer.brew_container}` : ''}
-        </ThemedText>
+        <View style={styles.styleContainerRow} testID={`beer-style-${beer.id}`}>
+          <ThemedText>
+            {beer.brew_style} {beer.brew_container ? `• ${beer.brew_container}` : ''}
+          </ThemedText>
+          {glassType && (
+            <View style={styles.glassIcon}>
+              <GlassIcon type={glassType} size={32} color={textColor} />
+            </View>
+          )}
+        </View>
         <ThemedText style={styles.dateAdded} testID={`beer-date-${beer.id}`}>
           {dateLabel}: {displayDate}
         </ThemedText>
 
         {isExpanded && beer.brew_description && (
-          <View style={[styles.descriptionContainer, { borderTopColor: borderColor }]} testID={`beer-description-container-${beer.id}`}>
+          <View
+            style={[styles.descriptionContainer, { borderTopColor: borderColor }]}
+            testID={`beer-description-container-${beer.id}`}
+          >
             <ThemedText type="defaultSemiBold" style={styles.descriptionTitle}>
               Description:
             </ThemedText>
@@ -133,6 +152,14 @@ const styles = StyleSheet.create({
   },
   beerName: {
     marginBottom: 4,
+  },
+  styleContainerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  glassIcon: {
+    marginLeft: 4,
   },
   descriptionContainer: {
     marginTop: 12,
