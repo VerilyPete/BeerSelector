@@ -232,9 +232,12 @@ export const setupTables = async (database: SQLiteDatabase): Promise<void> => {
 async function runMigrations(database: SQLiteDatabase, fromVersion: number): Promise<void> {
   console.log(`Running migrations from version ${fromVersion} to ${CURRENT_SCHEMA_VERSION}...`);
 
-  // Note: Import is dynamic to avoid circular dependencies during initialization
-  // The migration will be called from app/_layout.tsx with progress UI
-  // This function is kept minimal for cases where migration is called from setupTables
+  // Run migration to v3 (add glass_type column)
+  if (fromVersion < 3) {
+    const { migrateToVersion3 } = await import('./migrations/migrateToV3');
+    await migrateToVersion3(database);
+    console.log('Migration to version 3 complete');
+  }
 
   // Future migrations go here
   // if (fromVersion < 4) { await migrateToVersion4(database); }
