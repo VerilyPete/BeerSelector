@@ -151,7 +151,8 @@ export const initializeBeerDatabase = async (): Promise<void> => {
       setTimeout(async () => {
         try {
           const myBeers = await fetchMyBeersFromAPI();
-          await myBeersRepository.insertMany(myBeers);
+          const myBeersWithGlassTypes = calculateGlassTypes(myBeers);
+          await myBeersRepository.insertMany(myBeersWithGlassTypes);
         } catch (error) {
           console.error('Error in scheduled My Beers import:', error);
         }

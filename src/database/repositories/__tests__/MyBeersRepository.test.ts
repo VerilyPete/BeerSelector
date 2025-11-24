@@ -4,7 +4,7 @@
  */
 
 import { MyBeersRepository } from '../MyBeersRepository';
-import { Beerfinder } from '../../../types/beer';
+import { BeerfinderWithGlassType } from '../../../types/beer';
 import * as connection from '../../connection';
 
 // Mock the database connection module
@@ -34,14 +34,15 @@ describe('MyBeersRepository', () => {
 
   describe('insertMany', () => {
     it('should insert multiple tasted beers in batches', async () => {
-      const beers: Beerfinder[] = [
+      const beers: BeerfinderWithGlassType[] = [
         {
           id: '1',
           brew_name: 'Tasted IPA',
           brewer: 'Test Brewery',
           roh_lap: '1',
           tasted_date: '2024-01-01',
-          chit_code: 'CHT123'
+          chit_code: 'CHT123',
+          glass_type: 'pint'
         },
         {
           id: '2',
@@ -49,7 +50,8 @@ describe('MyBeersRepository', () => {
           brewer: 'Another Brewery',
           roh_lap: '2',
           tasted_date: '2024-01-02',
-          chit_code: 'CHT456'
+          chit_code: 'CHT456',
+          glass_type: 'tulip'
         }
       ];
 
@@ -94,24 +96,27 @@ describe('MyBeersRepository', () => {
     });
 
     it('should filter out beers without IDs', async () => {
-      const beers: Beerfinder[] = [
+      const beers: BeerfinderWithGlassType[] = [
         {
           id: '1',
           brew_name: 'Valid Beer',
           brewer: 'Test Brewery',
-          roh_lap: '1'
+          roh_lap: '1',
+          glass_type: 'pint'
         },
         {
           id: '',
           brew_name: 'Invalid Beer - No ID',
           brewer: 'Test Brewery',
-          roh_lap: '2'
-        } as Beerfinder,
+          roh_lap: '2',
+          glass_type: 'pint'
+        } as BeerfinderWithGlassType,
         {
           id: '2',
           brew_name: 'Another Valid Beer',
           brewer: 'Test Brewery',
-          roh_lap: '3'
+          roh_lap: '3',
+          glass_type: 'tulip'
         }
       ];
 
@@ -131,17 +136,19 @@ describe('MyBeersRepository', () => {
 
     it('should clear table when all beers are invalid', async () => {
       const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
-      const beers: Beerfinder[] = [
+      const beers: BeerfinderWithGlassType[] = [
         {
           id: '',
           brew_name: 'Invalid Beer 1',
-          brewer: 'Test Brewery'
-        } as Beerfinder,
+          brewer: 'Test Brewery',
+          glass_type: 'pint'
+        } as BeerfinderWithGlassType,
         {
           id: '',
           brew_name: 'Invalid Beer 2',
-          brewer: 'Test Brewery'
-        } as Beerfinder
+          brewer: 'Test Brewery',
+          glass_type: 'pint'
+        } as BeerfinderWithGlassType
       ];
 
       mockDatabase.getFirstAsync.mockResolvedValue({ count: 0 });
@@ -166,11 +173,12 @@ describe('MyBeersRepository', () => {
     });
 
     it('should process beers in batches of 20', async () => {
-      const beers: Beerfinder[] = Array.from({ length: 50 }, (_, i) => ({
+      const beers: BeerfinderWithGlassType[] = Array.from({ length: 50 }, (_, i) => ({
         id: `beer-${i}`,
         brew_name: `Beer ${i}`,
         brewer: 'Test Brewery',
-        roh_lap: `${i}`
+        roh_lap: `${i}`,
+        glass_type: i % 2 === 0 ? 'pint' as const : 'tulip' as const
       }));
 
       mockDatabase.getFirstAsync.mockResolvedValue({ count: 0 });
@@ -188,10 +196,11 @@ describe('MyBeersRepository', () => {
     });
 
     it('should handle beers with optional fields missing', async () => {
-      const beers: Beerfinder[] = [
+      const beers: BeerfinderWithGlassType[] = [
         {
           id: '1',
-          brew_name: 'Minimal Tasted Beer'
+          brew_name: 'Minimal Tasted Beer',
+          glass_type: 'pint'
           // All optional Beerfinder fields missing
         }
       ];
@@ -208,8 +217,8 @@ describe('MyBeersRepository', () => {
     });
 
     it('should throw error on database failure during insert', async () => {
-      const beers: Beerfinder[] = [
-        { id: '1', brew_name: 'Test Beer', brewer: 'Test Brewery' }
+      const beers: BeerfinderWithGlassType[] = [
+        { id: '1', brew_name: 'Test Beer', brewer: 'Test Brewery', glass_type: 'pint' }
       ];
 
       mockDatabase.runAsync.mockRejectedValueOnce(new Error('Database error'));
@@ -219,11 +228,12 @@ describe('MyBeersRepository', () => {
 
     it('should log progress during import', async () => {
       const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
-      const beers: Beerfinder[] = Array.from({ length: 10 }, (_, i) => ({
+      const beers: BeerfinderWithGlassType[] = Array.from({ length: 10 }, (_, i) => ({
         id: `beer-${i}`,
         brew_name: `Beer ${i}`,
         brewer: 'Test Brewery',
-        roh_lap: `${i}`
+        roh_lap: `${i}`,
+        glass_type: 'pint' as const
       }));
 
       mockDatabase.getFirstAsync.mockResolvedValue({ count: 0 });
@@ -241,7 +251,7 @@ describe('MyBeersRepository', () => {
     });
 
     it('should include all Beerfinder-specific fields in insert', async () => {
-      const beers: Beerfinder[] = [
+      const beers: BeerfinderWithGlassType[] = [
         {
           id: '1',
           brew_name: 'Complete Beer',
@@ -249,7 +259,8 @@ describe('MyBeersRepository', () => {
           roh_lap: '5',
           tasted_date: '2024-01-15',
           review_ratings: '4.5',
-          chit_code: 'CHT789'
+          chit_code: 'CHT789',
+          glass_type: 'tulip'
         }
       ];
 
@@ -271,20 +282,22 @@ describe('MyBeersRepository', () => {
 
   describe('getAll', () => {
     it('should return all tasted beers ordered by id', async () => {
-      const mockBeers: Beerfinder[] = [
+      const mockBeers: BeerfinderWithGlassType[] = [
         {
           id: '1',
           brew_name: 'Tasted Beer 1',
           brewer: 'Brewery 1',
           roh_lap: '1',
-          tasted_date: '2024-01-01'
+          tasted_date: '2024-01-01',
+          glass_type: 'pint'
         },
         {
           id: '2',
           brew_name: 'Tasted Beer 2',
           brewer: 'Brewery 2',
           roh_lap: '2',
-          tasted_date: '2024-01-02'
+          tasted_date: '2024-01-02',
+          glass_type: 'tulip'
         }
       ];
 
@@ -355,12 +368,13 @@ describe('MyBeersRepository', () => {
 
   describe('getById', () => {
     it('should return tasted beer when found', async () => {
-      const mockBeer: Beerfinder = {
+      const mockBeer: BeerfinderWithGlassType = {
         id: '123',
         brew_name: 'Tasted IPA',
         brewer: 'Test Brewery',
         roh_lap: '5',
-        tasted_date: '2024-01-15'
+        tasted_date: '2024-01-15',
+        glass_type: 'pint'
       };
 
       mockDatabase.getFirstAsync.mockResolvedValue(mockBeer);
@@ -483,9 +497,9 @@ describe('MyBeersRepository', () => {
   describe('error handling', () => {
     it('should handle individual beer insert errors gracefully', async () => {
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
-      const beers: Beerfinder[] = [
-        { id: '1', brew_name: 'Beer 1', brewer: 'Brewery 1' },
-        { id: '2', brew_name: 'Beer 2', brewer: 'Brewery 2' }
+      const beers: BeerfinderWithGlassType[] = [
+        { id: '1', brew_name: 'Beer 1', brewer: 'Brewery 1', glass_type: 'pint' },
+        { id: '2', brew_name: 'Beer 2', brewer: 'Brewery 2', glass_type: 'tulip' }
       ];
 
       mockDatabase.getFirstAsync.mockResolvedValue({ count: 0 });
@@ -508,8 +522,8 @@ describe('MyBeersRepository', () => {
     });
 
     it('should throw error on transaction failure', async () => {
-      const beers: Beerfinder[] = [
-        { id: '1', brew_name: 'Test Beer', brewer: 'Test Brewery' }
+      const beers: BeerfinderWithGlassType[] = [
+        { id: '1', brew_name: 'Test Beer', brewer: 'Test Brewery', glass_type: 'pint' }
       ];
 
       mockDatabase.withTransactionAsync.mockRejectedValueOnce(
@@ -522,9 +536,9 @@ describe('MyBeersRepository', () => {
 
   describe('insertManyUnsafe', () => {
     it('should insert beers without acquiring lock', async () => {
-      const beers: Beerfinder[] = [
-        { id: '1', brew_name: 'Test Beer 1', brewer: 'Test Brewery', roh_lap: '1' },
-        { id: '2', brew_name: 'Test Beer 2', brewer: 'Test Brewery', roh_lap: '2' }
+      const beers: BeerfinderWithGlassType[] = [
+        { id: '1', brew_name: 'Test Beer 1', brewer: 'Test Brewery', roh_lap: '1', glass_type: 'pint' },
+        { id: '2', brew_name: 'Test Beer 2', brewer: 'Test Brewery', roh_lap: '2', glass_type: 'tulip' }
       ];
 
       mockDatabase.getFirstAsync.mockResolvedValue({ count: 0 });
@@ -553,8 +567,8 @@ describe('MyBeersRepository', () => {
 
     it('should clear table when all beers invalid', async () => {
       const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
-      const beers: Beerfinder[] = [
-        { id: '', brew_name: 'Invalid Beer', brewer: 'Test' } as Beerfinder
+      const beers: BeerfinderWithGlassType[] = [
+        { id: '', brew_name: 'Invalid Beer', brewer: 'Test', glass_type: 'pint' } as BeerfinderWithGlassType
       ];
 
       mockDatabase.getFirstAsync.mockResolvedValue({ count: 0 });
@@ -569,11 +583,12 @@ describe('MyBeersRepository', () => {
     });
 
     it('should process beers in batches of 20', async () => {
-      const beers: Beerfinder[] = Array.from({ length: 50 }, (_, i) => ({
+      const beers: BeerfinderWithGlassType[] = Array.from({ length: 50 }, (_, i) => ({
         id: `beer-${i}`,
         brew_name: `Beer ${i}`,
         brewer: 'Test Brewery',
-        roh_lap: `${i}`
+        roh_lap: `${i}`,
+        glass_type: i % 2 === 0 ? 'pint' as const : 'tulip' as const
       }));
 
       mockDatabase.getFirstAsync.mockResolvedValue({ count: 0 });
@@ -588,10 +603,10 @@ describe('MyBeersRepository', () => {
 
     it('should skip beers without IDs during insert', async () => {
       const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
-      const beers: Beerfinder[] = [
-        { id: '1', brew_name: 'Valid', brewer: 'Test' },
-        { id: '', brew_name: 'Invalid', brewer: 'Test' } as Beerfinder,
-        { id: '2', brew_name: 'Valid 2', brewer: 'Test' }
+      const beers: BeerfinderWithGlassType[] = [
+        { id: '1', brew_name: 'Valid', brewer: 'Test', glass_type: 'pint' },
+        { id: '', brew_name: 'Invalid', brewer: 'Test', glass_type: 'pint' } as BeerfinderWithGlassType,
+        { id: '2', brew_name: 'Valid 2', brewer: 'Test', glass_type: 'tulip' }
       ];
 
       mockDatabase.getFirstAsync.mockResolvedValue({ count: 0 });
@@ -607,8 +622,8 @@ describe('MyBeersRepository', () => {
 
     it('should handle insert errors gracefully', async () => {
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
-      const beers: Beerfinder[] = [
-        { id: '1', brew_name: 'Beer 1', brewer: 'Test' }
+      const beers: BeerfinderWithGlassType[] = [
+        { id: '1', brew_name: 'Beer 1', brewer: 'Test', glass_type: 'pint' }
       ];
 
       mockDatabase.getFirstAsync.mockResolvedValue({ count: 0 });
@@ -627,8 +642,8 @@ describe('MyBeersRepository', () => {
 
     it('should log final row count', async () => {
       const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
-      const beers: Beerfinder[] = [
-        { id: '1', brew_name: 'Test Beer', brewer: 'Test' }
+      const beers: BeerfinderWithGlassType[] = [
+        { id: '1', brew_name: 'Test Beer', brewer: 'Test', glass_type: 'pint' }
       ];
 
       mockDatabase.getFirstAsync
@@ -643,8 +658,8 @@ describe('MyBeersRepository', () => {
     });
 
     it('should throw error on transaction failure', async () => {
-      const beers: Beerfinder[] = [
-        { id: '1', brew_name: 'Test Beer', brewer: 'Test' }
+      const beers: BeerfinderWithGlassType[] = [
+        { id: '1', brew_name: 'Test Beer', brewer: 'Test', glass_type: 'pint' }
       ];
 
       mockDatabase.withTransactionAsync.mockRejectedValueOnce(

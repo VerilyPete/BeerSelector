@@ -88,14 +88,24 @@ export default function RootLayout() {
             console.log(`Migration needed from version ${currentVersion} to ${CURRENT_SCHEMA_VERSION}...`);
             setMigrationProgress(0);
 
-            // Run migration with progress callback
-            await migrateToVersion3(db, (current, total) => {
-              const progress = (current / total) * 100;
-              setMigrationProgress(progress);
-            });
+            try {
+              // Run migration with progress callback
+              await migrateToVersion3(db, (current, total) => {
+                const progress = (current / total) * 100;
+                setMigrationProgress(progress);
+              });
 
-            setMigrationProgress(null);
-            console.log('Migration complete, reloading app state...');
+              setMigrationProgress(null);
+              console.log('Migration complete, reloading app state...');
+            } catch (error) {
+              console.error('Migration failed:', error);
+              setMigrationProgress(null); // Reset UI even on error
+              Alert.alert(
+                'Database Update Failed',
+                'The app may not function correctly. Please restart the app.',
+                [{ text: 'OK' }]
+              );
+            }
           }
 
           // Check if API URLs are set using centralized helper
