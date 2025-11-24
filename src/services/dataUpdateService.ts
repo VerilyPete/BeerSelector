@@ -1,6 +1,6 @@
 import { getPreference, setPreference, areApiUrlsConfigured } from '../database/preferences';
 import { fetchBeersFromAPI, fetchMyBeersFromAPI, fetchRewardsFromAPI } from '../api/beerApi';
-import { Beer, Beerfinder } from '../types/beer';
+import { Beer, Beerfinder, BeerWithGlassType, BeerfinderWithGlassType } from '../types/beer';
 import { Reward } from '../types/database';
 import { ApiErrorType, ErrorResponse, createErrorResponse } from '../utils/notificationUtils';
 import { beerRepository } from '../database/repositories/BeerRepository';
@@ -187,7 +187,7 @@ export async function fetchAndUpdateAllBeers(): Promise<DataUpdateResult> {
 
     // Calculate glass types BEFORE insertion
     console.log('Calculating glass types for beers...');
-    const beersWithGlassTypes = calculateGlassTypes(validationResult.validBeers);
+    const beersWithGlassTypes = calculateGlassTypes(validationResult.validBeers as Beer[]);
 
     // Update the database with valid beers including glass types
     await beerRepository.insertMany(beersWithGlassTypes);
@@ -401,7 +401,7 @@ export async function fetchAndUpdateMyBeers(): Promise<DataUpdateResult> {
 
     // Calculate glass types BEFORE insertion
     console.log('Calculating glass types for tasted beers...');
-    const beersWithGlassTypes = calculateGlassTypes(validBeers);
+    const beersWithGlassTypes = calculateGlassTypes(validBeers as Beer[]);
 
     // Update the database with the valid beers including glass types
     await myBeersRepository.insertMany(beersWithGlassTypes);
@@ -577,7 +577,11 @@ export async function sequentialRefreshAllData(): Promise<ManualRefreshResult> {
         throw new Error('No valid beers found in API response');
       }
 
-      await beerRepository.insertManyUnsafe(validationResult.validBeers);
+      // Calculate glass types BEFORE insertion
+      console.log('Sequential refresh: calculating glass types for beers...');
+      const beersWithGlassTypes = calculateGlassTypes(validationResult.validBeers as Beer[]);
+
+      await beerRepository.insertManyUnsafe(beersWithGlassTypes);
       await setPreference('all_beers_last_update', new Date().toISOString());
       await setPreference('all_beers_last_check', new Date().toISOString());
       allBeersResult = {
@@ -613,8 +617,12 @@ export async function sequentialRefreshAllData(): Promise<ManualRefreshResult> {
         });
       }
 
+      // Calculate glass types BEFORE insertion
+      console.log('Sequential refresh: calculating glass types for my beers...');
+      const myBeersWithGlassTypes = calculateGlassTypes(validationResult.validBeers as Beer[]);
+
       // Allow empty myBeers array (user may have no tasted beers)
-      await myBeersRepository.insertManyUnsafe(validationResult.validBeers);
+      await myBeersRepository.insertManyUnsafe(myBeersWithGlassTypes);
       await setPreference('my_beers_last_update', new Date().toISOString());
       await setPreference('my_beers_last_check', new Date().toISOString());
       myBeersResult = {
@@ -833,8 +841,8 @@ export async function checkAndRefreshOnAppOpen(minIntervalHours: number = 12): P
  * @throws Error if API URLs are not configured
  */
 export const refreshAllDataFromAPI = async (): Promise<{
-  allBeers: Beer[];
-  myBeers: Beerfinder[];
+  allBeers: BeerWithGlassType[];
+  myBeers: BeerfinderWithGlassType[];
   rewards: Reward[];
 }> => {
   console.log('Refreshing all data from API...');
@@ -867,7 +875,11 @@ export const refreshAllDataFromAPI = async (): Promise<{
       throw new Error('No valid all beers found in API response');
     }
 
-    await beerRepository.insertManyUnsafe(allBeersValidation.validBeers);
+    // Calculate glass types BEFORE insertion
+    console.log('Calculating glass types for all beers...');
+    const allBeersWithGlassTypes = calculateGlassTypes(allBeersValidation.validBeers as Beer[]);
+
+    await beerRepository.insertManyUnsafe(allBeersWithGlassTypes);
 
     console.log('Fetching my beers from API...');
     const myBeersRaw = await fetchMyBeersFromAPI();
@@ -881,17 +893,21 @@ export const refreshAllDataFromAPI = async (): Promise<{
       });
     }
 
-    await myBeersRepository.insertManyUnsafe(myBeersValidation.validBeers);
+    // Calculate glass types for my beers BEFORE insertion
+    console.log('Calculating glass types for my beers...');
+    const myBeersWithGlassTypes = calculateGlassTypes(myBeersValidation.validBeers as Beer[]);
+
+    await myBeersRepository.insertManyUnsafe(myBeersWithGlassTypes);
 
     console.log('Fetching rewards from API...');
     const rewards = await fetchRewardsFromAPI();
     await rewardsRepository.insertManyUnsafe(rewards);
 
-    console.log(`Refreshed all data: ${allBeersValidation.validBeers.length} beers, ${myBeersValidation.validBeers.length} tasted beers, ${rewards.length} rewards`);
+    console.log(`Refreshed all data: ${allBeersWithGlassTypes.length} beers, ${myBeersWithGlassTypes.length} tasted beers, ${rewards.length} rewards`);
 
     return {
-      allBeers: allBeersValidation.validBeers,
-      myBeers: myBeersValidation.validBeers,
+      allBeers: allBeersWithGlassTypes,
+      myBeers: myBeersWithGlassTypes as BeerfinderWithGlassType[],
       rewards
     };
   } finally {

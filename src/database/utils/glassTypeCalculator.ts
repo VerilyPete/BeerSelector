@@ -1,5 +1,5 @@
 import { getGlassType } from '@/src/utils/beerGlassType';
-import { Beer } from '@/src/types/beer';
+import { Beer, BeerWithGlassType } from '@/src/types/beer';
 import { SQLiteDatabase } from 'expo-sqlite';
 import { BeerRow } from '@/src/database/schemaTypes';
 
@@ -23,9 +23,18 @@ export function calculateGlassType(beer: Beer): Beer & { glass_type: 'pint' | 't
 /**
  * Calculate glass types for an array of beers
  * Used in data sync to pre-compute before insertion
+ *
+ * Returns BeerWithGlassType[] to match repository type signatures
  */
-export function calculateGlassTypes<T extends Beer>(beers: T[]): Array<T & { glass_type: 'pint' | 'tulip' | null }> {
-  return beers.map(beer => calculateGlassType(beer));
+export function calculateGlassTypes(beers: Beer[]): BeerWithGlassType[] {
+  return beers.map(beer => ({
+    ...beer,
+    glass_type: getGlassType(
+      beer.brew_container,
+      beer.brew_description,
+      beer.brew_style
+    ),
+  })) as BeerWithGlassType[];
 }
 
 /**

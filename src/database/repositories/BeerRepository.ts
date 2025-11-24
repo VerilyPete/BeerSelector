@@ -6,11 +6,10 @@
  */
 
 import { getDatabase } from '../connection';
-import { Beer, BeerWithGlassType } from '../../types/beer';
+import { BeerWithGlassType } from '../../types/beer';
 import { databaseLockManager } from '../locks';
 import {
   isAllBeersRow,
-  allBeersRowToBeer,
   allBeersRowToBeerWithGlassType,
   AllBeersRow
 } from '../schemaTypes';
@@ -159,9 +158,9 @@ export class BeerRepository {
    * Validates the result with type guards before returning.
    *
    * @param id - The beer ID to search for
-   * @returns Beer object if found and valid, null otherwise
+   * @returns BeerWithGlassType object if found and valid, null otherwise
    */
-  async getById(id: string): Promise<Beer | null> {
+  async getById(id: string): Promise<BeerWithGlassType | null> {
     const database = await getDatabase();
 
     try {
@@ -172,7 +171,7 @@ export class BeerRepository {
 
       // Validate and convert the row
       if (row && isAllBeersRow(row)) {
-        return allBeersRowToBeer(row);
+        return allBeersRowToBeerWithGlassType(row);
       }
 
       return null;
@@ -190,9 +189,9 @@ export class BeerRepository {
    * Validates all rows with type guards and filters out invalid data.
    *
    * @param query - Search query string
-   * @returns Array of matching Beer objects
+   * @returns Array of matching BeerWithGlassType objects
    */
-  async search(query: string): Promise<Beer[]> {
+  async search(query: string): Promise<BeerWithGlassType[]> {
     if (!query.trim()) {
       return this.getAll();
     }
@@ -215,7 +214,7 @@ export class BeerRepository {
       // Validate and convert each row
       return rows
         .filter(row => isAllBeersRow(row))
-        .map(row => allBeersRowToBeer(row));
+        .map(row => allBeersRowToBeerWithGlassType(row));
     } catch (error) {
       console.error('Error searching beers:', error);
       throw error;
@@ -228,9 +227,9 @@ export class BeerRepository {
    * Validates all rows with type guards and filters out invalid data.
    *
    * @param style - Beer style to filter by
-   * @returns Array of Beer objects matching the style
+   * @returns Array of BeerWithGlassType objects matching the style
    */
-  async getByStyle(style: string): Promise<Beer[]> {
+  async getByStyle(style: string): Promise<BeerWithGlassType[]> {
     const database = await getDatabase();
 
     try {
@@ -242,7 +241,7 @@ export class BeerRepository {
       // Validate and convert each row
       return rows
         .filter(row => isAllBeersRow(row))
-        .map(row => allBeersRowToBeer(row));
+        .map(row => allBeersRowToBeerWithGlassType(row));
     } catch (error) {
       console.error('Error getting beers by style:', error);
       throw error;
@@ -255,9 +254,9 @@ export class BeerRepository {
    * Validates all rows with type guards and filters out invalid data.
    *
    * @param brewer - Brewer name to filter by
-   * @returns Array of Beer objects from the specified brewer
+   * @returns Array of BeerWithGlassType objects from the specified brewer
    */
-  async getByBrewer(brewer: string): Promise<Beer[]> {
+  async getByBrewer(brewer: string): Promise<BeerWithGlassType[]> {
     const database = await getDatabase();
 
     try {
@@ -269,7 +268,7 @@ export class BeerRepository {
       // Validate and convert each row
       return rows
         .filter(row => isAllBeersRow(row))
-        .map(row => allBeersRowToBeer(row));
+        .map(row => allBeersRowToBeerWithGlassType(row));
     } catch (error) {
       console.error('Error getting beers by brewer:', error);
       throw error;
@@ -283,9 +282,9 @@ export class BeerRepository {
    * ID in the tasted_brew_current_round table.
    * Validates all rows with type guards and filters out invalid data.
    *
-   * @returns Array of untasted Beer objects
+   * @returns Array of untasted BeerWithGlassType objects
    */
-  async getUntasted(): Promise<Beer[]> {
+  async getUntasted(): Promise<BeerWithGlassType[]> {
     const database = await getDatabase();
 
     try {
@@ -300,7 +299,7 @@ export class BeerRepository {
       // Validate and convert each row
       return rows
         .filter(row => isAllBeersRow(row))
-        .map(row => allBeersRowToBeer(row));
+        .map(row => allBeersRowToBeerWithGlassType(row));
     } catch (error) {
       console.error('Error getting beers not in My Beers:', error);
       throw error;

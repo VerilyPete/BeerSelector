@@ -4,7 +4,7 @@
  */
 
 import { BeerRepository } from '../BeerRepository';
-import { Beer } from '../../../types/beer';
+import { Beer, BeerWithGlassType } from '../../../types/beer';
 import * as connection from '../../connection';
 
 // Mock the database connection module
@@ -34,20 +34,22 @@ describe('BeerRepository', () => {
 
   describe('insertMany', () => {
     it('should insert multiple beers in batches', async () => {
-      const beers: Beer[] = [
+      const beers: BeerWithGlassType[] = [
         {
           id: '1',
           brew_name: 'Test IPA',
           brewer: 'Test Brewery',
           brew_style: 'IPA',
-          added_date: '2024-01-01'
+          added_date: '2024-01-01',
+          glass_type: 'pint'
         },
         {
           id: '2',
           brew_name: 'Test Stout',
           brewer: 'Another Brewery',
           brew_style: 'Stout',
-          added_date: '2024-01-02'
+          added_date: '2024-01-02',
+          glass_type: 'tulip'
         }
       ];
 
@@ -69,21 +71,24 @@ describe('BeerRepository', () => {
     });
 
     it('should skip beers without IDs', async () => {
-      const beers: Beer[] = [
+      const beers: BeerWithGlassType[] = [
         {
           id: '1',
           brew_name: 'Valid Beer',
-          brewer: 'Test Brewery'
+          brewer: 'Test Brewery',
+          glass_type: 'pint'
         },
         {
           id: '',
           brew_name: 'Invalid Beer - No ID',
-          brewer: 'Test Brewery'
-        } as Beer,
+          brewer: 'Test Brewery',
+          glass_type: 'pint'
+        } as BeerWithGlassType,
         {
           id: '2',
           brew_name: 'Another Valid Beer',
-          brewer: 'Test Brewery'
+          brewer: 'Test Brewery',
+          glass_type: 'tulip'
         }
       ];
 
@@ -102,10 +107,11 @@ describe('BeerRepository', () => {
     });
 
     it('should process beers in batches of 50', async () => {
-      const beers: Beer[] = Array.from({ length: 120 }, (_, i) => ({
+      const beers: BeerWithGlassType[] = Array.from({ length: 120 }, (_, i) => ({
         id: `beer-${i}`,
         brew_name: `Beer ${i}`,
-        brewer: 'Test Brewery'
+        brewer: 'Test Brewery',
+        glass_type: i % 2 === 0 ? 'pint' as const : 'tulip' as const
       }));
 
       mockDatabase.getFirstAsync.mockResolvedValue({ count: 0 });
@@ -138,10 +144,11 @@ describe('BeerRepository', () => {
     });
 
     it('should handle beers with optional fields missing', async () => {
-      const beers: Beer[] = [
+      const beers: BeerWithGlassType[] = [
         {
           id: '1',
-          brew_name: 'Minimal Beer'
+          brew_name: 'Minimal Beer',
+          glass_type: 'pint'
           // All optional fields missing
         }
       ];
@@ -150,16 +157,16 @@ describe('BeerRepository', () => {
 
       await repository.insertMany(beers);
 
-      // Should insert beer with empty strings for missing fields
+      // Should insert beer with empty strings for missing fields and glass_type
       expect(mockDatabase.runAsync).toHaveBeenCalledWith(
         expect.stringContaining('INSERT OR REPLACE INTO allbeers'),
-        expect.arrayContaining(['1', '', 'Minimal Beer', '', '', '', '', '', '', ''])
+        expect.arrayContaining(['1', '', 'Minimal Beer', '', '', '', '', '', '', '', 'pint'])
       );
     });
 
     it('should throw error on database failure', async () => {
-      const beers: Beer[] = [
-        { id: '1', brew_name: 'Test Beer', brewer: 'Test Brewery' }
+      const beers: BeerWithGlassType[] = [
+        { id: '1', brew_name: 'Test Beer', brewer: 'Test Brewery', glass_type: 'pint' }
       ];
 
       mockDatabase.runAsync.mockRejectedValueOnce(new Error('Database error'));
@@ -169,10 +176,11 @@ describe('BeerRepository', () => {
 
     it('should log progress during import', async () => {
       const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
-      const beers: Beer[] = Array.from({ length: 10 }, (_, i) => ({
+      const beers: BeerWithGlassType[] = Array.from({ length: 10 }, (_, i) => ({
         id: `beer-${i}`,
         brew_name: `Beer ${i}`,
-        brewer: 'Test Brewery'
+        brewer: 'Test Brewery',
+        glass_type: 'pint' as const
       }));
 
       mockDatabase.getFirstAsync.mockResolvedValue({ count: 0 });
