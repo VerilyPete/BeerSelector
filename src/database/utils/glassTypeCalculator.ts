@@ -88,47 +88,46 @@ async function backfillTable(
 
   // Use SQL CASE statement for bulk update (10-20x faster than individual UPDATEs)
   // Process in batches to avoid SQLite expression tree limits
+  // Note: No transaction here - caller (migrateToV3) already has one
   const batchSize = 100;
   let processed = 0;
 
-  await database.withTransactionAsync(async () => {
-    for (let i = 0; i < updates.length; i += batchSize) {
-      const batch = updates.slice(i, i + batchSize);
+  for (let i = 0; i < updates.length; i += batchSize) {
+    const batch = updates.slice(i, i + batchSize);
 
-      // Build CASE statement
-      const caseStatements = batch
-        .map(u => `WHEN id = ? THEN ?`)
-        .join(' ');
+    // Build CASE statement
+    const caseStatements = batch
+      .map(u => `WHEN id = ? THEN ?`)
+      .join(' ');
 
-      // Flatten parameters: [id1, glassType1, id2, glassType2, ...]
-      const params: (string | null)[] = [];
-      batch.forEach(u => {
-        params.push(u.id, u.glassType);
-      });
+    // Flatten parameters: [id1, glassType1, id2, glassType2, ...]
+    const params: (string | null)[] = [];
+    batch.forEach(u => {
+      params.push(u.id, u.glassType);
+    });
 
-      // Add IDs for WHERE clause
-      const ids = batch.map(u => u.id);
-      params.push(...ids);
+    // Add IDs for WHERE clause
+    const ids = batch.map(u => u.id);
+    params.push(...ids);
 
-      // Execute bulk update
-      await database.runAsync(
-        `UPDATE ${tableName}
-         SET glass_type = CASE
-           ${caseStatements}
-           ELSE glass_type
-         END
-         WHERE id IN (${ids.map(() => '?').join(',')})`,
-        params
-      );
+    // Execute bulk update
+    await database.runAsync(
+      `UPDATE ${tableName}
+       SET glass_type = CASE
+         ${caseStatements}
+         ELSE glass_type
+       END
+       WHERE id IN (${ids.map(() => '?').join(',')})`,
+      params
+    );
 
-      processed += batch.length;
-      console.log(`Processed ${processed}/${total} beers in ${tableName}`);
+    processed += batch.length;
+    console.log(`Processed ${processed}/${total} beers in ${tableName}`);
 
-      if (onProgress) {
-        onProgress(processed, total);
-      }
+    if (onProgress) {
+      onProgress(processed, total);
     }
-  });
+  }
 
   console.log(`✅ Backfilled ${total} beers in ${tableName}`);
 }
