@@ -94,3 +94,4 @@ test-results/
 .maestro/recordings/
 .flashlight/reports/
 *.junit.xml
+junit.xml
