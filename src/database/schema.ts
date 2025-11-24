@@ -206,10 +206,8 @@ export const setupTables = async (database: SQLiteDatabase): Promise<void> => {
 
       // Initialize preferences with default values
       await initializeDefaultPreferences(database);
-    }
-
-    // Run migrations if needed
-    if (currentVersion < CURRENT_SCHEMA_VERSION) {
+    } else if (currentVersion < CURRENT_SCHEMA_VERSION) {
+      // Run migrations if needed (only for existing databases, not fresh installs)
       await runMigrations(database, currentVersion);
     }
 
