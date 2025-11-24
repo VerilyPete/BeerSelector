@@ -21,10 +21,10 @@
 
 import { renderHook, act } from '@testing-library/react-native';
 import { useBeerFilters, applyFilters } from '../useBeerFilters';
-import { Beer } from '@/src/types/beer';
+import { BeerWithGlassType } from '@/src/types/beer';
 
 describe('useBeerFilters - Optimization (Bottleneck #3)', () => {
-  const createMockBeer = (overrides: Partial<Beer> = {}): Beer => ({
+  const createMockBeer = (overrides: Partial<BeerWithGlassType> = {}): BeerWithGlassType => ({
     id: '1',
     brew_name: 'Test IPA',
     brewer: 'Test Brewery',
@@ -33,15 +33,17 @@ describe('useBeerFilters - Optimization (Bottleneck #3)', () => {
     brewer_loc: 'Austin, TX',
     brew_container: 'Draft',
     brew_description: 'Test description',
+    glass_type: 'tulip', // Pre-computed glass type for IPA
     ...overrides,
   });
 
-  const createMockBeers = (count: number): Beer[] =>
+  const createMockBeers = (count: number): BeerWithGlassType[] =>
     Array.from({ length: count }, (_, i) => createMockBeer({
       id: String(i + 1),
       brew_name: `Beer ${i + 1}`,
       brew_style: i % 3 === 0 ? 'IPA' : i % 3 === 1 ? 'Stout' : 'Porter',
       brew_container: i % 2 === 0 ? 'Draft' : 'Bottle',
+      glass_type: i % 3 === 0 ? 'tulip' : 'pint', // Pre-computed glass type based on style
     }));
 
   describe('Early Exit Optimization', () => {

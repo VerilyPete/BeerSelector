@@ -1,37 +1,29 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuites name="jest tests" tests="16" failures="0" errors="0" time="2.672">
-  <testsuite name="Repository Type Safety" errors="0" failures="0" skipped="0" timestamp="2025-11-24T05:17:25" time="1.843" tests="16">
-    <testcase classname="Repository Type Safety BeerRepository Type Safety getAll() should return Promise&lt;Beer[]&gt;" name="Repository Type Safety BeerRepository Type Safety getAll() should return Promise&lt;Beer[]&gt;" time="0.015">
+<testsuites name="jest tests" tests="12" failures="0" errors="0" time="2.957">
+  <testsuite name="BeerItem" errors="0" failures="0" skipped="0" timestamp="2025-11-24T05:43:43" time="2.221" tests="12">
+    <testcase classname="BeerItem renders collapsed state correctly" name="BeerItem renders collapsed state correctly" time="0.257">
     </testcase>
-    <testcase classname="Repository Type Safety BeerRepository Type Safety getById() should return Promise&lt;Beer | null&gt;" name="Repository Type Safety BeerRepository Type Safety getById() should return Promise&lt;Beer | null&gt;" time="0">
+    <testcase classname="BeerItem renders expanded state with description" name="BeerItem renders expanded state with description" time="0.005">
     </testcase>
-    <testcase classname="Repository Type Safety BeerRepository Type Safety search() should return Promise&lt;Beer[]&gt;" name="Repository Type Safety BeerRepository Type Safety search() should return Promise&lt;Beer[]&gt;" time="0.001">
+    <testcase classname="BeerItem calls onToggle with beer id when pressed" name="BeerItem calls onToggle with beer id when pressed" time="0.004">
     </testcase>
-    <testcase classname="Repository Type Safety BeerRepository Type Safety insertMany() should only accept Beer[]" name="Repository Type Safety BeerRepository Type Safety insertMany() should only accept Beer[]" time="0">
+    <testcase classname="BeerItem formats unix timestamp date correctly" name="BeerItem formats unix timestamp date correctly" time="0.004">
     </testcase>
-    <testcase classname="Repository Type Safety MyBeersRepository Type Safety getAll() should return Promise&lt;BeerfinderWithGlassType[]&gt;" name="Repository Type Safety MyBeersRepository Type Safety getAll() should return Promise&lt;BeerfinderWithGlassType[]&gt;" time="0.001">
+    <testcase classname="BeerItem formats MM/DD/YYYY date correctly for tasted beers" name="BeerItem formats MM/DD/YYYY date correctly for tasted beers" time="0.004">
     </testcase>
-    <testcase classname="Repository Type Safety MyBeersRepository Type Safety getById() should return Promise&lt;Beerfinder | null&gt;" name="Repository Type Safety MyBeersRepository Type Safety getById() should return Promise&lt;Beerfinder | null&gt;" time="0.001">
+    <testcase classname="BeerItem handles invalid dates gracefully" name="BeerItem handles invalid dates gracefully" time="0.004">
     </testcase>
-    <testcase classname="Repository Type Safety MyBeersRepository Type Safety getCount() should return Promise&lt;number&gt;" name="Repository Type Safety MyBeersRepository Type Safety getCount() should return Promise&lt;number&gt;" time="0">
+    <testcase classname="BeerItem handles missing optional fields gracefully" name="BeerItem handles missing optional fields gracefully" time="0.004">
     </testcase>
-    <testcase classname="Repository Type Safety MyBeersRepository Type Safety insertMany() should only accept BeerfinderWithGlassType[]" name="Repository Type Safety MyBeersRepository Type Safety insertMany() should only accept BeerfinderWithGlassType[]" time="0.001">
+    <testcase classname="BeerItem renders custom actions when expanded and provided" name="BeerItem renders custom actions when expanded and provided" time="0.008">
     </testcase>
-    <testcase classname="Repository Type Safety RewardsRepository Type Safety getAll() should return Promise&lt;Reward[]&gt;" name="Repository Type Safety RewardsRepository Type Safety getAll() should return Promise&lt;Reward[]&gt;" time="0">
+    <testcase classname="BeerItem handles empty date string" name="BeerItem handles empty date string" time="0.003">
     </testcase>
-    <testcase classname="Repository Type Safety RewardsRepository Type Safety getById() should return Promise&lt;Reward | null&gt;" name="Repository Type Safety RewardsRepository Type Safety getById() should return Promise&lt;Reward | null&gt;" time="0.001">
+    <testcase classname="BeerItem strips &lt;p&gt; and &lt;br&gt; tags from description" name="BeerItem strips &lt;p&gt; and &lt;br&gt; tags from description" time="0.003">
     </testcase>
-    <testcase classname="Repository Type Safety RewardsRepository Type Safety getByType() should return Promise&lt;Reward[]&gt;" name="Repository Type Safety RewardsRepository Type Safety getByType() should return Promise&lt;Reward[]&gt;" time="0">
+    <testcase classname="BeerItem uses default date label when not provided" name="BeerItem uses default date label when not provided" time="0.003">
     </testcase>
-    <testcase classname="Repository Type Safety RewardsRepository Type Safety getCount() should return Promise&lt;number&gt;" name="Repository Type Safety RewardsRepository Type Safety getCount() should return Promise&lt;number&gt;" time="0">
-    </testcase>
-    <testcase classname="Repository Type Safety RewardsRepository Type Safety insertMany() should only accept Reward[]" name="Repository Type Safety RewardsRepository Type Safety insertMany() should only accept Reward[]" time="0.001">
-    </testcase>
-    <testcase classname="Repository Type Safety Type Guard Integration should use type guards to validate data at runtime" name="Repository Type Safety Type Guard Integration should use type guards to validate data at runtime" time="0.001">
-    </testcase>
-    <testcase classname="Repository Type Safety Compile-Time Type Safety should enforce return types match repository entity types" name="Repository Type Safety Compile-Time Type Safety should enforce return types match repository entity types" time="0.001">
-    </testcase>
-    <testcase classname="Repository Type Safety Compile-Time Type Safety should prevent assigning wrong entity types" name="Repository Type Safety Compile-Time Type Safety should prevent assigning wrong entity types" time="0">
+    <testcase classname="BeerItem renders fallback for unnamed beer" name="BeerItem renders fallback for unnamed beer" time="0.003">
     </testcase>
   </testsuite>
 </testsuites>

@@ -14,7 +14,7 @@ import { BeerList } from './beer/BeerList';
 import { SkeletonLoader } from './beer/SkeletonLoader';
 import { QueuedBeer } from '@/src/utils/htmlParser';
 import { getQueuedBeers, deleteQueuedBeer as deleteQueuedBeerApi } from '@/src/api/queueService';
-import { Beer } from '@/src/types/beer';
+import { BeerWithGlassType } from '@/src/types/beer';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useAppContext } from '@/context/AppContext';
 import { useQueuedCheckIn } from '@/hooks/useQueuedCheckIn';
@@ -106,7 +106,7 @@ export const Beerfinder = () => {
    * MP-3 Bottleneck #5: Memoized event handlers for stable references
    * MP-7 Step 2: Use queued check-in with offline support
    */
-  const handleCheckIn = useCallback(async (item: Beer) => {
+  const handleCheckIn = useCallback(async (item: BeerWithGlassType) => {
     await queuedCheckIn(item);
   }, [queuedCheckIn]);
 
@@ -209,7 +209,7 @@ export const Beerfinder = () => {
     setLocalSearchText('');
   }, []);
 
-  const renderBeerActions = (item: Beer) => (
+  const renderBeerActions = (item: BeerWithGlassType) => (
     <View style={styles.buttonContainer}>
       <TouchableOpacity
         style={[styles.checkInButton, {
