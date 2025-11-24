@@ -1,29 +1,629 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuites name="jest tests" tests="12" failures="0" errors="0" time="2.957">
-  <testsuite name="BeerItem" errors="0" failures="0" skipped="0" timestamp="2025-11-24T05:43:43" time="2.221" tests="12">
-    <testcase classname="BeerItem renders collapsed state correctly" name="BeerItem renders collapsed state correctly" time="0.257">
+<testsuites name="jest tests" tests="27" failures="15" errors="0" time="3.386">
+  <testsuite name="BeerItem" errors="0" failures="0" skipped="0" timestamp="2025-11-24T18:07:18" time="1.83" tests="12">
+    <testcase classname="BeerItem renders collapsed state correctly" name="BeerItem renders collapsed state correctly" time="0.365">
     </testcase>
-    <testcase classname="BeerItem renders expanded state with description" name="BeerItem renders expanded state with description" time="0.005">
+    <testcase classname="BeerItem renders expanded state with description" name="BeerItem renders expanded state with description" time="0.006">
     </testcase>
-    <testcase classname="BeerItem calls onToggle with beer id when pressed" name="BeerItem calls onToggle with beer id when pressed" time="0.004">
+    <testcase classname="BeerItem calls onToggle with beer id when pressed" name="BeerItem calls onToggle with beer id when pressed" time="0.006">
     </testcase>
     <testcase classname="BeerItem formats unix timestamp date correctly" name="BeerItem formats unix timestamp date correctly" time="0.004">
     </testcase>
-    <testcase classname="BeerItem formats MM/DD/YYYY date correctly for tasted beers" name="BeerItem formats MM/DD/YYYY date correctly for tasted beers" time="0.004">
+    <testcase classname="BeerItem formats MM/DD/YYYY date correctly for tasted beers" name="BeerItem formats MM/DD/YYYY date correctly for tasted beers" time="0.005">
     </testcase>
     <testcase classname="BeerItem handles invalid dates gracefully" name="BeerItem handles invalid dates gracefully" time="0.004">
     </testcase>
-    <testcase classname="BeerItem handles missing optional fields gracefully" name="BeerItem handles missing optional fields gracefully" time="0.004">
+    <testcase classname="BeerItem handles missing optional fields gracefully" name="BeerItem handles missing optional fields gracefully" time="0.006">
     </testcase>
-    <testcase classname="BeerItem renders custom actions when expanded and provided" name="BeerItem renders custom actions when expanded and provided" time="0.008">
+    <testcase classname="BeerItem renders custom actions when expanded and provided" name="BeerItem renders custom actions when expanded and provided" time="0.007">
     </testcase>
-    <testcase classname="BeerItem handles empty date string" name="BeerItem handles empty date string" time="0.003">
+    <testcase classname="BeerItem handles empty date string" name="BeerItem handles empty date string" time="0.004">
     </testcase>
-    <testcase classname="BeerItem strips &lt;p&gt; and &lt;br&gt; tags from description" name="BeerItem strips &lt;p&gt; and &lt;br&gt; tags from description" time="0.003">
+    <testcase classname="BeerItem strips &lt;p&gt; and &lt;br&gt; tags from description" name="BeerItem strips &lt;p&gt; and &lt;br&gt; tags from description" time="0.004">
     </testcase>
-    <testcase classname="BeerItem uses default date label when not provided" name="BeerItem uses default date label when not provided" time="0.003">
+    <testcase classname="BeerItem uses default date label when not provided" name="BeerItem uses default date label when not provided" time="0.004">
     </testcase>
     <testcase classname="BeerItem renders fallback for unnamed beer" name="BeerItem renders fallback for unnamed beer" time="0.003">
+    </testcase>
+  </testsuite>
+  <testsuite name="BeerList" errors="0" failures="15" skipped="0" timestamp="2025-11-24T18:07:18" time="2.485" tests="15">
+    <testcase classname="BeerList renders empty message when no beers and not loading" name="BeerList renders empty message when no beers and not loading" time="0.023">
+      <failure>Error: No safe area value available. Make sure you are rendering `&lt;SafeAreaProvider&gt;` at the top of your app.
+    at useSafeAreaInsets (/workspace/BeerSelector/node_modules/react-native-safe-area-context/src/SafeAreaContext.tsx:126:11)
+    at BeerList (/workspace/BeerSelector/components/beer/BeerList.tsx:50:35)
+    at renderWithHooks (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:5608:18)
+    at mountIndeterminateComponent (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:9884:13)
+    at beginWork (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11351:16)
+    at performUnitOfWork (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15847:12)
+    at workLoopSync (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15784:5)
+    at renderRootSync (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15756:7)
+    at recoverFromConcurrentError (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15226:20)
+    at performConcurrentWorkOnRoot (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15126:22)
+    at flushActQueue (/workspace/BeerSelector/node_modules/react/cjs/react.development.js:2667:24)
+    at act (/workspace/BeerSelector/node_modules/react/cjs/react.development.js:2582:11)
+    at actImplementation (/workspace/BeerSelector/node_modules/@testing-library/react-native/src/act.ts:31:25)
+    at renderWithAct (/workspace/BeerSelector/node_modules/@testing-library/react-native/src/render-act.ts:13:11)
+    at renderInternal (/workspace/BeerSelector/node_modules/@testing-library/react-native/src/render.tsx:69:33)
+    at renderInternal (/workspace/BeerSelector/node_modules/@testing-library/react-native/src/render.tsx:44:10)
+    at Object.&lt;anonymous&gt; (/workspace/BeerSelector/components/beer/__tests__/BeerList.test.tsx:77:33)
+    at Promise.then.completed (/workspace/BeerSelector/node_modules/jest-circus/build/utils.js:298:28)
+    at new Promise (&lt;anonymous&gt;)
+    at callAsyncCircusFn (/workspace/BeerSelector/node_modules/jest-circus/build/utils.js:231:10)
+    at _callCircusTest (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:316:40)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at _runTest (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:252:3)
+    at _runTestsForDescribeBlock (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:126:9)
+    at _runTestsForDescribeBlock (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:121:9)
+    at run (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:71:3)
+    at runAndTransformResultsToJestFormat (/workspace/BeerSelector/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapterInit.js:122:21)
+    at jestAdapter (/workspace/BeerSelector/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:79:19)
+    at runTestInternal (/workspace/BeerSelector/node_modules/jest-runner/build/runTest.js:367:16)
+    at runTest (/workspace/BeerSelector/node_modules/jest-runner/build/runTest.js:444:34)
+    at Object.worker (/workspace/BeerSelector/node_modules/jest-runner/build/testWorker.js:106:12)</failure>
+    </testcase>
+    <testcase classname="BeerList uses default empty message when not provided" name="BeerList uses default empty message when not provided" time="0.003">
+      <failure>Error: No safe area value available. Make sure you are rendering `&lt;SafeAreaProvider&gt;` at the top of your app.
+    at useSafeAreaInsets (/workspace/BeerSelector/node_modules/react-native-safe-area-context/src/SafeAreaContext.tsx:126:11)
+    at BeerList (/workspace/BeerSelector/components/beer/BeerList.tsx:50:35)
+    at renderWithHooks (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:5608:18)
+    at mountIndeterminateComponent (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:9884:13)
+    at beginWork (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11351:16)
+    at performUnitOfWork (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15847:12)
+    at workLoopSync (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15784:5)
+    at renderRootSync (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15756:7)
+    at recoverFromConcurrentError (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15226:20)
+    at performConcurrentWorkOnRoot (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15126:22)
+    at flushActQueue (/workspace/BeerSelector/node_modules/react/cjs/react.development.js:2667:24)
+    at act (/workspace/BeerSelector/node_modules/react/cjs/react.development.js:2582:11)
+    at actImplementation (/workspace/BeerSelector/node_modules/@testing-library/react-native/src/act.ts:31:25)
+    at renderWithAct (/workspace/BeerSelector/node_modules/@testing-library/react-native/src/render-act.ts:13:11)
+    at renderInternal (/workspace/BeerSelector/node_modules/@testing-library/react-native/src/render.tsx:69:33)
+    at renderInternal (/workspace/BeerSelector/node_modules/@testing-library/react-native/src/render.tsx:44:10)
+    at Object.&lt;anonymous&gt; (/workspace/BeerSelector/components/beer/__tests__/BeerList.test.tsx:94:33)
+    at Promise.then.completed (/workspace/BeerSelector/node_modules/jest-circus/build/utils.js:298:28)
+    at new Promise (&lt;anonymous&gt;)
+    at callAsyncCircusFn (/workspace/BeerSelector/node_modules/jest-circus/build/utils.js:231:10)
+    at _callCircusTest (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:316:40)
+    at _runTest (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:252:3)
+    at _runTestsForDescribeBlock (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:126:9)
+    at _runTestsForDescribeBlock (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:121:9)
+    at run (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:71:3)
+    at runAndTransformResultsToJestFormat (/workspace/BeerSelector/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapterInit.js:122:21)
+    at jestAdapter (/workspace/BeerSelector/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:79:19)
+    at runTestInternal (/workspace/BeerSelector/node_modules/jest-runner/build/runTest.js:367:16)
+    at runTest (/workspace/BeerSelector/node_modules/jest-runner/build/runTest.js:444:34)
+    at Object.worker (/workspace/BeerSelector/node_modules/jest-runner/build/testWorker.js:106:12)</failure>
+    </testcase>
+    <testcase classname="BeerList does not render empty message when loading" name="BeerList does not render empty message when loading" time="0.002">
+      <failure>Error: No safe area value available. Make sure you are rendering `&lt;SafeAreaProvider&gt;` at the top of your app.
+    at useSafeAreaInsets (/workspace/BeerSelector/node_modules/react-native-safe-area-context/src/SafeAreaContext.tsx:126:11)
+    at BeerList (/workspace/BeerSelector/components/beer/BeerList.tsx:50:35)
+    at renderWithHooks (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:5608:18)
+    at mountIndeterminateComponent (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:9884:13)
+    at beginWork (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11351:16)
+    at performUnitOfWork (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15847:12)
+    at workLoopSync (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15784:5)
+    at renderRootSync (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15756:7)
+    at recoverFromConcurrentError (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15226:20)
+    at performConcurrentWorkOnRoot (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15126:22)
+    at flushActQueue (/workspace/BeerSelector/node_modules/react/cjs/react.development.js:2667:24)
+    at act (/workspace/BeerSelector/node_modules/react/cjs/react.development.js:2582:11)
+    at actImplementation (/workspace/BeerSelector/node_modules/@testing-library/react-native/src/act.ts:31:25)
+    at renderWithAct (/workspace/BeerSelector/node_modules/@testing-library/react-native/src/render-act.ts:13:11)
+    at renderInternal (/workspace/BeerSelector/node_modules/@testing-library/react-native/src/render.tsx:69:33)
+    at renderInternal (/workspace/BeerSelector/node_modules/@testing-library/react-native/src/render.tsx:44:10)
+    at Object.&lt;anonymous&gt; (/workspace/BeerSelector/components/beer/__tests__/BeerList.test.tsx:110:35)
+    at Promise.then.completed (/workspace/BeerSelector/node_modules/jest-circus/build/utils.js:298:28)
+    at new Promise (&lt;anonymous&gt;)
+    at callAsyncCircusFn (/workspace/BeerSelector/node_modules/jest-circus/build/utils.js:231:10)
+    at _callCircusTest (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:316:40)
+    at _runTest (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:252:3)
+    at _runTestsForDescribeBlock (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:126:9)
+    at _runTestsForDescribeBlock (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:121:9)
+    at run (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:71:3)
+    at runAndTransformResultsToJestFormat (/workspace/BeerSelector/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapterInit.js:122:21)
+    at jestAdapter (/workspace/BeerSelector/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:79:19)
+    at runTestInternal (/workspace/BeerSelector/node_modules/jest-runner/build/runTest.js:367:16)
+    at runTest (/workspace/BeerSelector/node_modules/jest-runner/build/runTest.js:444:34)
+    at Object.worker (/workspace/BeerSelector/node_modules/jest-runner/build/testWorker.js:106:12)</failure>
+    </testcase>
+    <testcase classname="BeerList handles empty beers with custom empty message" name="BeerList handles empty beers with custom empty message" time="0.002">
+      <failure>Error: No safe area value available. Make sure you are rendering `&lt;SafeAreaProvider&gt;` at the top of your app.
+    at useSafeAreaInsets (/workspace/BeerSelector/node_modules/react-native-safe-area-context/src/SafeAreaContext.tsx:126:11)
+    at BeerList (/workspace/BeerSelector/components/beer/BeerList.tsx:50:35)
+    at renderWithHooks (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:5608:18)
+    at mountIndeterminateComponent (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:9884:13)
+    at beginWork (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11351:16)
+    at performUnitOfWork (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15847:12)
+    at workLoopSync (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15784:5)
+    at renderRootSync (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15756:7)
+    at recoverFromConcurrentError (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15226:20)
+    at performConcurrentWorkOnRoot (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15126:22)
+    at flushActQueue (/workspace/BeerSelector/node_modules/react/cjs/react.development.js:2667:24)
+    at act (/workspace/BeerSelector/node_modules/react/cjs/react.development.js:2582:11)
+    at actImplementation (/workspace/BeerSelector/node_modules/@testing-library/react-native/src/act.ts:31:25)
+    at renderWithAct (/workspace/BeerSelector/node_modules/@testing-library/react-native/src/render-act.ts:13:11)
+    at renderInternal (/workspace/BeerSelector/node_modules/@testing-library/react-native/src/render.tsx:69:33)
+    at renderInternal (/workspace/BeerSelector/node_modules/@testing-library/react-native/src/render.tsx:44:10)
+    at Object.&lt;anonymous&gt; (/workspace/BeerSelector/components/beer/__tests__/BeerList.test.tsx:128:33)
+    at Promise.then.completed (/workspace/BeerSelector/node_modules/jest-circus/build/utils.js:298:28)
+    at new Promise (&lt;anonymous&gt;)
+    at callAsyncCircusFn (/workspace/BeerSelector/node_modules/jest-circus/build/utils.js:231:10)
+    at _callCircusTest (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:316:40)
+    at _runTest (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:252:3)
+    at _runTestsForDescribeBlock (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:126:9)
+    at _runTestsForDescribeBlock (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:121:9)
+    at run (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:71:3)
+    at runAndTransformResultsToJestFormat (/workspace/BeerSelector/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapterInit.js:122:21)
+    at jestAdapter (/workspace/BeerSelector/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:79:19)
+    at runTestInternal (/workspace/BeerSelector/node_modules/jest-runner/build/runTest.js:367:16)
+    at runTest (/workspace/BeerSelector/node_modules/jest-runner/build/runTest.js:444:34)
+    at Object.worker (/workspace/BeerSelector/node_modules/jest-runner/build/testWorker.js:106:12)</failure>
+    </testcase>
+    <testcase classname="BeerList shows appropriate empty message for visitor mode" name="BeerList shows appropriate empty message for visitor mode" time="0.002">
+      <failure>Error: No safe area value available. Make sure you are rendering `&lt;SafeAreaProvider&gt;` at the top of your app.
+    at useSafeAreaInsets (/workspace/BeerSelector/node_modules/react-native-safe-area-context/src/SafeAreaContext.tsx:126:11)
+    at BeerList (/workspace/BeerSelector/components/beer/BeerList.tsx:50:35)
+    at renderWithHooks (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:5608:18)
+    at mountIndeterminateComponent (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:9884:13)
+    at beginWork (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11351:16)
+    at performUnitOfWork (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15847:12)
+    at workLoopSync (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15784:5)
+    at renderRootSync (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15756:7)
+    at recoverFromConcurrentError (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15226:20)
+    at performConcurrentWorkOnRoot (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15126:22)
+    at flushActQueue (/workspace/BeerSelector/node_modules/react/cjs/react.development.js:2667:24)
+    at act (/workspace/BeerSelector/node_modules/react/cjs/react.development.js:2582:11)
+    at actImplementation (/workspace/BeerSelector/node_modules/@testing-library/react-native/src/act.ts:31:25)
+    at renderWithAct (/workspace/BeerSelector/node_modules/@testing-library/react-native/src/render-act.ts:13:11)
+    at renderInternal (/workspace/BeerSelector/node_modules/@testing-library/react-native/src/render.tsx:69:33)
+    at renderInternal (/workspace/BeerSelector/node_modules/@testing-library/react-native/src/render.tsx:44:10)
+    at Object.&lt;anonymous&gt; (/workspace/BeerSelector/components/beer/__tests__/BeerList.test.tsx:145:33)
+    at Promise.then.completed (/workspace/BeerSelector/node_modules/jest-circus/build/utils.js:298:28)
+    at new Promise (&lt;anonymous&gt;)
+    at callAsyncCircusFn (/workspace/BeerSelector/node_modules/jest-circus/build/utils.js:231:10)
+    at _callCircusTest (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:316:40)
+    at _runTest (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:252:3)
+    at _runTestsForDescribeBlock (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:126:9)
+    at _runTestsForDescribeBlock (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:121:9)
+    at run (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:71:3)
+    at runAndTransformResultsToJestFormat (/workspace/BeerSelector/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapterInit.js:122:21)
+    at jestAdapter (/workspace/BeerSelector/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:79:19)
+    at runTestInternal (/workspace/BeerSelector/node_modules/jest-runner/build/runTest.js:367:16)
+    at runTest (/workspace/BeerSelector/node_modules/jest-runner/build/runTest.js:444:34)
+    at Object.worker (/workspace/BeerSelector/node_modules/jest-runner/build/testWorker.js:106:12)</failure>
+    </testcase>
+    <testcase classname="BeerList handles null/undefined gracefully" name="BeerList handles null/undefined gracefully" time="0.002">
+      <failure>Error: No safe area value available. Make sure you are rendering `&lt;SafeAreaProvider&gt;` at the top of your app.
+    at useSafeAreaInsets (/workspace/BeerSelector/node_modules/react-native-safe-area-context/src/SafeAreaContext.tsx:126:11)
+    at BeerList (/workspace/BeerSelector/components/beer/BeerList.tsx:50:35)
+    at renderWithHooks (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:5608:18)
+    at mountIndeterminateComponent (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:9884:13)
+    at beginWork (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11351:16)
+    at performUnitOfWork (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15847:12)
+    at workLoopSync (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15784:5)
+    at renderRootSync (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15756:7)
+    at recoverFromConcurrentError (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15226:20)
+    at performConcurrentWorkOnRoot (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15126:22)
+    at flushActQueue (/workspace/BeerSelector/node_modules/react/cjs/react.development.js:2667:24)
+    at act (/workspace/BeerSelector/node_modules/react/cjs/react.development.js:2582:11)
+    at actImplementation (/workspace/BeerSelector/node_modules/@testing-library/react-native/src/act.ts:31:25)
+    at renderWithAct (/workspace/BeerSelector/node_modules/@testing-library/react-native/src/render-act.ts:13:11)
+    at renderInternal (/workspace/BeerSelector/node_modules/@testing-library/react-native/src/render.tsx:69:33)
+    at renderInternal (/workspace/BeerSelector/node_modules/@testing-library/react-native/src/render.tsx:44:10)
+    at Object.&lt;anonymous&gt; (/workspace/BeerSelector/components/beer/__tests__/BeerList.test.tsx:162:33)
+    at Promise.then.completed (/workspace/BeerSelector/node_modules/jest-circus/build/utils.js:298:28)
+    at new Promise (&lt;anonymous&gt;)
+    at callAsyncCircusFn (/workspace/BeerSelector/node_modules/jest-circus/build/utils.js:231:10)
+    at _callCircusTest (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:316:40)
+    at _runTest (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:252:3)
+    at _runTestsForDescribeBlock (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:126:9)
+    at _runTestsForDescribeBlock (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:121:9)
+    at run (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:71:3)
+    at runAndTransformResultsToJestFormat (/workspace/BeerSelector/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapterInit.js:122:21)
+    at jestAdapter (/workspace/BeerSelector/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:79:19)
+    at runTestInternal (/workspace/BeerSelector/node_modules/jest-runner/build/runTest.js:367:16)
+    at runTest (/workspace/BeerSelector/node_modules/jest-runner/build/runTest.js:444:34)
+    at Object.worker (/workspace/BeerSelector/node_modules/jest-runner/build/testWorker.js:106:12)</failure>
+    </testcase>
+    <testcase classname="BeerList accepts all required props without error" name="BeerList accepts all required props without error" time="0.017">
+      <failure>Error: expect(received).not.toThrow()
+
+Error name:    &quot;Error&quot;
+Error message: &quot;No safe area value available. Make sure you are rendering `&lt;SafeAreaProvider&gt;` at the top of your app.&quot;
+
+      48 |   renderItemActions,
+      49 | }) =&gt; {
+    &gt; 50 |   const insets = useSafeAreaInsets();
+         |                                   ^
+      51 |   const tintColor = useThemeColor({}, &apos;tint&apos;);
+      52 |
+      53 |   // Memoize renderItem to prevent unnecessary re-renders of FlatList items
+
+      at useSafeAreaInsets (node_modules/react-native-safe-area-context/src/SafeAreaContext.tsx:126:11)
+      at BeerList (components/beer/BeerList.tsx:50:35)
+      at renderWithHooks (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:5608:18)
+      at mountIndeterminateComponent (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:9884:13)
+      at beginWork (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11351:16)
+      at performUnitOfWork (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15847:12)
+      at workLoopSync (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15784:5)
+      at renderRootSync (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15756:7)
+      at recoverFromConcurrentError (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15226:20)
+      at performConcurrentWorkOnRoot (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15126:22)
+      at flushActQueue (node_modules/react/cjs/react.development.js:2667:24)
+      at act (node_modules/react/cjs/react.development.js:2582:11)
+      at actImplementation (node_modules/@testing-library/react-native/src/act.ts:31:25)
+      at renderWithAct (node_modules/@testing-library/react-native/src/render-act.ts:13:11)
+      at renderInternal (node_modules/@testing-library/react-native/src/render.tsx:69:33)
+      at renderInternal (node_modules/@testing-library/react-native/src/render.tsx:44:10)
+      at components/beer/__tests__/BeerList.test.tsx:180:13
+      at Object.&lt;anonymous&gt; (node_modules/expect/build/toThrowMatchers.js:74:11)
+      at Object.throwingMatcher [as toThrow] (node_modules/expect/build/index.js:320:21)
+      at Object.toThrow (components/beer/__tests__/BeerList.test.tsx:190:11)
+    at Object.toThrow (/workspace/BeerSelector/components/beer/__tests__/BeerList.test.tsx:190:11)
+    at Promise.then.completed (/workspace/BeerSelector/node_modules/jest-circus/build/utils.js:298:28)
+    at new Promise (&lt;anonymous&gt;)
+    at callAsyncCircusFn (/workspace/BeerSelector/node_modules/jest-circus/build/utils.js:231:10)
+    at _callCircusTest (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:316:40)
+    at _runTest (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:252:3)
+    at _runTestsForDescribeBlock (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:126:9)
+    at _runTestsForDescribeBlock (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:121:9)
+    at run (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:71:3)
+    at runAndTransformResultsToJestFormat (/workspace/BeerSelector/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapterInit.js:122:21)
+    at jestAdapter (/workspace/BeerSelector/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:79:19)
+    at runTestInternal (/workspace/BeerSelector/node_modules/jest-runner/build/runTest.js:367:16)
+    at runTest (/workspace/BeerSelector/node_modules/jest-runner/build/runTest.js:444:34)
+    at Object.worker (/workspace/BeerSelector/node_modules/jest-runner/build/testWorker.js:106:12)</failure>
+    </testcase>
+    <testcase classname="BeerList accepts optional props without error" name="BeerList accepts optional props without error" time="0.003">
+      <failure>Error: expect(received).not.toThrow()
+
+Error name:    &quot;Error&quot;
+Error message: &quot;No safe area value available. Make sure you are rendering `&lt;SafeAreaProvider&gt;` at the top of your app.&quot;
+
+      48 |   renderItemActions,
+      49 | }) =&gt; {
+    &gt; 50 |   const insets = useSafeAreaInsets();
+         |                                   ^
+      51 |   const tintColor = useThemeColor({}, &apos;tint&apos;);
+      52 |
+      53 |   // Memoize renderItem to prevent unnecessary re-renders of FlatList items
+
+      at useSafeAreaInsets (node_modules/react-native-safe-area-context/src/SafeAreaContext.tsx:126:11)
+      at BeerList (components/beer/BeerList.tsx:50:35)
+      at renderWithHooks (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:5608:18)
+      at mountIndeterminateComponent (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:9884:13)
+      at beginWork (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11351:16)
+      at performUnitOfWork (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15847:12)
+      at workLoopSync (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15784:5)
+      at renderRootSync (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15756:7)
+      at recoverFromConcurrentError (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15226:20)
+      at performConcurrentWorkOnRoot (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15126:22)
+      at flushActQueue (node_modules/react/cjs/react.development.js:2667:24)
+      at act (node_modules/react/cjs/react.development.js:2582:11)
+      at actImplementation (node_modules/@testing-library/react-native/src/act.ts:31:25)
+      at renderWithAct (node_modules/@testing-library/react-native/src/render-act.ts:13:11)
+      at renderInternal (node_modules/@testing-library/react-native/src/render.tsx:69:33)
+      at renderInternal (node_modules/@testing-library/react-native/src/render.tsx:44:10)
+      at components/beer/__tests__/BeerList.test.tsx:198:13
+      at Object.&lt;anonymous&gt; (node_modules/expect/build/toThrowMatchers.js:74:11)
+      at Object.throwingMatcher [as toThrow] (node_modules/expect/build/index.js:320:21)
+      at Object.toThrow (components/beer/__tests__/BeerList.test.tsx:211:11)
+    at Object.toThrow (/workspace/BeerSelector/components/beer/__tests__/BeerList.test.tsx:211:11)
+    at Promise.then.completed (/workspace/BeerSelector/node_modules/jest-circus/build/utils.js:298:28)
+    at new Promise (&lt;anonymous&gt;)
+    at callAsyncCircusFn (/workspace/BeerSelector/node_modules/jest-circus/build/utils.js:231:10)
+    at _callCircusTest (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:316:40)
+    at _runTest (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:252:3)
+    at _runTestsForDescribeBlock (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:126:9)
+    at _runTestsForDescribeBlock (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:121:9)
+    at run (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:71:3)
+    at runAndTransformResultsToJestFormat (/workspace/BeerSelector/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapterInit.js:122:21)
+    at jestAdapter (/workspace/BeerSelector/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:79:19)
+    at runTestInternal (/workspace/BeerSelector/node_modules/jest-runner/build/runTest.js:367:16)
+    at runTest (/workspace/BeerSelector/node_modules/jest-runner/build/runTest.js:444:34)
+    at Object.worker (/workspace/BeerSelector/node_modules/jest-runner/build/testWorker.js:106:12)</failure>
+    </testcase>
+    <testcase classname="BeerList renders component in loading state" name="BeerList renders component in loading state" time="0.002">
+      <failure>Error: No safe area value available. Make sure you are rendering `&lt;SafeAreaProvider&gt;` at the top of your app.
+    at useSafeAreaInsets (/workspace/BeerSelector/node_modules/react-native-safe-area-context/src/SafeAreaContext.tsx:126:11)
+    at BeerList (/workspace/BeerSelector/components/beer/BeerList.tsx:50:35)
+    at renderWithHooks (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:5608:18)
+    at mountIndeterminateComponent (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:9884:13)
+    at beginWork (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11351:16)
+    at performUnitOfWork (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15847:12)
+    at workLoopSync (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15784:5)
+    at renderRootSync (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15756:7)
+    at recoverFromConcurrentError (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15226:20)
+    at performConcurrentWorkOnRoot (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15126:22)
+    at flushActQueue (/workspace/BeerSelector/node_modules/react/cjs/react.development.js:2667:24)
+    at act (/workspace/BeerSelector/node_modules/react/cjs/react.development.js:2582:11)
+    at actImplementation (/workspace/BeerSelector/node_modules/@testing-library/react-native/src/act.ts:31:25)
+    at renderWithAct (/workspace/BeerSelector/node_modules/@testing-library/react-native/src/render-act.ts:13:11)
+    at renderInternal (/workspace/BeerSelector/node_modules/@testing-library/react-native/src/render.tsx:69:33)
+    at renderInternal (/workspace/BeerSelector/node_modules/@testing-library/react-native/src/render.tsx:44:10)
+    at Object.&lt;anonymous&gt; (/workspace/BeerSelector/components/beer/__tests__/BeerList.test.tsx:216:35)
+    at Promise.then.completed (/workspace/BeerSelector/node_modules/jest-circus/build/utils.js:298:28)
+    at new Promise (&lt;anonymous&gt;)
+    at callAsyncCircusFn (/workspace/BeerSelector/node_modules/jest-circus/build/utils.js:231:10)
+    at _callCircusTest (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:316:40)
+    at _runTest (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:252:3)
+    at _runTestsForDescribeBlock (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:126:9)
+    at _runTestsForDescribeBlock (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:121:9)
+    at run (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:71:3)
+    at runAndTransformResultsToJestFormat (/workspace/BeerSelector/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapterInit.js:122:21)
+    at jestAdapter (/workspace/BeerSelector/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:79:19)
+    at runTestInternal (/workspace/BeerSelector/node_modules/jest-runner/build/runTest.js:367:16)
+    at runTest (/workspace/BeerSelector/node_modules/jest-runner/build/runTest.js:444:34)
+    at Object.worker (/workspace/BeerSelector/node_modules/jest-runner/build/testWorker.js:106:12)</failure>
+    </testcase>
+    <testcase classname="BeerList handles refreshing state" name="BeerList handles refreshing state" time="0.003">
+      <failure>Error: expect(received).not.toThrow()
+
+Error name:    &quot;Error&quot;
+Error message: &quot;No safe area value available. Make sure you are rendering `&lt;SafeAreaProvider&gt;` at the top of your app.&quot;
+
+      48 |   renderItemActions,
+      49 | }) =&gt; {
+    &gt; 50 |   const insets = useSafeAreaInsets();
+         |                                   ^
+      51 |   const tintColor = useThemeColor({}, &apos;tint&apos;);
+      52 |
+      53 |   // Memoize renderItem to prevent unnecessary re-renders of FlatList items
+
+      at useSafeAreaInsets (node_modules/react-native-safe-area-context/src/SafeAreaContext.tsx:126:11)
+      at BeerList (components/beer/BeerList.tsx:50:35)
+      at renderWithHooks (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:5608:18)
+      at mountIndeterminateComponent (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:9884:13)
+      at beginWork (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11351:16)
+      at performUnitOfWork (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15847:12)
+      at workLoopSync (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15784:5)
+      at renderRootSync (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15756:7)
+      at recoverFromConcurrentError (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15226:20)
+      at performConcurrentWorkOnRoot (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15126:22)
+      at flushActQueue (node_modules/react/cjs/react.development.js:2667:24)
+      at act (node_modules/react/cjs/react.development.js:2582:11)
+      at actImplementation (node_modules/@testing-library/react-native/src/act.ts:31:25)
+      at renderWithAct (node_modules/@testing-library/react-native/src/render-act.ts:13:11)
+      at renderInternal (node_modules/@testing-library/react-native/src/render.tsx:69:33)
+      at renderInternal (node_modules/@testing-library/react-native/src/render.tsx:44:10)
+      at components/beer/__tests__/BeerList.test.tsx:234:13
+      at Object.&lt;anonymous&gt; (node_modules/expect/build/toThrowMatchers.js:74:11)
+      at Object.throwingMatcher [as toThrow] (node_modules/expect/build/index.js:320:21)
+      at Object.toThrow (components/beer/__tests__/BeerList.test.tsx:244:11)
+    at Object.toThrow (/workspace/BeerSelector/components/beer/__tests__/BeerList.test.tsx:244:11)
+    at Promise.then.completed (/workspace/BeerSelector/node_modules/jest-circus/build/utils.js:298:28)
+    at new Promise (&lt;anonymous&gt;)
+    at callAsyncCircusFn (/workspace/BeerSelector/node_modules/jest-circus/build/utils.js:231:10)
+    at _callCircusTest (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:316:40)
+    at _runTest (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:252:3)
+    at _runTestsForDescribeBlock (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:126:9)
+    at _runTestsForDescribeBlock (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:121:9)
+    at run (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:71:3)
+    at runAndTransformResultsToJestFormat (/workspace/BeerSelector/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapterInit.js:122:21)
+    at jestAdapter (/workspace/BeerSelector/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:79:19)
+    at runTestInternal (/workspace/BeerSelector/node_modules/jest-runner/build/runTest.js:367:16)
+    at runTest (/workspace/BeerSelector/node_modules/jest-runner/build/runTest.js:444:34)
+    at Object.worker (/workspace/BeerSelector/node_modules/jest-runner/build/testWorker.js:106:12)</failure>
+    </testcase>
+    <testcase classname="BeerList applies correct empty state styling" name="BeerList applies correct empty state styling" time="0.001">
+      <failure>Error: No safe area value available. Make sure you are rendering `&lt;SafeAreaProvider&gt;` at the top of your app.
+    at useSafeAreaInsets (/workspace/BeerSelector/node_modules/react-native-safe-area-context/src/SafeAreaContext.tsx:126:11)
+    at BeerList (/workspace/BeerSelector/components/beer/BeerList.tsx:50:35)
+    at renderWithHooks (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:5608:18)
+    at mountIndeterminateComponent (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:9884:13)
+    at beginWork (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11351:16)
+    at performUnitOfWork (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15847:12)
+    at workLoopSync (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15784:5)
+    at renderRootSync (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15756:7)
+    at recoverFromConcurrentError (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15226:20)
+    at performConcurrentWorkOnRoot (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15126:22)
+    at flushActQueue (/workspace/BeerSelector/node_modules/react/cjs/react.development.js:2667:24)
+    at act (/workspace/BeerSelector/node_modules/react/cjs/react.development.js:2582:11)
+    at actImplementation (/workspace/BeerSelector/node_modules/@testing-library/react-native/src/act.ts:31:25)
+    at renderWithAct (/workspace/BeerSelector/node_modules/@testing-library/react-native/src/render-act.ts:13:11)
+    at renderInternal (/workspace/BeerSelector/node_modules/@testing-library/react-native/src/render.tsx:69:33)
+    at renderInternal (/workspace/BeerSelector/node_modules/@testing-library/react-native/src/render.tsx:44:10)
+    at Object.&lt;anonymous&gt; (/workspace/BeerSelector/components/beer/__tests__/BeerList.test.tsx:249:33)
+    at Promise.then.completed (/workspace/BeerSelector/node_modules/jest-circus/build/utils.js:298:28)
+    at new Promise (&lt;anonymous&gt;)
+    at callAsyncCircusFn (/workspace/BeerSelector/node_modules/jest-circus/build/utils.js:231:10)
+    at _callCircusTest (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:316:40)
+    at _runTest (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:252:3)
+    at _runTestsForDescribeBlock (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:126:9)
+    at _runTestsForDescribeBlock (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:121:9)
+    at run (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:71:3)
+    at runAndTransformResultsToJestFormat (/workspace/BeerSelector/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapterInit.js:122:21)
+    at jestAdapter (/workspace/BeerSelector/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:79:19)
+    at runTestInternal (/workspace/BeerSelector/node_modules/jest-runner/build/runTest.js:367:16)
+    at runTest (/workspace/BeerSelector/node_modules/jest-runner/build/runTest.js:444:34)
+    at Object.worker (/workspace/BeerSelector/node_modules/jest-runner/build/testWorker.js:106:12)</failure>
+    </testcase>
+    <testcase classname="BeerList provides callback functions without error" name="BeerList provides callback functions without error" time="0.005">
+      <failure>Error: expect(received).not.toThrow()
+
+Error name:    &quot;Error&quot;
+Error message: &quot;No safe area value available. Make sure you are rendering `&lt;SafeAreaProvider&gt;` at the top of your app.&quot;
+
+      48 |   renderItemActions,
+      49 | }) =&gt; {
+    &gt; 50 |   const insets = useSafeAreaInsets();
+         |                                   ^
+      51 |   const tintColor = useThemeColor({}, &apos;tint&apos;);
+      52 |
+      53 |   // Memoize renderItem to prevent unnecessary re-renders of FlatList items
+
+      at useSafeAreaInsets (node_modules/react-native-safe-area-context/src/SafeAreaContext.tsx:126:11)
+      at BeerList (components/beer/BeerList.tsx:50:35)
+      at renderWithHooks (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:5608:18)
+      at mountIndeterminateComponent (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:9884:13)
+      at beginWork (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11351:16)
+      at performUnitOfWork (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15847:12)
+      at workLoopSync (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15784:5)
+      at renderRootSync (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15756:7)
+      at recoverFromConcurrentError (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15226:20)
+      at performConcurrentWorkOnRoot (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15126:22)
+      at flushActQueue (node_modules/react/cjs/react.development.js:2667:24)
+      at act (node_modules/react/cjs/react.development.js:2582:11)
+      at actImplementation (node_modules/@testing-library/react-native/src/act.ts:31:25)
+      at renderWithAct (node_modules/@testing-library/react-native/src/render-act.ts:13:11)
+      at renderInternal (node_modules/@testing-library/react-native/src/render.tsx:69:33)
+      at renderInternal (node_modules/@testing-library/react-native/src/render.tsx:44:10)
+      at components/beer/__tests__/BeerList.test.tsx:273:13
+      at Object.&lt;anonymous&gt; (node_modules/expect/build/toThrowMatchers.js:74:11)
+      at Object.throwingMatcher [as toThrow] (node_modules/expect/build/index.js:320:21)
+      at Object.toThrow (components/beer/__tests__/BeerList.test.tsx:283:11)
+    at Object.toThrow (/workspace/BeerSelector/components/beer/__tests__/BeerList.test.tsx:283:11)
+    at Promise.then.completed (/workspace/BeerSelector/node_modules/jest-circus/build/utils.js:298:28)
+    at new Promise (&lt;anonymous&gt;)
+    at callAsyncCircusFn (/workspace/BeerSelector/node_modules/jest-circus/build/utils.js:231:10)
+    at _callCircusTest (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:316:40)
+    at _runTest (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:252:3)
+    at _runTestsForDescribeBlock (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:126:9)
+    at _runTestsForDescribeBlock (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:121:9)
+    at run (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:71:3)
+    at runAndTransformResultsToJestFormat (/workspace/BeerSelector/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapterInit.js:122:21)
+    at jestAdapter (/workspace/BeerSelector/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:79:19)
+    at runTestInternal (/workspace/BeerSelector/node_modules/jest-runner/build/runTest.js:367:16)
+    at runTest (/workspace/BeerSelector/node_modules/jest-runner/build/runTest.js:444:34)
+    at Object.worker (/workspace/BeerSelector/node_modules/jest-runner/build/testWorker.js:106:12)</failure>
+    </testcase>
+    <testcase classname="BeerList handles various empty message formats" name="BeerList handles various empty message formats" time="0.002">
+      <failure>Error: No safe area value available. Make sure you are rendering `&lt;SafeAreaProvider&gt;` at the top of your app.
+    at useSafeAreaInsets (/workspace/BeerSelector/node_modules/react-native-safe-area-context/src/SafeAreaContext.tsx:126:11)
+    at BeerList (/workspace/BeerSelector/components/beer/BeerList.tsx:50:35)
+    at renderWithHooks (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:5608:18)
+    at mountIndeterminateComponent (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:9884:13)
+    at beginWork (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11351:16)
+    at performUnitOfWork (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15847:12)
+    at workLoopSync (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15784:5)
+    at renderRootSync (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15756:7)
+    at recoverFromConcurrentError (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15226:20)
+    at performConcurrentWorkOnRoot (/workspace/BeerSelector/node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15126:22)
+    at flushActQueue (/workspace/BeerSelector/node_modules/react/cjs/react.development.js:2667:24)
+    at act (/workspace/BeerSelector/node_modules/react/cjs/react.development.js:2582:11)
+    at actImplementation (/workspace/BeerSelector/node_modules/@testing-library/react-native/src/act.ts:31:25)
+    at renderWithAct (/workspace/BeerSelector/node_modules/@testing-library/react-native/src/render-act.ts:13:11)
+    at renderInternal (/workspace/BeerSelector/node_modules/@testing-library/react-native/src/render.tsx:69:33)
+    at renderInternal (/workspace/BeerSelector/node_modules/@testing-library/react-native/src/render.tsx:44:10)
+    at /workspace/BeerSelector/components/beer/__tests__/BeerList.test.tsx:296:34
+    at Array.forEach (&lt;anonymous&gt;)
+    at Object.forEach (/workspace/BeerSelector/components/beer/__tests__/BeerList.test.tsx:295:14)
+    at Promise.then.completed (/workspace/BeerSelector/node_modules/jest-circus/build/utils.js:298:28)
+    at new Promise (&lt;anonymous&gt;)
+    at callAsyncCircusFn (/workspace/BeerSelector/node_modules/jest-circus/build/utils.js:231:10)
+    at _callCircusTest (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:316:40)
+    at _runTest (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:252:3)
+    at _runTestsForDescribeBlock (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:126:9)
+    at _runTestsForDescribeBlock (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:121:9)
+    at run (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:71:3)
+    at runAndTransformResultsToJestFormat (/workspace/BeerSelector/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapterInit.js:122:21)
+    at jestAdapter (/workspace/BeerSelector/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:79:19)
+    at runTestInternal (/workspace/BeerSelector/node_modules/jest-runner/build/runTest.js:367:16)
+    at runTest (/workspace/BeerSelector/node_modules/jest-runner/build/runTest.js:444:34)
+    at Object.worker (/workspace/BeerSelector/node_modules/jest-runner/build/testWorker.js:106:12)</failure>
+    </testcase>
+    <testcase classname="BeerList accepts valid Beer objects" name="BeerList accepts valid Beer objects" time="0.004">
+      <failure>Error: expect(received).not.toThrow()
+
+Error name:    &quot;Error&quot;
+Error message: &quot;No safe area value available. Make sure you are rendering `&lt;SafeAreaProvider&gt;` at the top of your app.&quot;
+
+      48 |   renderItemActions,
+      49 | }) =&gt; {
+    &gt; 50 |   const insets = useSafeAreaInsets();
+         |                                   ^
+      51 |   const tintColor = useThemeColor({}, &apos;tint&apos;);
+      52 |
+      53 |   // Memoize renderItem to prevent unnecessary re-renders of FlatList items
+
+      at useSafeAreaInsets (node_modules/react-native-safe-area-context/src/SafeAreaContext.tsx:126:11)
+      at BeerList (components/beer/BeerList.tsx:50:35)
+      at renderWithHooks (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:5608:18)
+      at mountIndeterminateComponent (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:9884:13)
+      at beginWork (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11351:16)
+      at performUnitOfWork (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15847:12)
+      at workLoopSync (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15784:5)
+      at renderRootSync (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15756:7)
+      at recoverFromConcurrentError (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15226:20)
+      at performConcurrentWorkOnRoot (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15126:22)
+      at flushActQueue (node_modules/react/cjs/react.development.js:2667:24)
+      at act (node_modules/react/cjs/react.development.js:2582:11)
+      at actImplementation (node_modules/@testing-library/react-native/src/act.ts:31:25)
+      at renderWithAct (node_modules/@testing-library/react-native/src/render-act.ts:13:11)
+      at renderInternal (node_modules/@testing-library/react-native/src/render.tsx:69:33)
+      at renderInternal (node_modules/@testing-library/react-native/src/render.tsx:44:10)
+      at components/beer/__tests__/BeerList.test.tsx:331:13
+      at Object.&lt;anonymous&gt; (node_modules/expect/build/toThrowMatchers.js:74:11)
+      at Object.throwingMatcher [as toThrow] (node_modules/expect/build/index.js:320:21)
+      at Object.toThrow (components/beer/__tests__/BeerList.test.tsx:341:11)
+    at Object.toThrow (/workspace/BeerSelector/components/beer/__tests__/BeerList.test.tsx:341:11)
+    at Promise.then.completed (/workspace/BeerSelector/node_modules/jest-circus/build/utils.js:298:28)
+    at new Promise (&lt;anonymous&gt;)
+    at callAsyncCircusFn (/workspace/BeerSelector/node_modules/jest-circus/build/utils.js:231:10)
+    at _callCircusTest (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:316:40)
+    at _runTest (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:252:3)
+    at _runTestsForDescribeBlock (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:126:9)
+    at _runTestsForDescribeBlock (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:121:9)
+    at run (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:71:3)
+    at runAndTransformResultsToJestFormat (/workspace/BeerSelector/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapterInit.js:122:21)
+    at jestAdapter (/workspace/BeerSelector/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:79:19)
+    at runTestInternal (/workspace/BeerSelector/node_modules/jest-runner/build/runTest.js:367:16)
+    at runTest (/workspace/BeerSelector/node_modules/jest-runner/build/runTest.js:444:34)
+    at Object.worker (/workspace/BeerSelector/node_modules/jest-runner/build/testWorker.js:106:12)</failure>
+    </testcase>
+    <testcase classname="BeerList handles boolean props correctly" name="BeerList handles boolean props correctly" time="0.003">
+      <failure>Error: expect(received).not.toThrow()
+
+Error name:    &quot;Error&quot;
+Error message: &quot;No safe area value available. Make sure you are rendering `&lt;SafeAreaProvider&gt;` at the top of your app.&quot;
+
+      48 |   renderItemActions,
+      49 | }) =&gt; {
+    &gt; 50 |   const insets = useSafeAreaInsets();
+         |                                   ^
+      51 |   const tintColor = useThemeColor({}, &apos;tint&apos;);
+      52 |
+      53 |   // Memoize renderItem to prevent unnecessary re-renders of FlatList items
+
+      at useSafeAreaInsets (node_modules/react-native-safe-area-context/src/SafeAreaContext.tsx:126:11)
+      at BeerList (components/beer/BeerList.tsx:50:35)
+      at renderWithHooks (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:5608:18)
+      at mountIndeterminateComponent (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:9884:13)
+      at beginWork (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11351:16)
+      at performUnitOfWork (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15847:12)
+      at workLoopSync (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15784:5)
+      at renderRootSync (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15756:7)
+      at recoverFromConcurrentError (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15226:20)
+      at performConcurrentWorkOnRoot (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:15126:22)
+      at flushActQueue (node_modules/react/cjs/react.development.js:2667:24)
+      at act (node_modules/react/cjs/react.development.js:2582:11)
+      at actImplementation (node_modules/@testing-library/react-native/src/act.ts:31:25)
+      at renderWithAct (node_modules/@testing-library/react-native/src/render-act.ts:13:11)
+      at renderInternal (node_modules/@testing-library/react-native/src/render.tsx:69:33)
+      at renderInternal (node_modules/@testing-library/react-native/src/render.tsx:44:10)
+      at components/beer/__tests__/BeerList.test.tsx:355:15
+      at Object.&lt;anonymous&gt; (node_modules/expect/build/toThrowMatchers.js:74:11)
+      at Object.throwingMatcher [as toThrow] (node_modules/expect/build/index.js:320:21)
+      at toThrow (components/beer/__tests__/BeerList.test.tsx:365:13)
+          at Array.forEach (&lt;anonymous&gt;)
+      at Object.forEach (components/beer/__tests__/BeerList.test.tsx:353:15)
+    at toThrow (/workspace/BeerSelector/components/beer/__tests__/BeerList.test.tsx:365:13)
+    at Array.forEach (&lt;anonymous&gt;)
+    at Object.forEach (/workspace/BeerSelector/components/beer/__tests__/BeerList.test.tsx:353:15)
+    at Promise.then.completed (/workspace/BeerSelector/node_modules/jest-circus/build/utils.js:298:28)
+    at new Promise (&lt;anonymous&gt;)
+    at callAsyncCircusFn (/workspace/BeerSelector/node_modules/jest-circus/build/utils.js:231:10)
+    at _callCircusTest (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:316:40)
+    at _runTest (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:252:3)
+    at _runTestsForDescribeBlock (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:126:9)
+    at _runTestsForDescribeBlock (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:121:9)
+    at run (/workspace/BeerSelector/node_modules/jest-circus/build/run.js:71:3)
+    at runAndTransformResultsToJestFormat (/workspace/BeerSelector/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapterInit.js:122:21)
+    at jestAdapter (/workspace/BeerSelector/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:79:19)
+    at runTestInternal (/workspace/BeerSelector/node_modules/jest-runner/build/runTest.js:367:16)
+    at runTest (/workspace/BeerSelector/node_modules/jest-runner/build/runTest.js:444:34)
+    at Object.worker (/workspace/BeerSelector/node_modules/jest-runner/build/testWorker.js:106:12)</failure>
     </testcase>
   </testsuite>
 </testsuites>

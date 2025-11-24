@@ -10,7 +10,7 @@ interface SearchBarProps {
   placeholder?: string;
 }
 
-export const SearchBar: React.FC<SearchBarProps> = ({
+const SearchBarComponent: React.FC<SearchBarProps> = ({
   searchText,
   onSearchChange,
   onClear,
@@ -43,6 +43,9 @@ export const SearchBar: React.FC<SearchBarProps> = ({
     </View>
   );
 };
+
+// Export memoized component to prevent unnecessary re-renders
+export const SearchBar = React.memo(SearchBarComponent);
 
 const styles = StyleSheet.create({
   container: {

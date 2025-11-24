@@ -87,11 +87,13 @@ export const BeerList: React.FC<BeerListProps> = ({
           colors={[tintColor]}
         />
       }
-      initialNumToRender={20}
-      maxToRenderPerBatch={20}
-      // MP-3 Bottleneck #6: windowSize=11 reduces memory by 30-40% (210→110 items)
-      windowSize={11}
+      // Performance optimization: Reduce initial render and batch sizes for 60+ FPS
+      initialNumToRender={10}
+      maxToRenderPerBatch={10}
+      // MP-3 Final: windowSize=5 (2.5 above + 2.5 below viewport) for optimal scroll FPS
+      windowSize={5}
       removeClippedSubviews={true}
+      updateCellsBatchingPeriod={50}
       getItemLayout={(data, index) => ({
         length: EXPECTED_ITEM_HEIGHT,
         offset: EXPECTED_ITEM_HEIGHT * index,
