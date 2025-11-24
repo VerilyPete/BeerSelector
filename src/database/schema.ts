@@ -175,37 +175,50 @@ export const setupTables = async (database: SQLiteDatabase): Promise<void> => {
     console.log(`Current schema version: ${currentVersion}`);
 
     if (currentVersion === 0) {
-      // First-time setup - create all tables
-      await database.withTransactionAsync(async () => {
-        // Create all tables
-        await database.execAsync(CREATE_ALLBEERS_TABLE);
-        await database.execAsync(CREATE_TASTED_BREW_TABLE);
-        await database.execAsync(CREATE_REWARDS_TABLE);
-        await database.execAsync(CREATE_PREFERENCES_TABLE);
-        await database.execAsync(CREATE_UNTAPPD_TABLE);
-        await database.execAsync(CREATE_OPERATION_QUEUE_TABLE);
+      // Check if this is a truly fresh install or an existing database without versioning
+      // (e.g., upgrading from TestFlight build that didn't have schema_version table)
+      const tableCheck = await database.getAllAsync<{ name: string }>(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='allbeers'"
+      );
 
-        // Create indexes for operation_queue table
-        // These indexes improve query performance for getPendingOperations() and other status/timestamp-based queries
-        await database.execAsync(`
-          CREATE INDEX IF NOT EXISTS idx_operation_queue_status
-          ON operation_queue(status);
-        `);
+      if (tableCheck.length > 0) {
+        // Tables already exist - this is an upgrade from pre-versioned database
+        // Treat as migration from version 2 (or earlier)
+        console.log('Detected existing database without schema versioning - running migration...');
+        await runMigrations(database, 2); // Assume v2 schema (no glass_type)
+      } else {
+        // Truly fresh install - create all tables at latest version
+        console.log('Fresh install detected - creating tables at latest version...');
+        await database.withTransactionAsync(async () => {
+          // Create all tables
+          await database.execAsync(CREATE_ALLBEERS_TABLE);
+          await database.execAsync(CREATE_TASTED_BREW_TABLE);
+          await database.execAsync(CREATE_REWARDS_TABLE);
+          await database.execAsync(CREATE_PREFERENCES_TABLE);
+          await database.execAsync(CREATE_UNTAPPD_TABLE);
+          await database.execAsync(CREATE_OPERATION_QUEUE_TABLE);
 
-        await database.execAsync(`
-          CREATE INDEX IF NOT EXISTS idx_operation_queue_timestamp
-          ON operation_queue(timestamp);
-        `);
+          // Create indexes for operation_queue table
+          await database.execAsync(`
+            CREATE INDEX IF NOT EXISTS idx_operation_queue_status
+            ON operation_queue(status);
+          `);
 
-        console.log('[Database] Created operation_queue indexes');
+          await database.execAsync(`
+            CREATE INDEX IF NOT EXISTS idx_operation_queue_timestamp
+            ON operation_queue(timestamp);
+          `);
 
-        // Record initial schema version at current version (includes glass_type columns)
-        await recordMigration(database, CURRENT_SCHEMA_VERSION);
-        console.log(`Initial schema created at version ${CURRENT_SCHEMA_VERSION}`);
-      });
+          console.log('[Database] Created operation_queue indexes');
 
-      // Initialize preferences with default values
-      await initializeDefaultPreferences(database);
+          // Record initial schema version at current version (includes glass_type columns)
+          await recordMigration(database, CURRENT_SCHEMA_VERSION);
+          console.log(`Initial schema created at version ${CURRENT_SCHEMA_VERSION}`);
+        });
+
+        // Initialize preferences with default values
+        await initializeDefaultPreferences(database);
+      }
     } else if (currentVersion < CURRENT_SCHEMA_VERSION) {
       // Run migrations if needed (only for existing databases, not fresh installs)
       await runMigrations(database, currentVersion);
