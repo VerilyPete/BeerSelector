@@ -12,12 +12,15 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 import { initializeBeerDatabase } from '@/src/database/db';
 import { getPreference, setPreference, areApiUrlsConfigured } from '@/src/database/preferences';
 import { getDatabase, closeDatabaseConnection } from '@/src/database/connection';
+import { getCurrentSchemaVersion, CURRENT_SCHEMA_VERSION } from '@/src/database/schemaVersion';
+import { migrateToVersion3 } from '@/src/database/migrations/migrateToV3';
 import { AppProvider } from '@/context/AppContext';
 import { NetworkProvider } from '@/context/NetworkContext';
 import { OperationQueueProvider } from '@/context/OperationQueueContext';
 import { OptimisticUpdateProvider } from '@/context/OptimisticUpdateContext';
 import { OfflineIndicator } from '@/components/OfflineIndicator';
 import { QueuedOperationsManager } from '@/components/QueuedOperationsManager';
+import { MigrationProgressOverlay } from '@/components/MigrationProgressOverlay';
 
 // Disable react-devtools connection to port 8097
 if (__DEV__) {
@@ -54,6 +57,7 @@ export default function RootLayout() {
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
   const [initialRoute, setInitialRoute] = useState<string | null>(null);
+  const [migrationProgress, setMigrationProgress] = useState<number | null>(null);
   const initializationStarted = useRef(false);
   const lifecycleOperationInProgress = useRef(false);
 
@@ -75,6 +79,24 @@ export default function RootLayout() {
           await initializeBeerDatabase();
           dbInitialized = true;
           console.log('Database initialized successfully');
+
+          // Check for schema migrations
+          const db = await getDatabase();
+          const currentVersion = await getCurrentSchemaVersion(db);
+
+          if (currentVersion < CURRENT_SCHEMA_VERSION) {
+            console.log(`Migration needed from version ${currentVersion} to ${CURRENT_SCHEMA_VERSION}...`);
+            setMigrationProgress(0);
+
+            // Run migration with progress callback
+            await migrateToVersion3(db, (current, total) => {
+              const progress = (current / total) * 100;
+              setMigrationProgress(progress);
+            });
+
+            setMigrationProgress(null);
+            console.log('Migration complete, reloading app state...');
+          }
 
           // Check if API URLs are set using centralized helper
           const apiUrlsConfigured = await areApiUrlsConfigured();
@@ -213,6 +235,10 @@ export default function RootLayout() {
                 <OfflineIndicator />
                 <QueuedOperationsManager />
                 <StatusBar style="auto" />
+                {/* Show migration overlay when migrating */}
+                {migrationProgress !== null && (
+                  <MigrationProgressOverlay progress={migrationProgress} />
+                )}
               </ThemeProvider>
             </AppProvider>
           </OperationQueueProvider>

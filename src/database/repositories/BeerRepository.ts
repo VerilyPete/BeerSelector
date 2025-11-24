@@ -6,11 +6,12 @@
  */
 
 import { getDatabase } from '../connection';
-import { Beer } from '../../types/beer';
+import { Beer, BeerWithGlassType } from '../../types/beer';
 import { databaseLockManager } from '../locks';
 import {
   isAllBeersRow,
   allBeersRowToBeer,
+  allBeersRowToBeerWithGlassType,
   AllBeersRow
 } from '../schemaTypes';
 
@@ -31,9 +32,9 @@ export class BeerRepository {
    * Skips beers without valid IDs.
    * Uses database lock to prevent concurrent operations.
    *
-   * @param beers - Array of Beer objects to insert
+   * @param beers - Array of BeerWithGlassType objects to insert
    */
-  async insertMany(beers: Beer[]): Promise<void> {
+  async insertMany(beers: BeerWithGlassType[]): Promise<void> {
     // Acquire database lock to prevent concurrent operations
     if (!await databaseLockManager.acquireLock('BeerRepository.insertMany')) {
       throw new Error('Could not acquire database lock for beer insertion');
@@ -53,18 +54,18 @@ export class BeerRepository {
    * UNSAFE: This method does NOT acquire a database lock.
    * Only use when already holding a master lock (e.g., in sequential refresh).
    *
-   * @param beers - Array of Beer objects to insert
+   * @param beers - Array of BeerWithGlassType objects to insert
    */
-  async insertManyUnsafe(beers: Beer[]): Promise<void> {
+  async insertManyUnsafe(beers: BeerWithGlassType[]): Promise<void> {
     await this._insertManyInternal(beers);
   }
 
   /**
    * Internal implementation of beer insertion (shared by locked and unlocked variants)
    *
-   * @param beers - Array of Beer objects to insert
+   * @param beers - Array of BeerWithGlassType objects to insert
    */
-  private async _insertManyInternal(beers: Beer[]): Promise<void> {
+  private async _insertManyInternal(beers: BeerWithGlassType[]): Promise<void> {
     const database = await getDatabase();
 
     // Always refresh the allbeers table with the latest data
@@ -91,8 +92,8 @@ export class BeerRepository {
           await database.runAsync(
             `INSERT OR REPLACE INTO allbeers (
               id, added_date, brew_name, brewer, brewer_loc,
-              brew_style, brew_container, review_count, review_rating, brew_description
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              brew_style, brew_container, review_count, review_rating, brew_description, glass_type
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
               beer.id,
               beer.added_date || '',
@@ -103,7 +104,8 @@ export class BeerRepository {
               beer.brew_container || '',
               beer.review_count || '',
               beer.review_rating || '',
-              beer.brew_description || ''
+              beer.brew_description || '',
+              beer.glass_type
             ]
           );
         }
@@ -131,9 +133,9 @@ export class BeerRepository {
    * Orders by added_date DESC.
    * Validates all rows with type guards and filters out invalid data.
    *
-   * @returns Array of Beer objects
+   * @returns Array of BeerWithGlassType objects
    */
-  async getAll(): Promise<Beer[]> {
+  async getAll(): Promise<BeerWithGlassType[]> {
     const database = await getDatabase();
 
     try {
@@ -144,7 +146,7 @@ export class BeerRepository {
       // Validate and convert each row
       return rows
         .filter(row => isAllBeersRow(row))
-        .map(row => allBeersRowToBeer(row));
+        .map(row => allBeersRowToBeerWithGlassType(row));
     } catch (error) {
       console.error('Error getting beers from database:', error);
       throw error;

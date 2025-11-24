@@ -9,6 +9,7 @@ import { rewardsRepository } from '../database/repositories/RewardsRepository';
 import { databaseLockManager } from '../database/DatabaseLockManager';
 import { validateBrewInStockResponse, validateBeerArray, validateRewardsResponse } from '../api/validators';
 import { logError, logWarning } from '../utils/errorLogger';
+import { calculateGlassTypes } from '../database/utils/glassTypeCalculator';
 
 /**
  * Result of a data update operation
@@ -184,8 +185,12 @@ export async function fetchAndUpdateAllBeers(): Promise<DataUpdateResult> {
       };
     }
 
-    // Update the database with valid beers only
-    await beerRepository.insertMany(validationResult.validBeers);
+    // Calculate glass types BEFORE insertion
+    console.log('Calculating glass types for beers...');
+    const beersWithGlassTypes = calculateGlassTypes(validationResult.validBeers);
+
+    // Update the database with valid beers including glass types
+    await beerRepository.insertMany(beersWithGlassTypes);
 
     // Update the last update timestamp
     await setPreference('all_beers_last_update', new Date().toISOString());
@@ -394,8 +399,12 @@ export async function fetchAndUpdateMyBeers(): Promise<DataUpdateResult> {
       };
     }
 
-    // Update the database with the valid beers
-    await myBeersRepository.insertMany(validBeers);
+    // Calculate glass types BEFORE insertion
+    console.log('Calculating glass types for tasted beers...');
+    const beersWithGlassTypes = calculateGlassTypes(validBeers);
+
+    // Update the database with the valid beers including glass types
+    await myBeersRepository.insertMany(beersWithGlassTypes);
 
     // Update the last update timestamp
     await setPreference('my_beers_last_update', new Date().toISOString());

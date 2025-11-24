@@ -15,7 +15,7 @@
  */
 
 import { z } from 'zod';
-import { Beer, Beerfinder } from '../types/beer';
+import { Beer, Beerfinder, BeerWithGlassType, BeerfinderWithGlassType } from '../types/beer';
 import { Reward, Preference, UntappdCookie } from '../types/database';
 
 // ============================================================================
@@ -36,7 +36,8 @@ import { Reward, Preference, UntappdCookie } from '../types/database';
  *   brew_container TEXT,
  *   review_count TEXT,
  *   review_rating TEXT,
- *   brew_description TEXT
+ *   brew_description TEXT,
+ *   glass_type TEXT -- Added in schema v3
  * )
  *
  * Required fields: id, brew_name (non-empty)
@@ -55,6 +56,7 @@ export const allBeersRowSchema = z.object({
   review_count: z.string().optional(),
   review_rating: z.string().optional(),
   brew_description: z.string().optional(),
+  glass_type: z.union([z.literal('pint'), z.literal('tulip'), z.null()]).optional(),
 });
 
 /**
@@ -91,6 +93,26 @@ export function allBeersRowToBeer(row: AllBeersRow): Beer {
   };
 }
 
+/**
+ * Convert AllBeersRow to BeerWithGlassType domain model
+ * Used after schema v3 migration when glass_type is guaranteed to be present
+ */
+export function allBeersRowToBeerWithGlassType(row: AllBeersRow): BeerWithGlassType {
+  return {
+    id: typeof row.id === 'number' ? String(row.id) : row.id,
+    added_date: row.added_date,
+    brew_name: row.brew_name,
+    brewer: row.brewer,
+    brewer_loc: row.brewer_loc,
+    brew_style: row.brew_style,
+    brew_container: row.brew_container,
+    review_count: row.review_count,
+    review_rating: row.review_rating,
+    brew_description: row.brew_description,
+    glass_type: row.glass_type ?? null, // Guaranteed to be present after migration
+  };
+}
+
 // ============================================================================
 // TastedBrew Table (tasted_brew_current_round)
 // ============================================================================
@@ -111,7 +133,8 @@ export function allBeersRowToBeer(row: AllBeersRow): Beer {
  *   review_count TEXT,
  *   review_ratings TEXT,
  *   brew_description TEXT,
- *   chit_code TEXT
+ *   chit_code TEXT,
+ *   glass_type TEXT -- Added in schema v3
  * )
  *
  * Required fields: id, brew_name (non-empty)
@@ -130,6 +153,7 @@ export const tastedBrewRowSchema = z.object({
   review_ratings: z.string().optional(),
   brew_description: z.string().optional(),
   chit_code: z.string().optional(),
+  glass_type: z.union([z.literal('pint'), z.literal('tulip'), z.null()]).optional(),
 });
 
 /**
@@ -161,6 +185,28 @@ export function tastedBrewRowToBeerfinder(row: TastedBrewRow): Beerfinder {
     review_ratings: row.review_ratings,
     brew_description: row.brew_description,
     chit_code: row.chit_code,
+  };
+}
+
+/**
+ * Convert TastedBrewRow to BeerfinderWithGlassType domain model
+ * Used after schema v3 migration when glass_type is guaranteed to be present
+ */
+export function tastedBrewRowToBeerfinderWithGlassType(row: TastedBrewRow): BeerfinderWithGlassType {
+  return {
+    id: row.id,
+    roh_lap: row.roh_lap,
+    tasted_date: row.tasted_date,
+    brew_name: row.brew_name,
+    brewer: row.brewer,
+    brewer_loc: row.brewer_loc,
+    brew_style: row.brew_style,
+    brew_container: row.brew_container,
+    review_count: row.review_count,
+    review_ratings: row.review_ratings,
+    brew_description: row.brew_description,
+    chit_code: row.chit_code,
+    glass_type: row.glass_type ?? null, // Guaranteed to be present after migration
   };
 }
 
