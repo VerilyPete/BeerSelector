@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Beer, Beerfinder } from '@/src/types/beer';
+import { BeerWithGlassType, BeerfinderWithGlassType } from '@/src/types/beer';
 
-// Union type to allow both Beer and Beerfinder
-type FilterableBeer = Beer | Beerfinder;
+// Union type to allow both BeerWithGlassType and BeerfinderWithGlassType
+// These branded types guarantee the glass_type property is present
+type FilterableBeer = BeerWithGlassType | BeerfinderWithGlassType;
 
 type SortOption = 'date' | 'name';
 

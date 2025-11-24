@@ -5,10 +5,11 @@ import { ThemedView } from '../ThemedView';
 import { ThemedText } from '../ThemedText';
 import { BeerItem } from './BeerItem';
 import { useThemeColor } from '@/hooks/useThemeColor';
-import { Beer, Beerfinder } from '@/src/types/beer';
+import { BeerWithGlassType, BeerfinderWithGlassType } from '@/src/types/beer';
 
-// Union type to accept both Beer and Beerfinder
-type DisplayableBeer = Beer | Beerfinder;
+// Union type to accept both BeerWithGlassType and BeerfinderWithGlassType
+// These branded types guarantee the glass_type property is present
+type DisplayableBeer = BeerWithGlassType | BeerfinderWithGlassType;
 
 type BeerListProps = {
   beers: DisplayableBeer[];

@@ -31,7 +31,7 @@ import { Alert } from 'react-native';
 import { getSessionData } from '@/src/api/sessionManager';
 import { isVisitorMode as checkIsVisitorMode } from '@/src/api/authService';
 import type { SessionData } from '@/src/types/api';
-import type { Beer, Beerfinder } from '@/src/types/beer';
+import type { BeerWithGlassType, BeerfinderWithGlassType } from '@/src/types/beer';
 import type { Reward } from '@/src/types/database';
 import { beerRepository } from '@/src/database/repositories/BeerRepository';
 import { myBeersRepository } from '@/src/database/repositories/MyBeersRepository';
@@ -128,11 +128,11 @@ export interface SessionState {
  * Beer list state interface
  */
 export interface BeerState {
-  /** All beers from the Flying Saucer API */
-  allBeers: Beer[];
+  /** All beers from the Flying Saucer API (with pre-computed glass types) */
+  allBeers: BeerWithGlassType[];
 
-  /** Beers the user has tasted (Beerfinder data) */
-  tastedBeers: Beerfinder[];
+  /** Beers the user has tasted (Beerfinder data with pre-computed glass types) */
+  tastedBeers: BeerfinderWithGlassType[];
 
   /** User's rewards from UFO Club */
   rewards: Reward[];
@@ -222,10 +222,10 @@ export interface AppContextValue extends AppState {
 
   // Beer list actions
   /** Update all beers list */
-  setAllBeers: (beers: Beer[]) => void;
+  setAllBeers: (beers: BeerWithGlassType[]) => void;
 
   /** Update tasted beers list */
-  setTastedBeers: (beers: Beerfinder[]) => void;
+  setTastedBeers: (beers: BeerfinderWithGlassType[]) => void;
 
   /** Update rewards list */
   setRewards: (rewards: Reward[]) => void;
@@ -532,11 +532,11 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   // BEER LIST ACTIONS
   // ============================================================================
 
-  const setAllBeers = useCallback((newBeers: Beer[]) => {
+  const setAllBeers = useCallback((newBeers: BeerWithGlassType[]) => {
     setBeers((prev) => ({ ...prev, allBeers: newBeers }));
   }, []);
 
-  const setTastedBeers = useCallback((newBeers: Beerfinder[]) => {
+  const setTastedBeers = useCallback((newBeers: BeerfinderWithGlassType[]) => {
     setBeers((prev) => ({ ...prev, tastedBeers: newBeers }));
   }, []);
 
