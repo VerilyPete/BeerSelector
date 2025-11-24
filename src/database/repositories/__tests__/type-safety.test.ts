@@ -13,7 +13,7 @@
 import { BeerRepository } from '../BeerRepository';
 import { MyBeersRepository } from '../MyBeersRepository';
 import { RewardsRepository } from '../RewardsRepository';
-import { Beer, Beerfinder } from '@/src/types/beer';
+import { Beer, Beerfinder, BeerWithGlassType } from '@/src/types/beer';
 import { Reward } from '@/src/types/database';
 import { AllBeersRow, TastedBrewRow, RewardRow } from '../../schemaTypes';
 
@@ -128,7 +128,7 @@ describe('Repository Type Safety', () => {
       const { getDatabase } = require('../../connection');
       getDatabase.mockResolvedValue(mockDb);
 
-      const validBeers: Beer[] = [
+      const validBeers: BeerWithGlassType[] = [
         {
           id: '1',
           brew_name: 'Test Beer',
@@ -136,6 +136,7 @@ describe('Repository Type Safety', () => {
           brewer: 'Test Brewery',
           brewer_loc: 'Austin, TX',
           brew_style: 'IPA',
+          glass_type: 'pint',
         },
       ];
 

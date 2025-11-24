@@ -29,7 +29,8 @@ export const CREATE_ALLBEERS_TABLE = `
     brew_container TEXT,
     review_count TEXT,
     review_rating TEXT,
-    brew_description TEXT
+    brew_description TEXT,
+    glass_type TEXT
   )
 `;
 
@@ -55,7 +56,8 @@ export const CREATE_TASTED_BREW_TABLE = `
     review_count TEXT,
     review_ratings TEXT,
     brew_description TEXT,
-    chit_code TEXT
+    chit_code TEXT,
+    glass_type TEXT
   )
 `;
 

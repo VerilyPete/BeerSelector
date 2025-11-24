@@ -6,14 +6,14 @@
  */
 
 import { getDatabase } from '../connection';
-import { Beerfinder } from '../../types/beer';
+import { BeerfinderWithGlassType } from '../../types/beer';
 import { databaseLockManager } from '../locks';
 import {
   TastedBrewRow,
   TableInfo,
   ColumnInfo,
   isTastedBrewRow,
-  tastedBrewRowToBeerfinder,
+  tastedBrewRowToBeerfinderWithGlassType,
   isCountResult
 } from '../schemaTypes';
 
@@ -35,9 +35,9 @@ export class MyBeersRepository {
    * - Processes in batches of 20
    * - Uses database lock to prevent concurrent operations
    *
-   * @param beers - Array of Beerfinder objects to insert
+   * @param beers - Array of BeerfinderWithGlassType objects to insert
    */
-  async insertMany(beers: Beerfinder[]): Promise<void> {
+  async insertMany(beers: BeerfinderWithGlassType[]): Promise<void> {
     console.log(`DB: Populating My Beers table with ${beers.length} beers`);
 
     // Acquire database lock to prevent concurrent operations
@@ -106,8 +106,8 @@ export class MyBeersRepository {
                   `INSERT OR REPLACE INTO tasted_brew_current_round (
                     id, roh_lap, tasted_date, brew_name, brewer, brewer_loc,
                     brew_style, brew_container, review_count, review_ratings,
-                    brew_description, chit_code
-                  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    brew_description, chit_code, glass_type
+                  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                   [
                     beer.id,
                     beer.roh_lap || '',
@@ -120,7 +120,8 @@ export class MyBeersRepository {
                     beer.review_count || '',
                     beer.review_ratings || '',
                     beer.brew_description || '',
-                    beer.chit_code || ''
+                    beer.chit_code || '',
+                    beer.glass_type ?? null
                   ]
                 );
               } catch (err) {
@@ -159,9 +160,9 @@ export class MyBeersRepository {
    * Use case: When a parent function needs to coordinate multiple operations
    * under a single lock (e.g., fetchAndPopulateMyBeers).
    *
-   * @param beers - Array of Beerfinder objects to insert
+   * @param beers - Array of BeerfinderWithGlassType objects to insert
    */
-  async insertManyUnsafe(beers: Beerfinder[]): Promise<void> {
+  async insertManyUnsafe(beers: BeerfinderWithGlassType[]): Promise<void> {
     console.log(`DB: Populating My Beers table with ${beers.length} beers (UNSAFE - lock assumed held)`);
 
     const database = await getDatabase();
@@ -224,8 +225,8 @@ export class MyBeersRepository {
                 `INSERT OR REPLACE INTO tasted_brew_current_round (
                   id, roh_lap, tasted_date, brew_name, brewer, brewer_loc,
                   brew_style, brew_container, review_count, review_ratings,
-                  brew_description, chit_code
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                  brew_description, chit_code, glass_type
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
                   beer.id,
                   beer.roh_lap || '',
@@ -238,7 +239,8 @@ export class MyBeersRepository {
                   beer.review_count || '',
                   beer.review_ratings || '',
                   beer.brew_description || '',
-                  beer.chit_code || ''
+                  beer.chit_code || '',
+                  beer.glass_type ?? null
                 ]
               );
             } catch (err) {
@@ -268,9 +270,9 @@ export class MyBeersRepository {
    * Orders by id.
    * Validates all rows with type guards and filters out invalid data.
    *
-   * @returns Array of Beerfinder objects
+   * @returns Array of BeerfinderWithGlassType objects
    */
-  async getAll(): Promise<Beerfinder[]> {
+  async getAll(): Promise<BeerfinderWithGlassType[]> {
     const database = await getDatabase();
 
     try {
@@ -283,7 +285,7 @@ export class MyBeersRepository {
       // Validate and convert each row
       const validBeers = rows
         .filter(row => isTastedBrewRow(row))
-        .map(row => tastedBrewRowToBeerfinder(row));
+        .map(row => tastedBrewRowToBeerfinderWithGlassType(row));
 
       console.log(`DB: ${validBeers.length} valid tasted beers after validation`);
 
@@ -320,9 +322,9 @@ export class MyBeersRepository {
    * Validates the result with type guards before returning.
    *
    * @param id - The beer ID to search for
-   * @returns Beerfinder object if found and valid, null otherwise
+   * @returns BeerfinderWithGlassType object if found and valid, null otherwise
    */
-  async getById(id: string): Promise<Beerfinder | null> {
+  async getById(id: string): Promise<BeerfinderWithGlassType | null> {
     const database = await getDatabase();
 
     try {
@@ -333,7 +335,7 @@ export class MyBeersRepository {
 
       // Validate and convert the row
       if (row && isTastedBrewRow(row)) {
-        return tastedBrewRowToBeerfinder(row);
+        return tastedBrewRowToBeerfinderWithGlassType(row);
       }
 
       return null;

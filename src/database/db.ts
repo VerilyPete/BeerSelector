@@ -22,6 +22,7 @@ import { fetchBeersFromAPI, fetchMyBeersFromAPI, fetchRewardsFromAPI } from '../
 import { beerRepository } from './repositories/BeerRepository';
 import { myBeersRepository } from './repositories/MyBeersRepository';
 import { rewardsRepository } from './repositories/RewardsRepository';
+import { calculateGlassTypes } from './utils/glassTypeCalculator';
 
 // ============================================================================
 // DATABASE INITIALIZATION CONFIGURATION
@@ -176,7 +177,9 @@ export const initializeBeerDatabase = async (): Promise<void> => {
     // Fetch all beers (blocking - we need this immediately for the UI)
     try {
       const beers = await fetchBeersFromAPI();
-      await beerRepository.insertMany(beers);
+      // Calculate glass types before insertion
+      const beersWithGlassTypes = calculateGlassTypes(beers);
+      await beerRepository.insertMany(beersWithGlassTypes);
     } catch (error) {
       console.error('Error fetching and populating all beers:', error);
     }
