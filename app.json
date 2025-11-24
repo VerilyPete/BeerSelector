@@ -11,6 +11,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "org.verily.FSbeerselector",
+      "usesNonExemptEncryption": false,
       "buildNumber": "36",
       "infoPlist": {
         "UIBackgroundModes": []
@@ -21,7 +22,7 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.yourcompany.beerselector",
+      "package": "org.verily.FSBeerselector",
       "permissions": [
         "android.permission.INTERNET",
         "android.permission.READ_EXTERNAL_STORAGE",
