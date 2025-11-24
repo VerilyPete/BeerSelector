@@ -11,8 +11,8 @@ type GlassIconProps = {
 
 /**
  * Renders the appropriate glass icon based on type
- * - Pint glass for lower ABV draft beers
- * - Tulip glass for higher ABV draft beers
+ * - Pint glass for draft beers < 7.4% ABV
+ * - Tulip glass for draft beers >= 7.4% ABV
  */
 export function GlassIcon({ type, size = 24, color = '#000000' }: GlassIconProps) {
   if (type === 'pint') {

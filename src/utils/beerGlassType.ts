@@ -6,6 +6,10 @@ export type GlassType = 'pint' | 'tulip' | null;
 
 /**
  * Extract ABV percentage from beer description HTML
+ * Supports multiple formats:
+ * - "5.2%" or "8%"
+ * - "5.2 ABV" or "ABV 5.2"
+ * - "5.2% ABV" or "ABV: 5.2%"
  * @param description - HTML description string containing ABV percentage
  * @returns ABV as a number or null if not found/invalid
  */
@@ -15,15 +19,31 @@ export function extractABV(description: string | undefined): number | null {
   // Strip HTML tags to get plain text
   const plainText = description.replace(/<[^>]*>/g, '');
 
-  // Look for percentage pattern (e.g., "5.2%" or "8%")
-  const percentageMatch = plainText.match(/(\d+(?:\.\d+)?)\s*%/);
+  // Try multiple patterns in order of specificity
 
+  // Pattern 1: Look for percentage pattern (e.g., "5.2%" or "8%")
+  // Negative lookahead to avoid matching negative numbers
+  const percentageMatch = plainText.match(/(?<!-)\b(\d+(?:\.\d+)?)\s*%/);
   if (percentageMatch && percentageMatch[1]) {
     const abv = parseFloat(percentageMatch[1]);
-
-    // Validate it's a reasonable ABV (0-100%)
     if (!isNaN(abv) && abv >= 0 && abv <= 100) {
       return abv;
+    }
+  }
+
+  // Pattern 2: Look for "ABV" near a number (e.g., "5.2 ABV", "ABV 5.2", "ABV: 5.2")
+  // Negative lookahead to avoid matching negative numbers
+  const abvPattern = /(?:ABV[:\s]*(?<!-)\b(\d+(?:\.\d+)?)|(?<!-)\b(\d+(?:\.\d+)?)\s*ABV)/i;
+  const abvMatch = plainText.match(abvPattern);
+
+  if (abvMatch) {
+    // Match could be in group 1 (ABV first) or group 2 (number first)
+    const abvString = abvMatch[1] || abvMatch[2];
+    if (abvString) {
+      const abv = parseFloat(abvString);
+      if (!isNaN(abv) && abv >= 0 && abv <= 100) {
+        return abv;
+      }
     }
   }
 
@@ -32,13 +52,29 @@ export function extractABV(description: string | undefined): number | null {
 
 /**
  * Determine the appropriate glass type based on container type and ABV
- * @param container - Beer container type (e.g., "Draft", "Bottled")
+ * Rules (in priority order):
+ * 1. Container size override:
+ *    - "13oz draft" or "13 oz draft" → Tulip glass (skip ABV detection)
+ *    - "16oz draft" or "16 oz draft" → Pint glass (skip ABV detection)
+ * 2. ABV-based detection (for other draft beers):
+ *    - ABV < 7.4% → Pint glass
+ *    - ABV >= 7.4% → Tulip glass
+ * 3. Beer style keyword fallback (if all other checks fail):
+ *    - Style contains "pilsner" or "lager" → Pint glass
+ *    - Style contains "imperial", "tripel", "quad", or "barleywine" → Tulip glass
+ * 4. No icon shown for:
+ *    - Bottled beers
+ *    - Non-draft containers
+ *    - Draft beers without detectable ABV and no style keywords
+ * @param container - Beer container type (e.g., "Draft", "13oz draft", "16oz draft", "Bottled")
  * @param description - Beer description containing ABV
+ * @param brewStyle - Beer style (e.g., "Imperial IPA", "Belgian Tripel", "Barleywine")
  * @returns Glass type or null if no icon should be displayed
  */
 export function getGlassType(
   container: string | undefined,
-  description: string | undefined
+  description: string | undefined,
+  brewStyle?: string
 ): GlassType {
   if (!container) return null;
 
@@ -47,6 +83,17 @@ export function getGlassType(
   // No glyphs for bottled beers
   if (normalizedContainer.includes('bottled')) return null;
 
+  // Check for specific container sizes (skip ABV detection)
+  // Match both "13oz" and "13 oz" (with or without space)
+  if ((normalizedContainer.includes('13oz') || normalizedContainer.includes('13 oz')) &&
+      normalizedContainer.includes('draft')) {
+    return 'tulip';
+  }
+  if ((normalizedContainer.includes('16oz') || normalizedContainer.includes('16 oz')) &&
+      normalizedContainer.includes('draft')) {
+    return 'pint';
+  }
+
   // Only show glyphs for draft/draught beers
   const isDraft = normalizedContainer.includes('draft') || normalizedContainer.includes('draught');
 
@@ -54,14 +101,34 @@ export function getGlassType(
 
   // Extract ABV from description
   const abv = extractABV(description);
-  if (abv === null) return null;
+  if (abv !== null) {
+    // Tulip glass for >= 7.4% ABV
+    if (abv >= 7.4) return 'tulip';
 
-  // Tulip glass for 8-18% ABV
-  if (abv >= 8 && abv <= 18) return 'tulip';
+    // Pint glass for < 7.4% ABV
+    if (abv < 7.4) return 'pint';
+  }
 
-  // Pint glass for < 8% ABV
-  if (abv < 8) return 'pint';
+  // Fallback: Check beer style for specific keywords
+  if (brewStyle) {
+    const normalizedStyle = brewStyle.toLowerCase();
 
-  // No icon for > 18% ABV
+    // Check for pint glass styles first
+    const pintStyleKeywords = ['pilsner', 'lager'];
+    for (const keyword of pintStyleKeywords) {
+      if (normalizedStyle.includes(keyword)) {
+        return 'pint';
+      }
+    }
+
+    // Then check for tulip glass styles
+    const tulipStyleKeywords = ['imperial', 'tripel', 'quad', 'barleywine'];
+    for (const keyword of tulipStyleKeywords) {
+      if (normalizedStyle.includes(keyword)) {
+        return 'tulip';
+      }
+    }
+  }
+
   return null;
 }

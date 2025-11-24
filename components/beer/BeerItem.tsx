@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { StyleSheet, View, TouchableOpacity } from 'react-native';
 import { ThemedText } from '../ThemedText';
 import { useThemeColor } from '@/hooks/useThemeColor';
@@ -78,8 +78,12 @@ const BeerItemComponent: React.FC<BeerItemProps> = ({
       ? formatDateString(beer.tasted_date)
       : formatDate(beer.added_date || '');
 
-  // Determine glass type based on container and ABV
-  const glassType = getGlassType(beer.brew_container, beer.brew_description);
+  // Determine glass type based on container, ABV, and beer style
+  // Memoized to avoid recalculating on every render (beer props are stable during session)
+  const glassType = useMemo(
+    () => getGlassType(beer.brew_container, beer.brew_description, beer.brew_style),
+    [beer.brew_container, beer.brew_description, beer.brew_style]
+  );
 
   return (
     <TouchableOpacity
