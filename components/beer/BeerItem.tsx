@@ -105,11 +105,17 @@ const BeerItemComponent: React.FC<BeerItemProps> = ({
           {beer.brewer} {beer.brewer_loc ? `• ${beer.brewer_loc}` : ''}
         </ThemedText>
         <View style={styles.styleContainerRow} testID={`beer-style-${beer.id}`}>
-          <ThemedText>
-            {beer.brew_style} {beer.brew_container ? `• ${beer.brew_container}` : ''}
-          </ThemedText>
+          <View style={styles.textContainer}>
+            <ThemedText>
+              {beer.brew_style} {beer.brew_container ? `• ${beer.brew_container}` : ''}
+            </ThemedText>
+          </View>
           {glassType && (
-            <View style={styles.glassIcon}>
+            <View
+              style={styles.glassIcon}
+              accessible={true}
+              accessibilityLabel={`Served in ${glassType} glass`}
+            >
               <GlassIcon type={glassType} size={32} color={textColor} />
             </View>
           )}
@@ -137,6 +143,9 @@ const BeerItemComponent: React.FC<BeerItemProps> = ({
   );
 };
 
+// Design system constants
+const ELEMENT_SPACING = 8; // Horizontal gap between text and icons
+
 const styles = StyleSheet.create({
   beerItem: {
     marginBottom: 16,
@@ -157,7 +166,10 @@ const styles = StyleSheet.create({
   styleContainerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: ELEMENT_SPACING,
+  },
+  textContainer: {
+    flex: 1,
   },
   glassIcon: {
     marginLeft: 4,
