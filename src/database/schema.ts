@@ -7,6 +7,12 @@
 
 import { SQLiteDatabase } from 'expo-sqlite';
 import { Preference } from '../types/database';
+import {
+  CURRENT_SCHEMA_VERSION,
+  CREATE_SCHEMA_VERSION_TABLE,
+  getCurrentSchemaVersion,
+  recordMigration,
+} from './schemaVersion';
 
 /**
  * SQL statement to create the allbeers table
@@ -28,6 +34,11 @@ export const CREATE_ALLBEERS_TABLE = `
 `;
 
 /**
+ * Alias for compatibility with existing code
+ */
+export const CREATE_ALL_BEERS_TABLE = CREATE_ALLBEERS_TABLE;
+
+/**
  * SQL statement to create the tasted_brew_current_round table
  * Stores the user's tasted beers for the current UFO Club plate
  */
@@ -47,6 +58,11 @@ export const CREATE_TASTED_BREW_TABLE = `
     chit_code TEXT
   )
 `;
+
+/**
+ * Alias for compatibility with existing code
+ */
+export const CREATE_MY_BEERS_TABLE = CREATE_TASTED_BREW_TABLE;
 
 /**
  * SQL statement to create the rewards table
@@ -83,6 +99,11 @@ export const CREATE_UNTAPPD_TABLE = `
     description TEXT
   )
 `;
+
+/**
+ * Alias for compatibility with existing code
+ */
+export const CREATE_UNTAPPD_COOKIES_TABLE = CREATE_UNTAPPD_TABLE;
 
 /**
  * SQL statement to create the operation_queue table
@@ -142,33 +163,53 @@ export const DEFAULT_PREFERENCES: Preference[] = [
  */
 export const setupTables = async (database: SQLiteDatabase): Promise<void> => {
   try {
-    // Use a transaction for creating all tables
-    await database.withTransactionAsync(async () => {
-      // Create all tables
-      await database.execAsync(CREATE_ALLBEERS_TABLE);
-      await database.execAsync(CREATE_TASTED_BREW_TABLE);
-      await database.execAsync(CREATE_REWARDS_TABLE);
-      await database.execAsync(CREATE_PREFERENCES_TABLE);
-      await database.execAsync(CREATE_UNTAPPD_TABLE);
-      await database.execAsync(CREATE_OPERATION_QUEUE_TABLE);
+    console.log('Initializing database schema...');
 
-      // Create indexes for operation_queue table
-      // These indexes improve query performance for getPendingOperations() and other status/timestamp-based queries
-      await database.execAsync(`
-        CREATE INDEX IF NOT EXISTS idx_operation_queue_status
-        ON operation_queue(status);
-      `);
+    // Create schema_version table first
+    await database.execAsync(CREATE_SCHEMA_VERSION_TABLE);
 
-      await database.execAsync(`
-        CREATE INDEX IF NOT EXISTS idx_operation_queue_timestamp
-        ON operation_queue(timestamp);
-      `);
+    // Check current version
+    const currentVersion = await getCurrentSchemaVersion(database);
+    console.log(`Current schema version: ${currentVersion}`);
 
-      console.log('[Database] Created operation_queue indexes');
-    });
+    if (currentVersion === 0) {
+      // First-time setup - create all tables
+      await database.withTransactionAsync(async () => {
+        // Create all tables
+        await database.execAsync(CREATE_ALLBEERS_TABLE);
+        await database.execAsync(CREATE_TASTED_BREW_TABLE);
+        await database.execAsync(CREATE_REWARDS_TABLE);
+        await database.execAsync(CREATE_PREFERENCES_TABLE);
+        await database.execAsync(CREATE_UNTAPPD_TABLE);
+        await database.execAsync(CREATE_OPERATION_QUEUE_TABLE);
 
-    // Initialize preferences with default values if table is empty
-    await initializeDefaultPreferences(database);
+        // Create indexes for operation_queue table
+        // These indexes improve query performance for getPendingOperations() and other status/timestamp-based queries
+        await database.execAsync(`
+          CREATE INDEX IF NOT EXISTS idx_operation_queue_status
+          ON operation_queue(status);
+        `);
+
+        await database.execAsync(`
+          CREATE INDEX IF NOT EXISTS idx_operation_queue_timestamp
+          ON operation_queue(timestamp);
+        `);
+
+        console.log('[Database] Created operation_queue indexes');
+
+        // Record initial schema version (2 for current state before glass_type)
+        await recordMigration(database, 2);
+        console.log('Initial schema created at version 2');
+      });
+
+      // Initialize preferences with default values
+      await initializeDefaultPreferences(database);
+    }
+
+    // Run migrations if needed
+    if (currentVersion < CURRENT_SCHEMA_VERSION) {
+      await runMigrations(database, currentVersion);
+    }
 
     console.log('Database tables created successfully');
   } catch (error) {
@@ -176,6 +217,26 @@ export const setupTables = async (database: SQLiteDatabase): Promise<void> => {
     throw error;
   }
 };
+
+/**
+ * Run all necessary migrations from current version to target version
+ *
+ * Note: This function should NOT show progress UI. The migration progress
+ * UI is handled in app/_layout.tsx during app startup.
+ *
+ * @param database - The SQLite database instance
+ * @param fromVersion - Current schema version
+ */
+async function runMigrations(database: SQLiteDatabase, fromVersion: number): Promise<void> {
+  console.log(`Running migrations from version ${fromVersion} to ${CURRENT_SCHEMA_VERSION}...`);
+
+  // Note: Import is dynamic to avoid circular dependencies during initialization
+  // The migration will be called from app/_layout.tsx with progress UI
+  // This function is kept minimal for cases where migration is called from setupTables
+
+  // Future migrations go here
+  // if (fromVersion < 4) { await migrateToVersion4(database); }
+}
 
 /**
  * Initializes default preferences if the preferences table is empty
