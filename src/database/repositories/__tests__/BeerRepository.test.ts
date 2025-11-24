@@ -196,18 +196,20 @@ describe('BeerRepository', () => {
 
   describe('getAll', () => {
     it('should return all beers ordered by added_date DESC', async () => {
-      const mockBeers: Beer[] = [
+      const mockBeers: BeerWithGlassType[] = [
         {
           id: '2',
           brew_name: 'Newer Beer',
           brewer: 'Test Brewery',
-          added_date: '2024-01-02'
+          added_date: '2024-01-02',
+          glass_type: 'pint'
         },
         {
           id: '1',
           brew_name: 'Older Beer',
           brewer: 'Test Brewery',
-          added_date: '2024-01-01'
+          added_date: '2024-01-01',
+          glass_type: 'tulip'
         }
       ];
 
@@ -249,10 +251,11 @@ describe('BeerRepository', () => {
 
   describe('getById', () => {
     it('should return beer when found', async () => {
-      const mockBeer: Beer = {
+      const mockBeer: BeerWithGlassType = {
         id: '123',
         brew_name: 'Test IPA',
-        brewer: 'Test Brewery'
+        brewer: 'Test Brewery',
+        glass_type: 'pint'
       };
 
       mockDatabase.getFirstAsync.mockResolvedValue(mockBeer);
@@ -295,12 +298,13 @@ describe('BeerRepository', () => {
 
   describe('search', () => {
     it('should search beers by name, brewer, style, and description', async () => {
-      const mockBeers: Beer[] = [
+      const mockBeers: BeerWithGlassType[] = [
         {
           id: '1',
           brew_name: 'Hoppy IPA',
           brewer: 'Test Brewery',
-          brew_style: 'IPA'
+          brew_style: 'IPA',
+          glass_type: 'pint'
         }
       ];
 
@@ -316,8 +320,8 @@ describe('BeerRepository', () => {
     });
 
     it('should return all beers when query is empty', async () => {
-      const mockBeers: Beer[] = [
-        { id: '1', brew_name: 'Beer 1', brewer: 'Brewery 1' }
+      const mockBeers: BeerWithGlassType[] = [
+        { id: '1', brew_name: 'Beer 1', brewer: 'Brewery 1', glass_type: 'pint' }
       ];
 
       mockDatabase.getAllAsync.mockResolvedValue(mockBeers);
@@ -386,18 +390,20 @@ describe('BeerRepository', () => {
 
   describe('getByStyle', () => {
     it('should return beers matching the style', async () => {
-      const mockBeers: Beer[] = [
+      const mockBeers: BeerWithGlassType[] = [
         {
           id: '1',
           brew_name: 'IPA 1',
           brewer: 'Brewery 1',
-          brew_style: 'IPA'
+          brew_style: 'IPA',
+          glass_type: 'pint'
         },
         {
           id: '2',
           brew_name: 'IPA 2',
           brewer: 'Brewery 2',
-          brew_style: 'IPA'
+          brew_style: 'IPA',
+          glass_type: 'tulip'
         }
       ];
 
@@ -441,18 +447,20 @@ describe('BeerRepository', () => {
 
   describe('getByBrewer', () => {
     it('should return beers from the specified brewer', async () => {
-      const mockBeers: Beer[] = [
+      const mockBeers: BeerWithGlassType[] = [
         {
           id: '1',
           brew_name: 'IPA',
           brewer: 'Test Brewery',
-          brew_style: 'IPA'
+          brew_style: 'IPA',
+          glass_type: 'pint'
         },
         {
           id: '2',
           brew_name: 'Stout',
           brewer: 'Test Brewery',
-          brew_style: 'Stout'
+          brew_style: 'Stout',
+          glass_type: 'tulip'
         }
       ];
 
@@ -496,16 +504,18 @@ describe('BeerRepository', () => {
 
   describe('getUntasted', () => {
     it('should return beers not in tasted_brew_current_round table', async () => {
-      const mockBeers: Beer[] = [
+      const mockBeers: BeerWithGlassType[] = [
         {
           id: '1',
           brew_name: 'Untasted Beer 1',
-          brewer: 'Brewery 1'
+          brewer: 'Brewery 1',
+          glass_type: 'pint'
         },
         {
           id: '2',
           brew_name: 'Untasted Beer 2',
-          brewer: 'Brewery 2'
+          brewer: 'Brewery 2',
+          glass_type: 'tulip'
         }
       ];
 

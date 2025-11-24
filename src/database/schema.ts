@@ -199,9 +199,9 @@ export const setupTables = async (database: SQLiteDatabase): Promise<void> => {
 
         console.log('[Database] Created operation_queue indexes');
 
-        // Record initial schema version (2 for current state before glass_type)
-        await recordMigration(database, 2);
-        console.log('Initial schema created at version 2');
+        // Record initial schema version at current version (includes glass_type columns)
+        await recordMigration(database, CURRENT_SCHEMA_VERSION);
+        console.log(`Initial schema created at version ${CURRENT_SCHEMA_VERSION}`);
       });
 
       // Initialize preferences with default values

@@ -1,29 +1,37 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuites name="jest tests" tests="12" failures="0" errors="0" time="1.913">
-  <testsuite name="Sequential Refresh Coordination" errors="0" failures="0" skipped="0" timestamp="2025-11-17T21:56:46" time="0.941" tests="12">
-    <testcase classname="Sequential Refresh Coordination sequentialRefreshAllData should execute refresh operations sequentially, not in parallel" name="Sequential Refresh Coordination sequentialRefreshAllData should execute refresh operations sequentially, not in parallel" time="0.012">
+<testsuites name="jest tests" tests="16" failures="0" errors="0" time="2.672">
+  <testsuite name="Repository Type Safety" errors="0" failures="0" skipped="0" timestamp="2025-11-24T05:17:25" time="1.843" tests="16">
+    <testcase classname="Repository Type Safety BeerRepository Type Safety getAll() should return Promise&lt;Beer[]&gt;" name="Repository Type Safety BeerRepository Type Safety getAll() should return Promise&lt;Beer[]&gt;" time="0.015">
     </testcase>
-    <testcase classname="Sequential Refresh Coordination sequentialRefreshAllData should use a master lock to coordinate all operations" name="Sequential Refresh Coordination sequentialRefreshAllData should use a master lock to coordinate all operations" time="0.001">
+    <testcase classname="Repository Type Safety BeerRepository Type Safety getById() should return Promise&lt;Beer | null&gt;" name="Repository Type Safety BeerRepository Type Safety getById() should return Promise&lt;Beer | null&gt;" time="0">
     </testcase>
-    <testcase classname="Sequential Refresh Coordination sequentialRefreshAllData should properly queue multiple simultaneous refresh requests" name="Sequential Refresh Coordination sequentialRefreshAllData should properly queue multiple simultaneous refresh requests" time="0.001">
+    <testcase classname="Repository Type Safety BeerRepository Type Safety search() should return Promise&lt;Beer[]&gt;" name="Repository Type Safety BeerRepository Type Safety search() should return Promise&lt;Beer[]&gt;" time="0.001">
     </testcase>
-    <testcase classname="Sequential Refresh Coordination sequentialRefreshAllData should release master lock even if an operation fails" name="Sequential Refresh Coordination sequentialRefreshAllData should release master lock even if an operation fails" time="0.017">
+    <testcase classname="Repository Type Safety BeerRepository Type Safety insertMany() should only accept Beer[]" name="Repository Type Safety BeerRepository Type Safety insertMany() should only accept Beer[]" time="0">
     </testcase>
-    <testcase classname="Sequential Refresh Coordination sequentialRefreshAllData should complete faster than parallel execution with lock contention" name="Sequential Refresh Coordination sequentialRefreshAllData should complete faster than parallel execution with lock contention" time="0.001">
+    <testcase classname="Repository Type Safety MyBeersRepository Type Safety getAll() should return Promise&lt;BeerfinderWithGlassType[]&gt;" name="Repository Type Safety MyBeersRepository Type Safety getAll() should return Promise&lt;BeerfinderWithGlassType[]&gt;" time="0.001">
     </testcase>
-    <testcase classname="Sequential Refresh Coordination sequentialRefreshAllData should use unsafe repository methods to avoid nested lock acquisition" name="Sequential Refresh Coordination sequentialRefreshAllData should use unsafe repository methods to avoid nested lock acquisition" time="0">
+    <testcase classname="Repository Type Safety MyBeersRepository Type Safety getById() should return Promise&lt;Beerfinder | null&gt;" name="Repository Type Safety MyBeersRepository Type Safety getById() should return Promise&lt;Beerfinder | null&gt;" time="0.001">
     </testcase>
-    <testcase classname="Sequential Refresh Coordination Comparison: Parallel vs Sequential demonstrates current parallel execution causes lock queueing" name="Sequential Refresh Coordination Comparison: Parallel vs Sequential demonstrates current parallel execution causes lock queueing" time="0.001">
+    <testcase classname="Repository Type Safety MyBeersRepository Type Safety getCount() should return Promise&lt;number&gt;" name="Repository Type Safety MyBeersRepository Type Safety getCount() should return Promise&lt;number&gt;" time="0">
     </testcase>
-    <testcase classname="Sequential Refresh Coordination Production Integration Tests (CI-4) manualRefreshAllData should use sequential execution pattern" name="Sequential Refresh Coordination Production Integration Tests (CI-4) manualRefreshAllData should use sequential execution pattern" time="0">
+    <testcase classname="Repository Type Safety MyBeersRepository Type Safety insertMany() should only accept BeerfinderWithGlassType[]" name="Repository Type Safety MyBeersRepository Type Safety insertMany() should only accept BeerfinderWithGlassType[]" time="0.001">
     </testcase>
-    <testcase classname="Sequential Refresh Coordination Production Integration Tests (CI-4) manualRefreshAllData should use only one master lock" name="Sequential Refresh Coordination Production Integration Tests (CI-4) manualRefreshAllData should use only one master lock" time="0.001">
+    <testcase classname="Repository Type Safety RewardsRepository Type Safety getAll() should return Promise&lt;Reward[]&gt;" name="Repository Type Safety RewardsRepository Type Safety getAll() should return Promise&lt;Reward[]&gt;" time="0">
     </testcase>
-    <testcase classname="Sequential Refresh Coordination Production Integration Tests (CI-4) manualRefreshAllData should handle multiple simultaneous calls without lock contention" name="Sequential Refresh Coordination Production Integration Tests (CI-4) manualRefreshAllData should handle multiple simultaneous calls without lock contention" time="0.001">
+    <testcase classname="Repository Type Safety RewardsRepository Type Safety getById() should return Promise&lt;Reward | null&gt;" name="Repository Type Safety RewardsRepository Type Safety getById() should return Promise&lt;Reward | null&gt;" time="0.001">
     </testcase>
-    <testcase classname="Sequential Refresh Coordination Production Integration Tests (CI-5) refreshAllDataFromAPI should use sequential execution pattern" name="Sequential Refresh Coordination Production Integration Tests (CI-5) refreshAllDataFromAPI should use sequential execution pattern" time="0">
+    <testcase classname="Repository Type Safety RewardsRepository Type Safety getByType() should return Promise&lt;Reward[]&gt;" name="Repository Type Safety RewardsRepository Type Safety getByType() should return Promise&lt;Reward[]&gt;" time="0">
     </testcase>
-    <testcase classname="Sequential Refresh Coordination Production Integration Tests (CI-5) refreshAllDataFromAPI should use only one master lock" name="Sequential Refresh Coordination Production Integration Tests (CI-5) refreshAllDataFromAPI should use only one master lock" time="0">
+    <testcase classname="Repository Type Safety RewardsRepository Type Safety getCount() should return Promise&lt;number&gt;" name="Repository Type Safety RewardsRepository Type Safety getCount() should return Promise&lt;number&gt;" time="0">
+    </testcase>
+    <testcase classname="Repository Type Safety RewardsRepository Type Safety insertMany() should only accept Reward[]" name="Repository Type Safety RewardsRepository Type Safety insertMany() should only accept Reward[]" time="0.001">
+    </testcase>
+    <testcase classname="Repository Type Safety Type Guard Integration should use type guards to validate data at runtime" name="Repository Type Safety Type Guard Integration should use type guards to validate data at runtime" time="0.001">
+    </testcase>
+    <testcase classname="Repository Type Safety Compile-Time Type Safety should enforce return types match repository entity types" name="Repository Type Safety Compile-Time Type Safety should enforce return types match repository entity types" time="0.001">
+    </testcase>
+    <testcase classname="Repository Type Safety Compile-Time Type Safety should prevent assigning wrong entity types" name="Repository Type Safety Compile-Time Type Safety should prevent assigning wrong entity types" time="0">
     </testcase>
   </testsuite>
 </testsuites>
