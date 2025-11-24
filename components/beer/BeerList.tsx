@@ -90,8 +90,10 @@ export const BeerList: React.FC<BeerListProps> = ({
       // Performance optimization: Reduce initial render and batch sizes for 60+ FPS
       initialNumToRender={10}
       maxToRenderPerBatch={10}
-      // MP-3 Final: windowSize=5 (2.5 above + 2.5 below viewport) for optimal scroll FPS
-      windowSize={5}
+      // MP-3 Final: windowSize=7 (3.5 above + 3.5 below viewport) for optimal scroll FPS
+      // This is a 67% reduction from React Native default (21) - safer than windowSize=5
+      // Fallback if blank areas appear: increase to 9 (57% reduction) or 11 (48% reduction)
+      windowSize={7}
       removeClippedSubviews={true}
       updateCellsBatchingPeriod={50}
       getItemLayout={(data, index) => ({
