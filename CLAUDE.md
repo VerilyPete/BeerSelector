@@ -9,6 +9,7 @@ BeerSelector is a React Native mobile app built with Expo SDK 52 for beer enthus
 ### UFO Club Business Logic
 
 **The 200 Beer Challenge:**
+
 - Users work toward drinking 200 unique beers at Flying Saucer locations
 - **All Beers**: Complete taplist at current location
 - **Tasted Beers**: Beers user has already checked in (stored in `tasted_brew_current_round` table)
@@ -21,6 +22,7 @@ BeerSelector is a React Native mobile app built with Expo SDK 52 for beer enthus
 ### Visitor Mode vs Member Mode
 
 **Visitor Mode (Guest Login):**
+
 - Limited access for users without UFO Club membership
 - **Can access**: All Beers list only (view taplist at current location)
 - **Cannot access**: Tasted Brews tab, Beerfinder tab, Rewards
@@ -29,6 +31,7 @@ BeerSelector is a React Native mobile app built with Expo SDK 52 for beer enthus
 - No personal data or tracking
 
 **Member Mode (UFO Club Login):**
+
 - Full access to all features
 - Can view All Beers, Tasted Brews, Beerfinder, and Rewards
 - Can check-in beers and track progress toward 200
@@ -39,6 +42,7 @@ BeerSelector is a React Native mobile app built with Expo SDK 52 for beer enthus
 ## Common Commands
 
 ### Development
+
 ```bash
 npm start                 # Start Expo development server
 npm run ios              # Run on iOS simulator
@@ -47,6 +51,7 @@ npm run web              # Run web version
 ```
 
 ### Testing
+
 ```bash
 npm test                 # Run tests in watch mode
 npm run test:ci          # Run tests with coverage report (CI mode)
@@ -58,12 +63,14 @@ npx jest src/services/__tests__/dataUpdateService --coverage --collectCoverageFr
 ```
 
 ### Utilities
+
 ```bash
 npm run reset-project    # Reset project state
 npm run lint             # Run ESLint
 ```
 
 ### iOS Build Number Management
+
 ```bash
 # Increment build number in Xcode project
 ./scripts/increment-build.sh
@@ -84,6 +91,7 @@ npm start
 **Key variables**: API URLs, network timeouts, external service URLs
 
 See also:
+
 - `docs/ENVIRONMENT_VARIABLES.md` - Complete environment variable guide
 - `.env.example` - Template with all available variables
 - `src/config/` - Configuration module
@@ -101,6 +109,7 @@ The app uses SQLite for offline-first data storage with a **repository pattern**
 - **Initialization Flow**: Database setup happens in `app/_layout.tsx` with retry logic before app renders
 
 **IMPORTANT - Repository Pattern (HP-7 COMPLETED)**:
+
 - ❌ **DO NOT import from `src/database/db.ts`** - This file is deprecated
 - ✅ **USE repositories directly**:
   ```typescript
@@ -115,6 +124,7 @@ The app uses SQLite for offline-first data storage with a **repository pattern**
 - See `MIGRATION_GUIDE_REPOSITORIES.md` for complete migration examples
 
 **Main Tables**:
+
 - `allbeers` - Complete beer catalog from Flying Saucer API
 - `tasted_brew_current_round` - User's tasted beers for current plate
 - `rewards` - UFO Club rewards and achievements
@@ -122,6 +132,7 @@ The app uses SQLite for offline-first data storage with a **repository pattern**
 - `untappd_cookies` - Untappd authentication tokens
 
 **Critical Database Patterns**:
+
 ```typescript
 // Always use withTransactionAsync for transactions
 await database.withTransactionAsync(async () => {
@@ -137,12 +148,14 @@ import { isBeer, isPreference } from './database/types';
 The app uses a centralized configuration system in `src/config/config.ts` that provides a single source of truth for all API endpoints, URLs, and app settings.
 
 **Key Features**:
+
 - Environment-based configuration (development, staging, production)
 - Support for environment variables via `.env` files
 - Dynamic URL construction for all API endpoints
 - Type-safe endpoint and referer management
 
 **Usage Patterns**:
+
 ```typescript
 import { config } from '@/src/config';
 
@@ -170,6 +183,7 @@ const untappdUrl = config.external.untappd.loginUrl;
 ```
 
 **Available Endpoints**:
+
 - `memberQueues` - User's queued beers
 - `deleteQueuedBrew` - Delete a queued beer
 - `addToQueue` - Add beer to queue (check-in)
@@ -180,11 +194,13 @@ const untappdUrl = config.external.untappd.loginUrl;
 - `visitor` - Visitor mode page
 
 **Available Referers**:
+
 - `memberDashboard` - For API requests from member dashboard
 - `memberRewards` - For API requests from rewards page
 - `memberQueues` - For API requests from queues page
 
 **IMPORTANT**:
+
 - ❌ **DO NOT hardcode URLs** - Always use the config module
 - ✅ **USE config.api.getFullUrl()** for constructing full URLs
 - ✅ **USE config.api.endpoints** for endpoint paths
@@ -192,6 +208,7 @@ const untappdUrl = config.external.untappd.loginUrl;
 
 **Environment Configuration**:
 Set environment variables in `.env.development`, `.env.staging`, or `.env.production`:
+
 ```bash
 EXPO_PUBLIC_API_BASE_URL=https://your-api-server.com
 EXPO_PUBLIC_API_TIMEOUT=15000
@@ -203,17 +220,20 @@ See `docs/ENVIRONMENT_VARIABLES.md` for complete configuration options.
 ### API & Authentication Layer
 
 **Authentication Flow**:
+
 1. User logs in via WebView → gets session cookies
 2. Cookies stored in `apiClientInstance.ts` and SecureStore
 3. Auto-login attempted on app startup via `authService.autoLogin()`
 4. Two modes: UFO Club member (full access) vs Visitor (read-only taplist)
 
 **API Client Pattern**:
+
 - Centralized HTTP client in `src/api/apiClient.ts` with cookie management
 - Session validation through `sessionValidator.ts`
 - Flying Saucer API returns nested response format: `[{}, { brewInStock: [...beers] }]`
 
 **Key Services**:
+
 - `src/api/authService.ts` - Login, auto-login, visitor mode
 - `src/api/sessionManager.ts` - Cookie persistence with SecureStore
 - `src/services/dataUpdateService.ts` - Fetch and sync beer data
@@ -221,12 +241,14 @@ See `docs/ENVIRONMENT_VARIABLES.md` for complete configuration options.
 ### Data Refresh Strategy
 
 **Automatic Refresh** (in `app/_layout.tsx`):
+
 - Triggers on every app open if API URLs configured
 - Refreshes all beers and rewards in parallel
 - Uses `manualRefreshAllData()` from `dataUpdateService.ts`
 - Timestamp-based: only refreshes if >2 hours since last refresh (see `REFRESH_PLAN.md`)
 
 **Refresh Logic** (`src/services/dataUpdateService.ts`):
+
 ```typescript
 // Check last refresh timestamp (2-hour window)
 const lastRefresh = await getPreference('last_all_beers_refresh');
@@ -240,6 +262,7 @@ if (lastRefresh && Date.now() - parseInt(lastRefresh) < 2 * 60 * 60 * 1000) {
 ### Navigation Structure (Expo Router)
 
 File-based routing with tabs:
+
 - `app/(tabs)/` - Tab navigation screens
   - `index.tsx` - All Beers list
   - `beerlist.tsx` - Beerfinder (filtered search)
@@ -254,6 +277,7 @@ File-based routing with tabs:
 ### Component Architecture
 
 **Key Components**:
+
 - `components/AllBeers.tsx` - Beer list with search/filter
 - `components/Beerfinder.tsx` - Advanced search for untasted beers
 - `components/TastedBrewList.tsx` - Tasted beers with empty state handling
@@ -263,6 +287,7 @@ File-based routing with tabs:
 **Theming**: App supports dark/light mode via `useColorScheme()` hook. When adding UI elements, ensure they don't render white-on-white or black-on-black in dark mode.
 
 **Component Patterns**:
+
 - Functional components with hooks
 - `ThemedText` and `ThemedView` for consistent styling
 - Haptic feedback on interactions via `expo-haptics`
@@ -270,6 +295,7 @@ File-based routing with tabs:
 ### Testing Architecture
 
 **Test Organization**:
+
 - `__tests__/` - Component snapshot tests
 - `src/api/__tests__/` - API service tests
 - `src/database/__tests__/` - Database operation tests
@@ -277,29 +303,34 @@ File-based routing with tabs:
 - `context/__tests__/` - Context and state management tests
 
 **Testing Strategy**:
+
 - ✅ **Jest**: Use for unit tests only (functions, utilities, pure logic)
 - ✅ **Maestro/Flashlight**: Use for ALL integration and E2E tests
 - ❌ **DO NOT use Jest for integration tests** - React Native testing environment causes timeouts
 - ❌ **DO NOT write unit tests for React Native hooks** - Hooks that use React Native context (useColorScheme, useThemeColor, etc.) cause timeouts in Jest. Test these hooks indirectly through component tests or Maestro E2E tests.
 
 **Why Maestro for Integration Tests**:
+
 - Jest integration tests consistently timeout in React Native environment
 - Maestro provides reliable cross-platform E2E testing
 - Flashlight offers performance profiling capabilities
 - Better suited for testing actual app flows and user interactions
 
 **Mock Strategy**:
+
 - Expo modules mocked in `__mocks__/` directory
 - SQLite operations mocked in database tests (unit tests)
 - API calls mocked with jest.fn() (unit tests)
 - Real data from `allbeers.json` and `mybeers.json` for service-level tests
 
 **Important Notes**:
+
 - Component integration tests were removed due to React Native testing environment issues
 - Focus on unit tests in Jest, comprehensive integration tests in Maestro
 - Plan to implement Maestro test suite as part of MP-5 (Missing Integration Tests)
 
 **What to Test Where**:
+
 ```typescript
 // ✅ Jest Unit Tests - Pure logic hooks
 export function useBeerFilters() {
@@ -328,6 +359,7 @@ Based on systematic analysis of 27 hanging tests, follow these patterns to preve
 #### ✅ SAFE PATTERNS - Use Jest
 
 **1. Pure Function Tests** - No React Native dependencies
+
 ```typescript
 // ✅ SAFE: Business logic, utilities, data transformations
 it('filters beers correctly', () => {
@@ -337,6 +369,7 @@ it('filters beers correctly', () => {
 ```
 
 **2. Database Operations** - SQLite mocks work well
+
 ```typescript
 // ✅ SAFE: CRUD operations, repository pattern
 it('inserts beer into database', async () => {
@@ -347,6 +380,7 @@ it('inserts beer into database', async () => {
 ```
 
 **3. API Service Tests** - HTTP mocks work well
+
 ```typescript
 // ✅ SAFE: Request/response handling
 it('fetches beers from API', async () => {
@@ -357,6 +391,7 @@ it('fetches beers from API', async () => {
 ```
 
 **4. Simple Components** - No RN hook dependencies
+
 ```typescript
 // ✅ SAFE: Components without useColorScheme/useThemeColor
 it('renders beer name', () => {
@@ -368,6 +403,7 @@ it('renders beer name', () => {
 #### ❌ UNSAFE PATTERNS - Will Hang in Jest
 
 **1. renderHook() with React Native Context**
+
 ```typescript
 // ❌ WILL HANG: Hook uses Alert.alert, Appearance, or NetInfo
 it('shows error alert', async () => {
@@ -382,6 +418,7 @@ it('shows error message', () => {
 ```
 
 **2. Components with Theme Hooks**
+
 ```typescript
 // ❌ WILL HANG: Even with mocks, useThemeColor/useColorScheme cause hangs
 it('renders with theme colors', () => {
@@ -395,6 +432,7 @@ it('renders with theme colors', () => {
 ```
 
 **3. Performance/Profiling Tests**
+
 ```typescript
 // ❌ WILL HANG: Profiler API doesn't work in jsdom
 it('measures render performance', () => {
@@ -406,6 +444,7 @@ it('measures render performance', () => {
 ```
 
 **4. Timer-Based Hook Tests**
+
 ```typescript
 // ❌ WILL HANG: Fake timers + renderHook + RN hook
 it('debounces input', () => {
@@ -422,6 +461,7 @@ it('debounce logic works', () => {
 ```
 
 **5. Integration Tests**
+
 ```typescript
 // ❌ WILL HANG: Multiple async operations in RN context
 it('completes login flow', async () => {
@@ -437,6 +477,7 @@ it('completes login flow', async () => {
 ```
 
 **6. Native Module Tests**
+
 ```typescript
 // ❌ WILL HANG: NetInfo requires native runtime
 it('detects network status', () => {
@@ -448,6 +489,7 @@ it('detects network status', () => {
 ```
 
 **7. WebView Tests**
+
 ```typescript
 // ❌ WILL HANG: WebView navigation/cookies don't resolve
 it('handles login callback', async () => {
@@ -484,17 +526,17 @@ Ask these questions:
 
 #### Quick Reference Table
 
-| Test Type | Jest | Maestro | Notes |
-|-----------|------|---------|-------|
-| Pure functions | ✅ | ❌ | Business logic, utilities, data transformations |
-| API services | ✅ | ❌ | HTTP clients, request/response handling |
-| Database operations | ✅ | ❌ | CRUD operations, repository pattern |
-| RN hooks (direct) | ❌ | ✅ | Hooks using Alert, Appearance, NetInfo |
-| Component integration | ❌ | ✅ | Multi-component flows, navigation |
-| E2E flows | ❌ | ✅ | Login, checkout, full user journeys |
-| Performance tests | ❌ | ✅ | Render times, FPS, memory usage |
-| Simple components | ✅ | ❌ | Components without RN hook dependencies |
-| Theme-dependent components | ❌ | ✅ | Components using useThemeColor/useColorScheme |
+| Test Type                  | Jest | Maestro | Notes                                           |
+| -------------------------- | ---- | ------- | ----------------------------------------------- |
+| Pure functions             | ✅   | ❌      | Business logic, utilities, data transformations |
+| API services               | ✅   | ❌      | HTTP clients, request/response handling         |
+| Database operations        | ✅   | ❌      | CRUD operations, repository pattern             |
+| RN hooks (direct)          | ❌   | ✅      | Hooks using Alert, Appearance, NetInfo          |
+| Component integration      | ❌   | ✅      | Multi-component flows, navigation               |
+| E2E flows                  | ❌   | ✅      | Login, checkout, full user journeys             |
+| Performance tests          | ❌   | ✅      | Render times, FPS, memory usage                 |
+| Simple components          | ✅   | ❌      | Components without RN hook dependencies         |
+| Theme-dependent components | ❌   | ✅      | Components using useThemeColor/useColorScheme   |
 
 **Reference**: See `JEST_HANGING_TESTS_FINAL_REPORT.md` for complete analysis of 27 hanging test patterns.
 
@@ -503,6 +545,7 @@ Ask these questions:
 ### Type System
 
 **Type Guards** (in `src/database/types.ts` and `src/types/`):
+
 ```typescript
 // Always validate data with type guards
 if (isBeer(data)) {
@@ -511,6 +554,7 @@ if (isBeer(data)) {
 ```
 
 **Key Types**:
+
 - `Beer` - Complete beer data structure
 - `Beerfinder` - Beer with tasted status
 - `Preference` - App preference key-value pair
@@ -520,26 +564,31 @@ if (isBeer(data)) {
 ## Important Conventions
 
 ### Expo SQLite 15.1.4 Requirements
+
 - Use `withTransactionAsync()` for all transactions (not `transaction()`)
 - Database initialization must complete before any operations
 - Use `getAllAsync()`, `runAsync()`, `execAsync()` (async methods only)
 
 ### Data Validation
+
 - Always use type guards before database operations
 - Validate API responses before storing (check for required fields like `id`)
 - Handle empty/missing data gracefully
 
 ### Error Handling
+
 - API errors use `ApiErrorType` enum (NETWORK_ERROR, SERVER_ERROR, etc.)
 - Network timeouts set to 15 seconds in data fetches
 - Database operations wrapped in try-catch with logging
 
 ### Dark Mode Support
+
 - Test all UI changes in both light and dark modes
 - Use `ThemedText` and `ThemedView` components
 - Avoid hardcoded colors
 
 ### Refresh Behavior
+
 - 2-hour refresh window to avoid excessive API calls
 - Timestamp stored in preferences: `last_all_beers_refresh`, `last_my_beers_refresh`
 - Clear old data before writing new data (see `REFRESH_PLAN.md`)
@@ -547,6 +596,7 @@ if (isBeer(data)) {
 ## Key Files Reference
 
 ### Data Access Layer (Primary)
+
 - `src/database/repositories/` - Data access via repository pattern (use these directly)
   - `BeerRepository.ts` - All beers CRUD operations with lock management
   - `MyBeersRepository.ts` - Tasted beers (Beerfinder) operations with lock management
@@ -555,15 +605,25 @@ if (isBeer(data)) {
 - `src/database/preferences.ts` - App preferences management
 
 ### Core Application Files
+
 - `app/_layout.tsx` - App initialization, database setup, auto-refresh
 - `src/services/dataUpdateService.ts` - Data fetching and refresh logic with sequential coordination
 - `src/api/authService.ts` - Authentication flow (member and visitor modes)
 - `app/settings.tsx` - Settings UI with login/logout (400+ lines)
 - `.cursor/rules/expo-rules.mdc` - Development guidelines
 
+### Expo Local Modules
+
+- `modules/live-activity/` - iOS Live Activity native module (Expo Modules API)
+  - `ios/LiveActivityModule.swift` - Pure Swift implementation
+  - `ios/LiveActivity.podspec` - CocoaPods configuration (must have `DEFINES_MODULE = YES`)
+  - `src/index.ts` - TypeScript interface and types
+  - `expo-module.config.json` - Module configuration for autolinking
+
 ## API Response Format
 
 Flying Saucer API returns nested arrays:
+
 ```json
 [
   { "something": "else" },
@@ -576,13 +636,56 @@ Extract beers from `brewInStock` property in second array element.
 ## Build Configuration
 
 - iOS: Bundle identifier `org.verily.FSbeerselector`
-- Android: Package name `com.yourcompany.beerselector`
+- Android: Package name `org.verily.FSBeerselector`
 - New Architecture enabled in `app.json`
 - Current iOS build number tracked in Xcode project
+
+### iOS Build Approach
+
+**Local Xcode Builds**: This project uses **local Xcode builds**, not EAS (Expo Application Services).
+
+- Build iOS app directly in Xcode (not `eas build`)
+- Manual code signing and provisioning profile configuration
+- Widget Extensions and App Groups configured directly in Xcode project
+- CocoaPods for native dependencies (`pod install`)
+- No Expo config plugins needed for native iOS features
+- Direct access to Xcode project for native feature development
+
+**iOS Live Activities**:
+
+- **Expo Module**: `modules/live-activity/` (Expo Modules API with pure Swift)
+- Widget Extension: `ios/BeerQueueWidget/` (Swift/SwiftUI)
+- **Local updates only** (no push notifications, no remote updates)
+- App Group: `group.org.verily.FSbeerselector.beerqueue`
+- Shows beer queue status when user checks in beers
+- Updates locally when queue changes (no backend required)
+- **Auto-dismiss**: Activities auto-dismiss 3 hours after last update using end-and-restart pattern
+
+**Live Activity Module Usage**:
+
+```typescript
+import LiveActivityModule from '@/modules/live-activity';
+
+// Check if enabled
+const enabled = await LiveActivityModule.areActivitiesEnabled();
+
+// Start/restart activity (recommended for auto-dismiss)
+const activityId = await LiveActivityModule.restartActivity({
+  memberId: 'M123',
+  storeId: 'S456',
+  beers: [{ id: '1', name: 'Test IPA' }],
+});
+
+// End all activities
+await LiveActivityModule.endAllActivities();
+```
+
+See `docs/liveactivity/IMPLEMENTATION_COMPLETE.md` for full documentation.
 
 ## Cursor/Copilot Rules
 
 From `.cursor/rules/expo-rules.mdc`:
+
 - Use functional components with hooks
 - Use TypeScript for type safety
 - Use expo-sqlite 15.1.4 API (not older versions)

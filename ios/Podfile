@@ -16,6 +16,9 @@ prepare_react_native_project!
 target 'BeerSelector' do
   use_expo_modules!
 
+  # Local Expo module for Live Activity
+  pod 'LiveActivity', :path => '../modules/live-activity/ios'
+
   if ENV['EXPO_USE_COMMUNITY_AUTOLINKING'] == '1'
     config_command = ['node', '-e', "process.argv=['', '', 'config'];require('@react-native-community/cli').run()"];
   else
@@ -60,6 +63,13 @@ target 'BeerSelector' do
         resource_bundle_target.build_configurations.each do |config|
           config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
         end
+      end
+    end
+
+    # Fix C++ standard mismatch between RCT-Folly and project
+    installer.pods_project.targets.each do |target|
+      target.build_configurations.each do |config|
+        config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'c++20'
       end
     end
   end

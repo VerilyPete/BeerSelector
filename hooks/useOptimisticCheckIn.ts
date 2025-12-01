@@ -22,7 +22,7 @@
  */
 
 import { useState, useCallback } from 'react';
-import { Alert } from 'react-native';
+import { Alert, Platform } from 'react-native';
 import { useNetwork } from '@/context/NetworkContext';
 import { useOperationQueue } from '@/context/OperationQueueContext';
 import { useOptimisticUpdate } from '@/context/OptimisticUpdateContext';
@@ -32,6 +32,8 @@ import { BeerWithGlassType } from '@/src/types/beer';
 import { OperationType, CheckInBeerPayload } from '@/src/types/operationQueue';
 import { OptimisticUpdateType, OptimisticUpdateStatus } from '@/src/types/optimisticUpdate';
 import { getSessionData } from '@/src/api/sessionManager';
+import { getQueuedBeers } from '@/src/api/queueService';
+import { updateLiveActivityWithQueue } from '@/src/services/liveActivityService';
 
 export interface UseOptimisticCheckInResult {
   /** Execute a check-in with optimistic UI updates */
@@ -71,7 +73,12 @@ export const useOptimisticCheckIn = (): UseOptimisticCheckInResult => {
         // Get session data
         const sessionData = await getSessionData();
 
-        if (!sessionData || !sessionData.memberId || !sessionData.storeId || !sessionData.storeName) {
+        if (
+          !sessionData ||
+          !sessionData.memberId ||
+          !sessionData.storeId ||
+          !sessionData.storeName
+        ) {
           Alert.alert('Error', 'Please log in to check in beers.');
           return;
         }
@@ -86,7 +93,7 @@ export const useOptimisticCheckIn = (): UseOptimisticCheckInResult => {
         }
 
         // Check if beer is already in tasted list
-        const wasInTastedBeers = beers.tastedBeers.some((b) => b.id === beer.id);
+        const wasInTastedBeers = beers.tastedBeers.some(b => b.id === beer.id);
 
         if (wasInTastedBeers) {
           Alert.alert('Already Tasted', `${beer.brew_name} is already in your tasted list.`);
@@ -129,6 +136,18 @@ export const useOptimisticCheckIn = (): UseOptimisticCheckInResult => {
         if (result.success) {
           // Add to queued set to remove from Beerfinder list
           addQueuedBeer(beer.id);
+
+          // Update Live Activity with current queue (iOS only)
+          if (Platform.OS === 'ios') {
+            try {
+              const queuedBeers = await getQueuedBeers();
+              await updateLiveActivityWithQueue(queuedBeers, sessionData, false);
+            } catch (liveActivityError) {
+              // Live Activity errors should never block the main flow
+              console.log('[useOptimisticCheckIn] Live Activity update failed:', liveActivityError);
+            }
+          }
+
           Alert.alert('Success', `${beer.brew_name} has been queued for check-in!`);
         } else {
           Alert.alert(
@@ -144,6 +163,19 @@ export const useOptimisticCheckIn = (): UseOptimisticCheckInResult => {
         if (error instanceof SyntaxError && error.message.includes('JSON Parse error')) {
           // Add to queued set to remove from Beerfinder list
           addQueuedBeer(beer.id);
+
+          // Update Live Activity with current queue (iOS only)
+          // Note: sessionData is already available from the outer scope, no need to re-fetch
+          if (Platform.OS === 'ios') {
+            try {
+              const queuedBeers = await getQueuedBeers();
+              await updateLiveActivityWithQueue(queuedBeers, sessionData, false);
+            } catch (liveActivityError) {
+              // Live Activity errors should never block the main flow
+              console.log('[useOptimisticCheckIn] Live Activity update failed:', liveActivityError);
+            }
+          }
+
           Alert.alert('Success', `${beer.brew_name} has been queued for check-in!`);
           return;
         }
@@ -155,13 +187,7 @@ export const useOptimisticCheckIn = (): UseOptimisticCheckInResult => {
         setIsChecking(false);
       }
     },
-    [
-      isConnected,
-      isInternetReachable,
-      queueOperation,
-      beers.tastedBeers,
-      addQueuedBeer,
-    ]
+    [isConnected, isInternetReachable, queueOperation, beers.tastedBeers, addQueuedBeer]
   );
 
   /**
@@ -169,8 +195,11 @@ export const useOptimisticCheckIn = (): UseOptimisticCheckInResult => {
    */
   const getPendingBeer = useCallback(
     (beerId: string): { status: OptimisticUpdateStatus; error?: string } | null => {
-      const update = pendingUpdates.find((u) => {
-        if (u.type === OptimisticUpdateType.CHECK_IN_BEER && u.rollbackData.type === 'CHECK_IN_BEER') {
+      const update = pendingUpdates.find(u => {
+        if (
+          u.type === OptimisticUpdateType.CHECK_IN_BEER &&
+          u.rollbackData.type === 'CHECK_IN_BEER'
+        ) {
           return u.rollbackData.beer.id === beerId;
         }
         return false;
@@ -192,23 +221,17 @@ export const useOptimisticCheckIn = (): UseOptimisticCheckInResult => {
    * Retry a failed check-in
    * @deprecated No longer applicable - check-ins don't have local state to retry
    */
-  const retryCheckIn = useCallback(
-    async (_beerId: string): Promise<void> => {
-      // No-op: check-ins are queued server-side, not stored locally
-    },
-    []
-  );
+  const retryCheckIn = useCallback(async (_beerId: string): Promise<void> => {
+    // No-op: check-ins are queued server-side, not stored locally
+  }, []);
 
   /**
    * Manually rollback a check-in
    * @deprecated No longer applicable - check-ins don't modify local tasted list
    */
-  const rollbackCheckIn = useCallback(
-    async (_beerId: string): Promise<void> => {
-      // No-op: check-ins don't add to tasted list until employee confirmation
-    },
-    []
-  );
+  const rollbackCheckIn = useCallback(async (_beerId: string): Promise<void> => {
+    // No-op: check-ins don't add to tasted list until employee confirmation
+  }, []);
 
   return {
     checkInBeer,

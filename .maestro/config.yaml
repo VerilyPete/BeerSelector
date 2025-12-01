@@ -25,6 +25,11 @@ flows:
   - 12-offline-scenarios.yaml
   - 13-network-timeout-recovery.yaml
   - 14-api-error-handling.yaml
+  # Live Activity tests (require physical iOS device - iOS 16.1+)
+  # These tests will fail on simulators - run only on physical devices
+  - live-activity-restart.yaml
+  - live-activity-empty-queue.yaml
+  - live-activity-logout.yaml
 
 # Performance thresholds
 performance:

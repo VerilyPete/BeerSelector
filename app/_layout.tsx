@@ -5,10 +5,18 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState, useRef } from 'react';
 import 'react-native-reanimated';
-import { LogBox, Alert, AppState, AppStateStatus } from 'react-native';
+import { LogBox, Alert, AppState, AppStateStatus, Platform, Linking } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { useColorScheme } from '@/hooks/useColorScheme';
+import {
+  syncLiveActivityOnLaunch,
+  syncActivityIdFromNative,
+} from '@/src/services/liveActivityService';
+import { getQueuedBeers } from '@/src/api/queueService';
+import { getSessionData } from '@/src/api/sessionManager';
+import { isVisitorMode as checkIsVisitorMode } from '@/src/api/authService';
+// eslint-disable-next-line no-restricted-imports -- initializeBeerDatabase is the app bootstrap function, not CRUD
 import { initializeBeerDatabase } from '@/src/database/db';
 import { getPreference, setPreference, areApiUrlsConfigured } from '@/src/database/preferences';
 import { getDatabase, closeDatabaseConnection } from '@/src/database/connection';
@@ -22,6 +30,20 @@ import { OfflineIndicator } from '@/components/OfflineIndicator';
 import { QueuedOperationsManager } from '@/components/QueuedOperationsManager';
 import { MigrationProgressOverlay } from '@/components/MigrationProgressOverlay';
 
+/**
+ * Handle deep links from Live Activity.
+ * Deep link format: beerselector://beerfinder
+ *
+ * Note: The /beerfinder route (app/beerfinder.tsx) handles this automatically
+ * via Expo Router's deep link matching. This handler is kept for logging
+ * and potential future deep link patterns.
+ */
+const handleDeepLink = (url: string | null) => {
+  if (!url) return;
+  console.log('[DeepLink] Received URL:', url);
+  // Expo Router handles beerselector://beerfinder via app/beerfinder.tsx redirect
+};
+
 // Disable react-devtools connection to port 8097
 if (__DEV__) {
   const originalConsoleError = console.error;
@@ -30,10 +52,10 @@ if (__DEV__) {
       args[0] &&
       typeof args[0] === 'string' &&
       (args[0].includes('nw_connection') ||
-       args[0].includes('quic_conn') ||
-       args[0].includes('8097') ||
-       args[0].includes('timestamp_locked_on_nw_queue') ||
-       args[0].includes('Hit maximum timestamp count'))
+        args[0].includes('quic_conn') ||
+        args[0].includes('8097') ||
+        args[0].includes('timestamp_locked_on_nw_queue') ||
+        args[0].includes('Hit maximum timestamp count'))
     ) {
       return;
     }
@@ -44,7 +66,7 @@ if (__DEV__) {
     'nw_socket',
     'quic_conn',
     'Hit maximum timestamp count',
-    'timestamp_locked_on_nw_queue'
+    'timestamp_locked_on_nw_queue',
   ]);
 }
 
@@ -65,7 +87,9 @@ export default function RootLayout() {
     async function prepare() {
       // Prevent duplicate initialization
       if (initializationStarted.current) {
-        console.log('[DUPLICATE PREVENTED] Initialization already started (useRef guard caught duplicate useEffect run), skipping...');
+        console.log(
+          '[DUPLICATE PREVENTED] Initialization already started (useRef guard caught duplicate useEffect run), skipping...'
+        );
         return;
       }
       initializationStarted.current = true;
@@ -85,7 +109,9 @@ export default function RootLayout() {
           const currentVersion = await getCurrentSchemaVersion(db);
 
           if (currentVersion < CURRENT_SCHEMA_VERSION) {
-            console.log(`Migration needed from version ${currentVersion} to ${CURRENT_SCHEMA_VERSION}...`);
+            console.log(
+              `Migration needed from version ${currentVersion} to ${CURRENT_SCHEMA_VERSION}...`
+            );
             setMigrationProgress(0);
 
             try {
@@ -114,45 +140,70 @@ export default function RootLayout() {
 
           // If API URLs are empty or it's first launch, set initial route to settings
           if (!apiUrlsConfigured || isFirstLaunch === 'true') {
-              console.log('API URLs not set or first launch, redirecting to settings page');
-              // Mark that it's no longer the first launch
-              if (isFirstLaunch === 'true') {
-                await setPreference('first_launch', 'false', 'Flag indicating if this is the first app launch');
-              }
-
-              // Set initial route to settings
-              setInitialRoute('/settings');
-            } else {
-              // Normal app startup flow
-              setInitialRoute('(tabs)');
-
-              // Initial data load is handled by initializeBeerDatabase() above
-              // (all beers, my beers, and rewards are fetched during initialization)
-              // User-triggered refreshes will still work via pull-to-refresh gestures
-              console.log('Database initialization complete - initial data already loaded');
+            console.log('API URLs not set or first launch, redirecting to settings page');
+            // Mark that it's no longer the first launch
+            if (isFirstLaunch === 'true') {
+              await setPreference(
+                'first_launch',
+                'false',
+                'Flag indicating if this is the first app launch'
+              );
             }
-          } catch (dbError) {
-            console.error('Database initialization failed, retrying once:', dbError);
 
-            if (!dbInitialized) {
-              // Wait a moment and try again once
-              await new Promise(resolve => setTimeout(resolve, 1000));
+            // Set initial route to settings
+            setInitialRoute('/settings');
+          } else {
+            // Normal app startup flow
+            setInitialRoute('(tabs)');
+
+            // Initial data load is handled by initializeBeerDatabase() above
+            // (all beers, my beers, and rewards are fetched during initialization)
+            // User-triggered refreshes will still work via pull-to-refresh gestures
+            console.log('Database initialization complete - initial data already loaded');
+
+            // Sync Live Activity on initial launch (iOS only)
+            if (Platform.OS === 'ios') {
               try {
-                console.log('Attempting database initialization retry...');
-                await initializeBeerDatabase();
-                console.log('Database initialized successfully on retry');
-                setInitialRoute('(tabs)');
-              } catch (retryError) {
-                console.error('Database initialization failed on retry:', retryError);
-                // Continue anyway - we'll handle database errors in the components
-                setInitialRoute('(tabs)');
+                // Sync with any existing Live Activities from previous app sessions
+                // (e.g., if app was force-quit with an active Live Activity)
+                await syncActivityIdFromNative();
+
+                // Sync Live Activity with current queue state
+                const sessionData = await getSessionData();
+                const isVisitor = await checkIsVisitorMode(false);
+                await syncLiveActivityOnLaunch(getQueuedBeers, sessionData, isVisitor);
+                console.log('Live Activity synced on initial launch');
+              } catch (liveActivityError) {
+                // Live Activity sync errors should never block the main flow
+                console.log(
+                  '[_layout] Live Activity sync failed on initial launch:',
+                  liveActivityError
+                );
               }
-            } else {
-              console.log('Database was already initialized but another error occurred');
-              // Database was initialized but something else failed
-              setInitialRoute('(tabs)');
             }
           }
+        } catch (dbError) {
+          console.error('Database initialization failed, retrying once:', dbError);
+
+          if (!dbInitialized) {
+            // Wait a moment and try again once
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            try {
+              console.log('Attempting database initialization retry...');
+              await initializeBeerDatabase();
+              console.log('Database initialized successfully on retry');
+              setInitialRoute('(tabs)');
+            } catch (retryError) {
+              console.error('Database initialization failed on retry:', retryError);
+              // Continue anyway - we'll handle database errors in the components
+              setInitialRoute('(tabs)');
+            }
+          } else {
+            console.log('Database was already initialized but another error occurred');
+            // Database was initialized but something else failed
+            setInitialRoute('(tabs)');
+          }
+        }
 
         // Do NOT hide splash screen here - it will be hidden after navigation completes
       } catch (error) {
@@ -189,6 +240,20 @@ export default function RootLayout() {
           } catch (error) {
             console.error('Error reopening database on foreground:', error);
           }
+
+          // Sync Live Activity on app foreground (iOS only)
+          if (Platform.OS === 'ios') {
+            try {
+              // Sync with native activity state first
+              await syncActivityIdFromNative();
+              const sessionData = await getSessionData();
+              const isVisitor = await checkIsVisitorMode(false);
+              await syncLiveActivityOnLaunch(getQueuedBeers, sessionData, isVisitor);
+            } catch (liveActivityError) {
+              // Live Activity sync errors should never block the main flow
+              console.log('[_layout] Live Activity sync failed on foreground:', liveActivityError);
+            }
+          }
         }
       } finally {
         lifecycleOperationInProgress.current = false;
@@ -199,6 +264,29 @@ export default function RootLayout() {
 
     return () => {
       subscription.remove();
+    };
+  }, []);
+
+  // Deep link handling for Live Activity taps
+  useEffect(() => {
+    // Handle initial URL (app opened from deep link while closed)
+    const getInitialURL = async () => {
+      try {
+        const url = await Linking.getInitialURL();
+        handleDeepLink(url);
+      } catch (error) {
+        console.error('[DeepLink] Error getting initial URL:', error);
+      }
+    };
+    getInitialURL();
+
+    // Handle URLs when app is already open (app foregrounded from deep link)
+    const linkingSubscription = Linking.addEventListener('url', event => {
+      handleDeepLink(event.url);
+    });
+
+    return () => {
+      linkingSubscription.remove();
     };
   }, []);
 

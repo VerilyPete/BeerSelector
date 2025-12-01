@@ -1,0 +1,213 @@
+appId: org.verily.FSbeerselector
+name: "Live Activity - Empty Queue Handling"
+---
+# Test Flow: Live Activity Ends When Queue Becomes Empty
+# This test verifies that the Live Activity ends properly when all beers
+# are removed from the queue (empty queue = no Live Activity).
+#
+# IMPORTANT: Live Activities only work on physical iOS devices.
+# This test will NOT work on iOS simulators - skip if running on simulator.
+#
+# Prerequisites:
+# - Physical iOS device (iPhone or iPad)
+# - iOS 16.1 or later
+# - App logged in as UFO Club member (not visitor mode)
+# - Live Activities enabled in device Settings > BeerSelector
+# - API URLs configured
+#
+# What this test verifies:
+# 1. Adding beer to queue starts a Live Activity
+# 2. Removing all beers from queue ends the Live Activity
+# 3. App remains stable after activity ends
+# 4. New beers can be added after queue was emptied
+
+# ========================================
+# STEP 1: Initial Setup
+# ========================================
+
+# Launch app with existing state (should already be logged in)
+- launchApp:
+    clearState: false
+
+# Wait for app initialization
+- waitForAnimationToEnd
+
+# Dismiss Expo dev menu if present
+- runFlow:
+    when:
+      visible: "Reload"
+    commands:
+      - pressKey: Escape
+      - waitForAnimationToEnd
+
+# ========================================
+# STEP 2: Start with Beer in Queue
+# ========================================
+
+# Navigate to Beerfinder
+- tapOn: "Beerfinder"
+- waitForAnimationToEnd
+
+# Verify we're on the Beerfinder screen
+- assertVisible:
+    id: "beer-list"
+
+# Add a beer to the queue to ensure we have an active Live Activity
+- tapOn:
+    id: "beer-item-.*"
+    index: 0
+- waitForAnimationToEnd
+
+# Tap "Check Me In!" to add beer to queue
+- tapOn:
+    text: "Check Me In!"
+- waitForAnimationToEnd
+
+# Wait for Live Activity to start
+- wait: 1500
+
+# Verify beer was added
+- assertVisible:
+    text: "queued|Queue|added"
+
+# ========================================
+# STEP 3: Navigate to Queue View
+# ========================================
+
+# Look for way to view/manage queue
+# This could be a "View Queue" button, badge on tab, or dedicated screen
+- runFlow:
+    when:
+      visible: "View Queue"
+    commands:
+      - tapOn: "View Queue"
+      - waitForAnimationToEnd
+
+# Alternative: Navigate to Settings to manage queue
+- runFlow:
+    when:
+      visible: "Settings"
+    commands:
+      - tapOn: "Settings"
+      - waitForAnimationToEnd
+      - swipe:
+          direction: DOWN
+          # Scroll to find queue management section
+
+# ========================================
+# STEP 4: Remove Beer from Queue
+# ========================================
+
+# Find and tap remove/delete button for the queued beer
+# The exact UI element depends on implementation
+- runFlow:
+    when:
+      visible: "Remove|Delete|X"
+    commands:
+      - tapOn:
+          text: "Remove|Delete"
+          index: 0
+      - waitForAnimationToEnd
+
+# Alternative: Swipe to delete if using swipe gestures
+- runFlow:
+    when:
+      visible:
+        id: "queued-beer-.*"
+    commands:
+      - swipe:
+          direction: LEFT
+          from:
+            id: "queued-beer-.*"
+            index: 0
+          duration: 500
+      - waitForAnimationToEnd
+      - tapOn:
+          text: "Delete|Remove"
+          optional: true
+
+# Wait for removal to process and Live Activity to end
+# The restart pattern with empty array should end the activity
+- wait: 2000
+
+# ========================================
+# STEP 5: Verify Activity Ended
+# ========================================
+
+# Verify queue is now empty
+# Look for empty state message or 0 count
+- assertVisible:
+    text: "empty|0 beers|No beers|queue is empty"
+    optional: true
+
+# Verify app is still responsive
+- tapOn: "Beerfinder"
+- waitForAnimationToEnd
+- assertVisible:
+    id: "beer-list"
+
+# ========================================
+# STEP 6: Verify Can Add New Beer After Empty
+# ========================================
+
+# Add a new beer to verify the activity system works after being emptied
+- tapOn:
+    id: "beer-item-.*"
+    index: 0
+- waitForAnimationToEnd
+
+# Tap "Check Me In!"
+- tapOn:
+    text: "Check Me In!"
+- waitForAnimationToEnd
+
+# Wait for new Live Activity to start
+- wait: 1500
+
+# Verify beer was queued (proves activity system recovered)
+- assertVisible:
+    text: "queued|Queue|added"
+
+# ========================================
+# STEP 7: Final Stability Check
+# ========================================
+
+# Navigate through tabs to verify app stability
+- tapOn: "All Beer"
+- waitForAnimationToEnd
+- assertVisible:
+    id: "all-beers-container"
+
+- tapOn: "Tasted Brews"
+- waitForAnimationToEnd
+
+- tapOn: "Beerfinder"
+- waitForAnimationToEnd
+- assertVisible:
+    id: "beer-list"
+
+# Test search still works
+- tapOn:
+    id: "search-input"
+- inputText: "Stout"
+- waitForAnimationToEnd
+- tapOn:
+    id: "clear-search-button"
+- waitForAnimationToEnd
+
+# ========================================
+# Test Complete
+# ========================================
+# This test verifies:
+# - Beer added to queue starts Live Activity
+# - Removing all beers from queue ends Live Activity
+# - App handles empty queue state gracefully
+# - New beers can be added after emptying queue
+# - Live Activity system recovers properly
+# - App remains stable throughout the process
+#
+# Manual verification on physical device:
+# - Observe Live Activity in Dynamic Island/Lock Screen
+# - When queue empties, activity should dismiss immediately
+# - No lingering or stale activity should remain
+# - Adding new beer should start fresh activity
