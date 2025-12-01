@@ -39,6 +39,13 @@ export const getSessionData = async (): Promise<SessionData | null> => {
       return null;
     }
   } catch (error) {
+    // Handle locked device case gracefully - this is expected when app launches
+    // from lock screen (e.g., via Live Activity tap) before device is unlocked
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    if (errorMessage.includes('User interaction is not allowed')) {
+      console.log('[SessionManager] Device locked, cannot access secure storage');
+      return null;
+    }
     console.error('Error getting session data:', error);
     return null;
   }

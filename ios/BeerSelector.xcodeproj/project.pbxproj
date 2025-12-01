@@ -19,6 +19,7 @@
 		C19E0C6F2ED1660400C31A00 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C19E0C6E2ED1660400C31A00 /* SwiftUI.framework */; };
 		C19E0C802ED1660600C31A00 /* BeerQueueWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = C19E0C6B2ED1660400C31A00 /* BeerQueueWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		C19E0C872ED1687600C31A00 /* ActivityKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C19E0C862ED1687600C31A00 /* ActivityKit.framework */; };
+		C1D09B912ED51382004B2D04 /* BeerQueueSharedTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1D09B8E2ED51382004B2D04 /* BeerQueueSharedTypes.swift */; };
 		F75F6C8FFEAE4B819CA10348 /* noop-file.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A4D2E9AC5AB46DB9DDBEF6B /* noop-file.swift */; };
 /* End PBXBuildFile section */
 
@@ -66,6 +67,7 @@
 		C19E0C6E2ED1660400C31A00 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 		C19E0C862ED1687600C31A00 /* ActivityKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = ActivityKit.framework; path = System/Library/Frameworks/ActivityKit.framework; sourceTree = SDKROOT; };
 		C19E0C882ED1690600C31A00 /* BeerQueueWidgetExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = BeerQueueWidgetExtension.entitlements; sourceTree = "<group>"; };
+		C1D09B8E2ED51382004B2D04 /* BeerQueueSharedTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeerQueueSharedTypes.swift; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		FAC715A2D49A985799AEE119 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-BeerSelector/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -78,20 +80,12 @@
 			);
 			target = C19E0C6A2ED1660400C31A00 /* BeerQueueWidgetExtension */;
 		};
-		C19E0C8A2ED169A000C31A00 /* Exceptions for "BeerQueueWidget" folder in "BeerSelector" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				BeerQueueWidgetLiveActivity.swift,
-			);
-			target = 13B07F861A680F5B00A75B9A /* BeerSelector */;
-		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		C19E0C702ED1660400C31A00 /* BeerQueueWidget */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				C19E0C8A2ED169A000C31A00 /* Exceptions for "BeerQueueWidget" folder in "BeerSelector" target */,
 				C19E0C842ED1660600C31A00 /* Exceptions for "BeerQueueWidget" folder in "BeerQueueWidgetExtension" target */,
 			);
 			path = BeerQueueWidget;
@@ -160,6 +154,7 @@
 		83CBB9F61A601CBA00E9B192 = {
 			isa = PBXGroup;
 			children = (
+				C1D09B8E2ED51382004B2D04 /* BeerQueueSharedTypes.swift */,
 				C19E0C882ED1690600C31A00 /* BeerQueueWidgetExtension.entitlements */,
 				13B07FAE1A68108700A75B9A /* BeerSelector */,
 				832341AE1AAA6A7D00B99B32 /* Libraries */,
@@ -279,6 +274,7 @@
 					};
 					C19E0C6A2ED1660400C31A00 = {
 						CreatedOnToolsVersion = 26.1.1;
+						LastSwiftMigration = 2610;
 					};
 				};
 			};
@@ -368,9 +364,13 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-BeerSelector/Pods-BeerSelector-frameworks-${CONFIGURATION}-input-files.xcfilelist",
 			);
+			inputPaths = (
+			);
 			name = "[CP] Embed Pods Frameworks";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-BeerSelector/Pods-BeerSelector-frameworks-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -385,9 +385,13 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-BeerSelector/Pods-BeerSelector-resources-${CONFIGURATION}-input-files.xcfilelist",
 			);
+			inputPaths = (
+			);
 			name = "[CP] Copy Pods Resources";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-BeerSelector/Pods-BeerSelector-resources-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -438,6 +442,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C1D09B912ED51382004B2D04 /* BeerQueueSharedTypes.swift in Sources */,
 				13B07FBC1A68108700A75B9A /* AppDelegate.mm in Sources */,
 				13B07FC11A68108700A75B9A /* main.m in Sources */,
 				B18059E884C0ABDD17F3DC3D /* ExpoModulesProvider.swift in Sources */,
@@ -598,10 +603,7 @@
 				LIBRARY_SEARCH_PATHS = "$(SDKROOT)/usr/lib/swift\"$(inherited)\"";
 				MTL_ENABLE_DEBUG_INFO = YES;
 				ONLY_ACTIVE_ARCH = YES;
-				OTHER_LDFLAGS = (
-					"$(inherited)",
-					" ",
-				);
+				OTHER_LDFLAGS = "$(inherited)  ";
 				REACT_NATIVE_PATH = "${PODS_ROOT}/../../node_modules/react-native";
 				SDKROOT = iphoneos;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) DEBUG";
@@ -656,10 +658,7 @@
 				);
 				LIBRARY_SEARCH_PATHS = "$(SDKROOT)/usr/lib/swift\"$(inherited)\"";
 				MTL_ENABLE_DEBUG_INFO = NO;
-				OTHER_LDFLAGS = (
-					"$(inherited)",
-					" ",
-				);
+				OTHER_LDFLAGS = "$(inherited)  ";
 				REACT_NATIVE_PATH = "${PODS_ROOT}/../../node_modules/react-native";
 				SDKROOT = iphoneos;
 				USE_HERMES = true;
@@ -676,6 +675,7 @@
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_WEAK = YES;
 				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
 				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
@@ -725,6 +725,7 @@
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_WEAK = YES;
 				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
 				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;

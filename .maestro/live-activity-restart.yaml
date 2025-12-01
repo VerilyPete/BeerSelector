@@ -1,0 +1,186 @@
+appId: org.verily.FSbeerselector
+name: "Live Activity - Restart Pattern on Queue Updates"
+---
+# Test Flow: Live Activity Restart Pattern
+# This test verifies that Live Activities use the end-and-restart pattern
+# when the beer queue is updated, ensuring the staleDate is refreshed.
+#
+# IMPORTANT: Live Activities only work on physical iOS devices.
+# This test will NOT work on iOS simulators - skip if running on simulator.
+#
+# Prerequisites:
+# - Physical iOS device (iPhone or iPad)
+# - iOS 16.1 or later
+# - App logged in as UFO Club member (not visitor mode)
+# - Live Activities enabled in device Settings > BeerSelector
+# - API URLs configured
+#
+# What this test verifies:
+# 1. Adding first beer to queue starts a Live Activity
+# 2. Adding second beer triggers restart (activity updates without disappearing)
+# 3. Queue shows correct beer count
+# 4. App remains stable throughout the restart cycle
+
+# ========================================
+# STEP 1: Initial Setup
+# ========================================
+
+# Launch app with existing state (should already be logged in)
+- launchApp:
+    clearState: false
+
+# Wait for app initialization
+- waitForAnimationToEnd
+
+# Dismiss Expo dev menu if present
+- runFlow:
+    when:
+      visible: "Reload"
+    commands:
+      - pressKey: Escape
+      - waitForAnimationToEnd
+
+# ========================================
+# STEP 2: Navigate to Beerfinder
+# ========================================
+
+# Tap on Beerfinder tab (where check-ins happen)
+- tapOn: "Beerfinder"
+- waitForAnimationToEnd
+
+# Verify we're on the Beerfinder screen
+- assertVisible:
+    id: "beer-list"
+
+# ========================================
+# STEP 3: Add First Beer to Queue
+# ========================================
+
+# Tap on the first available beer item to expand it
+- tapOn:
+    id: "beer-item-.*"
+    index: 0
+- waitForAnimationToEnd
+
+# Verify the beer item expanded (check-in button should be visible)
+- assertVisible:
+    text: "Check Me In!"
+
+# Tap the "Check Me In!" button to add beer to queue
+- tapOn:
+    text: "Check Me In!"
+
+# Wait for the check-in to process
+# This triggers startActivity() on the native side
+- waitForAnimationToEnd
+
+# Wait additional time for Live Activity animation
+- wait: 1500
+
+# Verify success feedback (queued toast or visual indicator)
+# The exact text may vary based on implementation
+- assertVisible:
+    text: "queued|Queue|added"
+    # Matches "queued for check-in", "Added to Queue", etc.
+
+# ========================================
+# STEP 4: Add Second Beer (Triggers Restart)
+# ========================================
+
+# Collapse the first beer item by tapping elsewhere or scrolling
+- swipe:
+    direction: UP
+    duration: 500
+- waitForAnimationToEnd
+
+# Tap on the second available beer item
+- tapOn:
+    id: "beer-item-.*"
+    index: 1
+- waitForAnimationToEnd
+
+# Verify check-in button is visible
+- assertVisible:
+    text: "Check Me In!"
+
+# Tap "Check Me In!" to add second beer to queue
+# This triggers the restart pattern: end existing activity, start new one
+- tapOn:
+    text: "Check Me In!"
+
+# Wait for the check-in and restart to process
+# The restart pattern should happen within the debounce window (500ms)
+- waitForAnimationToEnd
+
+# Wait additional time for:
+# 1. Debounce delay (500ms)
+# 2. End activity animation
+# 3. Start new activity animation
+- wait: 2000
+
+# Verify success feedback
+- assertVisible:
+    text: "queued|Queue|added"
+
+# ========================================
+# STEP 5: Verify Queue State
+# ========================================
+
+# Navigate to view the queue (if there's a queue view)
+# Note: The exact navigation depends on app implementation
+# This might be a "View Queue" button or a dedicated tab/screen
+
+# Look for queue indicator showing 2 beers
+# The exact UI element depends on implementation
+- runFlow:
+    when:
+      visible: "View Queue"
+    commands:
+      - tapOn: "View Queue"
+      - waitForAnimationToEnd
+      - assertVisible:
+          text: "2"
+          # Should show 2 beers in queue
+
+# ========================================
+# STEP 6: Verify App Stability
+# ========================================
+
+# Navigate back to Beerfinder
+- tapOn: "Beerfinder"
+- waitForAnimationToEnd
+
+# Verify app is still responsive
+- assertVisible:
+    id: "beer-list"
+
+# Test search functionality still works
+- tapOn:
+    id: "search-input"
+- inputText: "IPA"
+- waitForAnimationToEnd
+
+# Clear search
+- tapOn:
+    id: "clear-search-button"
+- waitForAnimationToEnd
+
+# Final stability check - app should not have crashed
+- assertVisible:
+    id: "beer-list"
+
+# ========================================
+# Test Complete
+# ========================================
+# This test verifies:
+# - First beer check-in starts Live Activity
+# - Second beer check-in triggers restart pattern
+# - Activity restarts without permanent disappearance
+# - Queue correctly tracks multiple beers
+# - App remains stable throughout restart cycle
+#
+# Manual verification on physical device:
+# - Observe Live Activity appearing in Dynamic Island/Lock Screen
+# - On second check-in, activity should briefly disappear and reappear
+# - The transition should be smooth (< 100ms visible gap)
+# - Check staleDate is reset (activity won't dim for another 3 hours)

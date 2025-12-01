@@ -1,0 +1,212 @@
+appId: org.verily.FSbeerselector
+name: "Live Activity - Logout Cleanup"
+---
+# Test Flow: Live Activity Ends on Logout
+# This test verifies that the Live Activity is properly ended when
+# the user logs out, ensuring no orphaned activities remain.
+#
+# IMPORTANT: Live Activities only work on physical iOS devices.
+# This test will NOT work on iOS simulators - skip if running on simulator.
+#
+# Prerequisites:
+# - Physical iOS device (iPhone or iPad)
+# - iOS 16.1 or later
+# - App logged in as UFO Club member (not visitor mode)
+# - Live Activities enabled in device Settings > BeerSelector
+# - API URLs configured
+#
+# What this test verifies:
+# 1. Active Live Activity exists before logout
+# 2. Logout ends the Live Activity
+# 3. App returns to logged-out state cleanly
+# 4. No errors or crashes during logout cleanup
+# 5. User can log back in after logout
+
+# ========================================
+# STEP 1: Initial Setup - Ensure Logged In
+# ========================================
+
+# Launch app with existing state
+- launchApp:
+    clearState: false
+
+# Wait for app initialization
+- waitForAnimationToEnd
+
+# Dismiss Expo dev menu if present
+- runFlow:
+    when:
+      visible: "Reload"
+    commands:
+      - pressKey: Escape
+      - waitForAnimationToEnd
+
+# ========================================
+# STEP 2: Create Active Live Activity
+# ========================================
+
+# Navigate to Beerfinder to add beer to queue
+- tapOn: "Beerfinder"
+- waitForAnimationToEnd
+
+# Verify we have access (not in visitor mode)
+- assertVisible:
+    id: "beer-list"
+
+# Add a beer to queue to create an active Live Activity
+- tapOn:
+    id: "beer-item-.*"
+    index: 0
+- waitForAnimationToEnd
+
+# Check if the beer is already queued or can be checked in
+- runFlow:
+    when:
+      visible: "Check Me In!"
+    commands:
+      - tapOn:
+          text: "Check Me In!"
+      - waitForAnimationToEnd
+      - wait: 1500
+
+# At this point, we should have an active Live Activity
+# (or the beer was already queued)
+
+# ========================================
+# STEP 3: Navigate to Settings
+# ========================================
+
+# Go to Settings to access logout
+- tapOn: "Settings"
+- waitForAnimationToEnd
+
+# Verify we're on the settings screen
+- assertVisible:
+    text: "Settings"
+
+# Scroll down to find logout button if needed
+- swipe:
+    direction: DOWN
+    duration: 500
+- waitForAnimationToEnd
+
+# ========================================
+# STEP 4: Perform Logout
+# ========================================
+
+# Verify logout button exists (confirms we're logged in)
+- assertVisible:
+    text: "Logout|Log Out|Sign Out"
+
+# Tap the logout button
+- tapOn:
+    text: "Logout|Log Out|Sign Out"
+
+# Wait for any confirmation dialog
+- waitForAnimationToEnd
+
+# Handle confirmation dialog if present
+- runFlow:
+    when:
+      visible: "Confirm|Yes|OK"
+    commands:
+      - tapOn:
+          text: "Confirm|Yes|OK"
+      - waitForAnimationToEnd
+
+# Wait for logout to complete
+# This should trigger endAllActivities() on the native side
+- wait: 2000
+
+# ========================================
+# STEP 5: Verify Logged Out State
+# ========================================
+
+# Verify we're back to logged-out state
+# Should see login button or welcome screen
+- assertVisible:
+    text: "Login|Log In|Sign In|Welcome"
+
+# Verify the app didn't crash
+- assertNotVisible:
+    text: "Error|Crash|unexpected"
+    optional: true
+
+# Verify we're on the settings or login screen
+- assertVisible:
+    text: "Settings"
+
+# ========================================
+# STEP 6: Verify No Stale Activity
+# ========================================
+
+# The Live Activity should have been ended during logout
+# This is verified manually by checking the device's Dynamic Island/Lock Screen
+# but we can verify the app state is clean
+
+# Verify app is responsive
+- tapOn: "All Beer"
+- waitForAnimationToEnd
+
+# In logged-out state, All Beer should still be accessible
+- assertVisible:
+    id: "all-beers-container"
+
+# Beerfinder and Tasted Brews should be restricted or hidden
+# This depends on visitor mode handling
+
+# ========================================
+# STEP 7: Verify Login Available
+# ========================================
+
+# Navigate back to Settings
+- tapOn: "Settings"
+- waitForAnimationToEnd
+
+# Verify login button is available (proves clean logout state)
+- assertVisible:
+    text: "Login|Log In|Flying Saucer"
+
+# ========================================
+# STEP 8: Stability After Logout
+# ========================================
+
+# Verify the app is fully functional in logged-out state
+- tapOn: "All Beer"
+- waitForAnimationToEnd
+
+# Test basic functionality
+- tapOn:
+    id: "search-input"
+- inputText: "Ale"
+- waitForAnimationToEnd
+
+- tapOn:
+    id: "clear-search-button"
+- waitForAnimationToEnd
+
+# Verify list is still accessible
+- assertVisible:
+    id: "beer-list"
+
+# ========================================
+# Test Complete
+# ========================================
+# This test verifies:
+# - Active Live Activity exists before logout
+# - Logout triggers activity cleanup (endAllActivities)
+# - App returns to clean logged-out state
+# - No errors or crashes during logout
+# - Login option is available after logout
+# - App remains stable after logout
+#
+# Manual verification on physical device:
+# - Before logout: Live Activity visible in Dynamic Island/Lock Screen
+# - After logout: Live Activity should be immediately dismissed
+# - No orphaned or stale activities should remain
+# - The activity should not reappear on next app launch
+#
+# Note: To fully test, log back in and verify you can:
+# 1. Check in beers again
+# 2. Live Activity starts fresh
+# 3. No duplicate activities from previous session

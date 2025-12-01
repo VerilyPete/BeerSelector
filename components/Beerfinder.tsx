@@ -1,5 +1,14 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { StyleSheet, View, TouchableOpacity, Alert, ActivityIndicator, Modal, FlatList } from 'react-native';
+import {
+  StyleSheet,
+  View,
+  TouchableOpacity,
+  Alert,
+  ActivityIndicator,
+  Modal,
+  FlatList,
+  Platform,
+} from 'react-native';
 import { ThemedText } from './ThemedText';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { useUntappdColor } from '@/hooks/useUntappdColor';
@@ -18,7 +27,8 @@ import { BeerWithGlassType } from '@/src/types/beer';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useAppContext } from '@/context/AppContext';
 import { useQueuedCheckIn } from '@/hooks/useQueuedCheckIn';
-
+import { getSessionData } from '@/src/api/sessionManager';
+import { updateLiveActivityWithQueue } from '@/src/services/liveActivityService';
 
 export const Beerfinder = () => {
   // MP-4 Step 2: Use context for beer data instead of local state
@@ -52,7 +62,6 @@ export const Beerfinder = () => {
     filteredBeers,
     filters,
     sortBy,
-    searchText,
     expandedId,
     setSearchText,
     toggleFilter,
@@ -84,8 +93,9 @@ export const Beerfinder = () => {
       const parsedBeers = await getQueuedBeers();
       const queuedIds = parsedBeers
         .map(queuedBeer => {
-          const matchingBeer = beers.allBeers.find(beer =>
-            queuedBeer.name.includes(beer.brew_name) || beer.brew_name.includes(queuedBeer.name)
+          const matchingBeer = beers.allBeers.find(
+            beer =>
+              queuedBeer.name.includes(beer.brew_name) || beer.brew_name.includes(queuedBeer.name)
           );
           return matchingBeer?.id;
         })
@@ -106,9 +116,12 @@ export const Beerfinder = () => {
    * MP-3 Bottleneck #5: Memoized event handlers for stable references
    * MP-7 Step 2: Use queued check-in with offline support
    */
-  const handleCheckIn = useCallback(async (item: BeerWithGlassType) => {
-    await queuedCheckIn(item);
-  }, [queuedCheckIn]);
+  const handleCheckIn = useCallback(
+    async (item: BeerWithGlassType) => {
+      await queuedCheckIn(item);
+    },
+    [queuedCheckIn]
+  );
 
   const viewQueues = useCallback(async () => {
     try {
@@ -125,8 +138,9 @@ export const Beerfinder = () => {
       const queuedBeerIds = parsedBeers
         .map(queuedBeer => {
           // Find matching beer by name (queue name may include container type)
-          const matchingBeer = beers.allBeers.find(beer =>
-            queuedBeer.name.includes(beer.brew_name) || beer.brew_name.includes(queuedBeer.name)
+          const matchingBeer = beers.allBeers.find(
+            beer =>
+              queuedBeer.name.includes(beer.brew_name) || beer.brew_name.includes(queuedBeer.name)
           );
           return matchingBeer?.id;
         })
@@ -139,7 +153,8 @@ export const Beerfinder = () => {
       console.error('View queues error:', error);
 
       // Set appropriate error message
-      const errorMessage = error instanceof Error ? error.message : 'Failed to load queue. Please try again.';
+      const errorMessage =
+        error instanceof Error ? error.message : 'Failed to load queue. Please try again.';
       setQueueError(errorMessage);
 
       Alert.alert('Error', errorMessage);
@@ -148,50 +163,73 @@ export const Beerfinder = () => {
     }
   }, [beers.allBeers, syncQueuedBeerIds]);
 
-  const deleteQueuedBeer = useCallback(async (beerId: string, beerName: string) => {
-    try {
-      Alert.alert(
-        "Confirm Deletion",
-        `Are you sure you want to remove ${beerName} from your queue?`,
-        [
-          {
-            text: "Cancel",
-            style: "cancel"
-          },
-          {
-            text: "Delete",
-            onPress: async () => {
-              setDeletingBeerId(beerId);
-
-              try {
-                // Use the queue service to delete the beer
-                const success = await deleteQueuedBeerApi(beerId);
-
-                if (success) {
-                  // Refresh the queue list
-                  await viewQueues();
-                  Alert.alert('Success', `Successfully removed ${beerName} from your queue!`);
-                } else {
-                  Alert.alert('Error', 'Failed to delete beer. Please try again.');
-                }
-              } catch (error: unknown) {
-                console.error('Delete queued beer error:', error);
-                Alert.alert('Error', error instanceof Error ? error.message : 'Failed to delete beer. Please try again.');
-              } finally {
-                setDeletingBeerId(null);
-              }
+  const deleteQueuedBeer = useCallback(
+    async (beerId: string, beerName: string) => {
+      try {
+        Alert.alert(
+          'Confirm Deletion',
+          `Are you sure you want to remove ${beerName} from your queue?`,
+          [
+            {
+              text: 'Cancel',
+              style: 'cancel',
             },
-            style: "destructive"
-          }
-        ]
-      );
-    } catch (error: unknown) {
-      console.error('Delete queued beer error:', error);
-      Alert.alert('Error', `Failed to delete beer: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      setDeletingBeerId(null);
-    }
-  }, [viewQueues]);
+            {
+              text: 'Delete',
+              onPress: async () => {
+                setDeletingBeerId(beerId);
 
+                try {
+                  // Use the queue service to delete the beer
+                  const success = await deleteQueuedBeerApi(beerId);
+
+                  if (success) {
+                    // Refresh the queue list
+                    await viewQueues();
+
+                    // Update Live Activity with updated queue (iOS only)
+                    if (Platform.OS === 'ios') {
+                      try {
+                        const sessionData = await getSessionData();
+                        const updatedQueuedBeers = await getQueuedBeers();
+                        await updateLiveActivityWithQueue(updatedQueuedBeers, sessionData, false);
+                      } catch (liveActivityError) {
+                        // Live Activity errors should never block the main flow
+                        console.log('[Beerfinder] Live Activity update failed:', liveActivityError);
+                      }
+                    }
+
+                    Alert.alert('Success', `Successfully removed ${beerName} from your queue!`);
+                  } else {
+                    Alert.alert('Error', 'Failed to delete beer. Please try again.');
+                  }
+                } catch (error: unknown) {
+                  console.error('Delete queued beer error:', error);
+                  Alert.alert(
+                    'Error',
+                    error instanceof Error
+                      ? error.message
+                      : 'Failed to delete beer. Please try again.'
+                  );
+                } finally {
+                  setDeletingBeerId(null);
+                }
+              },
+              style: 'destructive',
+            },
+          ]
+        );
+      } catch (error: unknown) {
+        console.error('Delete queued beer error:', error);
+        Alert.alert(
+          'Error',
+          `Failed to delete beer: ${error instanceof Error ? error.message : 'Unknown error'}`
+        );
+        setDeletingBeerId(null);
+      }
+    },
+    [viewQueues]
+  );
 
   const handleUntappdSearch = useCallback((beerName: string) => {
     setSelectedBeerName(beerName);
@@ -212,10 +250,13 @@ export const Beerfinder = () => {
   const renderBeerActions = (item: BeerWithGlassType) => (
     <View style={styles.buttonContainer}>
       <TouchableOpacity
-        style={[styles.checkInButton, {
-          backgroundColor: untappdColor,
-          width: '48%'
-        }]}
+        style={[
+          styles.checkInButton,
+          {
+            backgroundColor: untappdColor,
+            width: '48%',
+          },
+        ]}
         onPress={() => handleCheckIn(item)}
         activeOpacity={0.7}
         disabled={checkinLoading}
@@ -223,25 +264,38 @@ export const Beerfinder = () => {
         {checkinLoading ? (
           <ActivityIndicator size="small" color={colorScheme === 'dark' ? '#FFFFFF' : 'white'} />
         ) : (
-          <ThemedText style={[styles.checkInButtonText, {
-            color: colorScheme === 'dark' ? '#FFFFFF' : 'white'
-          }]}>
+          <ThemedText
+            style={[
+              styles.checkInButtonText,
+              {
+                color: colorScheme === 'dark' ? '#FFFFFF' : 'white',
+              },
+            ]}
+          >
             Check Me In!
           </ThemedText>
         )}
       </TouchableOpacity>
 
       <TouchableOpacity
-        style={[styles.checkInButton, {
-          backgroundColor: untappdColor,
-          width: '48%'
-        }]}
+        style={[
+          styles.checkInButton,
+          {
+            backgroundColor: untappdColor,
+            width: '48%',
+          },
+        ]}
         onPress={() => handleUntappdSearch(item.brew_name)}
         activeOpacity={0.7}
       >
-        <ThemedText style={[styles.checkInButtonText, {
-          color: colorScheme === 'dark' ? '#FFFFFF' : 'white'
-        }]}>
+        <ThemedText
+          style={[
+            styles.checkInButtonText,
+            {
+              color: colorScheme === 'dark' ? '#FFFFFF' : 'white',
+            },
+          ]}
+        >
           Check Untappd
         </ThemedText>
       </TouchableOpacity>
@@ -261,18 +315,22 @@ export const Beerfinder = () => {
 
           {queueError ? (
             <View style={styles.queueErrorContainer}>
-              <ThemedText style={styles.queueErrorText}>
-                {queueError}
-              </ThemedText>
+              <ThemedText style={styles.queueErrorText}>{queueError}</ThemedText>
               <TouchableOpacity
-                style={[styles.retryButton, {
-                  backgroundColor: untappdColor
-                }]}
+                style={[
+                  styles.retryButton,
+                  {
+                    backgroundColor: untappdColor,
+                  },
+                ]}
                 onPress={viewQueues}
                 disabled={loadingQueues}
               >
                 {loadingQueues ? (
-                  <ActivityIndicator size="small" color={colorScheme === 'dark' ? '#FFFFFF' : 'white'} />
+                  <ActivityIndicator
+                    size="small"
+                    color={colorScheme === 'dark' ? '#FFFFFF' : 'white'}
+                  />
                 ) : (
                   <ThemedText style={[styles.retryButtonText, { color: 'white' }]}>
                     Try Again
@@ -281,9 +339,7 @@ export const Beerfinder = () => {
               </TouchableOpacity>
             </View>
           ) : queuedBeers.length === 0 ? (
-            <ThemedText style={styles.noQueuesText}>
-              No beer currently in queue
-            </ThemedText>
+            <ThemedText style={styles.noQueuesText}>No beer currently in queue</ThemedText>
           ) : (
             <FlatList
               data={queuedBeers}
@@ -294,24 +350,33 @@ export const Beerfinder = () => {
                     <ThemedText type="defaultSemiBold" style={styles.queuedBeerName}>
                       {item.name}
                     </ThemedText>
-                    <ThemedText style={styles.queuedBeerDate}>
-                      {item.date}
-                    </ThemedText>
+                    <ThemedText style={styles.queuedBeerDate}>{item.date}</ThemedText>
                   </View>
                   <TouchableOpacity
-                    style={[styles.deleteButton, {
-                      backgroundColor: colorScheme === 'dark' ? '#ff4d4f' : '#fff0f0',
-                      borderColor: colorScheme === 'dark' ? '#ff7875' : '#ffa39e'
-                    }]}
+                    style={[
+                      styles.deleteButton,
+                      {
+                        backgroundColor: colorScheme === 'dark' ? '#ff4d4f' : '#fff0f0',
+                        borderColor: colorScheme === 'dark' ? '#ff7875' : '#ffa39e',
+                      },
+                    ]}
                     onPress={() => deleteQueuedBeer(item.id, item.name)}
                     disabled={deletingBeerId === item.id}
                   >
                     {deletingBeerId === item.id ? (
-                      <ActivityIndicator size="small" color={colorScheme === 'dark' ? 'white' : '#f5222d'} />
+                      <ActivityIndicator
+                        size="small"
+                        color={colorScheme === 'dark' ? 'white' : '#f5222d'}
+                      />
                     ) : (
-                      <ThemedText style={[styles.deleteButtonText, {
-                        color: colorScheme === 'dark' ? 'white' : '#f5222d'
-                      }]}>
+                      <ThemedText
+                        style={[
+                          styles.deleteButtonText,
+                          {
+                            color: colorScheme === 'dark' ? 'white' : '#f5222d',
+                          },
+                        ]}
+                      >
                         Delete
                       </ThemedText>
                     )}
@@ -324,14 +389,15 @@ export const Beerfinder = () => {
           )}
 
           <TouchableOpacity
-            style={[styles.closeButton, {
-              backgroundColor: untappdColor
-            }]}
+            style={[
+              styles.closeButton,
+              {
+                backgroundColor: untappdColor,
+              },
+            ]}
             onPress={() => setQueueModalVisible(false)}
           >
-            <ThemedText style={[styles.closeButtonText, { color: 'white' }]}>
-              Close
-            </ThemedText>
+            <ThemedText style={[styles.closeButtonText, { color: 'white' }]}>Close</ThemedText>
           </TouchableOpacity>
         </View>
       </View>
@@ -347,33 +413,52 @@ export const Beerfinder = () => {
           <View style={styles.filtersContainer}>
             <View style={styles.buttonsContainer}>
               <TouchableOpacity
-                style={[styles.actionButton, {
-                  backgroundColor: untappdColor,
-                  marginRight: 8
-                }]}
+                style={[
+                  styles.actionButton,
+                  {
+                    backgroundColor: untappdColor,
+                    marginRight: 8,
+                  },
+                ]}
                 onPress={viewQueues}
                 disabled={loadingQueues}
               >
                 {loadingQueues ? (
-                  <ActivityIndicator size="small" color={colorScheme === 'dark' ? '#FFFFFF' : 'white'} />
+                  <ActivityIndicator
+                    size="small"
+                    color={colorScheme === 'dark' ? '#FFFFFF' : 'white'}
+                  />
                 ) : (
-                  <ThemedText style={[styles.actionButtonText, {
-                    color: colorScheme === 'dark' ? '#FFFFFF' : 'white'
-                  }]}>
+                  <ThemedText
+                    style={[
+                      styles.actionButtonText,
+                      {
+                        color: colorScheme === 'dark' ? '#FFFFFF' : 'white',
+                      },
+                    ]}
+                  >
                     View Queues
                   </ThemedText>
                 )}
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.actionButton, {
-                  backgroundColor: untappdColor
-                }]}
-                onPress={() => router.push("/screens/rewards" as any)}
+                style={[
+                  styles.actionButton,
+                  {
+                    backgroundColor: untappdColor,
+                  },
+                ]}
+                onPress={() => router.push('/screens/rewards' as any)}
               >
-                <ThemedText style={[styles.actionButtonText, {
-                  color: colorScheme === 'dark' ? '#FFFFFF' : 'white'
-                }]}>
+                <ThemedText
+                  style={[
+                    styles.actionButtonText,
+                    {
+                      color: colorScheme === 'dark' ? '#FFFFFF' : 'white',
+                    },
+                  ]}
+                >
                   Rewards
                 </ThemedText>
               </TouchableOpacity>
@@ -388,9 +473,7 @@ export const Beerfinder = () => {
             style={[styles.refreshButton, { backgroundColor: activeButtonColor }]}
             onPress={handleRefresh}
           >
-            <ThemedText style={[styles.buttonText, { color: 'white' }]}>
-              Try Again
-            </ThemedText>
+            <ThemedText style={[styles.buttonText, { color: 'white' }]}>Try Again</ThemedText>
           </TouchableOpacity>
         </View>
       ) : (
@@ -398,33 +481,52 @@ export const Beerfinder = () => {
           <View style={styles.filtersContainer}>
             <View style={styles.buttonsContainer}>
               <TouchableOpacity
-                style={[styles.actionButton, {
-                  backgroundColor: untappdColor,
-                  marginRight: 8
-                }]}
+                style={[
+                  styles.actionButton,
+                  {
+                    backgroundColor: untappdColor,
+                    marginRight: 8,
+                  },
+                ]}
                 onPress={viewQueues}
                 disabled={loadingQueues}
               >
                 {loadingQueues ? (
-                  <ActivityIndicator size="small" color={colorScheme === 'dark' ? '#FFFFFF' : 'white'} />
+                  <ActivityIndicator
+                    size="small"
+                    color={colorScheme === 'dark' ? '#FFFFFF' : 'white'}
+                  />
                 ) : (
-                  <ThemedText style={[styles.actionButtonText, {
-                    color: colorScheme === 'dark' ? '#FFFFFF' : 'white'
-                  }]}>
+                  <ThemedText
+                    style={[
+                      styles.actionButtonText,
+                      {
+                        color: colorScheme === 'dark' ? '#FFFFFF' : 'white',
+                      },
+                    ]}
+                  >
                     View Queues
                   </ThemedText>
                 )}
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.actionButton, {
-                  backgroundColor: untappdColor
-                }]}
-                onPress={() => router.push("/screens/rewards" as any)}
+                style={[
+                  styles.actionButton,
+                  {
+                    backgroundColor: untappdColor,
+                  },
+                ]}
+                onPress={() => router.push('/screens/rewards' as any)}
               >
-                <ThemedText style={[styles.actionButtonText, {
-                  color: colorScheme === 'dark' ? '#FFFFFF' : 'white'
-                }]}>
+                <ThemedText
+                  style={[
+                    styles.actionButtonText,
+                    {
+                      color: colorScheme === 'dark' ? '#FFFFFF' : 'white',
+                    },
+                  ]}
+                >
                   Rewards
                 </ThemedText>
               </TouchableOpacity>
