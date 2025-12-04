@@ -12,6 +12,7 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 import {
   syncLiveActivityOnLaunch,
   syncActivityIdFromNative,
+  cleanupStaleActivityOnForeground,
 } from '@/src/services/liveActivityService';
 import { getQueuedBeers } from '@/src/api/queueService';
 import { getSessionData } from '@/src/api/sessionManager';
@@ -244,8 +245,14 @@ export default function RootLayout() {
           // Sync Live Activity on app foreground (iOS only)
           if (Platform.OS === 'ios') {
             try {
-              // Sync with native activity state first
+              // Sync with native activity state first (recover state after force-quit)
               await syncActivityIdFromNative();
+
+              // Clean up stale activity first (this also cancels pending background task)
+              // This ensures activities older than 3 hours are ended before any sync
+              await cleanupStaleActivityOnForeground();
+
+              // Only sync if we have an active (non-stale) activity or need to start one
               const sessionData = await getSessionData();
               const isVisitor = await checkIsVisitorMode(false);
               await syncLiveActivityOnLaunch(getQueuedBeers, sessionData, isVisitor);

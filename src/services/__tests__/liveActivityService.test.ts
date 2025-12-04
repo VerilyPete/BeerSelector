@@ -25,6 +25,8 @@ import {
   getCurrentActivityId,
   updateLiveActivityWithQueue,
   syncLiveActivityOnLaunch,
+  syncActivityIdFromNative,
+  cleanupStaleActivityOnForeground,
   restartLiveActivity,
   debouncedRestartLiveActivity,
   cancelPendingRestart,
@@ -46,6 +48,9 @@ const mockRestartActivity = jest.fn();
 const mockGetAllActivityIds = jest.fn();
 const mockEndActivitiesOlderThan = jest.fn();
 const mockEndAllActivitiesSync = jest.fn();
+const mockScheduleCleanupTask = jest.fn();
+const mockCancelCleanupTask = jest.fn();
+const mockGetActivityStaleDate = jest.fn();
 
 // Mock Platform and NativeModules from react-native
 let mockPlatformOS = 'ios';
@@ -59,6 +64,9 @@ let mockLiveActivitiesModule: any = {
   getAllActivityIds: mockGetAllActivityIds,
   endActivitiesOlderThan: mockEndActivitiesOlderThan,
   endAllActivitiesSync: mockEndAllActivitiesSync,
+  scheduleCleanupTask: mockScheduleCleanupTask,
+  cancelCleanupTask: mockCancelCleanupTask,
+  getActivityStaleDate: mockGetActivityStaleDate,
 };
 
 jest.mock('react-native', () => ({
@@ -105,6 +113,15 @@ jest.mock('@/modules/live-activity/src', () => ({
     get endAllActivitiesSync() {
       return mockEndAllActivitiesSync;
     },
+    get scheduleCleanupTask() {
+      return mockScheduleCleanupTask;
+    },
+    get cancelCleanupTask() {
+      return mockCancelCleanupTask;
+    },
+    get getActivityStaleDate() {
+      return mockGetActivityStaleDate;
+    },
   },
 }));
 
@@ -130,7 +147,16 @@ describe('liveActivityService', () => {
       getAllActivityIds: mockGetAllActivityIds,
       endActivitiesOlderThan: mockEndActivitiesOlderThan,
       endAllActivitiesSync: mockEndAllActivitiesSync,
+      scheduleCleanupTask: mockScheduleCleanupTask,
+      cancelCleanupTask: mockCancelCleanupTask,
+      getActivityStaleDate: mockGetActivityStaleDate,
     };
+
+    // Set default mock implementations for cleanup task functions
+    mockScheduleCleanupTask.mockResolvedValue(true);
+    mockCancelCleanupTask.mockReturnValue(true);
+    mockGetActivityStaleDate.mockResolvedValue(null);
+    mockEndActivitiesOlderThan.mockResolvedValue(0);
   });
 
   afterEach(() => {
@@ -560,6 +586,14 @@ describe('liveActivityService', () => {
 
       expect(mockEndAllActivities).toHaveBeenCalled();
       expect(console.log).toHaveBeenCalledWith('[LiveActivity] Ended all activities');
+    });
+
+    it('should cancel cleanup task when ending all activities', async () => {
+      mockEndAllActivities.mockResolvedValueOnce(true);
+
+      await endAllLiveActivities();
+
+      expect(mockCancelCleanupTask).toHaveBeenCalled();
     });
   });
 
@@ -1045,6 +1079,113 @@ describe('liveActivityService', () => {
       const result = endAllActivitiesSync();
 
       expect(result).toBe(false);
+    });
+  });
+
+  describe('syncActivityIdFromNative', () => {
+    beforeEach(() => {
+      // Reset module state by ending any activity
+      mockEndActivity.mockResolvedValue(true);
+    });
+
+    it('should do nothing on non-iOS platforms', async () => {
+      mockPlatformOS = 'android';
+
+      await syncActivityIdFromNative();
+
+      expect(mockGetAllActivityIds).not.toHaveBeenCalled();
+    });
+
+    it('should sync activity ID when activities exist', async () => {
+      mockPlatformOS = 'ios';
+      mockGetAllActivityIds.mockResolvedValue(['test-activity-123']);
+      mockGetActivityStaleDate.mockResolvedValue(null);
+
+      await syncActivityIdFromNative();
+
+      expect(mockGetAllActivityIds).toHaveBeenCalled();
+      expect(getCurrentActivityId()).toBe('test-activity-123');
+    });
+
+    it('should restore stale timestamp when activity has stale date', async () => {
+      mockPlatformOS = 'ios';
+      mockGetAllActivityIds.mockResolvedValue(['test-activity-456']);
+      // Unix timestamp in seconds: Dec 4, 2025 12:00:00 UTC
+      const staleTimestampSeconds = 1733313600;
+      mockGetActivityStaleDate.mockResolvedValue(staleTimestampSeconds);
+
+      await syncActivityIdFromNative();
+
+      expect(mockGetAllActivityIds).toHaveBeenCalled();
+      expect(mockGetActivityStaleDate).toHaveBeenCalledWith('test-activity-456');
+      expect(getCurrentActivityId()).toBe('test-activity-456');
+      // Note: We can't directly test activityStaleTimestamp since it's not exported,
+      // but we verify the mock was called with the correct activity ID
+    });
+
+    it('should handle no existing activities', async () => {
+      mockPlatformOS = 'ios';
+      mockGetAllActivityIds.mockResolvedValue([]);
+
+      await syncActivityIdFromNative();
+
+      expect(mockGetAllActivityIds).toHaveBeenCalled();
+      expect(getCurrentActivityId()).toBe(null);
+    });
+
+    it('should handle errors gracefully', async () => {
+      mockPlatformOS = 'ios';
+      mockGetAllActivityIds.mockRejectedValue(new Error('Native error'));
+
+      // Should not throw
+      await syncActivityIdFromNative();
+
+      expect(getCurrentActivityId()).toBe(null);
+    });
+
+    it('should handle getActivityStaleDate errors gracefully', async () => {
+      mockPlatformOS = 'ios';
+      mockGetAllActivityIds.mockResolvedValue(['test-activity-789']);
+      mockGetActivityStaleDate.mockRejectedValue(new Error('Stale date error'));
+
+      // Should not throw, activity ID should still be synced
+      await syncActivityIdFromNative();
+
+      expect(getCurrentActivityId()).toBe('test-activity-789');
+    });
+
+    it('should end stale activities before syncing', async () => {
+      mockPlatformOS = 'ios';
+      mockEndActivitiesOlderThan.mockResolvedValue(2); // 2 stale activities ended
+      mockGetAllActivityIds.mockResolvedValue(['fresh-activity']);
+      mockGetActivityStaleDate.mockResolvedValue(null);
+
+      await syncActivityIdFromNative();
+
+      // Should call endActivitiesOlderThan with 3 hours in seconds
+      expect(mockEndActivitiesOlderThan).toHaveBeenCalledWith(10800);
+      expect(mockGetAllActivityIds).toHaveBeenCalled();
+      expect(getCurrentActivityId()).toBe('fresh-activity');
+    });
+
+    it('should allow cleanupStaleActivityOnForeground to use restored stale timestamp', async () => {
+      mockPlatformOS = 'ios';
+      mockGetAllActivityIds.mockResolvedValue(['test-activity']);
+      // Set a stale timestamp in the past (1 hour ago in seconds)
+      const pastTimestamp = Math.floor((Date.now() - 60 * 60 * 1000) / 1000);
+      mockGetActivityStaleDate.mockResolvedValue(pastTimestamp);
+      mockEndActivity.mockResolvedValue(true);
+
+      // First sync to restore the activity and stale timestamp
+      await syncActivityIdFromNative();
+      expect(getCurrentActivityId()).toBe('test-activity');
+
+      // Now cleanup should detect it as stale and end it
+      await cleanupStaleActivityOnForeground();
+
+      // Activity should have been cleaned up because it was stale
+      expect(mockEndActivity).toHaveBeenCalledWith('test-activity');
+      expect(getCurrentActivityId()).toBeNull();
     });
   });
 });

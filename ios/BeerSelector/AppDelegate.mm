@@ -2,11 +2,16 @@
 
 #import <React/RCTBundleURLProvider.h>
 #import <React/RCTLinkingManager.h>
+#import "BeerSelector-Swift.h"
 
 @implementation AppDelegate
 
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions
 {
+  // Register background task handler for Live Activity cleanup
+  // Must be called before returning from this method
+  [BackgroundTaskHandler registerTasks];
+
   self.moduleName = @"main";
 
   // You can add your custom initial props in the dictionary below.
