@@ -46,8 +46,14 @@ import type { SessionData } from '@/src/types/api';
 // Module-level state to track current activity
 let currentActivityId: string | null = null;
 
+// Module-level state for tracking stale timestamp
+// This tracks when the current activity should be considered stale and auto-dismissed
+let activityStaleTimestamp: number | null = null;
+
 // Constants
 const RESTART_DEBOUNCE_MS = 500;
+const STALE_DURATION_MS = 3 * 60 * 60 * 1000; // 3 hours in milliseconds
+const STALE_DURATION_SECONDS = 3 * 60 * 60; // 3 hours in seconds
 
 // Module-level debouncer state for restart operations
 let restartDebouncer: Debouncer<[StartActivityData], string | null> | null = null;
@@ -151,7 +157,18 @@ export async function startLiveActivity(
     });
 
     currentActivityId = activityId;
+    activityStaleTimestamp = Date.now() + STALE_DURATION_MS;
     console.log('[LiveActivity] Started activity:', activityId);
+
+    // Schedule background cleanup task for 3 hours from now
+    try {
+      await LiveActivityModule.scheduleCleanupTask(STALE_DURATION_SECONDS);
+      console.log('[LiveActivity] Scheduled cleanup task for 3 hours');
+    } catch (scheduleError) {
+      // Cleanup task scheduling failure is non-fatal
+      console.warn('[LiveActivity] Failed to schedule cleanup task:', scheduleError);
+    }
+
     return activityId;
   } catch (error) {
     // Handle expected errors gracefully
@@ -226,10 +243,20 @@ export async function endLiveActivity(): Promise<void> {
     await LiveActivityModule.endActivity(currentActivityId);
     console.log('[LiveActivity] Ended activity');
     currentActivityId = null;
+    activityStaleTimestamp = null;
+
+    // Cancel any pending background cleanup task
+    try {
+      LiveActivityModule.cancelCleanupTask();
+    } catch (cancelError) {
+      // Non-fatal, just log
+      console.warn('[LiveActivity] Failed to cancel cleanup task:', cancelError);
+    }
   } catch (error) {
     console.error('[LiveActivity] Error ending activity:', error);
     // Reset state even on error to prevent stale references
     currentActivityId = null;
+    activityStaleTimestamp = null;
   }
 }
 
@@ -251,12 +278,17 @@ export async function endAllLiveActivities(): Promise<void> {
     await LiveActivityModule.endAllActivities();
     console.log('[LiveActivity] Ended all activities');
 
-    // Reset our tracked activity ID
+    // Reset our tracked state
     currentActivityId = null;
+    activityStaleTimestamp = null;
+
+    // Cancel any pending cleanup task since we've ended all activities
+    LiveActivityModule.cancelCleanupTask();
   } catch (error) {
     console.error('[LiveActivity] Error ending all activities:', error);
     // Reset state even on error
     currentActivityId = null;
+    activityStaleTimestamp = null;
   }
 }
 
@@ -318,6 +350,25 @@ export async function syncActivityIdFromNative(): Promise<string | null> {
       // Use the first existing activity
       currentActivityId = activityIds[0];
       console.log('[LiveActivity] Synced with existing activity:', currentActivityId);
+
+      // Restore the stale timestamp from native module
+      if (currentActivityId) {
+        try {
+          const staleDateTimestamp =
+            await LiveActivityModule.getActivityStaleDate(currentActivityId);
+          if (staleDateTimestamp) {
+            // staleDateTimestamp is in seconds (Unix epoch), convert to milliseconds
+            activityStaleTimestamp = staleDateTimestamp * 1000;
+            console.log(
+              '[LiveActivity] Restored stale timestamp from native:',
+              new Date(activityStaleTimestamp).toISOString()
+            );
+          }
+        } catch (error) {
+          console.log('[LiveActivity] Could not restore stale timestamp:', error);
+        }
+      }
+
       return currentActivityId;
     }
 
@@ -397,8 +448,39 @@ export async function updateLiveActivityWithQueue(
 }
 
 /**
+ * Cleans up stale Live Activity when app returns to foreground.
+ * If the activity has exceeded its stale timestamp (3 hours since last queue change),
+ * it will be ended and the background cleanup task will be cancelled.
+ *
+ * This is the foreground cleanup layer of the two-layer cleanup strategy:
+ * - Layer 1: Background task (best effort, may be delayed by iOS)
+ * - Layer 2: Foreground cleanup (guaranteed when user opens app)
+ *
+ * @returns Promise that resolves when cleanup check is complete
+ */
+export async function cleanupStaleActivityOnForeground(): Promise<void> {
+  // Skip if no activity is tracked
+  if (!currentActivityId || !activityStaleTimestamp) {
+    return;
+  }
+
+  const now = Date.now();
+  if (now >= activityStaleTimestamp) {
+    console.log('[LiveActivity] Activity is stale, ending...');
+    console.log('[LiveActivity] Stale timestamp:', new Date(activityStaleTimestamp).toISOString());
+    console.log('[LiveActivity] Current time:', new Date(now).toISOString());
+
+    // endLiveActivity() handles canceling the cleanup task internally
+    await endLiveActivity();
+  }
+}
+
+/**
  * Syncs Live Activity state on app launch/foreground.
  * Fetches current queue and updates/starts/ends activity as needed.
+ *
+ * Note: Call cleanupStaleActivityOnForeground() before this function
+ * to ensure stale activities are cleaned up first.
  *
  * @param getQueuedBeersFunc - Function to fetch queued beers (dependency injection for testability)
  * @param sessionData - User session data
@@ -477,6 +559,14 @@ export async function restartLiveActivity(
       };
     }
 
+    // Cancel any pending cleanup task before restarting
+    try {
+      LiveActivityModule.cancelCleanupTask();
+    } catch (cancelError) {
+      // Non-fatal, just log
+      console.warn('[LiveActivity] Failed to cancel cleanup task before restart:', cancelError);
+    }
+
     const data: StartActivityData = {
       memberId: queueState.memberId,
       storeId: queueState.storeId,
@@ -486,7 +576,26 @@ export async function restartLiveActivity(
     const activityId = await LiveActivityModule.restartActivity(data);
 
     // Update module state
-    currentActivityId = activityId;
+    if (activityId) {
+      currentActivityId = activityId;
+      activityStaleTimestamp = Date.now() + STALE_DURATION_MS;
+
+      // Schedule new cleanup task for 3 hours from now
+      try {
+        await LiveActivityModule.scheduleCleanupTask(STALE_DURATION_SECONDS);
+        console.log('[LiveActivity] Scheduled cleanup task for 3 hours after restart');
+      } catch (scheduleError) {
+        // Non-fatal, just log
+        console.warn(
+          '[LiveActivity] Failed to schedule cleanup task after restart:',
+          scheduleError
+        );
+      }
+    } else {
+      // Queue was empty, activity ended
+      currentActivityId = null;
+      activityStaleTimestamp = null;
+    }
 
     return {
       success: true,

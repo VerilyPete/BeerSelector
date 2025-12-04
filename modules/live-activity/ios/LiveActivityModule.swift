@@ -15,8 +15,12 @@
 
 import ExpoModulesCore
 import ActivityKit
+import BackgroundTasks
 
 // MARK: - Module Definition
+
+/// Background task identifier for Live Activity cleanup
+private let cleanupTaskIdentifier = "org.verily.FSbeerselector.liveactivity.cleanup"
 
 public class LiveActivityModule: Module {
   /// Track the current activity ID
@@ -83,12 +87,11 @@ public class LiveActivityModule: Module {
 
       let beers = data.beers.map { QueuedBeer(id: $0.id, name: $0.name) }
       let contentState = BeerQueueAttributes.ContentState(beers: beers)
-      let staleDate = Date().addingTimeInterval(3 * 60 * 60) // 3 hours
-      let content = ActivityContent(state: contentState, staleDate: staleDate)
 
       for activity in Activity<BeerQueueAttributes>.activities {
         if activity.id == activityId {
-          await activity.update(content)
+          // Update content only - preserve existing staleDate
+          await activity.update(using: contentState)
           print("[LiveActivityModule] Updated activity: \(activityId)")
           return true
         }
@@ -237,6 +240,39 @@ public class LiveActivityModule: Module {
       // Wait up to 1 second for completion
       _ = semaphore.wait(timeout: .now() + 1.0)
       return completed
+    }
+
+    // MARK: - Background Task Management
+
+    AsyncFunction("scheduleCleanupTask") { (delaySeconds: Double) -> Bool in
+      let request = BGAppRefreshTaskRequest(identifier: cleanupTaskIdentifier)
+      request.earliestBeginDate = Date().addingTimeInterval(delaySeconds)
+
+      do {
+        try BGTaskScheduler.shared.submit(request)
+        print("[LiveActivityModule] Scheduled cleanup task for \(delaySeconds)s from now")
+        return true
+      } catch {
+        print("[LiveActivityModule] Failed to schedule cleanup task: \(error.localizedDescription) (type: \(type(of: error)))")
+        return false
+      }
+    }
+
+    Function("cancelCleanupTask") { () -> Bool in
+      BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: cleanupTaskIdentifier)
+      print("[LiveActivityModule] Cancelled cleanup task")
+      return true
+    }
+
+    AsyncFunction("getActivityStaleDate") { (activityId: String) -> Double? in
+      guard #available(iOS 16.2, *) else { return nil }
+
+      for activity in Activity<BeerQueueAttributes>.activities {
+        if activity.id == activityId {
+          return activity.content.staleDate?.timeIntervalSince1970
+        }
+      }
+      return nil
     }
   }
 

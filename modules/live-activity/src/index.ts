@@ -107,7 +107,7 @@ export interface LiveActivityModuleInterface {
 
   /**
    * Updates an existing Live Activity with new queue state.
-   * Also resets the staleDate to 3 hours from now.
+   * Note: This preserves the existing staleDate - use restartActivity() to reset the timer.
    *
    * @param activityId - ID of the activity to update
    * @param data - Updated activity data with new beers array
@@ -176,6 +176,37 @@ export interface LiveActivityModuleInterface {
    * @returns boolean indicating completion (may timeout)
    */
   endAllActivitiesSync(): boolean;
+
+  /**
+   * Schedules a background cleanup task to end Live Activities.
+   * The task will run approximately after the specified delay.
+   *
+   * Note: iOS does not guarantee exact execution time for BGAppRefreshTask.
+   * The task may run minutes to hours after the scheduled time, depending on
+   * device battery level, user's app usage patterns, and system resources.
+   *
+   * @param delaySeconds - Delay in seconds before the task should run (typically 10800 for 3 hours)
+   * @returns Promise resolving to true if task was scheduled successfully
+   */
+  scheduleCleanupTask(delaySeconds: number): Promise<boolean>;
+
+  /**
+   * Cancels any pending background cleanup task.
+   * Call this when restarting an activity (to reschedule with fresh timer)
+   * or when the user manually ends the activity.
+   *
+   * @returns true if cancellation was successful
+   */
+  cancelCleanupTask(): boolean;
+
+  /**
+   * Gets the stale date for a specific activity.
+   * The stale date is when the activity should be considered expired.
+   *
+   * @param activityId - ID of the activity to check
+   * @returns Promise resolving to Unix timestamp (seconds since epoch) or null if not found
+   */
+  getActivityStaleDate(activityId: string): Promise<number | null>;
 }
 
 // ============================================================================
