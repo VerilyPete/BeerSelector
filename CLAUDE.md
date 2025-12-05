@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-BeerSelector is a React Native mobile app built with Expo SDK 53 for beer enthusiasts to browse taplists, track tastings, and manage their Flying Saucer UFO Club experience. The app supports both authenticated UFO Club members and visitor mode with limited access.
+BeerSelector is a React Native mobile app built with Expo SDK 54 for beer enthusiasts to browse taplists, track tastings, and manage their Flying Saucer UFO Club experience. The app supports both authenticated UFO Club members and visitor mode with limited access.
 
 **Minimum Requirements**: iOS 17.6 or greater.
 
@@ -100,7 +100,7 @@ See also:
 
 ## Architecture
 
-### Database Layer (expo-sqlite 15.1.4)
+### Database Layer (expo-sqlite 16.0.x)
 
 The app uses SQLite for offline-first data storage with a **repository pattern**:
 
@@ -707,6 +707,6 @@ From `.cursor/rules/expo-rules.mdc`:
 
 - Use functional components with hooks
 - Use TypeScript for type safety
-- Use expo-sqlite 15.1.4 API (not older versions)
+- Use expo-sqlite 16.0.x API (not older versions)
 - Implement proper offline support
 - Ensure dark mode compatibility for all UI elements

@@ -11,10 +11,10 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "org.verily.FSbeerselector",
-      "usesNonExemptEncryption": false,
       "buildNumber": "36",
       "infoPlist": {
-        "UIBackgroundModes": []
+        "UIBackgroundModes": [],
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -23,6 +23,7 @@
         "backgroundColor": "#ffffff"
       },
       "package": "org.verily.FSBeerselector",
+      "edgeToEdgeEnabled": true,
       "permissions": [
         "android.permission.INTERNET",
         "android.permission.READ_EXTERNAL_STORAGE",
