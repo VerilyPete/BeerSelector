@@ -13,7 +13,7 @@ describe('Database Schema', () => {
   const mockRunAsync = jest.fn().mockResolvedValue({ changes: 0, lastInsertRowId: 0 });
   const mockGetFirstAsync = jest.fn();
   const mockGetAllAsync = jest.fn().mockResolvedValue([]);
-  const mockWithTransactionAsync = jest.fn(async (callback) => {
+  const mockWithTransactionAsync = jest.fn(async callback => {
     await callback();
   });
 
@@ -50,7 +50,7 @@ describe('Database Schema', () => {
     mockRunAsync.mockClear().mockResolvedValue({ changes: 0, lastInsertRowId: 0 });
     mockGetFirstAsync.mockClear();
     mockGetAllAsync.mockClear().mockResolvedValue([]);
-    mockWithTransactionAsync.mockClear().mockImplementation(async (callback) => {
+    mockWithTransactionAsync.mockClear().mockImplementation(async callback => {
       await callback();
     });
   });
@@ -91,8 +91,8 @@ describe('Database Schema', () => {
       await setupDatabase();
 
       // Find the call that creates the allbeers table
-      const allbeersCall = (mockExecAsync as jest.Mock).mock.calls.find(
-        call => call[0].includes('CREATE TABLE IF NOT EXISTS allbeers')
+      const allbeersCall = (mockExecAsync as jest.Mock).mock.calls.find(call =>
+        call[0].includes('CREATE TABLE IF NOT EXISTS allbeers')
       );
 
       expect(allbeersCall).toBeDefined();
@@ -114,8 +114,8 @@ describe('Database Schema', () => {
     it('should create tasted_brew_current_round table with correct columns', async () => {
       await setupDatabase();
 
-      const tastedBrewCall = (mockExecAsync as jest.Mock).mock.calls.find(
-        call => call[0].includes('CREATE TABLE IF NOT EXISTS tasted_brew_current_round')
+      const tastedBrewCall = (mockExecAsync as jest.Mock).mock.calls.find(call =>
+        call[0].includes('CREATE TABLE IF NOT EXISTS tasted_brew_current_round')
       );
 
       expect(tastedBrewCall).toBeDefined();
@@ -139,8 +139,8 @@ describe('Database Schema', () => {
     it('should create rewards table with correct columns', async () => {
       await setupDatabase();
 
-      const rewardsCall = (mockExecAsync as jest.Mock).mock.calls.find(
-        call => call[0].includes('CREATE TABLE IF NOT EXISTS rewards')
+      const rewardsCall = (mockExecAsync as jest.Mock).mock.calls.find(call =>
+        call[0].includes('CREATE TABLE IF NOT EXISTS rewards')
       );
 
       expect(rewardsCall).toBeDefined();
@@ -154,8 +154,8 @@ describe('Database Schema', () => {
     it('should create preferences table with correct columns', async () => {
       await setupDatabase();
 
-      const preferencesCall = (mockExecAsync as jest.Mock).mock.calls.find(
-        call => call[0].includes('CREATE TABLE IF NOT EXISTS preferences')
+      const preferencesCall = (mockExecAsync as jest.Mock).mock.calls.find(call =>
+        call[0].includes('CREATE TABLE IF NOT EXISTS preferences')
       );
 
       expect(preferencesCall).toBeDefined();
@@ -169,8 +169,8 @@ describe('Database Schema', () => {
     it('should create untappd table with correct columns', async () => {
       await setupDatabase();
 
-      const untappdCall = (mockExecAsync as jest.Mock).mock.calls.find(
-        call => call[0].includes('CREATE TABLE IF NOT EXISTS untappd')
+      const untappdCall = (mockExecAsync as jest.Mock).mock.calls.find(call =>
+        call[0].includes('CREATE TABLE IF NOT EXISTS untappd')
       );
 
       expect(untappdCall).toBeDefined();
@@ -231,10 +231,7 @@ describe('Database Schema', () => {
       await expect(setupDatabase()).rejects.toThrow('Database creation failed');
 
       // Verify error was logged
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'Error setting up database:',
-        testError
-      );
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Error setting up database:', testError);
     });
 
     it('should use a transaction for table creation', async () => {
@@ -279,22 +276,23 @@ describe('Database Schema', () => {
   });
 
   describe('Table Schema Verification', () => {
-    it('should have 5 tables total', async () => {
+    it('should have 7 tables total', async () => {
       await setupDatabase();
 
       // Count the number of CREATE TABLE calls
-      const createTableCalls = (mockExecAsync as jest.Mock).mock.calls.filter(
-        call => call[0].includes('CREATE TABLE IF NOT EXISTS')
+      // Tables: allbeers, tasted_brew_current_round, rewards, preferences, untappd, operation_queue, schema_version
+      const createTableCalls = (mockExecAsync as jest.Mock).mock.calls.filter(call =>
+        call[0].includes('CREATE TABLE IF NOT EXISTS')
       );
 
-      expect(createTableCalls.length).toBe(6);
+      expect(createTableCalls.length).toBe(7);
     });
 
     it('should use TEXT type for all columns', async () => {
       await setupDatabase();
 
-      const createTableCalls = (mockExecAsync as jest.Mock).mock.calls.filter(
-        call => call[0].includes('CREATE TABLE IF NOT EXISTS')
+      const createTableCalls = (mockExecAsync as jest.Mock).mock.calls.filter(call =>
+        call[0].includes('CREATE TABLE IF NOT EXISTS')
       );
 
       // Verify all tables use TEXT columns (no INTEGER, REAL, etc.)
@@ -307,8 +305,8 @@ describe('Database Schema', () => {
     it('should use PRIMARY KEY for id columns', async () => {
       await setupDatabase();
 
-      const createTableCalls = (mockExecAsync as jest.Mock).mock.calls.filter(
-        call => call[0].includes('CREATE TABLE IF NOT EXISTS')
+      const createTableCalls = (mockExecAsync as jest.Mock).mock.calls.filter(call =>
+        call[0].includes('CREATE TABLE IF NOT EXISTS')
       );
 
       // Verify each table has a PRIMARY KEY
@@ -321,8 +319,8 @@ describe('Database Schema', () => {
     it('should use IF NOT EXISTS for all tables', async () => {
       await setupDatabase();
 
-      const createTableCalls = (mockExecAsync as jest.Mock).mock.calls.filter(
-        call => call[0].includes('CREATE TABLE')
+      const createTableCalls = (mockExecAsync as jest.Mock).mock.calls.filter(call =>
+        call[0].includes('CREATE TABLE')
       );
 
       // Verify all use IF NOT EXISTS

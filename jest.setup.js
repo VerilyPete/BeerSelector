@@ -1,7 +1,9 @@
+/* eslint-env jest */
+
 // Mock the expo-sqlite module
 jest.mock('expo-sqlite', () => {
   const mockDatabase = {
-    transaction: jest.fn().mockImplementation((callback) => {
+    transaction: jest.fn().mockImplementation(callback => {
       const mockTransaction = {
         executeSql: jest.fn().mockImplementation((query, params, successCallback) => {
           if (successCallback) {
@@ -19,7 +21,7 @@ jest.mock('expo-sqlite', () => {
     execAsync: jest.fn().mockResolvedValue([{ rows: { _array: [] } }]),
     getFirstAsync: jest.fn().mockResolvedValue(null),
     getAllAsync: jest.fn().mockResolvedValue([]),
-    withTransactionAsync: jest.fn().mockImplementation(async (callback) => {
+    withTransactionAsync: jest.fn().mockImplementation(async callback => {
       return await callback();
     }),
   };
@@ -34,12 +36,12 @@ jest.mock('expo-sqlite', () => {
 jest.mock('expo-secure-store', () => {
   const secureStore = {};
   return {
-    getItemAsync: jest.fn().mockImplementation((key) => Promise.resolve(secureStore[key])),
+    getItemAsync: jest.fn().mockImplementation(key => Promise.resolve(secureStore[key])),
     setItemAsync: jest.fn().mockImplementation((key, value) => {
       secureStore[key] = value;
       return Promise.resolve();
     }),
-    deleteItemAsync: jest.fn().mockImplementation((key) => {
+    deleteItemAsync: jest.fn().mockImplementation(key => {
       delete secureStore[key];
       return Promise.resolve();
     }),
@@ -53,6 +55,58 @@ jest.mock('expo-constants', () => ({
     extra: {
       apiUrl: 'https://test-api.example.com',
     },
+  },
+}));
+
+// Mock react-native-safe-area-context
+jest.mock('react-native-safe-area-context', () => {
+  const React = require('react');
+  const insets = { top: 0, right: 0, bottom: 0, left: 0 };
+  const frame = { x: 0, y: 0, width: 390, height: 844 };
+
+  return {
+    SafeAreaProvider: ({ children }) => children,
+    SafeAreaView: ({ children }) => children,
+    useSafeAreaInsets: () => insets,
+    useSafeAreaFrame: () => frame,
+    SafeAreaInsetsContext: React.createContext(insets),
+    SafeAreaFrameContext: React.createContext(frame),
+    initialWindowMetrics: {
+      insets,
+      frame,
+    },
+  };
+});
+
+// Mock the LiveActivity module
+jest.mock('@/modules/live-activity', () => ({
+  __esModule: true,
+  default: {
+    areActivitiesEnabled: jest.fn().mockResolvedValue(true),
+    startActivity: jest.fn().mockResolvedValue('mock-activity-id'),
+    updateActivity: jest.fn().mockResolvedValue(undefined),
+    endActivity: jest.fn().mockResolvedValue(undefined),
+    endAllActivities: jest.fn().mockResolvedValue(undefined),
+    restartActivity: jest.fn().mockResolvedValue('mock-activity-id'),
+    getAllActivityIds: jest.fn().mockResolvedValue([]),
+    endActivitiesOlderThan: jest.fn().mockResolvedValue(0),
+    endAllActivitiesSync: jest.fn().mockReturnValue(true),
+  },
+}));
+
+// Also mock the path without @ alias
+jest.mock('live-activity', () => ({
+  __esModule: true,
+  default: {
+    areActivitiesEnabled: jest.fn().mockResolvedValue(true),
+    startActivity: jest.fn().mockResolvedValue('mock-activity-id'),
+    updateActivity: jest.fn().mockResolvedValue(undefined),
+    endActivity: jest.fn().mockResolvedValue(undefined),
+    endAllActivities: jest.fn().mockResolvedValue(undefined),
+    restartActivity: jest.fn().mockResolvedValue('mock-activity-id'),
+    getAllActivityIds: jest.fn().mockResolvedValue([]),
+    endActivitiesOlderThan: jest.fn().mockResolvedValue(0),
+    endAllActivitiesSync: jest.fn().mockReturnValue(true),
   },
 }));
 
@@ -83,67 +137,10 @@ jest.useFakeTimers();
 
 // Polyfill setImmediate for React Native animations
 global.setImmediate = global.setImmediate || ((fn, ...args) => global.setTimeout(fn, 0, ...args));
-global.clearImmediate = global.clearImmediate || ((id) => global.clearTimeout(id));
+global.clearImmediate = global.clearImmediate || (id => global.clearTimeout(id));
 
-// Mock React Native's ScrollView to avoid transform issues with internal specs
-jest.mock('react-native/Libraries/Components/ScrollView/ScrollView', () => {
-  const RealComponent = jest.requireActual('react-native/Libraries/Components/ScrollView/ScrollView');
-  const React = require('react');
-  class ScrollView extends React.Component {
-    scrollTo = jest.fn();
-    scrollToEnd = jest.fn();
-    flashScrollIndicators = jest.fn();
-    
-    render() {
-      const View = require('react-native').View;
-      return React.createElement(View, this.props, this.props.children);
-    }
-  }
-  return ScrollView;
-});
-
-// Mock FlatList to avoid ScrollView dependency issues
-jest.mock('react-native/Libraries/Lists/FlatList', () => {
-  const React = require('react');
-  const { View, Text } = require('react-native');
-  
-  class FlatList extends React.Component {
-    scrollToEnd = jest.fn();
-    scrollToIndex = jest.fn();
-    scrollToItem = jest.fn();
-    scrollToOffset = jest.fn();
-    flashScrollIndicators = jest.fn();
-    
-    render() {
-      const { data, renderItem, ListEmptyComponent, testID } = this.props;
-      
-      if (!data || data.length === 0) {
-        if (ListEmptyComponent) {
-          if (typeof ListEmptyComponent === 'function') {
-            return React.createElement(ListEmptyComponent);
-          }
-          return ListEmptyComponent;
-        }
-        return null;
-      }
-      
-      return React.createElement(
-        View,
-        { testID },
-        data.map((item, index) => {
-          const key = this.props.keyExtractor ? this.props.keyExtractor(item, index) : index;
-          return React.createElement(
-            View,
-            { key },
-            renderItem({ item, index, separators: {} })
-          );
-        })
-      );
-    }
-  }
-  
-  return FlatList;
-});
+// Note: ScrollView and FlatList deep import mocks removed
+// React Native 0.79+ deprecates deep imports - jest-expo preset handles these properly
 
 // Mock expo-haptics
 jest.mock('expo-haptics', () => ({
@@ -153,23 +150,23 @@ jest.mock('expo-haptics', () => ({
   ImpactFeedbackStyle: {
     Light: 'light',
     Medium: 'medium',
-    Heavy: 'heavy'
+    Heavy: 'heavy',
   },
   NotificationFeedbackType: {
     Success: 'success',
     Warning: 'warning',
-    Error: 'error'
-  }
+    Error: 'error',
+  },
 }));
 
 // Mock react-native-webview
 jest.mock('react-native-webview', () => {
   const React = require('react');
   const { View } = require('react-native');
-  
+
   return {
     WebView: React.forwardRef((props, ref) => {
       return React.createElement(View, { ...props, ref }, props.children);
-    })
+    }),
   };
 });

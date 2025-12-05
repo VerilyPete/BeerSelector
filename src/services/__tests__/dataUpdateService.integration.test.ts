@@ -92,7 +92,10 @@ describe('dataUpdateService integration tests', () => {
       expect(result.itemCount).toBeGreaterThan(0);
 
       // Verify that fetch was called with the correct URL
-      expect(global.fetch).toHaveBeenCalledWith(testAllBeersUrl, expect.objectContaining({ signal: expect.any(Object) }));
+      expect(global.fetch).toHaveBeenCalledWith(
+        testAllBeersUrl,
+        expect.objectContaining({ signal: expect.any(Object) })
+      );
 
       // Verify that beerRepository.insertMany was called with the correct data
       expect(beerRepository.insertMany).toHaveBeenCalledTimes(1);
@@ -107,11 +110,16 @@ describe('dataUpdateService integration tests', () => {
       // Verify service filters invalid beers - service removes beers without id or brew_name
       // The validator only checks for id and brew_name (brewer and brew_style can be empty)
       const rawBeers = allBeersData[1].brewInStock;
-      const validBeers = rawBeers.filter((beer: any) =>
-        beer.id && beer.brew_name && typeof beer.brew_name === 'string' && beer.brew_name.trim() !== ''
+      const validBeers = rawBeers.filter(
+        (beer: any) =>
+          beer.id &&
+          beer.brew_name &&
+          typeof beer.brew_name === 'string' &&
+          beer.brew_name.trim() !== ''
       );
 
-      expect(beersPassedToPopulate).toEqual(validBeers);
+      // Verify count matches (glass_type is added by calculateGlassTypes, so we can't do exact equality)
+      expect(beersPassedToPopulate.length).toBe(validBeers.length);
       expect(beersPassedToPopulate.length).toBeLessThanOrEqual(rawBeers.length);
 
       // Verify all beers have valid IDs and brew_name (only required fields per validator)
@@ -123,12 +131,13 @@ describe('dataUpdateService integration tests', () => {
         expect(beer.brew_name.trim()).not.toBe(''); // Not empty after trim
       });
 
-      // Verify that each beer has the expected properties
+      // Verify that each beer has the expected properties including glass_type
       const firstBeer = beersPassedToPopulate[0];
       expect(firstBeer).toHaveProperty('id');
       expect(firstBeer).toHaveProperty('brew_name');
       expect(firstBeer).toHaveProperty('brewer');
       expect(firstBeer).toHaveProperty('brew_style');
+      expect(firstBeer).toHaveProperty('glass_type'); // Added by calculateGlassTypes
 
       // Verify that setPreference was called to update the timestamps
       expect(setPreference).toHaveBeenCalledWith('all_beers_last_update', expect.any(String));
@@ -178,7 +187,10 @@ describe('dataUpdateService integration tests', () => {
       expect(result.dataUpdated).toBe(false);
 
       // Verify that fetch was called
-      expect(global.fetch).toHaveBeenCalledWith(testAllBeersUrl, expect.objectContaining({ signal: expect.any(Object) }));
+      expect(global.fetch).toHaveBeenCalledWith(
+        testAllBeersUrl,
+        expect.objectContaining({ signal: expect.any(Object) })
+      );
 
       // Verify that beerRepository.insertMany was not called
       expect(beerRepository.insertMany).not.toHaveBeenCalled();
@@ -205,7 +217,10 @@ describe('dataUpdateService integration tests', () => {
       expect(result.dataUpdated).toBe(false);
 
       // Verify that fetch was called
-      expect(global.fetch).toHaveBeenCalledWith(testAllBeersUrl, expect.objectContaining({ signal: expect.any(Object) }));
+      expect(global.fetch).toHaveBeenCalledWith(
+        testAllBeersUrl,
+        expect.objectContaining({ signal: expect.any(Object) })
+      );
 
       // Verify that beerRepository.insertMany was not called
       expect(beerRepository.insertMany).not.toHaveBeenCalled();
@@ -229,7 +244,10 @@ describe('dataUpdateService integration tests', () => {
       expect(result.dataUpdated).toBe(false);
 
       // Verify that fetch was called
-      expect(global.fetch).toHaveBeenCalledWith(testAllBeersUrl, expect.objectContaining({ signal: expect.any(Object) }));
+      expect(global.fetch).toHaveBeenCalledWith(
+        testAllBeersUrl,
+        expect.objectContaining({ signal: expect.any(Object) })
+      );
 
       // Verify that beerRepository.insertMany was not called
       expect(beerRepository.insertMany).not.toHaveBeenCalled();
@@ -262,19 +280,22 @@ describe('dataUpdateService integration tests', () => {
       expect(result.itemCount).toBeGreaterThan(0);
 
       // Verify that fetch was called with the correct URL
-      expect(global.fetch).toHaveBeenCalledWith(testMyBeersUrl, expect.objectContaining({ signal: expect.any(Object) }));
+      expect(global.fetch).toHaveBeenCalledWith(
+        testMyBeersUrl,
+        expect.objectContaining({ signal: expect.any(Object) })
+      );
 
       // Verify that myBeersRepository.insertMany was called with the correct data
       expect(myBeersRepository.insertMany).toHaveBeenCalledTimes(1);
-      
+
       // Verify that the data passed to myBeersRepository.insertMany is the tasted_brew_current_round array
       const beersPassedToPopulate = (myBeersRepository.insertMany as jest.Mock).mock.calls[0][0];
       expect(Array.isArray(beersPassedToPopulate)).toBe(true);
-      
-      // Verify that the data structure matches what we expect
-      expect(beersPassedToPopulate).toEqual(myBeersData[1].tasted_brew_current_round);
-      
-      // Verify that each beer has the expected properties
+
+      // Verify that the data has correct count (same as source data)
+      expect(beersPassedToPopulate.length).toBe(myBeersData[1].tasted_brew_current_round.length);
+
+      // Verify that each beer has the expected properties including glass_type (added by calculateGlassTypes)
       const firstBeer = beersPassedToPopulate[0];
       expect(firstBeer).toHaveProperty('id');
       expect(firstBeer).toHaveProperty('brew_name');
@@ -282,7 +303,8 @@ describe('dataUpdateService integration tests', () => {
       expect(firstBeer).toHaveProperty('brew_style');
       expect(firstBeer).toHaveProperty('tasted_date');
       expect(firstBeer).toHaveProperty('chit_code');
-      
+      expect(firstBeer).toHaveProperty('glass_type'); // Added by calculateGlassTypes
+
       // Verify that setPreference was called to update the timestamps
       expect(setPreference).toHaveBeenCalledWith('my_beers_last_update', expect.any(String));
       expect(setPreference).toHaveBeenCalledWith('my_beers_last_check', expect.any(String));
@@ -331,7 +353,10 @@ describe('dataUpdateService integration tests', () => {
       expect(result.dataUpdated).toBe(false);
 
       // Verify that fetch was called
-      expect(global.fetch).toHaveBeenCalledWith(testMyBeersUrl, expect.objectContaining({ signal: expect.any(Object) }));
+      expect(global.fetch).toHaveBeenCalledWith(
+        testMyBeersUrl,
+        expect.objectContaining({ signal: expect.any(Object) })
+      );
 
       // Verify that myBeersRepository.insertMany was not called
       expect(myBeersRepository.insertMany).not.toHaveBeenCalled();
@@ -358,7 +383,10 @@ describe('dataUpdateService integration tests', () => {
       expect(result.dataUpdated).toBe(false);
 
       // Verify that fetch was called
-      expect(global.fetch).toHaveBeenCalledWith(testMyBeersUrl, expect.objectContaining({ signal: expect.any(Object) }));
+      expect(global.fetch).toHaveBeenCalledWith(
+        testMyBeersUrl,
+        expect.objectContaining({ signal: expect.any(Object) })
+      );
 
       // Verify that myBeersRepository.insertMany was not called
       expect(myBeersRepository.insertMany).not.toHaveBeenCalled();
@@ -374,7 +402,7 @@ describe('dataUpdateService integration tests', () => {
       // Create data with empty tasted_brew_current_round array (happens when round rolls over at 200 beers)
       const emptyBeersData = [
         { member: { member_id: '123', name: 'Test User' } },
-        { tasted_brew_current_round: [] }  // Empty array - new user or round rollover
+        { tasted_brew_current_round: [] }, // Empty array - new user or round rollover
       ];
 
       // Mock fetch to return the empty data
@@ -392,7 +420,10 @@ describe('dataUpdateService integration tests', () => {
       expect(result.itemCount).toBe(0);
 
       // Verify that fetch was called
-      expect(global.fetch).toHaveBeenCalledWith(testMyBeersUrl, expect.objectContaining({ signal: expect.any(Object) }));
+      expect(global.fetch).toHaveBeenCalledWith(
+        testMyBeersUrl,
+        expect.objectContaining({ signal: expect.any(Object) })
+      );
 
       // Verify that myBeersRepository.insertMany was called with empty array
       expect(myBeersRepository.insertMany).toHaveBeenCalledWith([]);
@@ -402,18 +433,22 @@ describe('dataUpdateService integration tests', () => {
       expect(setPreference).toHaveBeenCalledWith('my_beers_last_check', expect.any(String));
 
       // Verify that the correct log message was called
-      expect(console.log).toHaveBeenCalledWith('Empty tasted beers array - user has no tasted beers in current round (new user or round rollover at 200 beers), clearing database');
+      expect(console.log).toHaveBeenCalledWith(
+        'Empty tasted beers array - user has no tasted beers in current round (new user or round rollover at 200 beers), clearing database'
+      );
     });
 
     it('should handle data with no valid beers', async () => {
       // Create a modified version of the data with invalid beers (no IDs)
       const invalidBeersData = [
         { member: { member_id: '123', name: 'Test User' } },
-        { tasted_brew_current_round: [
-          { brew_name: 'Beer 1', brewer: 'Brewery 1' }, // No ID
-          { brew_name: 'Beer 2', brewer: 'Brewery 2' }, // No ID
-          { brew_name: 'Beer 3', brewer: 'Brewery 3' }  // No ID
-        ]}
+        {
+          tasted_brew_current_round: [
+            { brew_name: 'Beer 1', brewer: 'Brewery 1' }, // No ID
+            { brew_name: 'Beer 2', brewer: 'Brewery 2' }, // No ID
+            { brew_name: 'Beer 3', brewer: 'Brewery 3' }, // No ID
+          ],
+        },
       ];
 
       // Mock fetch to return the invalid data
@@ -431,7 +466,10 @@ describe('dataUpdateService integration tests', () => {
       expect(result.itemCount).toBe(0);
 
       // Verify that fetch was called
-      expect(global.fetch).toHaveBeenCalledWith(testMyBeersUrl, expect.objectContaining({ signal: expect.any(Object) }));
+      expect(global.fetch).toHaveBeenCalledWith(
+        testMyBeersUrl,
+        expect.objectContaining({ signal: expect.any(Object) })
+      );
 
       // Verify that myBeersRepository.insertMany was called with empty array
       expect(myBeersRepository.insertMany).toHaveBeenCalledWith([]);
@@ -441,7 +479,9 @@ describe('dataUpdateService integration tests', () => {
       expect(setPreference).toHaveBeenCalledWith('my_beers_last_check', expect.any(String));
 
       // Verify that the new log message was called
-      expect(console.log).toHaveBeenCalledWith('No valid beers with IDs found, but API returned data - clearing database');
+      expect(console.log).toHaveBeenCalledWith(
+        'No valid beers with IDs found, but API returned data - clearing database'
+      );
     });
 
     it('should handle fetch throwing an exception', async () => {
@@ -456,7 +496,10 @@ describe('dataUpdateService integration tests', () => {
       expect(result.dataUpdated).toBe(false);
 
       // Verify that fetch was called
-      expect(global.fetch).toHaveBeenCalledWith(testMyBeersUrl, expect.objectContaining({ signal: expect.any(Object) }));
+      expect(global.fetch).toHaveBeenCalledWith(
+        testMyBeersUrl,
+        expect.objectContaining({ signal: expect.any(Object) })
+      );
 
       // Verify that myBeersRepository.insertMany was not called
       expect(myBeersRepository.insertMany).not.toHaveBeenCalled();
@@ -479,10 +522,9 @@ describe('dataUpdateService integration tests', () => {
 
         (global.fetch as jest.Mock).mockResolvedValue({
           ok: true,
-          json: jest.fn().mockResolvedValue([
-            {},
-            { brewInStock: [{ id: '1', brew_name: 'Test' }] }
-          ]),
+          json: jest
+            .fn()
+            .mockResolvedValue([{}, { brewInStock: [{ id: '1', brew_name: 'Test' }] }]),
         });
 
         (beerRepository.insertMany as jest.Mock).mockResolvedValue(undefined);
@@ -505,10 +547,9 @@ describe('dataUpdateService integration tests', () => {
 
         (global.fetch as jest.Mock).mockResolvedValue({
           ok: true,
-          json: jest.fn().mockResolvedValue([
-            {},
-            { brewInStock: [{ id: '1', brew_name: 'Test' }] }
-          ]),
+          json: jest
+            .fn()
+            .mockResolvedValue([{}, { brewInStock: [{ id: '1', brew_name: 'Test' }] }]),
         });
 
         (beerRepository.insertMany as jest.Mock).mockResolvedValue(undefined);
@@ -537,10 +578,9 @@ describe('dataUpdateService integration tests', () => {
           capturedSignal = options.signal;
           return Promise.resolve({
             ok: true,
-            json: jest.fn().mockResolvedValue([
-              {},
-              { brewInStock: [{ id: '1', brew_name: 'Test' }] }
-            ]),
+            json: jest
+              .fn()
+              .mockResolvedValue([{}, { brewInStock: [{ id: '1', brew_name: 'Test' }] }]),
           });
         });
 
@@ -569,10 +609,9 @@ describe('dataUpdateService integration tests', () => {
 
         (global.fetch as jest.Mock).mockResolvedValue({
           ok: true,
-          json: jest.fn().mockResolvedValue([
-            {},
-            { brewInStock: [{ id: '1', brew_name: 'Test' }] }
-          ]),
+          json: jest
+            .fn()
+            .mockResolvedValue([{}, { brewInStock: [{ id: '1', brew_name: 'Test' }] }]),
         });
 
         (beerRepository.insertMany as jest.Mock).mockResolvedValue(undefined);
@@ -598,10 +637,12 @@ describe('dataUpdateService integration tests', () => {
 
         (global.fetch as jest.Mock).mockResolvedValue({
           ok: true,
-          json: jest.fn().mockResolvedValue([
-            {},
-            { tasted_brew_current_round: [{ id: '1', brew_name: 'Test' }] }
-          ]),
+          json: jest
+            .fn()
+            .mockResolvedValue([
+              {},
+              { tasted_brew_current_round: [{ id: '1', brew_name: 'Test' }] },
+            ]),
         });
 
         (myBeersRepository.insertMany as jest.Mock).mockResolvedValue(undefined);
@@ -646,10 +687,9 @@ describe('dataUpdateService integration tests', () => {
 
         (global.fetch as jest.Mock).mockResolvedValue({
           ok: true,
-          json: jest.fn().mockResolvedValue([
-            {},
-            { brewInStock: [{ id: '1', brew_name: 'Test' }] }
-          ]),
+          json: jest
+            .fn()
+            .mockResolvedValue([{}, { brewInStock: [{ id: '1', brew_name: 'Test' }] }]),
         });
 
         (beerRepository.insertMany as jest.Mock).mockResolvedValue(undefined);
@@ -671,10 +711,9 @@ describe('dataUpdateService integration tests', () => {
 
         (global.fetch as jest.Mock).mockResolvedValue({
           ok: true,
-          json: jest.fn().mockResolvedValue([
-            {},
-            { brewInStock: [{ id: '1', brew_name: 'Test' }] }
-          ]),
+          json: jest
+            .fn()
+            .mockResolvedValue([{}, { brewInStock: [{ id: '1', brew_name: 'Test' }] }]),
         });
 
         (beerRepository.insertMany as jest.Mock).mockResolvedValue(undefined);
@@ -720,9 +759,7 @@ describe('dataUpdateService integration tests', () => {
       it('should handle network errors with proper error types', async () => {
         (getPreference as jest.Mock).mockResolvedValueOnce(testAllBeersUrl);
 
-        (global.fetch as jest.Mock).mockRejectedValue(
-          new TypeError('Network request failed')
-        );
+        (global.fetch as jest.Mock).mockRejectedValue(new TypeError('Network request failed'));
 
         const result = await fetchAndUpdateAllBeers();
 
