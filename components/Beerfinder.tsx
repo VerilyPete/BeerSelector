@@ -13,6 +13,7 @@ import { ThemedText } from './ThemedText';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { useUntappdColor } from '@/hooks/useUntappdColor';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { useBreakpoint } from '@/hooks/useBreakpoint';
 import { SearchBar } from './SearchBar';
 import { router } from 'expo-router';
 import { UntappdWebView } from './UntappdWebView';
@@ -33,6 +34,9 @@ import { updateLiveActivityWithQueue } from '@/src/services/liveActivityService'
 export const Beerfinder = () => {
   // MP-4 Step 2: Use context for beer data instead of local state
   const { beers, loading, errors, syncQueuedBeerIds } = useAppContext();
+
+  // Responsive layout: 1 column on phone, 2 on tablet portrait, 3 on tablet landscape
+  const { numColumns } = useBreakpoint();
 
   const colorScheme = useColorScheme();
   const { queuedCheckIn, isLoading: checkinLoading } = useQueuedCheckIn();
@@ -559,6 +563,7 @@ export const Beerfinder = () => {
             expandedId={expandedId}
             onToggleExpand={toggleExpand}
             renderItemActions={renderBeerActions}
+            numColumns={numColumns}
           />
 
           {renderQueueModal()}

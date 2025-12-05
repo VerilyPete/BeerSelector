@@ -1,0 +1,86 @@
+{
+  "fill" : {
+    "automatic-gradient" : "display-p3:0.10596,0.13597,0.18743,1.00000"
+  },
+  "groups" : [
+    {
+      "layers" : [
+        {
+          "image-name" : "ufo.png",
+          "name" : "ufo",
+          "position" : {
+            "scale" : 1,
+            "translation-in-points" : [
+              -57.1953125,
+              61.2421875
+            ]
+          }
+        },
+        {
+          "hidden" : false,
+          "image-name" : "Head.png",
+          "name" : "Head",
+          "position" : {
+            "scale" : 1,
+            "translation-in-points" : [
+              -76.2421875,
+              -331
+            ]
+          }
+        },
+        {
+          "image-name" : "Bubble.png",
+          "name" : "Bubble",
+          "position" : {
+            "scale" : 1,
+            "translation-in-points" : [
+              46.8046875,
+              242.74609375
+            ]
+          }
+        },
+        {
+          "image-name" : "Bubble.png",
+          "name" : "Bubble",
+          "position" : {
+            "scale" : 1,
+            "translation-in-points" : [
+              78.8046875,
+              -88.77734375
+            ]
+          }
+        },
+        {
+          "image-name" : "Bubble.png",
+          "name" : "Bubble",
+          "position" : {
+            "scale" : 1,
+            "translation-in-points" : [
+              -193.1953125,
+              208.74609375
+            ]
+          }
+        },
+        {
+          "blend-mode" : "overlay",
+          "image-name" : "Mug.png",
+          "name" : "Mug"
+        }
+      ],
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.5
+      },
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.5
+      }
+    }
+  ],
+  "supported-platforms" : {
+    "circles" : [
+      "watchOS"
+    ],
+    "squares" : "shared"
+  }
+}
