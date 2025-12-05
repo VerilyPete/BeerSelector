@@ -1,174 +1,596 @@
 /**
- * MP-3 Step 3b: SkeletonLoader Component
+ * SkeletonLoader Component System
  *
- * Purpose: Provide visual loading feedback during initial data fetch
- * - Displays animated placeholder items during loading
- * - Matches BeerItem visual structure and height for smooth transitions
- * - Supports light and dark themes
- * - Renders efficiently with smooth animations using native driver
- * - Accessible with proper labels for screen readers
+ * A reusable skeleton loading system for the BeerSelector app.
+ * Provides visual loading feedback during data fetching with
+ * smooth shimmer animations using react-native-reanimated.
+ *
+ * Components:
+ * - SkeletonBox: Basic rectangular skeleton with shimmer animation
+ * - SkeletonText: Text-sized skeleton for text placeholders
+ * - SkeletonBeerItem: Pre-built skeleton matching BeerItem layout
+ * - SkeletonBeerList: Multiple SkeletonBeerItem for list loading
+ *
+ * NOTE: This component requires expo-linear-gradient to be installed:
+ * npx expo install expo-linear-gradient
  */
 
-import React, { useEffect, useRef } from 'react';
-import { View, Animated, StyleSheet, ViewStyle } from 'react-native';
-import { useThemeColor } from '@/hooks/useThemeColor';
+import React, { useCallback, useMemo } from 'react';
+import { View, StyleSheet, ViewStyle, useColorScheme } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withTiming,
+  Easing,
+  interpolate,
+} from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Colors } from '@/constants/Colors';
+import { spacing, borderRadii } from '@/constants/spacing';
 
-type SkeletonLoaderProps = {
-  count?: number; // Default: 10
+// ============================================================================
+// Types
+// ============================================================================
+
+type SkeletonBoxProps = {
+  /** Width of the skeleton box (number or percentage string) */
+  width?: number | `${number}%`;
+  /** Height of the skeleton box */
+  height?: number;
+  /** Border radius override */
+  borderRadius?: number;
+  /** Animation duration in milliseconds */
+  animationDuration?: number;
+  /** Additional styles */
+  style?: ViewStyle;
+};
+
+type SkeletonTextProps = {
+  /** Number of text lines to display */
+  lines?: number;
+  /** Width of the last line (for natural text appearance) */
+  lastLineWidth?: number | `${number}%`;
+  /** Line height */
+  lineHeight?: number;
+  /** Gap between lines */
+  lineGap?: number;
+  /** Animation duration in milliseconds */
+  animationDuration?: number;
+  /** Additional styles */
+  style?: ViewStyle;
+};
+
+type SkeletonBeerItemProps = {
+  /** Animation duration in milliseconds */
+  animationDuration?: number;
+  /** Whether to show glass icon placeholder */
+  showGlassIcon?: boolean;
+  /** Additional styles */
+  style?: ViewStyle;
+};
+
+type SkeletonBeerListProps = {
+  /** Number of skeleton items to display */
+  count?: number;
+  /** Animation duration in milliseconds */
+  animationDuration?: number;
+  /** Additional styles */
+  style?: ViewStyle;
+};
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+const DEFAULT_ANIMATION_DURATION = 1500;
+const DEFAULT_LINE_HEIGHT = 16;
+const DEFAULT_LINE_GAP = spacing.s;
+
+// ============================================================================
+// Hooks
+// ============================================================================
+
+/**
+ * Custom hook to get skeleton colors based on current theme
+ */
+const useSkeletonColors = () => {
+  const colorScheme = useColorScheme() ?? 'light';
+
+  return useMemo(
+    () => ({
+      base: Colors[colorScheme].skeletonBase,
+      highlight: Colors[colorScheme].skeletonHighlight,
+      // Gradient stops for shimmer effect
+      gradientColors: [
+        Colors[colorScheme].skeletonBase,
+        Colors[colorScheme].skeletonHighlight,
+        Colors[colorScheme].skeletonBase,
+      ] as const,
+    }),
+    [colorScheme]
+  );
 };
 
 /**
- * SkeletonLoader Component
- *
- * Displays a configurable number of animated skeleton items that match
- * the structure and dimensions of BeerItem for a smooth loading experience.
- *
- * @param count - Number of skeleton items to render (default: 10)
+ * Custom hook to create shimmer animation
+ */
+const useShimmerAnimation = (duration: number = DEFAULT_ANIMATION_DURATION) => {
+  const translateX = useSharedValue(-1);
+
+  // Start animation on mount
+  React.useEffect(() => {
+    translateX.value = withRepeat(
+      withTiming(1, {
+        duration,
+        easing: Easing.linear,
+      }),
+      -1, // Infinite repeat
+      false // Don't reverse
+    );
+  }, [translateX, duration]);
+
+  return translateX;
+};
+
+// ============================================================================
+// SkeletonBox Component
+// ============================================================================
+
+/**
+ * Basic rectangular skeleton with shimmer animation.
  *
  * @example
  * ```tsx
- * // Default 10 items
- * <SkeletonLoader />
- *
- * // Custom count
- * <SkeletonLoader count={20} />
+ * <SkeletonBox width={200} height={20} />
+ * <SkeletonBox width="100%" height={40} borderRadius={8} />
  * ```
  */
-export const SkeletonLoader: React.FC<SkeletonLoaderProps> = ({ count = 10 }) => {
-  // Animation value for shimmer effect
-  const shimmerValue = useRef(new Animated.Value(0)).current;
+export const SkeletonBox: React.FC<SkeletonBoxProps> = ({
+  width = '100%',
+  height = DEFAULT_LINE_HEIGHT,
+  borderRadius = borderRadii.s,
+  animationDuration = DEFAULT_ANIMATION_DURATION,
+  style,
+}) => {
+  const colors = useSkeletonColors();
+  const shimmerTranslate = useShimmerAnimation(animationDuration);
 
-  // Theme colors
-  const baseColor = useThemeColor(
-    { light: '#F5F5F5', dark: '#1C1C1E' },
-    'background'
-  );
-  const shimmerColor = useThemeColor(
-    { light: '#E0E0E0', dark: '#2C2C2E' },
-    'background'
-  );
-
-  // Start shimmer animation on mount
-  useEffect(() => {
-    const animation = Animated.loop(
-      Animated.sequence([
-        Animated.timing(shimmerValue, {
-          toValue: 1,
-          duration: 1000,
-          useNativeDriver: true, // Use native driver for better performance
-        }),
-        Animated.timing(shimmerValue, {
-          toValue: 0,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-      ])
-    );
-
-    animation.start();
-
-    // Cleanup animation on unmount
-    return () => {
-      animation.stop();
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [
+        {
+          translateX: interpolate(shimmerTranslate.value, [-1, 1], [-200, 200]),
+        },
+      ],
     };
-  }, [shimmerValue]);
-
-  // Interpolate opacity for shimmer effect
-  const shimmerOpacity = shimmerValue.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.3, 1],
   });
 
-  // Handle edge case: negative or invalid count
-  const validCount = Math.max(0, count || 10);
+  const containerStyle = useMemo(
+    () => [
+      styles.skeletonBox,
+      {
+        width,
+        height,
+        borderRadius,
+        backgroundColor: colors.base,
+      },
+      style,
+    ],
+    [width, height, borderRadius, colors.base, style]
+  );
 
   return (
-    <View
-      style={styles.container}
-      testID="skeleton-loader"
-      accessibilityLabel="Loading content"
-      accessibilityRole="progressbar"
-    >
-      {Array.from({ length: validCount }).map((_, index) => (
-        <View
-          key={index}
-          style={[styles.skeletonItem, { backgroundColor: baseColor }]}
-          testID={`skeleton-item-${index}`}
-        >
-          {/* Title placeholder - 75% width */}
-          <Animated.View
-            style={[
-              styles.placeholder,
-              styles.titlePlaceholder,
-              { backgroundColor: shimmerColor, opacity: shimmerOpacity },
-            ]}
-            testID={`skeleton-item-${index}-title`}
-          />
-
-          {/* Brewery placeholder - 60% width */}
-          <Animated.View
-            style={[
-              styles.placeholder,
-              styles.breweryPlaceholder,
-              { backgroundColor: shimmerColor, opacity: shimmerOpacity },
-            ]}
-            testID={`skeleton-item-${index}-brewery`}
-          />
-
-          {/* Style placeholder - 50% width */}
-          <Animated.View
-            style={[
-              styles.placeholder,
-              styles.stylePlaceholder,
-              { backgroundColor: shimmerColor, opacity: shimmerOpacity },
-            ]}
-            testID={`skeleton-item-${index}-style`}
-          />
-
-          {/* Date placeholder - 30% width */}
-          <Animated.View
-            style={[
-              styles.placeholder,
-              styles.datePlaceholder,
-              { backgroundColor: shimmerColor, opacity: shimmerOpacity },
-            ]}
-            testID={`skeleton-item-${index}-date`}
-          />
-        </View>
-      ))}
+    <View style={containerStyle} testID="skeleton-box">
+      <Animated.View style={[styles.shimmerContainer, animatedStyle]}>
+        <LinearGradient
+          colors={colors.gradientColors}
+          start={{ x: 0, y: 0.5 }}
+          end={{ x: 1, y: 0.5 }}
+          style={styles.shimmerGradient}
+        />
+      </Animated.View>
     </View>
   );
 };
 
+// ============================================================================
+// SkeletonText Component
+// ============================================================================
+
+/**
+ * Text-sized skeleton for text placeholders.
+ * Supports multiple lines with configurable widths.
+ *
+ * @example
+ * ```tsx
+ * <SkeletonText lines={3} lastLineWidth="60%" />
+ * <SkeletonText lines={1} lineHeight={24} />
+ * ```
+ */
+export const SkeletonText: React.FC<SkeletonTextProps> = ({
+  lines = 1,
+  lastLineWidth = '75%',
+  lineHeight = DEFAULT_LINE_HEIGHT,
+  lineGap = DEFAULT_LINE_GAP,
+  animationDuration = DEFAULT_ANIMATION_DURATION,
+  style,
+}) => {
+  const colors = useSkeletonColors();
+  const shimmerTranslate = useShimmerAnimation(animationDuration);
+
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [
+        {
+          translateX: interpolate(shimmerTranslate.value, [-1, 1], [-200, 200]),
+        },
+      ],
+    };
+  });
+
+  const renderLines = useCallback(() => {
+    const lineElements = [];
+
+    for (let i = 0; i < lines; i++) {
+      const isLastLine = i === lines - 1;
+      const lineWidth = isLastLine && lines > 1 ? lastLineWidth : '100%';
+
+      lineElements.push(
+        <View
+          key={i}
+          style={[
+            styles.skeletonBox,
+            {
+              width: lineWidth,
+              height: lineHeight,
+              borderRadius: borderRadii.xs,
+              backgroundColor: colors.base,
+              marginTop: i > 0 ? lineGap : 0,
+            },
+          ]}
+          testID={`skeleton-text-line-${i}`}
+        >
+          <Animated.View style={[styles.shimmerContainer, animatedStyle]}>
+            <LinearGradient
+              colors={colors.gradientColors}
+              start={{ x: 0, y: 0.5 }}
+              end={{ x: 1, y: 0.5 }}
+              style={styles.shimmerGradient}
+            />
+          </Animated.View>
+        </View>
+      );
+    }
+
+    return lineElements;
+  }, [lines, lastLineWidth, lineHeight, lineGap, colors, animatedStyle]);
+
+  return (
+    <View style={[styles.textContainer, style]} testID="skeleton-text">
+      {renderLines()}
+    </View>
+  );
+};
+
+// ============================================================================
+// SkeletonBeerItem Component
+// ============================================================================
+
+/**
+ * Pre-built skeleton matching the BeerItem layout.
+ * Provides a consistent loading placeholder for beer list items.
+ *
+ * @example
+ * ```tsx
+ * <SkeletonBeerItem />
+ * <SkeletonBeerItem showGlassIcon={false} />
+ * ```
+ */
+export const SkeletonBeerItem: React.FC<SkeletonBeerItemProps> = ({
+  animationDuration = DEFAULT_ANIMATION_DURATION,
+  showGlassIcon = true,
+  style,
+}) => {
+  const colorScheme = useColorScheme() ?? 'light';
+  const colors = useSkeletonColors();
+  const shimmerTranslate = useShimmerAnimation(animationDuration);
+
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [
+        {
+          translateX: interpolate(shimmerTranslate.value, [-1, 1], [-200, 200]),
+        },
+      ],
+    };
+  });
+
+  // Card border color based on theme
+  const borderColor = colorScheme === 'dark' ? Colors.dark.border : Colors.light.border;
+
+  return (
+    <View
+      style={[styles.beerItemCard, { borderColor, backgroundColor: colors.base }, style]}
+      testID="skeleton-beer-item"
+      accessibilityLabel="Loading beer item"
+      accessibilityRole="progressbar"
+    >
+      {/* Header row with beer name and glass icon */}
+      <View style={styles.beerItemHeaderRow}>
+        <View style={styles.beerItemNameContainer}>
+          {/* Beer name placeholder - two lines */}
+          <View
+            style={[
+              styles.skeletonBox,
+              {
+                width: '85%',
+                height: 20,
+                borderRadius: borderRadii.s,
+                backgroundColor: colors.base,
+              },
+            ]}
+          >
+            <Animated.View style={[styles.shimmerContainer, animatedStyle]}>
+              <LinearGradient
+                colors={colors.gradientColors}
+                start={{ x: 0, y: 0.5 }}
+                end={{ x: 1, y: 0.5 }}
+                style={styles.shimmerGradient}
+              />
+            </Animated.View>
+          </View>
+          <View
+            style={[
+              styles.skeletonBox,
+              {
+                width: '60%',
+                height: 20,
+                borderRadius: borderRadii.s,
+                backgroundColor: colors.base,
+                marginTop: spacing.xs,
+              },
+            ]}
+          >
+            <Animated.View style={[styles.shimmerContainer, animatedStyle]}>
+              <LinearGradient
+                colors={colors.gradientColors}
+                start={{ x: 0, y: 0.5 }}
+                end={{ x: 1, y: 0.5 }}
+                style={styles.shimmerGradient}
+              />
+            </Animated.View>
+          </View>
+        </View>
+
+        {/* Glass icon placeholder */}
+        {showGlassIcon && (
+          <View
+            style={[styles.skeletonBox, styles.beerItemGlassIcon, { backgroundColor: colors.base }]}
+          >
+            <Animated.View style={[styles.shimmerContainer, animatedStyle]}>
+              <LinearGradient
+                colors={colors.gradientColors}
+                start={{ x: 0, y: 0.5 }}
+                end={{ x: 1, y: 0.5 }}
+                style={styles.shimmerGradient}
+              />
+            </Animated.View>
+          </View>
+        )}
+      </View>
+
+      {/* Brewery placeholder */}
+      <View
+        style={[
+          styles.skeletonBox,
+          {
+            width: '70%',
+            height: 16,
+            borderRadius: borderRadii.xs,
+            backgroundColor: colors.base,
+            marginTop: spacing.s,
+          },
+        ]}
+      >
+        <Animated.View style={[styles.shimmerContainer, animatedStyle]}>
+          <LinearGradient
+            colors={colors.gradientColors}
+            start={{ x: 0, y: 0.5 }}
+            end={{ x: 1, y: 0.5 }}
+            style={styles.shimmerGradient}
+          />
+        </Animated.View>
+      </View>
+
+      {/* Style and container placeholder */}
+      <View
+        style={[
+          styles.skeletonBox,
+          {
+            width: '55%',
+            height: 14,
+            borderRadius: borderRadii.xs,
+            backgroundColor: colors.base,
+            marginTop: spacing.xs,
+          },
+        ]}
+      >
+        <Animated.View style={[styles.shimmerContainer, animatedStyle]}>
+          <LinearGradient
+            colors={colors.gradientColors}
+            start={{ x: 0, y: 0.5 }}
+            end={{ x: 1, y: 0.5 }}
+            style={styles.shimmerGradient}
+          />
+        </Animated.View>
+      </View>
+
+      {/* Date placeholder */}
+      <View
+        style={[
+          styles.skeletonBox,
+          {
+            width: '35%',
+            height: 12,
+            borderRadius: borderRadii.xs,
+            backgroundColor: colors.base,
+            marginTop: spacing.s,
+          },
+        ]}
+      >
+        <Animated.View style={[styles.shimmerContainer, animatedStyle]}>
+          <LinearGradient
+            colors={colors.gradientColors}
+            start={{ x: 0, y: 0.5 }}
+            end={{ x: 1, y: 0.5 }}
+            style={styles.shimmerGradient}
+          />
+        </Animated.View>
+      </View>
+    </View>
+  );
+};
+
+// ============================================================================
+// SkeletonBeerList Component
+// ============================================================================
+
+/**
+ * Multiple SkeletonBeerItem components for list loading states.
+ * Use this when loading a list of beers.
+ *
+ * @example
+ * ```tsx
+ * <SkeletonBeerList count={10} />
+ * <SkeletonBeerList count={5} animationDuration={2000} />
+ * ```
+ */
+export const SkeletonBeerList: React.FC<SkeletonBeerListProps> = ({
+  count = 10,
+  animationDuration = DEFAULT_ANIMATION_DURATION,
+  style,
+}) => {
+  // Handle edge case: negative or invalid count
+  const validCount = Math.max(0, Math.min(count, 50)); // Cap at 50 for performance
+
+  const renderItems = useCallback(() => {
+    const items = [];
+
+    for (let i = 0; i < validCount; i++) {
+      items.push(
+        <SkeletonBeerItem key={`skeleton-beer-item-${i}`} animationDuration={animationDuration} />
+      );
+    }
+
+    return items;
+  }, [validCount, animationDuration]);
+
+  return (
+    <View
+      style={[styles.listContainer, style]}
+      testID="skeleton-beer-list"
+      accessibilityLabel={`Loading ${validCount} beer items`}
+      accessibilityRole="progressbar"
+    >
+      {renderItems()}
+    </View>
+  );
+};
+
+// ============================================================================
+// Legacy SkeletonLoader Export (for backward compatibility)
+// ============================================================================
+
+type SkeletonLoaderProps = {
+  count?: number;
+};
+
+/**
+ * Legacy SkeletonLoader component for backward compatibility.
+ * Wraps SkeletonBeerList with the original API.
+ *
+ * @deprecated Use SkeletonBeerList instead for more options
+ *
+ * @example
+ * ```tsx
+ * <SkeletonLoader count={10} />
+ * ```
+ */
+export const SkeletonLoader: React.FC<SkeletonLoaderProps> = ({ count = 10 }) => {
+  return <SkeletonBeerList count={count} />;
+};
+
+// ============================================================================
+// Styles
+// ============================================================================
+
 const styles = StyleSheet.create({
-  container: {
-    paddingHorizontal: 16,
-    paddingTop: 8,
+  // Base skeleton box
+  skeletonBox: {
+    overflow: 'hidden',
+    position: 'relative',
   } as ViewStyle,
-  skeletonItem: {
-    height: 140, // Match BeerItem collapsed height (120-160px range)
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 16,
-    justifyContent: 'space-around',
+
+  // Shimmer animation container
+  shimmerContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '200%',
   } as ViewStyle,
-  placeholder: {
-    borderRadius: 4,
+
+  // Shimmer gradient
+  shimmerGradient: {
+    flex: 1,
+    width: '100%',
   } as ViewStyle,
-  titlePlaceholder: {
-    width: '75%',
-    height: 20,
+
+  // Text container
+  textContainer: {
+    flexDirection: 'column',
   } as ViewStyle,
-  breweryPlaceholder: {
-    width: '60%',
-    height: 16,
+
+  // Beer item card - matches BeerItem.tsx styles
+  beerItemCard: {
+    borderRadius: spacing.sm, // 12
+    borderWidth: 1,
+    padding: spacing.m, // 16
+    marginHorizontal: spacing.xs, // 4
+    marginBottom: spacing.m, // 16
+    minHeight: 140,
   } as ViewStyle,
-  stylePlaceholder: {
-    width: '50%',
-    height: 16,
+
+  // Beer item header row
+  beerItemHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.s, // 8
   } as ViewStyle,
-  datePlaceholder: {
-    width: '30%',
-    height: 12,
+
+  // Beer item name container
+  beerItemNameContainer: {
+    flex: 1,
+  } as ViewStyle,
+
+  // Beer item glass icon placeholder
+  beerItemGlassIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: borderRadii.s, // 4
+  } as ViewStyle,
+
+  // List container
+  listContainer: {
+    paddingHorizontal: spacing.sm, // 12
+    paddingTop: spacing.s, // 8
   } as ViewStyle,
 });
+
+// ============================================================================
+// Default Export
+// ============================================================================
+
+export default SkeletonLoader;

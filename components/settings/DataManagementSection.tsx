@@ -1,9 +1,9 @@
 import React from 'react';
-import { View, TouchableOpacity, StyleSheet, ViewStyle, ActivityIndicator } from 'react-native';
+import { View, ViewStyle } from 'react-native';
 
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
-import { useThemeColor } from '@/hooks/useThemeColor';
+import { Colors } from '@/constants/Colors';
+import SettingsSection from './SettingsSection';
+import SettingsItem from './SettingsItem';
 
 /**
  * Props for DataManagementSection component
@@ -40,12 +40,10 @@ interface DataManagementSectionProps {
  * - Flying Saucer authentication
  * - Navigation to home screen
  *
- * Renders conditionally based on:
- * - API configuration status
- * - First login state
- * - Navigation stack state
+ * Uses the new SettingsSection and SettingsItem components
+ * for consistent styling and dark mode support.
  *
- * All buttons are disabled during refresh operations.
+ * All items show loading state during refresh operations.
  */
 export default function DataManagementSection({
   apiUrlsConfigured,
@@ -58,8 +56,6 @@ export default function DataManagementSection({
   style,
   testID = 'data-management-section',
 }: DataManagementSectionProps) {
-  const buttonBackgroundColor = useThemeColor({ light: '#007AFF', dark: '#0A84FF' }, 'tint');
-
   // Don't render section at all if first login and URLs not configured
   if (isFirstLogin && !apiUrlsConfigured) {
     return null;
@@ -76,116 +72,65 @@ export default function DataManagementSection({
     }
   };
 
+  // Count how many items will be shown to manage separators
+  const showRefresh = apiUrlsConfigured;
+  const showLogin = !isFirstLogin;
+  const showHome = apiUrlsConfigured && !canGoBack;
+
   return (
-    <ThemedView style={[styles.container, style]} testID={testID}>
-      {/* Section Title */}
-      <ThemedText style={styles.sectionTitle}>Data Management</ThemedText>
+    <View style={style} testID={testID}>
+      <SettingsSection
+        title="Data"
+        footer={
+          apiUrlsConfigured
+            ? 'Refresh to get the latest beer list and rewards from Flying Saucer.'
+            : undefined
+        }
+      >
+        {/* Refresh Button */}
+        {showRefresh && (
+          <SettingsItem
+            icon="arrow.clockwise"
+            iconBackgroundColor={Colors.light.success}
+            title={refreshing ? 'Refreshing...' : 'Refresh All Data'}
+            subtitle="Download latest beers and rewards"
+            accessoryType={refreshing ? 'loading' : 'none'}
+            onPress={handleRefresh}
+            disabled={refreshing}
+            showSeparator={showLogin || showHome}
+            testID="refresh-all-data-button"
+          />
+        )}
 
-      {/* Refresh Button - only show when API URLs are configured */}
-      {apiUrlsConfigured && (
-        <TouchableOpacity
-          testID="refresh-all-data-button"
-          style={[
-            styles.button,
-            { backgroundColor: buttonBackgroundColor },
-            refreshing && styles.buttonDisabled,
-          ]}
-          onPress={handleRefresh}
-          disabled={refreshing}
-          accessibilityRole="button"
-          accessibilityLabel="Refresh all beer data from server"
-          accessibilityHint="Downloads latest beer information from Flying Saucer"
-          accessibilityState={{ disabled: refreshing }}
-        >
-          {refreshing ? (
-            <View style={styles.buttonContent}>
-              <ActivityIndicator size="small" color="#FFFFFF" style={styles.buttonSpinner} />
-              <ThemedText style={styles.buttonText}>Refreshing data...</ThemedText>
-            </View>
-          ) : (
-            <ThemedText style={styles.buttonText}>Refresh All Beer Data</ThemedText>
-          )}
-        </TouchableOpacity>
-      )}
+        {/* Login Button */}
+        {showLogin && (
+          <SettingsItem
+            icon="person.crop.circle"
+            iconBackgroundColor={Colors.light.tint}
+            title="Login to Flying Saucer"
+            subtitle="Sign in with your UFO Club account"
+            accessoryType="chevron"
+            onPress={onLogin}
+            disabled={refreshing}
+            showSeparator={showHome}
+            testID="login-button"
+          />
+        )}
 
-      {/* Login Button - hidden during first login flow */}
-      {!isFirstLogin && (
-        <TouchableOpacity
-          testID="login-button"
-          style={[
-            styles.button,
-            { backgroundColor: buttonBackgroundColor },
-            refreshing && styles.buttonDisabled,
-          ]}
-          onPress={onLogin}
-          disabled={refreshing}
-          accessibilityRole="button"
-          accessibilityLabel="Login to Flying Saucer account"
-          accessibilityHint="Opens login page to authenticate with Flying Saucer"
-          accessibilityState={{ disabled: refreshing }}
-        >
-          <ThemedText style={styles.buttonText}>Login to Flying Saucer</ThemedText>
-        </TouchableOpacity>
-      )}
-
-      {/* Home Navigation Button - only show when URLs configured and can't go back */}
-      {apiUrlsConfigured && !canGoBack && (
-        <TouchableOpacity
-          style={[
-            styles.button,
-            { backgroundColor: buttonBackgroundColor },
-            refreshing && styles.buttonDisabled,
-          ]}
-          onPress={onGoHome}
-          disabled={refreshing}
-          accessibilityRole="button"
-          accessibilityLabel="Go to home screen"
-          accessibilityHint="Navigates to the main beer list screen"
-          accessibilityState={{ disabled: refreshing }}
-        >
-          <ThemedText style={styles.buttonText}>Go to Home Screen</ThemedText>
-        </TouchableOpacity>
-      )}
-    </ThemedView>
+        {/* Home Navigation Button */}
+        {showHome && (
+          <SettingsItem
+            icon="house.fill"
+            iconBackgroundColor="#5856D6"
+            title="Go to Home Screen"
+            subtitle="Return to the main beer list"
+            accessoryType="chevron"
+            onPress={onGoHome}
+            disabled={refreshing}
+            showSeparator={false}
+          />
+        )}
+      </SettingsSection>
+    </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    padding: 16,
-    marginBottom: 20,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 16,
-  },
-  button: {
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    marginBottom: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 48,
-  },
-  buttonDisabled: {
-    opacity: 0.5,
-  },
-  secondaryButton: {
-    // Secondary button styling (e.g., logout)
-  },
-  buttonContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  buttonSpinner: {
-    marginRight: 8,
-  },
-  buttonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-});

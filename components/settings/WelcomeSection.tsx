@@ -1,8 +1,12 @@
 import React from 'react';
-import { View, TouchableOpacity, StyleSheet, ViewStyle } from 'react-native';
+import { View, StyleSheet, ViewStyle } from 'react-native';
 
 import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
+import { useThemeColor } from '@/hooks/useThemeColor';
+import { Colors } from '@/constants/Colors';
+import { spacing, borderRadii } from '@/constants/spacing';
+import SettingsSection from './SettingsSection';
+import SettingsItem from './SettingsItem';
 
 /**
  * Props for WelcomeSection component
@@ -38,21 +42,11 @@ interface WelcomeSectionProps {
  * WelcomeSection Component
  *
  * Displays first-login welcome message with:
- * - Welcome title
- * - Instructional text
- * - Login button
+ * - Welcome message card
+ * - Login action using SettingsItem
  *
  * Shown only on first app launch before API URLs are configured.
- * Button is disabled during login or refresh operations.
- *
- * @example
- * ```tsx
- * <WelcomeSection
- *   onLogin={handleLogin}
- *   loginLoading={isLoggingIn}
- *   refreshing={refreshing}
- * />
- * ```
+ * Uses the new SettingsSection and SettingsItem components.
  */
 export default function WelcomeSection({
   onLogin,
@@ -61,81 +55,77 @@ export default function WelcomeSection({
   style,
   testID = 'welcome-section',
 }: WelcomeSectionProps) {
+  const backgroundElevatedColor = useThemeColor(
+    { light: Colors.light.backgroundElevated, dark: Colors.dark.backgroundElevated },
+    'background'
+  );
+  const borderColor = useThemeColor(
+    { light: Colors.light.border, dark: Colors.dark.border },
+    'background'
+  );
+  const textSecondaryColor = useThemeColor(
+    { light: Colors.light.textSecondary, dark: Colors.dark.textSecondary },
+    'text'
+  );
+
+  const isDisabled = loginLoading || refreshing;
+
   return (
-    <ThemedView style={[styles.container, style]} testID={testID}>
-      {/* Section Title */}
-      <ThemedText style={styles.sectionTitle}>Welcome to Beer Selector</ThemedText>
-
-      {/* Welcome Message */}
-      <View style={styles.welcomeMessage}>
-        <ThemedText style={styles.welcomeText}>
-          Please log in to your UFO Club account or as a Visitor to start using the app.
+    <View style={style} testID={testID}>
+      {/* Welcome Message Card */}
+      <View
+        style={[
+          styles.welcomeCard,
+          {
+            backgroundColor: backgroundElevatedColor,
+            borderColor: borderColor,
+          },
+        ]}
+      >
+        <ThemedText style={styles.welcomeTitle}>Welcome to Beer Selector</ThemedText>
+        <ThemedText style={[styles.welcomeText, { color: textSecondaryColor }]}>
+          Track your UFO Club progress, discover new beers, and never miss a tap takeover.
         </ThemedText>
-
-        {/* Login Button */}
-        <TouchableOpacity
-          testID="login-button"
-          style={[
-            styles.loginButton,
-            (loginLoading || refreshing) && styles.loginButtonDisabled,
-          ]}
-          onPress={onLogin}
-          disabled={loginLoading || refreshing}
-          accessibilityRole="button"
-          accessibilityLabel="Login to Flying Saucer"
-          accessibilityHint="Opens login page to authenticate with Flying Saucer or continue as visitor"
-          accessibilityState={{ disabled: loginLoading || refreshing }}
-        >
-          <ThemedText style={styles.loginButtonText}>
-            {loginLoading ? 'Logging in...' : 'Login to Flying Saucer'}
-          </ThemedText>
-        </TouchableOpacity>
       </View>
-    </ThemedView>
+
+      {/* Account Section with Login */}
+      <SettingsSection
+        title="Get Started"
+        footer="Sign in with your UFO Club account to track your tasted beers, or continue as a visitor to browse taplists."
+      >
+        <SettingsItem
+          icon="person.crop.circle.badge.plus"
+          iconBackgroundColor={Colors.light.tint}
+          title={loginLoading ? 'Signing in...' : 'Sign In to Flying Saucer'}
+          subtitle="Access your UFO Club account"
+          accessoryType={loginLoading ? 'loading' : 'chevron'}
+          onPress={onLogin}
+          disabled={isDisabled}
+          showSeparator={false}
+          testID="login-button"
+        />
+      </SettingsSection>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    borderRadius: 12,
-    marginBottom: 20,
-    overflow: 'hidden',
-    padding: 16,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 16,
-  },
-  welcomeMessage: {
+  welcomeCard: {
+    borderRadius: borderRadii.l,
+    borderWidth: StyleSheet.hairlineWidth,
+    padding: spacing.l,
+    marginBottom: spacing.l,
     alignItems: 'center',
+  },
+  welcomeTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    marginBottom: spacing.s,
+    textAlign: 'center',
   },
   welcomeText: {
-    textAlign: 'center',
-    marginBottom: 16,
-    lineHeight: 20,
-  },
-  loginButton: {
-    backgroundColor: '#007AFF',
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 48,
-    width: '80%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  loginButtonDisabled: {
-    opacity: 0.5,
-  },
-  loginButtonText: {
-    color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: '600',
+    lineHeight: 22,
+    textAlign: 'center',
   },
 });

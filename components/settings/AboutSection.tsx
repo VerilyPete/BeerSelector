@@ -1,11 +1,15 @@
 import React from 'react';
-import { View, TouchableOpacity, StyleSheet, ViewStyle, Platform } from 'react-native';
+import { View, StyleSheet, ViewStyle, Platform } from 'react-native';
 import Constants from 'expo-constants';
 import * as WebBrowser from 'expo-web-browser';
+import * as Haptics from 'expo-haptics';
 
 import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
 import { useThemeColor } from '@/hooks/useThemeColor';
+import { Colors } from '@/constants/Colors';
+import { spacing } from '@/constants/spacing';
+import SettingsSection from './SettingsSection';
+import SettingsItem from './SettingsItem';
 
 /**
  * Props for AboutSection component
@@ -30,7 +34,8 @@ interface AboutSectionProps {
  * - External links (Help, Privacy)
  * - Copyright notice
  *
- * Supports dark mode and accessibility features.
+ * Uses the new SettingsSection and SettingsItem components
+ * for consistent styling and dark mode support.
  */
 export default function AboutSection({
   helpUrl,
@@ -38,7 +43,10 @@ export default function AboutSection({
   style,
   testID = 'about-section',
 }: AboutSectionProps) {
-  const linkColor = useThemeColor({ light: '#007AFF', dark: '#0A84FF' }, 'tint');
+  const textMutedColor = useThemeColor(
+    { light: Colors.light.textMuted, dark: Colors.dark.textMuted },
+    'text'
+  );
 
   // Get version information from expo config
   const version = Constants.expoConfig?.version || '1.0.0';
@@ -54,129 +62,75 @@ export default function AboutSection({
   const currentYear = new Date().getFullYear();
 
   /**
-   * Opens external URL in browser
-   * Handles errors gracefully without throwing
+   * Opens external URL in browser with haptic feedback
    */
   const handleOpenLink = async (url: string) => {
     try {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       await WebBrowser.openBrowserAsync(url);
     } catch (error) {
       console.error('Failed to open browser:', error);
-      // Fail silently - user experience is better without error alerts for link opening failures
     }
   };
 
+  // Build version string
+  const versionString = buildNumber ? `${version} (${buildNumber})` : version;
+
   return (
-    <ThemedView style={[styles.container, style]} testID={testID}>
-      {/* Section Title */}
-      <ThemedText style={styles.sectionTitle}>About</ThemedText>
+    <View style={style} testID={testID}>
+      <SettingsSection title="About">
+        {/* App Info */}
+        <SettingsItem
+          icon="info.circle.fill"
+          iconBackgroundColor={Colors.light.info}
+          title="Beer Selector"
+          subtitle={`Version ${versionString}`}
+          accessoryType="none"
+          showSeparator={!!(helpUrl || privacyUrl)}
+        />
 
-      {/* App Name */}
+        {/* Help Link */}
+        {helpUrl && (
+          <SettingsItem
+            icon="questionmark.circle.fill"
+            iconBackgroundColor={Colors.light.success}
+            title="Help & Documentation"
+            accessoryType="chevron"
+            onPress={() => handleOpenLink(helpUrl)}
+            showSeparator={!!privacyUrl}
+          />
+        )}
+
+        {/* Privacy Policy Link */}
+        {privacyUrl && (
+          <SettingsItem
+            icon="hand.raised.fill"
+            iconBackgroundColor="#5856D6"
+            title="Privacy Policy"
+            accessoryType="chevron"
+            onPress={() => handleOpenLink(privacyUrl)}
+            showSeparator={false}
+          />
+        )}
+      </SettingsSection>
+
+      {/* Copyright Footer */}
       <ThemedText
-        testID="app-name-text"
-        style={styles.appName}
-        accessibilityLabel="Beer Selector application"
-        accessibilityRole="text"
-      >
-        Beer Selector
-      </ThemedText>
-
-      {/* Version and Build Information */}
-      <ThemedText
-        testID="version-text"
-        style={styles.versionText}
-        accessibilityLabel={`Version ${version}${buildNumber ? `, Build ${buildNumber}` : ''}`}
-        accessibilityRole="text"
-      >
-        Version {version}
-        {buildNumber && ` • Build ${buildNumber}`}
-      </ThemedText>
-
-      {/* External Links */}
-      {(helpUrl || privacyUrl) && (
-        <View style={styles.linksContainer}>
-          {helpUrl && (
-            <TouchableOpacity
-              onPress={() => handleOpenLink(helpUrl)}
-              style={styles.linkButton}
-              accessibilityRole="button"
-              accessibilityLabel="Help and Documentation"
-              accessibilityHint="Opens help documentation in browser"
-            >
-              <ThemedText style={[styles.linkText, { color: linkColor }]}>
-                Help & Documentation
-              </ThemedText>
-            </TouchableOpacity>
-          )}
-
-          {privacyUrl && (
-            <TouchableOpacity
-              onPress={() => handleOpenLink(privacyUrl)}
-              style={styles.linkButton}
-              accessibilityRole="button"
-              accessibilityLabel="Privacy Policy"
-              accessibilityHint="Opens privacy policy in browser"
-            >
-              <ThemedText style={[styles.linkText, { color: linkColor }]}>
-                Privacy Policy
-              </ThemedText>
-            </TouchableOpacity>
-          )}
-        </View>
-      )}
-
-      {/* Copyright Notice */}
-      <ThemedText
-        style={styles.copyrightText}
+        style={[styles.copyrightText, { color: textMutedColor }]}
         accessibilityLabel={`Copyright ${currentYear} Beer Selector. All rights reserved.`}
         accessibilityRole="text"
       >
-        © {currentYear} Beer Selector. All rights reserved.
+        {currentYear} Beer Selector. All rights reserved.
       </ThemedText>
-    </ThemedView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    padding: 16,
-    marginBottom: 20,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 16,
-  },
-  appName: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  versionText: {
-    fontSize: 16,
-    textAlign: 'center',
-    marginBottom: 20,
-    opacity: 0.7,
-  },
-  linksContainer: {
-    marginTop: 8,
-    marginBottom: 20,
-  },
-  linkButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    marginVertical: 4,
-  },
-  linkText: {
-    fontSize: 16,
-    textAlign: 'center',
-    textDecorationLine: 'underline',
-  },
   copyrightText: {
-    fontSize: 12,
+    fontSize: 13,
     textAlign: 'center',
-    opacity: 0.5,
-    marginTop: 8,
+    marginTop: spacing.xl,
+    marginBottom: spacing.m,
   },
 });

@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { StyleSheet, TouchableOpacity, View, ScrollView } from 'react-native';
+import { StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -9,6 +9,9 @@ import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { Colors } from '@/constants/Colors';
+import { spacing, borderRadii } from '@/constants/spacing';
+
 // Import extracted components
 import LoginWebView from '@/components/LoginWebView';
 import AboutSection from '@/components/settings/AboutSection';
@@ -26,7 +29,14 @@ export default function SettingsScreen() {
   // Theme colors
   const tintColor = useThemeColor({}, 'tint');
   const colorScheme = useColorScheme() ?? 'light';
-  const cardColor = useThemeColor({ light: '#F5F5F5', dark: '#1C1C1E' }, 'background');
+  const backgroundSecondaryColor = useThemeColor(
+    { light: Colors.light.backgroundSecondary, dark: Colors.dark.backgroundSecondary },
+    'background'
+  );
+  const closeButtonBgColor = useThemeColor(
+    { light: 'rgba(120, 120, 128, 0.12)', dark: 'rgba(120, 120, 128, 0.32)' },
+    'background'
+  );
 
   // URL search params
   const { action } = useLocalSearchParams<{ action?: string }>();
@@ -65,7 +75,7 @@ export default function SettingsScreen() {
   }, [action, startMemberLogin]);
 
   return (
-    <ThemedView style={styles.container}>
+    <ThemedView style={[styles.container, { backgroundColor: backgroundSecondaryColor }]}>
       <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
 
       {/* Login WebView Modal */}
@@ -82,52 +92,50 @@ export default function SettingsScreen() {
         {!isFirstLogin && canGoBack && (
           <TouchableOpacity
             testID="back-button"
-            style={styles.backButton}
+            style={[styles.backButton, { backgroundColor: closeButtonBgColor }]}
             onPress={() => router.back()}
           >
-            <IconSymbol name="xmark" size={26} color={tintColor} />
+            <IconSymbol name="xmark" size={16} color={tintColor} weight="semibold" />
           </TouchableOpacity>
         )}
 
-        <ScrollView style={styles.scrollView}>
-          <View style={styles.content}>
-            {/* Title Section */}
-            <View style={styles.titleSection}>
-              <ThemedText type="title" style={styles.pageTitle}>
-                Settings
-              </ThemedText>
-            </View>
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Title Section */}
+          <ThemedText type="title" style={styles.pageTitle}>
+            Settings
+          </ThemedText>
 
-            {/* Welcome Section - First Login Only */}
-            {isFirstLogin && (
-              <WelcomeSection
-                onLogin={startMemberLogin}
-                loginLoading={isLoggingIn}
-                refreshing={refreshing}
-                style={{ backgroundColor: cardColor }}
-              />
-            )}
+          {/* Welcome Section - First Login Only */}
+          {isFirstLogin && (
+            <WelcomeSection
+              onLogin={startMemberLogin}
+              loginLoading={isLoggingIn}
+              refreshing={refreshing}
+            />
+          )}
 
-            {/* About Section */}
-            <AboutSection style={{ backgroundColor: cardColor }} />
+          {/* Data Management Section */}
+          {(!isFirstLogin || apiUrlsConfigured) && (
+            <DataManagementSection
+              apiUrlsConfigured={apiUrlsConfigured}
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              isFirstLogin={isFirstLogin}
+              onLogin={startMemberLogin}
+              canGoBack={canGoBack}
+              onGoHome={() => router.replace('/(tabs)')}
+            />
+          )}
 
-            {/* Data Management Section */}
-            {(!isFirstLogin || apiUrlsConfigured) && (
-              <DataManagementSection
-                apiUrlsConfigured={apiUrlsConfigured}
-                refreshing={refreshing}
-                onRefresh={handleRefresh}
-                isFirstLogin={isFirstLogin}
-                onLogin={startMemberLogin}
-                canGoBack={canGoBack}
-                onGoHome={() => router.replace('/(tabs)')}
-                style={{ backgroundColor: cardColor }}
-              />
-            )}
+          {/* About Section */}
+          <AboutSection />
 
-            {/* Developer Tools Section - Only visible in development mode */}
-            <DeveloperSection cardColor={cardColor} tintColor={tintColor} />
-          </View>
+          {/* Developer Tools Section - Only visible in development mode */}
+          <DeveloperSection />
         </ScrollView>
       </SafeAreaView>
     </ThemedView>
@@ -144,49 +152,26 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
+  scrollContent: {
+    paddingHorizontal: spacing.m,
+    paddingTop: spacing.m,
+    paddingBottom: spacing.xxl,
+  },
   backButton: {
     position: 'absolute',
-    top: 60,
-    right: 20,
+    top: spacing.m,
+    right: spacing.m,
     zIndex: 10,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(200, 200, 200, 0.5)',
+    width: 30,
+    height: 30,
+    borderRadius: borderRadii.full,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  content: {
-    flex: 1,
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 30,
-  },
-  titleSection: {
-    marginBottom: 20,
-    alignItems: 'center',
-  },
   pageTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  section: {
-    borderRadius: 12,
-    marginBottom: 20,
-    overflow: 'hidden',
-    padding: 16,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 16,
-  },
-  infoContainer: {
-    paddingTop: 8,
-  },
-  buttonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 34,
+    fontWeight: '700',
+    marginBottom: spacing.l,
+    marginTop: spacing.xs,
   },
 });
