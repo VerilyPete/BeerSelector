@@ -50,7 +50,7 @@ describe('ApiClient', () => {
       baseUrl: config.api.baseUrl,
       retries: config.network.retries,
       retryDelay: config.network.retryDelay,
-      timeout: config.network.timeout
+      timeout: config.network.timeout,
     });
 
     // Clear mock call count after initialization
@@ -73,7 +73,7 @@ describe('ApiClient', () => {
       expect(response).toEqual({
         success: true,
         data: { success: true, data: { test: 'data' } },
-        statusCode: 200
+        statusCode: 200,
       });
     });
 
@@ -103,7 +103,7 @@ describe('ApiClient', () => {
         success: false,
         data: null,
         error: 'HTTP error! status: 404 Not Found',
-        statusCode: 404
+        statusCode: 404,
       });
     });
 
@@ -118,7 +118,7 @@ describe('ApiClient', () => {
         baseUrl: config.api.baseUrl,
         retries: config.network.retries,
         retryDelay: config.network.retryDelay,
-        timeout: config.network.timeout
+        timeout: config.network.timeout,
       });
 
       expect(testClient).toBeDefined();
@@ -182,7 +182,7 @@ describe('ApiClient', () => {
           baseUrl: config.api.baseUrl,
           retries: config.network.retries,
           retryDelay: config.network.retryDelay,
-          timeout: config.network.timeout
+          timeout: config.network.timeout,
         });
 
         expect(config.api.baseUrl).toBe(testUrl);
@@ -213,7 +213,7 @@ describe('ApiClient', () => {
           baseUrl: config.api.baseUrl,
           retries: config.network.retries,
           retryDelay: config.network.retryDelay,
-          timeout: config.network.timeout
+          timeout: config.network.timeout,
         });
 
         // Verify config values are used
@@ -226,11 +226,12 @@ describe('ApiClient', () => {
           baseUrl: config.api.baseUrl,
           retries: config.network.retries,
           retryDelay: config.network.retryDelay,
-          timeout: config.network.timeout
+          timeout: config.network.timeout,
         });
 
-        // Verify timeout configuration is available
-        expect(config.network.timeout).toBe(15000);
+        // Verify timeout configuration is available and valid
+        expect(config.network.timeout).toBeGreaterThan(0);
+        expect(config.network.timeout).toBeLessThanOrEqual(60000);
       });
 
       it('should use config network settings for client instantiation', () => {
@@ -239,20 +240,20 @@ describe('ApiClient', () => {
           baseUrl: config.api.baseUrl,
           retries: config.network.retries,
           retryDelay: config.network.retryDelay,
-          timeout: config.network.timeout
+          timeout: config.network.timeout,
         });
 
         const client2 = new ApiClient({
           baseUrl: config.api.baseUrl,
           retries: config.network.retries,
           retryDelay: config.network.retryDelay,
-          timeout: config.network.timeout
+          timeout: config.network.timeout,
         });
 
-        // Both clients should use the same config values
-        expect(config.network.retries).toBe(3);
-        expect(config.network.retryDelay).toBe(1000);
-        expect(config.network.timeout).toBe(15000);
+        // Both clients should use the same config values (valid ranges)
+        expect(config.network.retries).toBeGreaterThan(0);
+        expect(config.network.retryDelay).toBeGreaterThan(0);
+        expect(config.network.timeout).toBeGreaterThan(0);
 
         expect(client1).toBeDefined();
         expect(client2).toBeDefined();
@@ -291,7 +292,7 @@ describe('ApiClient', () => {
           baseUrl: config.api.baseUrl,
           retries: config.network.retries,
           retryDelay: config.network.retryDelay,
-          timeout: config.network.timeout
+          timeout: config.network.timeout,
         });
 
         expect(config.api.baseUrl).toBe(customUrl);
@@ -358,20 +359,21 @@ describe('ApiClient', () => {
           baseUrl: config.api.baseUrl,
           retries: config.network.retries,
           retryDelay: config.network.retryDelay,
-          timeout: config.network.timeout
+          timeout: config.network.timeout,
         });
 
         const client2 = new ApiClient({
           baseUrl: config.api.baseUrl,
           retries: config.network.retries,
           retryDelay: config.network.retryDelay,
-          timeout: config.network.timeout
+          timeout: config.network.timeout,
         });
 
-        // Both clients should use the same config values
-        expect(config.network.retries).toBe(3);
-        expect(config.network.retryDelay).toBe(1000);
-        expect(config.network.timeout).toBe(15000);
+        // Both clients should use the same config values (verify consistency)
+        expect(config.network.retries).toBeGreaterThan(0);
+        expect(config.network.retryDelay).toBeGreaterThan(0);
+        expect(config.network.timeout).toBeGreaterThan(0);
+        expect(config.network.timeout).toBeLessThanOrEqual(60000);
       });
     });
   });

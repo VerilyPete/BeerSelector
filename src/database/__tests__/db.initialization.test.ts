@@ -24,7 +24,7 @@ jest.mock('../connection', () => ({
     getFirstAsync: jest.fn().mockResolvedValue(null),
     runAsync: jest.fn().mockResolvedValue({ rowsAffected: 1 }),
     execAsync: jest.fn().mockResolvedValue(undefined),
-    withTransactionAsync: jest.fn().mockImplementation(async (callback) => {
+    withTransactionAsync: jest.fn().mockImplementation(async callback => {
       return await callback();
     }),
   }),
@@ -83,19 +83,23 @@ const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
 const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
 
 describe('initializeBeerDatabase', () => {
-  // Mock data
+  // Mock data (include glass_type as it's added by calculateGlassTypes)
   const mockBeers = [
-    { id: 'beer-1', brew_name: 'Test Beer 1', brewer: 'Test Brewery' },
-    { id: 'beer-2', brew_name: 'Test Beer 2', brewer: 'Test Brewery' },
+    { id: 'beer-1', brew_name: 'Test Beer 1', brewer: 'Test Brewery', glass_type: null },
+    { id: 'beer-2', brew_name: 'Test Beer 2', brewer: 'Test Brewery', glass_type: null },
   ];
 
   const mockMyBeers = [
-    { id: 'beer-1', brew_name: 'Test Beer 1', brewer: 'Test Brewery', tasted_date: '2023-01-01' },
+    {
+      id: 'beer-1',
+      brew_name: 'Test Beer 1',
+      brewer: 'Test Brewery',
+      tasted_date: '2023-01-01',
+      glass_type: null,
+    },
   ];
 
-  const mockRewards = [
-    { id: 'reward-1', name: 'Test Reward', points: 100 },
-  ];
+  const mockRewards = [{ id: 'reward-1', name: 'Test Reward', points: 100 }];
 
   beforeEach(() => {
     // Clear all mocks before each test
@@ -168,7 +172,9 @@ describe('initializeBeerDatabase', () => {
       await initializeBeerDatabase();
 
       // Verify it logs message and returns early
-      expect(consoleLogSpy).toHaveBeenCalledWith('API URLs not configured, database initialization will be limited');
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        'API URLs not configured, database initialization will be limited'
+      );
 
       // Verify no API calls made
       expect(fetchBeersFromAPI).not.toHaveBeenCalled();
@@ -202,7 +208,9 @@ describe('initializeBeerDatabase', () => {
       expect(fetchMyBeersFromAPI).not.toHaveBeenCalled();
       expect(myBeersRepository.insertMany).not.toHaveBeenCalled();
 
-      expect(consoleLogSpy).toHaveBeenCalledWith('In visitor mode - skipping scheduled My Beers import');
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        'In visitor mode - skipping scheduled My Beers import'
+      );
 
       jest.useRealTimers();
     });
@@ -218,7 +226,9 @@ describe('initializeBeerDatabase', () => {
       expect(fetchRewardsFromAPI).not.toHaveBeenCalled();
       expect(rewardsRepository.insertMany).not.toHaveBeenCalled();
 
-      expect(consoleLogSpy).toHaveBeenCalledWith('In visitor mode - skipping scheduled Rewards import');
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        'In visitor mode - skipping scheduled Rewards import'
+      );
 
       jest.useRealTimers();
     });
@@ -267,7 +277,10 @@ describe('initializeBeerDatabase', () => {
       await jest.advanceTimersByTimeAsync(100);
 
       // Verify error logged but doesn't crash
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Error in scheduled My Beers import:', mockError);
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'Error in scheduled My Beers import:',
+        mockError
+      );
 
       // My Beers repository should not have been called
       expect(myBeersRepository.insertMany).not.toHaveBeenCalled();
@@ -306,7 +319,10 @@ describe('initializeBeerDatabase', () => {
       await expect(initializeBeerDatabase()).resolves.toBeUndefined();
 
       // Verify error logged
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Error fetching and populating all beers:', mockError);
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'Error fetching and populating all beers:',
+        mockError
+      );
 
       // Verify function completes (doesn't crash app)
       expect(consoleLogSpy).toHaveBeenCalledWith('Beer database initialization completed');
@@ -324,9 +340,18 @@ describe('initializeBeerDatabase', () => {
       await jest.advanceTimersByTimeAsync(300);
 
       // All errors should be logged
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Error fetching and populating all beers:', expect.any(Error));
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Error in scheduled My Beers import:', expect.any(Error));
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Error in scheduled Rewards import:', expect.any(Error));
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'Error fetching and populating all beers:',
+        expect.any(Error)
+      );
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'Error in scheduled My Beers import:',
+        expect.any(Error)
+      );
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'Error in scheduled Rewards import:',
+        expect.any(Error)
+      );
 
       // Function should complete successfully
       expect(consoleLogSpy).toHaveBeenCalledWith('Beer database initialization completed');

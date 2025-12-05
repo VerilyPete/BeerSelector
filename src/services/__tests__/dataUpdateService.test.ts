@@ -9,6 +9,11 @@ import { fetchAndUpdateAllBeers, fetchAndUpdateMyBeers } from '../dataUpdateServ
 import { Beer, Beerfinder } from '../../types/beer';
 import { config } from '@/src/config';
 
+// Import mocked functions after setting up mocks
+import { getPreference, setPreference } from '../../database/preferences';
+import { beerRepository } from '../../database/repositories/BeerRepository';
+import { myBeersRepository } from '../../database/repositories/MyBeersRepository';
+
 // Mock database preferences
 jest.mock('../../database/preferences', () => ({
   getPreference: jest.fn(),
@@ -27,11 +32,6 @@ jest.mock('../../database/repositories/MyBeersRepository', () => ({
     insertMany: jest.fn(),
   },
 }));
-
-// Import mocked functions after setting up mocks
-import { getPreference, setPreference } from '../../database/preferences';
-import { beerRepository } from '../../database/repositories/BeerRepository';
-import { myBeersRepository } from '../../database/repositories/MyBeersRepository';
 
 // Mock fetch
 global.fetch = jest.fn();
@@ -129,10 +129,7 @@ describe('dataUpdateService', () => {
       // Mock fetch to return an array without brewInStock
       (global.fetch as jest.Mock).mockResolvedValueOnce({
         ok: true,
-        json: jest.fn().mockResolvedValueOnce([
-          { something: 'else' },
-          { notBrewInStock: [] }
-        ]),
+        json: jest.fn().mockResolvedValueOnce([{ something: 'else' }, { notBrewInStock: [] }]),
       });
 
       const result = await fetchAndUpdateAllBeers();
@@ -147,19 +144,16 @@ describe('dataUpdateService', () => {
       // Mock getPreference to return a test API URL
       (getPreference as jest.Mock).mockResolvedValueOnce(testAllBeersUrl);
 
-      // Mock beers data
+      // Mock beers data (include glass_type as it's added by calculateGlassTypes)
       const mockBeers: Beer[] = [
-        { id: 'beer-1', brew_name: 'Test Beer 1', brewer: 'Brewery 1' },
-        { id: 'beer-2', brew_name: 'Test Beer 2', brewer: 'Brewery 2' }
+        { id: 'beer-1', brew_name: 'Test Beer 1', brewer: 'Brewery 1', glass_type: null },
+        { id: 'beer-2', brew_name: 'Test Beer 2', brewer: 'Brewery 2', glass_type: null },
       ];
 
       // Mock fetch to return valid data
       (global.fetch as jest.Mock).mockResolvedValueOnce({
         ok: true,
-        json: jest.fn().mockResolvedValueOnce([
-          { something: 'else' },
-          { brewInStock: mockBeers }
-        ]),
+        json: jest.fn().mockResolvedValueOnce([{ something: 'else' }, { brewInStock: mockBeers }]),
       });
 
       // Mock beerRepository.insertMany to succeed
@@ -176,7 +170,9 @@ describe('dataUpdateService', () => {
       expect(beerRepository.insertMany).toHaveBeenCalledWith(mockBeers);
       expect(setPreference).toHaveBeenCalledWith('all_beers_last_update', expect.any(String));
       expect(setPreference).toHaveBeenCalledWith('all_beers_last_check', expect.any(String));
-      expect(console.log).toHaveBeenCalledWith(`Updated all beers data with ${mockBeers.length} valid beers (skipped 0 invalid)`);
+      expect(console.log).toHaveBeenCalledWith(
+        `Updated all beers data with ${mockBeers.length} valid beers (skipped 0 invalid)`
+      );
     });
 
     it('should handle errors during update', async () => {
@@ -221,10 +217,9 @@ describe('dataUpdateService', () => {
       // Mock valid response
       (global.fetch as jest.Mock).mockResolvedValueOnce({
         ok: true,
-        json: jest.fn().mockResolvedValueOnce([
-          {},
-          { brewInStock: [{ id: '1', brew_name: 'Test' }] }
-        ]),
+        json: jest
+          .fn()
+          .mockResolvedValueOnce([{}, { brewInStock: [{ id: '1', brew_name: 'Test' }] }]),
       });
 
       (beerRepository.insertMany as jest.Mock).mockResolvedValueOnce(undefined);
@@ -245,15 +240,12 @@ describe('dataUpdateService', () => {
       const mockBeers = [
         { id: 'beer-1', brew_name: 'Valid Beer 1', brewer: 'Brewery 1' },
         { brew_name: 'Invalid Beer - No ID', brewer: 'Brewery 2' }, // Missing id
-        { id: 'beer-3', brew_name: 'Valid Beer 2', brewer: 'Brewery 3' }
+        { id: 'beer-3', brew_name: 'Valid Beer 2', brewer: 'Brewery 3' },
       ];
 
       (global.fetch as jest.Mock).mockResolvedValueOnce({
         ok: true,
-        json: jest.fn().mockResolvedValueOnce([
-          {},
-          { brewInStock: mockBeers }
-        ]),
+        json: jest.fn().mockResolvedValueOnce([{}, { brewInStock: mockBeers }]),
       });
 
       (beerRepository.insertMany as jest.Mock).mockResolvedValueOnce(undefined);
@@ -263,9 +255,7 @@ describe('dataUpdateService', () => {
 
       expect(result.success).toBe(true);
       expect(result.itemCount).toBe(2); // Only 2 valid beers
-      expect(console.log).toHaveBeenCalledWith(
-        expect.stringContaining('skipped 1 invalid')
-      );
+      expect(console.log).toHaveBeenCalledWith(expect.stringContaining('skipped 1 invalid'));
     });
   });
 
@@ -274,7 +264,7 @@ describe('dataUpdateService', () => {
       // Mock getPreference to return null for visitor mode check, then null for API URL
       (getPreference as jest.Mock)
         .mockResolvedValueOnce('false') // is_visitor_mode
-        .mockResolvedValueOnce(null);   // my_beers_api_url
+        .mockResolvedValueOnce(null); // my_beers_api_url
 
       const result = await fetchAndUpdateMyBeers();
 
@@ -340,10 +330,9 @@ describe('dataUpdateService', () => {
       // Mock fetch to return an array without tasted_brew_current_round
       (global.fetch as jest.Mock).mockResolvedValueOnce({
         ok: true,
-        json: jest.fn().mockResolvedValueOnce([
-          { something: 'else' },
-          { notTastedBrewCurrentRound: [] }
-        ]),
+        json: jest
+          .fn()
+          .mockResolvedValueOnce([{ something: 'else' }, { notTastedBrewCurrentRound: [] }]),
       });
 
       const result = await fetchAndUpdateMyBeers();
@@ -363,16 +352,15 @@ describe('dataUpdateService', () => {
       // Mock beers data without IDs
       const mockBeers: Partial<Beerfinder>[] = [
         { brew_name: 'Test Beer 1', brewer: 'Brewery 1' },
-        { brew_name: 'Test Beer 2', brewer: 'Brewery 2' }
+        { brew_name: 'Test Beer 2', brewer: 'Brewery 2' },
       ];
 
       // Mock fetch to return data with invalid beers
       (global.fetch as jest.Mock).mockResolvedValueOnce({
         ok: true,
-        json: jest.fn().mockResolvedValueOnce([
-          { something: 'else' },
-          { tasted_brew_current_round: mockBeers }
-        ]),
+        json: jest
+          .fn()
+          .mockResolvedValueOnce([{ something: 'else' }, { tasted_brew_current_round: mockBeers }]),
       });
 
       // Mock myBeersRepository.insertMany and setPreference to succeed
@@ -384,7 +372,9 @@ describe('dataUpdateService', () => {
       expect(result.success).toBe(true);
       expect(result.dataUpdated).toBe(true);
       expect(result.itemCount).toBe(0);
-      expect(console.log).toHaveBeenCalledWith('No valid beers with IDs found, but API returned data - clearing database');
+      expect(console.log).toHaveBeenCalledWith(
+        'No valid beers with IDs found, but API returned data - clearing database'
+      );
     });
 
     it('should successfully update my beers', async () => {
@@ -393,19 +383,18 @@ describe('dataUpdateService', () => {
         .mockResolvedValueOnce('false') // is_visitor_mode
         .mockResolvedValueOnce(testMyBeersUrl); // my_beers_api_url
 
-      // Mock beers data with IDs
+      // Mock beers data with IDs (include glass_type as it's added by calculateGlassTypes)
       const mockBeers: Beerfinder[] = [
-        { id: 'beer-1', brew_name: 'Test Beer 1', tasted_date: '2023-01-01' },
-        { id: 'beer-2', brew_name: 'Test Beer 2', tasted_date: '2023-01-02' }
+        { id: 'beer-1', brew_name: 'Test Beer 1', tasted_date: '2023-01-01', glass_type: null },
+        { id: 'beer-2', brew_name: 'Test Beer 2', tasted_date: '2023-01-02', glass_type: null },
       ];
 
       // Mock fetch to return valid data
       (global.fetch as jest.Mock).mockResolvedValueOnce({
         ok: true,
-        json: jest.fn().mockResolvedValueOnce([
-          { something: 'else' },
-          { tasted_brew_current_round: mockBeers }
-        ]),
+        json: jest
+          .fn()
+          .mockResolvedValueOnce([{ something: 'else' }, { tasted_brew_current_round: mockBeers }]),
       });
 
       // Mock myBeersRepository.insertMany to succeed
@@ -422,7 +411,9 @@ describe('dataUpdateService', () => {
       expect(myBeersRepository.insertMany).toHaveBeenCalledWith(mockBeers);
       expect(setPreference).toHaveBeenCalledWith('my_beers_last_update', expect.any(String));
       expect(setPreference).toHaveBeenCalledWith('my_beers_last_check', expect.any(String));
-      expect(console.log).toHaveBeenCalledWith(`Updated my beers data with ${mockBeers.length} valid beers`);
+      expect(console.log).toHaveBeenCalledWith(
+        `Updated my beers data with ${mockBeers.length} valid beers`
+      );
     });
 
     it('should handle errors during update', async () => {
@@ -464,10 +455,7 @@ describe('dataUpdateService', () => {
       // Mock fetch to return empty array
       (global.fetch as jest.Mock).mockResolvedValueOnce({
         ok: true,
-        json: jest.fn().mockResolvedValueOnce([
-          {},
-          { tasted_brew_current_round: [] }
-        ]),
+        json: jest.fn().mockResolvedValueOnce([{}, { tasted_brew_current_round: [] }]),
       });
 
       (myBeersRepository.insertMany as jest.Mock).mockResolvedValueOnce(undefined);
@@ -479,9 +467,7 @@ describe('dataUpdateService', () => {
       expect(result.dataUpdated).toBe(true);
       expect(result.itemCount).toBe(0);
       expect(myBeersRepository.insertMany).toHaveBeenCalledWith([]);
-      expect(console.log).toHaveBeenCalledWith(
-        expect.stringContaining('empty state')
-      );
+      expect(console.log).toHaveBeenCalledWith(expect.stringContaining('empty state'));
     });
 
     it('should handle fetch timeout with AbortError', async () => {
@@ -513,10 +499,12 @@ describe('dataUpdateService', () => {
       // Mock valid response
       (global.fetch as jest.Mock).mockResolvedValueOnce({
         ok: true,
-        json: jest.fn().mockResolvedValueOnce([
-          {},
-          { tasted_brew_current_round: [{ id: '1', brew_name: 'Test' }] }
-        ]),
+        json: jest
+          .fn()
+          .mockResolvedValueOnce([
+            {},
+            { tasted_brew_current_round: [{ id: '1', brew_name: 'Test' }] },
+          ]),
       });
 
       (myBeersRepository.insertMany as jest.Mock).mockResolvedValueOnce(undefined);
@@ -539,10 +527,9 @@ describe('dataUpdateService', () => {
 
         (global.fetch as jest.Mock).mockResolvedValueOnce({
           ok: true,
-          json: jest.fn().mockResolvedValueOnce([
-            {},
-            { brewInStock: [{ id: '1', brew_name: 'Test' }] }
-          ]),
+          json: jest
+            .fn()
+            .mockResolvedValueOnce([{}, { brewInStock: [{ id: '1', brew_name: 'Test' }] }]),
         });
 
         (beerRepository.insertMany as jest.Mock).mockResolvedValueOnce(undefined);
@@ -551,10 +538,7 @@ describe('dataUpdateService', () => {
         const result = await fetchAndUpdateAllBeers();
 
         expect(result.success).toBe(true);
-        expect(global.fetch).toHaveBeenCalledWith(
-          productionUrl,
-          expect.any(Object)
-        );
+        expect(global.fetch).toHaveBeenCalledWith(productionUrl, expect.any(Object));
       });
 
       it('should work with custom API URL', async () => {
@@ -565,10 +549,9 @@ describe('dataUpdateService', () => {
 
         (global.fetch as jest.Mock).mockResolvedValueOnce({
           ok: true,
-          json: jest.fn().mockResolvedValueOnce([
-            {},
-            { brewInStock: [{ id: '1', brew_name: 'Test' }] }
-          ]),
+          json: jest
+            .fn()
+            .mockResolvedValueOnce([{}, { brewInStock: [{ id: '1', brew_name: 'Test' }] }]),
         });
 
         (beerRepository.insertMany as jest.Mock).mockResolvedValueOnce(undefined);
@@ -577,10 +560,7 @@ describe('dataUpdateService', () => {
         const result = await fetchAndUpdateAllBeers();
 
         expect(result.success).toBe(true);
-        expect(global.fetch).toHaveBeenCalledWith(
-          customUrl,
-          expect.any(Object)
-        );
+        expect(global.fetch).toHaveBeenCalledWith(customUrl, expect.any(Object));
       });
     });
 
@@ -594,10 +574,9 @@ describe('dataUpdateService', () => {
           // Return a resolved promise to avoid hanging
           return Promise.resolve({
             ok: true,
-            json: jest.fn().mockResolvedValue([
-              {},
-              { brewInStock: [{ id: '1', brew_name: 'Test' }] }
-            ]),
+            json: jest
+              .fn()
+              .mockResolvedValue([{}, { brewInStock: [{ id: '1', brew_name: 'Test' }] }]),
           });
         });
 
@@ -631,9 +610,7 @@ describe('dataUpdateService', () => {
         const malformedUrl = 'not-a-valid-url';
         (getPreference as jest.Mock).mockResolvedValueOnce(malformedUrl);
 
-        (global.fetch as jest.Mock).mockRejectedValueOnce(
-          new TypeError('Failed to fetch')
-        );
+        (global.fetch as jest.Mock).mockRejectedValueOnce(new TypeError('Failed to fetch'));
 
         const result = await fetchAndUpdateAllBeers();
 
@@ -647,10 +624,9 @@ describe('dataUpdateService', () => {
 
         (global.fetch as jest.Mock).mockResolvedValueOnce({
           ok: true,
-          json: jest.fn().mockResolvedValueOnce([
-            {},
-            { brewInStock: [{ id: '1', brew_name: 'Test' }] }
-          ]),
+          json: jest
+            .fn()
+            .mockResolvedValueOnce([{}, { brewInStock: [{ id: '1', brew_name: 'Test' }] }]),
         });
 
         (beerRepository.insertMany as jest.Mock).mockResolvedValueOnce(undefined);
@@ -659,10 +635,7 @@ describe('dataUpdateService', () => {
         const result = await fetchAndUpdateAllBeers();
 
         expect(result.success).toBe(true);
-        expect(global.fetch).toHaveBeenCalledWith(
-          httpsUrl,
-          expect.any(Object)
-        );
+        expect(global.fetch).toHaveBeenCalledWith(httpsUrl, expect.any(Object));
       });
 
       it('should accept HTTP URLs', async () => {
@@ -671,10 +644,9 @@ describe('dataUpdateService', () => {
 
         (global.fetch as jest.Mock).mockResolvedValueOnce({
           ok: true,
-          json: jest.fn().mockResolvedValueOnce([
-            {},
-            { brewInStock: [{ id: '1', brew_name: 'Test' }] }
-          ]),
+          json: jest
+            .fn()
+            .mockResolvedValueOnce([{}, { brewInStock: [{ id: '1', brew_name: 'Test' }] }]),
         });
 
         (beerRepository.insertMany as jest.Mock).mockResolvedValueOnce(undefined);
@@ -683,10 +655,7 @@ describe('dataUpdateService', () => {
         const result = await fetchAndUpdateAllBeers();
 
         expect(result.success).toBe(true);
-        expect(global.fetch).toHaveBeenCalledWith(
-          httpUrl,
-          expect.any(Object)
-        );
+        expect(global.fetch).toHaveBeenCalledWith(httpUrl, expect.any(Object));
       });
     });
 
@@ -701,10 +670,9 @@ describe('dataUpdateService', () => {
 
         (global.fetch as jest.Mock).mockResolvedValueOnce({
           ok: true,
-          json: jest.fn().mockResolvedValueOnce([
-            {},
-            { brewInStock: [{ id: '1', brew_name: 'Test' }] }
-          ]),
+          json: jest
+            .fn()
+            .mockResolvedValueOnce([{}, { brewInStock: [{ id: '1', brew_name: 'Test' }] }]),
         });
 
         (beerRepository.insertMany as jest.Mock).mockResolvedValueOnce(undefined);
@@ -736,9 +704,7 @@ describe('dataUpdateService', () => {
       it('should properly categorize network errors', async () => {
         (getPreference as jest.Mock).mockResolvedValueOnce(testAllBeersUrl);
 
-        (global.fetch as jest.Mock).mockRejectedValueOnce(
-          new TypeError('Network request failed')
-        );
+        (global.fetch as jest.Mock).mockRejectedValueOnce(new TypeError('Network request failed'));
 
         const result = await fetchAndUpdateAllBeers();
 
