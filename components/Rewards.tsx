@@ -9,6 +9,7 @@ import {
   Alert,
   Platform,
   useColorScheme,
+  useWindowDimensions,
 } from 'react-native';
 import Animated, {
   useSharedValue,
@@ -258,9 +259,13 @@ const ProgressHeader = ({ tastedCount }: { tastedCount: number }) => {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const colors = isDark ? Colors.dark : Colors.light;
+  const { width: screenWidth } = useWindowDimensions();
 
   const progress = Math.min(tastedCount / BEER_GOAL, 1);
   const remaining = Math.max(BEER_GOAL - tastedCount, 0);
+
+  // Responsive ring size: smaller on narrow screens, larger on wide screens but capped
+  const ringSize = Math.min(Math.max(screenWidth * 0.2, 80), 120);
 
   return (
     <Animated.View
@@ -292,7 +297,7 @@ const ProgressHeader = ({ tastedCount }: { tastedCount: number }) => {
             </ThemedText>
           )}
         </View>
-        <ProgressRing progress={progress} />
+        <ProgressRing progress={progress} size={ringSize} />
       </View>
 
       {/* Milestone markers */}
@@ -643,6 +648,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    overflow: 'hidden',
   },
   progressTextContainer: {
     flex: 1,
@@ -666,6 +672,8 @@ const styles = StyleSheet.create({
   progressRingContainer: {
     justifyContent: 'center',
     alignItems: 'center',
+    overflow: 'hidden',
+    flexShrink: 0,
   },
   progressCircle: {
     position: 'absolute',
