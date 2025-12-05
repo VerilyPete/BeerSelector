@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import * as Haptics from 'expo-haptics';
+import Animated from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
@@ -13,6 +14,7 @@ import { useHomeScreenState, HomeScreenView } from '@/hooks/useHomeScreenState';
 import { Colors } from '@/constants/Colors';
 import { spacing, borderRadii } from '@/constants/spacing';
 import { getShadow } from '@/constants/shadows';
+import { useAnimatedPress } from '@/animations';
 
 /**
  * Navigation card data structure
@@ -30,6 +32,7 @@ interface NavigationCardProps {
 /**
  * Navigation Card Component
  * Renders an elevated card with icon, title, and description
+ * Includes animated press feedback for a polished feel
  */
 function NavigationCard({
   title,
@@ -45,6 +48,9 @@ function NavigationCard({
   const colors = Colors[colorScheme];
   const borderColor = useThemeColor({}, 'border');
 
+  // Animation hooks
+  const { animatedStyle: pressStyle, onPressIn, onPressOut } = useAnimatedPress({ disabled });
+
   const handlePress = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     onPress();
@@ -56,44 +62,48 @@ function NavigationCard({
     <TouchableOpacity
       testID={testID}
       onPress={handlePress}
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
       disabled={disabled}
-      activeOpacity={0.7}
+      activeOpacity={1}
       style={styles.cardTouchable}
       accessibilityRole="button"
       accessibilityLabel={title}
       accessibilityHint={description}
       accessibilityState={{ disabled }}
     >
-      <ThemedView
-        variant="elevated"
-        style={[
-          styles.navigationCard,
-          getShadow('md', isDark),
-          { borderColor },
-          disabled && styles.cardDisabled,
-        ]}
-      >
+      <Animated.View style={pressStyle}>
         <ThemedView
           variant="elevated"
-          style={[styles.iconContainer, { backgroundColor: colors.tint }]}
+          style={[
+            styles.navigationCard,
+            getShadow('md', isDark),
+            { borderColor },
+            disabled && styles.cardDisabled,
+          ]}
         >
-          <IconComponent name={iconName as any} size={28} color={colors.textOnPrimary} />
+          <ThemedView
+            variant="elevated"
+            style={[styles.iconContainer, { backgroundColor: colors.tint }]}
+          >
+            <IconComponent name={iconName as any} size={28} color={colors.textOnPrimary} />
+          </ThemedView>
+          <ThemedView variant="elevated" style={styles.cardContent}>
+            <ThemedText type="defaultSemiBold" style={styles.cardTitle}>
+              {title}
+            </ThemedText>
+            <ThemedText type="muted" style={styles.cardDescription}>
+              {description}
+            </ThemedText>
+          </ThemedView>
+          <Ionicons
+            name="chevron-forward"
+            size={24}
+            color={colors.textMuted}
+            style={styles.chevron}
+          />
         </ThemedView>
-        <ThemedView variant="elevated" style={styles.cardContent}>
-          <ThemedText type="defaultSemiBold" style={styles.cardTitle}>
-            {title}
-          </ThemedText>
-          <ThemedText type="muted" style={styles.cardDescription}>
-            {description}
-          </ThemedText>
-        </ThemedView>
-        <Ionicons
-          name="chevron-forward"
-          size={24}
-          color={colors.textMuted}
-          style={styles.chevron}
-        />
-      </ThemedView>
+      </Animated.View>
     </TouchableOpacity>
   );
 }
@@ -164,10 +174,14 @@ function WelcomeCard({
 /**
  * Settings Button Component
  * Fixed position button in the top right corner
+ * Includes animated press feedback
  */
 function SettingsButton({ onPress }: { onPress: () => void }) {
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
+
+  // Animation hooks
+  const { animatedStyle: pressStyle, onPressIn, onPressOut } = useAnimatedPress();
 
   const handlePress = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -177,13 +191,24 @@ function SettingsButton({ onPress }: { onPress: () => void }) {
   return (
     <TouchableOpacity
       testID="settings-nav-button"
-      style={[styles.settingsButton, { backgroundColor: colors.backgroundTertiary }]}
+      style={styles.settingsButton}
       onPress={handlePress}
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
+      activeOpacity={1}
       hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
       accessibilityRole="button"
       accessibilityLabel="Open settings"
     >
-      <Ionicons name="settings-outline" size={24} color={colors.icon} />
+      <Animated.View
+        style={[
+          styles.settingsButtonInner,
+          { backgroundColor: colors.backgroundTertiary },
+          pressStyle,
+        ]}
+      >
+        <Ionicons name="settings-outline" size={24} color={colors.icon} />
+      </Animated.View>
     </TouchableOpacity>
   );
 }
@@ -204,11 +229,15 @@ function LoadingView() {
 /**
  * Setup View Component
  * Shown when API URLs are not configured
+ * Includes animated press feedback on the login button
  */
 function SetupView({ onLoginPress }: { onLoginPress: () => void }) {
   const colorScheme = useColorScheme() ?? 'light';
   const isDark = colorScheme === 'dark';
   const colors = Colors[colorScheme];
+
+  // Animation hooks
+  const { animatedStyle: pressStyle, onPressIn, onPressOut } = useAnimatedPress();
 
   const handlePress = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -231,13 +260,16 @@ function SetupView({ onLoginPress }: { onLoginPress: () => void }) {
           Log in to your UFO Club account or continue as a visitor to explore the taplist.
         </ThemedText>
         <TouchableOpacity
-          style={[styles.loginButton, { backgroundColor: colors.tint }]}
           onPress={handlePress}
-          activeOpacity={0.8}
+          onPressIn={onPressIn}
+          onPressOut={onPressOut}
+          activeOpacity={1}
         >
-          <ThemedText style={[styles.loginButtonText, { color: colors.textOnPrimary }]}>
-            Get Started
-          </ThemedText>
+          <Animated.View style={[styles.loginButton, { backgroundColor: colors.tint }, pressStyle]}>
+            <ThemedText style={[styles.loginButtonText, { color: colors.textOnPrimary }]}>
+              Get Started
+            </ThemedText>
+          </Animated.View>
         </TouchableOpacity>
       </ThemedView>
     </ThemedView>
@@ -406,12 +438,14 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: spacing.m,
     right: spacing.m,
+    zIndex: 10,
+  },
+  settingsButtonInner: {
     width: 44,
     height: 44,
     borderRadius: borderRadii.full,
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 10,
   },
 
   // Welcome Card
