@@ -5,6 +5,7 @@ import { beerRepository } from '@/src/database/repositories/BeerRepository';
 import { ThemedText } from './ThemedText';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { useUntappdColor } from '@/hooks/useUntappdColor';
+import { useBreakpoint } from '@/hooks/useBreakpoint';
 import { SearchBar } from './SearchBar';
 import { useBeerFilters } from '@/hooks/useBeerFilters';
 import { useDataRefresh } from '@/hooks/useDataRefresh';
@@ -19,6 +20,9 @@ import { useAppContext } from '@/context/AppContext';
 export const AllBeers = () => {
   // MP-4 Step 2: Use context for beer data instead of local state
   const { beers, loading, errors, setAllBeers, setLoadingBeers, setBeerError } = useAppContext();
+
+  // Responsive layout: 1 column on phone, 2 on tablet portrait, 3 on tablet landscape
+  const { numColumns } = useBreakpoint();
 
   const [untappdModalVisible, setUntappdModalVisible] = useState(false);
   const [selectedBeerName, setSelectedBeerName] = useState('');
@@ -189,6 +193,7 @@ export const AllBeers = () => {
             expandedId={expandedId}
             onToggleExpand={toggleExpand}
             renderItemActions={renderBeerActions}
+            numColumns={numColumns}
           />
 
           <UntappdWebView

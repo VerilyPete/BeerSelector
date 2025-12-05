@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { StyleSheet, View, TouchableOpacity } from 'react-native';
 import { ThemedText } from './ThemedText';
 import { useThemeColor } from '@/hooks/useThemeColor';
+import { useBreakpoint } from '@/hooks/useBreakpoint';
 import { SearchBar } from './SearchBar';
 import { useBeerFilters } from '@/hooks/useBeerFilters';
 import { useDataRefresh } from '@/hooks/useDataRefresh';
@@ -17,6 +18,9 @@ import { OptimisticStatusBadge } from './optimistic/OptimisticStatusBadge';
 export const TastedBrewList = () => {
   // MP-4 Step 2: Use context for beer data instead of local state
   const { beers, loading, errors, setTastedBeers, setAllBeers, setRewards } = useAppContext();
+
+  // Responsive layout: 1 column on phone, 2 on tablet portrait, 3 on tablet landscape
+  const { numColumns } = useBreakpoint();
 
   // MP-7 Step 3: Optimistic UI updates
   const { getPendingBeer, retryCheckIn, rollbackCheckIn } = useOptimisticCheckIn();
@@ -172,6 +176,7 @@ export const TastedBrewList = () => {
             onToggleExpand={toggleExpand}
             dateLabel="Tasted"
             renderItemActions={renderTastedBeerActions}
+            numColumns={numColumns}
           />
         </>
       )}
