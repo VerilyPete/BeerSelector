@@ -1,9 +1,11 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useEffect } from 'react';
 import { StyleSheet, FlatList, RefreshControl, View, ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemedView } from '../ThemedView';
 import { ThemedText } from '../ThemedText';
 import { BeerItem } from './BeerItem';
+import { AnimatedRefreshHeader } from '../ui/AnimatedRefreshHeader';
+import { usePullToRefresh } from '@/animations/usePullToRefresh';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { BeerWithGlassType, BeerfinderWithGlassType } from '@/src/types/beer';
 
@@ -23,6 +25,8 @@ type BeerListProps = {
   renderItemActions?: (beer: DisplayableBeer) => React.ReactNode;
   /** Number of columns for grid layout (1 for phone, 2 for tablet portrait, 3 for tablet landscape) */
   numColumns?: number;
+  /** Whether to show the animated refresh header (default: true) */
+  showAnimatedRefresh?: boolean;
 };
 
 /**
@@ -38,6 +42,11 @@ const EXPECTED_ITEM_HEIGHT = 150;
  */
 const TAB_BAR_HEIGHT = 49;
 
+/**
+ * Height of the animated refresh header
+ */
+const REFRESH_HEADER_HEIGHT = 80;
+
 export const BeerList: React.FC<BeerListProps> = ({
   beers,
   loading,
@@ -49,9 +58,27 @@ export const BeerList: React.FC<BeerListProps> = ({
   dateLabel,
   renderItemActions,
   numColumns = 1,
+  showAnimatedRefresh = true,
 }) => {
   const insets = useSafeAreaInsets();
   const tintColor = useThemeColor({}, 'tint');
+
+  // Pull-to-refresh animation hook
+  const { pullProgress, isRefreshing, rotation, handleScroll, startRefresh, endRefresh } =
+    usePullToRefresh({
+      refreshThreshold: 60,
+      maxPullDistance: 100,
+      enableHaptics: true, // Haptic feedback triggered at threshold
+    });
+
+  // Sync refreshing state with animation
+  useEffect(() => {
+    if (refreshing) {
+      startRefresh();
+    } else {
+      endRefresh();
+    }
+  }, [refreshing, startRefresh, endRefresh]);
 
   // Calculate column wrapper style for multi-column layouts
   const columnWrapperStyle = useMemo<ViewStyle | undefined>(() => {
@@ -95,6 +122,21 @@ export const BeerList: React.FC<BeerListProps> = ({
     [expandedId, onToggleExpand, dateLabel, renderItemActions, numColumns, itemWrapperStyle]
   );
 
+  // Render the animated refresh header as list header
+  const ListHeaderComponent = useMemo(() => {
+    if (!showAnimatedRefresh) return null;
+
+    return (
+      <AnimatedRefreshHeader
+        pullProgress={pullProgress}
+        isRefreshing={isRefreshing}
+        rotation={rotation}
+        height={REFRESH_HEADER_HEIGHT}
+        accessibilityLabel="Pull down to refresh the beer list"
+      />
+    );
+  }, [showAnimatedRefresh, pullProgress, isRefreshing, rotation]);
+
   if (!loading && beers.length === 0) {
     return (
       <ThemedView style={styles.emptyContainer} testID="beer-list-empty">
@@ -120,14 +162,23 @@ export const BeerList: React.FC<BeerListProps> = ({
         styles.listContent,
         { paddingBottom: TAB_BAR_HEIGHT + insets.bottom + 16 },
       ]}
+      // Animated refresh header (positioned above list content)
+      ListHeaderComponent={ListHeaderComponent}
+      ListHeaderComponentStyle={showAnimatedRefresh ? styles.headerContainer : undefined}
+      // Native RefreshControl for actual refresh functionality
       refreshControl={
         <RefreshControl
           refreshing={refreshing}
           onRefresh={onRefresh}
-          tintColor={tintColor}
-          colors={[tintColor]}
+          tintColor={showAnimatedRefresh ? 'transparent' : tintColor}
+          colors={showAnimatedRefresh ? ['transparent'] : [tintColor]}
+          // Hide the native spinner when using animated header
+          style={showAnimatedRefresh ? styles.hiddenRefreshControl : undefined}
         />
       }
+      // Handle scroll events for pull-to-refresh animation
+      onScroll={showAnimatedRefresh ? handleScroll : undefined}
+      scrollEventThrottle={showAnimatedRefresh ? 16 : undefined}
       // Performance optimization: Reduce initial render and batch sizes for 60+ FPS
       initialNumToRender={10}
       maxToRenderPerBatch={10}
@@ -142,7 +193,7 @@ export const BeerList: React.FC<BeerListProps> = ({
       {...(numColumns === 1 && {
         getItemLayout: (_data: ArrayLike<DisplayableBeer> | null | undefined, index: number) => ({
           length: EXPECTED_ITEM_HEIGHT,
-          offset: EXPECTED_ITEM_HEIGHT * index,
+          offset: EXPECTED_ITEM_HEIGHT * index + (showAnimatedRefresh ? REFRESH_HEADER_HEIGHT : 0),
           index,
         }),
       })}
@@ -155,6 +206,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 4,
     // paddingBottom is calculated dynamically: TAB_BAR_HEIGHT + insets.bottom + 16
+  },
+  headerContainer: {
+    overflow: 'visible',
+    zIndex: 1,
+  },
+  hiddenRefreshControl: {
+    opacity: 0,
+    height: 0,
   },
   emptyContainer: {
     flex: 1,

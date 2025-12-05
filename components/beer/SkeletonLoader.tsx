@@ -11,23 +11,31 @@
  * - SkeletonBeerItem: Pre-built skeleton matching BeerItem layout
  * - SkeletonBeerList: Multiple SkeletonBeerItem for list loading
  *
+ * Performance Features:
+ * - All animations run on UI thread via Reanimated worklets
+ * - Optimized for 60fps on iPhone 11 and equivalent devices
+ * - Respects reduced motion accessibility preference
+ * - Memory efficient with proper cleanup
+ *
  * NOTE: This component requires expo-linear-gradient to be installed:
  * npx expo install expo-linear-gradient
  */
 
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useEffect } from 'react';
 import { View, StyleSheet, ViewStyle, useColorScheme } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withRepeat,
   withTiming,
-  Easing,
+  cancelAnimation,
   interpolate,
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors } from '@/constants/Colors';
 import { spacing, borderRadii } from '@/constants/spacing';
+import { easings, durations } from '@/animations/config';
+import { useAnimationConfig } from '@/animations/useReducedMotion';
 
 // ============================================================================
 // Types
@@ -83,16 +91,26 @@ type SkeletonBeerListProps = {
 // Constants
 // ============================================================================
 
-const DEFAULT_ANIMATION_DURATION = 1500;
+/** Default shimmer animation duration in ms */
+const DEFAULT_ANIMATION_DURATION = durations.shimmer;
+
+/** Default text line height in pixels */
 const DEFAULT_LINE_HEIGHT = 16;
+
+/** Default gap between text lines */
 const DEFAULT_LINE_GAP = spacing.s;
+
+/** Shimmer gradient width as percentage of container */
+const SHIMMER_WIDTH = 200;
 
 // ============================================================================
 // Hooks
 // ============================================================================
 
 /**
- * Custom hook to get skeleton colors based on current theme
+ * Custom hook to get skeleton colors based on current theme.
+ *
+ * @returns Theme-aware skeleton colors for base and highlight states
  */
 const useSkeletonColors = () => {
   const colorScheme = useColorScheme() ?? 'light';
@@ -113,22 +131,40 @@ const useSkeletonColors = () => {
 };
 
 /**
- * Custom hook to create shimmer animation
+ * Custom hook to create shimmer animation with reduced motion support.
+ *
+ * The animation runs entirely on the UI thread for 60fps performance.
+ * When reduced motion is enabled, returns a static value (no animation).
+ *
+ * @param duration - Animation duration in milliseconds
+ * @returns Shared value for translateX animation (-1 to 1 range)
  */
 const useShimmerAnimation = (duration: number = DEFAULT_ANIMATION_DURATION) => {
-  const translateX = useSharedValue(-1);
+  const { isReducedMotion } = useAnimationConfig();
+  const translateX = useSharedValue(isReducedMotion ? 0 : -1);
 
-  // Start animation on mount
-  React.useEffect(() => {
+  useEffect(() => {
+    // Skip animation if reduced motion is enabled
+    if (isReducedMotion) {
+      translateX.value = 0;
+      return;
+    }
+
+    // Start infinite shimmer animation on UI thread
     translateX.value = withRepeat(
       withTiming(1, {
         duration,
-        easing: Easing.linear,
+        easing: easings.linear, // Linear for smooth continuous shimmer
       }),
       -1, // Infinite repeat
       false // Don't reverse
     );
-  }, [translateX, duration]);
+
+    // Cleanup: cancel animation on unmount to prevent memory leaks
+    return () => {
+      cancelAnimation(translateX);
+    };
+  }, [translateX, duration, isReducedMotion]);
 
   return translateX;
 };
@@ -139,6 +175,9 @@ const useShimmerAnimation = (duration: number = DEFAULT_ANIMATION_DURATION) => {
 
 /**
  * Basic rectangular skeleton with shimmer animation.
+ *
+ * This is the fundamental building block for all skeleton components.
+ * Uses Reanimated for 60fps shimmer animation running on the UI thread.
  *
  * @example
  * ```tsx
@@ -156,11 +195,13 @@ export const SkeletonBox: React.FC<SkeletonBoxProps> = ({
   const colors = useSkeletonColors();
   const shimmerTranslate = useShimmerAnimation(animationDuration);
 
+  // Animated style runs on UI thread via worklet
   const animatedStyle = useAnimatedStyle(() => {
+    'worklet';
     return {
       transform: [
         {
-          translateX: interpolate(shimmerTranslate.value, [-1, 1], [-200, 200]),
+          translateX: interpolate(shimmerTranslate.value, [-1, 1], [-SHIMMER_WIDTH, SHIMMER_WIDTH]),
         },
       ],
     };
@@ -219,11 +260,13 @@ export const SkeletonText: React.FC<SkeletonTextProps> = ({
   const colors = useSkeletonColors();
   const shimmerTranslate = useShimmerAnimation(animationDuration);
 
+  // Animated style runs on UI thread via worklet
   const animatedStyle = useAnimatedStyle(() => {
+    'worklet';
     return {
       transform: [
         {
-          translateX: interpolate(shimmerTranslate.value, [-1, 1], [-200, 200]),
+          translateX: interpolate(shimmerTranslate.value, [-1, 1], [-SHIMMER_WIDTH, SHIMMER_WIDTH]),
         },
       ],
     };
@@ -281,6 +324,11 @@ export const SkeletonText: React.FC<SkeletonTextProps> = ({
  * Pre-built skeleton matching the BeerItem layout.
  * Provides a consistent loading placeholder for beer list items.
  *
+ * Performance optimized:
+ * - Single shared shimmer animation for all elements
+ * - Memoized styles to prevent unnecessary recalculations
+ * - UI thread animation via Reanimated worklet
+ *
  * @example
  * ```tsx
  * <SkeletonBeerItem />
@@ -296,11 +344,13 @@ export const SkeletonBeerItem: React.FC<SkeletonBeerItemProps> = ({
   const colors = useSkeletonColors();
   const shimmerTranslate = useShimmerAnimation(animationDuration);
 
+  // Single animated style shared by all skeleton elements in this item
   const animatedStyle = useAnimatedStyle(() => {
+    'worklet';
     return {
       transform: [
         {
-          translateX: interpolate(shimmerTranslate.value, [-1, 1], [-200, 200]),
+          translateX: interpolate(shimmerTranslate.value, [-1, 1], [-SHIMMER_WIDTH, SHIMMER_WIDTH]),
         },
       ],
     };
@@ -308,6 +358,21 @@ export const SkeletonBeerItem: React.FC<SkeletonBeerItemProps> = ({
 
   // Card border color based on theme
   const borderColor = colorScheme === 'dark' ? Colors.dark.border : Colors.light.border;
+
+  // Memoized gradient component to reduce re-renders
+  const ShimmerGradient = useMemo(
+    () => (
+      <Animated.View style={[styles.shimmerContainer, animatedStyle]}>
+        <LinearGradient
+          colors={colors.gradientColors}
+          start={{ x: 0, y: 0.5 }}
+          end={{ x: 1, y: 0.5 }}
+          style={styles.shimmerGradient}
+        />
+      </Animated.View>
+    ),
+    [colors.gradientColors, animatedStyle]
+  );
 
   return (
     <View
@@ -331,14 +396,7 @@ export const SkeletonBeerItem: React.FC<SkeletonBeerItemProps> = ({
               },
             ]}
           >
-            <Animated.View style={[styles.shimmerContainer, animatedStyle]}>
-              <LinearGradient
-                colors={colors.gradientColors}
-                start={{ x: 0, y: 0.5 }}
-                end={{ x: 1, y: 0.5 }}
-                style={styles.shimmerGradient}
-              />
-            </Animated.View>
+            {ShimmerGradient}
           </View>
           <View
             style={[
@@ -352,14 +410,7 @@ export const SkeletonBeerItem: React.FC<SkeletonBeerItemProps> = ({
               },
             ]}
           >
-            <Animated.View style={[styles.shimmerContainer, animatedStyle]}>
-              <LinearGradient
-                colors={colors.gradientColors}
-                start={{ x: 0, y: 0.5 }}
-                end={{ x: 1, y: 0.5 }}
-                style={styles.shimmerGradient}
-              />
-            </Animated.View>
+            {ShimmerGradient}
           </View>
         </View>
 
@@ -368,14 +419,7 @@ export const SkeletonBeerItem: React.FC<SkeletonBeerItemProps> = ({
           <View
             style={[styles.skeletonBox, styles.beerItemGlassIcon, { backgroundColor: colors.base }]}
           >
-            <Animated.View style={[styles.shimmerContainer, animatedStyle]}>
-              <LinearGradient
-                colors={colors.gradientColors}
-                start={{ x: 0, y: 0.5 }}
-                end={{ x: 1, y: 0.5 }}
-                style={styles.shimmerGradient}
-              />
-            </Animated.View>
+            {ShimmerGradient}
           </View>
         )}
       </View>
@@ -393,14 +437,7 @@ export const SkeletonBeerItem: React.FC<SkeletonBeerItemProps> = ({
           },
         ]}
       >
-        <Animated.View style={[styles.shimmerContainer, animatedStyle]}>
-          <LinearGradient
-            colors={colors.gradientColors}
-            start={{ x: 0, y: 0.5 }}
-            end={{ x: 1, y: 0.5 }}
-            style={styles.shimmerGradient}
-          />
-        </Animated.View>
+        {ShimmerGradient}
       </View>
 
       {/* Style and container placeholder */}
@@ -416,14 +453,7 @@ export const SkeletonBeerItem: React.FC<SkeletonBeerItemProps> = ({
           },
         ]}
       >
-        <Animated.View style={[styles.shimmerContainer, animatedStyle]}>
-          <LinearGradient
-            colors={colors.gradientColors}
-            start={{ x: 0, y: 0.5 }}
-            end={{ x: 1, y: 0.5 }}
-            style={styles.shimmerGradient}
-          />
-        </Animated.View>
+        {ShimmerGradient}
       </View>
 
       {/* Date placeholder */}
@@ -439,14 +469,7 @@ export const SkeletonBeerItem: React.FC<SkeletonBeerItemProps> = ({
           },
         ]}
       >
-        <Animated.View style={[styles.shimmerContainer, animatedStyle]}>
-          <LinearGradient
-            colors={colors.gradientColors}
-            start={{ x: 0, y: 0.5 }}
-            end={{ x: 1, y: 0.5 }}
-            style={styles.shimmerGradient}
-          />
-        </Animated.View>
+        {ShimmerGradient}
       </View>
     </View>
   );
@@ -459,6 +482,11 @@ export const SkeletonBeerItem: React.FC<SkeletonBeerItemProps> = ({
 /**
  * Multiple SkeletonBeerItem components for list loading states.
  * Use this when loading a list of beers.
+ *
+ * Performance optimized:
+ * - Caps maximum items at 50 to prevent memory issues
+ * - Uses key-based rendering for efficient updates
+ * - Each item shares animation config but maintains independent state
  *
  * @example
  * ```tsx

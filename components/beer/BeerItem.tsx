@@ -1,5 +1,6 @@
 import React from 'react';
 import { StyleSheet, TouchableOpacity, View, useColorScheme } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { ThemedText } from '../ThemedText';
 import { ThemedView } from '../ThemedView';
 import { useThemeColor } from '@/hooks/useThemeColor';
@@ -7,6 +8,7 @@ import { BeerWithGlassType, BeerfinderWithGlassType } from '@/src/types/beer';
 import { GlassIcon } from '../icons/GlassIcon';
 import { spacing } from '@/constants/spacing';
 import { getShadow } from '@/constants/shadows';
+import { useAnimatedPress, useAnimatedExpand } from '@/animations';
 
 // Union type to accept both BeerWithGlassType and BeerfinderWithGlassType
 // These branded types guarantee the glass_type property is present
@@ -81,6 +83,10 @@ const BeerItemComponent: React.FC<BeerItemProps> = ({
   const iconColor = useThemeColor({}, 'icon');
   const separatorColor = useThemeColor({}, 'separator');
 
+  // Animation hooks
+  const { animatedStyle: pressStyle, onPressIn, onPressOut } = useAnimatedPress();
+  const { animatedStyle: expandStyle } = useAnimatedExpand({ isExpanded });
+
   // Format date for display
   // Check if beer has tasted_date (Beerfinder type) or added_date (Beer type)
   const displayDate =
@@ -101,103 +107,107 @@ const BeerItemComponent: React.FC<BeerItemProps> = ({
   return (
     <TouchableOpacity
       onPress={() => onToggle(beer.id)}
-      activeOpacity={0.7}
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
+      activeOpacity={1}
       testID={`beer-item-${beer.id}`}
       style={styles.touchable}
       accessibilityRole="button"
       accessibilityLabel={`${beer.brew_name} by ${beer.brewer}`}
     >
-      <ThemedView
-        variant="elevated"
-        style={[
-          styles.card,
-          cardShadow,
-          {
-            borderColor: borderColor,
-          },
-          isTasted && styles.tastedCard,
-        ]}
-      >
-        {/* Draft indicator accent bar */}
-        {isDraft && (
-          <View
-            style={[styles.accentBar, { backgroundColor: accentColor }]}
-            accessibilityLabel="Draft beer"
-          />
-        )}
+      <Animated.View style={pressStyle}>
+        <ThemedView
+          variant="elevated"
+          style={[
+            styles.card,
+            cardShadow,
+            {
+              borderColor: borderColor,
+            },
+            isTasted && styles.tastedCard,
+          ]}
+        >
+          {/* Draft indicator accent bar */}
+          {isDraft && (
+            <View
+              style={[styles.accentBar, { backgroundColor: accentColor }]}
+              accessibilityLabel="Draft beer"
+            />
+          )}
 
-        {/* Header row with beer name and glass icon */}
-        <View style={styles.headerRow}>
-          <View style={styles.nameContainer}>
-            <ThemedText
-              type="defaultSemiBold"
-              style={styles.beerName}
-              testID={`beer-name-${beer.id}`}
-              numberOfLines={isExpanded ? undefined : 2}
-            >
-              {beer.brew_name || 'Unnamed Beer'}
+          {/* Header row with beer name and glass icon */}
+          <View style={styles.headerRow}>
+            <View style={styles.nameContainer}>
+              <ThemedText
+                type="defaultSemiBold"
+                style={styles.beerName}
+                testID={`beer-name-${beer.id}`}
+                numberOfLines={isExpanded ? undefined : 2}
+              >
+                {beer.brew_name || 'Unnamed Beer'}
+              </ThemedText>
+            </View>
+            {glassType && (
+              <View
+                style={styles.glassIconContainer}
+                accessible={true}
+                accessibilityLabel={`Served in ${glassType} glass`}
+              >
+                <GlassIcon type={glassType} size={28} color={iconColor} />
+              </View>
+            )}
+          </View>
+
+          {/* Brewery info */}
+          <ThemedText
+            type="secondary"
+            style={styles.breweryText}
+            testID={`beer-brewer-${beer.id}`}
+            numberOfLines={isExpanded ? undefined : 1}
+          >
+            {beer.brewer}
+            {beer.brewer_loc ? ` \u2022 ${beer.brewer_loc}` : ''}
+          </ThemedText>
+
+          {/* Style and container info */}
+          <View style={styles.metaRow} testID={`beer-style-${beer.id}`}>
+            <ThemedText type="muted" style={styles.styleText} numberOfLines={1}>
+              {beer.brew_style}
+              {beer.brew_container ? ` \u2022 ${beer.brew_container}` : ''}
             </ThemedText>
           </View>
-          {glassType && (
-            <View
-              style={styles.glassIconContainer}
-              accessible={true}
-              accessibilityLabel={`Served in ${glassType} glass`}
+
+          {/* Date row */}
+          <ThemedText type="muted" style={styles.dateText} testID={`beer-date-${beer.id}`}>
+            {dateLabel}: {displayDate}
+          </ThemedText>
+
+          {/* Expanded description section with animation */}
+          {isExpanded && beer.brew_description && (
+            <Animated.View
+              style={[styles.descriptionSection, { borderTopColor: separatorColor }, expandStyle]}
+              testID={`beer-description-container-${beer.id}`}
             >
-              <GlassIcon type={glassType} size={28} color={iconColor} />
+              <ThemedText type="defaultSemiBold" style={styles.descriptionLabel}>
+                Description
+              </ThemedText>
+              <ThemedText style={styles.descriptionText} testID={`beer-description-${beer.id}`}>
+                {beer.brew_description.replace(/<\/?p>/g, '').replace(/<\/?br ?\/?>/, '\n')}
+              </ThemedText>
+              {renderActions && <View style={styles.actionsContainer}>{renderActions()}</View>}
+            </Animated.View>
+          )}
+
+          {/* Tasted indicator badge */}
+          {isTasted && (
+            <View style={[styles.tastedBadge, { backgroundColor: accentColor }]}>
+              <ThemedText lightColor="#292524" darkColor="#292524" style={styles.tastedBadgeText}>
+                Tasted
+              </ThemedText>
             </View>
           )}
-        </View>
-
-        {/* Brewery info */}
-        <ThemedText
-          type="secondary"
-          style={styles.breweryText}
-          testID={`beer-brewer-${beer.id}`}
-          numberOfLines={isExpanded ? undefined : 1}
-        >
-          {beer.brewer}
-          {beer.brewer_loc ? ` \u2022 ${beer.brewer_loc}` : ''}
-        </ThemedText>
-
-        {/* Style and container info */}
-        <View style={styles.metaRow} testID={`beer-style-${beer.id}`}>
-          <ThemedText type="muted" style={styles.styleText} numberOfLines={1}>
-            {beer.brew_style}
-            {beer.brew_container ? ` \u2022 ${beer.brew_container}` : ''}
-          </ThemedText>
-        </View>
-
-        {/* Date row */}
-        <ThemedText type="muted" style={styles.dateText} testID={`beer-date-${beer.id}`}>
-          {dateLabel}: {displayDate}
-        </ThemedText>
-
-        {/* Expanded description section */}
-        {isExpanded && beer.brew_description && (
-          <View
-            style={[styles.descriptionSection, { borderTopColor: separatorColor }]}
-            testID={`beer-description-container-${beer.id}`}
-          >
-            <ThemedText type="defaultSemiBold" style={styles.descriptionLabel}>
-              Description
-            </ThemedText>
-            <ThemedText style={styles.descriptionText} testID={`beer-description-${beer.id}`}>
-              {beer.brew_description.replace(/<\/?p>/g, '').replace(/<\/?br ?\/?>/, '\n')}
-            </ThemedText>
-            {renderActions && <View style={styles.actionsContainer}>{renderActions()}</View>}
-          </View>
-        )}
-
-        {/* Tasted indicator badge */}
-        {isTasted && (
-          <View style={[styles.tastedBadge, { backgroundColor: accentColor }]}>
-            <ThemedText lightColor="#292524" darkColor="#292524" style={styles.tastedBadgeText}>
-              Tasted
-            </ThemedText>
-          </View>
-        )}
-      </ThemedView>
+        </ThemedView>
+      </Animated.View>
     </TouchableOpacity>
   );
 };
