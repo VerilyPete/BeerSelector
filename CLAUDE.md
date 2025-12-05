@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-BeerSelector is a React Native mobile app built with Expo SDK 52 for beer enthusiasts to browse taplists, track tastings, and manage their Flying Saucer UFO Club experience. The app supports both authenticated UFO Club members and visitor mode with limited access.
+BeerSelector is a React Native mobile app built with Expo SDK 53 for beer enthusiasts to browse taplists, track tastings, and manage their Flying Saucer UFO Club experience. The app supports both authenticated UFO Club members and visitor mode with limited access.
 
 **Minimum Requirements**: iOS 17.6 or greater.
 
@@ -285,6 +285,23 @@ File-based routing with tabs:
 - `components/TastedBrewList.tsx` - Tasted beers with empty state handling
 - `components/Rewards.tsx` - Rewards display
 - `components/UntappdWebView.tsx` - Untappd integration (alpha)
+
+**IMPORTANT - UntappdWebView Safari Cookie Sharing**:
+
+The `UntappdWebView.tsx` component MUST use `WebBrowser.openAuthSessionAsync()` (NOT `openBrowserAsync()`). This is critical because:
+
+- `openAuthSessionAsync` uses `ASWebAuthenticationSession` on iOS which **shares cookies with Safari**
+- `openBrowserAsync` uses `SFSafariViewController` which does NOT share cookies with Safari (since iOS 11)
+- Users expect to be automatically logged into Untappd if they're logged in via Safari
+- Changing to `openBrowserAsync` will break the user experience (users would have to re-login every time)
+
+```typescript
+// ✅ CORRECT - Shares Safari cookies
+WebBrowser.openAuthSessionAsync(searchUrl, undefined, { ... });
+
+// ❌ WRONG - Does NOT share Safari cookies
+WebBrowser.openBrowserAsync(searchUrl, { ... });
+```
 
 **Theming**: App supports dark/light mode via `useColorScheme()` hook. When adding UI elements, ensure they don't render white-on-white or black-on-black in dark mode.
 
