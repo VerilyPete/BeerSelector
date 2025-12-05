@@ -3,7 +3,8 @@
 ## BeerSelector App Migration: SDK 52 to SDK 54
 
 **Created:** December 4, 2025
-**Current SDK Version:** 52.0.46
+**Last Updated:** December 5, 2025
+**Current SDK Version:** 53.0.24 (Phase 1 complete, stabilizing)
 **Target SDK Version:** 54.x.x
 
 > **Important:** Expo recommends upgrading SDK versions incrementally, one at a time. This plan is structured as **two separate migrations** - complete SDK 53 fully before starting SDK 54. Do not rush through both in a single session.
@@ -52,10 +53,10 @@ This migration involves significant changes:
 
 ### Before Starting Migration
 
-- [ ] **Node.js**: Ensure Node 20.19.4+ is installed (Node 18 EOL as of April 2025)
+- [x] **Node.js**: Ensure Node 20.19.4+ is installed (Node 18 EOL as of April 2025)
 - [ ] **Xcode**: Update to Xcode 16.1+ (Xcode 26 recommended for SDK 54)
 - [x] **Backup**: Create a git branch or tag for the current stable state
-- [ ] **Clean State**: Ensure all tests pass on current SDK 52
+- [x] **Clean State**: Ensure all tests pass on current SDK 52
 
 ```bash
 # Verify Node version
@@ -115,6 +116,51 @@ Given the significant changes, this plan uses a **sequential migration**:
 ---
 
 ## Phase 1: SDK 52 to SDK 53
+
+### Progress Status (Updated: December 5, 2025)
+
+| Step                        | Status         | Notes                                                                  |
+| --------------------------- | -------------- | ---------------------------------------------------------------------- |
+| 1.0 Cleanup Dependencies    | ✅ COMPLETED   | Removed `react-native-live-activities`, updated `react-native-webview` |
+| 1.1 Update Expo SDK         | ✅ COMPLETED   | Updated to expo@53.0.24                                                |
+| 1.2 Update React/RN         | ✅ COMPLETED   | React 19.0.0, React Native 0.79.6                                      |
+| 1.3 AppDelegate Migration   | ✅ COMPLETED   | Created `AppDelegate.swift`, updated project.pbxproj                   |
+| 1.4 Update iOS Dependencies | ✅ COMPLETED   | `pod install` successful, verified in Xcode                            |
+| 1.5 Verify SDK 53 Build     | ✅ COMPLETED   | Xcode build successful                                                 |
+| 1.6 SDK 53 Stabilization    | 🔄 IN PROGRESS | Testing on physical device                                             |
+
+**Jest Tests**: All 1654 tests pass after SDK 53 upgrade (61 suites, 14 skipped)
+
+**Xcode Build**: Successful (December 5, 2025)
+
+- Note: `pod install` shows deprecation warning about `dependency_targets.flat_map` but this is informational only - pods install correctly and Xcode builds work
+
+**Additional Fix Applied**:
+
+- `components/UntappdWebView.tsx` - Changed from `openBrowserAsync` to `openAuthSessionAsync` to restore Safari cookie sharing (uses ASWebAuthenticationSession instead of SFSafariViewController)
+
+**Files Modified**:
+
+- `package.json` - SDK 53, React 19, RN 0.79.6
+- `jest.config.js` - Removed custom transforms/patterns for RN 0.79+ compatibility
+- `jest.setup.js` - Added LiveActivity mock functions, eslint-env directive, removed deprecated deep import mocks
+- `ios/BeerSelector/AppDelegate.swift` - NEW: Swift AppDelegate for SDK 53
+- `ios/BeerSelector/BeerSelector-Bridging-Header.h` - Updated bridging header
+- `ios/BeerSelector.xcodeproj/project.pbxproj` - Updated for Swift AppDelegate
+- `ios/BeerSelector/AppDelegate.old.h`, `AppDelegate.old.mm`, `main.old.m` - Renamed old files (can delete after verification)
+- `components/UntappdWebView.tsx` - Fixed Safari cookie sharing
+
+**Commit**: `9fea3ed` - "Upgrade to Expo SDK 53 with Swift AppDelegate"
+
+**Next Steps**:
+
+1. Test on physical device
+2. Verify Live Activity functionality
+3. Deploy to TestFlight for broader testing
+4. Run app for 2-3 days to catch subtle issues
+5. Tag as `sdk-53-stable` after stabilization
+
+---
 
 ### Step 1.0: Cleanup Dependencies (Critical)
 
