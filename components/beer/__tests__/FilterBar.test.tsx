@@ -36,6 +36,16 @@ jest.mock('@/components/ui/IconSymbol', () => ({
 jest.mock('@/components/ThemedText');
 jest.mock('@/components/ThemedView');
 
+// Mock expo-haptics
+jest.mock('expo-haptics', () => ({
+  impactAsync: jest.fn(),
+  ImpactFeedbackStyle: {
+    Light: 'light',
+    Medium: 'medium',
+    Heavy: 'heavy',
+  },
+}));
+
 // Use real timers for this test suite to avoid hanging
 beforeAll(() => {
   jest.useRealTimers();
@@ -128,7 +138,7 @@ describe('FilterBar', () => {
 
   // Test 5: Calls onToggleSort when sort button pressed
   test('calls onToggleSort when sort button pressed', () => {
-    const { getByText } = render(
+    const { getByTestId } = render(
       <FilterBar
         filters={mockFilters}
         sortBy="name"
@@ -137,7 +147,7 @@ describe('FilterBar', () => {
       />
     );
 
-    fireEvent.press(getByText(/Sort by:/));
+    fireEvent.press(getByTestId('sort-toggle-button'));
     expect(mockOnToggleSort).toHaveBeenCalled();
     expect(mockOnToggleSort).toHaveBeenCalledTimes(1);
   });
@@ -164,7 +174,7 @@ describe('FilterBar', () => {
 
   // Test 7: Shows correct sort label for name sorting
   test('shows correct sort label for name sorting', () => {
-    const { getByText } = render(
+    const { getByTestId } = render(
       <FilterBar
         filters={mockFilters}
         sortBy="name"
@@ -173,13 +183,13 @@ describe('FilterBar', () => {
       />
     );
 
-    // When sorted by name, button should offer "Sort by: Date"
-    expect(getByText('Sort by: Date')).toBeTruthy();
+    // When sorted by name, button should offer "Date" (to switch to date sort)
+    expect(getByTestId('sort-button-text').props.children).toBe('Date');
   });
 
   // Test 8: Shows correct sort label for date sorting
   test('shows correct sort label for date sorting', () => {
-    const { getByText } = render(
+    const { getByTestId } = render(
       <FilterBar
         filters={mockFilters}
         sortBy="date"
@@ -188,8 +198,8 @@ describe('FilterBar', () => {
       />
     );
 
-    // When sorted by date, button should offer "Sort by: Name"
-    expect(getByText('Sort by: Name')).toBeTruthy();
+    // When sorted by date, button should offer "Name" (to switch to name sort)
+    expect(getByTestId('sort-button-text').props.children).toBe('Name');
   });
 
   // Test 9: Renders Draft filter as active
