@@ -158,7 +158,7 @@ describe('Beerfinder Loading States (MP-3 Step 3a)', () => {
       const { getByTestId } = render(<Beerfinder />);
 
       // Skeleton visible
-      expect(getByTestID('skeleton-loader')).toBeDefined();
+      expect(getByTestId('skeleton-loader')).toBeDefined();
 
       // Action buttons should be visible even during loading
       // (Better UX - user can navigate away if needed)
@@ -306,9 +306,7 @@ describe('Beerfinder Loading States (MP-3 Step 3a)', () => {
 
   describe('Error State', () => {
     it('should hide skeleton and show error message on fetch failure', async () => {
-      (beerRepository.getUntasted as jest.Mock).mockRejectedValue(
-        new Error('Database error')
-      );
+      (beerRepository.getUntasted as jest.Mock).mockRejectedValue(new Error('Database error'));
 
       const { queryByTestId, getByText } = render(<Beerfinder />);
 
@@ -319,9 +317,7 @@ describe('Beerfinder Loading States (MP-3 Step 3a)', () => {
     });
 
     it('should show try again button on error', async () => {
-      (beerRepository.getUntasted as jest.Mock).mockRejectedValue(
-        new Error('Network error')
-      );
+      (beerRepository.getUntasted as jest.Mock).mockRejectedValue(new Error('Network error'));
 
       const { getByText } = render(<Beerfinder />);
 
@@ -476,7 +472,7 @@ describe('Beerfinder Loading States (MP-3 Step 3a)', () => {
         () => new Promise(resolve => setTimeout(() => resolve(mockUntastedBeers), 500))
       );
 
-      const { getByTestId, getByText } = render(<Beerfinder />);
+      const { getByTestId } = render(<Beerfinder />);
 
       // Skeleton visible
       expect(getByTestId('skeleton-loader')).toBeDefined();
@@ -488,14 +484,11 @@ describe('Beerfinder Loading States (MP-3 Step 3a)', () => {
     it('should maintain layout structure between states', async () => {
       (beerRepository.getUntasted as jest.Mock).mockResolvedValue(mockUntastedBeers);
 
-      const { container } = render(<Beerfinder />);
-
-      // Initial layout
-      const initialStructure = container;
+      const { getByTestId } = render(<Beerfinder />);
 
       await waitFor(() => {
-        // Loaded layout should use same container
-        expect(container).toBeDefined();
+        // Loaded layout should use same container - verify component renders
+        expect(getByTestId('beer-list')).toBeDefined();
       });
     });
   });
@@ -512,9 +505,12 @@ describe('Beerfinder Loading States (MP-3 Step 3a)', () => {
       const { getByTestId } = render(<Beerfinder />);
 
       // Should still show untasted beers despite My Beers timeout
-      await waitFor(() => {
-        expect(getByTestId('beer-list')).toBeDefined();
-      }, { timeout: 6000 });
+      await waitFor(
+        () => {
+          expect(getByTestId('beer-list')).toBeDefined();
+        },
+        { timeout: 6000 }
+      );
     });
 
     it('should handle concurrent fetches (untasted + My Beers)', async () => {

@@ -137,9 +137,7 @@ const NAVIGATION_DELAY_MS = 300;
  * @param props - Configuration object with optional onRefreshData callback
  * @returns Object containing login state and control functions
  */
-export const useLoginFlow = ({
-  onRefreshData,
-}: UseLoginFlowProps): UseLoginFlowReturn => {
+export const useLoginFlow = ({ onRefreshData }: UseLoginFlowProps): UseLoginFlowReturn => {
   // State for login flow
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [loginWebViewVisible, setLoginWebViewVisible] = useState(false);
@@ -149,7 +147,7 @@ export const useLoginFlow = ({
   const isMounted = useRef(true);
 
   // Ref to track pending timers for cleanup
-  const pendingTimers = useRef<Set<NodeJS.Timeout>>(new Set());
+  const pendingTimers = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
 
   /**
    * Cleanup effect - prevents state updates on unmounted component
@@ -226,7 +224,11 @@ export const useLoginFlow = ({
 
       // Set API URLs configured preference (non-critical, log if fails)
       try {
-        await setPreference('api_urls_configured', 'true', 'Flag indicating API URLs are configured');
+        await setPreference(
+          'api_urls_configured',
+          'true',
+          'Flag indicating API URLs are configured'
+        );
       } catch (prefError) {
         console.warn('Failed to set api_urls_configured preference:', prefError);
         // Continue with login flow even if preference fails

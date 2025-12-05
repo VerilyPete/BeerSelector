@@ -35,7 +35,6 @@ export const AllBeers = () => {
     filteredBeers,
     filters,
     sortBy,
-    searchText,
     expandedId,
     setSearchText,
     toggleFilter,
@@ -72,7 +71,9 @@ export const AllBeers = () => {
   const { refreshing, handleRefresh } = useDataRefresh({
     onDataReloaded: async () => {
       const freshBeers = await beerRepository.getAll();
-      const filteredData = freshBeers.filter(beer => beer.brew_name && beer.brew_name.trim() !== '');
+      const filteredData = freshBeers.filter(
+        beer => beer.brew_name && beer.brew_name.trim() !== ''
+      );
       setAllBeers(filteredData);
       setBeerError(null);
     },
@@ -109,19 +110,20 @@ export const AllBeers = () => {
   const renderBeerActions = (item: BeerWithGlassType) => (
     <View style={styles.buttonContainer}>
       <TouchableOpacity
-        style={[styles.checkInButton, {
-          backgroundColor: untappdColor,
-          width: '48%'
-        }]}
+        style={[
+          styles.checkInButton,
+          {
+            backgroundColor: untappdColor,
+            width: '48%',
+          },
+        ]}
         onPress={() => handleUntappdSearch(item.brew_name)}
         activeOpacity={0.7}
         accessible={true}
         accessibilityLabel={`Check ${item.brew_name} on Untappd`}
         accessibilityRole="button"
       >
-        <ThemedText style={styles.checkInButtonText}>
-          Check Untappd
-        </ThemedText>
+        <ThemedText style={styles.checkInButtonText}>Check Untappd</ThemedText>
       </TouchableOpacity>
     </View>
   );
@@ -144,15 +146,15 @@ export const AllBeers = () => {
         </>
       ) : errors.beerError ? (
         <View style={styles.centered} testID="error-container">
-          <ThemedText style={styles.errorText} testID="error-message">{errors.beerError}</ThemedText>
+          <ThemedText style={styles.errorText} testID="error-message">
+            {errors.beerError}
+          </ThemedText>
           <TouchableOpacity
             style={[styles.refreshButton, { backgroundColor: activeButtonColor }]}
             onPress={loadBeers}
             testID="try-again-button"
           >
-            <ThemedText style={[styles.buttonText, { color: 'white' }]}>
-              Try Again
-            </ThemedText>
+            <ThemedText style={[styles.buttonText, { color: 'white' }]}>Try Again</ThemedText>
           </TouchableOpacity>
         </View>
       ) : (

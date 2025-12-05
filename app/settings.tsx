@@ -1,10 +1,9 @@
 import React, { useEffect } from 'react';
-import { StyleSheet, TouchableOpacity, View, Alert, ScrollView } from 'react-native';
+import { StyleSheet, TouchableOpacity, View, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { router, useLocalSearchParams } from 'expo-router';
 import { IconSymbol } from '@/components/ui/IconSymbol';
-import Constants from 'expo-constants';
 
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
@@ -36,12 +35,7 @@ export default function SettingsScreen() {
   const { refreshBeerData, refreshSession } = useAppContext();
 
   // Custom hooks for state management
-  const {
-    apiUrlsConfigured,
-    isFirstLogin,
-    canGoBack,
-    loadPreferences,
-  } = useSettingsState();
+  const { apiUrlsConfigured, isFirstLogin, canGoBack, loadPreferences } = useSettingsState();
 
   const { refreshing, handleRefresh } = useSettingsRefresh();
 
@@ -99,7 +93,9 @@ export default function SettingsScreen() {
           <View style={styles.content}>
             {/* Title Section */}
             <View style={styles.titleSection}>
-              <ThemedText type="title" style={styles.pageTitle}>Settings</ThemedText>
+              <ThemedText type="title" style={styles.pageTitle}>
+                Settings
+              </ThemedText>
             </View>
 
             {/* Welcome Section - First Login Only */}

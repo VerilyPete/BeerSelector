@@ -165,11 +165,13 @@ export const useOptimisticCheckIn = (): UseOptimisticCheckInResult => {
           addQueuedBeer(beer.id);
 
           // Update Live Activity with current queue (iOS only)
-          // Note: sessionData is already available from the outer scope, no need to re-fetch
           if (Platform.OS === 'ios') {
             try {
               const queuedBeers = await getQueuedBeers();
-              await updateLiveActivityWithQueue(queuedBeers, sessionData, false);
+              const currentSessionData = await getSessionData();
+              if (currentSessionData) {
+                await updateLiveActivityWithQueue(queuedBeers, currentSessionData, false);
+              }
             } catch (liveActivityError) {
               // Live Activity errors should never block the main flow
               console.log('[useOptimisticCheckIn] Live Activity update failed:', liveActivityError);

@@ -58,11 +58,7 @@ export default function DataManagementSection({
   style,
   testID = 'data-management-section',
 }: DataManagementSectionProps) {
-  const tintColor = useThemeColor({}, 'tint');
-  const buttonBackgroundColor = useThemeColor(
-    { light: '#007AFF', dark: '#0A84FF' },
-    'tint'
-  );
+  const buttonBackgroundColor = useThemeColor({ light: '#007AFF', dark: '#0A84FF' }, 'tint');
 
   // Don't render section at all if first login and URLs not configured
   if (isFirstLogin && !apiUrlsConfigured) {
@@ -103,11 +99,7 @@ export default function DataManagementSection({
         >
           {refreshing ? (
             <View style={styles.buttonContent}>
-              <ActivityIndicator
-                size="small"
-                color="#FFFFFF"
-                style={styles.buttonSpinner}
-              />
+              <ActivityIndicator size="small" color="#FFFFFF" style={styles.buttonSpinner} />
               <ThemedText style={styles.buttonText}>Refreshing data...</ThemedText>
             </View>
           ) : (

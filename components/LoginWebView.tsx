@@ -25,20 +25,20 @@ export default function LoginWebView({
   onLoginSuccess,
   onLoginCancel,
   onRefreshData,
-  loading: externalLoading
+  loading: _externalLoading,
 }: LoginWebViewProps) {
   const tintColor = useThemeColor({}, 'tint');
   const cardBackgroundColor = useThemeColor({ light: '#F5F5F5', dark: '#1C1C1E' }, 'background');
   const borderColor = useThemeColor({ light: '#CCCCCC', dark: '#333333' }, 'text');
-  const loadingOverlayColor = useThemeColor({ light: 'rgba(255, 255, 255, 0.8)', dark: 'rgba(28, 28, 30, 0.8)' }, 'background');
+  const loadingOverlayColor = useThemeColor(
+    { light: 'rgba(255, 255, 255, 0.8)', dark: 'rgba(28, 28, 30, 0.8)' },
+    'background'
+  );
 
-  const [internalLoading, setInternalLoading] = useState(false);
+  const [_internalLoading, setInternalLoading] = useState(false);
   const webViewRef = useRef<WebView>(null);
   const processedUrlsRef = useRef<Set<string>>(new Set());
   const lastLoggedUrlRef = useRef<{ url: string; timestamp: number }>({ url: '', timestamp: 0 });
-
-  // Use external loading prop if provided, otherwise use internal state
-  const loading = externalLoading !== undefined ? externalLoading : internalLoading;
 
   // Cleanup refs when modal closes to prevent stale state
   useEffect(() => {
@@ -59,8 +59,9 @@ export default function LoginWebView({
   const handleWebViewNavigationStateChange = useCallback((navState: WebViewNavigation) => {
     // Prevent duplicate logs for same URL within 500ms (React Strict Mode causes double calls)
     const now = Date.now();
-    const isDuplicate = navState.url === lastLoggedUrlRef.current.url &&
-                       (now - lastLoggedUrlRef.current.timestamp) < 500;
+    const isDuplicate =
+      navState.url === lastLoggedUrlRef.current.url &&
+      now - lastLoggedUrlRef.current.timestamp < 500;
 
     if (!navState.loading && !isDuplicate) {
       console.log('Flying Saucer WebView finished loading:', navState.url);
@@ -221,26 +222,27 @@ export default function LoginWebView({
   }, []);
 
   // Handle messages from WebView
-  const handleWebViewMessage = useCallback(async (event: WebViewMessageEvent) => {
-    try {
-      const data = JSON.parse(event.nativeEvent.data);
+  const handleWebViewMessage = useCallback(
+    async (event: WebViewMessageEvent) => {
+      try {
+        const data = JSON.parse(event.nativeEvent.data);
 
-      // Handle JavaScript injection errors
-      if (data.type === 'JS_INJECTION_ERROR') {
-        console.error('JavaScript injection failed:', data.error, 'at', data.location);
-        Alert.alert(
-          'Login Error',
-          'There was an error processing the login page. Please try again.',
-          [{ text: 'OK', onPress: handleClose }]
-        );
-        return;
-      }
+        // Handle JavaScript injection errors
+        if (data.type === 'JS_INJECTION_ERROR') {
+          console.error('JavaScript injection failed:', data.error, 'at', data.location);
+          Alert.alert(
+            'Login Error',
+            'There was an error processing the login page. Please try again.',
+            [{ text: 'OK', onPress: handleClose }]
+          );
+          return;
+        }
 
-      // Handle URL check from onLoadEnd
-      if (data.type === 'URL_CHECK') {
-        // Verify the URL hasn't changed before injecting page-specific JS
-        if (webViewRef.current) {
-          webViewRef.current.injectJavaScript(`
+        // Handle URL check from onLoadEnd
+        if (data.type === 'URL_CHECK') {
+          // Verify the URL hasn't changed before injecting page-specific JS
+          if (webViewRef.current) {
+            webViewRef.current.injectJavaScript(`
             (function() {
               try {
                 if (window.location.href === ${JSON.stringify(data.url)}) {
@@ -257,139 +259,166 @@ export default function LoginWebView({
               return true;
             })();
           `);
-        }
-        return;
-      }
-
-      if (data.type === 'URL_VERIFIED') {
-        injectPageSpecificJavaScript(data.url);
-        return;
-      }
-
-      if (data.type === 'URLs') {
-        const { userJsonUrl, storeJsonUrl, cookies } = data;
-
-        console.log('Received member login data from WebView');
-        console.log('Cookies received:', Object.keys(cookies || {}).join(', '));
-
-        if (userJsonUrl && storeJsonUrl) {
-          // Explicitly clear visitor mode flag for regular login
-          await setPreference('is_visitor_mode', 'false', 'Flag indicating whether the user is in visitor mode');
-
-          // Update preferences with new API endpoints
-          setPreference('user_json_url', userJsonUrl, 'API endpoint for user data');
-          setPreference('store_json_url', storeJsonUrl, 'API endpoint for store data');
-
-          // Also set the API URLs that are used by the rest of the app
-          setPreference('my_beers_api_url', userJsonUrl, 'API endpoint for fetching Beerfinder beers');
-          setPreference('all_beers_api_url', storeJsonUrl, 'API endpoint for fetching all beers');
-
-          // Save login timestamp
-          setPreference('last_login_timestamp', new Date().toISOString(), 'Last successful login timestamp');
-
-          // Save cookies
-          setPreference('auth_cookies', JSON.stringify(cookies), 'Authentication cookies');
-
-          // Extract and save session data to SecureStore for API requests
-          const sessionData = extractSessionDataFromResponse(new Headers(), cookies);
-          console.log('Extracted session data:', sessionData);
-
-          // Validate session data before saving
-          if (isSessionData(sessionData)) {
-            await saveSessionData(sessionData);
-            console.log('Member session data saved to SecureStore successfully');
-          } else {
-            console.warn('Incomplete session data from member login cookies - missing required fields');
-            console.warn('Required: memberId, sessionId, storeId, storeName');
-            console.warn('Got:', {
-              hasMemberId: !!(sessionData && sessionData.memberId),
-              hasSessionId: !!(sessionData && sessionData.sessionId),
-              hasStoreId: !!(sessionData && sessionData.storeId),
-              hasStoreName: !!(sessionData && sessionData.storeName)
-            });
           }
-
-          // Clear processed URLs for next login session
-          processedUrlsRef.current.clear();
-
-          // Call onLoginSuccess which will handle refresh and navigation
-          onLoginSuccess();
-        }
-      }
-      else if (data.type === 'VISITOR_LOGIN_ERROR') {
-        console.error('Error extracting visitor login data in WebView:', data.error);
-        Alert.alert(
-          'Visitor Login Failed',
-          'Could not extract the store information needed for visitor mode. Please try again.',
-          [{ text: 'OK' }]
-        );
-        onLoginCancel();
-      }
-      else if (data.type === 'VISITOR_LOGIN') {
-        const { cookies, rawCookies, url } = data;
-        console.log('Received visitor login data', cookies);
-        console.log('Raw cookies from WebView:', rawCookies);
-        console.log('URL at login time:', url);
-
-        // Verify we have a store ID in the cookies
-        const storeId = cookies.store__id || cookies.store;
-        if (!storeId) {
-          console.error('No store ID found in visitor cookies. Cookies received:', JSON.stringify(cookies));
-          Alert.alert(
-            'Visitor Login Failed',
-            'Could not find store ID in cookies. Please try again or contact support.',
-            [{ text: 'OK' }]
-          );
-          onLoginCancel();
           return;
         }
 
-        // Handle visitor login using the API
-        try {
-          const loginResult = await handleVisitorLogin(cookies);
-          console.log('Visitor login result:', loginResult);
+        if (data.type === 'URL_VERIFIED') {
+          injectPageSpecificJavaScript(data.url);
+          return;
+        }
 
-          if (loginResult.success) {
-            // Ensure visitor mode preference is explicitly set to true
-            await setPreference('is_visitor_mode', 'true', 'Flag indicating whether the user is in visitor mode');
+        if (data.type === 'URLs') {
+          const { userJsonUrl, storeJsonUrl, cookies } = data;
 
-            // Fetch only the store data URL for visitor mode
-            const storeJsonUrl = `https://fsbs.beerknurd.com/bk-store-json.php?sid=${storeId}`;
-            console.log('Setting all_beers_api_url to:', storeJsonUrl);
-            await setPreference('all_beers_api_url', storeJsonUrl, 'API endpoint for fetching all beers');
+          console.log('Received member login data from WebView');
+          console.log('Cookies received:', Object.keys(cookies || {}).join(', '));
 
-            // For visitor mode, use empty data placeholder instead of dummy URL to prevent network errors
-            await setPreference('my_beers_api_url', 'none://visitor_mode', 'Placeholder URL for visitor mode (not a real endpoint)');
+          if (userJsonUrl && storeJsonUrl) {
+            // Explicitly clear visitor mode flag for regular login
+            await setPreference(
+              'is_visitor_mode',
+              'false',
+              'Flag indicating whether the user is in visitor mode'
+            );
+
+            // Update preferences with new API endpoints
+            setPreference('user_json_url', userJsonUrl, 'API endpoint for user data');
+            setPreference('store_json_url', storeJsonUrl, 'API endpoint for store data');
+
+            // Also set the API URLs that are used by the rest of the app
+            setPreference(
+              'my_beers_api_url',
+              userJsonUrl,
+              'API endpoint for fetching Beerfinder beers'
+            );
+            setPreference('all_beers_api_url', storeJsonUrl, 'API endpoint for fetching all beers');
+
+            // Save login timestamp
+            setPreference(
+              'last_login_timestamp',
+              new Date().toISOString(),
+              'Last successful login timestamp'
+            );
+
+            // Save cookies
+            setPreference('auth_cookies', JSON.stringify(cookies), 'Authentication cookies');
+
+            // Extract and save session data to SecureStore for API requests
+            const sessionData = extractSessionDataFromResponse(new Headers(), cookies);
+            console.log('Extracted session data:', sessionData);
+
+            // Validate session data before saving
+            if (isSessionData(sessionData)) {
+              await saveSessionData(sessionData);
+              console.log('Member session data saved to SecureStore successfully');
+            } else {
+              console.warn(
+                'Incomplete session data from member login cookies - missing required fields'
+              );
+              console.warn('Required: memberId, sessionId, storeId, storeName');
+              console.warn('Got:', {
+                hasMemberId: !!(sessionData && sessionData.memberId),
+                hasSessionId: !!(sessionData && sessionData.sessionId),
+                hasStoreId: !!(sessionData && sessionData.storeId),
+                hasStoreName: !!(sessionData && sessionData.storeName),
+              });
+            }
 
             // Clear processed URLs for next login session
             processedUrlsRef.current.clear();
 
             // Call onLoginSuccess which will handle refresh and navigation
             onLoginSuccess();
-          } else {
-            // Show error message
-            Alert.alert(
-              'Visitor Login Failed',
-              loginResult.error || 'Could not log in as visitor. Please try again.',
-              [{ text: 'OK' }]
-            );
-            onLoginCancel();
           }
-        } catch (error) {
-          console.error('Error during visitor login:', error);
+        } else if (data.type === 'VISITOR_LOGIN_ERROR') {
+          console.error('Error extracting visitor login data in WebView:', data.error);
           Alert.alert(
-            'Error',
-            'An error occurred during visitor login. Please try again.',
+            'Visitor Login Failed',
+            'Could not extract the store information needed for visitor mode. Please try again.',
             [{ text: 'OK' }]
           );
           onLoginCancel();
+        } else if (data.type === 'VISITOR_LOGIN') {
+          const { cookies, rawCookies, url } = data;
+          console.log('Received visitor login data', cookies);
+          console.log('Raw cookies from WebView:', rawCookies);
+          console.log('URL at login time:', url);
+
+          // Verify we have a store ID in the cookies
+          const storeId = cookies.store__id || cookies.store;
+          if (!storeId) {
+            console.error(
+              'No store ID found in visitor cookies. Cookies received:',
+              JSON.stringify(cookies)
+            );
+            Alert.alert(
+              'Visitor Login Failed',
+              'Could not find store ID in cookies. Please try again or contact support.',
+              [{ text: 'OK' }]
+            );
+            onLoginCancel();
+            return;
+          }
+
+          // Handle visitor login using the API
+          try {
+            const loginResult = await handleVisitorLogin(cookies);
+            console.log('Visitor login result:', loginResult);
+
+            if (loginResult.success) {
+              // Ensure visitor mode preference is explicitly set to true
+              await setPreference(
+                'is_visitor_mode',
+                'true',
+                'Flag indicating whether the user is in visitor mode'
+              );
+
+              // Fetch only the store data URL for visitor mode
+              const storeJsonUrl = `https://fsbs.beerknurd.com/bk-store-json.php?sid=${storeId}`;
+              console.log('Setting all_beers_api_url to:', storeJsonUrl);
+              await setPreference(
+                'all_beers_api_url',
+                storeJsonUrl,
+                'API endpoint for fetching all beers'
+              );
+
+              // For visitor mode, use empty data placeholder instead of dummy URL to prevent network errors
+              await setPreference(
+                'my_beers_api_url',
+                'none://visitor_mode',
+                'Placeholder URL for visitor mode (not a real endpoint)'
+              );
+
+              // Clear processed URLs for next login session
+              processedUrlsRef.current.clear();
+
+              // Call onLoginSuccess which will handle refresh and navigation
+              onLoginSuccess();
+            } else {
+              // Show error message
+              Alert.alert(
+                'Visitor Login Failed',
+                loginResult.error || 'Could not log in as visitor. Please try again.',
+                [{ text: 'OK' }]
+              );
+              onLoginCancel();
+            }
+          } catch (error) {
+            console.error('Error during visitor login:', error);
+            Alert.alert('Error', 'An error occurred during visitor login. Please try again.', [
+              { text: 'OK' },
+            ]);
+            onLoginCancel();
+          }
         }
+      } catch (error) {
+        console.error('Error handling WebView message:', error);
+        onLoginCancel();
       }
-    } catch (error) {
-      console.error('Error handling WebView message:', error);
-      onLoginCancel();
-    }
-  }, [injectPageSpecificJavaScript, onRefreshData, onLoginSuccess, onLoginCancel, handleClose]);
+    },
+    [injectPageSpecificJavaScript, onRefreshData, onLoginSuccess, onLoginCancel, handleClose]
+  );
 
   return (
     <Modal
@@ -400,7 +429,12 @@ export default function LoginWebView({
       accessibilityViewIsModal={true}
     >
       <SafeAreaView style={{ flex: 1 }} testID="login-webview-modal">
-        <View style={[styles.webViewHeader, { backgroundColor: cardBackgroundColor, borderBottomColor: borderColor }]}>
+        <View
+          style={[
+            styles.webViewHeader,
+            { backgroundColor: cardBackgroundColor, borderBottomColor: borderColor },
+          ]}
+        >
           <TouchableOpacity
             onPress={handleClose}
             style={styles.closeButton}
@@ -420,11 +454,11 @@ export default function LoginWebView({
           onLoadEnd={handleWebViewLoadEnd}
           accessible={true}
           accessibilityLabel="Flying Saucer login page"
-          onError={(syntheticEvent) => {
+          onError={syntheticEvent => {
             const { nativeEvent } = syntheticEvent;
             console.error('WebView error:', nativeEvent);
           }}
-          onHttpError={(syntheticEvent) => {
+          onHttpError={syntheticEvent => {
             const { nativeEvent } = syntheticEvent;
             console.error('WebView HTTP error:', nativeEvent.statusCode, nativeEvent.url);
           }}
@@ -447,7 +481,9 @@ export default function LoginWebView({
           cacheMode="LOAD_CACHE_ELSE_NETWORK"
           startInLoadingState={true}
           renderLoading={() => (
-            <View style={[styles.webViewLoadingContainer, { backgroundColor: loadingOverlayColor }]}>
+            <View
+              style={[styles.webViewLoadingContainer, { backgroundColor: loadingOverlayColor }]}
+            >
               <ActivityIndicator size="large" color={tintColor} />
               <ThemedText style={styles.webViewLoadingText}>Loading Flying Saucer...</ThemedText>
             </View>

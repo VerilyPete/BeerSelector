@@ -24,6 +24,7 @@ import { StyleSheet, View, TouchableOpacity, ActivityIndicator } from 'react-nat
 import { ThemedText } from '../ThemedText';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { OptimisticUpdateStatus } from '@/src/types/optimisticUpdate';
+import { Colors } from '@/constants/Colors';
 
 interface OptimisticStatusBadgeProps {
   /** Current status of the optimistic update */
@@ -41,7 +42,7 @@ interface OptimisticStatusBadgeProps {
 
 export const OptimisticStatusBadge: React.FC<OptimisticStatusBadgeProps> = ({
   status,
-  error,
+  error: _error,
   onRetry,
   onCancel,
 }) => {
@@ -49,42 +50,43 @@ export const OptimisticStatusBadge: React.FC<OptimisticStatusBadgeProps> = ({
 
   // Color schemes for different statuses
   const getStatusColors = () => {
-    const isDark = colorScheme === 'dark';
+    const theme = colorScheme ?? 'light';
+    const themeColors = Colors[theme];
 
     switch (status) {
       case OptimisticUpdateStatus.PENDING:
         return {
-          bg: isDark ? '#d48806' : '#ffc53d',
-          border: isDark ? '#faad14' : '#ffa940',
-          text: isDark ? '#fff' : '#000',
+          bg: themeColors.warningBg,
+          border: themeColors.warningBorder,
+          text: themeColors.textOnStatus, // Always white on colored status backgrounds for visibility
         };
 
       case OptimisticUpdateStatus.SYNCING:
         return {
-          bg: isDark ? '#1890ff' : '#69c0ff',
-          border: isDark ? '#40a9ff' : '#40a9ff',
-          text: isDark ? '#fff' : '#000',
+          bg: themeColors.infoBg,
+          border: themeColors.infoBorder,
+          text: themeColors.textOnStatus, // Always white on colored status backgrounds for visibility
         };
 
       case OptimisticUpdateStatus.SUCCESS:
         return {
-          bg: isDark ? '#52c41a' : '#95de64',
-          border: isDark ? '#73d13d' : '#73d13d',
-          text: isDark ? '#fff' : '#000',
+          bg: themeColors.successBg,
+          border: themeColors.successBorder,
+          text: themeColors.textOnStatus, // Always white on colored status backgrounds for visibility
         };
 
       case OptimisticUpdateStatus.FAILED:
         return {
-          bg: isDark ? '#ff4d4f' : '#ff7875',
-          border: isDark ? '#ff7875' : '#ffa39e',
-          text: isDark ? '#fff' : '#fff',
+          bg: themeColors.errorBg,
+          border: themeColors.errorBorder,
+          text: themeColors.textOnStatus, // Always white on colored status backgrounds for visibility
         };
 
       default:
         return {
-          bg: isDark ? '#666' : '#ccc',
-          border: isDark ? '#888' : '#aaa',
-          text: isDark ? '#fff' : '#000',
+          bg: themeColors.backgroundSecondary,
+          border: themeColors.border,
+          text: themeColors.text,
         };
     }
   };
@@ -121,16 +123,10 @@ export const OptimisticStatusBadge: React.FC<OptimisticStatusBadgeProps> = ({
   const BadgeContent = (
     <View style={[styles.badge, { backgroundColor: colors.bg, borderColor: colors.border }]}>
       {status === OptimisticUpdateStatus.SYNCING && (
-        <ActivityIndicator
-          size="small"
-          color={colors.text}
-          style={styles.spinner}
-        />
+        <ActivityIndicator size="small" color={colors.text} style={styles.spinner} />
       )}
 
-      <ThemedText style={[styles.badgeText, { color: colors.text }]}>
-        {getStatusText()}
-      </ThemedText>
+      <ThemedText style={[styles.badgeText, { color: colors.text }]}>{getStatusText()}</ThemedText>
 
       {status === OptimisticUpdateStatus.PENDING && onCancel && (
         <TouchableOpacity onPress={onCancel} style={styles.cancelButton}>

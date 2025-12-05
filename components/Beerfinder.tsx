@@ -73,7 +73,12 @@ export const Beerfinder = () => {
   const activeButtonColor = useThemeColor({}, 'tint');
   const untappdColor = useUntappdColor();
   const cardColor = useThemeColor({}, 'background');
-  const borderColor = useThemeColor({ light: '#e0e0e0', dark: '#333' }, 'text');
+  const borderColor = useThemeColor({}, 'border');
+  const textOnPrimary = useThemeColor({}, 'textOnPrimary');
+  const errorColor = useThemeColor({}, 'error');
+  const errorBgColor = useThemeColor({}, 'errorBg');
+  const errorBorderColor = useThemeColor({}, 'errorBorder');
+  const overlayColor = useThemeColor({}, 'overlay');
 
   // Use the shared data refresh hook
   // Note: Data loading now happens in _layout.tsx via AppContext
@@ -260,13 +265,13 @@ export const Beerfinder = () => {
         disabled={checkinLoading}
       >
         {checkinLoading ? (
-          <ActivityIndicator size="small" color={colorScheme === 'dark' ? '#FFFFFF' : 'white'} />
+          <ActivityIndicator size="small" color={textOnPrimary} />
         ) : (
           <ThemedText
             style={[
               styles.checkInButtonText,
               {
-                color: colorScheme === 'dark' ? '#FFFFFF' : 'white',
+                color: textOnPrimary,
               },
             ]}
           >
@@ -290,7 +295,7 @@ export const Beerfinder = () => {
           style={[
             styles.checkInButtonText,
             {
-              color: colorScheme === 'dark' ? '#FFFFFF' : 'white',
+              color: textOnPrimary,
             },
           ]}
         >
@@ -307,13 +312,15 @@ export const Beerfinder = () => {
       visible={queueModalVisible}
       onRequestClose={() => setQueueModalVisible(false)}
     >
-      <View style={styles.modalOverlay}>
+      <View style={[styles.modalOverlay, { backgroundColor: overlayColor }]}>
         <View style={[styles.modalContent, { backgroundColor: cardColor, borderColor }]}>
           <ThemedText style={styles.modalTitle}>Queued Brews</ThemedText>
 
           {queueError ? (
             <View style={styles.queueErrorContainer}>
-              <ThemedText style={styles.queueErrorText}>{queueError}</ThemedText>
+              <ThemedText style={[styles.queueErrorText, { color: errorColor }]}>
+                {queueError}
+              </ThemedText>
               <TouchableOpacity
                 style={[
                   styles.retryButton,
@@ -325,12 +332,9 @@ export const Beerfinder = () => {
                 disabled={loadingQueues}
               >
                 {loadingQueues ? (
-                  <ActivityIndicator
-                    size="small"
-                    color={colorScheme === 'dark' ? '#FFFFFF' : 'white'}
-                  />
+                  <ActivityIndicator size="small" color={textOnPrimary} />
                 ) : (
-                  <ThemedText style={[styles.retryButtonText, { color: 'white' }]}>
+                  <ThemedText style={[styles.retryButtonText, { color: textOnPrimary }]}>
                     Try Again
                   </ThemedText>
                 )}
@@ -354,8 +358,8 @@ export const Beerfinder = () => {
                     style={[
                       styles.deleteButton,
                       {
-                        backgroundColor: colorScheme === 'dark' ? '#ff4d4f' : '#fff0f0',
-                        borderColor: colorScheme === 'dark' ? '#ff7875' : '#ffa39e',
+                        backgroundColor: errorBgColor,
+                        borderColor: errorBorderColor,
                       },
                     ]}
                     onPress={() => deleteQueuedBeer(item.id, item.name)}
@@ -364,14 +368,14 @@ export const Beerfinder = () => {
                     {deletingBeerId === item.id ? (
                       <ActivityIndicator
                         size="small"
-                        color={colorScheme === 'dark' ? 'white' : '#f5222d'}
+                        color={colorScheme === 'dark' ? textOnPrimary : errorColor}
                       />
                     ) : (
                       <ThemedText
                         style={[
                           styles.deleteButtonText,
                           {
-                            color: colorScheme === 'dark' ? 'white' : '#f5222d',
+                            color: colorScheme === 'dark' ? textOnPrimary : errorColor,
                           },
                         ]}
                       >
@@ -395,7 +399,9 @@ export const Beerfinder = () => {
             ]}
             onPress={() => setQueueModalVisible(false)}
           >
-            <ThemedText style={[styles.closeButtonText, { color: 'white' }]}>Close</ThemedText>
+            <ThemedText style={[styles.closeButtonText, { color: textOnPrimary }]}>
+              Close
+            </ThemedText>
           </TouchableOpacity>
         </View>
       </View>
@@ -422,16 +428,13 @@ export const Beerfinder = () => {
                 disabled={loadingQueues}
               >
                 {loadingQueues ? (
-                  <ActivityIndicator
-                    size="small"
-                    color={colorScheme === 'dark' ? '#FFFFFF' : 'white'}
-                  />
+                  <ActivityIndicator size="small" color={textOnPrimary} />
                 ) : (
                   <ThemedText
                     style={[
                       styles.actionButtonText,
                       {
-                        color: colorScheme === 'dark' ? '#FFFFFF' : 'white',
+                        color: textOnPrimary,
                       },
                     ]}
                   >
@@ -453,7 +456,7 @@ export const Beerfinder = () => {
                   style={[
                     styles.actionButtonText,
                     {
-                      color: colorScheme === 'dark' ? '#FFFFFF' : 'white',
+                      color: textOnPrimary,
                     },
                   ]}
                 >
@@ -471,7 +474,7 @@ export const Beerfinder = () => {
             style={[styles.refreshButton, { backgroundColor: activeButtonColor }]}
             onPress={handleRefresh}
           >
-            <ThemedText style={[styles.buttonText, { color: 'white' }]}>Try Again</ThemedText>
+            <ThemedText style={[styles.buttonText, { color: textOnPrimary }]}>Try Again</ThemedText>
           </TouchableOpacity>
         </View>
       ) : (
@@ -490,16 +493,13 @@ export const Beerfinder = () => {
                 disabled={loadingQueues}
               >
                 {loadingQueues ? (
-                  <ActivityIndicator
-                    size="small"
-                    color={colorScheme === 'dark' ? '#FFFFFF' : 'white'}
-                  />
+                  <ActivityIndicator size="small" color={textOnPrimary} />
                 ) : (
                   <ThemedText
                     style={[
                       styles.actionButtonText,
                       {
-                        color: colorScheme === 'dark' ? '#FFFFFF' : 'white',
+                        color: textOnPrimary,
                       },
                     ]}
                   >
@@ -521,7 +521,7 @@ export const Beerfinder = () => {
                   style={[
                     styles.actionButtonText,
                     {
-                      color: colorScheme === 'dark' ? '#FFFFFF' : 'white',
+                      color: textOnPrimary,
                     },
                   ]}
                 >
@@ -648,7 +648,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     padding: 20,
   },
   modalContent: {
@@ -678,7 +677,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'center',
     marginBottom: 16,
-    color: '#f5222d',
   },
   retryButton: {
     paddingVertical: 10,

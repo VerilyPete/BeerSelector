@@ -38,7 +38,6 @@ export default function AboutSection({
   style,
   testID = 'about-section',
 }: AboutSectionProps) {
-  const tintColor = useThemeColor({}, 'tint');
   const linkColor = useThemeColor({ light: '#007AFF', dark: '#0A84FF' }, 'tint');
 
   // Get version information from expo config
@@ -47,7 +46,7 @@ export default function AboutSection({
   // Get platform-specific build number
   const buildNumber = Platform.select({
     ios: Constants.expoConfig?.ios?.buildNumber,
-    android: Constants.expoConfig?.android?.versionCode,
+    android: Constants.expoConfig?.android?.versionCode?.toString(),
     default: undefined,
   });
 
