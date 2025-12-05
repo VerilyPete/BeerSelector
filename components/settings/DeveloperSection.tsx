@@ -1,21 +1,20 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { View, StyleSheet, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, Alert } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
 import { useThemeColor } from '@/hooks/useThemeColor';
+import { Colors } from '@/constants/Colors';
+import { spacing } from '@/constants/spacing';
 import { beerRepository } from '@/src/database/repositories/BeerRepository';
 import { myBeersRepository } from '@/src/database/repositories/MyBeersRepository';
 import { rewardsRepository } from '@/src/database/repositories/RewardsRepository';
 import { getPreference, setPreference } from '@/src/database/preferences';
 import { createMockSession } from '@/src/api/mockSession';
 import { clearSessionData } from '@/src/api/sessionManager';
+// eslint-disable-next-line no-restricted-imports
 import { clearUntappdCookies } from '@/src/database/db';
-
-interface DeveloperSectionProps {
-  cardColor: string;
-  tintColor: string;
-}
+import SettingsSection from './SettingsSection';
+import SettingsItem from './SettingsItem';
 
 /**
  * Helper function to extract error message from unknown error type
@@ -27,14 +26,13 @@ function getErrorMessage(error: unknown): string {
   return String(error);
 }
 
-export default function DeveloperSection({ cardColor, tintColor }: DeveloperSectionProps) {
+export default function DeveloperSection() {
   const [dbStats, setDbStats] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const isMountedRef = useRef(true);
 
-  // Get destructive color for danger zone (supports both light and dark mode)
-  const destructiveColor = useThemeColor(
-    { light: '#ff3b30', dark: '#ff453a' },
+  const textMutedColor = useThemeColor(
+    { light: Colors.light.textMuted, dark: Colors.dark.textMuted },
     'text'
   );
 
@@ -45,18 +43,12 @@ export default function DeveloperSection({ cardColor, tintColor }: DeveloperSect
     };
   }, []);
 
-  // Only render in development mode
-  if (!__DEV__) {
-    return null;
-  }
-
   const showDatabaseStats = useCallback(async () => {
-    // Add haptic feedback for button press
     if (process.env.EXPO_OS === 'ios') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
 
-    if (isLoading) return; // Prevent duplicate requests
+    if (isLoading) return;
 
     try {
       setIsLoading(true);
@@ -70,7 +62,6 @@ export default function DeveloperSection({ cardColor, tintColor }: DeveloperSect
 
       const stats = `
 Database Statistics:
-━━━━━━━━━━━━━━━━━━━
 All Beers: ${allBeers.length}
 Tasted Beers: ${myBeers.length}
 Rewards: ${rewards.length}
@@ -82,7 +73,6 @@ Tasted Beers: ${lastMyBeersRefresh ? new Date(parseInt(lastMyBeersRefresh)).toLo
 
       Alert.alert('Database Stats', stats, [{ text: 'OK' }]);
 
-      // Only update state if component is still mounted
       if (isMountedRef.current) {
         setDbStats(`${allBeers.length} beers, ${myBeers.length} tasted`);
       }
@@ -98,7 +88,6 @@ Tasted Beers: ${lastMyBeersRefresh ? new Date(parseInt(lastMyBeersRefresh)).toLo
   }, [isLoading]);
 
   const clearRefreshTimestamps = useCallback(async () => {
-    // Add haptic feedback for button press
     if (process.env.EXPO_OS === 'ios') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
@@ -126,13 +115,11 @@ Tasted Beers: ${lastMyBeersRefresh ? new Date(parseInt(lastMyBeersRefresh)).toLo
   }, []);
 
   const viewAllPreferences = useCallback(async () => {
-    // Add haptic feedback for button press
     if (process.env.EXPO_OS === 'ios') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
 
     try {
-      // Get common preferences to display
       const prefs = {
         api_base_url: await getPreference('api_base_url'),
         is_visitor_mode: await getPreference('is_visitor_mode'),
@@ -152,7 +139,6 @@ Tasted Beers: ${lastMyBeersRefresh ? new Date(parseInt(lastMyBeersRefresh)).toLo
   }, []);
 
   const handleCreateMockSession = useCallback(async () => {
-    // Add haptic feedback for button press
     if (process.env.EXPO_OS === 'ios') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
@@ -167,14 +153,13 @@ Tasted Beers: ${lastMyBeersRefresh ? new Date(parseInt(lastMyBeersRefresh)).toLo
   }, []);
 
   const resetToFirstRun = useCallback(async () => {
-    // Add warning haptic feedback for destructive action
     if (process.env.EXPO_OS === 'ios') {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
     }
 
     Alert.alert(
-      '⚠️ Reset Application',
-      'This will:\n\n• Clear all beer data\n• Clear tasted beers\n• Clear rewards\n• Clear session cookies\n• Reset all settings to defaults\n• Set app to first-run state\n\nThis cannot be undone. Continue?',
+      'Reset Application',
+      'This will clear all data and reset to first-run state. This cannot be undone. Continue?',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -184,47 +169,61 @@ Tasted Beers: ${lastMyBeersRefresh ? new Date(parseInt(lastMyBeersRefresh)).toLo
             try {
               console.log('Starting application reset...');
 
-              // Clear all data tables
               await beerRepository.clear();
-              console.log('✓ Cleared all beers');
+              console.log('Cleared all beers');
 
               await myBeersRepository.clear();
-              console.log('✓ Cleared tasted beers');
+              console.log('Cleared tasted beers');
 
               await rewardsRepository.clear();
-              console.log('✓ Cleared rewards');
+              console.log('Cleared rewards');
 
-              // Clear Untappd cookies
               await clearUntappdCookies();
-              console.log('✓ Cleared Untappd cookies');
+              console.log('Cleared Untappd cookies');
 
-              // Clear session data (Flying Saucer cookies)
               await clearSessionData();
-              console.log('✓ Cleared session data');
+              console.log('Cleared session data');
 
-              // Reset preferences using preferences module (consistent with rest of codebase)
               await setPreference('all_beers_api_url', '', 'API endpoint for fetching all beers');
-              await setPreference('my_beers_api_url', '', 'API endpoint for fetching Beerfinder beers');
-              await setPreference('first_launch', 'true', 'Flag indicating if this is the first app launch');
-              await setPreference('is_visitor_mode', 'false', 'Flag indicating if user is in visitor mode');
-              await setPreference('last_all_beers_refresh', '0', 'Timestamp of last all beers refresh');
-              await setPreference('last_my_beers_refresh', '0', 'Timestamp of last my beers refresh');
-              console.log('✓ Reset preferences to defaults');
+              await setPreference(
+                'my_beers_api_url',
+                '',
+                'API endpoint for fetching Beerfinder beers'
+              );
+              await setPreference(
+                'first_launch',
+                'true',
+                'Flag indicating if this is the first app launch'
+              );
+              await setPreference(
+                'is_visitor_mode',
+                'false',
+                'Flag indicating if user is in visitor mode'
+              );
+              await setPreference(
+                'last_all_beers_refresh',
+                '0',
+                'Timestamp of last all beers refresh'
+              );
+              await setPreference(
+                'last_my_beers_refresh',
+                '0',
+                'Timestamp of last my beers refresh'
+              );
+              console.log('Reset preferences to defaults');
 
               console.log('Application reset complete!');
 
               Alert.alert(
                 'Reset Complete',
-                'The application has been reset to first-run state. Please restart the app.',
+                'The application has been reset. Please restart the app.',
                 [{ text: 'OK' }]
               );
             } catch (error) {
               console.error('Failed to reset application:', error);
-              Alert.alert(
-                'Reset Failed',
-                `An error occurred during reset:\n\n${getErrorMessage(error)}\n\nSome data may have been cleared.`,
-                [{ text: 'OK' }]
-              );
+              Alert.alert('Reset Failed', `An error occurred: ${getErrorMessage(error)}`, [
+                { text: 'OK' },
+              ]);
             }
           },
         },
@@ -232,170 +231,92 @@ Tasted Beers: ${lastMyBeersRefresh ? new Date(parseInt(lastMyBeersRefresh)).toLo
     );
   }, []);
 
+  // Only render in development mode - after all hooks are called
+  if (!__DEV__) {
+    return null;
+  }
+
   return (
-    <ThemedView style={[styles.card, { backgroundColor: cardColor }]} testID="developer-section">
-      <ThemedText style={styles.cardTitle}>🛠️ Developer Tools</ThemedText>
-      <ThemedText style={styles.devWarning}>
-        (Development mode only - hidden in production)
-      </ThemedText>
-
-      <TouchableOpacity
-        style={[styles.button, { borderColor: tintColor }]}
-        onPress={showDatabaseStats}
-        disabled={isLoading}
-        accessible={true}
-        accessibilityRole="button"
-        accessibilityLabel="Database Statistics"
-        accessibilityHint="Shows current database counts and last refresh times"
+    <View testID="developer-section">
+      <SettingsSection
+        title="Developer Tools"
+        footer={`Environment: ${process.env.NODE_ENV || 'development'} | __DEV__: ${__DEV__ ? 'true' : 'false'}`}
       >
-        <ThemedText style={styles.buttonText}>
-          {isLoading ? '⏳ Loading...' : '📊 Database Statistics'}
-        </ThemedText>
-        {!isLoading && dbStats ? (
-          <ThemedText style={styles.statsText}>{dbStats}</ThemedText>
-        ) : null}
-        {isLoading && (
-          <ActivityIndicator
-            size="small"
-            color={tintColor}
-            style={styles.loadingIndicator}
-          />
-        )}
-      </TouchableOpacity>
+        {/* Database Statistics */}
+        <SettingsItem
+          icon="chart.bar.fill"
+          iconBackgroundColor="#5856D6"
+          title="Database Statistics"
+          subtitle={dbStats || 'View database counts and refresh times'}
+          accessoryType={isLoading ? 'loading' : 'chevron'}
+          onPress={showDatabaseStats}
+          disabled={isLoading}
+        />
 
-      <TouchableOpacity
-        style={[styles.button, { borderColor: tintColor }]}
-        onPress={clearRefreshTimestamps}
-        disabled={isLoading}
-        accessible={true}
-        accessibilityRole="button"
-        accessibilityLabel="Clear Refresh Timestamps"
-        accessibilityHint="Forces a data refresh on next app start"
-      >
-        <ThemedText style={styles.buttonText}>🔄 Clear Refresh Timestamps</ThemedText>
-      </TouchableOpacity>
+        {/* Clear Refresh Timestamps */}
+        <SettingsItem
+          icon="clock.arrow.circlepath"
+          iconBackgroundColor={Colors.light.warning}
+          title="Clear Refresh Timestamps"
+          subtitle="Force data refresh on next start"
+          accessoryType="chevron"
+          onPress={clearRefreshTimestamps}
+          disabled={isLoading}
+        />
 
-      <TouchableOpacity
-        style={[styles.button, { borderColor: tintColor }]}
-        onPress={viewAllPreferences}
-        disabled={isLoading}
-        accessible={true}
-        accessibilityRole="button"
-        accessibilityLabel="View Preferences"
-        accessibilityHint="Displays all app preference values"
-      >
-        <ThemedText style={styles.buttonText}>⚙️ View Preferences</ThemedText>
-      </TouchableOpacity>
+        {/* View Preferences */}
+        <SettingsItem
+          icon="gearshape.fill"
+          iconBackgroundColor={Colors.light.textMuted}
+          title="View Preferences"
+          subtitle="Display all app preference values"
+          accessoryType="chevron"
+          onPress={viewAllPreferences}
+          disabled={isLoading}
+        />
 
-      <TouchableOpacity
-        style={[styles.button, { borderColor: tintColor }]}
-        onPress={handleCreateMockSession}
-        disabled={isLoading}
-        testID="create-mock-session-button"
-        accessible={true}
-        accessibilityRole="button"
-        accessibilityLabel="Create Mock Session"
-        accessibilityHint="Creates a mock session for testing purposes"
-      >
-        <ThemedText style={styles.buttonText}>🧪 Create Mock Session</ThemedText>
-      </TouchableOpacity>
+        {/* Create Mock Session */}
+        <SettingsItem
+          icon="flask.fill"
+          iconBackgroundColor={Colors.light.success}
+          title="Create Mock Session"
+          subtitle="Create a mock session for testing"
+          accessoryType="chevron"
+          onPress={handleCreateMockSession}
+          disabled={isLoading}
+          testID="create-mock-session-button"
+          showSeparator={false}
+        />
+      </SettingsSection>
 
-      <View style={styles.dangerZone}>
-        <ThemedText style={[styles.dangerTitle, { color: destructiveColor }]}>
-          ⚠️ Danger Zone
-        </ThemedText>
-        <TouchableOpacity
-          style={[
-            styles.dangerButton,
-            { borderColor: destructiveColor, backgroundColor: `${destructiveColor}10` },
-          ]}
+      {/* Danger Zone */}
+      <SettingsSection title="Danger Zone" footer="Warning: This action cannot be undone.">
+        <SettingsItem
+          icon="arrow.counterclockwise"
+          title="Reset to First-Run State"
+          subtitle="Clear all data and settings"
+          accessoryType="chevron"
           onPress={resetToFirstRun}
           disabled={isLoading}
-          accessible={true}
-          accessibilityRole="button"
-          accessibilityLabel="Reset to First-Run State"
-          accessibilityHint="Warning: Resets all app data and settings. This cannot be undone."
-        >
-          <ThemedText style={[styles.buttonText, { color: destructiveColor }]}>
-            🔄 Reset to First-Run State
-          </ThemedText>
-        </TouchableOpacity>
-      </View>
+          destructive
+          showSeparator={false}
+        />
+      </SettingsSection>
 
-      <View style={styles.envInfo}>
-        <ThemedText style={styles.envText}>
-          Environment: {process.env.NODE_ENV || 'development'}
-        </ThemedText>
-        <ThemedText style={styles.envText}>
-          __DEV__: {__DEV__ ? 'true' : 'false'}
-        </ThemedText>
-      </View>
-    </ThemedView>
+      {/* Dev Mode Indicator */}
+      <ThemedText style={[styles.devModeText, { color: textMutedColor }]}>
+        Development mode - hidden in production builds
+      </ThemedText>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    padding: 20,
-    borderRadius: 12,
-    marginBottom: 20,
-  },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  devWarning: {
+  devModeText: {
     fontSize: 12,
-    opacity: 0.6,
-    marginBottom: 16,
+    textAlign: 'center',
     fontStyle: 'italic',
-  },
-  button: {
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 12,
-    minHeight: 44, // iOS HIG minimum touch target size
-  },
-  buttonText: {
-    fontSize: 16,
-  },
-  statsText: {
-    fontSize: 12,
-    marginTop: 4,
-    opacity: 0.7,
-  },
-  loadingIndicator: {
-    marginTop: 8,
-  },
-  dangerZone: {
-    marginTop: 16,
-    paddingTop: 16,
-    borderTopWidth: 2,
-    borderTopColor: 'rgba(255, 59, 48, 0.3)',
-  },
-  dangerTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  dangerButton: {
-    borderWidth: 2,
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 12,
-    minHeight: 44, // iOS HIG minimum touch target size
-  },
-  envInfo: {
-    marginTop: 8,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(128, 128, 128, 0.2)',
-  },
-  envText: {
-    fontSize: 12,
-    opacity: 0.6,
-    marginBottom: 4,
+    marginTop: spacing.s,
+    marginBottom: spacing.m,
   },
 });
