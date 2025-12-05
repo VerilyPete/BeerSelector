@@ -54,17 +54,19 @@ This migration involves significant changes:
 
 - [ ] **Node.js**: Ensure Node 20.19.4+ is installed (Node 18 EOL as of April 2025)
 - [ ] **Xcode**: Update to Xcode 16.1+ (Xcode 26 recommended for SDK 54)
-- [ ] **Backup**: Create a git branch or tag for the current stable state
+- [x] **Backup**: Create a git branch or tag for the current stable state
 - [ ] **Clean State**: Ensure all tests pass on current SDK 52
 
 ```bash
 # Verify Node version
 node --version  # Should be >= 20.19.4
 
-# Create backup branch
-git checkout -b backup/pre-sdk54-migration
-git push origin backup/pre-sdk54-migration
-git checkout feature/ios-live-activity  # or your working branch
+# Create backup branch (COMPLETED)
+git checkout -b backup/pre-sdk53-migration
+git push origin backup/pre-sdk53-migration
+
+# Create migration branch (COMPLETED)
+git checkout -b migration/sdk-53
 ```
 
 ### Recommended Approach
