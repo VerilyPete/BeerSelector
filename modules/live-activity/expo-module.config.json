@@ -2,6 +2,7 @@
   "name": "live-activity",
   "platforms": ["ios"],
   "ios": {
-    "modules": ["LiveActivityModule"]
+    "modules": ["LiveActivityModule"],
+    "appDelegateSubscribers": ["LiveActivityAppDelegate"]
   }
 }
