@@ -198,8 +198,6 @@ export const Beerfinder = () => {
                         console.log('[Beerfinder] Live Activity update failed:', liveActivityError);
                       }
                     }
-
-                    Alert.alert('Success', `Successfully removed ${beerName} from your queue!`);
                   } else {
                     Alert.alert('Error', 'Failed to delete beer. Please try again.');
                   }

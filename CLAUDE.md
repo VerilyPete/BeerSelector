@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 BeerSelector is a React Native mobile app built with Expo SDK 52 for beer enthusiasts to browse taplists, track tastings, and manage their Flying Saucer UFO Club experience. The app supports both authenticated UFO Club members and visitor mode with limited access.
 
+**Minimum Requirements**: iOS 17.6 or greater.
+
 ### UFO Club Business Logic
 
 **The 200 Beer Challenge:**
