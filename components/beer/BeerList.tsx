@@ -51,20 +51,25 @@ export const BeerList: React.FC<BeerListProps> = ({
   const tintColor = useThemeColor({}, 'tint');
 
   // Memoize renderItem to prevent unnecessary re-renders of FlatList items
-  const renderItem = useCallback(({ item }: { item: DisplayableBeer }) => (
-    <BeerItem
-      beer={item}
-      isExpanded={expandedId === item.id}
-      onToggle={onToggleExpand}
-      dateLabel={dateLabel}
-      renderActions={renderItemActions ? () => renderItemActions(item) : undefined}
-    />
-  ), [expandedId, onToggleExpand, dateLabel, renderItemActions]);
+  const renderItem = useCallback(
+    ({ item }: { item: DisplayableBeer }) => (
+      <BeerItem
+        beer={item}
+        isExpanded={expandedId === item.id}
+        onToggle={onToggleExpand}
+        dateLabel={dateLabel}
+        renderActions={renderItemActions ? () => renderItemActions(item) : undefined}
+      />
+    ),
+    [expandedId, onToggleExpand, dateLabel, renderItemActions]
+  );
 
   if (!loading && beers.length === 0) {
     return (
       <ThemedView style={styles.emptyContainer} testID="beer-list-empty">
-        <ThemedText style={styles.emptyText} testID="beer-list-empty-message">{emptyMessage}</ThemedText>
+        <ThemedText style={styles.emptyText} testID="beer-list-empty-message">
+          {emptyMessage}
+        </ThemedText>
       </ThemedView>
     );
   }
@@ -73,11 +78,11 @@ export const BeerList: React.FC<BeerListProps> = ({
     <FlatList
       testID="beer-list"
       data={beers}
-      keyExtractor={(item) => item.id}
+      keyExtractor={item => item.id}
       renderItem={renderItem}
       contentContainerStyle={[
         styles.listContent,
-        { paddingBottom: TAB_BAR_HEIGHT + insets.bottom + 16 }
+        { paddingBottom: TAB_BAR_HEIGHT + insets.bottom + 16 },
       ]}
       refreshControl={
         <RefreshControl
@@ -96,7 +101,7 @@ export const BeerList: React.FC<BeerListProps> = ({
       windowSize={7}
       removeClippedSubviews={true}
       updateCellsBatchingPeriod={50}
-      getItemLayout={(data, index) => ({
+      getItemLayout={(_data, index) => ({
         length: EXPECTED_ITEM_HEIGHT,
         offset: EXPECTED_ITEM_HEIGHT * index,
         index,

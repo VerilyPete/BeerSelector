@@ -1,6 +1,8 @@
 import React from 'react';
 import { render } from '@testing-library/react-native';
 
+import { BeerList } from '../BeerList';
+
 // Mock theme hooks before importing component
 jest.mock('@/hooks/useColorScheme', () => ({
   useColorScheme: jest.fn(() => 'light'),
@@ -25,8 +27,6 @@ jest.mock('../BeerItem', () => ({
     );
   },
 }));
-
-import { BeerList } from '../BeerList';
 
 // Use real timers for this test suite to avoid hanging
 beforeAll(() => {
@@ -285,15 +285,10 @@ describe('BeerList', () => {
 
   // Test 13: Handles different empty message scenarios
   test('handles various empty message formats', () => {
-    const messages = [
-      'No beers available',
-      'Try searching for a beer!',
-      'Your list is empty',
-      '',
-    ];
+    const messages = ['No beers available', 'Try searching for a beer!', 'Your list is empty', ''];
 
-    messages.forEach((msg) => {
-      const { rerender } = render(
+    messages.forEach(msg => {
+      render(
         <BeerList
           beers={[]}
           loading={false}

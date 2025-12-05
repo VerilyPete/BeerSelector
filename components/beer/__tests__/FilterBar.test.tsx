@@ -1,13 +1,27 @@
 import React from 'react';
 import { render, fireEvent } from '@testing-library/react-native';
 
+import { FilterBar } from '../FilterBar';
+
 // Mock theme hooks before importing component
 jest.mock('@/hooks/useColorScheme', () => ({
   useColorScheme: jest.fn(() => 'light'),
 }));
 
 jest.mock('@/hooks/useThemeColor', () => ({
-  useThemeColor: jest.fn(() => '#000000'),
+  useThemeColor: jest.fn((_props, colorName) => {
+    const colors: Record<string, string> = {
+      tint: '#0a7ea4',
+      textOnPrimary: '#FFFFFF',
+      backgroundSecondary: '#F5F5F0',
+      backgroundTertiary: 'rgba(150, 150, 150, 0.1)',
+      text: '#11181C',
+      background: '#FAFAFA',
+      border: '#E7E5E4',
+      accent: '#FFC107',
+    };
+    return colors[colorName] || '#000000';
+  }),
 }));
 
 // Mock IconSymbol component
@@ -21,8 +35,6 @@ jest.mock('@/components/ui/IconSymbol', () => ({
 // Mock ThemedText and ThemedView to use plain React Native components
 jest.mock('@/components/ThemedText');
 jest.mock('@/components/ThemedView');
-
-import { FilterBar } from '../FilterBar';
 
 // Use real timers for this test suite to avoid hanging
 beforeAll(() => {
@@ -295,7 +307,7 @@ describe('FilterBar', () => {
 
   // Test 16: Filters remain independent
   test('filter buttons work independently', () => {
-    const { getByText, rerender } = render(
+    const { getByText } = render(
       <FilterBar
         filters={mockFilters}
         sortBy="name"

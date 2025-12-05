@@ -4,6 +4,7 @@ import { ThemedText } from '../ThemedText';
 import { IconSymbol } from '../ui/IconSymbol';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { Colors } from '@/constants/Colors';
 
 type SortOption = 'date' | 'name';
 
@@ -29,15 +30,17 @@ const FilterBarComponent: React.FC<FilterBarProps> = ({
   showHeaviesAndIpa = true,
 }) => {
   const colorScheme = useColorScheme();
-  const activeButtonColor = useThemeColor({}, 'tint');
-  const inactiveButtonColor = useThemeColor({ light: '#E5E5E5', dark: '#2C2C2E' }, 'background');
-  const inactiveButtonTextColor = useThemeColor({ light: '#333333', dark: '#EFEFEF' }, 'text');
-  const textColor = useThemeColor({}, 'text');
+  const theme = colorScheme ?? 'light';
+  const themeColors = Colors[theme];
 
-  // Dark mode active colors
-  const isAnyFilterActive = filters.isDraft || filters.isHeavies || filters.isIpa || sortBy === 'name';
-  const buttonTextColor = colorScheme === 'dark' && isAnyFilterActive ? '#000000' : 'white';
-  const activeBgColor = colorScheme === 'dark' && isAnyFilterActive ? '#FFC107' : activeButtonColor;
+  const activeButtonColor = useThemeColor({}, 'tint');
+  const inactiveButtonColor = themeColors.backgroundSecondary;
+  const inactiveButtonTextColor = themeColors.text;
+  const textColor = themeColors.text;
+
+  // Dark mode active colors - use accent color and appropriate text color
+  const buttonTextColor = themeColors.textOnPrimary;
+  const activeBgColor = colorScheme === 'dark' ? themeColors.accent : activeButtonColor;
 
   return (
     <View style={styles.filterContainer} testID="filter-bar">
@@ -115,7 +118,7 @@ const FilterBarComponent: React.FC<FilterBarProps> = ({
       )}
 
       <TouchableOpacity
-        style={styles.sortButton}
+        style={[styles.sortButton, { backgroundColor: themeColors.backgroundTertiary }]}
         onPress={onToggleSort}
         activeOpacity={0.7}
         testID="sort-toggle-button"
@@ -158,7 +161,6 @@ const styles = StyleSheet.create({
   sortButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(150, 150, 150, 0.1)',
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 20,

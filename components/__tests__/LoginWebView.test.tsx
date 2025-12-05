@@ -3,6 +3,12 @@ import { render, fireEvent, waitFor } from '@testing-library/react-native';
 import { Alert } from 'react-native';
 import { config } from '@/src/config';
 
+// Import after mocks
+import LoginWebView from '@/components/LoginWebView';
+import { setPreference } from '@/src/database/preferences';
+import { saveSessionData } from '@/src/api/sessionManager';
+import { handleVisitorLogin } from '@/src/api/authService';
+
 // Test URL constants
 const TEST_BASE_URL = 'https://test.beerknurd.com';
 const UNTAPPD_BASE_URL = 'https://untappd.com';
@@ -17,7 +23,7 @@ const TEST_RETRY_DELAY = 1000;
 jest.mock('@/src/config', () => ({
   config: {
     api: {
-      getFullUrl: jest.fn((endpoint) => `${TEST_BASE_URL}/${endpoint}.php`),
+      getFullUrl: jest.fn(endpoint => `${TEST_BASE_URL}/${endpoint}.php`),
       baseUrl: TEST_BASE_URL,
       endpoints: {
         kiosk: '/kiosk.php',
@@ -27,28 +33,28 @@ jest.mock('@/src/config', () => ({
         addToQueue: '/addToQueue.php',
         deleteQueuedBrew: '/deleteQueuedBrew.php',
         addToRewardQueue: '/addToRewardQueue.php',
-        memberRewards: '/memberRewards.php'
+        memberRewards: '/memberRewards.php',
       },
       referers: {
         memberDashboard: `${TEST_BASE_URL}/member-dash.php`,
         memberRewards: `${TEST_BASE_URL}/memberRewards.php`,
-        memberQueues: `${TEST_BASE_URL}/memberQueues.php`
-      }
+        memberQueues: `${TEST_BASE_URL}/memberQueues.php`,
+      },
     },
     network: {
       timeout: TEST_TIMEOUT,
       retries: TEST_RETRIES,
-      retryDelay: TEST_RETRY_DELAY
+      retryDelay: TEST_RETRY_DELAY,
     },
     external: {
       untappd: {
         baseUrl: UNTAPPD_BASE_URL,
-        loginUrl: `${UNTAPPD_BASE_URL}/login`
-      }
+        loginUrl: `${UNTAPPD_BASE_URL}/login`,
+      },
     },
     setEnvironment: jest.fn(),
-    setCustomApiUrl: jest.fn()
-  }
+    setCustomApiUrl: jest.fn(),
+  },
 }));
 
 // Mock theme hooks
@@ -82,14 +88,7 @@ const mockWebViewRef = {
 jest.mock('react-native-webview', () => {
   const { View } = require('react-native');
   return {
-    WebView: ({
-      onMessage,
-      onLoadEnd,
-      onNavigationStateChange,
-      onLoadStart,
-      testID,
-      ref
-    }: any) => {
+    WebView: ({ onMessage, onLoadEnd, onNavigationStateChange, onLoadStart, testID, ref }: any) => {
       // Expose the mock ref
       if (ref) {
         Object.assign(ref, mockWebViewRef);
@@ -129,12 +128,6 @@ jest.mock('@/src/api/sessionManager', () => ({
 jest.mock('@/src/api/authService', () => ({
   handleVisitorLogin: jest.fn().mockResolvedValue({ success: true }),
 }));
-
-// Import after mocks
-import LoginWebView from '@/components/LoginWebView';
-import { setPreference } from '@/src/database/preferences';
-import { saveSessionData, extractSessionDataFromResponse } from '@/src/api/sessionManager';
-import { handleVisitorLogin } from '@/src/api/authService';
 
 describe('LoginWebView', () => {
   const mockOnLoginSuccess = jest.fn();
@@ -272,10 +265,7 @@ describe('LoginWebView', () => {
       const closeButton = getByTestId('close-webview-button');
       fireEvent.press(closeButton);
 
-      expect(alertSpy).toHaveBeenCalledWith(
-        'Login Cancelled',
-        'The login process was cancelled.'
-      );
+      expect(alertSpy).toHaveBeenCalledWith('Login Cancelled', 'The login process was cancelled.');
     });
 
     it('should clear processed URLs when closed', () => {
@@ -664,7 +654,7 @@ describe('LoginWebView', () => {
       const alertSpy = jest.spyOn(Alert, 'alert');
       (handleVisitorLogin as jest.Mock).mockResolvedValue({
         success: false,
-        error: 'Failed to login'
+        error: 'Failed to login',
       });
 
       const { getByTestId } = render(
@@ -1303,7 +1293,7 @@ describe('LoginWebView', () => {
 
   describe('Props and State Management', () => {
     it('should accept custom loading state', () => {
-      const { rerender, getByTestId } = render(
+      const { rerender } = render(
         <LoginWebView
           visible={true}
           onLoginSuccess={mockOnLoginSuccess}
@@ -1403,7 +1393,7 @@ describe('LoginWebView', () => {
   describe('Config Integration', () => {
     describe('Component Config Usage', () => {
       it('should use config for WebView source URL', () => {
-        const { getByTestId } = render(
+        render(
           <LoginWebView
             visible={true}
             onLoginSuccess={mockOnLoginSuccess}
@@ -1533,7 +1523,9 @@ describe('LoginWebView', () => {
         );
 
         // Component should call config again on rerender
-        expect((config.api.getFullUrl as jest.Mock).mock.calls.length).toBeGreaterThan(initialCallCount);
+        expect((config.api.getFullUrl as jest.Mock).mock.calls.length).toBeGreaterThan(
+          initialCallCount
+        );
       });
 
       it('should handle custom API URL change gracefully', () => {
@@ -1552,8 +1544,8 @@ describe('LoginWebView', () => {
         expect(config.api.baseUrl).toBe(TEST_BASE_URL);
 
         // Simulate environment change
-        (config.api.getFullUrl as jest.Mock).mockImplementation((endpoint) =>
-          `${CUSTOM_URL}/${endpoint}.php`
+        (config.api.getFullUrl as jest.Mock).mockImplementation(
+          endpoint => `${CUSTOM_URL}/${endpoint}.php`
         );
         (config.api.baseUrl as any) = CUSTOM_URL;
 
@@ -1613,8 +1605,8 @@ describe('LoginWebView', () => {
       it('should work with production environment URLs', () => {
         // Mock production config
         const PROD_BASE_URL = 'https://tapthatapp.beerknurd.com';
-        (config.api.getFullUrl as jest.Mock).mockImplementation((endpoint) =>
-          `${PROD_BASE_URL}/${endpoint}.php`
+        (config.api.getFullUrl as jest.Mock).mockImplementation(
+          endpoint => `${PROD_BASE_URL}/${endpoint}.php`
         );
         (config.api.baseUrl as any) = PROD_BASE_URL;
 
@@ -1634,8 +1626,8 @@ describe('LoginWebView', () => {
       it('should work with custom API URLs', () => {
         // Mock custom config
         const CUSTOM_BASE_URL = 'https://custom.example.com';
-        (config.api.getFullUrl as jest.Mock).mockImplementation((endpoint) =>
-          `${CUSTOM_BASE_URL}/${endpoint}.php`
+        (config.api.getFullUrl as jest.Mock).mockImplementation(
+          endpoint => `${CUSTOM_BASE_URL}/${endpoint}.php`
         );
         (config.api.baseUrl as any) = CUSTOM_BASE_URL;
 
@@ -1655,8 +1647,8 @@ describe('LoginWebView', () => {
       it('should handle development environment', () => {
         // Mock development config
         const DEV_BASE_URL = 'http://localhost:3000';
-        (config.api.getFullUrl as jest.Mock).mockImplementation((endpoint) =>
-          `${DEV_BASE_URL}/${endpoint}.php`
+        (config.api.getFullUrl as jest.Mock).mockImplementation(
+          endpoint => `${DEV_BASE_URL}/${endpoint}.php`
         );
         (config.api.baseUrl as any) = DEV_BASE_URL;
 
@@ -1868,6 +1860,5 @@ describe('LoginWebView', () => {
         });
       });
     });
-
   });
 });

@@ -11,17 +11,14 @@ import { SkeletonLoader } from './beer/SkeletonLoader';
 import { BeerfinderWithGlassType } from '@/src/types/beer';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useAppContext } from '@/context/AppContext';
-import { useOptimisticUpdate } from '@/context/OptimisticUpdateContext';
 import { useOptimisticCheckIn } from '@/hooks/useOptimisticCheckIn';
 import { OptimisticStatusBadge } from './optimistic/OptimisticStatusBadge';
-import { OptimisticUpdateType, CheckInRollbackData } from '@/src/types/optimisticUpdate';
 
 export const TastedBrewList = () => {
   // MP-4 Step 2: Use context for beer data instead of local state
   const { beers, loading, errors, setTastedBeers, setAllBeers, setRewards } = useAppContext();
 
   // MP-7 Step 3: Optimistic UI updates
-  const { pendingUpdates } = useOptimisticUpdate();
   const { getPendingBeer, retryCheckIn, rollbackCheckIn } = useOptimisticCheckIn();
 
   /**
@@ -91,26 +88,29 @@ export const TastedBrewList = () => {
   /**
    * MP-7 Step 3: Render optimistic status badge for tasted beers
    */
-  const renderTastedBeerActions = useCallback((item: BeerfinderWithGlassType) => {
-    const pendingStatus = getPendingBeer(item.id);
+  const renderTastedBeerActions = useCallback(
+    (item: BeerfinderWithGlassType) => {
+      const pendingStatus = getPendingBeer(item.id);
 
-    if (pendingStatus) {
-      return (
-        <OptimisticStatusBadge
-          status={pendingStatus.status}
-          error={pendingStatus.error}
-          onRetry={() => retryCheckIn(item.id)}
-          onCancel={() => rollbackCheckIn(item.id)}
-        />
-      );
-    }
+      if (pendingStatus) {
+        return (
+          <OptimisticStatusBadge
+            status={pendingStatus.status}
+            error={pendingStatus.error}
+            onRetry={() => retryCheckIn(item.id)}
+            onCancel={() => rollbackCheckIn(item.id)}
+          />
+        );
+      }
 
-    return null;
-  }, [getPendingBeer, retryCheckIn, rollbackCheckIn]);
+      return null;
+    },
+    [getPendingBeer, retryCheckIn, rollbackCheckIn]
+  );
 
   const emptyMessage = searchText
-    ? "No tasted beer matches your search criteria."
-    : "No beers in your current round yet. Start exploring and log some brews!";
+    ? 'No tasted beer matches your search criteria.'
+    : 'No beers in your current round yet. Start exploring and log some brews!';
 
   return (
     <View testID="tasted-brews-container" style={styles.container}>
@@ -135,9 +135,7 @@ export const TastedBrewList = () => {
             style={[styles.refreshButton, { backgroundColor: activeButtonColor }]}
             onPress={handleRefresh}
           >
-            <ThemedText style={[styles.buttonText, { color: 'white' }]}>
-              Try Again
-            </ThemedText>
+            <ThemedText style={[styles.buttonText, { color: 'white' }]}>Try Again</ThemedText>
           </TouchableOpacity>
         </View>
       ) : (

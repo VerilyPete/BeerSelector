@@ -18,6 +18,7 @@ import React, { Component, ReactNode, ErrorInfo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, useColorScheme } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { logError } from '../src/utils/errorLogger';
+import { Colors } from '@/constants/Colors';
 
 interface ErrorBoundaryProps {
   /** Content to render when no error occurs */
@@ -38,6 +39,18 @@ interface ErrorBoundaryState {
   errorInfo: ErrorInfo | null;
 }
 
+/** Theme colors interface passed from wrapper */
+interface ThemeColors {
+  text: string;
+  textSecondary: string;
+  textMuted: string;
+  background: string;
+  backgroundElevated: string;
+  border: string;
+  tint: string;
+  textOnPrimary: string;
+}
+
 /**
  * Error boundary component for catching React component errors
  *
@@ -45,8 +58,11 @@ interface ErrorBoundaryState {
  * must be class components (they use lifecycle methods).
  * The dark mode styling is provided via a functional wrapper component.
  */
-class ErrorBoundaryInner extends Component<ErrorBoundaryProps & { colorScheme: 'light' | 'dark' }, ErrorBoundaryState> {
-  constructor(props: ErrorBoundaryProps & { colorScheme: 'light' | 'dark' }) {
+class ErrorBoundaryInner extends Component<
+  ErrorBoundaryProps & { colors: ThemeColors },
+  ErrorBoundaryState
+> {
+  constructor(props: ErrorBoundaryProps & { colors: ThemeColors }) {
     super(props);
     this.state = {
       hasError: false,
@@ -142,9 +158,8 @@ class ErrorBoundaryInner extends Component<ErrorBoundaryProps & { colorScheme: '
   }
 
   renderErrorDetails(): ReactNode {
-    const { showStack, colorScheme } = this.props;
+    const { showStack, colors } = this.props;
     const { error, errorInfo } = this.state;
-    const isDark = colorScheme === 'dark';
 
     if (!showStack) {
       return null;
@@ -154,48 +169,34 @@ class ErrorBoundaryInner extends Component<ErrorBoundaryProps & { colorScheme: '
       <View style={styles.detailsContainer}>
         {error?.stack && (
           <View style={styles.stackContainer}>
-            <Text style={[
-              styles.detailsTitle,
-              { color: isDark ? '#ECEDEE' : '#333' }
-            ]}>
-              Stack Trace:
-            </Text>
-            <ScrollView style={[
-              styles.stackScroll,
-              {
-                backgroundColor: isDark ? '#1e1e1e' : '#fff',
-                borderColor: isDark ? '#333' : '#ddd',
-              }
-            ]}>
-              <Text style={[
-                styles.stackText,
-                { color: isDark ? '#d4d4d4' : '#444' }
-              ]}>
-                {error.stack}
-              </Text>
+            <Text style={[styles.detailsTitle, { color: colors.text }]}>Stack Trace:</Text>
+            <ScrollView
+              style={[
+                styles.stackScroll,
+                {
+                  backgroundColor: colors.backgroundElevated,
+                  borderColor: colors.border,
+                },
+              ]}
+            >
+              <Text style={[styles.stackText, { color: colors.textSecondary }]}>{error.stack}</Text>
             </ScrollView>
           </View>
         )}
 
         {errorInfo?.componentStack && (
           <View style={styles.stackContainer}>
-            <Text style={[
-              styles.detailsTitle,
-              { color: isDark ? '#ECEDEE' : '#333' }
-            ]}>
-              Component Stack:
-            </Text>
-            <ScrollView style={[
-              styles.stackScroll,
-              {
-                backgroundColor: isDark ? '#1e1e1e' : '#fff',
-                borderColor: isDark ? '#333' : '#ddd',
-              }
-            ]}>
-              <Text style={[
-                styles.stackText,
-                { color: isDark ? '#d4d4d4' : '#444' }
-              ]}>
+            <Text style={[styles.detailsTitle, { color: colors.text }]}>Component Stack:</Text>
+            <ScrollView
+              style={[
+                styles.stackScroll,
+                {
+                  backgroundColor: colors.backgroundElevated,
+                  borderColor: colors.border,
+                },
+              ]}
+            >
+              <Text style={[styles.stackText, { color: colors.textSecondary }]}>
                 {errorInfo.componentStack}
               </Text>
             </ScrollView>
@@ -206,8 +207,7 @@ class ErrorBoundaryInner extends Component<ErrorBoundaryProps & { colorScheme: '
   }
 
   render(): ReactNode {
-    const { colorScheme } = this.props;
-    const isDark = colorScheme === 'dark';
+    const { colors } = this.props;
 
     if (this.state.hasError) {
       const { fallbackMessage } = this.props;
@@ -215,54 +215,34 @@ class ErrorBoundaryInner extends Component<ErrorBoundaryProps & { colorScheme: '
       const errorType = this.getErrorType();
 
       return (
-        <SafeAreaView style={[
-          styles.container,
-          { backgroundColor: isDark ? '#151718' : '#f5f5f5' }
-        ]}>
+        <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
           <View style={styles.content}>
             {this.renderErrorIcon()}
 
-            <Text style={[
-              styles.title,
-              { color: isDark ? '#ECEDEE' : '#333' }
-            ]}>
-              Something went wrong
-            </Text>
+            <Text style={[styles.title, { color: colors.text }]}>Something went wrong</Text>
 
             {fallbackMessage && (
-              <Text style={[
-                styles.customMessage,
-                { color: isDark ? '#d4d4d4' : '#555' }
-              ]}>
+              <Text style={[styles.customMessage, { color: colors.textSecondary }]}>
                 {fallbackMessage}
               </Text>
             )}
 
-            <Text style={[
-              styles.errorMessage,
-              { color: isDark ? '#b8b8b8' : '#666' }
-            ]}>
-              {errorMessage}
-            </Text>
+            <Text style={[styles.errorMessage, { color: colors.textMuted }]}>{errorMessage}</Text>
 
             {errorType && errorType !== 'Error' && (
-              <Text style={[
-                styles.errorType,
-                { color: isDark ? '#999' : '#888' }
-              ]}>
+              <Text style={[styles.errorType, { color: colors.textMuted }]}>
                 Error Type: {errorType}
               </Text>
             )}
 
             <TouchableOpacity
-              style={[
-                styles.retryButton,
-                { backgroundColor: isDark ? '#0a84ff' : '#007AFF' }
-              ]}
+              style={[styles.retryButton, { backgroundColor: colors.tint }]}
               onPress={this.handleReset}
               activeOpacity={0.7}
             >
-              <Text style={styles.retryButtonText}>Try Again</Text>
+              <Text style={[styles.retryButtonText, { color: colors.textOnPrimary }]}>
+                Try Again
+              </Text>
             </TouchableOpacity>
 
             {this.renderErrorDetails()}
@@ -276,11 +256,21 @@ class ErrorBoundaryInner extends Component<ErrorBoundaryProps & { colorScheme: '
 }
 
 /**
- * Functional wrapper component that provides color scheme to the class-based ErrorBoundary
+ * Functional wrapper component that provides theme colors to the class-based ErrorBoundary
  */
 export default function ErrorBoundary(props: ErrorBoundaryProps) {
   const colorScheme = useColorScheme() ?? 'light';
-  return <ErrorBoundaryInner {...props} colorScheme={colorScheme} />;
+  const colors: ThemeColors = {
+    text: Colors[colorScheme].text,
+    textSecondary: Colors[colorScheme].textSecondary,
+    textMuted: Colors[colorScheme].textMuted,
+    background: Colors[colorScheme].background,
+    backgroundElevated: Colors[colorScheme].backgroundElevated,
+    border: Colors[colorScheme].border,
+    tint: Colors[colorScheme].tint,
+    textOnPrimary: Colors[colorScheme].textOnPrimary,
+  };
+  return <ErrorBoundaryInner {...props} colors={colors} />;
 }
 
 const styles = StyleSheet.create({
@@ -328,7 +318,6 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   retryButtonText: {
-    color: '#fff',
     fontSize: 16,
     fontWeight: '600',
   },

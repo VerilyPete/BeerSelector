@@ -18,7 +18,7 @@
  * ```
  */
 
-import React, { useMemo } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -36,7 +36,7 @@ import {
   CheckInBeerPayload,
   isCheckInBeerPayload,
 } from '@/src/types/operationQueue';
-import { useColorScheme } from '@/hooks/useColorScheme';
+import { useThemeColor } from '@/hooks/useThemeColor';
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -54,16 +54,25 @@ interface QueuedOperationsModalProps {
 // COMPONENT
 // ============================================================================
 
-export const QueuedOperationsModal: React.FC<QueuedOperationsModalProps> = ({ visible, onClose }) => {
+export const QueuedOperationsModal: React.FC<QueuedOperationsModalProps> = ({
+  visible,
+  onClose,
+}) => {
   const { queuedOperations, isRetrying, retryOperation, deleteOperation, clearQueue, retryConfig } =
     useOperationQueue();
-  const colorScheme = useColorScheme();
 
-  const isDark = colorScheme === 'dark';
-  const backgroundColor = isDark ? '#1a1a1a' : '#ffffff';
-  const textColor = isDark ? '#ffffff' : '#000000';
-  const borderColor = isDark ? '#333' : '#ddd';
-  const modalBackground = isDark ? '#000000cc' : '#00000080';
+  // Theme colors
+  const backgroundColor = useThemeColor({}, 'backgroundElevated');
+  const textColor = useThemeColor({}, 'text');
+  const borderColor = useThemeColor({}, 'border');
+  const modalBackground = useThemeColor({}, 'overlay');
+  const backgroundSecondary = useThemeColor({}, 'backgroundSecondary');
+  const warningColor = useThemeColor({}, 'warning');
+  const infoColor = useThemeColor({}, 'info');
+  const successColor = useThemeColor({}, 'success');
+  const errorColor = useThemeColor({}, 'error');
+  const textOnPrimary = useThemeColor({}, 'textOnPrimary');
+  const textOnStatus = useThemeColor({}, 'textOnStatus');
 
   /**
    * Get human-readable operation type name
@@ -106,20 +115,20 @@ export const QueuedOperationsModal: React.FC<QueuedOperationsModalProps> = ({ vi
   };
 
   /**
-   * Get status color
+   * Get status color (uses theme-aware colors)
    */
   const getStatusColor = (status: OperationStatus): string => {
     switch (status) {
       case OperationStatus.PENDING:
-        return '#FFA500'; // Orange
+        return warningColor;
       case OperationStatus.RETRYING:
-        return '#2196F3'; // Blue
+        return infoColor;
       case OperationStatus.SUCCESS:
-        return '#4CAF50'; // Green
+        return successColor;
       case OperationStatus.FAILED:
-        return '#ff4444'; // Red
+        return errorColor;
       default:
-        return '#999';
+        return borderColor;
     }
   };
 
@@ -178,9 +187,7 @@ export const QueuedOperationsModal: React.FC<QueuedOperationsModalProps> = ({ vi
       await retryOperation(id);
       Alert.alert('Success', 'Operation retry initiated');
     } catch (error) {
-      const errorMessage = error instanceof Error
-        ? error.message
-        : 'Unknown error occurred';
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
 
       Alert.alert(
         'Retry Failed',
@@ -193,66 +200,48 @@ export const QueuedOperationsModal: React.FC<QueuedOperationsModalProps> = ({ vi
    * Handle delete operation
    */
   const handleDelete = (id: string) => {
-    Alert.alert(
-      'Delete Operation',
-      'Are you sure you want to delete this queued operation?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteOperation(id);
-              Alert.alert('Deleted', 'Operation removed from queue');
-            } catch (error) {
-              const errorMessage = error instanceof Error
-                ? error.message
-                : 'Unknown error occurred';
+    Alert.alert('Delete Operation', 'Are you sure you want to delete this queued operation?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await deleteOperation(id);
+            Alert.alert('Deleted', 'Operation removed from queue');
+          } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
 
-              Alert.alert(
-                'Delete Failed',
-                `Could not delete operation: ${errorMessage}`
-              );
-            }
-          },
+            Alert.alert('Delete Failed', `Could not delete operation: ${errorMessage}`);
+          }
         },
-      ]
-    );
+      },
+    ]);
   };
 
   /**
    * Handle clear all
    */
   const handleClearAll = () => {
-    Alert.alert(
-      'Clear Queue',
-      'Are you sure you want to clear all queued operations?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Clear All',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await clearQueue();
-              onClose();
-            } catch (error) {
-              Alert.alert('Error', 'Failed to clear queue. Please try again.');
-            }
-          },
+    Alert.alert('Clear Queue', 'Are you sure you want to clear all queued operations?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Clear All',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await clearQueue();
+            onClose();
+          } catch (error) {
+            Alert.alert('Error', 'Failed to clear queue. Please try again.');
+          }
         },
-      ]
-    );
+      },
+    ]);
   };
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      transparent={true}
-      onRequestClose={onClose}
-    >
+    <Modal visible={visible} animationType="slide" transparent={true} onRequestClose={onClose}>
       <View style={[styles.modalOverlay, { backgroundColor: modalBackground }]}>
         <View style={[styles.modalContent, { backgroundColor }]}>
           {/* Header */}
@@ -264,7 +253,7 @@ export const QueuedOperationsModal: React.FC<QueuedOperationsModalProps> = ({ vi
           </View>
 
           {/* Info */}
-          <View style={[styles.infoContainer, { backgroundColor: isDark ? '#2a2a2a' : '#f5f5f5' }]}>
+          <View style={[styles.infoContainer, { backgroundColor: backgroundSecondary }]}>
             <Text style={[styles.infoText, { color: textColor }]}>
               Operations will automatically retry when connection is restored.
             </Text>
@@ -282,10 +271,13 @@ export const QueuedOperationsModal: React.FC<QueuedOperationsModalProps> = ({ vi
                 </Text>
               </View>
             ) : (
-              queuedOperations.map((operation) => (
+              queuedOperations.map(operation => (
                 <View
                   key={operation.id}
-                  style={[styles.operationCard, { backgroundColor: isDark ? '#2a2a2a' : '#f9f9f9', borderColor }]}
+                  style={[
+                    styles.operationCard,
+                    { backgroundColor: backgroundSecondary, borderColor },
+                  ]}
                 >
                   {/* Operation header */}
                   <View style={styles.operationHeader}>
@@ -299,7 +291,9 @@ export const QueuedOperationsModal: React.FC<QueuedOperationsModalProps> = ({ vi
                           { backgroundColor: getStatusColor(operation.status) },
                         ]}
                       >
-                        <Text style={styles.statusText}>{getStatusText(operation.status)}</Text>
+                        <Text style={[styles.statusText, { color: textOnStatus }]}>
+                          {getStatusText(operation.status)}
+                        </Text>
                       </View>
                     </View>
                     <Text style={[styles.timestamp, { color: textColor, opacity: 0.6 }]}>
@@ -321,7 +315,7 @@ export const QueuedOperationsModal: React.FC<QueuedOperationsModalProps> = ({ vi
 
                   {/* Error message */}
                   {operation.errorMessage && (
-                    <Text style={[styles.errorMessage, { color: '#ff4444' }]}>
+                    <Text style={[styles.errorMessage, { color: errorColor }]}>
                       {operation.errorMessage}
                     </Text>
                   )}
@@ -331,21 +325,25 @@ export const QueuedOperationsModal: React.FC<QueuedOperationsModalProps> = ({ vi
                     {operation.status !== OperationStatus.RETRYING && (
                       <TouchableOpacity
                         onPress={() => handleRetry(operation.id)}
-                        style={[styles.actionButton, { backgroundColor: '#2196F3' }]}
+                        style={[styles.actionButton, { backgroundColor: infoColor }]}
                         disabled={isRetrying}
                       >
-                        <Text style={styles.actionButtonText}>Retry</Text>
+                        <Text style={[styles.actionButtonText, { color: textOnPrimary }]}>
+                          Retry
+                        </Text>
                       </TouchableOpacity>
                     )}
                     {operation.status === OperationStatus.RETRYING && (
-                      <ActivityIndicator size="small" color="#2196F3" />
+                      <ActivityIndicator size="small" color={infoColor} />
                     )}
                     <TouchableOpacity
                       onPress={() => handleDelete(operation.id)}
-                      style={[styles.actionButton, { backgroundColor: '#ff4444' }]}
+                      style={[styles.actionButton, { backgroundColor: errorColor }]}
                       disabled={isRetrying}
                     >
-                      <Text style={styles.actionButtonText}>Delete</Text>
+                      <Text style={[styles.actionButtonText, { color: textOnPrimary }]}>
+                        Delete
+                      </Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -358,10 +356,10 @@ export const QueuedOperationsModal: React.FC<QueuedOperationsModalProps> = ({ vi
             <View style={[styles.footer, { borderTopColor: borderColor }]}>
               <TouchableOpacity
                 onPress={handleClearAll}
-                style={[styles.clearButton, { backgroundColor: '#ff4444' }]}
+                style={[styles.clearButton, { backgroundColor: errorColor }]}
                 disabled={isRetrying}
               >
-                <Text style={styles.clearButtonText}>Clear All</Text>
+                <Text style={[styles.clearButtonText, { color: textOnPrimary }]}>Clear All</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -449,7 +447,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   statusText: {
-    color: '#ffffff',
+    // Color applied dynamically via textOnStatus theme token for contrast on colored badge backgrounds
     fontSize: 10,
     fontWeight: 'bold',
   },
@@ -479,7 +477,6 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   actionButtonText: {
-    color: '#ffffff',
     fontSize: 12,
     fontWeight: '600',
   },
@@ -493,7 +490,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   clearButtonText: {
-    color: '#ffffff',
     fontSize: 16,
     fontWeight: 'bold',
   },
