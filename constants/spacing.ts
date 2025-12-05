@@ -24,3 +24,25 @@ export const spacing = {
 } as const;
 
 export type SpacingKey = keyof typeof spacing;
+
+/**
+ * Border radii scale for consistent rounded corners
+ */
+export const borderRadii = {
+  /** 0px - No rounding */
+  none: 0,
+  /** 2px - Extra small rounding */
+  xs: 2,
+  /** 4px - Small rounding */
+  s: 4,
+  /** 8px - Medium rounding */
+  m: 8,
+  /** 16px - Large rounding */
+  l: 16,
+  /** 24px - Extra large rounding (pills) */
+  xl: 24,
+  /** 9999px - Full rounding (circles) */
+  full: 9999,
+} as const;
+
+export type BorderRadiiKey = keyof typeof borderRadii;
