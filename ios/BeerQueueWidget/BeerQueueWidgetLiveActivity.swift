@@ -28,15 +28,18 @@ struct BeerQueueWidgetLiveActivity: Widget {
                     BeerQueueExpandedView(beers: context.state.beers)
                 }
             } compactLeading: {
-                // Compact leading - beer mug icon
-                Image(systemName: "mug.fill")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(Color.dynamicIslandAccent)
+                // Compact leading - mug icon for each beer (max 5)
+                HStack(spacing: 2) {
+                    ForEach(context.state.beers.prefix(5)) { _ in
+                        Image(systemName: "mug.fill")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(Color.dynamicIslandAccent)
+                    }
+                }
+                .accessibilityLabel("\(context.state.beers.count) beers in queue")
             } compactTrailing: {
-                // Compact trailing - beer count
-                Text("\(context.state.beers.count)")
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(.primary)
+                // Empty - count shown via number of mug icons
+                EmptyView()
             } minimal: {
                 // Minimal view - just the mug icon
                 Image(systemName: "mug.fill")
