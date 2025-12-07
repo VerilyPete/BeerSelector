@@ -1,6 +1,6 @@
 import { StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import React from 'react';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import * as Haptics from 'expo-haptics';
@@ -175,8 +175,9 @@ function WelcomeCard({
  * Settings Button Component
  * Fixed position button in the top right corner
  * Includes animated press feedback
+ * Uses safe area insets to position below status bar
  */
-function SettingsButton({ onPress }: { onPress: () => void }) {
+function SettingsButton({ onPress, topInset }: { onPress: () => void; topInset: number }) {
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
 
@@ -191,7 +192,7 @@ function SettingsButton({ onPress }: { onPress: () => void }) {
   return (
     <TouchableOpacity
       testID="settings-nav-button"
-      style={styles.settingsButton}
+      style={[styles.settingsButton, { top: topInset + spacing.sm }]}
       onPress={handlePress}
       onPressIn={onPressIn}
       onPressOut={onPressOut}
@@ -298,84 +299,86 @@ function MainHomeView({
   };
 }) {
   const isVisitor = view === 'visitor';
+  const insets = useSafeAreaInsets();
 
   return (
     <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea} edges={['top', 'right', 'left']}>
-        <SettingsButton onPress={actions.navigateToSettings} />
+      <SettingsButton onPress={actions.navigateToSettings} topInset={insets.top} />
 
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Welcome Card */}
-          <WelcomeCard memberName={memberName} storeName={storeName} isVisitor={isVisitor} />
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingTop: insets.top + spacing.xxl + spacing.m },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Welcome Card */}
+        <WelcomeCard memberName={memberName} storeName={storeName} isVisitor={isVisitor} />
 
-          {/* Navigation Section Title */}
-          <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>
-            Explore
-          </ThemedText>
+        {/* Navigation Section Title */}
+        <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>
+          Explore
+        </ThemedText>
 
-          {/* All Beers Card - Always visible */}
-          <NavigationCard
-            testID="nav-all-beers"
-            title="All Beers"
-            description="Browse the complete taplist at your location"
-            iconName="beer-outline"
-            iconFamily="ionicons"
-            onPress={actions.navigateToAllBeers}
-          />
+        {/* All Beers Card - Always visible */}
+        <NavigationCard
+          testID="nav-all-beers"
+          title="All Beers"
+          description="Browse the complete taplist at your location"
+          iconName="beer-outline"
+          iconFamily="ionicons"
+          onPress={actions.navigateToAllBeers}
+        />
 
-          {/* Beerfinder Card - Member only */}
-          <NavigationCard
-            testID="nav-beerfinder"
-            title="Beerfinder"
-            description={
-              isVisitor
-                ? "Log in to find beers you haven't tasted"
-                : "Find beers you haven't tasted yet"
-            }
-            iconName="glass-mug-variant"
-            iconFamily="material-community"
-            onPress={actions.navigateToBeerfinder}
-            disabled={isVisitor}
-          />
+        {/* Beerfinder Card - Member only */}
+        <NavigationCard
+          testID="nav-beerfinder"
+          title="Beerfinder"
+          description={
+            isVisitor
+              ? "Log in to find beers you haven't tasted"
+              : "Find beers you haven't tasted yet"
+          }
+          iconName="glass-mug-variant"
+          iconFamily="material-community"
+          onPress={actions.navigateToBeerfinder}
+          disabled={isVisitor}
+        />
 
-          {/* Tasted Brews Card - Member only */}
-          <NavigationCard
-            testID="nav-tasted-brews"
-            title="Tasted Brews"
-            description={
-              isVisitor
-                ? 'Log in to track your tasting history'
-                : 'View your tasting history and progress'
-            }
-            iconName="checkmark-done-circle-outline"
-            iconFamily="ionicons"
-            onPress={actions.navigateToTastedBrews}
-            disabled={isVisitor}
-          />
+        {/* Tasted Brews Card - Member only */}
+        <NavigationCard
+          testID="nav-tasted-brews"
+          title="Tasted Brews"
+          description={
+            isVisitor
+              ? 'Log in to track your tasting history'
+              : 'View your tasting history and progress'
+          }
+          iconName="checkmark-done-circle-outline"
+          iconFamily="ionicons"
+          onPress={actions.navigateToTastedBrews}
+          disabled={isVisitor}
+        />
 
-          {/* Rewards Card - Member only */}
-          <NavigationCard
-            testID="nav-rewards"
-            title="Rewards"
-            description={
-              isVisitor
-                ? 'Log in to view your UFO Club rewards'
-                : 'View and redeem your UFO Club rewards'
-            }
-            iconName="gift-outline"
-            iconFamily="ionicons"
-            onPress={actions.navigateToRewards}
-            disabled={isVisitor}
-          />
+        {/* Rewards Card - Member only */}
+        <NavigationCard
+          testID="nav-rewards"
+          title="Rewards"
+          description={
+            isVisitor
+              ? 'Log in to view your UFO Club rewards'
+              : 'View and redeem your UFO Club rewards'
+          }
+          iconName="gift-outline"
+          iconFamily="ionicons"
+          onPress={actions.navigateToRewards}
+          disabled={isVisitor}
+        />
 
-          {/* Bottom spacing */}
-          <ThemedView style={styles.bottomSpacer} />
-        </ScrollView>
-      </SafeAreaView>
+        {/* Bottom spacing */}
+        <ThemedView style={styles.bottomSpacer} />
+      </ScrollView>
     </ThemedView>
   );
 }
@@ -415,15 +418,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  safeArea: {
-    flex: 1,
-  },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
     paddingHorizontal: spacing.m,
-    paddingTop: spacing.xxl + spacing.m, // Account for settings button
+    // paddingTop is set dynamically using safe area insets
     paddingBottom: spacing.xl,
   },
   centeredContainer: {
@@ -436,7 +436,7 @@ const styles = StyleSheet.create({
   // Settings Button
   settingsButton: {
     position: 'absolute',
-    top: spacing.m,
+    // top is set dynamically using safe area insets
     right: spacing.m,
     zIndex: 10,
   },

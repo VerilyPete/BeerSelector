@@ -4,15 +4,15 @@ import Animated from 'react-native-reanimated';
 import { ThemedText } from '../ThemedText';
 import { ThemedView } from '../ThemedView';
 import { useThemeColor } from '@/hooks/useThemeColor';
-import { BeerWithGlassType, BeerfinderWithGlassType } from '@/src/types/beer';
-import { GlassIcon } from '../icons/GlassIcon';
+import { BeerWithContainerType, BeerfinderWithContainerType } from '@/src/types/beer';
+import { ContainerIcon } from '../icons/ContainerIcon';
 import { spacing } from '@/constants/spacing';
 import { getShadow } from '@/constants/shadows';
 import { useAnimatedPress, useAnimatedExpand } from '@/animations';
 
-// Union type to accept both BeerWithGlassType and BeerfinderWithGlassType
-// These branded types guarantee the glass_type property is present
-type DisplayableBeer = BeerWithGlassType | BeerfinderWithGlassType;
+// Union type to accept both BeerWithContainerType and BeerfinderWithContainerType
+// These types have the container_type property (which can be null)
+type DisplayableBeer = BeerWithContainerType | BeerfinderWithContainerType;
 
 type BeerItemProps = {
   beer: DisplayableBeer;
@@ -94,12 +94,13 @@ const BeerItemComponent: React.FC<BeerItemProps> = ({
       ? formatDateString(beer.tasted_date)
       : formatDate(beer.added_date || '');
 
-  // Use pre-computed glass type from database - no runtime calculation needed!
+  // Use pre-computed container type from database - no runtime calculation needed!
   // This improves FlatList scroll performance by 30-40%
-  const glassType = beer.glass_type;
+  const containerType = beer.container_type;
 
-  // Check if beer is on draft (visual indicator)
-  const isDraft = beer.brew_container?.toLowerCase().includes('draft');
+  // Check container type for visual indicators (draft accent bar)
+  const containerLower = beer.brew_container?.toLowerCase() || '';
+  const isDraft = containerLower.includes('draft') || containerLower.includes('draught');
 
   // Get appropriate shadow based on expanded state
   const cardShadow = isExpanded ? getShadow('md', isDark) : getShadow('sm', isDark);
@@ -135,27 +136,26 @@ const BeerItemComponent: React.FC<BeerItemProps> = ({
             />
           )}
 
-          {/* Header row with beer name and glass icon */}
-          <View style={styles.headerRow}>
-            <View style={styles.nameContainer}>
-              <ThemedText
-                type="defaultSemiBold"
-                style={styles.beerName}
-                testID={`beer-name-${beer.id}`}
-                numberOfLines={isExpanded ? undefined : 2}
-              >
-                {beer.brew_name || 'Unnamed Beer'}
-              </ThemedText>
-            </View>
-            {glassType && (
-              <View
-                style={styles.glassIconContainer}
-                accessible={true}
-                accessibilityLabel={`Served in ${glassType} glass`}
-              >
-                <GlassIcon type={glassType} size={28} color={iconColor} />
-              </View>
-            )}
+          {/* Beer name */}
+          <ThemedText
+            type="defaultSemiBold"
+            style={[styles.beerName, styles.beerNameWithIcon]}
+            testID={`beer-name-${beer.id}`}
+            numberOfLines={isExpanded ? undefined : 2}
+          >
+            {beer.brew_name || 'Unnamed Beer'}
+          </ThemedText>
+
+          {/* Container icon - positioned absolutely to not affect layout */}
+          {/* Always shown: displays specific icon for known types, question mark for unknown */}
+          <View
+            style={styles.servingIconContainer}
+            accessible={true}
+            accessibilityLabel={
+              containerType ? `Served in ${containerType}` : 'Unknown container type'
+            }
+          >
+            <ContainerIcon type={containerType} size={24} color={iconColor} />
           </View>
 
           {/* Brewery info */}
@@ -237,22 +237,19 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: spacing.sm,
     borderBottomLeftRadius: spacing.sm,
   },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.s,
-  },
-  nameContainer: {
-    flex: 1,
-  },
   beerName: {
     fontSize: 17,
     lineHeight: 22,
   },
-  glassIconContainer: {
-    padding: spacing.xs,
-    minWidth: 44, // Touch target
-    minHeight: 44, // Touch target
+  beerNameWithIcon: {
+    paddingRight: 36, // Make room for absolutely positioned icon
+  },
+  servingIconContainer: {
+    position: 'absolute',
+    top: spacing.m,
+    right: spacing.m,
+    width: 28,
+    height: 28,
     alignItems: 'center',
     justifyContent: 'center',
   },

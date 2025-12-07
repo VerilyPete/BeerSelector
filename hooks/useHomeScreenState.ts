@@ -208,7 +208,7 @@ export const useHomeScreenState = (): UseHomeScreenStateReturn => {
   const actions = useMemo<HomeScreenActions>(
     () => ({
       navigateToSettings: () => {
-        router.navigate('/settings?action=login');
+        router.navigate('/settings');
       },
       navigateToAllBeers: () => {
         router.navigate('/(tabs)/beerlist');

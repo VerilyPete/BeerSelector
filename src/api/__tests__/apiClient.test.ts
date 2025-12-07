@@ -45,13 +45,8 @@ describe('ApiClient', () => {
       text: jest.fn().mockResolvedValue('{"success":true,"data":{"test":"data"}}'),
     });
 
-    // Use config values for ApiClient instantiation
-    apiClient = new ApiClient({
-      baseUrl: config.api.baseUrl,
-      retries: config.network.retries,
-      retryDelay: config.network.retryDelay,
-      timeout: config.network.timeout,
-    });
+    // Use singleton getInstance() instead of private constructor
+    apiClient = ApiClient.getInstance();
 
     // Clear mock call count after initialization
     // (ApiClient constructor calls fetch for network monitoring)

@@ -35,7 +35,7 @@ describe('BeerItem', () => {
     brew_container: '16oz Can',
     brew_description: '<p>A delicious test beer with hoppy notes.</p>',
     added_date: '1699564800', // Unix timestamp (Nov 10, 2023)
-    glass_type: 'tulip' as const, // Pre-computed glass type (tulip for IPA)
+    container_type: 'tulip' as const, // Pre-computed container type (tulip for draft IPA)
   };
 
   const mockOnToggle = jest.fn();
@@ -141,7 +141,7 @@ describe('BeerItem', () => {
       brew_container: '',
       brew_description: '',
       added_date: '1699564800',
-      glass_type: null, // Pre-computed glass type (null for Lager)
+      container_type: null, // Pre-computed container type (null for unknown containers)
     };
 
     const { getByText } = render(

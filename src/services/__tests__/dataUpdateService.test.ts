@@ -144,10 +144,10 @@ describe('dataUpdateService', () => {
       // Mock getPreference to return a test API URL
       (getPreference as jest.Mock).mockResolvedValueOnce(testAllBeersUrl);
 
-      // Mock beers data (include glass_type as it's added by calculateGlassTypes)
+      // Mock beers data (without container_type - it's added by calculateContainerTypes in the service)
       const mockBeers: Beer[] = [
-        { id: 'beer-1', brew_name: 'Test Beer 1', brewer: 'Brewery 1', glass_type: null },
-        { id: 'beer-2', brew_name: 'Test Beer 2', brewer: 'Brewery 2', glass_type: null },
+        { id: 'beer-1', brew_name: 'Test Beer 1', brewer: 'Brewery 1' },
+        { id: 'beer-2', brew_name: 'Test Beer 2', brewer: 'Brewery 2' },
       ];
 
       // Mock fetch to return valid data
@@ -167,7 +167,11 @@ describe('dataUpdateService', () => {
       expect(result.success).toBe(true);
       expect(result.dataUpdated).toBe(true);
       expect(result.itemCount).toBe(mockBeers.length);
-      expect(beerRepository.insertMany).toHaveBeenCalledWith(mockBeers);
+      // The service adds container_type (null) to beers before insertion via calculateContainerTypes()
+      expect(beerRepository.insertMany).toHaveBeenCalledWith([
+        { id: 'beer-1', brew_name: 'Test Beer 1', brewer: 'Brewery 1', container_type: null },
+        { id: 'beer-2', brew_name: 'Test Beer 2', brewer: 'Brewery 2', container_type: null },
+      ]);
       expect(setPreference).toHaveBeenCalledWith('all_beers_last_update', expect.any(String));
       expect(setPreference).toHaveBeenCalledWith('all_beers_last_check', expect.any(String));
       expect(console.log).toHaveBeenCalledWith(
@@ -383,10 +387,10 @@ describe('dataUpdateService', () => {
         .mockResolvedValueOnce('false') // is_visitor_mode
         .mockResolvedValueOnce(testMyBeersUrl); // my_beers_api_url
 
-      // Mock beers data with IDs (include glass_type as it's added by calculateGlassTypes)
+      // Mock beers data with IDs (without container_type - it's added by calculateContainerTypes in the service)
       const mockBeers: Beerfinder[] = [
-        { id: 'beer-1', brew_name: 'Test Beer 1', tasted_date: '2023-01-01', glass_type: null },
-        { id: 'beer-2', brew_name: 'Test Beer 2', tasted_date: '2023-01-02', glass_type: null },
+        { id: 'beer-1', brew_name: 'Test Beer 1', tasted_date: '2023-01-01' },
+        { id: 'beer-2', brew_name: 'Test Beer 2', tasted_date: '2023-01-02' },
       ];
 
       // Mock fetch to return valid data
@@ -408,7 +412,11 @@ describe('dataUpdateService', () => {
       expect(result.success).toBe(true);
       expect(result.dataUpdated).toBe(true);
       expect(result.itemCount).toBe(mockBeers.length);
-      expect(myBeersRepository.insertMany).toHaveBeenCalledWith(mockBeers);
+      // The service adds container_type (null) to beers before insertion via calculateContainerTypes()
+      expect(myBeersRepository.insertMany).toHaveBeenCalledWith([
+        { id: 'beer-1', brew_name: 'Test Beer 1', tasted_date: '2023-01-01', container_type: null },
+        { id: 'beer-2', brew_name: 'Test Beer 2', tasted_date: '2023-01-02', container_type: null },
+      ]);
       expect(setPreference).toHaveBeenCalledWith('my_beers_last_update', expect.any(String));
       expect(setPreference).toHaveBeenCalledWith('my_beers_last_check', expect.any(String));
       expect(console.log).toHaveBeenCalledWith(

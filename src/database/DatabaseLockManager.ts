@@ -19,7 +19,7 @@ interface LockRequest {
   resolve: (acquired: boolean) => void;
   reject: (error: Error) => void;
   timestamp: number;
-  acquisitionTimeoutId?: NodeJS.Timeout;
+  acquisitionTimeoutId?: ReturnType<typeof setTimeout>;
 }
 
 /**
@@ -48,7 +48,7 @@ interface LockRequest {
 export class DatabaseLockManager {
   private lockHeld: boolean = false;
   private queue: LockRequest[] = [];
-  private timeoutId: NodeJS.Timeout | null = null;
+  private timeoutId: ReturnType<typeof setTimeout> | null = null;
   private readonly LOCK_TIMEOUT_MS = 15000; // 15 seconds for mobile UX (hold timeout)
   private readonly ACQUISITION_TIMEOUT_MS = 30000; // 30 seconds for acquisition timeout
   private currentOperation: string | null = null;
@@ -103,12 +103,14 @@ export class DatabaseLockManager {
         resolve,
         reject,
         timestamp: Date.now(),
-        acquisitionTimeoutId
+        acquisitionTimeoutId,
       });
 
       // Warn if queue is getting long (after adding to queue)
       if (this.queue.length >= this.QUEUE_WARNING_THRESHOLD) {
-        console.warn(`[LockManager] Queue length is ${this.queue.length}, exceeding threshold of ${this.QUEUE_WARNING_THRESHOLD}`);
+        console.warn(
+          `[LockManager] Queue length is ${this.queue.length}, exceeding threshold of ${this.QUEUE_WARNING_THRESHOLD}`
+        );
       }
     });
   }
@@ -124,7 +126,7 @@ export class DatabaseLockManager {
   private _grantLock(
     operationName: string,
     resolve: (acquired: boolean) => void,
-    acquisitionTimeoutId?: NodeJS.Timeout,
+    acquisitionTimeoutId?: ReturnType<typeof setTimeout>,
     requestTimestamp?: number
   ): void {
     // Track wait time if this was a queued request
@@ -186,7 +188,9 @@ export class DatabaseLockManager {
       console.warn(`Lock acquisition timeout for ${operationName} after ${timeoutMs}ms`);
 
       // Reject the promise
-      request.reject(new Error(`Lock acquisition timeout for ${operationName} after ${timeoutMs}ms`));
+      request.reject(
+        new Error(`Lock acquisition timeout for ${operationName} after ${timeoutMs}ms`)
+      );
     }
   }
 
@@ -236,7 +240,12 @@ export class DatabaseLockManager {
     if (this.queue.length > 0) {
       const next = this.queue.shift();
       if (next) {
-        this._grantLock(next.operationName, next.resolve, next.acquisitionTimeoutId, next.timestamp);
+        this._grantLock(
+          next.operationName,
+          next.resolve,
+          next.acquisitionTimeoutId,
+          next.timestamp
+        );
       }
     }
   }

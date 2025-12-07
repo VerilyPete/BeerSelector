@@ -57,7 +57,7 @@ describe('AllBeers Loading States (MP-3 Step 3a)', () => {
       brewer_loc: 'Austin, TX',
       abv: '6.5',
       ibu: '60',
-      glass_type: 'tulip' as const, // Pre-computed glass type for IPA
+      container_type: 'tulip' as const, // Pre-computed glass type for IPA
     },
     {
       id: '2',
@@ -70,7 +70,7 @@ describe('AllBeers Loading States (MP-3 Step 3a)', () => {
       brewer_loc: 'Denver, CO',
       abv: '8.0',
       ibu: '45',
-      glass_type: 'pint' as const, // Pre-computed glass type for Stout
+      container_type: 'pint' as const, // Pre-computed glass type for Stout
     },
   ];
 

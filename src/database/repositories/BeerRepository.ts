@@ -6,13 +6,9 @@
  */
 
 import { getDatabase } from '../connection';
-import { BeerWithGlassType } from '../../types/beer';
+import { BeerWithContainerType } from '../../types/beer';
 import { databaseLockManager } from '../locks';
-import {
-  isAllBeersRow,
-  allBeersRowToBeerWithGlassType,
-  AllBeersRow
-} from '../schemaTypes';
+import { isAllBeersRow, allBeersRowToBeerWithContainerType, AllBeersRow } from '../schemaTypes';
 
 /**
  * Repository class for Beer entity operations
@@ -31,11 +27,11 @@ export class BeerRepository {
    * Skips beers without valid IDs.
    * Uses database lock to prevent concurrent operations.
    *
-   * @param beers - Array of BeerWithGlassType objects to insert
+   * @param beers - Array of BeerWithContainerType objects to insert
    */
-  async insertMany(beers: BeerWithGlassType[]): Promise<void> {
+  async insertMany(beers: BeerWithContainerType[]): Promise<void> {
     // Acquire database lock to prevent concurrent operations
-    if (!await databaseLockManager.acquireLock('BeerRepository.insertMany')) {
+    if (!(await databaseLockManager.acquireLock('BeerRepository.insertMany'))) {
       throw new Error('Could not acquire database lock for beer insertion');
     }
 
@@ -53,24 +49,26 @@ export class BeerRepository {
    * UNSAFE: This method does NOT acquire a database lock.
    * Only use when already holding a master lock (e.g., in sequential refresh).
    *
-   * @param beers - Array of BeerWithGlassType objects to insert
+   * @param beers - Array of BeerWithContainerType objects to insert
    */
-  async insertManyUnsafe(beers: BeerWithGlassType[]): Promise<void> {
+  async insertManyUnsafe(beers: BeerWithContainerType[]): Promise<void> {
     await this._insertManyInternal(beers);
   }
 
   /**
    * Internal implementation of beer insertion (shared by locked and unlocked variants)
    *
-   * @param beers - Array of BeerWithGlassType objects to insert
+   * @param beers - Array of BeerWithContainerType objects to insert
    */
-  private async _insertManyInternal(beers: BeerWithGlassType[]): Promise<void> {
+  private async _insertManyInternal(beers: BeerWithContainerType[]): Promise<void> {
     const database = await getDatabase();
 
     // Always refresh the allbeers table with the latest data
     // Clear existing data first, then insert fresh records in batches
     await database.withTransactionAsync(async () => {
-      const before = await database.getFirstAsync<{ count: number }>('SELECT COUNT(*) as count FROM allbeers');
+      const before = await database.getFirstAsync<{ count: number }>(
+        'SELECT COUNT(*) as count FROM allbeers'
+      );
       await database.runAsync('DELETE FROM allbeers');
       console.log(`Cleared allbeers table (removed ${before?.count ?? 0} rows)`);
     });
@@ -91,7 +89,7 @@ export class BeerRepository {
           await database.runAsync(
             `INSERT OR REPLACE INTO allbeers (
               id, added_date, brew_name, brewer, brewer_loc,
-              brew_style, brew_container, review_count, review_rating, brew_description, glass_type
+              brew_style, brew_container, review_count, review_rating, brew_description, container_type
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
               beer.id,
@@ -104,7 +102,7 @@ export class BeerRepository {
               beer.review_count || '',
               beer.review_rating || '',
               beer.brew_description || '',
-              beer.glass_type
+              beer.container_type,
             ]
           );
         }
@@ -112,13 +110,17 @@ export class BeerRepository {
 
       // Log progress for larger batches
       if ((i + batchSize) % 200 === 0 || i + batchSize >= beers.length) {
-        console.log(`Imported ${Math.min(i + batchSize, beers.length)} of ${beers.length} beers...`);
+        console.log(
+          `Imported ${Math.min(i + batchSize, beers.length)} of ${beers.length} beers...`
+        );
       }
     }
 
     // Verify final row count
     try {
-      const after = await database.getFirstAsync<{ count: number }>('SELECT COUNT(*) as count FROM allbeers');
+      const after = await database.getFirstAsync<{ count: number }>(
+        'SELECT COUNT(*) as count FROM allbeers'
+      );
       console.log(`Beer import complete! allbeers now has ${after?.count ?? 0} rows`);
     } catch (e) {
       console.log('Beer import complete! (row count query failed)');
@@ -132,9 +134,9 @@ export class BeerRepository {
    * Orders by added_date DESC.
    * Validates all rows with type guards and filters out invalid data.
    *
-   * @returns Array of BeerWithGlassType objects
+   * @returns Array of BeerWithContainerType objects
    */
-  async getAll(): Promise<BeerWithGlassType[]> {
+  async getAll(): Promise<BeerWithContainerType[]> {
     const database = await getDatabase();
 
     try {
@@ -145,7 +147,7 @@ export class BeerRepository {
       // Validate and convert each row
       return rows
         .filter(row => isAllBeersRow(row))
-        .map(row => allBeersRowToBeerWithGlassType(row));
+        .map(row => allBeersRowToBeerWithContainerType(row));
     } catch (error) {
       console.error('Error getting beers from database:', error);
       throw error;
@@ -158,20 +160,19 @@ export class BeerRepository {
    * Validates the result with type guards before returning.
    *
    * @param id - The beer ID to search for
-   * @returns BeerWithGlassType object if found and valid, null otherwise
+   * @returns BeerWithContainerType object if found and valid, null otherwise
    */
-  async getById(id: string): Promise<BeerWithGlassType | null> {
+  async getById(id: string): Promise<BeerWithContainerType | null> {
     const database = await getDatabase();
 
     try {
-      const row = await database.getFirstAsync<AllBeersRow>(
-        'SELECT * FROM allbeers WHERE id = ?',
-        [id]
-      );
+      const row = await database.getFirstAsync<AllBeersRow>('SELECT * FROM allbeers WHERE id = ?', [
+        id,
+      ]);
 
       // Validate and convert the row
       if (row && isAllBeersRow(row)) {
-        return allBeersRowToBeerWithGlassType(row);
+        return allBeersRowToBeerWithContainerType(row);
       }
 
       return null;
@@ -189,9 +190,9 @@ export class BeerRepository {
    * Validates all rows with type guards and filters out invalid data.
    *
    * @param query - Search query string
-   * @returns Array of matching BeerWithGlassType objects
+   * @returns Array of matching BeerWithContainerType objects
    */
-  async search(query: string): Promise<BeerWithGlassType[]> {
+  async search(query: string): Promise<BeerWithContainerType[]> {
     if (!query.trim()) {
       return this.getAll();
     }
@@ -214,7 +215,7 @@ export class BeerRepository {
       // Validate and convert each row
       return rows
         .filter(row => isAllBeersRow(row))
-        .map(row => allBeersRowToBeerWithGlassType(row));
+        .map(row => allBeersRowToBeerWithContainerType(row));
     } catch (error) {
       console.error('Error searching beers:', error);
       throw error;
@@ -227,9 +228,9 @@ export class BeerRepository {
    * Validates all rows with type guards and filters out invalid data.
    *
    * @param style - Beer style to filter by
-   * @returns Array of BeerWithGlassType objects matching the style
+   * @returns Array of BeerWithContainerType objects matching the style
    */
-  async getByStyle(style: string): Promise<BeerWithGlassType[]> {
+  async getByStyle(style: string): Promise<BeerWithContainerType[]> {
     const database = await getDatabase();
 
     try {
@@ -241,7 +242,7 @@ export class BeerRepository {
       // Validate and convert each row
       return rows
         .filter(row => isAllBeersRow(row))
-        .map(row => allBeersRowToBeerWithGlassType(row));
+        .map(row => allBeersRowToBeerWithContainerType(row));
     } catch (error) {
       console.error('Error getting beers by style:', error);
       throw error;
@@ -254,9 +255,9 @@ export class BeerRepository {
    * Validates all rows with type guards and filters out invalid data.
    *
    * @param brewer - Brewer name to filter by
-   * @returns Array of BeerWithGlassType objects from the specified brewer
+   * @returns Array of BeerWithContainerType objects from the specified brewer
    */
-  async getByBrewer(brewer: string): Promise<BeerWithGlassType[]> {
+  async getByBrewer(brewer: string): Promise<BeerWithContainerType[]> {
     const database = await getDatabase();
 
     try {
@@ -268,7 +269,7 @@ export class BeerRepository {
       // Validate and convert each row
       return rows
         .filter(row => isAllBeersRow(row))
-        .map(row => allBeersRowToBeerWithGlassType(row));
+        .map(row => allBeersRowToBeerWithContainerType(row));
     } catch (error) {
       console.error('Error getting beers by brewer:', error);
       throw error;
@@ -282,9 +283,9 @@ export class BeerRepository {
    * ID in the tasted_brew_current_round table.
    * Validates all rows with type guards and filters out invalid data.
    *
-   * @returns Array of untasted BeerWithGlassType objects
+   * @returns Array of untasted BeerWithContainerType objects
    */
-  async getUntasted(): Promise<BeerWithGlassType[]> {
+  async getUntasted(): Promise<BeerWithContainerType[]> {
     const database = await getDatabase();
 
     try {
@@ -299,7 +300,7 @@ export class BeerRepository {
       // Validate and convert each row
       return rows
         .filter(row => isAllBeersRow(row))
-        .map(row => allBeersRowToBeerWithGlassType(row));
+        .map(row => allBeersRowToBeerWithContainerType(row));
     } catch (error) {
       console.error('Error getting beers not in My Beers:', error);
       throw error;
@@ -316,10 +317,16 @@ export class BeerRepository {
 
     try {
       await database.withTransactionAsync(async () => {
-        const before = await database.getFirstAsync<{ count: number }>('SELECT COUNT(*) as count FROM allbeers');
+        const before = await database.getFirstAsync<{ count: number }>(
+          'SELECT COUNT(*) as count FROM allbeers'
+        );
         await database.runAsync('DELETE FROM allbeers');
-        const after = await database.getFirstAsync<{ count: number }>('SELECT COUNT(*) as count FROM allbeers');
-        console.log(`DB: Successfully cleared allbeers table (removed ${before?.count ?? 0} rows, now ${after?.count ?? 0})`);
+        const after = await database.getFirstAsync<{ count: number }>(
+          'SELECT COUNT(*) as count FROM allbeers'
+        );
+        console.log(
+          `DB: Successfully cleared allbeers table (removed ${before?.count ?? 0} rows, now ${after?.count ?? 0})`
+        );
       });
     } catch (error) {
       console.error('Error clearing all beers:', error);

@@ -85,30 +85,28 @@ describe('MockServer Config Integration Example', () => {
       // Configure mock response
       const mockBeers = [
         { id: 1, name: 'Test IPA', brewery: 'Test Brewery' },
-        { id: 2, name: 'Test Stout', brewery: 'Craft Co' }
+        { id: 2, name: 'Test Stout', brewery: 'Craft Co' },
       ];
 
       mockServer.setResponse('/memberQueues.php', {
         status: 200,
-        body: [null, { brewInStock: mockBeers }]
+        body: [null, { brewInStock: mockBeers }],
       });
 
       // Make request to mock server
-      (global.fetch as jest.Mock).mockImplementation(async (url) => {
+      (global.fetch as jest.Mock).mockImplementation(async url => {
         // Simulate the fetch by making actual call to mock server
         if (url === config.api.getFullUrl('memberQueues')) {
           return {
             ok: true,
             status: 200,
-            json: async () => [null, { brewInStock: mockBeers }]
+            json: async () => [null, { brewInStock: mockBeers }],
           };
         }
         return { ok: false, status: 404 };
       });
 
-      const response = await (global.fetch as jest.Mock)(
-        config.api.getFullUrl('memberQueues')
-      );
+      const response = await (global.fetch as jest.Mock)(config.api.getFullUrl('memberQueues'));
 
       expect(response.ok).toBe(true);
       expect(response.status).toBe(200);
@@ -124,7 +122,7 @@ describe('MockServer Config Integration Example', () => {
       // Configure response
       mockServer.setResponse('/deleteQueuedBrew.php', {
         status: 200,
-        body: { success: true }
+        body: { success: true },
       });
 
       // Simulate making a request (in real tests, this would be actual HTTP)
@@ -145,18 +143,16 @@ describe('MockServer Config Integration Example', () => {
     it('should handle 404 responses', async () => {
       mockServer.setDefaultResponse({
         status: 404,
-        body: { error: 'Not Found' }
+        body: { error: 'Not Found' },
       });
 
       (global.fetch as jest.Mock).mockImplementation(async () => ({
         ok: false,
         status: 404,
-        json: async () => ({ error: 'Not Found' })
+        json: async () => ({ error: 'Not Found' }),
       }));
 
-      const response = await (global.fetch as jest.Mock)(
-        `${mockServer.getUrl()}/unknown-endpoint`
-      );
+      const response = await (global.fetch as jest.Mock)(`${mockServer.getUrl()}/unknown-endpoint`);
 
       expect(response.ok).toBe(false);
       expect(response.status).toBe(404);
@@ -169,7 +165,7 @@ describe('MockServer Config Integration Example', () => {
       mockServer.setResponse('/slow-endpoint', {
         status: 200,
         body: { data: 'Eventually returned' },
-        delay: 100 // 100ms delay
+        delay: 100, // 100ms delay
       });
 
       // In a real test, the delay would be applied by the mock server
@@ -202,15 +198,16 @@ describe('MockServer Config Integration Example', () => {
     });
 
     it('should support sequential responses', () => {
-      const responses = [
-        { status: 200, body: { message: 'First' } },
-        { status: 201, body: { message: 'Second' } },
-        { status: 202, body: { message: 'Third' } }
-      ];
-
+      // Example sequential responses pattern
       // In real usage with createSequentialResponses helper
       // Each call returns the next response in sequence
       // After the last response, it cycles back to the first
+      // Expected pattern:
+      // [
+      //   { status: 200, body: { message: 'First' } },
+      //   { status: 201, body: { message: 'Second' } },
+      //   { status: 202, body: { message: 'Third' } }
+      // ]
     });
   });
 });
@@ -239,15 +236,15 @@ describe('MockServer Patterns for Flying Saucer API', () => {
             name: 'Dogfish Head 60 Minute IPA',
             brewery: 'Dogfish Head Craft Brewery',
             style: 'IPA',
-            abv: 6.0
-          }
-        ]
-      }
+            abv: 6.0,
+          },
+        ],
+      },
     ];
 
     mockServer.setResponse('/memberQueues.php', {
       status: 200,
-      body: mockResponse
+      body: mockResponse,
     });
 
     // This response format matches what the real API returns
@@ -260,8 +257,8 @@ describe('MockServer Patterns for Flying Saucer API', () => {
       body: '<html>Dashboard HTML</html>',
       headers: {
         'Content-Type': 'text/html',
-        'Set-Cookie': 'PHPSESSID=test123; Path=/; HttpOnly'
-      }
+        'Set-Cookie': 'PHPSESSID=test123; Path=/; HttpOnly',
+      },
     });
 
     // This simulates the login response with session cookie
@@ -276,10 +273,10 @@ describe('MockServer Patterns for Flying Saucer API', () => {
         {
           brewInStock: [
             { id: 1, name: 'Visitor Beer 1', isAvailable: true },
-            { id: 2, name: 'Visitor Beer 2', isAvailable: false }
-          ]
-        }
-      ]
+            { id: 2, name: 'Visitor Beer 2', isAvailable: false },
+          ],
+        },
+      ],
     });
 
     // Visitor mode returns limited beer data

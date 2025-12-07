@@ -22,7 +22,7 @@ import React from 'react';
 import { render } from '@testing-library/react-native';
 import { FlatList } from 'react-native';
 import { BeerList } from '../BeerList';
-import { BeerWithGlassType } from '@/src/types/beer';
+import { BeerWithContainerType } from '@/src/types/beer';
 
 // Mock dependencies
 jest.mock('@/hooks/useThemeColor', () => ({
@@ -42,7 +42,7 @@ jest.mock('../BeerItem', () => ({
 }));
 
 describe('BeerList - Virtualization Window Tuning (Bottleneck #6)', () => {
-  const createMockBeer = (id: string): BeerWithGlassType => ({
+  const createMockBeer = (id: string): BeerWithContainerType => ({
     id,
     brew_name: `Test Beer ${id}`,
     brewer: 'Test Brewery',
@@ -51,10 +51,10 @@ describe('BeerList - Virtualization Window Tuning (Bottleneck #6)', () => {
     brewer_loc: 'Austin, TX',
     brew_container: 'Draft',
     brew_description: 'Test description',
-    glass_type: 'tulip', // Pre-computed glass type for IPA
+    container_type: 'tulip', // Pre-computed glass type for IPA
   });
 
-  const mockBeers: BeerWithGlassType[] = Array.from({ length: 200 }, (_, i) =>
+  const mockBeers: BeerWithContainerType[] = Array.from({ length: 200 }, (_, i) =>
     createMockBeer(String(i + 1))
   );
 

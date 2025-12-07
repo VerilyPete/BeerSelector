@@ -33,7 +33,15 @@
  * ```
  */
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  ReactNode,
+} from 'react';
 import { optimisticUpdateRepository } from '@/src/database/repositories/OptimisticUpdateRepository';
 import {
   OptimisticUpdate,
@@ -42,10 +50,7 @@ import {
   RollbackData,
   OptimisticUpdateConfig,
   DEFAULT_OPTIMISTIC_CONFIG,
-  CheckInRollbackData,
-  isCheckInRollbackData,
 } from '@/src/types/optimisticUpdate';
-import { Beer, Beerfinder } from '@/src/types/beer';
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -204,61 +209,63 @@ export const OptimisticUpdateProvider: React.FC<OptimisticUpdateProviderProps> =
   /**
    * Confirm an update succeeded
    */
-  const confirmUpdate = useCallback(async (id: string): Promise<void> => {
-    try {
-      await optimisticUpdateRepository.updateStatus(id, OptimisticUpdateStatus.SUCCESS);
-      await loadUpdates();
-      console.log(`[OptimisticUpdateContext] Confirmed update: ${id}`);
-
-      // Auto-cleanup after a short delay
-      setTimeout(async () => {
-        await optimisticUpdateRepository.delete(id);
+  const confirmUpdate = useCallback(
+    async (id: string): Promise<void> => {
+      try {
+        await optimisticUpdateRepository.updateStatus(id, OptimisticUpdateStatus.SUCCESS);
         await loadUpdates();
-      }, 1000);
-    } catch (error) {
-      console.error('[OptimisticUpdateContext] Error confirming update:', error);
-      throw error;
-    }
-  }, [loadUpdates]);
+        console.log(`[OptimisticUpdateContext] Confirmed update: ${id}`);
+
+        // Auto-cleanup after a short delay
+        setTimeout(async () => {
+          await optimisticUpdateRepository.delete(id);
+          await loadUpdates();
+        }, 1000);
+      } catch (error) {
+        console.error('[OptimisticUpdateContext] Error confirming update:', error);
+        throw error;
+      }
+    },
+    [loadUpdates]
+  );
 
   /**
    * Rollback an update (restore previous state)
    */
-  const rollbackUpdate = useCallback(async (id: string, error?: string): Promise<RollbackData | null> => {
-    try {
-      const update = await optimisticUpdateRepository.getById(id);
+  const rollbackUpdate = useCallback(
+    async (id: string, error?: string): Promise<RollbackData | null> => {
+      try {
+        const update = await optimisticUpdateRepository.getById(id);
 
-      if (!update) {
-        console.warn(`[OptimisticUpdateContext] Update ${id} not found for rollback`);
-        return null;
+        if (!update) {
+          console.warn(`[OptimisticUpdateContext] Update ${id} not found for rollback`);
+          return null;
+        }
+
+        // Update status to FAILED
+        await optimisticUpdateRepository.updateStatus(id, OptimisticUpdateStatus.FAILED, error);
+
+        // Reload updates
+        await loadUpdates();
+
+        console.log(`[OptimisticUpdateContext] Rolled back update: ${id}`);
+
+        // Return rollback data so caller can restore state
+        return update.rollbackData;
+      } catch (error) {
+        console.error('[OptimisticUpdateContext] Error rolling back update:', error);
+        throw error;
       }
-
-      // Update status to FAILED
-      await optimisticUpdateRepository.updateStatus(
-        id,
-        OptimisticUpdateStatus.FAILED,
-        error
-      );
-
-      // Reload updates
-      await loadUpdates();
-
-      console.log(`[OptimisticUpdateContext] Rolled back update: ${id}`);
-
-      // Return rollback data so caller can restore state
-      return update.rollbackData;
-    } catch (error) {
-      console.error('[OptimisticUpdateContext] Error rolling back update:', error);
-      throw error;
-    }
-  }, [loadUpdates]);
+    },
+    [loadUpdates]
+  );
 
   /**
    * Get update by ID
    */
   const getUpdate = useCallback(
     (id: string): OptimisticUpdate | null => {
-      return optimisticUpdates.find((u) => u.id === id) || null;
+      return optimisticUpdates.find(u => u.id === id) || null;
     },
     [optimisticUpdates]
   );
@@ -268,7 +275,7 @@ export const OptimisticUpdateProvider: React.FC<OptimisticUpdateProviderProps> =
    */
   const getUpdateByOperationId = useCallback(
     (operationId: string): OptimisticUpdate | null => {
-      return optimisticUpdates.find((u) => u.operationId === operationId) || null;
+      return optimisticUpdates.find(u => u.operationId === operationId) || null;
     },
     [optimisticUpdates]
   );
@@ -350,13 +357,16 @@ export const OptimisticUpdateProvider: React.FC<OptimisticUpdateProviderProps> =
    * Cleanup old completed updates periodically
    */
   useEffect(() => {
-    const cleanupInterval = setInterval(async () => {
-      try {
-        await optimisticUpdateRepository.clearOldCompleted(24 * 60 * 60 * 1000); // 24 hours
-      } catch (error) {
-        console.error('[OptimisticUpdateContext] Error cleaning up old updates:', error);
-      }
-    }, 60 * 60 * 1000); // Run every hour
+    const cleanupInterval = setInterval(
+      async () => {
+        try {
+          await optimisticUpdateRepository.clearOldCompleted(24 * 60 * 60 * 1000); // 24 hours
+        } catch (error) {
+          console.error('[OptimisticUpdateContext] Error cleaning up old updates:', error);
+        }
+      },
+      60 * 60 * 1000
+    ); // Run every hour
 
     return () => clearInterval(cleanupInterval);
   }, []);
@@ -370,9 +380,8 @@ export const OptimisticUpdateProvider: React.FC<OptimisticUpdateProviderProps> =
    */
   const pendingUpdates = useMemo(() => {
     return optimisticUpdates.filter(
-      (u) =>
-        u.status === OptimisticUpdateStatus.PENDING ||
-        u.status === OptimisticUpdateStatus.SYNCING
+      u =>
+        u.status === OptimisticUpdateStatus.PENDING || u.status === OptimisticUpdateStatus.SYNCING
     );
   }, [optimisticUpdates]);
 
@@ -413,7 +422,9 @@ export const OptimisticUpdateProvider: React.FC<OptimisticUpdateProviderProps> =
     ]
   );
 
-  return <OptimisticUpdateContext.Provider value={value}>{children}</OptimisticUpdateContext.Provider>;
+  return (
+    <OptimisticUpdateContext.Provider value={value}>{children}</OptimisticUpdateContext.Provider>
+  );
 };
 
 // ============================================================================

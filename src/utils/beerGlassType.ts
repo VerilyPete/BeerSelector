@@ -1,7 +1,17 @@
 /**
- * Glass type utilities for determining appropriate glassware based on beer properties
+ * Container type utilities for determining appropriate serving vessel based on beer properties
+ *
+ * Container types:
+ * - 'pint': Pint glass for regular draft beers (<7.4% ABV)
+ * - 'tulip': Tulip glass for high ABV draft beers (>=7.4%)
+ * - 'can': Can icon for canned beers
+ * - 'bottle': Bottle icon for bottled beers
+ * - null: No icon displayed
  */
 
+export type ContainerType = 'pint' | 'tulip' | 'can' | 'bottle' | null;
+
+// Legacy alias for backwards compatibility
 export type GlassType = 'pint' | 'tulip' | null;
 
 /**
@@ -51,53 +61,62 @@ export function extractABV(description: string | undefined): number | null {
 }
 
 /**
- * Determine the appropriate glass type based on container type and ABV
+ * Determine the appropriate container type based on container type and ABV
  * Rules (in priority order):
- * 1. Container size override:
- *    - "13oz draft" or "13 oz draft" → Tulip glass (skip ABV detection)
- *    - "16oz draft" or "16 oz draft" → Pint glass (skip ABV detection)
- * 2. ABV-based detection (for other draft beers):
- *    - ABV < 7.4% → Pint glass
- *    - ABV >= 7.4% → Tulip glass
- * 3. Beer style keyword fallback (if all other checks fail):
- *    - Style contains "pilsner" or "lager" → Pint glass
- *    - Style contains "imperial", "tripel", "quad", or "barleywine" → Tulip glass
+ * 1. Can detection:
+ *    - Container contains "can" → 'can'
+ * 2. Bottle detection:
+ *    - Container contains "bottle" or "bottled" → 'bottle'
+ * 3. Draft/Draught detection with glass type:
+ *    a. Container size override:
+ *       - "13oz draft" or "13 oz draft" → 'tulip' (skip ABV detection)
+ *       - "16oz draft" or "16 oz draft" → 'pint' (skip ABV detection)
+ *    b. ABV-based detection (for other draft beers):
+ *       - ABV < 7.4% → 'pint'
+ *       - ABV >= 7.4% → 'tulip'
+ *    c. Beer style keyword fallback (if all other checks fail):
+ *       - Style contains "pilsner" or "lager" → 'pint'
+ *       - Style contains "imperial", "tripel", "quad", or "barleywine" → 'tulip'
  * 4. No icon shown for:
- *    - Bottled beers
- *    - Non-draft containers
+ *    - Non-draft containers without can/bottle
  *    - Draft beers without detectable ABV and no style keywords
- * @param container - Beer container type (e.g., "Draft", "13oz draft", "16oz draft", "Bottled")
+ * @param container - Beer container type (e.g., "Draft", "13oz draft", "Can", "Bottled")
  * @param description - Beer description containing ABV
  * @param brewStyle - Beer style (e.g., "Imperial IPA", "Belgian Tripel", "Barleywine")
- * @returns Glass type or null if no icon should be displayed
+ * @returns Container type or null if no icon should be displayed
  */
-export function getGlassType(
+export function getContainerType(
   container: string | undefined,
   description: string | undefined,
   brewStyle?: string
-): GlassType {
+): ContainerType {
   if (!container) return null;
 
   const normalizedContainer = container.toLowerCase();
 
-  // No glyphs for bottled beers
-  if (normalizedContainer.includes('bottled')) return null;
-
-  // Check for specific container sizes (skip ABV detection)
-  // Match both "13oz" and "13 oz" (with or without space)
-  if ((normalizedContainer.includes('13oz') || normalizedContainer.includes('13 oz')) &&
-      normalizedContainer.includes('draft')) {
-    return 'tulip';
-  }
-  if ((normalizedContainer.includes('16oz') || normalizedContainer.includes('16 oz')) &&
-      normalizedContainer.includes('draft')) {
-    return 'pint';
+  // Check for can first (highest priority for non-draft)
+  if (normalizedContainer.includes('can')) {
+    return 'can';
   }
 
-  // Only show glyphs for draft/draught beers
+  // Check for bottle/bottled
+  if (normalizedContainer.includes('bottle')) {
+    return 'bottle';
+  }
+
+  // Check for draft/draught beers with glass type detection
   const isDraft = normalizedContainer.includes('draft') || normalizedContainer.includes('draught');
 
   if (!isDraft) return null;
+
+  // Check for specific container sizes (skip ABV detection)
+  // Match both "13oz" and "13 oz" (with or without space)
+  if (normalizedContainer.includes('13oz') || normalizedContainer.includes('13 oz')) {
+    return 'tulip';
+  }
+  if (normalizedContainer.includes('16oz') || normalizedContainer.includes('16 oz')) {
+    return 'pint';
+  }
 
   // Extract ABV from description
   const abv = extractABV(description);
@@ -130,5 +149,22 @@ export function getGlassType(
     }
   }
 
+  return null;
+}
+
+/**
+ * Legacy function - use getContainerType instead
+ * @deprecated Use getContainerType which also handles can/bottle containers
+ */
+export function getGlassType(
+  container: string | undefined,
+  description: string | undefined,
+  brewStyle?: string
+): GlassType {
+  const containerType = getContainerType(container, description, brewStyle);
+  // Only return pint/tulip for glass types (legacy behavior)
+  if (containerType === 'pint' || containerType === 'tulip') {
+    return containerType;
+  }
   return null;
 }

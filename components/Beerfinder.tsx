@@ -24,7 +24,7 @@ import { BeerList } from './beer/BeerList';
 import { SkeletonLoader } from './beer/SkeletonLoader';
 import { QueuedBeer } from '@/src/utils/htmlParser';
 import { getQueuedBeers, deleteQueuedBeer as deleteQueuedBeerApi } from '@/src/api/queueService';
-import { BeerWithGlassType } from '@/src/types/beer';
+import { BeerWithContainerType } from '@/src/types/beer';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useAppContext } from '@/context/AppContext';
 import { useQueuedCheckIn } from '@/hooks/useQueuedCheckIn';
@@ -126,7 +126,7 @@ export const Beerfinder = () => {
    * MP-7 Step 2: Use queued check-in with offline support
    */
   const handleCheckIn = useCallback(
-    async (item: BeerWithGlassType) => {
+    async (item: BeerWithContainerType) => {
       await queuedCheckIn(item);
     },
     [queuedCheckIn]
@@ -254,7 +254,7 @@ export const Beerfinder = () => {
     setLocalSearchText('');
   }, []);
 
-  const renderBeerActions = (item: BeerWithGlassType) => (
+  const renderBeerActions = (item: BeerWithContainerType) => (
     <View style={styles.buttonContainer}>
       <TouchableOpacity
         style={[
@@ -278,6 +278,7 @@ export const Beerfinder = () => {
                 color: textOnPrimary,
               },
             ]}
+            numberOfLines={1}
           >
             Check Me In!
           </ThemedText>
@@ -302,8 +303,9 @@ export const Beerfinder = () => {
               color: textOnPrimary,
             },
           ]}
+          numberOfLines={1}
         >
-          Check Untappd
+          Untappd
         </ThemedText>
       </TouchableOpacity>
     </View>

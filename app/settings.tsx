@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { router, useLocalSearchParams } from 'expo-router';
 import { IconSymbol } from '@/components/ui/IconSymbol';
@@ -26,6 +26,9 @@ import { useSettingsRefresh } from '@/hooks/useSettingsRefresh';
 import { useAppContext } from '@/context/AppContext';
 
 export default function SettingsScreen() {
+  // Safe area insets for proper positioning
+  const insets = useSafeAreaInsets();
+
   // Theme colors
   const tintColor = useThemeColor({}, 'tint');
   const colorScheme = useColorScheme() ?? 'light';
@@ -87,57 +90,55 @@ export default function SettingsScreen() {
         loading={isLoggingIn}
       />
 
-      <SafeAreaView style={styles.safeArea} edges={['top', 'right', 'left']}>
-        {/* Back button - only show if not first login and we can go back */}
-        {!isFirstLogin && canGoBack && (
-          <TouchableOpacity
-            testID="back-button"
-            style={[styles.backButton, { backgroundColor: closeButtonBgColor }]}
-            onPress={() => router.back()}
-          >
-            <IconSymbol name="xmark" size={16} color={tintColor} weight="semibold" />
-          </TouchableOpacity>
+      {/* Back button - only show if not first login and we can go back */}
+      {!isFirstLogin && canGoBack && (
+        <TouchableOpacity
+          testID="back-button"
+          style={[styles.backButton, { backgroundColor: closeButtonBgColor, top: insets.top + 12 }]}
+          onPress={() => router.back()}
+        >
+          <IconSymbol name="xmark" size={16} color={tintColor} weight="semibold" />
+        </TouchableOpacity>
+      )}
+
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + spacing.m }]}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Title Section */}
+        <ThemedText type="title" style={styles.pageTitle}>
+          Settings
+        </ThemedText>
+
+        {/* Welcome Section - First Login Only */}
+        {isFirstLogin && (
+          <WelcomeSection
+            onLogin={startMemberLogin}
+            loginLoading={isLoggingIn}
+            refreshing={refreshing}
+          />
         )}
 
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Title Section */}
-          <ThemedText type="title" style={styles.pageTitle}>
-            Settings
-          </ThemedText>
+        {/* Data Management Section */}
+        {(!isFirstLogin || apiUrlsConfigured) && (
+          <DataManagementSection
+            apiUrlsConfigured={apiUrlsConfigured}
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            isFirstLogin={isFirstLogin}
+            onLogin={startMemberLogin}
+            canGoBack={canGoBack}
+            onGoHome={() => router.replace('/(tabs)')}
+          />
+        )}
 
-          {/* Welcome Section - First Login Only */}
-          {isFirstLogin && (
-            <WelcomeSection
-              onLogin={startMemberLogin}
-              loginLoading={isLoggingIn}
-              refreshing={refreshing}
-            />
-          )}
+        {/* About Section */}
+        <AboutSection />
 
-          {/* Data Management Section */}
-          {(!isFirstLogin || apiUrlsConfigured) && (
-            <DataManagementSection
-              apiUrlsConfigured={apiUrlsConfigured}
-              refreshing={refreshing}
-              onRefresh={handleRefresh}
-              isFirstLogin={isFirstLogin}
-              onLogin={startMemberLogin}
-              canGoBack={canGoBack}
-              onGoHome={() => router.replace('/(tabs)')}
-            />
-          )}
-
-          {/* About Section */}
-          <AboutSection />
-
-          {/* Developer Tools Section - Only visible in development mode */}
-          <DeveloperSection />
-        </ScrollView>
-      </SafeAreaView>
+        {/* Developer Tools Section - Only visible in development mode */}
+        <DeveloperSection />
+      </ScrollView>
     </ThemedView>
   );
 }
@@ -146,20 +147,15 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  safeArea: {
-    flex: 1,
-  },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
     paddingHorizontal: spacing.m,
-    paddingTop: spacing.m,
     paddingBottom: spacing.xxl,
   },
   backButton: {
     position: 'absolute',
-    top: spacing.m,
     right: spacing.m,
     zIndex: 10,
     width: 30,

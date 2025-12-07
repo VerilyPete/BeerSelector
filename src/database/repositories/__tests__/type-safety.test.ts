@@ -13,7 +13,12 @@
 import { BeerRepository } from '../BeerRepository';
 import { MyBeersRepository } from '../MyBeersRepository';
 import { RewardsRepository } from '../RewardsRepository';
-import { Beer, Beerfinder, BeerWithGlassType, BeerfinderWithGlassType } from '@/src/types/beer';
+import {
+  Beer,
+  Beerfinder,
+  BeerWithContainerType,
+  BeerfinderWithContainerType,
+} from '@/src/types/beer';
 import { Reward } from '@/src/types/database';
 import { AllBeersRow, TastedBrewRow, RewardRow } from '../../schemaTypes';
 
@@ -128,7 +133,7 @@ describe('Repository Type Safety', () => {
       const { getDatabase } = require('../../connection');
       getDatabase.mockResolvedValue(mockDb);
 
-      const validBeers: BeerWithGlassType[] = [
+      const validBeers: BeerWithContainerType[] = [
         {
           id: '1',
           brew_name: 'Test Beer',
@@ -136,7 +141,7 @@ describe('Repository Type Safety', () => {
           brewer: 'Test Brewery',
           brewer_loc: 'Austin, TX',
           brew_style: 'IPA',
-          glass_type: 'pint',
+          container_type: 'pint',
         },
       ];
 
@@ -156,7 +161,7 @@ describe('Repository Type Safety', () => {
       jest.clearAllMocks();
     });
 
-    it('getAll() should return Promise<BeerfinderWithGlassType[]>', async () => {
+    it('getAll() should return Promise<BeerfinderWithContainerType[]>', async () => {
       const mockDb = {
         getAllAsync: jest.fn().mockResolvedValue([
           {
@@ -172,7 +177,7 @@ describe('Repository Type Safety', () => {
             review_ratings: '4.5',
             brew_description: 'Hoppy',
             chit_code: 'ABC123',
-            glass_type: 'pint',
+            container_type: 'pint',
           } as TastedBrewRow,
         ]),
       };
@@ -182,16 +187,16 @@ describe('Repository Type Safety', () => {
 
       const result = await repository.getAll();
 
-      // TypeScript should infer result as BeerfinderWithGlassType[]
-      const beerfinder: BeerfinderWithGlassType = result[0];
+      // TypeScript should infer result as BeerfinderWithContainerType[]
+      const beerfinder: BeerfinderWithContainerType = result[0];
       expect(beerfinder.id).toBe('1');
       expect(beerfinder.tasted_date).toBe('2025-01-01');
-      expect(beerfinder.glass_type).toBe('pint');
+      expect(beerfinder.container_type).toBe('pint');
 
-      // This should work - BeerfinderWithGlassType has these properties
+      // This should work - BeerfinderWithContainerType has these properties
       const _tastedDate: string | undefined = beerfinder.tasted_date;
       const _chitCode: string | undefined = beerfinder.chit_code;
-      const _glassType: 'pint' | 'tulip' | null = beerfinder.glass_type;
+      const _containerType: 'pint' | 'tulip' | 'can' | 'bottle' | null = beerfinder.container_type;
     });
 
     it('getById() should return Promise<Beerfinder | null>', async () => {
@@ -224,7 +229,7 @@ describe('Repository Type Safety', () => {
       expect(count).toBe(42);
     });
 
-    it('insertMany() should only accept BeerfinderWithGlassType[]', async () => {
+    it('insertMany() should only accept BeerfinderWithContainerType[]', async () => {
       const mockDb = {
         withTransactionAsync: jest.fn(async (callback: () => Promise<void>) => {
           await callback();
@@ -236,14 +241,14 @@ describe('Repository Type Safety', () => {
       const { getDatabase } = require('../../connection');
       getDatabase.mockResolvedValue(mockDb);
 
-      const validBeerfinders: BeerfinderWithGlassType[] = [
+      const validBeerfinders: BeerfinderWithContainerType[] = [
         {
           id: '1',
           brew_name: 'Test Beer',
           tasted_date: '2025-01-01',
           roh_lap: '1',
           chit_code: 'ABC123',
-          glass_type: 'pint',
+          container_type: 'pint',
         },
       ];
 
@@ -416,12 +421,13 @@ describe('Repository Type Safety', () => {
 
       // These type assertions should pass at compile time
       const _beerPromise: Promise<Beer[]> = beerRepo.getAll();
-      const _beerfinderPromise: Promise<BeerfinderWithGlassType[]> = myBeersRepo.getAll();
+      const _beerfinderPromise: Promise<BeerfinderWithContainerType[]> = myBeersRepo.getAll();
       const _rewardPromise: Promise<Reward[]> = rewardsRepo.getAll();
 
       // Type-level assertions (compile-time only)
       type AssertBeerType = BeerRepoGetAll extends Promise<Beer[]> ? true : false;
-      type AssertBeerfinderType = MyBeersRepoGetAll extends Promise<BeerfinderWithGlassType[]> ? true : false;
+      type AssertBeerfinderType =
+        MyBeersRepoGetAll extends Promise<BeerfinderWithContainerType[]> ? true : false;
       type AssertRewardType = RewardsRepoGetAll extends Promise<Reward[]> ? true : false;
 
       const _assert1: AssertBeerType = true;
@@ -436,10 +442,10 @@ describe('Repository Type Safety', () => {
       const myBeersRepo = new MyBeersRepository();
 
       // TypeScript should prevent these assignments
-      // @ts-expect-error - Cannot assign Promise<Beer[]> to Promise<BeerfinderWithGlassType[]>
-      const _wrong1: Promise<BeerfinderWithGlassType[]> = beerRepo.getAll();
+      // @ts-expect-error - Cannot assign Promise<Beer[]> to Promise<BeerfinderWithContainerType[]>
+      const _wrong1: Promise<BeerfinderWithContainerType[]> = beerRepo.getAll();
 
-      // @ts-expect-error - Cannot assign Promise<BeerfinderWithGlassType[]> to Promise<Beer[]>
+      // @ts-expect-error - Cannot assign Promise<BeerfinderWithContainerType[]> to Promise<Beer[]>
       const _wrong2: Promise<Beer[]> = myBeersRepo.getAll();
 
       expect(true).toBe(true); // Dummy assertion for Jest
