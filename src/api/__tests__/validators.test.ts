@@ -53,7 +53,9 @@ describe('API Response Validators', () => {
       const result = validateBrewInStockResponse(invalidResponse);
 
       expect(result.isValid).toBe(false);
-      expect(result.errors).toContain('Response array does not have expected structure (length < 2)');
+      expect(result.errors).toContain(
+        'Response array does not have expected structure (length < 2)'
+      );
       expect(result.data).toBeUndefined();
     });
 
@@ -230,7 +232,7 @@ describe('API Response Validators', () => {
     it('should reject beer object that is not an object', () => {
       const stringBeer = 'not an object';
       const numberBeer = 123;
-      const arrayBeer = [];
+      const arrayBeer: unknown[] = [];
 
       expect(validateBeer(stringBeer as any).isValid).toBe(false);
       expect(validateBeer(numberBeer as any).isValid).toBe(false);

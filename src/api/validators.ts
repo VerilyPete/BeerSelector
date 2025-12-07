@@ -157,7 +157,7 @@ export function validateBeer(beer: unknown): ValidationResult<unknown> {
  */
 export function validateBeerArray(beers: unknown[]): {
   validBeers: unknown[];
-  invalidBeers: Array<{ beer: unknown; errors: string[] }>;
+  invalidBeers: { beer: unknown; errors: string[] }[];
   summary: {
     total: number;
     valid: number;
@@ -165,7 +165,7 @@ export function validateBeerArray(beers: unknown[]): {
   };
 } {
   const validBeers: unknown[] = [];
-  const invalidBeers: Array<{ beer: unknown; errors: string[] }> = [];
+  const invalidBeers: { beer: unknown; errors: string[] }[] = [];
 
   for (const beer of beers) {
     const result = validateBeer(beer);

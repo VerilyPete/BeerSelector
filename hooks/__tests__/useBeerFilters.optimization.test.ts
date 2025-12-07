@@ -21,10 +21,12 @@
 
 import { renderHook, act } from '@testing-library/react-native';
 import { useBeerFilters, applyFilters } from '../useBeerFilters';
-import { BeerWithGlassType } from '@/src/types/beer';
+import { BeerWithContainerType } from '@/src/types/beer';
 
 describe('useBeerFilters - Optimization (Bottleneck #3)', () => {
-  const createMockBeer = (overrides: Partial<BeerWithGlassType> = {}): BeerWithGlassType => ({
+  const createMockBeer = (
+    overrides: Partial<BeerWithContainerType> = {}
+  ): BeerWithContainerType => ({
     id: '1',
     brew_name: 'Test IPA',
     brewer: 'Test Brewery',
@@ -33,18 +35,18 @@ describe('useBeerFilters - Optimization (Bottleneck #3)', () => {
     brewer_loc: 'Austin, TX',
     brew_container: 'Draft',
     brew_description: 'Test description',
-    glass_type: 'tulip', // Pre-computed glass type for IPA
+    container_type: 'tulip', // Pre-computed glass type for IPA
     ...overrides,
   });
 
-  const createMockBeers = (count: number): BeerWithGlassType[] =>
+  const createMockBeers = (count: number): BeerWithContainerType[] =>
     Array.from({ length: count }, (_, i) =>
       createMockBeer({
         id: String(i + 1),
         brew_name: `Beer ${i + 1}`,
         brew_style: i % 3 === 0 ? 'IPA' : i % 3 === 1 ? 'Stout' : 'Porter',
         brew_container: i % 2 === 0 ? 'Draft' : 'Bottle',
-        glass_type: i % 3 === 0 ? 'tulip' : 'pint', // Pre-computed glass type based on style
+        container_type: i % 3 === 0 ? 'tulip' : 'pint', // Pre-computed glass type based on style
       })
     );
 

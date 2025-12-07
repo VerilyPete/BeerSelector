@@ -6,7 +6,9 @@ import { SessionData, ApiError, isSessionData } from '../types/api';
  * @param sessionData The session data to validate
  * @returns The validated session data or null if invalid
  */
-export async function validateSession(sessionData: SessionData | null): Promise<SessionData | null> {
+export async function validateSession(
+  sessionData: SessionData | null
+): Promise<SessionData | null> {
   if (!sessionData) {
     console.warn('Session validation failed: No session data provided');
     return null;
@@ -19,7 +21,7 @@ export async function validateSession(sessionData: SessionData | null): Promise<
   }
 
   // Check for required fields
-  const requiredFields: Array<keyof SessionData> = ['memberId', 'storeId', 'storeName', 'sessionId'];
+  const requiredFields: (keyof SessionData)[] = ['memberId', 'storeId', 'storeName', 'sessionId'];
   const missingFields = requiredFields.filter(field => !sessionData[field]);
 
   if (missingFields.length > 0) {

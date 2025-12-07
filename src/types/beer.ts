@@ -2,6 +2,8 @@
  * Types related to beer data in the application
  */
 
+import { ContainerType } from '@/src/utils/beerGlassType';
+
 /**
  * Base Beer interface representing a beer in the system
  */
@@ -19,12 +21,16 @@ export interface Beer {
 }
 
 /**
- * Beer with glass type (after database fetch, guaranteed to have glass_type)
- * This is a branded type to ensure type safety - glass_type is always present
- * after fetching from database (post-migration to schema v3)
+ * Beer with container type property (after database fetch)
+ * The container_type field is always present after schema v4 migration,
+ * but its value can be null for beers where we can't determine the container:
+ * - Draft beers without detectable ABV or 13oz/16oz size marker
+ * - Container types we don't recognize
+ *
+ * Container types: 'pint', 'tulip', 'can', 'bottle', or null (no icon shown)
  */
-export interface BeerWithGlassType extends Beer {
-  glass_type: 'pint' | 'tulip' | null; // Required, not optional
+export interface BeerWithContainerType extends Beer {
+  container_type: ContainerType; // Field present, value can be null
 }
 
 /**
@@ -38,10 +44,11 @@ export interface Beerfinder extends Beer {
 }
 
 /**
- * Beerfinder with glass type (after database fetch)
- * Combines Beerfinder properties with guaranteed glass_type property
+ * Beerfinder with container type (after database fetch)
+ * Combines Beerfinder properties with container_type property
+ * (container_type can be null for unrecognized container types)
  */
-export interface BeerfinderWithGlassType extends BeerWithGlassType {
+export interface BeerfinderWithContainerType extends BeerWithContainerType {
   roh_lap?: string;
   tasted_date?: string;
   review_ratings?: string;
@@ -88,8 +95,7 @@ export interface CheckInResponse {
  */
 export function isBeer(obj: unknown): obj is Beer {
   if (!obj) return false;
-  return typeof obj.id === 'string' &&
-    typeof obj.brew_name === 'string';
+  return typeof obj.id === 'string' && typeof obj.brew_name === 'string';
 }
 
 /**
@@ -99,11 +105,12 @@ export function isBeer(obj: unknown): obj is Beer {
  */
 export function isBeerfinder(obj: unknown): obj is Beerfinder {
   if (!obj) return false;
-  return isBeer(obj) && (
-    obj.roh_lap !== undefined ||
-    obj.tasted_date !== undefined ||
-    obj.review_ratings !== undefined ||
-    obj.chit_code !== undefined
+  return (
+    isBeer(obj) &&
+    (obj.roh_lap !== undefined ||
+      obj.tasted_date !== undefined ||
+      obj.review_ratings !== undefined ||
+      obj.chit_code !== undefined)
   );
 }
 
@@ -114,31 +121,31 @@ export function isBeerfinder(obj: unknown): obj is Beerfinder {
  */
 export function isBeerDetails(obj: unknown): obj is BeerDetails {
   if (!obj) return false;
-  return isBeer(obj) && (
-    obj.abv !== undefined ||
-    obj.ibu !== undefined ||
-    obj.availability !== undefined ||
-    obj.seasonal !== undefined ||
-    obj.origin_country !== undefined ||
-    obj.untappd_rating !== undefined ||
-    obj.untappd_ratings_count !== undefined
+  return (
+    isBeer(obj) &&
+    (obj.abv !== undefined ||
+      obj.ibu !== undefined ||
+      obj.availability !== undefined ||
+      obj.seasonal !== undefined ||
+      obj.origin_country !== undefined ||
+      obj.untappd_rating !== undefined ||
+      obj.untappd_ratings_count !== undefined)
   );
 }
 
 /**
- * Type guard to check if an object is a BeerWithGlassType
+ * Type guard to check if an object is a BeerWithContainerType
  * @param obj The object to check
- * @returns True if the object is a BeerWithGlassType, false otherwise
+ * @returns True if the object is a BeerWithContainerType, false otherwise
  */
-export function isBeerWithGlassType(obj: unknown): obj is BeerWithGlassType {
+export function isBeerWithContainerType(obj: unknown): obj is BeerWithContainerType {
   if (!isBeer(obj)) return false;
 
   const beer = obj as any;
 
-  // glass_type must be present and valid
-  if (beer.glass_type !== 'pint' &&
-      beer.glass_type !== 'tulip' &&
-      beer.glass_type !== null) {
+  // container_type must be present and valid
+  const validTypes = ['pint', 'tulip', 'can', 'bottle', null];
+  if (!validTypes.includes(beer.container_type)) {
     return false;
   }
 
@@ -146,12 +153,12 @@ export function isBeerWithGlassType(obj: unknown): obj is BeerWithGlassType {
 }
 
 /**
- * Type guard to check if an object is a BeerfinderWithGlassType
+ * Type guard to check if an object is a BeerfinderWithContainerType
  * @param obj The object to check
- * @returns True if the object is a BeerfinderWithGlassType, false otherwise
+ * @returns True if the object is a BeerfinderWithContainerType, false otherwise
  */
-export function isBeerfinderWithGlassType(obj: unknown): obj is BeerfinderWithGlassType {
-  if (!isBeerWithGlassType(obj)) return false;
+export function isBeerfinderWithContainerType(obj: unknown): obj is BeerfinderWithContainerType {
+  if (!isBeerWithContainerType(obj)) return false;
   if (!isBeerfinder(obj)) return false;
   return true;
 }

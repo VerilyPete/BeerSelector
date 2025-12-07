@@ -31,10 +31,10 @@ export interface ValidationSummary {
  */
 export interface BeersValidationResult<T = Beer> {
   validBeers: T[];
-  invalidBeers: Array<{
+  invalidBeers: {
     beer: unknown;
     errors: string[];
-  }>;
+  }[];
   summary: ValidationSummary;
 }
 
@@ -132,7 +132,7 @@ export function validateBeerForInsertion(beer: unknown): BeerValidationResult {
  */
 export function validateBeersForInsertion(beers: unknown[]): BeersValidationResult<Beer> {
   const validBeers: Beer[] = [];
-  const invalidBeers: Array<{ beer: unknown; errors: string[] }> = [];
+  const invalidBeers: { beer: unknown; errors: string[] }[] = [];
 
   for (const beer of beers) {
     const validationResult = validateBeerForInsertion(beer);
@@ -205,7 +205,7 @@ export function validateRewardForInsertion(reward: unknown): BeerValidationResul
  */
 export function validateRewardsForInsertion(rewards: unknown[]): BeersValidationResult<Reward> {
   const validRewards: Reward[] = [];
-  const invalidRewards: Array<{ beer: unknown; errors: string[] }> = [];
+  const invalidRewards: { beer: unknown; errors: string[] }[] = [];
 
   for (const reward of rewards) {
     const validationResult = validateRewardForInsertion(reward);

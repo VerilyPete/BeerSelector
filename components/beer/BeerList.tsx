@@ -7,11 +7,11 @@ import { BeerItem } from './BeerItem';
 import { AnimatedRefreshHeader } from '../ui/AnimatedRefreshHeader';
 import { usePullToRefresh } from '@/animations/usePullToRefresh';
 import { useThemeColor } from '@/hooks/useThemeColor';
-import { BeerWithGlassType, BeerfinderWithGlassType } from '@/src/types/beer';
+import { BeerWithContainerType, BeerfinderWithContainerType } from '@/src/types/beer';
 
-// Union type to accept both BeerWithGlassType and BeerfinderWithGlassType
-// These branded types guarantee the glass_type property is present
-type DisplayableBeer = BeerWithGlassType | BeerfinderWithGlassType;
+// Union type to accept both BeerWithContainerType and BeerfinderWithContainerType
+// These types have the container_type property (which can be null)
+type DisplayableBeer = BeerWithContainerType | BeerfinderWithContainerType;
 
 type BeerListProps = {
   beers: DisplayableBeer[];

@@ -3,6 +3,14 @@
     {
       "filename" : "ufobeer 2.png",
       "idiom" : "universal"
+    },
+    {
+      "filename" : "ufobeer 3.png",
+      "idiom" : "iphone"
+    },
+    {
+      "filename" : "ufobeer 4.png",
+      "idiom" : "ipad"
     }
   ],
   "info" : {

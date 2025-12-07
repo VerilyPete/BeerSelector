@@ -26,12 +26,20 @@
  * ```
  */
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  ReactNode,
+} from 'react';
 import { Alert } from 'react-native';
 import { getSessionData } from '@/src/api/sessionManager';
 import { isVisitorMode as checkIsVisitorMode } from '@/src/api/authService';
 import type { SessionData } from '@/src/types/api';
-import type { BeerWithGlassType, BeerfinderWithGlassType } from '@/src/types/beer';
+import type { BeerWithContainerType, BeerfinderWithContainerType } from '@/src/types/beer';
 import type { Reward } from '@/src/types/database';
 import { beerRepository } from '@/src/database/repositories/BeerRepository';
 import { myBeersRepository } from '@/src/database/repositories/MyBeersRepository';
@@ -128,11 +136,11 @@ export interface SessionState {
  * Beer list state interface
  */
 export interface BeerState {
-  /** All beers from the Flying Saucer API (with pre-computed glass types) */
-  allBeers: BeerWithGlassType[];
+  /** All beers from the Flying Saucer API (with pre-computed container types) */
+  allBeers: BeerWithContainerType[];
 
-  /** Beers the user has tasted (Beerfinder data with pre-computed glass types) */
-  tastedBeers: BeerfinderWithGlassType[];
+  /** Beers the user has tasted (Beerfinder data with pre-computed container types) */
+  tastedBeers: BeerfinderWithContainerType[];
 
   /** User's rewards from UFO Club */
   rewards: Reward[];
@@ -222,10 +230,10 @@ export interface AppContextValue extends AppState {
 
   // Beer list actions
   /** Update all beers list */
-  setAllBeers: (beers: BeerWithGlassType[]) => void;
+  setAllBeers: (beers: BeerWithContainerType[]) => void;
 
   /** Update tasted beers list */
-  setTastedBeers: (beers: BeerfinderWithGlassType[]) => void;
+  setTastedBeers: (beers: BeerfinderWithContainerType[]) => void;
 
   /** Update rewards list */
   setRewards: (rewards: Reward[]) => void;
@@ -349,36 +357,42 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   /**
    * Creates an empty session state (logged out)
    */
-  const createEmptySession = useCallback((): SessionState => ({
-    isLoggedIn: false,
-    isVisitor: false,
-    userName: undefined,
-    userEmail: undefined,
-    firstName: undefined,
-    lastName: undefined,
-    memberId: undefined,
-    storeId: undefined,
-    storeName: undefined,
-    cardNum: undefined,
-    sessionId: undefined,
-  }), []);
+  const createEmptySession = useCallback(
+    (): SessionState => ({
+      isLoggedIn: false,
+      isVisitor: false,
+      userName: undefined,
+      userEmail: undefined,
+      firstName: undefined,
+      lastName: undefined,
+      memberId: undefined,
+      storeId: undefined,
+      storeName: undefined,
+      cardNum: undefined,
+      sessionId: undefined,
+    }),
+    []
+  );
 
   /**
    * Creates session state from SessionData
    */
-  const createSessionFromData = useCallback((sessionData: SessionData, isVisitor: boolean): SessionState => ({
-    isLoggedIn: true,
-    isVisitor,
-    userName: sessionData.username,
-    userEmail: sessionData.email,
-    firstName: sessionData.firstName,
-    lastName: sessionData.lastName,
-    memberId: sessionData.memberId,
-    storeId: sessionData.storeId,
-    storeName: sessionData.storeName,
-    cardNum: sessionData.cardNum,
-    sessionId: sessionData.sessionId,
-  }), []);
+  const createSessionFromData = useCallback(
+    (sessionData: SessionData, isVisitor: boolean): SessionState => ({
+      isLoggedIn: true,
+      isVisitor,
+      userName: sessionData.username,
+      userEmail: sessionData.email,
+      firstName: sessionData.firstName,
+      lastName: sessionData.lastName,
+      memberId: sessionData.memberId,
+      storeId: sessionData.storeId,
+      storeName: sessionData.storeName,
+      cardNum: sessionData.cardNum,
+      sessionId: sessionData.sessionId,
+    }),
+    []
+  );
 
   // ============================================================================
   // SESSION ACTIONS
@@ -421,18 +435,20 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     const [allBeersData, tastedBeersData, rewardsData] = await Promise.all([
       beerRepository.getAll(),
       myBeersRepository.getAll(),
-      rewardsRepository.getAll()
+      rewardsRepository.getAll(),
     ]);
 
     // Update state with all data at once, preserving queuedBeerIds
-    setBeers((prev) => ({
+    setBeers(prev => ({
       allBeers: allBeersData,
       tastedBeers: tastedBeersData,
       rewards: rewardsData,
       queuedBeerIds: prev.queuedBeerIds,
     }));
 
-    console.log(`[AppContext] Loaded beer data: ${allBeersData.length} all beers, ${tastedBeersData.length} tasted beers, ${rewardsData.length} rewards`);
+    console.log(
+      `[AppContext] Loaded beer data: ${allBeersData.length} all beers, ${tastedBeersData.length} tasted beers, ${rewardsData.length} rewards`
+    );
 
     return { allBeersData, tastedBeersData, rewardsData };
   }, []);
@@ -451,7 +467,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     let retryCount = 0;
     const maxRetries = 3;
     let isCancelled = false;
-    const timers: Set<NodeJS.Timeout> = new Set();
+    const timers: Set<ReturnType<typeof setTimeout>> = new Set();
 
     const loadBeerData = async (): Promise<void> => {
       if (isCancelled) return;
@@ -462,7 +478,10 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         setBeerError(null); // Clear error on success
         console.log('[AppContext] Beer data loaded successfully');
       } catch (error) {
-        console.error(`[AppContext] Error loading beer data (attempt ${retryCount + 1}/${maxRetries + 1}):`, error);
+        console.error(
+          `[AppContext] Error loading beer data (attempt ${retryCount + 1}/${maxRetries + 1}):`,
+          error
+        );
 
         if (retryCount < maxRetries && !isCancelled) {
           retryCount++;
@@ -486,9 +505,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
             Alert.alert(
               'Data Load Failed',
               'Unable to load beer data after multiple attempts. Please check your connection and restart the app.',
-              [
-                { text: 'OK', style: 'default' }
-              ]
+              [{ text: 'OK', style: 'default' }]
             );
           }
         }
@@ -510,9 +527,12 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   /**
    * Update session state after login
    */
-  const updateSession = useCallback((sessionData: SessionData, isVisitor: boolean) => {
-    setSession(createSessionFromData(sessionData, isVisitor));
-  }, [createSessionFromData]);
+  const updateSession = useCallback(
+    (sessionData: SessionData, isVisitor: boolean) => {
+      setSession(createSessionFromData(sessionData, isVisitor));
+    },
+    [createSessionFromData]
+  );
 
   /**
    * Clear session state on logout
@@ -532,16 +552,16 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   // BEER LIST ACTIONS
   // ============================================================================
 
-  const setAllBeers = useCallback((newBeers: BeerWithGlassType[]) => {
-    setBeers((prev) => ({ ...prev, allBeers: newBeers }));
+  const setAllBeers = useCallback((newBeers: BeerWithContainerType[]) => {
+    setBeers(prev => ({ ...prev, allBeers: newBeers }));
   }, []);
 
-  const setTastedBeers = useCallback((newBeers: BeerfinderWithGlassType[]) => {
-    setBeers((prev) => ({ ...prev, tastedBeers: newBeers }));
+  const setTastedBeers = useCallback((newBeers: BeerfinderWithContainerType[]) => {
+    setBeers(prev => ({ ...prev, tastedBeers: newBeers }));
   }, []);
 
   const setRewards = useCallback((newRewards: Reward[]) => {
-    setBeers((prev) => ({ ...prev, rewards: newRewards }));
+    setBeers(prev => ({ ...prev, rewards: newRewards }));
   }, []);
 
   /**
@@ -566,7 +586,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
    * Add a beer ID to the queued set (prevents double check-ins)
    */
   const addQueuedBeer = useCallback((beerId: string) => {
-    setBeers((prev) => {
+    setBeers(prev => {
       const newSet = new Set(prev.queuedBeerIds);
       newSet.add(beerId);
       return { ...prev, queuedBeerIds: newSet };
@@ -577,7 +597,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
    * Remove a beer ID from the queued set
    */
   const removeQueuedBeer = useCallback((beerId: string) => {
-    setBeers((prev) => {
+    setBeers(prev => {
       const newSet = new Set(prev.queuedBeerIds);
       newSet.delete(beerId);
       return { ...prev, queuedBeerIds: newSet };
@@ -589,7 +609,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
    * Called when viewing queues to keep local state in sync with server
    */
   const syncQueuedBeerIds = useCallback((ids: string[]) => {
-    setBeers((prev) => ({ ...prev, queuedBeerIds: new Set(ids) }));
+    setBeers(prev => ({ ...prev, queuedBeerIds: new Set(ids) }));
   }, []);
 
   // ============================================================================
@@ -597,15 +617,15 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   // ============================================================================
 
   const setSearchText = useCallback((text: string) => {
-    setFilters((prev) => ({ ...prev, searchText: text }));
+    setFilters(prev => ({ ...prev, searchText: text }));
   }, []);
 
   const setSelectedFilters = useCallback((newFilters: Record<string, string>) => {
-    setFilters((prev) => ({ ...prev, selectedFilters: newFilters }));
+    setFilters(prev => ({ ...prev, selectedFilters: newFilters }));
   }, []);
 
   const setSortBy = useCallback((sortBy: string | undefined) => {
-    setFilters((prev) => ({ ...prev, sortBy }));
+    setFilters(prev => ({ ...prev, sortBy }));
   }, []);
 
   const clearFilters = useCallback(() => {
@@ -621,15 +641,15 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   // ============================================================================
 
   const setLoadingBeers = useCallback((isLoading: boolean) => {
-    setLoading((prev) => ({ ...prev, isLoadingBeers: isLoading }));
+    setLoading(prev => ({ ...prev, isLoadingBeers: isLoading }));
   }, []);
 
   const setLoadingRewards = useCallback((isLoading: boolean) => {
-    setLoading((prev) => ({ ...prev, isLoadingRewards: isLoading }));
+    setLoading(prev => ({ ...prev, isLoadingRewards: isLoading }));
   }, []);
 
   const setRefreshing = useCallback((isRefreshing: boolean) => {
-    setLoading((prev) => ({ ...prev, isRefreshing }));
+    setLoading(prev => ({ ...prev, isRefreshing }));
   }, []);
 
   // ============================================================================
@@ -637,15 +657,15 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   // ============================================================================
 
   const setBeerError = useCallback((error: string | null) => {
-    setErrors((prev) => ({ ...prev, beerError: error }));
+    setErrors(prev => ({ ...prev, beerError: error }));
   }, []);
 
   const setRewardError = useCallback((error: string | null) => {
-    setErrors((prev) => ({ ...prev, rewardError: error }));
+    setErrors(prev => ({ ...prev, rewardError: error }));
   }, []);
 
   const setSessionError = useCallback((error: string | null) => {
-    setErrors((prev) => ({ ...prev, sessionError: error }));
+    setErrors(prev => ({ ...prev, sessionError: error }));
   }, []);
 
   const clearErrors = useCallback(() => {
@@ -660,75 +680,78 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   // CONTEXT VALUE
   // ============================================================================
 
-  const value: AppContextValue = useMemo(() => ({
-    // State
-    session,
-    beers,
-    filters,
-    loading,
-    errors,
+  const value: AppContextValue = useMemo(
+    () => ({
+      // State
+      session,
+      beers,
+      filters,
+      loading,
+      errors,
 
-    // Session actions
-    updateSession,
-    clearSession,
-    refreshSession,
+      // Session actions
+      updateSession,
+      clearSession,
+      refreshSession,
 
-    // Beer list actions
-    setAllBeers,
-    setTastedBeers,
-    setRewards,
-    refreshBeerData,
-    addQueuedBeer,
-    removeQueuedBeer,
-    syncQueuedBeerIds,
+      // Beer list actions
+      setAllBeers,
+      setTastedBeers,
+      setRewards,
+      refreshBeerData,
+      addQueuedBeer,
+      removeQueuedBeer,
+      syncQueuedBeerIds,
 
-    // Filter actions
-    setSearchText,
-    setSelectedFilters,
-    setSortBy,
-    clearFilters,
+      // Filter actions
+      setSearchText,
+      setSelectedFilters,
+      setSortBy,
+      clearFilters,
 
-    // Loading actions
-    setLoadingBeers,
-    setLoadingRewards,
-    setRefreshing,
+      // Loading actions
+      setLoadingBeers,
+      setLoadingRewards,
+      setRefreshing,
 
-    // Error actions
-    setBeerError,
-    setRewardError,
-    setSessionError,
-    clearErrors,
-  }), [
-    // Only include state variables, NOT the action functions
-    // (action functions are stable thanks to useCallback with empty deps)
-    session,
-    beers,
-    filters,
-    loading,
-    errors,
-    // Action functions are automatically stable due to useCallback
-    updateSession,
-    clearSession,
-    refreshSession,
-    setAllBeers,
-    setTastedBeers,
-    setRewards,
-    refreshBeerData,
-    addQueuedBeer,
-    removeQueuedBeer,
-    syncQueuedBeerIds,
-    setSearchText,
-    setSelectedFilters,
-    setSortBy,
-    clearFilters,
-    setLoadingBeers,
-    setLoadingRewards,
-    setRefreshing,
-    setBeerError,
-    setRewardError,
-    setSessionError,
-    clearErrors,
-  ]);
+      // Error actions
+      setBeerError,
+      setRewardError,
+      setSessionError,
+      clearErrors,
+    }),
+    [
+      // Only include state variables, NOT the action functions
+      // (action functions are stable thanks to useCallback with empty deps)
+      session,
+      beers,
+      filters,
+      loading,
+      errors,
+      // Action functions are automatically stable due to useCallback
+      updateSession,
+      clearSession,
+      refreshSession,
+      setAllBeers,
+      setTastedBeers,
+      setRewards,
+      refreshBeerData,
+      addQueuedBeer,
+      removeQueuedBeer,
+      syncQueuedBeerIds,
+      setSearchText,
+      setSelectedFilters,
+      setSortBy,
+      clearFilters,
+      setLoadingBeers,
+      setLoadingRewards,
+      setRefreshing,
+      setBeerError,
+      setRewardError,
+      setSessionError,
+      clearErrors,
+    ]
+  );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 };

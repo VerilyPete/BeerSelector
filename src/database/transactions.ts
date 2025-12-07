@@ -36,9 +36,7 @@ export interface DatabaseOperationResult<T = unknown> {
 /**
  * Type for database operation callbacks
  */
-export type DatabaseOperation<T = DatabaseOperationResult> = (
-  db: SQLiteDatabase
-) => Promise<T>;
+export type DatabaseOperation<T = DatabaseOperationResult> = (db: SQLiteDatabase) => Promise<T>;
 
 /**
  * Wraps a database operation in a transaction with automatic rollback on error.
@@ -147,9 +145,9 @@ export async function withBatchInsert<T>(
   validator: (record: T) => { isValid: boolean; errors: string[] },
   insertFn: (db: SQLiteDatabase, record: T) => Promise<void>
 ): Promise<DatabaseOperationResult> {
-  return await withDatabaseTransaction(database, async (db) => {
+  return await withDatabaseTransaction(database, async db => {
     const validRecords: T[] = [];
-    const invalidRecords: Array<{ record: T; errors: string[] }> = [];
+    const invalidRecords: { record: T; errors: string[] }[] = [];
 
     // Validate all records first
     for (const record of records) {
@@ -240,7 +238,7 @@ export async function withReplaceData<T>(
   newRecords: T[],
   insertFn: (db: SQLiteDatabase, record: T) => Promise<void>
 ): Promise<DatabaseOperationResult> {
-  return await withDatabaseTransaction(database, async (db) => {
+  return await withDatabaseTransaction(database, async db => {
     // Step 1: Delete old data
     const deleteQuery = deleteCondition
       ? `DELETE FROM ${tableName} ${deleteCondition}`

@@ -9,7 +9,7 @@ import { useDataRefresh } from '@/hooks/useDataRefresh';
 import { FilterBar } from './beer/FilterBar';
 import { BeerList } from './beer/BeerList';
 import { SkeletonLoader } from './beer/SkeletonLoader';
-import { BeerfinderWithGlassType } from '@/src/types/beer';
+import { BeerfinderWithContainerType } from '@/src/types/beer';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useAppContext } from '@/context/AppContext';
 import { useOptimisticCheckIn } from '@/hooks/useOptimisticCheckIn';
@@ -93,7 +93,7 @@ export const TastedBrewList = () => {
    * MP-7 Step 3: Render optimistic status badge for tasted beers
    */
   const renderTastedBeerActions = useCallback(
-    (item: BeerfinderWithGlassType) => {
+    (item: BeerfinderWithContainerType) => {
       const pendingStatus = getPendingBeer(item.id);
 
       if (pendingStatus) {

@@ -30,8 +30,16 @@
  * ```
  */
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode, useRef } from 'react';
-import { Alert } from 'react-native';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  ReactNode,
+  useRef,
+} from 'react';
 import { operationQueueRepository } from '@/src/database/repositories/OperationQueueRepository';
 import { getDatabase } from '@/src/database/connection';
 import { useNetwork } from './NetworkContext';
@@ -56,12 +64,19 @@ import { Beer } from '@/src/types/beer';
 /**
  * Callback for operation success
  */
-export type OperationSuccessCallback = (operationId: string, operation: QueuedOperation) => Promise<void> | void;
+export type OperationSuccessCallback = (
+  operationId: string,
+  operation: QueuedOperation
+) => Promise<void> | void;
 
 /**
  * Callback for operation failure
  */
-export type OperationFailureCallback = (operationId: string, operation: QueuedOperation, error?: string) => Promise<void> | void;
+export type OperationFailureCallback = (
+  operationId: string,
+  operation: QueuedOperation,
+  error?: string
+) => Promise<void> | void;
 
 /**
  * Context value interface
@@ -127,7 +142,7 @@ export const OperationQueueProvider: React.FC<OperationQueueProviderProps> = ({
   const [queuedOperations, setQueuedOperations] = useState<QueuedOperation[]>([]);
   const [isRetrying, setIsRetrying] = useState(false);
   const { isConnected, isInternetReachable, details } = useNetwork();
-  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const previousConnectionState = useRef<boolean | null>(null);
 
   // Callbacks for operation success/failure
@@ -199,7 +214,9 @@ export const OperationQueueProvider: React.FC<OperationQueueProviderProps> = ({
    */
   const executeOperation = useCallback(
     async (operation: QueuedOperation): Promise<OperationExecutionResult> => {
-      console.log(`[OperationQueueContext] Executing operation: ${operation.type} (${operation.id})`);
+      console.log(
+        `[OperationQueueContext] Executing operation: ${operation.type} (${operation.id})`
+      );
 
       try {
         switch (operation.type) {
@@ -287,6 +304,38 @@ export const OperationQueueProvider: React.FC<OperationQueueProviderProps> = ({
   );
 
   /**
+   * Notify success callbacks
+   */
+  const notifySuccess = useCallback(
+    async (operationId: string, operation: QueuedOperation): Promise<void> => {
+      for (const callback of successCallbacksRef.current) {
+        try {
+          await callback(operationId, operation);
+        } catch (error) {
+          console.error('[OperationQueueContext] Error in success callback:', error);
+        }
+      }
+    },
+    []
+  );
+
+  /**
+   * Notify failure callbacks
+   */
+  const notifyFailure = useCallback(
+    async (operationId: string, operation: QueuedOperation, error?: string): Promise<void> => {
+      for (const callback of failureCallbacksRef.current) {
+        try {
+          await callback(operationId, operation, error);
+        } catch (callbackError) {
+          console.error('[OperationQueueContext] Error in failure callback:', callbackError);
+        }
+      }
+    },
+    []
+  );
+
+  /**
    * Retry a specific operation
    */
   const retryOperation = useCallback(
@@ -305,12 +354,7 @@ export const OperationQueueProvider: React.FC<OperationQueueProviderProps> = ({
           `UPDATE operation_queue
            SET status = ?, last_retry_timestamp = ?
            WHERE id = ? AND status != ?`,
-          [
-            OperationStatus.RETRYING,
-            Date.now(),
-            id,
-            OperationStatus.RETRYING
-          ]
+          [OperationStatus.RETRYING, Date.now(), id, OperationStatus.RETRYING]
         );
 
         // If no rows updated, operation is already being retried
@@ -389,7 +433,9 @@ export const OperationQueueProvider: React.FC<OperationQueueProviderProps> = ({
         return;
       }
 
-      console.log(`[OperationQueueContext] Retrying ${pendingOperations.length} pending operations`);
+      console.log(
+        `[OperationQueueContext] Retrying ${pendingOperations.length} pending operations`
+      );
 
       // Retry operations sequentially to avoid overwhelming the server
       for (const operation of pendingOperations) {
@@ -398,7 +444,7 @@ export const OperationQueueProvider: React.FC<OperationQueueProviderProps> = ({
         // Add delay between operations based on retry count
         if (operation.retryCount > 0) {
           const delay = calculateRetryDelay(operation.retryCount);
-          await new Promise((resolve) => setTimeout(resolve, delay));
+          await new Promise(resolve => setTimeout(resolve, delay));
         }
       }
 
@@ -480,32 +526,6 @@ export const OperationQueueProvider: React.FC<OperationQueueProviderProps> = ({
     };
   }, []);
 
-  /**
-   * Notify success callbacks
-   */
-  const notifySuccess = useCallback(async (operationId: string, operation: QueuedOperation): Promise<void> => {
-    for (const callback of successCallbacksRef.current) {
-      try {
-        await callback(operationId, operation);
-      } catch (error) {
-        console.error('[OperationQueueContext] Error in success callback:', error);
-      }
-    }
-  }, []);
-
-  /**
-   * Notify failure callbacks
-   */
-  const notifyFailure = useCallback(async (operationId: string, operation: QueuedOperation, error?: string): Promise<void> => {
-    for (const callback of failureCallbacksRef.current) {
-      try {
-        await callback(operationId, operation, error);
-      } catch (callbackError) {
-        console.error('[OperationQueueContext] Error in failure callback:', callbackError);
-      }
-    }
-  }, []);
-
   // ============================================================================
   // EFFECTS
   // ============================================================================
@@ -557,7 +577,13 @@ export const OperationQueueProvider: React.FC<OperationQueueProviderProps> = ({
         clearTimeout(retryTimeoutRef.current);
       }
     };
-  }, [isConnected, isInternetReachable, details.isConnectionExpensive, retryAll, retryConfig.reconnectionDebounceMs]);
+  }, [
+    isConnected,
+    isInternetReachable,
+    details.isConnectionExpensive,
+    retryAll,
+    retryConfig.reconnectionDebounceMs,
+  ]);
 
   // ============================================================================
   // CONTEXT VALUE
@@ -577,7 +603,19 @@ export const OperationQueueProvider: React.FC<OperationQueueProviderProps> = ({
       onOperationFailure,
       retryConfig,
     }),
-    [queuedOperations, isRetrying, queueOperation, retryAll, retryOperation, clearQueue, deleteOperation, refresh, onOperationSuccess, onOperationFailure, retryConfig]
+    [
+      queuedOperations,
+      isRetrying,
+      queueOperation,
+      retryAll,
+      retryOperation,
+      clearQueue,
+      deleteOperation,
+      refresh,
+      onOperationSuccess,
+      onOperationFailure,
+      retryConfig,
+    ]
   );
 
   return <OperationQueueContext.Provider value={value}>{children}</OperationQueueContext.Provider>;

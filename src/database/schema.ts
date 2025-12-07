@@ -30,7 +30,7 @@ export const CREATE_ALLBEERS_TABLE = `
     review_count TEXT,
     review_rating TEXT,
     brew_description TEXT,
-    glass_type TEXT
+    container_type TEXT
   )
 `;
 
@@ -57,7 +57,7 @@ export const CREATE_TASTED_BREW_TABLE = `
     review_ratings TEXT,
     brew_description TEXT,
     chit_code TEXT,
-    glass_type TEXT
+    container_type TEXT
   )
 `;
 
@@ -131,18 +131,18 @@ export const DEFAULT_PREFERENCES: Preference[] = [
   {
     key: 'all_beers_api_url',
     value: '',
-    description: 'API endpoint for fetching all beers'
+    description: 'API endpoint for fetching all beers',
   },
   {
     key: 'my_beers_api_url',
     value: '',
-    description: 'API endpoint for fetching Beerfinder beers'
+    description: 'API endpoint for fetching Beerfinder beers',
   },
   {
     key: 'first_launch',
     value: 'true',
-    description: 'Flag indicating if this is the first app launch'
-  }
+    description: 'Flag indicating if this is the first app launch',
+  },
 ];
 
 /**
@@ -250,8 +250,15 @@ async function runMigrations(database: SQLiteDatabase, fromVersion: number): Pro
     console.log('Migration to version 3 complete');
   }
 
+  // Run migration to v4 (rename glass_type to container_type, add can/bottle support)
+  if (fromVersion < 4) {
+    const { migrateToVersion4 } = await import('./migrations/migrateToV4');
+    await migrateToVersion4(database);
+    console.log('Migration to version 4 complete');
+  }
+
   // Future migrations go here
-  // if (fromVersion < 4) { await migrateToVersion4(database); }
+  // if (fromVersion < 5) { await migrateToVersion5(database); }
 }
 
 /**
@@ -266,7 +273,9 @@ async function runMigrations(database: SQLiteDatabase, fromVersion: number): Pro
 const initializeDefaultPreferences = async (database: SQLiteDatabase): Promise<void> => {
   try {
     // Check if preferences already exist
-    const count = await database.getFirstAsync<{ count: number }>('SELECT COUNT(*) as count FROM preferences');
+    const count = await database.getFirstAsync<{ count: number }>(
+      'SELECT COUNT(*) as count FROM preferences'
+    );
 
     // Only add default preferences if the table is empty
     if (!count || count.count === 0) {

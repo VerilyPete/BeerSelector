@@ -98,12 +98,12 @@ const ProgressRing = ({
 
   return (
     <View
-      style={[styles.progressRingContainer, { width: size, height: size }]}
+      style={[styles.progressRingContainer, { width: size + 8, height: size + 8 }]}
       accessibilityRole="progressbar"
       accessibilityValue={{ min: 0, max: 100, now: progressPercent }}
       accessibilityLabel={`Progress: ${progressPercent}% toward 200 beers`}
     >
-      <Animated.View style={animatedStyle}>
+      <Animated.View style={[animatedStyle, { width: size, height: size }]}>
         <View style={StyleSheet.absoluteFill}>
           {/* Background circle */}
           <View
@@ -137,8 +137,10 @@ const ProgressRing = ({
         </View>
       </Animated.View>
       <View style={styles.progressRingInner}>
-        <ThemedText style={styles.progressPercentage}>{Math.round(progress * 100)}%</ThemedText>
-        <ThemedText type="muted" style={styles.progressLabel}>
+        <ThemedText style={[styles.progressPercentage, { fontSize: size * 0.2 }]}>
+          {Math.round(progress * 100)}%
+        </ThemedText>
+        <ThemedText type="muted" style={[styles.progressLabel, { fontSize: size * 0.1 }]}>
           Complete
         </ThemedText>
       </View>
@@ -647,12 +649,10 @@ const styles = StyleSheet.create({
   progressHeaderContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    overflow: 'hidden',
   },
   progressTextContainer: {
     flex: 1,
-    paddingRight: spacing.m,
+    marginRight: spacing.m,
   },
   progressTitle: {
     marginBottom: spacing.xs,
@@ -668,17 +668,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
 
-  // Progress Ring
+  // Progress Ring - overflow hidden clips any transforms, padding gives breathing room
   progressRingContainer: {
     justifyContent: 'center',
     alignItems: 'center',
-    overflow: 'hidden',
     flexShrink: 0,
+    overflow: 'hidden',
   },
   progressCircle: {
     position: 'absolute',
   },
   progressRingInner: {
+    ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
     alignItems: 'center',
   },

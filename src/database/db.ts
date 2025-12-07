@@ -22,7 +22,7 @@ import { fetchBeersFromAPI, fetchMyBeersFromAPI, fetchRewardsFromAPI } from '../
 import { beerRepository } from './repositories/BeerRepository';
 import { myBeersRepository } from './repositories/MyBeersRepository';
 import { rewardsRepository } from './repositories/RewardsRepository';
-import { calculateGlassTypes } from './utils/glassTypeCalculator';
+import { calculateContainerTypes } from './utils/glassTypeCalculator';
 
 // ============================================================================
 // DATABASE INITIALIZATION CONFIGURATION
@@ -144,15 +144,15 @@ export const initializeBeerDatabase = async (): Promise<void> => {
     }
 
     // Check for visitor mode to handle differently
-    const isVisitorMode = await getPreference('is_visitor_mode') === 'true';
+    const isVisitorMode = (await getPreference('is_visitor_mode')) === 'true';
 
     // Schedule My Beers import in background (non-blocking)
     if (!isVisitorMode) {
       setTimeout(async () => {
         try {
           const myBeers = await fetchMyBeersFromAPI();
-          const myBeersWithGlassTypes = calculateGlassTypes(myBeers);
-          await myBeersRepository.insertMany(myBeersWithGlassTypes);
+          const myBeersWithContainerTypes = calculateContainerTypes(myBeers);
+          await myBeersRepository.insertMany(myBeersWithContainerTypes);
         } catch (error) {
           console.error('Error in scheduled My Beers import:', error);
         }
@@ -178,9 +178,9 @@ export const initializeBeerDatabase = async (): Promise<void> => {
     // Fetch all beers (blocking - we need this immediately for the UI)
     try {
       const beers = await fetchBeersFromAPI();
-      // Calculate glass types before insertion
-      const beersWithGlassTypes = calculateGlassTypes(beers);
-      await beerRepository.insertMany(beersWithGlassTypes);
+      // Calculate container types before insertion
+      const beersWithContainerTypes = calculateContainerTypes(beers);
+      await beerRepository.insertMany(beersWithContainerTypes);
     } catch (error) {
       console.error('Error fetching and populating all beers:', error);
     }
@@ -243,7 +243,11 @@ export const getUntappdCookie = async (key: string): Promise<string | null> => {
  * @param value Cookie value
  * @param description Optional description
  */
-export const setUntappdCookie = async (key: string, value: string, description?: string): Promise<void> => {
+export const setUntappdCookie = async (
+  key: string,
+  value: string,
+  description?: string
+): Promise<void> => {
   const database = await initDatabase();
 
   try {
@@ -280,7 +284,7 @@ export const getAllUntappdCookies = async (): Promise<UntappdCookie[]> => {
   const database = await initDatabase();
 
   try {
-    const cookies = await database.getAllAsync<{ key: string, value: string, description: string }>(
+    const cookies = await database.getAllAsync<{ key: string; value: string; description: string }>(
       'SELECT key, value, description FROM untappd ORDER BY key'
     );
 
@@ -300,15 +304,19 @@ export const isUntappdLoggedIn = async (): Promise<boolean> => {
   const cookies = await getAllUntappdCookies();
 
   // First check for our custom detection flag which indicates we've detected login via UI elements
-  const loginDetectedViaUI = cookies.some(cookie => cookie.key === 'login_detected_via_ui' && cookie.value === 'true');
+  const loginDetectedViaUI = cookies.some(
+    cookie => cookie.key === 'login_detected_via_ui' && cookie.value === 'true'
+  );
 
   // Also check for our explicit login detection flag
-  const loginDetectedByApp = cookies.some(cookie => cookie.key === 'untappd_logged_in_detected' && cookie.value === 'true');
+  const loginDetectedByApp = cookies.some(
+    cookie => cookie.key === 'untappd_logged_in_detected' && cookie.value === 'true'
+  );
 
   // Check if we have the necessary cookies for an active session
   // At minimum, we would need the untappd_session_t cookie, but we may not have access to it if it's HttpOnly
-  const sessionCookiePresent = cookies.some(cookie =>
-    (cookie.key === 'untappd_session_t' || cookie.key === 'ut_session') && cookie.value
+  const sessionCookiePresent = cookies.some(
+    cookie => (cookie.key === 'untappd_session_t' || cookie.key === 'ut_session') && cookie.value
   );
 
   // Consider logged in if we have either:

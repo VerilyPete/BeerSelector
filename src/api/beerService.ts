@@ -1,11 +1,8 @@
-import * as SecureStore from 'expo-secure-store';
 import { getSessionData } from './sessionManager';
 import { autoLogin } from './authService';
 import { ApiClient } from './apiClient';
-import { Platform } from 'react-native';
-import Constants from 'expo-constants';
-import { ApiResponse, ApiError, SessionData } from '../types/api';
-import { Beer, Beerfinder, CheckInRequestData, CheckInResponse, isBeer, isBeerfinder } from '../types/beer';
+import { ApiError, ApiResponse } from '../types/api';
+import { Beer, Beerfinder, CheckInRequestData, CheckInResponse } from '../types/beer';
 import { config } from '@/src/config';
 
 const apiClient = ApiClient.getInstance();
@@ -21,7 +18,13 @@ export const checkInBeer = async (beer: Beer): Promise<CheckInResponse> => {
     let sessionData = await getSessionData();
 
     // If no session data or session is missing required fields, try auto-login
-    if (!sessionData || !sessionData.memberId || !sessionData.storeId || !sessionData.storeName || !sessionData.sessionId) {
+    if (
+      !sessionData ||
+      !sessionData.memberId ||
+      !sessionData.storeId ||
+      !sessionData.storeName ||
+      !sessionData.sessionId
+    ) {
       console.log('Session data invalid or missing, attempting auto-login');
       const loginResult = await autoLogin();
 
@@ -39,7 +42,7 @@ export const checkInBeer = async (beer: Beer): Promise<CheckInResponse> => {
       return {
         success: false,
         error: 'Check-in requires UFO Club member login. Please log in via Settings.',
-        message: 'Visitor mode does not support check-in'
+        message: 'Visitor mode does not support check-in',
       };
     }
 
@@ -51,13 +54,13 @@ export const checkInBeer = async (beer: Beer): Promise<CheckInResponse> => {
       chitCode: chitCode,
       chitBrewId: beer.id,
       chitBrewName: beer.brew_name,
-      chitStoreName: sessionData.storeName
+      chitStoreName: sessionData.storeName,
     };
 
     // Use the ApiClient to make the request
     const response = await apiClient.post<Record<string, unknown>>(
       config.api.endpoints.addToQueue,
-      requestData
+      requestData as unknown as Record<string, unknown>
     );
 
     // If the request was successful but returned no data
@@ -65,7 +68,7 @@ export const checkInBeer = async (beer: Beer): Promise<CheckInResponse> => {
       console.log('Empty response received from server, considering check-in successful');
       return {
         success: true,
-        message: 'Check-in processed successfully (empty response)'
+        message: 'Check-in processed successfully (empty response)',
       };
     }
 
@@ -74,7 +77,7 @@ export const checkInBeer = async (beer: Beer): Promise<CheckInResponse> => {
       return {
         success: true,
         message: 'Check-in successful',
-        ...response.data
+        ...response.data,
       };
     }
 
@@ -82,7 +85,7 @@ export const checkInBeer = async (beer: Beer): Promise<CheckInResponse> => {
     return {
       success: false,
       error: response.error || 'Unknown error occurred during check-in',
-      message: 'Check-in failed'
+      message: 'Check-in failed',
     };
   } catch (error) {
     console.error('Error checking in beer:', error);
@@ -92,14 +95,14 @@ export const checkInBeer = async (beer: Beer): Promise<CheckInResponse> => {
       return {
         success: false,
         error: error.message,
-        message: 'Check-in failed due to API error'
+        message: 'Check-in failed due to API error',
       };
     }
 
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error occurred',
-      message: 'Check-in failed due to unexpected error'
+      message: 'Check-in failed due to unexpected error',
     };
   }
 };
@@ -117,7 +120,7 @@ export async function getBeerDetails(beerId: string): Promise<ApiResponse<Beer>>
         success: false,
         data: null as unknown as Beer,
         error: 'Beer ID is required',
-        statusCode: 400
+        statusCode: 400,
       };
     }
 
@@ -132,7 +135,7 @@ export async function getBeerDetails(beerId: string): Promise<ApiResponse<Beer>>
         success: false,
         data: null as unknown as Beer,
         error: error.message,
-        statusCode: error.statusCode
+        statusCode: error.statusCode,
       };
     }
 
@@ -140,7 +143,7 @@ export async function getBeerDetails(beerId: string): Promise<ApiResponse<Beer>>
       success: false,
       data: null as unknown as Beer,
       error: error instanceof Error ? error.message : 'Unknown error occurred',
-      statusCode: 500
+      statusCode: 500,
     };
   }
 }
@@ -158,7 +161,7 @@ export async function searchBeers(query: string): Promise<ApiResponse<Beer[]>> {
         success: false,
         data: [] as Beer[],
         error: 'Search query is required',
-        statusCode: 400
+        statusCode: 400,
       };
     }
 
@@ -173,7 +176,7 @@ export async function searchBeers(query: string): Promise<ApiResponse<Beer[]>> {
         success: false,
         data: [] as Beer[],
         error: error.message,
-        statusCode: error.statusCode
+        statusCode: error.statusCode,
       };
     }
 
@@ -181,7 +184,7 @@ export async function searchBeers(query: string): Promise<ApiResponse<Beer[]>> {
       success: false,
       data: [] as Beer[],
       error: error instanceof Error ? error.message : 'Unknown error occurred',
-      statusCode: 500
+      statusCode: 500,
     };
   }
 }
@@ -203,7 +206,7 @@ export async function getAllBeers(): Promise<ApiResponse<Beer[]>> {
         success: false,
         data: [] as Beer[],
         error: error.message,
-        statusCode: error.statusCode
+        statusCode: error.statusCode,
       };
     }
 
@@ -211,7 +214,7 @@ export async function getAllBeers(): Promise<ApiResponse<Beer[]>> {
       success: false,
       data: [] as Beer[],
       error: error instanceof Error ? error.message : 'Unknown error occurred',
-      statusCode: 500
+      statusCode: 500,
     };
   }
 }
@@ -233,7 +236,7 @@ export async function getMyBeers(): Promise<ApiResponse<Beerfinder[]>> {
         success: false,
         data: [] as Beerfinder[],
         error: error.message,
-        statusCode: error.statusCode
+        statusCode: error.statusCode,
       };
     }
 
@@ -241,7 +244,7 @@ export async function getMyBeers(): Promise<ApiResponse<Beerfinder[]>> {
       success: false,
       data: [] as Beerfinder[],
       error: error instanceof Error ? error.message : 'Unknown error occurred',
-      statusCode: 500
+      statusCode: 500,
     };
   }
 }

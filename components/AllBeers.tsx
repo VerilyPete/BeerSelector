@@ -13,7 +13,7 @@ import { FilterBar } from './beer/FilterBar';
 import { BeerList } from './beer/BeerList';
 import { UntappdWebView } from './UntappdWebView';
 import { SkeletonLoader } from './beer/SkeletonLoader';
-import { BeerWithGlassType } from '@/src/types/beer';
+import { BeerWithContainerType } from '@/src/types/beer';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useAppContext } from '@/context/AppContext';
 
@@ -111,7 +111,7 @@ export const AllBeers = () => {
 
   // No useCallback wrapper - matches Beerfinder pattern
   // Function is called during render for each visible item, memoization doesn't help
-  const renderBeerActions = (item: BeerWithGlassType) => (
+  const renderBeerActions = (item: BeerWithContainerType) => (
     <View style={styles.buttonContainer}>
       <TouchableOpacity
         style={[
@@ -127,7 +127,9 @@ export const AllBeers = () => {
         accessibilityLabel={`Check ${item.brew_name} on Untappd`}
         accessibilityRole="button"
       >
-        <ThemedText style={styles.checkInButtonText}>Check Untappd</ThemedText>
+        <ThemedText style={styles.checkInButtonText} numberOfLines={1}>
+          Untappd
+        </ThemedText>
       </TouchableOpacity>
     </View>
   );

@@ -1,9 +1,9 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { BeerWithGlassType, BeerfinderWithGlassType } from '@/src/types/beer';
+import { BeerWithContainerType, BeerfinderWithContainerType } from '@/src/types/beer';
 
-// Union type to allow both BeerWithGlassType and BeerfinderWithGlassType
-// These branded types guarantee the glass_type property is present
-type FilterableBeer = BeerWithGlassType | BeerfinderWithGlassType;
+// Union type to allow both BeerWithContainerType and BeerfinderWithContainerType
+// These types have the container_type property (which can be null)
+type FilterableBeer = BeerWithContainerType | BeerfinderWithContainerType;
 
 type SortOption = 'date' | 'name';
 
@@ -96,7 +96,11 @@ export const applyFilters = <T extends FilterableBeer>(beers: T[], options: Filt
 };
 
 // Exported for testing
-export const applySorting = <T extends FilterableBeer>(beers: T[], sortBy: SortOption, dateField: DateSortField = 'added_date'): T[] => {
+export const applySorting = <T extends FilterableBeer>(
+  beers: T[],
+  sortBy: SortOption,
+  dateField: DateSortField = 'added_date'
+): T[] => {
   const sorted = [...beers];
 
   if (sortBy === 'name') {
@@ -144,7 +148,10 @@ export const applySorting = <T extends FilterableBeer>(beers: T[], sortBy: SortO
   return sorted;
 };
 
-export const useBeerFilters = <T extends FilterableBeer>(beers: T[], dateField: DateSortField = 'added_date') => {
+export const useBeerFilters = <T extends FilterableBeer>(
+  beers: T[],
+  dateField: DateSortField = 'added_date'
+) => {
   const [filters, setFilters] = useState<FilterState>({
     isDraft: false,
     isHeavies: false,
@@ -189,11 +196,11 @@ export const useBeerFilters = <T extends FilterableBeer>(beers: T[], dateField: 
   }, []);
 
   const toggleSort = useCallback(() => {
-    setSortBy(prev => prev === 'date' ? 'name' : 'date');
+    setSortBy(prev => (prev === 'date' ? 'name' : 'date'));
   }, []);
 
   const toggleExpand = useCallback((id: string) => {
-    setExpandedId(prev => prev === id ? null : id);
+    setExpandedId(prev => (prev === id ? null : id));
   }, []);
 
   return {

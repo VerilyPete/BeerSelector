@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Modal, View, TouchableOpacity, ActivityIndicator, StyleSheet, Alert } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView, WebViewNavigation, WebViewMessageEvent } from 'react-native-webview';
 
 import { ThemedText } from '@/components/ThemedText';
@@ -27,6 +27,7 @@ export default function LoginWebView({
   onRefreshData,
   loading: _externalLoading,
 }: LoginWebViewProps) {
+  const insets = useSafeAreaInsets();
   const tintColor = useThemeColor({}, 'tint');
   const cardBackgroundColor = useThemeColor({ light: '#F5F5F5', dark: '#1C1C1E' }, 'background');
   const borderColor = useThemeColor({ light: '#CCCCCC', dark: '#333333' }, 'text');
@@ -428,11 +429,15 @@ export default function LoginWebView({
       accessibilityLabel="Flying Saucer login modal"
       accessibilityViewIsModal={true}
     >
-      <SafeAreaView style={{ flex: 1 }} testID="login-webview-modal">
+      <View style={{ flex: 1 }} testID="login-webview-modal">
         <View
           style={[
             styles.webViewHeader,
-            { backgroundColor: cardBackgroundColor, borderBottomColor: borderColor },
+            {
+              backgroundColor: cardBackgroundColor,
+              borderBottomColor: borderColor,
+              paddingTop: insets.top + 12,
+            },
           ]}
         >
           <TouchableOpacity
@@ -489,7 +494,7 @@ export default function LoginWebView({
             </View>
           )}
         />
-      </SafeAreaView>
+      </View>
     </Modal>
   );
 }

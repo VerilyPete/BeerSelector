@@ -15,7 +15,13 @@
  */
 
 import { z } from 'zod';
-import { Beer, Beerfinder, BeerWithGlassType, BeerfinderWithGlassType } from '../types/beer';
+import {
+  Beer,
+  Beerfinder,
+  BeerWithContainerType,
+  BeerfinderWithContainerType,
+} from '../types/beer';
+import { ContainerType } from '../utils/beerGlassType';
 import { Reward, Preference, UntappdCookie } from '../types/database';
 
 // ============================================================================
@@ -37,16 +43,18 @@ import { Reward, Preference, UntappdCookie } from '../types/database';
  *   review_count TEXT,
  *   review_rating TEXT,
  *   brew_description TEXT,
- *   glass_type TEXT -- Added in schema v3
+ *   container_type TEXT -- Renamed from glass_type in schema v4, supports: pint, tulip, can, bottle
  * )
  *
  * Required fields: id, brew_name (non-empty)
  * All fields are TEXT in SQLite, optional fields default to empty string
  */
 export const allBeersRowSchema = z.object({
-  id: z.union([z.string(), z.number()]).refine(val => val !== null && val !== undefined && val !== '', {
-    message: 'id must not be empty'
-  }),
+  id: z
+    .union([z.string(), z.number()])
+    .refine(val => val !== null && val !== undefined && val !== '', {
+      message: 'id must not be empty',
+    }),
   added_date: z.string().optional(),
   brew_name: z.string().min(1, 'brew_name must not be empty'),
   brewer: z.string().optional(),
@@ -56,7 +64,9 @@ export const allBeersRowSchema = z.object({
   review_count: z.string().optional(),
   review_rating: z.string().optional(),
   brew_description: z.string().optional(),
-  glass_type: z.union([z.literal('pint'), z.literal('tulip'), z.null()]).optional(),
+  container_type: z
+    .union([z.literal('pint'), z.literal('tulip'), z.literal('can'), z.literal('bottle'), z.null()])
+    .optional(),
 });
 
 /**
@@ -94,10 +104,10 @@ export function allBeersRowToBeer(row: AllBeersRow): Beer {
 }
 
 /**
- * Convert AllBeersRow to BeerWithGlassType domain model
- * Used after schema v3 migration when glass_type is guaranteed to be present
+ * Convert AllBeersRow to BeerWithContainerType domain model
+ * Used after schema v4 migration when container_type is guaranteed to be present
  */
-export function allBeersRowToBeerWithGlassType(row: AllBeersRow): BeerWithGlassType {
+export function allBeersRowToBeerWithContainerType(row: AllBeersRow): BeerWithContainerType {
   return {
     id: typeof row.id === 'number' ? String(row.id) : row.id,
     added_date: row.added_date,
@@ -109,7 +119,7 @@ export function allBeersRowToBeerWithGlassType(row: AllBeersRow): BeerWithGlassT
     review_count: row.review_count,
     review_rating: row.review_rating,
     brew_description: row.brew_description,
-    glass_type: row.glass_type ?? null, // Guaranteed to be present after migration
+    container_type: (row.container_type ?? null) as ContainerType,
   };
 }
 
@@ -134,7 +144,7 @@ export function allBeersRowToBeerWithGlassType(row: AllBeersRow): BeerWithGlassT
  *   review_ratings TEXT,
  *   brew_description TEXT,
  *   chit_code TEXT,
- *   glass_type TEXT -- Added in schema v3
+ *   container_type TEXT -- Renamed from glass_type in schema v4, supports: pint, tulip, can, bottle
  * )
  *
  * Required fields: id, brew_name (non-empty)
@@ -153,7 +163,9 @@ export const tastedBrewRowSchema = z.object({
   review_ratings: z.string().optional(),
   brew_description: z.string().optional(),
   chit_code: z.string().optional(),
-  glass_type: z.union([z.literal('pint'), z.literal('tulip'), z.null()]).optional(),
+  container_type: z
+    .union([z.literal('pint'), z.literal('tulip'), z.literal('can'), z.literal('bottle'), z.null()])
+    .optional(),
 });
 
 /**
@@ -189,10 +201,12 @@ export function tastedBrewRowToBeerfinder(row: TastedBrewRow): Beerfinder {
 }
 
 /**
- * Convert TastedBrewRow to BeerfinderWithGlassType domain model
- * Used after schema v3 migration when glass_type is guaranteed to be present
+ * Convert TastedBrewRow to BeerfinderWithContainerType domain model
+ * Used after schema v4 migration when container_type is guaranteed to be present
  */
-export function tastedBrewRowToBeerfinderWithGlassType(row: TastedBrewRow): BeerfinderWithGlassType {
+export function tastedBrewRowToBeerfinderWithContainerType(
+  row: TastedBrewRow
+): BeerfinderWithContainerType {
   return {
     id: row.id,
     roh_lap: row.roh_lap,
@@ -206,7 +220,7 @@ export function tastedBrewRowToBeerfinderWithGlassType(row: TastedBrewRow): Beer
     review_ratings: row.review_ratings,
     brew_description: row.brew_description,
     chit_code: row.chit_code,
-    glass_type: row.glass_type ?? null, // Guaranteed to be present after migration
+    container_type: (row.container_type ?? null) as ContainerType,
   };
 }
 
@@ -352,7 +366,12 @@ export function untappdCookieRowToUntappdCookie(row: UntappdCookieRow): UntappdC
 /**
  * Union type of all database row types
  */
-export type DatabaseRow = AllBeersRow | TastedBrewRow | RewardRow | PreferenceRow | UntappdCookieRow;
+export type DatabaseRow =
+  | AllBeersRow
+  | TastedBrewRow
+  | RewardRow
+  | PreferenceRow
+  | UntappdCookieRow;
 
 /**
  * Schema for count query results
