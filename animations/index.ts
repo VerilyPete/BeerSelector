@@ -133,12 +133,3 @@ export {
   type UseAnimatedChevronConfig,
 } from './useAnimatedExpand';
 
-// ============================================================================
-// Pull-to-Refresh Animation Exports
-// ============================================================================
-
-export {
-  usePullToRefresh,
-  type UsePullToRefreshConfig,
-  type UsePullToRefreshReturn,
-} from './usePullToRefresh';
