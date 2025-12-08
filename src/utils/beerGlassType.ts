@@ -6,10 +6,11 @@
  * - 'tulip': Tulip glass for high ABV draft beers (>=7.4%)
  * - 'can': Can icon for canned beers
  * - 'bottle': Bottle icon for bottled beers
+ * - 'flight': Flight icon for beer flights (4 tasting glasses)
  * - null: No icon displayed
  */
 
-export type ContainerType = 'pint' | 'tulip' | 'can' | 'bottle' | null;
+export type ContainerType = 'pint' | 'tulip' | 'can' | 'bottle' | 'flight' | null;
 
 // Legacy alias for backwards compatibility
 export type GlassType = 'pint' | 'tulip' | null;
@@ -63,11 +64,14 @@ export function extractABV(description: string | undefined): number | null {
 /**
  * Determine the appropriate container type based on container type and ABV
  * Rules (in priority order):
- * 1. Can detection:
+ * 1. Flight detection:
+ *    - Name contains "flight" (word boundary) OR style equals "flight"
+ *    - AND container is draft/draught/flight/empty/null → 'flight'
+ * 2. Can detection:
  *    - Container contains "can" → 'can'
- * 2. Bottle detection:
+ * 3. Bottle detection:
  *    - Container contains "bottle" or "bottled" → 'bottle'
- * 3. Draft/Draught detection with glass type:
+ * 4. Draft/Draught detection with glass type:
  *    a. Container size override:
  *       - "13oz draft" or "13 oz draft" → 'tulip' (skip ABV detection)
  *       - "16oz draft" or "16 oz draft" → 'pint' (skip ABV detection)
@@ -77,19 +81,40 @@ export function extractABV(description: string | undefined): number | null {
  *    c. Beer style keyword fallback (if all other checks fail):
  *       - Style contains "pilsner" or "lager" → 'pint'
  *       - Style contains "imperial", "tripel", "quad", or "barleywine" → 'tulip'
- * 4. No icon shown for:
+ * 5. No icon shown for:
  *    - Non-draft containers without can/bottle
  *    - Draft beers without detectable ABV and no style keywords
  * @param container - Beer container type (e.g., "Draft", "13oz draft", "Can", "Bottled")
  * @param description - Beer description containing ABV
- * @param brewStyle - Beer style (e.g., "Imperial IPA", "Belgian Tripel", "Barleywine")
+ * @param brewStyle - Beer style (e.g., "Imperial IPA", "Belgian Tripel", "Barleywine", "Flight")
+ * @param brewName - Beer name (optional, used for flight detection)
+ * @param abv - Pre-extracted ABV value (optional, if not provided will extract from description)
  * @returns Container type or null if no icon should be displayed
  */
 export function getContainerType(
   container: string | undefined,
   description: string | undefined,
-  brewStyle?: string
+  brewStyle?: string,
+  brewName?: string,
+  abv?: number | null
 ): ContainerType {
+  // Flight detection (highest priority for draft/empty containers)
+  const isFlightByName = brewName && /\bflight\b/i.test(brewName);
+  const isFlightByStyle = brewStyle?.toLowerCase() === 'flight';
+
+  if (isFlightByName || isFlightByStyle) {
+    const normalizedContainer = container?.toLowerCase() ?? '';
+    const isFlightContainer =
+      !container ||
+      normalizedContainer === '' ||
+      normalizedContainer.includes('draft') ||
+      normalizedContainer.includes('draught') ||
+      normalizedContainer.includes('flight');
+    if (isFlightContainer) {
+      return 'flight';
+    }
+  }
+
   if (!container) return null;
 
   const normalizedContainer = container.toLowerCase();
@@ -118,14 +143,14 @@ export function getContainerType(
     return 'pint';
   }
 
-  // Extract ABV from description
-  const abv = extractABV(description);
-  if (abv !== null) {
+  // Use provided ABV or extract from description
+  const resolvedAbv = abv !== undefined ? abv : extractABV(description);
+  if (resolvedAbv !== null) {
     // Tulip glass for >= 7.4% ABV
-    if (abv >= 7.4) return 'tulip';
+    if (resolvedAbv >= 7.4) return 'tulip';
 
     // Pint glass for < 7.4% ABV
-    if (abv < 7.4) return 'pint';
+    if (resolvedAbv < 7.4) return 'pint';
   }
 
   // Fallback: Check beer style for specific keywords

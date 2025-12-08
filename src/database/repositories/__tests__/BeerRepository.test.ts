@@ -203,6 +203,13 @@ describe('BeerRepository', () => {
           brewer: 'Test Brewery',
           added_date: '2024-01-02',
           container_type: 'pint',
+          abv: null,
+          brew_container: undefined,
+          brew_description: undefined,
+          brew_style: undefined,
+          brewer_loc: undefined,
+          review_count: undefined,
+          review_rating: undefined,
         },
         {
           id: '1',
@@ -210,6 +217,13 @@ describe('BeerRepository', () => {
           brewer: 'Test Brewery',
           added_date: '2024-01-01',
           container_type: 'tulip',
+          abv: null,
+          brew_container: undefined,
+          brew_description: undefined,
+          brew_style: undefined,
+          brewer_loc: undefined,
+          review_count: undefined,
+          review_rating: undefined,
         },
       ];
 
@@ -256,6 +270,14 @@ describe('BeerRepository', () => {
         brew_name: 'Test IPA',
         brewer: 'Test Brewery',
         container_type: 'pint',
+        abv: null,
+        added_date: undefined,
+        brew_container: undefined,
+        brew_description: undefined,
+        brew_style: undefined,
+        brewer_loc: undefined,
+        review_count: undefined,
+        review_rating: undefined,
       };
 
       mockDatabase.getFirstAsync.mockResolvedValue(mockBeer);
@@ -305,6 +327,13 @@ describe('BeerRepository', () => {
           brewer: 'Test Brewery',
           brew_style: 'IPA',
           container_type: 'pint',
+          abv: null,
+          added_date: undefined,
+          brew_container: undefined,
+          brew_description: undefined,
+          brewer_loc: undefined,
+          review_count: undefined,
+          review_rating: undefined,
         },
       ];
 
@@ -321,7 +350,20 @@ describe('BeerRepository', () => {
 
     it('should return all beers when query is empty', async () => {
       const mockBeers: BeerWithContainerType[] = [
-        { id: '1', brew_name: 'Beer 1', brewer: 'Brewery 1', container_type: 'pint' },
+        {
+          id: '1',
+          brew_name: 'Beer 1',
+          brewer: 'Brewery 1',
+          container_type: 'pint',
+          abv: null,
+          added_date: undefined,
+          brew_container: undefined,
+          brew_description: undefined,
+          brew_style: undefined,
+          brewer_loc: undefined,
+          review_count: undefined,
+          review_rating: undefined,
+        },
       ];
 
       mockDatabase.getAllAsync.mockResolvedValue(mockBeers);
@@ -401,6 +443,13 @@ describe('BeerRepository', () => {
           brewer: 'Brewery 1',
           brew_style: 'IPA',
           container_type: 'pint',
+          abv: null,
+          added_date: undefined,
+          brew_container: undefined,
+          brew_description: undefined,
+          brewer_loc: undefined,
+          review_count: undefined,
+          review_rating: undefined,
         },
         {
           id: '2',
@@ -408,6 +457,13 @@ describe('BeerRepository', () => {
           brewer: 'Brewery 2',
           brew_style: 'IPA',
           container_type: 'tulip',
+          abv: null,
+          added_date: undefined,
+          brew_container: undefined,
+          brew_description: undefined,
+          brewer_loc: undefined,
+          review_count: undefined,
+          review_rating: undefined,
         },
       ];
 
@@ -455,6 +511,13 @@ describe('BeerRepository', () => {
           brewer: 'Test Brewery',
           brew_style: 'IPA',
           container_type: 'pint',
+          abv: null,
+          added_date: undefined,
+          brew_container: undefined,
+          brew_description: undefined,
+          brewer_loc: undefined,
+          review_count: undefined,
+          review_rating: undefined,
         },
         {
           id: '2',
@@ -462,6 +525,13 @@ describe('BeerRepository', () => {
           brewer: 'Test Brewery',
           brew_style: 'Stout',
           container_type: 'tulip',
+          abv: null,
+          added_date: undefined,
+          brew_container: undefined,
+          brew_description: undefined,
+          brewer_loc: undefined,
+          review_count: undefined,
+          review_rating: undefined,
         },
       ];
 
@@ -508,12 +578,28 @@ describe('BeerRepository', () => {
           brew_name: 'Untasted Beer 1',
           brewer: 'Brewery 1',
           container_type: 'pint',
+          abv: null,
+          added_date: undefined,
+          brew_container: undefined,
+          brew_description: undefined,
+          brew_style: undefined,
+          brewer_loc: undefined,
+          review_count: undefined,
+          review_rating: undefined,
         },
         {
           id: '2',
           brew_name: 'Untasted Beer 2',
           brewer: 'Brewery 2',
           container_type: 'tulip',
+          abv: null,
+          added_date: undefined,
+          brew_container: undefined,
+          brew_description: undefined,
+          brew_style: undefined,
+          brewer_loc: undefined,
+          review_count: undefined,
+          review_rating: undefined,
         },
       ];
 

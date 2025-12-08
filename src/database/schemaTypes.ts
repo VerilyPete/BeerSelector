@@ -43,7 +43,7 @@ import { Reward, Preference, UntappdCookie } from '../types/database';
  *   review_count TEXT,
  *   review_rating TEXT,
  *   brew_description TEXT,
- *   container_type TEXT -- Renamed from glass_type in schema v4, supports: pint, tulip, can, bottle
+ *   container_type TEXT -- Renamed from glass_type in schema v4, supports: pint, tulip, can, bottle, flight
  * )
  *
  * Required fields: id, brew_name (non-empty)
@@ -65,8 +65,16 @@ export const allBeersRowSchema = z.object({
   review_rating: z.string().optional(),
   brew_description: z.string().optional(),
   container_type: z
-    .union([z.literal('pint'), z.literal('tulip'), z.literal('can'), z.literal('bottle'), z.null()])
+    .union([
+      z.literal('pint'),
+      z.literal('tulip'),
+      z.literal('can'),
+      z.literal('bottle'),
+      z.literal('flight'),
+      z.null(),
+    ])
     .optional(),
+  abv: z.number().nullable().optional(),
 });
 
 /**
@@ -100,6 +108,7 @@ export function allBeersRowToBeer(row: AllBeersRow): Beer {
     review_count: row.review_count,
     review_rating: row.review_rating,
     brew_description: row.brew_description,
+    abv: row.abv,
   };
 }
 
@@ -120,6 +129,7 @@ export function allBeersRowToBeerWithContainerType(row: AllBeersRow): BeerWithCo
     review_rating: row.review_rating,
     brew_description: row.brew_description,
     container_type: (row.container_type ?? null) as ContainerType,
+    abv: row.abv ?? null,
   };
 }
 
@@ -144,7 +154,7 @@ export function allBeersRowToBeerWithContainerType(row: AllBeersRow): BeerWithCo
  *   review_ratings TEXT,
  *   brew_description TEXT,
  *   chit_code TEXT,
- *   container_type TEXT -- Renamed from glass_type in schema v4, supports: pint, tulip, can, bottle
+ *   container_type TEXT -- Renamed from glass_type in schema v4, supports: pint, tulip, can, bottle, flight
  * )
  *
  * Required fields: id, brew_name (non-empty)
@@ -164,8 +174,16 @@ export const tastedBrewRowSchema = z.object({
   brew_description: z.string().optional(),
   chit_code: z.string().optional(),
   container_type: z
-    .union([z.literal('pint'), z.literal('tulip'), z.literal('can'), z.literal('bottle'), z.null()])
+    .union([
+      z.literal('pint'),
+      z.literal('tulip'),
+      z.literal('can'),
+      z.literal('bottle'),
+      z.literal('flight'),
+      z.null(),
+    ])
     .optional(),
+  abv: z.number().nullable().optional(),
 });
 
 /**
@@ -197,6 +215,7 @@ export function tastedBrewRowToBeerfinder(row: TastedBrewRow): Beerfinder {
     review_ratings: row.review_ratings,
     brew_description: row.brew_description,
     chit_code: row.chit_code,
+    abv: row.abv,
   };
 }
 
@@ -221,6 +240,7 @@ export function tastedBrewRowToBeerfinderWithContainerType(
     brew_description: row.brew_description,
     chit_code: row.chit_code,
     container_type: (row.container_type ?? null) as ContainerType,
+    abv: row.abv ?? null,
   };
 }
 
