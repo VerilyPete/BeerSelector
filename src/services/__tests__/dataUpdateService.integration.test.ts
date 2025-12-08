@@ -138,6 +138,7 @@ describe('dataUpdateService integration tests', () => {
       expect(firstBeer).toHaveProperty('brewer');
       expect(firstBeer).toHaveProperty('brew_style');
       expect(firstBeer).toHaveProperty('container_type'); // Added by calculateContainerTypes
+      expect(firstBeer).toHaveProperty('abv'); // Added by calculateContainerTypes
 
       // Verify that setPreference was called to update the timestamps
       expect(setPreference).toHaveBeenCalledWith('all_beers_last_update', expect.any(String));
@@ -295,7 +296,7 @@ describe('dataUpdateService integration tests', () => {
       // Verify that the data has correct count (same as source data)
       expect(beersPassedToPopulate.length).toBe(myBeersData[1].tasted_brew_current_round.length);
 
-      // Verify that each beer has the expected properties including container_type (added by calculateContainerTypes)
+      // Verify that each beer has the expected properties including container_type and abv (added by calculateContainerTypes)
       const firstBeer = beersPassedToPopulate[0];
       expect(firstBeer).toHaveProperty('id');
       expect(firstBeer).toHaveProperty('brew_name');
@@ -304,6 +305,7 @@ describe('dataUpdateService integration tests', () => {
       expect(firstBeer).toHaveProperty('tasted_date');
       expect(firstBeer).toHaveProperty('chit_code');
       expect(firstBeer).toHaveProperty('container_type'); // Added by calculateContainerTypes
+      expect(firstBeer).toHaveProperty('abv'); // Added by calculateContainerTypes
 
       // Verify that setPreference was called to update the timestamps
       expect(setPreference).toHaveBeenCalledWith('my_beers_last_update', expect.any(String));

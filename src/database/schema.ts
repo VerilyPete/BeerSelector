@@ -30,7 +30,8 @@ export const CREATE_ALLBEERS_TABLE = `
     review_count TEXT,
     review_rating TEXT,
     brew_description TEXT,
-    container_type TEXT
+    container_type TEXT,
+    abv REAL
   )
 `;
 
@@ -57,7 +58,8 @@ export const CREATE_TASTED_BREW_TABLE = `
     review_ratings TEXT,
     brew_description TEXT,
     chit_code TEXT,
-    container_type TEXT
+    container_type TEXT,
+    abv REAL
   )
 `;
 
@@ -257,8 +259,19 @@ async function runMigrations(database: SQLiteDatabase, fromVersion: number): Pro
     console.log('Migration to version 4 complete');
   }
 
-  // Future migrations go here
-  // if (fromVersion < 5) { await migrateToVersion5(database); }
+  // Run migration to v5 (add flight container type detection)
+  if (fromVersion < 5) {
+    const { migrateToVersion5 } = await import('./migrations/migrateToV5');
+    await migrateToVersion5(database);
+    console.log('Migration to version 5 complete');
+  }
+
+  // Run migration to v6 (add abv column)
+  if (fromVersion < 6) {
+    const { migrateToVersion6 } = await import('./migrations/migrateToV6');
+    await migrateToVersion6(database);
+    console.log('Migration to version 6 complete');
+  }
 }
 
 /**

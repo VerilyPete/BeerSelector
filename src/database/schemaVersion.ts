@@ -1,6 +1,6 @@
 import { SQLiteDatabase } from 'expo-sqlite';
 
-export const CURRENT_SCHEMA_VERSION = 4;
+export const CURRENT_SCHEMA_VERSION = 6;
 
 export const CREATE_SCHEMA_VERSION_TABLE = `
   CREATE TABLE IF NOT EXISTS schema_version (

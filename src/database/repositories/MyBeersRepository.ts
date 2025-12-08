@@ -120,8 +120,8 @@ export class MyBeersRepository {
                   `INSERT OR REPLACE INTO tasted_brew_current_round (
                     id, roh_lap, tasted_date, brew_name, brewer, brewer_loc,
                     brew_style, brew_container, review_count, review_ratings,
-                    brew_description, chit_code, container_type
-                  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    brew_description, chit_code, container_type, abv
+                  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                   [
                     beer.id,
                     beer.roh_lap || '',
@@ -136,6 +136,7 @@ export class MyBeersRepository {
                     beer.brew_description || '',
                     beer.chit_code || '',
                     beer.container_type ?? null,
+                    beer.abv ?? null,
                   ]
                 );
               } catch (err) {
@@ -255,8 +256,8 @@ export class MyBeersRepository {
                 `INSERT OR REPLACE INTO tasted_brew_current_round (
                   id, roh_lap, tasted_date, brew_name, brewer, brewer_loc,
                   brew_style, brew_container, review_count, review_ratings,
-                  brew_description, chit_code, container_type
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                  brew_description, chit_code, container_type, abv
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
                   beer.id,
                   beer.roh_lap || '',
@@ -271,6 +272,7 @@ export class MyBeersRepository {
                   beer.brew_description || '',
                   beer.chit_code || '',
                   beer.container_type ?? null,
+                  beer.abv ?? null,
                 ]
               );
             } catch (err) {

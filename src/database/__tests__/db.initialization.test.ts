@@ -85,8 +85,22 @@ const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
 describe('initializeBeerDatabase', () => {
   // Mock data (include glass_type as it's added by calculateGlassTypes)
   const mockBeers = [
-    { id: 'beer-1', brew_name: 'Test Beer 1', brewer: 'Test Brewery', glass_type: null },
-    { id: 'beer-2', brew_name: 'Test Beer 2', brewer: 'Test Brewery', glass_type: null },
+    {
+      id: 'beer-1',
+      brew_name: 'Test Beer 1',
+      brewer: 'Test Brewery',
+      glass_type: null,
+      container_type: null,
+      abv: null,
+    },
+    {
+      id: 'beer-2',
+      brew_name: 'Test Beer 2',
+      brewer: 'Test Brewery',
+      glass_type: null,
+      container_type: null,
+      abv: null,
+    },
   ];
 
   const mockMyBeers = [
@@ -96,6 +110,8 @@ describe('initializeBeerDatabase', () => {
       brewer: 'Test Brewery',
       tasted_date: '2023-01-01',
       glass_type: null,
+      container_type: null,
+      abv: null,
     },
   ];
 

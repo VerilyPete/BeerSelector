@@ -18,6 +18,7 @@ export interface Beer {
   review_rating?: string;
   brew_description?: string;
   added_date?: string;
+  abv?: number | null;
 }
 
 /**
@@ -27,7 +28,7 @@ export interface Beer {
  * - Draft beers without detectable ABV or 13oz/16oz size marker
  * - Container types we don't recognize
  *
- * Container types: 'pint', 'tulip', 'can', 'bottle', or null (no icon shown)
+ * Container types: 'pint', 'tulip', 'can', 'bottle', 'flight', or null (no icon shown)
  */
 export interface BeerWithContainerType extends Beer {
   container_type: ContainerType; // Field present, value can be null
@@ -57,9 +58,9 @@ export interface BeerfinderWithContainerType extends BeerWithContainerType {
 
 /**
  * BeerDetails interface for detailed beer information
+ * Note: abv is inherited from Beer as number | null, not overridden as string
  */
 export interface BeerDetails extends Beer {
-  abv?: string;
   ibu?: string;
   availability?: string;
   seasonal?: boolean;
@@ -111,7 +112,7 @@ export function isBeerfinder(obj: unknown): obj is Beerfinder {
     isBeer(obj) &&
     (o.roh_lap !== undefined ||
       o.tasted_date !== undefined ||
-      o.review_rating !== undefined ||
+      o.review_ratings !== undefined ||
       o.chit_code !== undefined)
   );
 }
@@ -147,7 +148,7 @@ export function isBeerWithContainerType(obj: unknown): obj is BeerWithContainerT
   const beer = obj as any;
 
   // container_type must be present and valid
-  const validTypes = ['pint', 'tulip', 'can', 'bottle', null];
+  const validTypes = ['pint', 'tulip', 'can', 'bottle', 'flight', null];
   if (!validTypes.includes(beer.container_type)) {
     return false;
   }

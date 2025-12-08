@@ -136,12 +136,13 @@ const BeerItemComponent: React.FC<BeerItemProps> = ({
             />
           )}
 
-          {/* Beer name */}
+          {/* Beer name - truncated to 1 line when collapsed for uniform card heights in multi-column layouts */}
           <ThemedText
             type="defaultSemiBold"
             style={[styles.beerName, styles.beerNameWithIcon]}
             testID={`beer-name-${beer.id}`}
-            numberOfLines={isExpanded ? undefined : 2}
+            numberOfLines={isExpanded ? undefined : 1}
+            accessibilityHint={!isExpanded ? 'Double tap to show full beer name' : undefined}
           >
             {beer.brew_name || 'Unnamed Beer'}
           </ThemedText>
@@ -174,6 +175,7 @@ const BeerItemComponent: React.FC<BeerItemProps> = ({
             <ThemedText type="muted" style={styles.styleText} numberOfLines={1}>
               {beer.brew_style}
               {beer.brew_container ? ` \u2022 ${beer.brew_container}` : ''}
+              {beer.abv != null ? ` \u2022 ${beer.abv}% ABV` : ''}
             </ThemedText>
           </View>
 

@@ -167,10 +167,22 @@ describe('dataUpdateService', () => {
       expect(result.success).toBe(true);
       expect(result.dataUpdated).toBe(true);
       expect(result.itemCount).toBe(mockBeers.length);
-      // The service adds container_type (null) to beers before insertion via calculateContainerTypes()
+      // The service adds container_type and abv (both null) to beers before insertion via calculateContainerTypes()
       expect(beerRepository.insertMany).toHaveBeenCalledWith([
-        { id: 'beer-1', brew_name: 'Test Beer 1', brewer: 'Brewery 1', container_type: null },
-        { id: 'beer-2', brew_name: 'Test Beer 2', brewer: 'Brewery 2', container_type: null },
+        {
+          id: 'beer-1',
+          brew_name: 'Test Beer 1',
+          brewer: 'Brewery 1',
+          container_type: null,
+          abv: null,
+        },
+        {
+          id: 'beer-2',
+          brew_name: 'Test Beer 2',
+          brewer: 'Brewery 2',
+          container_type: null,
+          abv: null,
+        },
       ]);
       expect(setPreference).toHaveBeenCalledWith('all_beers_last_update', expect.any(String));
       expect(setPreference).toHaveBeenCalledWith('all_beers_last_check', expect.any(String));
@@ -412,10 +424,22 @@ describe('dataUpdateService', () => {
       expect(result.success).toBe(true);
       expect(result.dataUpdated).toBe(true);
       expect(result.itemCount).toBe(mockBeers.length);
-      // The service adds container_type (null) to beers before insertion via calculateContainerTypes()
+      // The service adds container_type and abv (both null) to beers before insertion via calculateContainerTypes()
       expect(myBeersRepository.insertMany).toHaveBeenCalledWith([
-        { id: 'beer-1', brew_name: 'Test Beer 1', tasted_date: '2023-01-01', container_type: null },
-        { id: 'beer-2', brew_name: 'Test Beer 2', tasted_date: '2023-01-02', container_type: null },
+        {
+          id: 'beer-1',
+          brew_name: 'Test Beer 1',
+          tasted_date: '2023-01-01',
+          container_type: null,
+          abv: null,
+        },
+        {
+          id: 'beer-2',
+          brew_name: 'Test Beer 2',
+          tasted_date: '2023-01-02',
+          container_type: null,
+          abv: null,
+        },
       ]);
       expect(setPreference).toHaveBeenCalledWith('my_beers_last_update', expect.any(String));
       expect(setPreference).toHaveBeenCalledWith('my_beers_last_check', expect.any(String));
