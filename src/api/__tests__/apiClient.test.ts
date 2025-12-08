@@ -109,7 +109,7 @@ describe('ApiClient', () => {
       expect(config.network.retryDelay).toBe(1000);
 
       // Verify client can be created with config values
-      const testClient = new ApiClient({
+      const testClient = ApiClient.getInstance({
         baseUrl: config.api.baseUrl,
         retries: config.network.retries,
         retryDelay: config.network.retryDelay,
@@ -173,7 +173,8 @@ describe('ApiClient', () => {
         const testUrl = 'https://test-config.example.com';
         config.setCustomApiUrl(testUrl);
 
-        const client = new ApiClient({
+        // Verify client can be created (getInstance returns existing instance or creates new one)
+        ApiClient.getInstance({
           baseUrl: config.api.baseUrl,
           retries: config.network.retries,
           retryDelay: config.network.retryDelay,
@@ -184,7 +185,7 @@ describe('ApiClient', () => {
       });
 
       it('should construct URLs correctly with config base URL', async () => {
-        const response = await apiClient.get('/test-path');
+        await apiClient.get('/test-path');
 
         expect(global.fetch).toHaveBeenCalledWith(
           `${config.api.baseUrl}/test-path`,
@@ -204,7 +205,8 @@ describe('ApiClient', () => {
 
     describe('Network Configuration', () => {
       it('should respect config retry settings', () => {
-        const client = new ApiClient({
+        // Verify client can be created (getInstance returns existing instance or creates new one)
+        ApiClient.getInstance({
           baseUrl: config.api.baseUrl,
           retries: config.network.retries,
           retryDelay: config.network.retryDelay,
@@ -217,7 +219,8 @@ describe('ApiClient', () => {
       });
 
       it('should respect config timeout settings', () => {
-        const client = new ApiClient({
+        // Verify client can be created (getInstance returns existing instance or creates new one)
+        ApiClient.getInstance({
           baseUrl: config.api.baseUrl,
           retries: config.network.retries,
           retryDelay: config.network.retryDelay,
@@ -231,14 +234,14 @@ describe('ApiClient', () => {
 
       it('should use config network settings for client instantiation', () => {
         // Verify that network settings from config are used
-        const client1 = new ApiClient({
+        const client1 = ApiClient.getInstance({
           baseUrl: config.api.baseUrl,
           retries: config.network.retries,
           retryDelay: config.network.retryDelay,
           timeout: config.network.timeout,
         });
 
-        const client2 = new ApiClient({
+        const client2 = ApiClient.getInstance({
           baseUrl: config.api.baseUrl,
           retries: config.network.retries,
           retryDelay: config.network.retryDelay,
@@ -283,7 +286,8 @@ describe('ApiClient', () => {
         const customUrl = 'https://staging.example.com';
         config.setCustomApiUrl(customUrl);
 
-        const client = new ApiClient({
+        // Verify client can be created (getInstance returns existing instance or creates new one)
+        ApiClient.getInstance({
           baseUrl: config.api.baseUrl,
           retries: config.network.retries,
           retryDelay: config.network.retryDelay,
@@ -350,14 +354,15 @@ describe('ApiClient', () => {
       });
 
       it('should have consistent network settings across client instances', () => {
-        const client1 = new ApiClient({
+        // Create two client instances to verify consistency
+        ApiClient.getInstance({
           baseUrl: config.api.baseUrl,
           retries: config.network.retries,
           retryDelay: config.network.retryDelay,
           timeout: config.network.timeout,
         });
 
-        const client2 = new ApiClient({
+        ApiClient.getInstance({
           baseUrl: config.api.baseUrl,
           retries: config.network.retries,
           retryDelay: config.network.retryDelay,

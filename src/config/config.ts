@@ -484,11 +484,6 @@ export const config: AppConfig = {
 };
 
 /**
- * Export types for external use
- */
-export type { ApiConfig };
-
-/**
  * Export error classes for error handling
  */
 export {

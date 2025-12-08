@@ -15,16 +15,18 @@
  * - Environment switching with env vars
  */
 
+// Note: config is imported dynamically in tests via require() to test different env configurations
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { config } from '../config';
 
 describe('Environment Variable Loading', () => {
   const originalEnv = process.env;
 
   // Helper to create a clean environment without EXPO_PUBLIC vars
-  const getCleanEnv = () => {
-    const clean: Record<string, string> = {};
+  const getCleanEnv = (): NodeJS.ProcessEnv => {
+    const clean: NodeJS.ProcessEnv = { NODE_ENV: 'test' };
     for (const key in originalEnv) {
-      if (!key.startsWith('EXPO_PUBLIC_') && originalEnv[key]) {
+      if (!key.startsWith('EXPO_PUBLIC_')) {
         clean[key] = originalEnv[key];
       }
     }
