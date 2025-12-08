@@ -8,7 +8,7 @@
  * 3. Refactor and improve (REFACTOR)
  */
 
-import { config, AppEnvironment, ApiEndpoints, NetworkConfig, ExternalServices } from '../config';
+import { config, AppEnvironment, ApiEndpoints } from '../config';
 
 describe('Configuration Module', () => {
   describe('Environment Configuration', () => {

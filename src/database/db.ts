@@ -15,7 +15,7 @@
 import * as SQLite from 'expo-sqlite';
 import { UntappdCookie } from './types';
 import { getDatabase } from './connection';
-import { getPreference, setPreference, areApiUrlsConfigured } from './preferences';
+import { getPreference, areApiUrlsConfigured } from './preferences';
 import { setupTables } from './schema';
 import { databaseInitializer } from './initializationState';
 import { fetchBeersFromAPI, fetchMyBeersFromAPI, fetchRewardsFromAPI } from '../api/beerApi';

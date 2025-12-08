@@ -7,7 +7,7 @@
 
 import { Beer } from '../types/beer';
 import { Reward } from '../types/database';
-import { allBeersRowSchema, rewardRowSchema } from './schemaTypes';
+import { rewardRowSchema } from './schemaTypes';
 
 /**
  * Result of validating a single beer object

@@ -108,10 +108,17 @@ async function backfillTable(
   if (total === 0) return;
 
   // Calculate glass types in memory (fast)
-  const updates = beers.map(beer => ({
-    id: beer.id,
-    glassType: getGlassType(beer.brew_container, beer.brew_description, beer.brew_style),
-  }));
+  const updates = beers.map(beer => {
+    const glassType = getGlassType(
+      beer.brew_container ?? undefined,
+      beer.brew_description ?? undefined,
+      beer.brew_style ?? undefined
+    );
+    return {
+      id: beer.id,
+      glassType: glassType === null ? undefined : glassType,
+    };
+  });
 
   // Use SQL CASE statement for bulk update (10-20x faster than individual UPDATEs)
   // Process in batches to avoid SQLite expression tree limits
@@ -123,12 +130,12 @@ async function backfillTable(
     const batch = updates.slice(i, i + batchSize);
 
     // Build CASE statement
-    const caseStatements = batch.map(u => `WHEN id = ? THEN ?`).join(' ');
+    const caseStatements = batch.map(_u => `WHEN id = ? THEN ?`).join(' ');
 
     // Flatten parameters: [id1, glassType1, id2, glassType2, ...]
     const params: (string | null)[] = [];
     batch.forEach(u => {
-      params.push(u.id, u.glassType);
+      params.push(u.id, u.glassType ?? null);
     });
 
     // Add IDs for WHERE clause

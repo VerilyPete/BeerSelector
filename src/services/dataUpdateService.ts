@@ -15,7 +15,6 @@ import { databaseLockManager } from '../database/DatabaseLockManager';
 import {
   validateBrewInStockResponse,
   validateBeerArray,
-  validateRewardsResponse,
 } from '../api/validators';
 import { logError, logWarning } from '../utils/errorLogger';
 import { calculateContainerTypes } from '../database/utils/glassTypeCalculator';
@@ -545,20 +544,24 @@ export async function fetchAndUpdateRewards(): Promise<DataUpdateResult> {
   }
 }
 
-// Unified manual refresh function that refreshes all data types (all beers, my beers, and rewards)
-// Allow tests to override the internal implementations used for refresh
-let fetchAllImpl = fetchAndUpdateAllBeers;
-let fetchMyImpl = fetchAndUpdateMyBeers;
-let fetchRewardsImpl = fetchAndUpdateRewards;
+// NOTE: These implementation variables and override function are currently unused.
+// They were intended for test injection but never fully implemented.
+// Keeping them for potential future use.
+// @ts-expect-error - Unused variable kept for future test injection
+let _fetchAllImpl = fetchAndUpdateAllBeers;
+// @ts-expect-error - Unused variable kept for future test injection
+let _fetchMyImpl = fetchAndUpdateMyBeers;
+// @ts-expect-error - Unused variable kept for future test injection
+let _fetchRewardsImpl = fetchAndUpdateRewards;
 
 export function __setRefreshImplementations(overrides: {
   fetchAll?: typeof fetchAndUpdateAllBeers;
   fetchMy?: typeof fetchAndUpdateMyBeers;
   fetchRewards?: typeof fetchAndUpdateRewards;
 }) {
-  if (overrides.fetchAll) fetchAllImpl = overrides.fetchAll;
-  if (overrides.fetchMy) fetchMyImpl = overrides.fetchMy;
-  if (overrides.fetchRewards) fetchRewardsImpl = overrides.fetchRewards;
+  if (overrides.fetchAll) _fetchAllImpl = overrides.fetchAll;
+  if (overrides.fetchMy) _fetchMyImpl = overrides.fetchMy;
+  if (overrides.fetchRewards) _fetchRewardsImpl = overrides.fetchRewards;
 }
 
 /**

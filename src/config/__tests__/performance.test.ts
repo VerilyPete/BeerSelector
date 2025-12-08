@@ -125,6 +125,7 @@ describe('Config Module Performance Benchmarks', () => {
     it('should access config.api.baseUrl in <1μs on average', () => {
       const avgTime = measureAverageTime(() => {
         const _baseUrl = config.api.baseUrl;
+        void _baseUrl; // Intentionally accessed for performance measurement
       }, 1000);
 
       warnIfPerformanceDegraded(
@@ -138,6 +139,7 @@ describe('Config Module Performance Benchmarks', () => {
     it('should access config.environment in <1μs on average', () => {
       const avgTime = measureAverageTime(() => {
         const _env = config.environment;
+        void _env; // Intentionally accessed for performance measurement
       }, 1000);
 
       warnIfPerformanceDegraded(
@@ -151,6 +153,7 @@ describe('Config Module Performance Benchmarks', () => {
     it('should access config.api.endpoints in <1μs on average', () => {
       const avgTime = measureAverageTime(() => {
         const _endpoints = config.api.endpoints;
+        void _endpoints; // Intentionally accessed for performance measurement
       }, 1000);
 
       warnIfPerformanceDegraded(
@@ -164,6 +167,7 @@ describe('Config Module Performance Benchmarks', () => {
     it('should access config.api.referers in <1μs on average', () => {
       const avgTime = measureAverageTime(() => {
         const _referers = config.api.referers;
+        void _referers; // Intentionally accessed for performance measurement
       }, 1000);
 
       warnIfPerformanceDegraded(
@@ -321,6 +325,7 @@ describe('Config Module Performance Benchmarks', () => {
     it('should access config.network.timeout in <5μs on average', () => {
       const avgTime = measureAverageTime(() => {
         const _timeout = config.network.timeout;
+        void _timeout; // Intentionally accessed for performance measurement
       }, 1000);
 
       warnIfPerformanceDegraded(
@@ -334,6 +339,7 @@ describe('Config Module Performance Benchmarks', () => {
     it('should access config.network.retries in <5μs on average', () => {
       const avgTime = measureAverageTime(() => {
         const _retries = config.network.retries;
+        void _retries; // Intentionally accessed for performance measurement
       }, 1000);
 
       warnIfPerformanceDegraded(
@@ -347,6 +353,7 @@ describe('Config Module Performance Benchmarks', () => {
     it('should access config.network.retryDelay in <5μs on average', () => {
       const avgTime = measureAverageTime(() => {
         const _retryDelay = config.network.retryDelay;
+        void _retryDelay; // Intentionally accessed for performance measurement
       }, 1000);
 
       warnIfPerformanceDegraded(
@@ -362,6 +369,7 @@ describe('Config Module Performance Benchmarks', () => {
         const _timeout = config.network.timeout;
         const _retries = config.network.retries;
         const _retryDelay = config.network.retryDelay;
+        void _timeout; void _retries; void _retryDelay; // Intentionally accessed for performance measurement
       }, 1000);
 
       const threshold = PERFORMANCE_THRESHOLDS.NETWORK_CONFIG_GETTER * 3;
@@ -375,6 +383,7 @@ describe('Config Module Performance Benchmarks', () => {
     it('should access config.external.untappd.baseUrl in <10μs on average', () => {
       const avgTime = measureAverageTime(() => {
         const _baseUrl = config.external.untappd.baseUrl;
+        void _baseUrl; // Intentionally accessed for performance measurement
       }, 1000);
 
       warnIfPerformanceDegraded(
@@ -388,6 +397,7 @@ describe('Config Module Performance Benchmarks', () => {
     it('should access config.external.untappd.loginUrl in <10μs on average', () => {
       const avgTime = measureAverageTime(() => {
         const _loginUrl = config.external.untappd.loginUrl;
+        void _loginUrl; // Intentionally accessed for performance measurement
       }, 1000);
 
       warnIfPerformanceDegraded(
@@ -445,6 +455,7 @@ describe('Config Module Performance Benchmarks', () => {
 
       const avgTime = measureAverageTime(() => {
         const _baseUrl = config.api.baseUrl;
+        void _baseUrl; // Intentionally accessed for performance measurement
       }, 1000);
 
       warnIfPerformanceDegraded(
@@ -535,6 +546,7 @@ describe('Config Module Performance Benchmarks', () => {
           config.api.getFullUrl('deleteQueuedBrew', { cid: '123' });
           const _baseUrl = config.api.baseUrl;
           const _timeout = config.network.timeout;
+          void _baseUrl; void _timeout; // Intentionally accessed for performance measurement
           config.external.untappd.searchUrl('Test Beer');
         }
       });
@@ -688,6 +700,7 @@ describe('Config Module Performance Benchmarks', () => {
           const _referers = config.api.referers;
           const _timeout = config.network.timeout;
           const _env = config.environment;
+          void _baseUrl; void _endpoints; void _referers; void _timeout; void _env; // Intentionally accessed for performance measurement
         }
       });
 

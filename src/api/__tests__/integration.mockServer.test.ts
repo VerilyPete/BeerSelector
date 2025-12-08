@@ -6,7 +6,6 @@
  * Unlike unit tests, these make real HTTP calls to validate end-to-end flow.
  */
 
-import { config } from '@/src/config';
 import {
   setupMockServer,
   FlyingSaucerResponses,
@@ -19,8 +18,6 @@ import {
   fetchWithRetry,
 } from '../beerApi';
 import * as preferences from '@/src/database/preferences';
-import { Beer } from '@/src/database/types';
-import { Reward } from '@/src/types/database';
 
 // Mock the preferences module
 jest.mock('@/src/database/preferences');

@@ -44,10 +44,11 @@ export interface DatabaseLock {
  * @returns True if the object is a Preference, false otherwise
  */
 export function isPreference(obj: unknown): obj is Preference {
-  if (!obj) return false;
-  return typeof obj.key === 'string' &&
-    typeof obj.value === 'string' &&
-    typeof obj.description === 'string';
+  if (!obj || typeof obj !== 'object') return false;
+  const o = obj as Record<string, unknown>;
+  return typeof o.key === 'string' &&
+    typeof o.value === 'string' &&
+    typeof o.description === 'string';
 }
 
 /**
@@ -56,10 +57,11 @@ export function isPreference(obj: unknown): obj is Preference {
  * @returns True if the object is a Reward, false otherwise
  */
 export function isReward(obj: unknown): obj is Reward {
-  if (!obj) return false;
-  return typeof obj.reward_id === 'string' &&
-    typeof obj.redeemed === 'string' &&
-    typeof obj.reward_type === 'string';
+  if (!obj || typeof obj !== 'object') return false;
+  const o = obj as Record<string, unknown>;
+  return typeof o.reward_id === 'string' &&
+    typeof o.redeemed === 'string' &&
+    typeof o.reward_type === 'string';
 }
 
 /**
@@ -68,8 +70,9 @@ export function isReward(obj: unknown): obj is Reward {
  * @returns True if the object is an UntappdCookie, false otherwise
  */
 export function isUntappdCookie(obj: unknown): obj is UntappdCookie {
-  if (!obj) return false;
-  return typeof obj.key === 'string' &&
-    typeof obj.value === 'string' &&
-    typeof obj.description === 'string';
+  if (!obj || typeof obj !== 'object') return false;
+  const o = obj as Record<string, unknown>;
+  return typeof o.key === 'string' &&
+    typeof o.value === 'string' &&
+    typeof o.description === 'string';
 }

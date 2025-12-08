@@ -81,11 +81,12 @@ export interface LoginResult {
  * @returns True if the object is a SessionData, false otherwise
  */
 export function isSessionData(obj: unknown): obj is SessionData {
-  if (!obj) return false;
-  return typeof obj.memberId === 'string' &&
-    typeof obj.storeId === 'string' &&
-    typeof obj.storeName === 'string' &&
-    typeof obj.sessionId === 'string';
+  if (!obj || typeof obj !== 'object') return false;
+  const o = obj as Record<string, unknown>;
+  return typeof o.memberId === 'string' &&
+    typeof o.storeId === 'string' &&
+    typeof o.storeName === 'string' &&
+    typeof o.sessionId === 'string';
 }
 
 /**
@@ -94,10 +95,11 @@ export function isSessionData(obj: unknown): obj is SessionData {
  * @returns True if the object is an ApiResponse, false otherwise
  */
 export function isApiResponse<T>(obj: unknown): obj is ApiResponse<T> {
-  if (!obj) return false;
-  return typeof obj.success === 'boolean' &&
-    typeof obj.statusCode === 'number' &&
-    'data' in obj;
+  if (!obj || typeof obj !== 'object') return false;
+  const o = obj as Record<string, unknown>;
+  return typeof o.success === 'boolean' &&
+    typeof o.statusCode === 'number' &&
+    'data' in o;
 }
 
 /**
@@ -106,6 +108,7 @@ export function isApiResponse<T>(obj: unknown): obj is ApiResponse<T> {
  * @returns True if the object is a LoginResult, false otherwise
  */
 export function isLoginResult(obj: unknown): obj is LoginResult {
-  if (!obj) return false;
-  return typeof obj.success === 'boolean';
+  if (!obj || typeof obj !== 'object') return false;
+  const o = obj as Record<string, unknown>;
+  return typeof o.success === 'boolean';
 }

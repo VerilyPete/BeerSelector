@@ -94,8 +94,9 @@ export interface CheckInResponse {
  * @returns True if the object is a Beer, false otherwise
  */
 export function isBeer(obj: unknown): obj is Beer {
-  if (!obj) return false;
-  return typeof obj.id === 'string' && typeof obj.brew_name === 'string';
+  if (!obj || typeof obj !== 'object') return false;
+  const o = obj as Record<string, unknown>;
+  return typeof o.id === 'string' && typeof o.brew_name === 'string';
 }
 
 /**
@@ -104,13 +105,14 @@ export function isBeer(obj: unknown): obj is Beer {
  * @returns True if the object is a Beerfinder, false otherwise
  */
 export function isBeerfinder(obj: unknown): obj is Beerfinder {
-  if (!obj) return false;
+  if (!obj || typeof obj !== 'object') return false;
+  const o = obj as Beer & Record<string, unknown>;
   return (
     isBeer(obj) &&
-    (obj.roh_lap !== undefined ||
-      obj.tasted_date !== undefined ||
-      obj.review_ratings !== undefined ||
-      obj.chit_code !== undefined)
+    (o.roh_lap !== undefined ||
+      o.tasted_date !== undefined ||
+      o.review_rating !== undefined ||
+      o.chit_code !== undefined)
   );
 }
 
@@ -120,16 +122,17 @@ export function isBeerfinder(obj: unknown): obj is Beerfinder {
  * @returns True if the object is a BeerDetails, false otherwise
  */
 export function isBeerDetails(obj: unknown): obj is BeerDetails {
-  if (!obj) return false;
+  if (!obj || typeof obj !== 'object') return false;
+  const o = obj as Beer & Record<string, unknown>;
   return (
     isBeer(obj) &&
-    (obj.abv !== undefined ||
-      obj.ibu !== undefined ||
-      obj.availability !== undefined ||
-      obj.seasonal !== undefined ||
-      obj.origin_country !== undefined ||
-      obj.untappd_rating !== undefined ||
-      obj.untappd_ratings_count !== undefined)
+    (o.abv !== undefined ||
+      o.ibu !== undefined ||
+      o.availability !== undefined ||
+      o.seasonal !== undefined ||
+      o.origin_country !== undefined ||
+      o.untappd_rating !== undefined ||
+      o.untappd_ratings_count !== undefined)
   );
 }
 
@@ -169,6 +172,7 @@ export function isBeerfinderWithContainerType(obj: unknown): obj is BeerfinderWi
  * @returns True if the object is a CheckInResponse, false otherwise
  */
 export function isCheckInResponse(obj: unknown): obj is CheckInResponse {
-  if (!obj) return false;
-  return typeof obj.success === 'boolean';
+  if (!obj || typeof obj !== 'object') return false;
+  const o = obj as Record<string, unknown>;
+  return typeof o.success === 'boolean';
 }

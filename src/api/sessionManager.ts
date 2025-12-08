@@ -131,7 +131,7 @@ export const parseCookies = (setCookieHeader: string): Record<string, string> =>
  * @returns The extracted session data
  */
 export const extractSessionDataFromResponse = (
-  headers: Headers,
+  _headers: Headers,
   cookies: Record<string, string>
 ): Partial<SessionData> => {
   const sessionData: Partial<SessionData> = {};

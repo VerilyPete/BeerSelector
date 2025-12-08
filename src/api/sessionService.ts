@@ -1,12 +1,13 @@
-import { getSessionData, saveSessionData, clearSessionData, SessionData } from './sessionManager';
+import { getSessionData, saveSessionData } from './sessionManager';
 import { getApiClient } from './apiClientInstance';
 import { validateSession } from './sessionValidator';
+import { SessionData } from '../types/api';
 
 export async function refreshSession(): Promise<SessionData | null> {
   try {
     const apiClient = getApiClient();
     const response = await apiClient.post('/auto-login.php', {});
-    const data = await response.json();
+    const data = response.data as any;
     
     if (data.success) {
       const sessionData = data.session;
