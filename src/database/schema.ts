@@ -93,23 +93,6 @@ export const CREATE_PREFERENCES_TABLE = `
 `;
 
 /**
- * SQL statement to create the untappd table
- * Stores Untappd authentication tokens and cookies
- */
-export const CREATE_UNTAPPD_TABLE = `
-  CREATE TABLE IF NOT EXISTS untappd (
-    key TEXT PRIMARY KEY,
-    value TEXT,
-    description TEXT
-  )
-`;
-
-/**
- * Alias for compatibility with existing code
- */
-export const CREATE_UNTAPPD_COOKIES_TABLE = CREATE_UNTAPPD_TABLE;
-
-/**
  * SQL statement to create the operation_queue table
  * Stores queued operations for retry when network connection is restored
  */
@@ -197,7 +180,6 @@ export const setupTables = async (database: SQLiteDatabase): Promise<void> => {
           await database.execAsync(CREATE_TASTED_BREW_TABLE);
           await database.execAsync(CREATE_REWARDS_TABLE);
           await database.execAsync(CREATE_PREFERENCES_TABLE);
-          await database.execAsync(CREATE_UNTAPPD_TABLE);
           await database.execAsync(CREATE_OPERATION_QUEUE_TABLE);
 
           // Create indexes for operation_queue table

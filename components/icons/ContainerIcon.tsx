@@ -12,10 +12,11 @@ type ContainerIconProps = {
 
 /**
  * Renders the appropriate container icon based on type
- * - Pint glass for draft beers < 7.4% ABV (13oz)
- * - Tulip glass for draft beers >= 7.4% ABV (16oz)
+ * - Pint glass for draft beers < 8% ABV (16oz)
+ * - Tulip glass for draft beers >= 8% ABV (13oz)
  * - Can for canned beers
  * - Bottle for bottled beers
+ * - Flight for beer flights (4 tasting glasses)
  * - Question mark for unknown container types (null)
  */
 export function ContainerIcon({ type, size = 24, color = '#000000' }: ContainerIconProps) {

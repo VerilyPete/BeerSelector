@@ -1,9 +1,7 @@
 /**
- * Database Orchestration & Specialized Features
+ * Database Orchestration
  *
- * This file contains:
- * 1. Database initialization and orchestration (initializeBeerDatabase)
- * 2. Untappd cookie management (alpha feature)
+ * This file contains database initialization and orchestration (initializeBeerDatabase).
  *
  * For data access operations, use repositories directly:
  * - beerRepository (src/database/repositories/BeerRepository.ts)
@@ -13,7 +11,6 @@
  */
 
 import * as SQLite from 'expo-sqlite';
-import { UntappdCookie } from './types';
 import { getDatabase } from './connection';
 import { getPreference, areApiUrlsConfigured } from './preferences';
 import { setupTables } from './schema';
@@ -200,142 +197,3 @@ export const resetDatabaseState = (): void => {
   databaseInitializer.reset();
   console.log('Database state reset');
 };
-
-// ============================================================================
-// UNTAPPD COOKIE MANAGEMENT (DEPRECATED)
-// ============================================================================
-//
-// NOTE: These functions are deprecated as of the migration to SFSafariViewController.
-// The Untappd integration now uses the system browser which shares cookies with Safari,
-// so users can leverage their existing Untappd login without the app managing credentials.
-//
-// These functions are retained for backward compatibility but should not be used in new code.
-// The untappd_cookies table will be removed in a future cleanup.
-//
-// ============================================================================
-
-/**
- * Get a single Untappd cookie by key
- * @deprecated Use SFSafariViewController integration instead (see UntappdWebView component)
- * @param key Cookie key
- * @returns Cookie value or null if not found
- */
-export const getUntappdCookie = async (key: string): Promise<string | null> => {
-  const database = await initDatabase();
-
-  try {
-    const result = await database.getFirstAsync<{ value: string }>(
-      'SELECT value FROM untappd WHERE key = ?',
-      [key]
-    );
-
-    return result ? result.value : null;
-  } catch (error) {
-    console.error(`Error getting Untappd cookie ${key}:`, error);
-    return null;
-  }
-};
-
-/**
- * Set a single Untappd cookie
- * @deprecated Use SFSafariViewController integration instead (see UntappdWebView component)
- * @param key Cookie key
- * @param value Cookie value
- * @param description Optional description
- */
-export const setUntappdCookie = async (
-  key: string,
-  value: string,
-  description?: string
-): Promise<void> => {
-  const database = await initDatabase();
-
-  try {
-    // If description is provided, update it; otherwise just update the value
-    if (description) {
-      await database.runAsync(
-        'INSERT OR REPLACE INTO untappd (key, value, description) VALUES (?, ?, ?)',
-        [key, value, description]
-      );
-    } else {
-      // Get the existing description if available
-      const existing = await database.getFirstAsync<{ description: string }>(
-        'SELECT description FROM untappd WHERE key = ?',
-        [key]
-      );
-
-      await database.runAsync(
-        'INSERT OR REPLACE INTO untappd (key, value, description) VALUES (?, ?, ?)',
-        [key, value, existing?.description || '']
-      );
-    }
-  } catch (error) {
-    console.error(`Error setting Untappd cookie ${key}:`, error);
-    throw error;
-  }
-};
-
-/**
- * Get all Untappd cookies
- * @deprecated Use SFSafariViewController integration instead (see UntappdWebView component)
- * @returns Array of Untappd cookies
- */
-export const getAllUntappdCookies = async (): Promise<UntappdCookie[]> => {
-  const database = await initDatabase();
-
-  try {
-    const cookies = await database.getAllAsync<{ key: string; value: string; description: string }>(
-      'SELECT key, value, description FROM untappd ORDER BY key'
-    );
-
-    return cookies || [];
-  } catch (error) {
-    console.error('Error getting all Untappd cookies:', error);
-    return [];
-  }
-};
-
-/**
- * Check if user is logged into Untappd
- * @deprecated Use SFSafariViewController integration instead (see UntappdWebView component)
- * @returns True if logged in, false otherwise
- */
-export const isUntappdLoggedIn = async (): Promise<boolean> => {
-  const cookies = await getAllUntappdCookies();
-
-  // First check for our custom detection flag which indicates we've detected login via UI elements
-  const loginDetectedViaUI = cookies.some(
-    cookie => cookie.key === 'login_detected_via_ui' && cookie.value === 'true'
-  );
-
-  // Also check for our explicit login detection flag
-  const loginDetectedByApp = cookies.some(
-    cookie => cookie.key === 'untappd_logged_in_detected' && cookie.value === 'true'
-  );
-
-  // Check if we have the necessary cookies for an active session
-  // At minimum, we would need the untappd_session_t cookie, but we may not have access to it if it's HttpOnly
-  const sessionCookiePresent = cookies.some(
-    cookie => (cookie.key === 'untappd_session_t' || cookie.key === 'ut_session') && cookie.value
-  );
-
-  // Consider logged in if we have either:
-  // 1. Detected login via UI elements
-  // 2. Explicitly detected login via navigation or page content
-  // 3. Have a session cookie (which is rare since most are HttpOnly)
-  return loginDetectedViaUI || loginDetectedByApp || sessionCookiePresent;
-};
-
-/**
- * Clear all Untappd cookies
- * @deprecated Use SFSafariViewController integration instead (see UntappdWebView component)
- */
-export async function clearUntappdCookies(): Promise<void> {
-  try {
-    const db = await initDatabase();
-    await db.execAsync('DELETE FROM untappd');
-  } catch (error) {
-    console.error('Error clearing Untappd cookies:', error);
-    throw error;
-  }
-}
