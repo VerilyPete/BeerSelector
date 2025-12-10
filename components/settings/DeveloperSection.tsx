@@ -11,8 +11,6 @@ import { rewardsRepository } from '@/src/database/repositories/RewardsRepository
 import { getPreference, setPreference } from '@/src/database/preferences';
 import { createMockSession } from '@/src/api/mockSession';
 import { clearSessionData } from '@/src/api/sessionManager';
-// eslint-disable-next-line no-restricted-imports
-import { clearUntappdCookies } from '@/src/database/db';
 import SettingsSection from './SettingsSection';
 import SettingsItem from './SettingsItem';
 
@@ -177,9 +175,6 @@ Tasted Beers: ${lastMyBeersRefresh ? new Date(parseInt(lastMyBeersRefresh)).toLo
 
               await rewardsRepository.clear();
               console.log('Cleared rewards');
-
-              await clearUntappdCookies();
-              console.log('Cleared Untappd cookies');
 
               await clearSessionData();
               console.log('Cleared session data');

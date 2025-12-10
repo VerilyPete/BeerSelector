@@ -22,7 +22,7 @@ import {
   BeerfinderWithContainerType,
 } from '../types/beer';
 import { ContainerType } from '../utils/beerGlassType';
-import { Reward, Preference, UntappdCookie } from '../types/database';
+import { Reward, Preference } from '../types/database';
 
 // ============================================================================
 // AllBeers Table
@@ -335,63 +335,13 @@ export function preferenceRowToPreference(row: PreferenceRow): Preference {
 }
 
 // ============================================================================
-// Untappd Table
-// ============================================================================
-
-/**
- * Zod schema for untappd table rows
- *
- * Matches SQL schema:
- * CREATE TABLE IF NOT EXISTS untappd (
- *   key TEXT PRIMARY KEY,
- *   value TEXT,
- *   description TEXT
- * )
- *
- * Required fields: key, value
- */
-export const untappdCookieRowSchema = z.object({
-  key: z.string().min(1, 'key must not be empty'),
-  value: z.string(),
-  description: z.string().optional(),
-});
-
-/**
- * TypeScript type for untappd table rows
- */
-export type UntappdCookieRow = z.infer<typeof untappdCookieRowSchema>;
-
-/**
- * Type guard to check if an object is a valid UntappdCookieRow
- */
-export function isUntappdCookieRow(obj: unknown): obj is UntappdCookieRow {
-  return untappdCookieRowSchema.safeParse(obj).success;
-}
-
-/**
- * Convert UntappdCookieRow to UntappdCookie domain model
- */
-export function untappdCookieRowToUntappdCookie(row: UntappdCookieRow): UntappdCookie {
-  return {
-    key: row.key,
-    value: row.value,
-    description: row.description || '',
-  };
-}
-
-// ============================================================================
 // Utility Types and Schemas
 // ============================================================================
 
 /**
  * Union type of all database row types
  */
-export type DatabaseRow =
-  | AllBeersRow
-  | TastedBrewRow
-  | RewardRow
-  | PreferenceRow
-  | UntappdCookieRow;
+export type DatabaseRow = AllBeersRow | TastedBrewRow | RewardRow | PreferenceRow;
 
 /**
  * Schema for count query results
@@ -444,7 +394,6 @@ export const schemas = {
   tastedBrewRow: tastedBrewRowSchema,
   rewardRow: rewardRowSchema,
   preferenceRow: preferenceRowSchema,
-  untappdCookieRow: untappdCookieRowSchema,
   countResult: countResultSchema,
   tableInfo: tableInfoSchema,
   columnInfo: columnInfoSchema,
@@ -458,7 +407,6 @@ export const typeGuards = {
   isTastedBrewRow,
   isRewardRow,
   isPreferenceRow,
-  isUntappdCookieRow,
   isCountResult,
 } as const;
 
@@ -470,5 +418,4 @@ export const converters = {
   tastedBrewRowToBeerfinder,
   rewardRowToReward,
   preferenceRowToPreference,
-  untappdCookieRowToUntappdCookie,
 } as const;

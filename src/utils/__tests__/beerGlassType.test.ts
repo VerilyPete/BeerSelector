@@ -119,16 +119,16 @@ describe('getGlassType', () => {
   });
 
   describe('draft beer glass selection', () => {
-    it('should return pint for draft beer < 7.4% ABV', () => {
+    it('should return pint for draft beer < 8% ABV', () => {
       expect(getGlassType('Draft', 'ABV 5.2')).toBe('pint');
       expect(getGlassType('draft', '6.5%')).toBe('pint');
       expect(getGlassType('Draught', 'ABV: 7.3')).toBe('pint');
-      expect(getGlassType('Draft', '7.0%')).toBe('pint');
+      expect(getGlassType('Draft', '7.9%')).toBe('pint');
     });
 
-    it('should return tulip for draft beer >= 7.4% ABV', () => {
-      expect(getGlassType('Draft', 'ABV 7.4')).toBe('tulip');
-      expect(getGlassType('draft', '8.0%')).toBe('tulip');
+    it('should return tulip for draft beer >= 8% ABV', () => {
+      expect(getGlassType('Draft', 'ABV 8.0')).toBe('tulip');
+      expect(getGlassType('draft', '8.5%')).toBe('tulip');
       expect(getGlassType('Draught', 'ABV: 10.5')).toBe('tulip');
       expect(getGlassType('Draft', '18.0%')).toBe('tulip');
       expect(getGlassType('Draft', '25%')).toBe('tulip');
@@ -201,7 +201,7 @@ describe('getGlassType', () => {
     });
 
     it('should handle typical beer description at threshold', () => {
-      const description = '<p>Strong pale ale. ABV 7.4</p>';
+      const description = '<p>Strong pale ale. ABV 8.0</p>';
       expect(getGlassType('Draft', description)).toBe('tulip');
     });
 
@@ -293,13 +293,13 @@ describe('getContainerType', () => {
   });
 
   describe('draft glass selection', () => {
-    it('returns pint for draft beer < 7.4% ABV', () => {
+    it('returns pint for draft beer < 8% ABV', () => {
       expect(getContainerType('Draft', '5.2%', undefined, 'Session IPA')).toBe('pint');
       expect(getContainerType('Draught', 'ABV 6.5', undefined, 'Pale Ale')).toBe('pint');
     });
 
-    it('returns tulip for draft beer >= 7.4% ABV', () => {
-      expect(getContainerType('Draft', '7.4%', undefined, 'Double IPA')).toBe('tulip');
+    it('returns tulip for draft beer >= 8% ABV', () => {
+      expect(getContainerType('Draft', '8.0%', undefined, 'Double IPA')).toBe('tulip');
       expect(getContainerType('Draught', 'ABV 10.5', undefined, 'Imperial Stout')).toBe('tulip');
     });
 

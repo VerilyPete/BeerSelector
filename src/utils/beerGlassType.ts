@@ -2,8 +2,8 @@
  * Container type utilities for determining appropriate serving vessel based on beer properties
  *
  * Container types:
- * - 'pint': Pint glass for regular draft beers (<7.4% ABV)
- * - 'tulip': Tulip glass for high ABV draft beers (>=7.4%)
+ * - 'pint': Pint glass for regular draft beers (<8% ABV)
+ * - 'tulip': Tulip glass for high ABV draft beers (>=8%)
  * - 'can': Can icon for canned beers
  * - 'bottle': Bottle icon for bottled beers
  * - 'flight': Flight icon for beer flights (4 tasting glasses)
@@ -76,8 +76,8 @@ export function extractABV(description: string | undefined): number | null {
  *       - "13oz draft" or "13 oz draft" → 'tulip' (skip ABV detection)
  *       - "16oz draft" or "16 oz draft" → 'pint' (skip ABV detection)
  *    b. ABV-based detection (for other draft beers):
- *       - ABV < 7.4% → 'pint'
- *       - ABV >= 7.4% → 'tulip'
+ *       - ABV < 8% → 'pint'
+ *       - ABV >= 8% → 'tulip'
  *    c. Beer style keyword fallback (if all other checks fail):
  *       - Style contains "pilsner" or "lager" → 'pint'
  *       - Style contains "imperial", "tripel", "quad", or "barleywine" → 'tulip'
@@ -146,11 +146,11 @@ export function getContainerType(
   // Use provided ABV or extract from description
   const resolvedAbv = abv !== undefined ? abv : extractABV(description);
   if (resolvedAbv !== null) {
-    // Tulip glass for >= 7.4% ABV
-    if (resolvedAbv >= 7.4) return 'tulip';
+    // Tulip glass for >= 8% ABV
+    if (resolvedAbv >= 8) return 'tulip';
 
-    // Pint glass for < 7.4% ABV
-    if (resolvedAbv < 7.4) return 'pint';
+    // Pint glass for < 8% ABV
+    if (resolvedAbv < 8) return 'pint';
   }
 
   // Fallback: Check beer style for specific keywords
