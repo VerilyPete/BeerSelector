@@ -31,7 +31,9 @@ export const CREATE_ALLBEERS_TABLE = `
     review_rating TEXT,
     brew_description TEXT,
     container_type TEXT,
-    abv REAL
+    abv REAL,
+    enrichment_confidence REAL,
+    enrichment_source TEXT
   )
 `;
 
@@ -59,7 +61,9 @@ export const CREATE_TASTED_BREW_TABLE = `
     brew_description TEXT,
     chit_code TEXT,
     container_type TEXT,
-    abv REAL
+    abv REAL,
+    enrichment_confidence REAL,
+    enrichment_source TEXT
   )
 `;
 
@@ -253,6 +257,13 @@ async function runMigrations(database: SQLiteDatabase, fromVersion: number): Pro
     const { migrateToVersion6 } = await import('./migrations/migrateToV6');
     await migrateToVersion6(database);
     console.log('Migration to version 6 complete');
+  }
+
+  // Run migration to v7 (add enrichment columns)
+  if (fromVersion < 7) {
+    const { migrateToVersion7 } = await import('./migrations/migrateToV7');
+    await migrateToVersion7(database);
+    console.log('Migration to version 7 complete');
   }
 }
 

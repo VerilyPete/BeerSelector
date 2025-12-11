@@ -89,8 +89,10 @@ export class BeerRepository {
           await database.runAsync(
             `INSERT OR REPLACE INTO allbeers (
               id, added_date, brew_name, brewer, brewer_loc,
-              brew_style, brew_container, review_count, review_rating, brew_description, container_type, abv
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              brew_style, brew_container, review_count, review_rating,
+              brew_description, container_type, abv,
+              enrichment_confidence, enrichment_source
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
               beer.id,
               beer.added_date || '',
@@ -104,6 +106,8 @@ export class BeerRepository {
               beer.brew_description || '',
               beer.container_type,
               beer.abv ?? null,
+              beer.enrichment_confidence ?? null,
+              beer.enrichment_source ?? null,
             ]
           );
         }

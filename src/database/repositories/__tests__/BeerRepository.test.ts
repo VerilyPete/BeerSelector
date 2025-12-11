@@ -42,6 +42,8 @@ describe('BeerRepository', () => {
           brew_style: 'IPA',
           added_date: '2024-01-01',
           container_type: 'pint',
+          enrichment_confidence: null,
+          enrichment_source: null,
         },
         {
           id: '2',
@@ -50,6 +52,8 @@ describe('BeerRepository', () => {
           brew_style: 'Stout',
           added_date: '2024-01-02',
           container_type: 'tulip',
+          enrichment_confidence: null,
+          enrichment_source: null,
         },
       ];
 
@@ -77,18 +81,24 @@ describe('BeerRepository', () => {
           brew_name: 'Valid Beer',
           brewer: 'Test Brewery',
           container_type: 'pint',
+          enrichment_confidence: null,
+          enrichment_source: null,
         },
         {
           id: '',
           brew_name: 'Invalid Beer - No ID',
           brewer: 'Test Brewery',
           container_type: 'pint',
+          enrichment_confidence: null,
+          enrichment_source: null,
         } as BeerWithContainerType,
         {
           id: '2',
           brew_name: 'Another Valid Beer',
           brewer: 'Test Brewery',
           container_type: 'tulip',
+          enrichment_confidence: null,
+          enrichment_source: null,
         },
       ];
 
@@ -112,6 +122,8 @@ describe('BeerRepository', () => {
         brew_name: `Beer ${i}`,
         brewer: 'Test Brewery',
         container_type: i % 2 === 0 ? ('pint' as const) : ('tulip' as const),
+        enrichment_confidence: null,
+        enrichment_source: null,
       }));
 
       mockDatabase.getFirstAsync.mockResolvedValue({ count: 0 });
@@ -149,6 +161,8 @@ describe('BeerRepository', () => {
           id: '1',
           brew_name: 'Minimal Beer',
           container_type: 'pint',
+          enrichment_confidence: null,
+          enrichment_source: null,
           // All optional fields missing
         },
       ];
@@ -166,7 +180,14 @@ describe('BeerRepository', () => {
 
     it('should throw error on database failure', async () => {
       const beers: BeerWithContainerType[] = [
-        { id: '1', brew_name: 'Test Beer', brewer: 'Test Brewery', container_type: 'pint' },
+        {
+          id: '1',
+          brew_name: 'Test Beer',
+          brewer: 'Test Brewery',
+          container_type: 'pint',
+          enrichment_confidence: null,
+          enrichment_source: null,
+        },
       ];
 
       mockDatabase.runAsync.mockRejectedValueOnce(new Error('Database error'));
@@ -181,6 +202,8 @@ describe('BeerRepository', () => {
         brew_name: `Beer ${i}`,
         brewer: 'Test Brewery',
         container_type: 'pint' as const,
+        enrichment_confidence: null,
+        enrichment_source: null,
       }));
 
       mockDatabase.getFirstAsync.mockResolvedValue({ count: 0 });
@@ -210,6 +233,8 @@ describe('BeerRepository', () => {
           brewer_loc: undefined,
           review_count: undefined,
           review_rating: undefined,
+          enrichment_confidence: null,
+          enrichment_source: null,
         },
         {
           id: '1',
@@ -224,6 +249,8 @@ describe('BeerRepository', () => {
           brewer_loc: undefined,
           review_count: undefined,
           review_rating: undefined,
+          enrichment_confidence: null,
+          enrichment_source: null,
         },
       ];
 
@@ -278,6 +305,8 @@ describe('BeerRepository', () => {
         brewer_loc: undefined,
         review_count: undefined,
         review_rating: undefined,
+        enrichment_confidence: null,
+        enrichment_source: null,
       };
 
       mockDatabase.getFirstAsync.mockResolvedValue(mockBeer);
@@ -334,6 +363,8 @@ describe('BeerRepository', () => {
           brewer_loc: undefined,
           review_count: undefined,
           review_rating: undefined,
+          enrichment_confidence: null,
+          enrichment_source: null,
         },
       ];
 
@@ -363,6 +394,8 @@ describe('BeerRepository', () => {
           brewer_loc: undefined,
           review_count: undefined,
           review_rating: undefined,
+          enrichment_confidence: null,
+          enrichment_source: null,
         },
       ];
 
@@ -450,6 +483,8 @@ describe('BeerRepository', () => {
           brewer_loc: undefined,
           review_count: undefined,
           review_rating: undefined,
+          enrichment_confidence: null,
+          enrichment_source: null,
         },
         {
           id: '2',
@@ -464,6 +499,8 @@ describe('BeerRepository', () => {
           brewer_loc: undefined,
           review_count: undefined,
           review_rating: undefined,
+          enrichment_confidence: null,
+          enrichment_source: null,
         },
       ];
 
@@ -518,6 +555,8 @@ describe('BeerRepository', () => {
           brewer_loc: undefined,
           review_count: undefined,
           review_rating: undefined,
+          enrichment_confidence: null,
+          enrichment_source: null,
         },
         {
           id: '2',
@@ -532,6 +571,8 @@ describe('BeerRepository', () => {
           brewer_loc: undefined,
           review_count: undefined,
           review_rating: undefined,
+          enrichment_confidence: null,
+          enrichment_source: null,
         },
       ];
 
@@ -586,6 +627,8 @@ describe('BeerRepository', () => {
           brewer_loc: undefined,
           review_count: undefined,
           review_rating: undefined,
+          enrichment_confidence: null,
+          enrichment_source: null,
         },
         {
           id: '2',
@@ -600,6 +643,8 @@ describe('BeerRepository', () => {
           brewer_loc: undefined,
           review_count: undefined,
           review_rating: undefined,
+          enrichment_confidence: null,
+          enrichment_source: null,
         },
       ];
 

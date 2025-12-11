@@ -5,6 +5,11 @@
 import { ContainerType } from '@/src/utils/beerGlassType';
 
 /**
+ * Valid enrichment source values
+ */
+export type EnrichmentSource = 'perplexity' | 'manual' | null;
+
+/**
  * Base Beer interface representing a beer in the system
  */
 export interface Beer {
@@ -19,6 +24,9 @@ export interface Beer {
   brew_description?: string;
   added_date?: string;
   abv?: number | null;
+  // Enrichment fields (from Cloudflare Worker)
+  enrichment_confidence?: number | null;
+  enrichment_source?: EnrichmentSource;
 }
 
 /**
@@ -29,9 +37,14 @@ export interface Beer {
  * - Container types we don't recognize
  *
  * Container types: 'pint', 'tulip', 'can', 'bottle', 'flight', or null (no icon shown)
+ *
+ * Enrichment fields are inherited from Beer and explicitly typed here for clarity.
  */
 export interface BeerWithContainerType extends Beer {
   container_type: ContainerType; // Field present, value can be null
+  // Enrichment fields explicitly typed (inherited from Beer, made required with nullable values)
+  enrichment_confidence: number | null;
+  enrichment_source: EnrichmentSource;
 }
 
 /**
@@ -48,6 +61,8 @@ export interface Beerfinder extends Beer {
  * Beerfinder with container type (after database fetch)
  * Combines Beerfinder properties with container_type property
  * (container_type can be null for unrecognized container types)
+ *
+ * Enrichment fields are inherited and explicitly typed here for clarity.
  */
 export interface BeerfinderWithContainerType extends BeerWithContainerType {
   roh_lap?: string;
@@ -97,7 +112,27 @@ export interface CheckInResponse {
 export function isBeer(obj: unknown): obj is Beer {
   if (!obj || typeof obj !== 'object') return false;
   const o = obj as Record<string, unknown>;
-  return typeof o.id === 'string' && typeof o.brew_name === 'string';
+
+  // Required fields
+  if (typeof o.id !== 'string' || typeof o.brew_name !== 'string') {
+    return false;
+  }
+
+  // Validate enrichment_source if present
+  if (o.enrichment_source !== undefined && o.enrichment_source !== null) {
+    if (o.enrichment_source !== 'perplexity' && o.enrichment_source !== 'manual') {
+      return false;
+    }
+  }
+
+  // Validate enrichment_confidence if present (should be number or null)
+  if (o.enrichment_confidence !== undefined && o.enrichment_confidence !== null) {
+    if (typeof o.enrichment_confidence !== 'number') {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 /**
@@ -145,12 +180,25 @@ export function isBeerDetails(obj: unknown): obj is BeerDetails {
 export function isBeerWithContainerType(obj: unknown): obj is BeerWithContainerType {
   if (!isBeer(obj)) return false;
 
-  const beer = obj as any;
+  const beer = obj as unknown as Record<string, unknown>;
 
   // container_type must be present and valid
   const validTypes = ['pint', 'tulip', 'can', 'bottle', 'flight', null];
-  if (!validTypes.includes(beer.container_type)) {
+  if (!validTypes.includes(beer.container_type as string | null)) {
     return false;
+  }
+
+  // For BeerWithContainerType, enrichment fields should be present (can be null)
+  // They are inherited from Beer but made required with nullable values
+  if (!('enrichment_confidence' in beer) || !('enrichment_source' in beer)) {
+    return false;
+  }
+
+  // Validate enrichment_source value if not null
+  if (beer.enrichment_source !== null) {
+    if (beer.enrichment_source !== 'perplexity' && beer.enrichment_source !== 'manual') {
+      return false;
+    }
   }
 
   return true;

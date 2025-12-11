@@ -142,6 +142,8 @@ describe('Repository Type Safety', () => {
           brewer_loc: 'Austin, TX',
           brew_style: 'IPA',
           container_type: 'pint',
+          enrichment_confidence: null,
+          enrichment_source: null,
         },
       ];
 
@@ -249,6 +251,9 @@ describe('Repository Type Safety', () => {
           roh_lap: '1',
           chit_code: 'ABC123',
           container_type: 'pint',
+          abv: null,
+          enrichment_confidence: null,
+          enrichment_source: null,
         },
       ];
 

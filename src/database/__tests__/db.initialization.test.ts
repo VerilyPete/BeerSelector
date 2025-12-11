@@ -92,6 +92,8 @@ describe('initializeBeerDatabase', () => {
       glass_type: null,
       container_type: null,
       abv: null,
+      enrichment_confidence: null,
+      enrichment_source: null,
     },
     {
       id: 'beer-2',
@@ -100,6 +102,8 @@ describe('initializeBeerDatabase', () => {
       glass_type: null,
       container_type: null,
       abv: null,
+      enrichment_confidence: null,
+      enrichment_source: null,
     },
   ];
 
@@ -112,6 +116,8 @@ describe('initializeBeerDatabase', () => {
       glass_type: null,
       container_type: null,
       abv: null,
+      enrichment_confidence: null,
+      enrichment_source: null,
     },
   ];
 

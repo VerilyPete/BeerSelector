@@ -52,6 +52,8 @@ describe('BeerList - Virtualization Window Tuning (Bottleneck #6)', () => {
     brew_container: 'Draft',
     brew_description: 'Test description',
     container_type: 'tulip', // Pre-computed glass type for IPA
+    enrichment_confidence: null,
+    enrichment_source: null,
   });
 
   const mockBeers: BeerWithContainerType[] = Array.from({ length: 200 }, (_, i) =>

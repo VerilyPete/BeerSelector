@@ -120,8 +120,9 @@ export class MyBeersRepository {
                   `INSERT OR REPLACE INTO tasted_brew_current_round (
                     id, roh_lap, tasted_date, brew_name, brewer, brewer_loc,
                     brew_style, brew_container, review_count, review_ratings,
-                    brew_description, chit_code, container_type, abv
-                  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    brew_description, chit_code, container_type, abv,
+                    enrichment_confidence, enrichment_source
+                  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                   [
                     beer.id,
                     beer.roh_lap || '',
@@ -137,6 +138,8 @@ export class MyBeersRepository {
                     beer.chit_code || '',
                     beer.container_type ?? null,
                     beer.abv ?? null,
+                    beer.enrichment_confidence ?? null,
+                    beer.enrichment_source ?? null,
                   ]
                 );
               } catch (err) {
@@ -256,8 +259,9 @@ export class MyBeersRepository {
                 `INSERT OR REPLACE INTO tasted_brew_current_round (
                   id, roh_lap, tasted_date, brew_name, brewer, brewer_loc,
                   brew_style, brew_container, review_count, review_ratings,
-                  brew_description, chit_code, container_type, abv
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                  brew_description, chit_code, container_type, abv,
+                  enrichment_confidence, enrichment_source
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
                   beer.id,
                   beer.roh_lap || '',
@@ -273,6 +277,8 @@ export class MyBeersRepository {
                   beer.chit_code || '',
                   beer.container_type ?? null,
                   beer.abv ?? null,
+                  beer.enrichment_confidence ?? null,
+                  beer.enrichment_source ?? null,
                 ]
               );
             } catch (err) {

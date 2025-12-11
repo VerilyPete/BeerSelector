@@ -44,6 +44,8 @@ describe('MyBeersRepository', () => {
           chit_code: 'CHT123',
           container_type: 'pint',
           abv: null,
+          enrichment_confidence: null,
+          enrichment_source: null,
         },
         {
           id: '2',
@@ -54,6 +56,8 @@ describe('MyBeersRepository', () => {
           chit_code: 'CHT456',
           container_type: 'tulip',
           abv: null,
+          enrichment_confidence: null,
+          enrichment_source: null,
         },
       ];
 
@@ -106,6 +110,8 @@ describe('MyBeersRepository', () => {
           roh_lap: '1',
           container_type: 'pint',
           abv: null,
+          enrichment_confidence: null,
+          enrichment_source: null,
         },
         {
           id: '',
@@ -114,6 +120,8 @@ describe('MyBeersRepository', () => {
           roh_lap: '2',
           container_type: 'pint',
           abv: null,
+          enrichment_confidence: null,
+          enrichment_source: null,
         } as BeerfinderWithContainerType,
         {
           id: '2',
@@ -122,6 +130,8 @@ describe('MyBeersRepository', () => {
           roh_lap: '3',
           container_type: 'tulip',
           abv: null,
+          enrichment_confidence: null,
+          enrichment_source: null,
         },
       ];
 
@@ -148,6 +158,8 @@ describe('MyBeersRepository', () => {
           brewer: 'Test Brewery',
           container_type: 'pint',
           abv: null,
+          enrichment_confidence: null,
+          enrichment_source: null,
         } as BeerfinderWithContainerType,
         {
           id: '',
@@ -155,6 +167,8 @@ describe('MyBeersRepository', () => {
           brewer: 'Test Brewery',
           container_type: 'pint',
           abv: null,
+          enrichment_confidence: null,
+          enrichment_source: null,
         } as BeerfinderWithContainerType,
       ];
 
@@ -187,6 +201,8 @@ describe('MyBeersRepository', () => {
         roh_lap: `${i}`,
         container_type: i % 2 === 0 ? ('pint' as const) : ('tulip' as const),
         abv: null,
+        enrichment_confidence: null,
+        enrichment_source: null,
       }));
 
       mockDatabase.getFirstAsync.mockResolvedValue({ count: 0 });
@@ -210,6 +226,8 @@ describe('MyBeersRepository', () => {
           brew_name: 'Minimal Tasted Beer',
           container_type: 'pint',
           abv: null,
+          enrichment_confidence: null,
+          enrichment_source: null,
           // All optional Beerfinder fields missing
         },
       ];
@@ -233,6 +251,8 @@ describe('MyBeersRepository', () => {
           brewer: 'Test Brewery',
           container_type: 'pint',
           abv: null,
+          enrichment_confidence: null,
+          enrichment_source: null,
         },
       ];
 
@@ -250,6 +270,8 @@ describe('MyBeersRepository', () => {
         roh_lap: `${i}`,
         container_type: 'pint' as const,
         abv: null,
+        enrichment_confidence: null,
+        enrichment_source: null,
       }));
 
       mockDatabase.getFirstAsync.mockResolvedValue({ count: 0 });
@@ -278,6 +300,8 @@ describe('MyBeersRepository', () => {
           chit_code: 'CHT789',
           container_type: 'tulip',
           abv: null,
+          enrichment_confidence: null,
+          enrichment_source: null,
         },
       ];
 
@@ -308,6 +332,8 @@ describe('MyBeersRepository', () => {
           tasted_date: '2024-01-01',
           container_type: 'pint',
           abv: null,
+          enrichment_confidence: null,
+          enrichment_source: null,
         },
         {
           id: '2',
@@ -317,6 +343,8 @@ describe('MyBeersRepository', () => {
           tasted_date: '2024-01-02',
           container_type: 'tulip',
           abv: null,
+          enrichment_confidence: null,
+          enrichment_source: null,
         },
       ];
 
@@ -395,6 +423,8 @@ describe('MyBeersRepository', () => {
         tasted_date: '2024-01-15',
         container_type: 'pint',
         abv: null,
+        enrichment_confidence: null,
+        enrichment_source: null,
       };
 
       mockDatabase.getFirstAsync.mockResolvedValue(mockBeer);
@@ -516,8 +546,24 @@ describe('MyBeersRepository', () => {
     it('should handle individual beer insert errors gracefully', async () => {
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
       const beers: BeerfinderWithContainerType[] = [
-        { id: '1', brew_name: 'Beer 1', brewer: 'Brewery 1', container_type: 'pint', abv: null },
-        { id: '2', brew_name: 'Beer 2', brewer: 'Brewery 2', container_type: 'tulip', abv: null },
+        {
+          id: '1',
+          brew_name: 'Beer 1',
+          brewer: 'Brewery 1',
+          container_type: 'pint',
+          abv: null,
+          enrichment_confidence: null,
+          enrichment_source: null,
+        },
+        {
+          id: '2',
+          brew_name: 'Beer 2',
+          brewer: 'Brewery 2',
+          container_type: 'tulip',
+          abv: null,
+          enrichment_confidence: null,
+          enrichment_source: null,
+        },
       ];
 
       mockDatabase.getFirstAsync.mockResolvedValue({ count: 0 });
@@ -547,6 +593,8 @@ describe('MyBeersRepository', () => {
           brewer: 'Test Brewery',
           container_type: 'pint',
           abv: null,
+          enrichment_confidence: null,
+          enrichment_source: null,
         },
       ];
 
@@ -566,6 +614,8 @@ describe('MyBeersRepository', () => {
           roh_lap: '1',
           container_type: 'pint',
           abv: null,
+          enrichment_confidence: null,
+          enrichment_source: null,
         },
         {
           id: '2',
@@ -574,6 +624,8 @@ describe('MyBeersRepository', () => {
           roh_lap: '2',
           container_type: 'tulip',
           abv: null,
+          enrichment_confidence: null,
+          enrichment_source: null,
         },
       ];
 
@@ -608,6 +660,8 @@ describe('MyBeersRepository', () => {
           brewer: 'Test',
           container_type: 'pint',
           abv: null,
+          enrichment_confidence: null,
+          enrichment_source: null,
         } as BeerfinderWithContainerType,
       ];
 
@@ -630,6 +684,8 @@ describe('MyBeersRepository', () => {
         roh_lap: `${i}`,
         container_type: i % 2 === 0 ? ('pint' as const) : ('tulip' as const),
         abv: null,
+        enrichment_confidence: null,
+        enrichment_source: null,
       }));
 
       mockDatabase.getFirstAsync.mockResolvedValue({ count: 0 });
@@ -645,15 +701,33 @@ describe('MyBeersRepository', () => {
     it('should skip beers without IDs during insert', async () => {
       const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
       const beers: BeerfinderWithContainerType[] = [
-        { id: '1', brew_name: 'Valid', brewer: 'Test', container_type: 'pint', abv: null },
+        {
+          id: '1',
+          brew_name: 'Valid',
+          brewer: 'Test',
+          container_type: 'pint',
+          abv: null,
+          enrichment_confidence: null,
+          enrichment_source: null,
+        },
         {
           id: '',
           brew_name: 'Invalid',
           brewer: 'Test',
           container_type: 'pint',
           abv: null,
+          enrichment_confidence: null,
+          enrichment_source: null,
         } as BeerfinderWithContainerType,
-        { id: '2', brew_name: 'Valid 2', brewer: 'Test', container_type: 'tulip', abv: null },
+        {
+          id: '2',
+          brew_name: 'Valid 2',
+          brewer: 'Test',
+          container_type: 'tulip',
+          abv: null,
+          enrichment_confidence: null,
+          enrichment_source: null,
+        },
       ];
 
       mockDatabase.getFirstAsync.mockResolvedValue({ count: 0 });
@@ -670,7 +744,15 @@ describe('MyBeersRepository', () => {
     it('should handle insert errors gracefully', async () => {
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
       const beers: BeerfinderWithContainerType[] = [
-        { id: '1', brew_name: 'Beer 1', brewer: 'Test', container_type: 'pint', abv: null },
+        {
+          id: '1',
+          brew_name: 'Beer 1',
+          brewer: 'Test',
+          container_type: 'pint',
+          abv: null,
+          enrichment_confidence: null,
+          enrichment_source: null,
+        },
       ];
 
       mockDatabase.getFirstAsync.mockResolvedValue({ count: 0 });
@@ -690,7 +772,15 @@ describe('MyBeersRepository', () => {
     it('should log final row count', async () => {
       const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
       const beers: BeerfinderWithContainerType[] = [
-        { id: '1', brew_name: 'Test Beer', brewer: 'Test', container_type: 'pint', abv: null },
+        {
+          id: '1',
+          brew_name: 'Test Beer',
+          brewer: 'Test',
+          container_type: 'pint',
+          abv: null,
+          enrichment_confidence: null,
+          enrichment_source: null,
+        },
       ];
 
       mockDatabase.getFirstAsync.mockResolvedValueOnce({ count: 1 }); // Final count after insert
@@ -705,7 +795,15 @@ describe('MyBeersRepository', () => {
 
     it('should throw error on transaction failure', async () => {
       const beers: BeerfinderWithContainerType[] = [
-        { id: '1', brew_name: 'Test Beer', brewer: 'Test', container_type: 'pint', abv: null },
+        {
+          id: '1',
+          brew_name: 'Test Beer',
+          brewer: 'Test',
+          container_type: 'pint',
+          abv: null,
+          enrichment_confidence: null,
+          enrichment_source: null,
+        },
       ];
 
       mockDatabase.withTransactionAsync.mockRejectedValueOnce(new Error('Transaction failed'));
