@@ -31,7 +31,7 @@ import { Reward, Preference } from '../types/database';
 /**
  * Zod schema for allbeers table rows
  *
- * Matches SQL schema:
+ * Matches SQL schema (v7):
  * CREATE TABLE IF NOT EXISTS allbeers (
  *   id TEXT PRIMARY KEY,
  *   added_date TEXT,
@@ -43,7 +43,10 @@ import { Reward, Preference } from '../types/database';
  *   review_count TEXT,
  *   review_rating TEXT,
  *   brew_description TEXT,
- *   container_type TEXT -- Renamed from glass_type in schema v4, supports: pint, tulip, can, bottle, flight
+ *   container_type TEXT,
+ *   abv REAL,
+ *   enrichment_confidence REAL,
+ *   enrichment_source TEXT
  * )
  *
  * Required fields: id, brew_name (non-empty)
@@ -75,6 +78,9 @@ export const allBeersRowSchema = z.object({
     ])
     .optional(),
   abv: z.number().nullable().optional(),
+  // Enrichment fields (added in schema v7)
+  enrichment_confidence: z.number().nullable().optional(),
+  enrichment_source: z.union([z.literal('perplexity'), z.literal('manual'), z.null()]).optional(),
 });
 
 /**
@@ -95,6 +101,8 @@ export function isAllBeersRow(obj: unknown): obj is AllBeersRow {
  * Convert AllBeersRow to Beer domain model
  * Currently they have the same structure, but this provides
  * a clear separation between database and domain layers
+ *
+ * Includes optional enrichment fields (added in schema v7)
  */
 export function allBeersRowToBeer(row: AllBeersRow): Beer {
   return {
@@ -109,12 +117,17 @@ export function allBeersRowToBeer(row: AllBeersRow): Beer {
     review_rating: row.review_rating,
     brew_description: row.brew_description,
     abv: row.abv,
+    // Enrichment fields (optional on Beer interface)
+    enrichment_confidence: row.enrichment_confidence,
+    enrichment_source: row.enrichment_source,
   };
 }
 
 /**
  * Convert AllBeersRow to BeerWithContainerType domain model
  * Used after schema v4 migration when container_type is guaranteed to be present
+ *
+ * Includes enrichment fields (added in schema v7)
  */
 export function allBeersRowToBeerWithContainerType(row: AllBeersRow): BeerWithContainerType {
   return {
@@ -130,6 +143,9 @@ export function allBeersRowToBeerWithContainerType(row: AllBeersRow): BeerWithCo
     brew_description: row.brew_description,
     container_type: (row.container_type ?? null) as ContainerType,
     abv: row.abv ?? null,
+    // Enrichment fields (default to null if not present)
+    enrichment_confidence: row.enrichment_confidence ?? null,
+    enrichment_source: row.enrichment_source ?? null,
   };
 }
 
@@ -140,7 +156,7 @@ export function allBeersRowToBeerWithContainerType(row: AllBeersRow): BeerWithCo
 /**
  * Zod schema for tasted_brew_current_round table rows
  *
- * Matches SQL schema:
+ * Matches SQL schema (v7):
  * CREATE TABLE IF NOT EXISTS tasted_brew_current_round (
  *   id TEXT PRIMARY KEY,
  *   roh_lap TEXT,
@@ -154,7 +170,10 @@ export function allBeersRowToBeerWithContainerType(row: AllBeersRow): BeerWithCo
  *   review_ratings TEXT,
  *   brew_description TEXT,
  *   chit_code TEXT,
- *   container_type TEXT -- Renamed from glass_type in schema v4, supports: pint, tulip, can, bottle, flight
+ *   container_type TEXT,
+ *   abv REAL,
+ *   enrichment_confidence REAL,
+ *   enrichment_source TEXT
  * )
  *
  * Required fields: id, brew_name (non-empty)
@@ -184,6 +203,9 @@ export const tastedBrewRowSchema = z.object({
     ])
     .optional(),
   abv: z.number().nullable().optional(),
+  // Enrichment fields (added in schema v7)
+  enrichment_confidence: z.number().nullable().optional(),
+  enrichment_source: z.union([z.literal('perplexity'), z.literal('manual'), z.null()]).optional(),
 });
 
 /**
@@ -200,6 +222,8 @@ export function isTastedBrewRow(obj: unknown): obj is TastedBrewRow {
 
 /**
  * Convert TastedBrewRow to Beerfinder domain model
+ *
+ * Includes optional enrichment fields (added in schema v7)
  */
 export function tastedBrewRowToBeerfinder(row: TastedBrewRow): Beerfinder {
   return {
@@ -216,12 +240,17 @@ export function tastedBrewRowToBeerfinder(row: TastedBrewRow): Beerfinder {
     brew_description: row.brew_description,
     chit_code: row.chit_code,
     abv: row.abv,
+    // Enrichment fields (optional on Beerfinder interface)
+    enrichment_confidence: row.enrichment_confidence,
+    enrichment_source: row.enrichment_source,
   };
 }
 
 /**
  * Convert TastedBrewRow to BeerfinderWithContainerType domain model
  * Used after schema v4 migration when container_type is guaranteed to be present
+ *
+ * Includes enrichment fields (added in schema v7)
  */
 export function tastedBrewRowToBeerfinderWithContainerType(
   row: TastedBrewRow
@@ -241,6 +270,9 @@ export function tastedBrewRowToBeerfinderWithContainerType(
     chit_code: row.chit_code,
     container_type: (row.container_type ?? null) as ContainerType,
     abv: row.abv ?? null,
+    // Enrichment fields (default to null if not present)
+    enrichment_confidence: row.enrichment_confidence ?? null,
+    enrichment_source: row.enrichment_source ?? null,
   };
 }
 

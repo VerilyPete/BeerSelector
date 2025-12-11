@@ -1,15 +1,29 @@
 import { getContainerType, extractABV, ContainerType } from '@/src/utils/beerGlassType';
-import { Beer, BeerWithContainerType } from '@/src/types/beer';
+import { Beer, BeerWithContainerType, EnrichmentSource } from '@/src/types/beer';
+
+/**
+ * Return type for calculateContainerType function
+ * Explicitly includes all fields for type safety
+ */
+interface BeerWithContainerTypeAndEnrichment extends Beer {
+  container_type: ContainerType;
+  abv: number | null;
+  enrichment_confidence: number | null;
+  enrichment_source: EnrichmentSource;
+}
 
 /**
  * Calculate and assign container type and ABV to a beer object
- * Returns new object with container_type and abv properties
+ * Returns new object with container_type, abv, and enrichment properties
+ *
+ * If beer already has enriched ABV (from Worker), use that.
+ * Otherwise, extract ABV from description.
+ *
+ * Enrichment fields are passed through if present.
  */
-export function calculateContainerType(
-  beer: Beer
-): Beer & { container_type: ContainerType; abv: number | null } {
-  // Extract ABV from description
-  const abv = extractABV(beer.brew_description);
+export function calculateContainerType(beer: Beer): BeerWithContainerTypeAndEnrichment {
+  // Use enriched ABV from Worker if available, otherwise extract from description
+  const abv = beer.abv ?? extractABV(beer.brew_description);
 
   // Calculate container type with ABV
   const containerType = getContainerType(
@@ -24,6 +38,9 @@ export function calculateContainerType(
     ...beer,
     container_type: containerType,
     abv: abv,
+    // Pass through enrichment fields, defaulting to null if not present
+    enrichment_confidence: beer.enrichment_confidence ?? null,
+    enrichment_source: beer.enrichment_source ?? null,
   };
 }
 
@@ -32,11 +49,16 @@ export function calculateContainerType(
  * Used in data sync to pre-compute before insertion
  *
  * Returns BeerWithContainerType[] to match repository type signatures
+ *
+ * If beer already has enriched ABV (from Worker), use that.
+ * Otherwise, extract ABV from description.
+ *
+ * Enrichment fields are passed through if present.
  */
 export function calculateContainerTypes(beers: Beer[]): BeerWithContainerType[] {
-  return beers.map(beer => {
-    // Extract ABV from description
-    const abv = extractABV(beer.brew_description);
+  return beers.map((beer): BeerWithContainerType => {
+    // Use enriched ABV from Worker if available, otherwise extract from description
+    const abv = beer.abv ?? extractABV(beer.brew_description);
 
     // Calculate container type with ABV
     const containerType = getContainerType(
@@ -51,6 +73,9 @@ export function calculateContainerTypes(beers: Beer[]): BeerWithContainerType[] 
       ...beer,
       container_type: containerType,
       abv: abv,
+      // Pass through enrichment fields, defaulting to null if not present
+      enrichment_confidence: beer.enrichment_confidence ?? null,
+      enrichment_source: beer.enrichment_source ?? null,
     };
-  }) as BeerWithContainerType[];
+  });
 }

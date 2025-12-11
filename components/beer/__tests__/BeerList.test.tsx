@@ -50,6 +50,8 @@ describe('BeerList', () => {
       added_date: '1699564800',
       brewer_loc: 'Texas',
       container_type: 'tulip' as const, // Pre-computed glass type for IPA
+      enrichment_confidence: null,
+      enrichment_source: null,
     },
     {
       id: '2',
@@ -62,6 +64,8 @@ describe('BeerList', () => {
       added_date: '1699651200',
       brewer_loc: 'Colorado',
       container_type: 'pint' as const, // Pre-computed glass type for Stout
+      enrichment_confidence: null,
+      enrichment_source: null,
     },
   ];
 
@@ -319,6 +323,8 @@ describe('BeerList', () => {
         added_date: '1699910400',
         brewer_loc: 'Oregon',
         container_type: 'pint' as const, // Pre-computed glass type for Ale
+        enrichment_confidence: null,
+        enrichment_source: null,
       },
     ];
 

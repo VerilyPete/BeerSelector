@@ -13,6 +13,8 @@ describe('useBeerFilters - Filter Logic', () => {
       brew_description: 'A hoppy beer',
       added_date: '1704067200', // Jan 1, 2024
       container_type: 'tulip',
+      enrichment_confidence: null,
+      enrichment_source: null,
     },
     {
       id: '2',
@@ -24,6 +26,8 @@ describe('useBeerFilters - Filter Logic', () => {
       brew_description: 'A dark beer',
       added_date: '1704153600', // Jan 2, 2024
       container_type: 'pint',
+      enrichment_confidence: null,
+      enrichment_source: null,
     },
     {
       id: '3',
@@ -35,6 +39,8 @@ describe('useBeerFilters - Filter Logic', () => {
       brew_description: 'A smooth porter',
       added_date: '1704240000', // Jan 3, 2024
       container_type: 'pint',
+      enrichment_confidence: null,
+      enrichment_source: null,
     },
     {
       id: '4',
@@ -46,6 +52,8 @@ describe('useBeerFilters - Filter Logic', () => {
       brew_description: 'A crisp lager',
       added_date: '1704326400', // Jan 4, 2024
       container_type: 'pint',
+      enrichment_confidence: null,
+      enrichment_source: null,
     },
     {
       id: '5',
@@ -57,6 +65,8 @@ describe('useBeerFilters - Filter Logic', () => {
       brew_description: 'A juicy IPA',
       added_date: '1704412800', // Jan 5, 2024
       container_type: 'tulip',
+      enrichment_confidence: null,
+      enrichment_source: null,
     },
   ];
 
@@ -279,6 +289,8 @@ describe('useBeerFilters - Filter Logic', () => {
             brew_description: '',
             added_date: '',
             container_type: 'pint',
+            enrichment_confidence: null,
+            enrichment_source: null,
           },
         ];
 

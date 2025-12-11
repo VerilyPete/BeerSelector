@@ -12,12 +12,18 @@ import { beerRepository } from '../database/repositories/BeerRepository';
 import { myBeersRepository } from '../database/repositories/MyBeersRepository';
 import { rewardsRepository } from '../database/repositories/RewardsRepository';
 import { databaseLockManager } from '../database/DatabaseLockManager';
-import {
-  validateBrewInStockResponse,
-  validateBeerArray,
-} from '../api/validators';
+import { validateBrewInStockResponse, validateBeerArray } from '../api/validators';
 import { logError, logWarning } from '../utils/errorLogger';
 import { calculateContainerTypes } from '../database/utils/glassTypeCalculator';
+import { config } from '@/src/config';
+import {
+  fetchBeersFromProxy,
+  fetchEnrichmentBatch,
+  bustTaplistCache,
+  mergeEnrichmentData,
+  recordFallback,
+  EnrichedBeerResponse,
+} from './enrichmentService';
 
 /**
  * Result of a data update operation
@@ -30,7 +36,54 @@ export interface DataUpdateResult {
 }
 
 /**
+ * Map Worker's enriched beer response to app's Beer interface
+ */
+function mapEnrichedBeerToAppBeer(beer: EnrichedBeerResponse): Beer {
+  return {
+    id: beer.id,
+    brew_name: beer.brew_name,
+    brewer: beer.brewer,
+    brewer_loc: beer.brewer_loc,
+    brew_style: beer.brew_style,
+    brew_container: beer.brew_container,
+    review_count: beer.review_count,
+    review_rating: beer.review_rating,
+    brew_description: beer.brew_description,
+    added_date: beer.added_date,
+    // Use enriched ABV from Worker
+    abv: beer.enriched_abv,
+    enrichment_confidence: beer.enrichment_confidence,
+    enrichment_source: beer.enrichment_source,
+  };
+}
+
+/**
+ * Extract store ID from the all_beers_api_url preference.
+ *
+ * The URL format is: https://fsbs.beerknurd.com/bk-store-json.php?sid={storeId}
+ * We need to extract the sid parameter.
+ *
+ * @param apiUrl - The full API URL
+ * @returns Store ID string or null if not found
+ */
+function extractStoreIdFromUrl(apiUrl: string): string | null {
+  try {
+    const url = new URL(apiUrl);
+    return url.searchParams.get('sid');
+  } catch {
+    // Try regex as fallback for malformed URLs
+    const match = apiUrl.match(/sid=(\d+)/);
+    return match ? match[1] : null;
+  }
+}
+
+/**
  * Fetch and update all beers data
+ *
+ * Uses a dual-path strategy:
+ * 1. PRIMARY: Try enrichment proxy (Worker) which returns enriched data
+ * 2. FALLBACK: Direct Flying Saucer fetch if proxy unavailable
+ *
  * @returns DataUpdateResult with success status and error information if applicable
  */
 export async function fetchAndUpdateAllBeers(): Promise<DataUpdateResult> {
@@ -52,112 +105,172 @@ export async function fetchAndUpdateAllBeers(): Promise<DataUpdateResult> {
       };
     }
 
-    // Make the request
-    console.log('Fetching all beers data...');
-    let response;
-    try {
-      // Set a timeout for the fetch request
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+    // Extract store ID from URL for proxy calls
+    const storeId = extractStoreIdFromUrl(apiUrl);
 
-      response = await fetch(apiUrl, { signal: controller.signal });
-      clearTimeout(timeoutId);
-    } catch (fetchError) {
-      logError(fetchError, {
-        operation: 'fetchAndUpdateAllBeers',
-        component: 'dataUpdateService',
-        additionalData: { message: 'Network error fetching all beers data' },
-      });
+    let allBeers: Beer[] = [];
+    let usedProxy = false;
 
-      // Check if it's an abort error (timeout) - treat as network error for consolidated messaging
-      if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+    // =========================================================================
+    // PRIMARY PATH: Try enrichment proxy first
+    // =========================================================================
+    if (storeId && config.enrichment.isConfigured()) {
+      try {
+        console.log(`[dataUpdateService] Attempting enrichment proxy for store ${storeId}...`);
+
+        const proxyResponse = await fetchBeersFromProxy(storeId);
+
+        // Map Worker response to Beer interface
+        allBeers = proxyResponse.beers.map(mapEnrichedBeerToAppBeer);
+        usedProxy = true;
+
+        console.log(
+          `[dataUpdateService] Fetched ${allBeers.length} beers via proxy${proxyResponse.cached ? ' (cached)' : ''}`
+        );
+      } catch (proxyError) {
+        // Log but don't fail - fall through to direct fetch
+        logWarning('Enrichment proxy failed, falling back to direct fetch', {
+          operation: 'fetchAndUpdateAllBeers',
+          component: 'dataUpdateService',
+          additionalData: {
+            storeId,
+            error: proxyError instanceof Error ? proxyError.message : String(proxyError),
+          },
+        });
+      }
+    } else if (!config.enrichment.isConfigured()) {
+      console.log('[dataUpdateService] Enrichment not configured, using direct fetch');
+    } else if (!storeId) {
+      console.log('[dataUpdateService] Could not extract store ID from URL, using direct fetch');
+    }
+
+    // =========================================================================
+    // FALLBACK PATH: Direct Flying Saucer fetch
+    // =========================================================================
+    if (!usedProxy) {
+      console.log('[dataUpdateService] Using direct Flying Saucer fetch...');
+      recordFallback(); // Track fallback for metrics
+
+      let response;
+      try {
+        // Set a timeout for the fetch request
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+
+        response = await fetch(apiUrl, { signal: controller.signal });
+        clearTimeout(timeoutId);
+      } catch (fetchError) {
+        logError(fetchError, {
+          operation: 'fetchAndUpdateAllBeers',
+          component: 'dataUpdateService',
+          additionalData: { message: 'Network error fetching all beers data' },
+        });
+
+        // Check if it's an abort error (timeout)
+        if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+          return {
+            success: false,
+            dataUpdated: false,
+            error: {
+              type: ApiErrorType.NETWORK_ERROR,
+              message: 'Network connection error: request timed out while fetching beer data.',
+              originalError: fetchError,
+            },
+          };
+        }
+
+        // Handle other network errors
+        return {
+          success: false,
+          dataUpdated: false,
+          error: createErrorResponse(fetchError),
+        };
+      }
+
+      // If the response is not OK, something went wrong
+      if (!response.ok) {
+        logError(`Failed to fetch all beers data: ${response.status} ${response.statusText}`, {
+          operation: 'fetchAndUpdateAllBeers',
+          component: 'dataUpdateService',
+          additionalData: { status: response.status, statusText: response.statusText },
+        });
         return {
           success: false,
           dataUpdated: false,
           error: {
-            type: ApiErrorType.NETWORK_ERROR, // Changed from TIMEOUT_ERROR to NETWORK_ERROR
-            message: 'Network connection error: request timed out while fetching beer data.',
-            originalError: fetchError,
+            type: ApiErrorType.SERVER_ERROR,
+            message: `Server error: ${response.statusText || 'Unknown error'}`,
+            statusCode: response.status,
           },
         };
       }
 
-      // Handle other network errors
-      return {
-        success: false,
-        dataUpdated: false,
-        error: createErrorResponse(fetchError),
-      };
+      // Parse the response
+      let data;
+      try {
+        data = await response.json();
+      } catch (parseError) {
+        logError(parseError, {
+          operation: 'fetchAndUpdateAllBeers',
+          component: 'dataUpdateService',
+          additionalData: { message: 'Error parsing all beers data' },
+        });
+        return {
+          success: false,
+          dataUpdated: false,
+          error: {
+            type: ApiErrorType.PARSE_ERROR,
+            message: 'Failed to parse server response',
+            originalError: parseError,
+          },
+        };
+      }
+
+      // Validate the API response structure
+      const responseValidation = validateBrewInStockResponse(data);
+      if (!responseValidation.isValid) {
+        logError('Invalid API response structure for all beers', {
+          operation: 'fetchAndUpdateAllBeers',
+          component: 'dataUpdateService',
+          additionalData: {
+            errors: responseValidation.errors,
+          },
+        });
+        return {
+          success: false,
+          dataUpdated: false,
+          error: {
+            type: ApiErrorType.VALIDATION_ERROR,
+            message: `Invalid data format received from server: ${responseValidation.errors.join(', ')}`,
+          },
+        };
+      }
+
+      // Extract the beers (no enrichment data in fallback path)
+      if (!responseValidation.data || responseValidation.data.length === 0) {
+        logError('No beers in validation data', {
+          operation: 'fetchAndUpdateAllBeers',
+          component: 'dataUpdateService',
+        });
+        return {
+          success: false,
+          dataUpdated: false,
+          error: {
+            type: ApiErrorType.VALIDATION_ERROR,
+            message: 'No beer data received from server',
+          },
+        };
+      }
+      allBeers = responseValidation.data;
+      console.log(
+        `[dataUpdateService] Fetched ${allBeers.length} beers via direct fetch (no enrichment)`
+      );
     }
 
-    // If the response is not OK, something went wrong
-    if (!response.ok) {
-      logError(`Failed to fetch all beers data: ${response.status} ${response.statusText}`, {
-        operation: 'fetchAndUpdateAllBeers',
-        component: 'dataUpdateService',
-        additionalData: { status: response.status, statusText: response.statusText },
-      });
-      return {
-        success: false,
-        dataUpdated: false,
-        error: {
-          type: ApiErrorType.SERVER_ERROR,
-          message: `Server error: ${response.statusText || 'Unknown error'}`,
-          statusCode: response.status,
-        },
-      };
-    }
-
-    // Parse the response
-    let data;
-    try {
-      data = await response.json();
-    } catch (parseError) {
-      logError(parseError, {
-        operation: 'fetchAndUpdateAllBeers',
-        component: 'dataUpdateService',
-        additionalData: { message: 'Error parsing all beers data' },
-      });
-      return {
-        success: false,
-        dataUpdated: false,
-        error: {
-          type: ApiErrorType.PARSE_ERROR,
-          message: 'Failed to parse server response',
-          originalError: parseError,
-        },
-      };
-    }
-
-    // Log the structure of the response for debugging
-    console.log('All beers API response structure:', typeof data);
-    if (Array.isArray(data)) {
-      console.log(`All beers API response is an array with ${data.length} items`);
-    }
-
-    // Validate the API response structure
-    const responseValidation = validateBrewInStockResponse(data);
-    if (!responseValidation.isValid) {
-      logError('Invalid API response structure for all beers', {
-        operation: 'fetchAndUpdateAllBeers',
-        component: 'dataUpdateService',
-        additionalData: {
-          errors: responseValidation.errors,
-        },
-      });
-      return {
-        success: false,
-        dataUpdated: false,
-        error: {
-          type: ApiErrorType.VALIDATION_ERROR,
-          message: `Invalid data format received from server: ${responseValidation.errors.join(', ')}`,
-        },
-      };
-    }
-
-    // Extract and validate the beers
-    const allBeers = responseValidation.data!;
-    console.log(`Found brewInStock with ${allBeers.length} beers`);
+    // Log the source of data
+    console.log(
+      `All beers fetch complete: ${allBeers.length} beers ${usedProxy ? '(with enrichment)' : '(no enrichment)'}`
+    );
 
     // Validate individual beer records before insertion
     const validationResult = validateBeerArray(allBeers);
@@ -197,6 +310,7 @@ export async function fetchAndUpdateAllBeers(): Promise<DataUpdateResult> {
     }
 
     // Calculate container types BEFORE insertion
+    // Note: calculateContainerTypes preserves enrichment fields if present
     console.log('Calculating container types for beers...');
     const beersWithContainerTypes = calculateContainerTypes(validationResult.validBeers as Beer[]);
 
@@ -426,8 +540,40 @@ export async function fetchAndUpdateMyBeers(): Promise<DataUpdateResult> {
     console.log('Calculating container types for tasted beers...');
     const beersWithContainerTypes = calculateContainerTypes(validBeers as Beer[]);
 
-    // Update the database with the valid beers including container types
-    await myBeersRepository.insertMany(beersWithContainerTypes);
+    // =========================================================================
+    // ENRICHMENT: Fetch enrichment data via batch lookup if proxy is configured
+    // =========================================================================
+    // Add batch enrichment for tasted beers if proxy is configured
+    let enrichedBeers = beersWithContainerTypes;
+    if (config.enrichment.isConfigured()) {
+      try {
+        const beerIds = beersWithContainerTypes.map(beer => beer.id);
+        console.log(
+          `[dataUpdateService] Fetching enrichment for ${beerIds.length} tasted beers...`
+        );
+
+        const enrichmentData = await fetchEnrichmentBatch(beerIds);
+        const enrichedCount = Object.keys(enrichmentData).length;
+
+        if (enrichedCount > 0) {
+          console.log(`[dataUpdateService] Got enrichment data for ${enrichedCount} beers`);
+          enrichedBeers = mergeEnrichmentData(beersWithContainerTypes, enrichmentData);
+        }
+      } catch (enrichmentError) {
+        // Log but don't fail - enrichment is optional enhancement
+        logWarning('Failed to fetch enrichment for tasted beers, continuing without', {
+          operation: 'fetchAndUpdateMyBeers',
+          component: 'dataUpdateService',
+          additionalData: {
+            error:
+              enrichmentError instanceof Error ? enrichmentError.message : String(enrichmentError),
+          },
+        });
+      }
+    }
+
+    // Update the database with the valid beers including container types and enrichment
+    await myBeersRepository.insertMany(enrichedBeers);
 
     // Update the last update timestamp
     await setPreference('my_beers_last_update', new Date().toISOString());
@@ -589,7 +735,37 @@ export async function sequentialRefreshAllData(): Promise<ManualRefreshResult> {
     console.log('Sequential refresh: starting all beers fetch');
     let allBeersResult: DataUpdateResult;
     try {
-      const allBeers = await fetchBeersFromAPI();
+      // Get API URL to extract store ID for proxy
+      const apiUrl = await getPreference('all_beers_api_url');
+      const storeId = apiUrl ? extractStoreIdFromUrl(apiUrl) : null;
+
+      let allBeers: Beer[] = [];
+      let usedProxy = false;
+
+      // Try proxy first if configured
+      if (storeId && config.enrichment.isConfigured()) {
+        try {
+          console.log(`[sequentialRefresh] Attempting proxy for store ${storeId}...`);
+          const proxyResponse = await fetchBeersFromProxy(storeId);
+          allBeers = proxyResponse.beers.map(mapEnrichedBeerToAppBeer);
+          usedProxy = true;
+          console.log(`[sequentialRefresh] Got ${allBeers.length} beers from proxy`);
+        } catch (proxyError) {
+          logWarning('Proxy failed in sequential refresh, falling back to direct fetch', {
+            operation: 'sequentialRefreshAllData',
+            component: 'dataUpdateService',
+            additionalData: {
+              error: proxyError instanceof Error ? proxyError.message : String(proxyError),
+            },
+          });
+        }
+      }
+
+      // Fall back to direct fetch if proxy not used
+      if (!usedProxy) {
+        recordFallback(); // Track fallback for metrics
+        allBeers = await fetchBeersFromAPI();
+      }
 
       // Validate beers before insertion
       const validationResult = validateBeerArray(allBeers);
@@ -660,8 +836,31 @@ export async function sequentialRefreshAllData(): Promise<ManualRefreshResult> {
         validationResult.validBeers as Beer[]
       );
 
+      // Add batch enrichment for my beers if proxy is configured
+      let enrichedMyBeers = myBeersWithContainerTypes;
+      if (config.enrichment.isConfigured() && myBeersWithContainerTypes.length > 0) {
+        try {
+          const beerIds = myBeersWithContainerTypes.map(beer => beer.id);
+          console.log(
+            `[sequentialRefresh] Fetching enrichment for ${beerIds.length} tasted beers...`
+          );
+          const enrichmentData = await fetchEnrichmentBatch(beerIds);
+          const enrichedCount = Object.keys(enrichmentData).length;
+
+          if (enrichedCount > 0) {
+            console.log(`[sequentialRefresh] Got enrichment for ${enrichedCount} tasted beers`);
+            enrichedMyBeers = mergeEnrichmentData(myBeersWithContainerTypes, enrichmentData);
+          }
+        } catch (enrichmentError) {
+          logWarning('Batch enrichment failed in sequential refresh, continuing without', {
+            operation: 'sequentialRefreshAllData',
+            component: 'dataUpdateService',
+          });
+        }
+      }
+
       // Allow empty myBeers array (user may have no tasted beers)
-      await myBeersRepository.insertManyUnsafe(myBeersWithContainerTypes);
+      await myBeersRepository.insertManyUnsafe(enrichedMyBeers);
       await setPreference('my_beers_last_update', new Date().toISOString());
       await setPreference('my_beers_last_check', new Date().toISOString());
       myBeersResult = {
@@ -781,6 +980,16 @@ export async function manualRefreshAllData(): Promise<ManualRefreshResult> {
     await setPreference('all_beers_last_check', '');
     await setPreference('my_beers_last_update', '');
     await setPreference('my_beers_last_check', '');
+
+    // Bust the enrichment proxy cache before manual refresh to ensure fresh data
+    if (apiUrl && config.enrichment.isConfigured()) {
+      const storeId = extractStoreIdFromUrl(apiUrl);
+      if (storeId) {
+        console.log(`[manualRefresh] Busting cache for store ${storeId}...`);
+        const cacheBusted = await bustTaplistCache(storeId);
+        console.log(`[manualRefresh] Cache bust result: ${cacheBusted}`);
+      }
+    }
 
     // Delegate to sequential refresh for proper lock coordination (CI-4 fix)
     // This avoids the lock contention that occurred with parallel Promise.allSettled()
@@ -923,8 +1132,41 @@ export const refreshAllDataFromAPI = async (): Promise<{
   try {
     // Execute sequentially to avoid lock contention
     // Use unsafe repository methods since we already hold master lock
+
+    // Get API URL to extract store ID for proxy
+    const apiUrl = await getPreference('all_beers_api_url');
+    const storeId = apiUrl ? extractStoreIdFromUrl(apiUrl) : null;
+
+    // =========================================================================
+    // ALL BEERS: Try proxy first, fall back to direct fetch
+    // =========================================================================
     console.log('Fetching all beers from API...');
-    const allBeersRaw = await fetchBeersFromAPI();
+    let allBeersRaw: Beer[] = [];
+    let usedProxy = false;
+
+    if (storeId && config.enrichment.isConfigured()) {
+      try {
+        console.log(`[refreshAllDataFromAPI] Attempting proxy for store ${storeId}...`);
+        const proxyResponse = await fetchBeersFromProxy(storeId);
+        allBeersRaw = proxyResponse.beers.map(mapEnrichedBeerToAppBeer);
+        usedProxy = true;
+        console.log(`[refreshAllDataFromAPI] Got ${allBeersRaw.length} beers from proxy`);
+      } catch (proxyError) {
+        logWarning('Proxy failed in refreshAllDataFromAPI, falling back to direct fetch', {
+          operation: 'refreshAllDataFromAPI',
+          component: 'dataUpdateService',
+          additionalData: {
+            error: proxyError instanceof Error ? proxyError.message : String(proxyError),
+          },
+        });
+      }
+    }
+
+    if (!usedProxy) {
+      recordFallback(); // Track fallback for metrics (matches sequentialRefreshAllData pattern)
+      allBeersRaw = await fetchBeersFromAPI();
+    }
+
     const allBeersValidation = validateBeerArray(allBeersRaw);
 
     if (allBeersValidation.invalidBeers.length > 0) {
@@ -947,6 +1189,9 @@ export const refreshAllDataFromAPI = async (): Promise<{
 
     await beerRepository.insertManyUnsafe(allBeersWithContainerTypes);
 
+    // =========================================================================
+    // MY BEERS: Fetch from FS, then batch enrichment
+    // =========================================================================
     console.log('Fetching my beers from API...');
     const myBeersRaw = await fetchMyBeersFromAPI();
     const myBeersValidation = validateBeerArray(myBeersRaw);
@@ -965,19 +1210,42 @@ export const refreshAllDataFromAPI = async (): Promise<{
       myBeersValidation.validBeers as Beer[]
     );
 
-    await myBeersRepository.insertManyUnsafe(myBeersWithContainerTypes);
+    // Add batch enrichment for my beers if proxy is configured
+    let enrichedMyBeers = myBeersWithContainerTypes;
+    if (config.enrichment.isConfigured() && myBeersWithContainerTypes.length > 0) {
+      try {
+        const beerIds = myBeersWithContainerTypes.map(beer => beer.id);
+        console.log(
+          `[refreshAllDataFromAPI] Fetching enrichment for ${beerIds.length} tasted beers...`
+        );
+        const enrichmentData = await fetchEnrichmentBatch(beerIds);
+        const enrichedCount = Object.keys(enrichmentData).length;
+
+        if (enrichedCount > 0) {
+          console.log(`[refreshAllDataFromAPI] Got enrichment for ${enrichedCount} tasted beers`);
+          enrichedMyBeers = mergeEnrichmentData(myBeersWithContainerTypes, enrichmentData);
+        }
+      } catch (enrichmentError) {
+        logWarning('Batch enrichment failed in refreshAllDataFromAPI, continuing without', {
+          operation: 'refreshAllDataFromAPI',
+          component: 'dataUpdateService',
+        });
+      }
+    }
+
+    await myBeersRepository.insertManyUnsafe(enrichedMyBeers);
 
     console.log('Fetching rewards from API...');
     const rewards = await fetchRewardsFromAPI();
     await rewardsRepository.insertManyUnsafe(rewards);
 
     console.log(
-      `Refreshed all data: ${allBeersWithContainerTypes.length} beers, ${myBeersWithContainerTypes.length} tasted beers, ${rewards.length} rewards`
+      `Refreshed all data: ${allBeersWithContainerTypes.length} beers, ${enrichedMyBeers.length} tasted beers, ${rewards.length} rewards`
     );
 
     return {
       allBeers: allBeersWithContainerTypes,
-      myBeers: myBeersWithContainerTypes as BeerfinderWithContainerType[],
+      myBeers: enrichedMyBeers as BeerfinderWithContainerType[],
       rewards,
     };
   } finally {
