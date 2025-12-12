@@ -1,319 +1,103 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuites name="jest tests" tests="156" failures="0" errors="0" time="2.099">
-  <testsuite name="AllBeersRow Schema - Edge Cases" errors="0" failures="0" skipped="0" timestamp="2025-12-09T16:41:25" time="1.239" tests="67">
-    <testcase classname="AllBeersRow Schema - Edge Cases Wrong Type Values should reject id as boolean" name="AllBeersRow Schema - Edge Cases Wrong Type Values should reject id as boolean" time="0.004">
+<testsuites name="jest tests" tests="49" failures="0" errors="0" time="1.438">
+  <testsuite name="enrichmentService" errors="0" failures="0" skipped="0" timestamp="2025-12-11T17:52:36" time="0.878" tests="49">
+    <testcase classname="enrichmentService Metrics getEnrichmentMetrics should return initial metrics with all zeros" name="enrichmentService Metrics getEnrichmentMetrics should return initial metrics with all zeros" time="0.003">
     </testcase>
-    <testcase classname="AllBeersRow Schema - Edge Cases Wrong Type Values should reject id as array" name="AllBeersRow Schema - Edge Cases Wrong Type Values should reject id as array" time="0.001">
+    <testcase classname="enrichmentService Metrics getEnrichmentMetrics should return a copy of metrics (not reference)" name="enrichmentService Metrics getEnrichmentMetrics should return a copy of metrics (not reference)" time="0">
     </testcase>
-    <testcase classname="AllBeersRow Schema - Edge Cases Wrong Type Values should reject id as object" name="AllBeersRow Schema - Edge Cases Wrong Type Values should reject id as object" time="0">
+    <testcase classname="enrichmentService Metrics resetEnrichmentMetrics should reset all metrics to zero" name="enrichmentService Metrics resetEnrichmentMetrics should reset all metrics to zero" time="0.001">
     </testcase>
-    <testcase classname="AllBeersRow Schema - Edge Cases Wrong Type Values should reject id as function" name="AllBeersRow Schema - Edge Cases Wrong Type Values should reject id as function" time="0.001">
+    <testcase classname="enrichmentService Metrics resetEnrichmentMetrics should update lastReset timestamp" name="enrichmentService Metrics resetEnrichmentMetrics should update lastReset timestamp" time="0">
     </testcase>
-    <testcase classname="AllBeersRow Schema - Edge Cases Wrong Type Values should reject brew_name as number" name="AllBeersRow Schema - Edge Cases Wrong Type Values should reject brew_name as number" time="0">
+    <testcase classname="enrichmentService Metrics recordFallback should increment fallback count" name="enrichmentService Metrics recordFallback should increment fallback count" time="0.001">
     </testcase>
-    <testcase classname="AllBeersRow Schema - Edge Cases Wrong Type Values should reject brew_name as boolean" name="AllBeersRow Schema - Edge Cases Wrong Type Values should reject brew_name as boolean" time="0.001">
+    <testcase classname="enrichmentService Rate Limiting getTimeUntilNextRequest should return 0 when under rate limit" name="enrichmentService Rate Limiting getTimeUntilNextRequest should return 0 when under rate limit" time="0">
     </testcase>
-    <testcase classname="AllBeersRow Schema - Edge Cases Wrong Type Values should reject brew_name as array" name="AllBeersRow Schema - Edge Cases Wrong Type Values should reject brew_name as array" time="0">
+    <testcase classname="enrichmentService mergeEnrichmentData should return original array when enrichment data is empty" name="enrichmentService mergeEnrichmentData should return original array when enrichment data is empty" time="0">
     </testcase>
-    <testcase classname="AllBeersRow Schema - Edge Cases Wrong Type Values should reject brew_name as object" name="AllBeersRow Schema - Edge Cases Wrong Type Values should reject brew_name as object" time="0">
+    <testcase classname="enrichmentService mergeEnrichmentData should merge enrichment data into matching beers" name="enrichmentService mergeEnrichmentData should merge enrichment data into matching beers" time="0.002">
     </testcase>
-    <testcase classname="AllBeersRow Schema - Edge Cases String Edge Cases should accept brew_name with only whitespace (Zod .min(1) checks length, not trim)" name="AllBeersRow Schema - Edge Cases String Edge Cases should accept brew_name with only whitespace (Zod .min(1) checks length, not trim)" time="0.001">
+    <testcase classname="enrichmentService mergeEnrichmentData should preserve existing ABV if enriched_abv is null" name="enrichmentService mergeEnrichmentData should preserve existing ABV if enriched_abv is null" time="0.001">
     </testcase>
-    <testcase classname="AllBeersRow Schema - Edge Cases String Edge Cases should accept id as whitespace-only string (schema checks !== empty, not trim)" name="AllBeersRow Schema - Edge Cases String Edge Cases should accept id as whitespace-only string (schema checks !== empty, not trim)" time="0">
+    <testcase classname="enrichmentService mergeEnrichmentData should work with BeerfinderWithContainerType" name="enrichmentService mergeEnrichmentData should work with BeerfinderWithContainerType" time="0">
     </testcase>
-    <testcase classname="AllBeersRow Schema - Edge Cases String Edge Cases should accept very long string (10KB)" name="AllBeersRow Schema - Edge Cases String Edge Cases should accept very long string (10KB)" time="0">
+    <testcase classname="enrichmentService mergeEnrichmentData should not mutate original array" name="enrichmentService mergeEnrichmentData should not mutate original array" time="0.001">
     </testcase>
-    <testcase classname="AllBeersRow Schema - Edge Cases String Edge Cases should accept empty optional string fields" name="AllBeersRow Schema - Edge Cases String Edge Cases should accept empty optional string fields" time="0">
+    <testcase classname="enrichmentService mergeEnrichmentData should handle empty beer array" name="enrichmentService mergeEnrichmentData should handle empty beer array" time="0">
     </testcase>
-    <testcase classname="AllBeersRow Schema - Edge Cases String Edge Cases should accept SQL-like strings in brew_name (not actual SQL injection)" name="AllBeersRow Schema - Edge Cases String Edge Cases should accept SQL-like strings in brew_name (not actual SQL injection)" time="0">
+    <testcase classname="enrichmentService Rate Limiting - Extended Tests __resetRateLimitStateForTests should clear rate limit state" name="enrichmentService Rate Limiting - Extended Tests __resetRateLimitStateForTests should clear rate limit state" time="0.001">
     </testcase>
-    <testcase classname="AllBeersRow Schema - Edge Cases String Edge Cases should accept HTML/XSS-like strings in description" name="AllBeersRow Schema - Edge Cases String Edge Cases should accept HTML/XSS-like strings in description" time="0">
+    <testcase classname="enrichmentService Rate Limiting - Extended Tests isRequestAllowed and getTimeUntilNextRequest interaction should return 0 wait time when rate limit not reached" name="enrichmentService Rate Limiting - Extended Tests isRequestAllowed and getTimeUntilNextRequest interaction should return 0 wait time when rate limit not reached" time="0">
     </testcase>
-    <testcase classname="AllBeersRow Schema - Edge Cases Unicode and Special Characters should accept emojis in brew_name" name="AllBeersRow Schema - Edge Cases Unicode and Special Characters should accept emojis in brew_name" time="0">
+    <testcase classname="enrichmentService Rate Limiting - Extended Tests isRequestAllowed and getTimeUntilNextRequest interaction should handle timestamp expiry correctly" name="enrichmentService Rate Limiting - Extended Tests isRequestAllowed and getTimeUntilNextRequest interaction should handle timestamp expiry correctly" time="0">
     </testcase>
-    <testcase classname="AllBeersRow Schema - Edge Cases Unicode and Special Characters should accept RTL (right-to-left) text" name="AllBeersRow Schema - Edge Cases Unicode and Special Characters should accept RTL (right-to-left) text" time="0">
+    <testcase classname="enrichmentService Health Functions checkEnrichmentHealth should return true when health endpoint returns ok status" name="enrichmentService Health Functions checkEnrichmentHealth should return true when health endpoint returns ok status" time="0.001">
     </testcase>
-    <testcase classname="AllBeersRow Schema - Edge Cases Unicode and Special Characters should accept Chinese/Japanese characters" name="AllBeersRow Schema - Edge Cases Unicode and Special Characters should accept Chinese/Japanese characters" time="0">
+    <testcase classname="enrichmentService Health Functions checkEnrichmentHealth should return false when health endpoint returns error status" name="enrichmentService Health Functions checkEnrichmentHealth should return false when health endpoint returns error status" time="0">
     </testcase>
-    <testcase classname="AllBeersRow Schema - Edge Cases Unicode and Special Characters should accept special punctuation and symbols" name="AllBeersRow Schema - Edge Cases Unicode and Special Characters should accept special punctuation and symbols" time="0">
+    <testcase classname="enrichmentService Health Functions checkEnrichmentHealth should return false when response is not ok" name="enrichmentService Health Functions checkEnrichmentHealth should return false when response is not ok" time="0">
     </testcase>
-    <testcase classname="AllBeersRow Schema - Edge Cases Unicode and Special Characters should accept zero-width characters" name="AllBeersRow Schema - Edge Cases Unicode and Special Characters should accept zero-width characters" time="0">
+    <testcase classname="enrichmentService Health Functions checkEnrichmentHealth should return false when fetch throws" name="enrichmentService Health Functions checkEnrichmentHealth should return false when fetch throws" time="0">
     </testcase>
-    <testcase classname="AllBeersRow Schema - Edge Cases Number String Edge Cases should accept numeric strings in review_count" name="AllBeersRow Schema - Edge Cases Number String Edge Cases should accept numeric strings in review_count" time="0">
+    <testcase classname="enrichmentService Health Functions checkEnrichmentHealth should return false when apiUrl is not configured" name="enrichmentService Health Functions checkEnrichmentHealth should return false when apiUrl is not configured" time="0">
     </testcase>
-    <testcase classname="AllBeersRow Schema - Edge Cases Number String Edge Cases should accept decimal strings in review_rating" name="AllBeersRow Schema - Edge Cases Number String Edge Cases should accept decimal strings in review_rating" time="0.001">
+    <testcase classname="enrichmentService Health Functions getEnrichmentHealthDetails should return health details with enrichment quotas" name="enrichmentService Health Functions getEnrichmentHealthDetails should return health details with enrichment quotas" time="0.001">
     </testcase>
-    <testcase classname="AllBeersRow Schema - Edge Cases Number String Edge Cases should accept negative number strings" name="AllBeersRow Schema - Edge Cases Number String Edge Cases should accept negative number strings" time="0">
+    <testcase classname="enrichmentService Health Functions getEnrichmentHealthDetails should return null when response is not ok" name="enrichmentService Health Functions getEnrichmentHealthDetails should return null when response is not ok" time="0">
     </testcase>
-    <testcase classname="AllBeersRow Schema - Edge Cases Number String Edge Cases should accept non-numeric strings in numeric fields" name="AllBeersRow Schema - Edge Cases Number String Edge Cases should accept non-numeric strings in numeric fields" time="0">
+    <testcase classname="enrichmentService Health Functions getEnrichmentHealthDetails should return null when fetch throws" name="enrichmentService Health Functions getEnrichmentHealthDetails should return null when fetch throws" time="0">
     </testcase>
-    <testcase classname="AllBeersRow Schema - Edge Cases Object and Array Edge Cases should reject nested object in id" name="AllBeersRow Schema - Edge Cases Object and Array Edge Cases should reject nested object in id" time="0">
+    <testcase classname="enrichmentService Health Functions getEnrichmentHealthDetails should return null when apiUrl is not configured" name="enrichmentService Health Functions getEnrichmentHealthDetails should return null when apiUrl is not configured" time="0">
     </testcase>
-    <testcase classname="AllBeersRow Schema - Edge Cases Object and Array Edge Cases should reject array in brew_name" name="AllBeersRow Schema - Edge Cases Object and Array Edge Cases should reject array in brew_name" time="0">
+    <testcase classname="enrichmentService API Functions getClientId should return cached client ID when available" name="enrichmentService API Functions getClientId should return cached client ID when available" time="0">
     </testcase>
-    <testcase classname="AllBeersRow Schema - Edge Cases Object and Array Edge Cases should strip extra properties (Zod default behavior)" name="AllBeersRow Schema - Edge Cases Object and Array Edge Cases should strip extra properties (Zod default behavior)" time="0.001">
+    <testcase classname="enrichmentService API Functions getClientId should return existing client ID from preferences" name="enrichmentService API Functions getClientId should return existing client ID from preferences" time="0">
     </testcase>
-    <testcase classname="AllBeersRow Schema - Edge Cases Object and Array Edge Cases should handle frozen objects" name="AllBeersRow Schema - Edge Cases Object and Array Edge Cases should handle frozen objects" time="0.001">
+    <testcase classname="enrichmentService API Functions fetchBeersFromProxy should throw when enrichment is not configured" name="enrichmentService API Functions fetchBeersFromProxy should throw when enrichment is not configured" time="0.039">
     </testcase>
-    <testcase classname="AllBeersRow Schema - Edge Cases Object and Array Edge Cases should handle sealed objects" name="AllBeersRow Schema - Edge Cases Object and Array Edge Cases should handle sealed objects" time="0">
+    <testcase classname="enrichmentService API Functions fetchBeersFromProxy should throw when rate limited" name="enrichmentService API Functions fetchBeersFromProxy should throw when rate limited" time="0.002">
     </testcase>
-    <testcase classname="AllBeersRow Schema - Edge Cases Type Guard Edge Cases should reject NaN values" name="AllBeersRow Schema - Edge Cases Type Guard Edge Cases should reject NaN values" time="0">
+    <testcase classname="enrichmentService API Functions fetchBeersFromProxy should return beer data on successful response" name="enrichmentService API Functions fetchBeersFromProxy should return beer data on successful response" time="0">
     </testcase>
-    <testcase classname="AllBeersRow Schema - Edge Cases Type Guard Edge Cases should reject Infinity values" name="AllBeersRow Schema - Edge Cases Type Guard Edge Cases should reject Infinity values" time="0.001">
+    <testcase classname="enrichmentService API Functions fetchBeersFromProxy should track cache hits in metrics" name="enrichmentService API Functions fetchBeersFromProxy should track cache hits in metrics" time="0.001">
     </testcase>
-    <testcase classname="AllBeersRow Schema - Edge Cases Type Guard Edge Cases should reject objects with Symbol keys" name="AllBeersRow Schema - Edge Cases Type Guard Edge Cases should reject objects with Symbol keys" time="0">
+    <testcase classname="enrichmentService API Functions fetchBeersFromProxy should handle 429 rate limit response from server" name="enrichmentService API Functions fetchBeersFromProxy should handle 429 rate limit response from server" time="0">
     </testcase>
-    <testcase classname="AllBeersRow Schema - Edge Cases Type Guard Edge Cases should reject objects with getter properties" name="AllBeersRow Schema - Edge Cases Type Guard Edge Cases should reject objects with getter properties" time="0">
+    <testcase classname="enrichmentService API Functions fetchBeersFromProxy should handle 401 unauthorized response" name="enrichmentService API Functions fetchBeersFromProxy should handle 401 unauthorized response" time="0.001">
     </testcase>
-    <testcase classname="TastedBrewRow Schema - Edge Cases Wrong Type Values should reject id as number" name="TastedBrewRow Schema - Edge Cases Wrong Type Values should reject id as number" time="0.001">
+    <testcase classname="enrichmentService API Functions fetchBeersFromProxy should handle other error responses" name="enrichmentService API Functions fetchBeersFromProxy should handle other error responses" time="0">
     </testcase>
-    <testcase classname="TastedBrewRow Schema - Edge Cases Wrong Type Values should reject tasted_date as Date object" name="TastedBrewRow Schema - Edge Cases Wrong Type Values should reject tasted_date as Date object" time="0">
+    <testcase classname="enrichmentService API Functions fetchBeersFromProxy should handle network timeout" name="enrichmentService API Functions fetchBeersFromProxy should handle network timeout" time="0.001">
     </testcase>
-    <testcase classname="TastedBrewRow Schema - Edge Cases Wrong Type Values should reject roh_lap as number" name="TastedBrewRow Schema - Edge Cases Wrong Type Values should reject roh_lap as number" time="0.001">
+    <testcase classname="enrichmentService API Functions fetchEnrichmentBatch should return empty object when not configured" name="enrichmentService API Functions fetchEnrichmentBatch should return empty object when not configured" time="0">
     </testcase>
-    <testcase classname="TastedBrewRow Schema - Edge Cases String Edge Cases should accept various date format strings" name="TastedBrewRow Schema - Edge Cases String Edge Cases should accept various date format strings" time="0">
+    <testcase classname="enrichmentService API Functions fetchEnrichmentBatch should return empty object for empty beer IDs array" name="enrichmentService API Functions fetchEnrichmentBatch should return empty object for empty beer IDs array" time="0">
     </testcase>
-    <testcase classname="TastedBrewRow Schema - Edge Cases String Edge Cases should accept empty id should be rejected" name="TastedBrewRow Schema - Edge Cases String Edge Cases should accept empty id should be rejected" time="0">
+    <testcase classname="enrichmentService API Functions fetchEnrichmentBatch should return enrichment data for valid beer IDs" name="enrichmentService API Functions fetchEnrichmentBatch should return enrichment data for valid beer IDs" time="0.001">
     </testcase>
-    <testcase classname="TastedBrewRow Schema - Edge Cases String Edge Cases should accept review_ratings (plural) but not review_rating" name="TastedBrewRow Schema - Edge Cases String Edge Cases should accept review_ratings (plural) but not review_rating" time="0.001">
+    <testcase classname="enrichmentService API Functions fetchEnrichmentBatch should chunk large requests based on batchSize config" name="enrichmentService API Functions fetchEnrichmentBatch should chunk large requests based on batchSize config" time="0.003">
     </testcase>
-    <testcase classname="TastedBrewRow Schema - Edge Cases Type Guard Edge Cases should reject objects with only some required fields" name="TastedBrewRow Schema - Edge Cases Type Guard Edge Cases should reject objects with only some required fields" time="0">
+    <testcase classname="enrichmentService API Functions fetchEnrichmentBatch should handle 429 rate limit and return partial results" name="enrichmentService API Functions fetchEnrichmentBatch should handle 429 rate limit and return partial results" time="0.001">
     </testcase>
-    <testcase classname="TastedBrewRow Schema - Edge Cases Type Guard Edge Cases should reject primitive values" name="TastedBrewRow Schema - Edge Cases Type Guard Edge Cases should reject primitive values" time="0">
+    <testcase classname="enrichmentService API Functions fetchEnrichmentBatch should handle non-429 errors and continue with next chunk" name="enrichmentService API Functions fetchEnrichmentBatch should handle non-429 errors and continue with next chunk" time="0">
     </testcase>
-    <testcase classname="RewardRow Schema - Edge Cases Wrong Type Values should reject reward_id as number" name="RewardRow Schema - Edge Cases Wrong Type Values should reject reward_id as number" time="0.001">
+    <testcase classname="enrichmentService API Functions fetchEnrichmentBatch should handle timeout and continue with next chunk" name="enrichmentService API Functions fetchEnrichmentBatch should handle timeout and continue with next chunk" time="0">
     </testcase>
-    <testcase classname="RewardRow Schema - Edge Cases Wrong Type Values should reject redeemed as boolean" name="RewardRow Schema - Edge Cases Wrong Type Values should reject redeemed as boolean" time="0">
+    <testcase classname="enrichmentService API Functions fetchEnrichmentBatch should track metrics per chunk processed" name="enrichmentService API Functions fetchEnrichmentBatch should track metrics per chunk processed" time="0.001">
     </testcase>
-    <testcase classname="RewardRow Schema - Edge Cases String Edge Cases should accept &quot;0&quot; and &quot;1&quot; as redeemed values" name="RewardRow Schema - Edge Cases String Edge Cases should accept &quot;0&quot; and &quot;1&quot; as redeemed values" time="0.003">
+    <testcase classname="enrichmentService API Functions fetchEnrichmentBatch should rate limit when too many chunks requested" name="enrichmentService API Functions fetchEnrichmentBatch should rate limit when too many chunks requested" time="0.001">
     </testcase>
-    <testcase classname="RewardRow Schema - Edge Cases String Edge Cases should accept &quot;true&quot; and &quot;false&quot; strings as redeemed values" name="RewardRow Schema - Edge Cases String Edge Cases should accept &quot;true&quot; and &quot;false&quot; strings as redeemed values" time="0">
+    <testcase classname="enrichmentService API Functions fetchEnrichmentBatch should handle network errors and stop processing" name="enrichmentService API Functions fetchEnrichmentBatch should handle network errors and stop processing" time="0">
     </testcase>
-    <testcase classname="RewardRow Schema - Edge Cases String Edge Cases should reject empty reward_id" name="RewardRow Schema - Edge Cases String Edge Cases should reject empty reward_id" time="0.001">
+    <testcase classname="enrichmentService Cache Functions bustTaplistCache should return true when cache is successfully cleared" name="enrichmentService Cache Functions bustTaplistCache should return true when cache is successfully cleared" time="0.001">
     </testcase>
-    <testcase classname="RewardRow Schema - Edge Cases Type Guard Edge Cases should accept valid minimal reward" name="RewardRow Schema - Edge Cases Type Guard Edge Cases should accept valid minimal reward" time="0">
+    <testcase classname="enrichmentService Cache Functions bustTaplistCache should return false when cache was not cleared" name="enrichmentService Cache Functions bustTaplistCache should return false when cache was not cleared" time="0">
     </testcase>
-    <testcase classname="RewardRow Schema - Edge Cases Type Guard Edge Cases should reject reward with missing reward_id" name="RewardRow Schema - Edge Cases Type Guard Edge Cases should reject reward with missing reward_id" time="0">
+    <testcase classname="enrichmentService Cache Functions bustTaplistCache should return false when response is not ok" name="enrichmentService Cache Functions bustTaplistCache should return false when response is not ok" time="0">
     </testcase>
-    <testcase classname="PreferenceRow Schema - Edge Cases Wrong Type Values should reject key as number" name="PreferenceRow Schema - Edge Cases Wrong Type Values should reject key as number" time="0.001">
+    <testcase classname="enrichmentService Cache Functions bustTaplistCache should return false when fetch throws" name="enrichmentService Cache Functions bustTaplistCache should return false when fetch throws" time="0">
     </testcase>
-    <testcase classname="PreferenceRow Schema - Edge Cases Wrong Type Values should reject value as object" name="PreferenceRow Schema - Edge Cases Wrong Type Values should reject value as object" time="0">
-    </testcase>
-    <testcase classname="PreferenceRow Schema - Edge Cases Wrong Type Values should reject value as array" name="PreferenceRow Schema - Edge Cases Wrong Type Values should reject value as array" time="0">
-    </testcase>
-    <testcase classname="PreferenceRow Schema - Edge Cases String Edge Cases should reject empty key" name="PreferenceRow Schema - Edge Cases String Edge Cases should reject empty key" time="0">
-    </testcase>
-    <testcase classname="PreferenceRow Schema - Edge Cases String Edge Cases should accept empty value (edge case: preference can be empty)" name="PreferenceRow Schema - Edge Cases String Edge Cases should accept empty value (edge case: preference can be empty)" time="0.001">
-    </testcase>
-    <testcase classname="PreferenceRow Schema - Edge Cases String Edge Cases should accept JSON strings as values" name="PreferenceRow Schema - Edge Cases String Edge Cases should accept JSON strings as values" time="0">
-    </testcase>
-    <testcase classname="PreferenceRow Schema - Edge Cases String Edge Cases should accept URLs as values" name="PreferenceRow Schema - Edge Cases String Edge Cases should accept URLs as values" time="0">
-    </testcase>
-    <testcase classname="PreferenceRow Schema - Edge Cases Type Guard Edge Cases should require both key and value" name="PreferenceRow Schema - Edge Cases Type Guard Edge Cases should require both key and value" time="0">
-    </testcase>
-    <testcase classname="PreferenceRow Schema - Edge Cases Type Guard Edge Cases should handle description as optional" name="PreferenceRow Schema - Edge Cases Type Guard Edge Cases should handle description as optional" time="0">
-    </testcase>
-    <testcase classname="Array Schema Validation - Edge Cases Large Dataset Validation should validate array of 10,000 beers efficiently" name="Array Schema Validation - Edge Cases Large Dataset Validation should validate array of 10,000 beers efficiently" time="0.055">
-    </testcase>
-    <testcase classname="Array Schema Validation - Edge Cases Large Dataset Validation should stop validation on first error in array" name="Array Schema Validation - Edge Cases Large Dataset Validation should stop validation on first error in array" time="0.004">
-    </testcase>
-    <testcase classname="Array Schema Validation - Edge Cases Mixed Valid/Invalid Data should identify all invalid items in small array" name="Array Schema Validation - Edge Cases Mixed Valid/Invalid Data should identify all invalid items in small array" time="0">
-    </testcase>
-    <testcase classname="Array Schema Validation - Edge Cases Empty and Null Arrays should accept empty array" name="Array Schema Validation - Edge Cases Empty and Null Arrays should accept empty array" time="0">
-    </testcase>
-    <testcase classname="Array Schema Validation - Edge Cases Empty and Null Arrays should reject null instead of array" name="Array Schema Validation - Edge Cases Empty and Null Arrays should reject null instead of array" time="0">
-    </testcase>
-    <testcase classname="Array Schema Validation - Edge Cases Empty and Null Arrays should reject undefined instead of array" name="Array Schema Validation - Edge Cases Empty and Null Arrays should reject undefined instead of array" time="0">
-    </testcase>
-    <testcase classname="Conversion Function Edge Cases allBeersRowToBeer should convert numeric id to string" name="Conversion Function Edge Cases allBeersRowToBeer should convert numeric id to string" time="0">
-    </testcase>
-    <testcase classname="Conversion Function Edge Cases allBeersRowToBeer should preserve optional undefined fields" name="Conversion Function Edge Cases allBeersRowToBeer should preserve optional undefined fields" time="0.001">
-    </testcase>
-    <testcase classname="Conversion Function Edge Cases rewardRowToReward should convert undefined redeemed to &quot;0&quot;" name="Conversion Function Edge Cases rewardRowToReward should convert undefined redeemed to &quot;0&quot;" time="0">
-    </testcase>
-    <testcase classname="Conversion Function Edge Cases rewardRowToReward should convert undefined reward_type to empty string" name="Conversion Function Edge Cases rewardRowToReward should convert undefined reward_type to empty string" time="0">
-    </testcase>
-    <testcase classname="Conversion Function Edge Cases preferenceRowToPreference should convert undefined description to empty string" name="Conversion Function Edge Cases preferenceRowToPreference should convert undefined description to empty string" time="0">
-    </testcase>
-  </testsuite>
-  <testsuite name="Beer Type Guards - Edge Cases" errors="0" failures="0" skipped="0" timestamp="2025-12-09T16:41:27" time="0.326" tests="89">
-    <testcase classname="Beer Type Guards - Edge Cases isBeer - Primitive Edge Cases should reject string primitives" name="Beer Type Guards - Edge Cases isBeer - Primitive Edge Cases should reject string primitives" time="0">
-    </testcase>
-    <testcase classname="Beer Type Guards - Edge Cases isBeer - Primitive Edge Cases should reject number primitives" name="Beer Type Guards - Edge Cases isBeer - Primitive Edge Cases should reject number primitives" time="0">
-    </testcase>
-    <testcase classname="Beer Type Guards - Edge Cases isBeer - Primitive Edge Cases should reject boolean primitives" name="Beer Type Guards - Edge Cases isBeer - Primitive Edge Cases should reject boolean primitives" time="0">
-    </testcase>
-    <testcase classname="Beer Type Guards - Edge Cases isBeer - Primitive Edge Cases should reject null" name="Beer Type Guards - Edge Cases isBeer - Primitive Edge Cases should reject null" time="0">
-    </testcase>
-    <testcase classname="Beer Type Guards - Edge Cases isBeer - Primitive Edge Cases should reject undefined" name="Beer Type Guards - Edge Cases isBeer - Primitive Edge Cases should reject undefined" time="0">
-    </testcase>
-    <testcase classname="Beer Type Guards - Edge Cases isBeer - Primitive Edge Cases should reject arrays" name="Beer Type Guards - Edge Cases isBeer - Primitive Edge Cases should reject arrays" time="0">
-    </testcase>
-    <testcase classname="Beer Type Guards - Edge Cases isBeer - Primitive Edge Cases should reject functions" name="Beer Type Guards - Edge Cases isBeer - Primitive Edge Cases should reject functions" time="0">
-    </testcase>
-    <testcase classname="Beer Type Guards - Edge Cases isBeer - Primitive Edge Cases should reject symbols" name="Beer Type Guards - Edge Cases isBeer - Primitive Edge Cases should reject symbols" time="0.001">
-    </testcase>
-    <testcase classname="Beer Type Guards - Edge Cases isBeer - Object Structure Edge Cases should reject object with id as number" name="Beer Type Guards - Edge Cases isBeer - Object Structure Edge Cases should reject object with id as number" time="0">
-    </testcase>
-    <testcase classname="Beer Type Guards - Edge Cases isBeer - Object Structure Edge Cases should reject object with id as boolean" name="Beer Type Guards - Edge Cases isBeer - Object Structure Edge Cases should reject object with id as boolean" time="0">
-    </testcase>
-    <testcase classname="Beer Type Guards - Edge Cases isBeer - Object Structure Edge Cases should reject object with id as object" name="Beer Type Guards - Edge Cases isBeer - Object Structure Edge Cases should reject object with id as object" time="0">
-    </testcase>
-    <testcase classname="Beer Type Guards - Edge Cases isBeer - Object Structure Edge Cases should reject object with id as array" name="Beer Type Guards - Edge Cases isBeer - Object Structure Edge Cases should reject object with id as array" time="0">
-    </testcase>
-    <testcase classname="Beer Type Guards - Edge Cases isBeer - Object Structure Edge Cases should reject object with brew_name as number" name="Beer Type Guards - Edge Cases isBeer - Object Structure Edge Cases should reject object with brew_name as number" time="0">
-    </testcase>
-    <testcase classname="Beer Type Guards - Edge Cases isBeer - Object Structure Edge Cases should reject object with brew_name as boolean" name="Beer Type Guards - Edge Cases isBeer - Object Structure Edge Cases should reject object with brew_name as boolean" time="0">
-    </testcase>
-    <testcase classname="Beer Type Guards - Edge Cases isBeer - Object Structure Edge Cases should reject object with brew_name as array" name="Beer Type Guards - Edge Cases isBeer - Object Structure Edge Cases should reject object with brew_name as array" time="0.001">
-    </testcase>
-    <testcase classname="Beer Type Guards - Edge Cases isBeer - Object Structure Edge Cases should reject object with brew_name as object" name="Beer Type Guards - Edge Cases isBeer - Object Structure Edge Cases should reject object with brew_name as object" time="0">
-    </testcase>
-    <testcase classname="Beer Type Guards - Edge Cases isBeer - Special JavaScript Values should reject object with NaN as id" name="Beer Type Guards - Edge Cases isBeer - Special JavaScript Values should reject object with NaN as id" time="0">
-    </testcase>
-    <testcase classname="Beer Type Guards - Edge Cases isBeer - Special JavaScript Values should reject object with Infinity as id" name="Beer Type Guards - Edge Cases isBeer - Special JavaScript Values should reject object with Infinity as id" time="0">
-    </testcase>
-    <testcase classname="Beer Type Guards - Edge Cases isBeer - Special JavaScript Values should reject object with -Infinity as id" name="Beer Type Guards - Edge Cases isBeer - Special JavaScript Values should reject object with -Infinity as id" time="0">
-    </testcase>
-    <testcase classname="Beer Type Guards - Edge Cases isBeer - Special JavaScript Values should accept object with empty string id (edge case)" name="Beer Type Guards - Edge Cases isBeer - Special JavaScript Values should accept object with empty string id (edge case)" time="0">
-    </testcase>
-    <testcase classname="Beer Type Guards - Edge Cases isBeer - Special JavaScript Values should accept object with empty string brew_name (edge case)" name="Beer Type Guards - Edge Cases isBeer - Special JavaScript Values should accept object with empty string brew_name (edge case)" time="0">
-    </testcase>
-    <testcase classname="Beer Type Guards - Edge Cases isBeer - Special JavaScript Values should accept object with whitespace-only strings" name="Beer Type Guards - Edge Cases isBeer - Special JavaScript Values should accept object with whitespace-only strings" time="0.001">
-    </testcase>
-    <testcase classname="Beer Type Guards - Edge Cases isBeer - Property Access Edge Cases should accept object with getters" name="Beer Type Guards - Edge Cases isBeer - Property Access Edge Cases should accept object with getters" time="0">
-    </testcase>
-    <testcase classname="Beer Type Guards - Edge Cases isBeer - Property Access Edge Cases should accept frozen object" name="Beer Type Guards - Edge Cases isBeer - Property Access Edge Cases should accept frozen object" time="0">
-    </testcase>
-    <testcase classname="Beer Type Guards - Edge Cases isBeer - Property Access Edge Cases should accept sealed object" name="Beer Type Guards - Edge Cases isBeer - Property Access Edge Cases should accept sealed object" time="0">
-    </testcase>
-    <testcase classname="Beer Type Guards - Edge Cases isBeer - Property Access Edge Cases should accept object with extra properties" name="Beer Type Guards - Edge Cases isBeer - Property Access Edge Cases should accept object with extra properties" time="0.001">
-    </testcase>
-    <testcase classname="Beer Type Guards - Edge Cases isBeer - Property Access Edge Cases should reject object with Symbol properties only" name="Beer Type Guards - Edge Cases isBeer - Property Access Edge Cases should reject object with Symbol properties only" time="0">
-    </testcase>
-    <testcase classname="Beer Type Guards - Edge Cases isBeer - Property Access Edge Cases should accept object with non-enumerable properties" name="Beer Type Guards - Edge Cases isBeer - Property Access Edge Cases should accept object with non-enumerable properties" time="0">
-    </testcase>
-    <testcase classname="Beer Type Guards - Edge Cases isBeer - Unicode and Special Characters should accept object with emoji in brew_name" name="Beer Type Guards - Edge Cases isBeer - Unicode and Special Characters should accept object with emoji in brew_name" time="0.001">
-    </testcase>
-    <testcase classname="Beer Type Guards - Edge Cases isBeer - Unicode and Special Characters should accept object with RTL text" name="Beer Type Guards - Edge Cases isBeer - Unicode and Special Characters should accept object with RTL text" time="0">
-    </testcase>
-    <testcase classname="Beer Type Guards - Edge Cases isBeer - Unicode and Special Characters should accept object with Chinese characters" name="Beer Type Guards - Edge Cases isBeer - Unicode and Special Characters should accept object with Chinese characters" time="0">
-    </testcase>
-    <testcase classname="Beer Type Guards - Edge Cases isBeer - Unicode and Special Characters should accept object with zero-width characters" name="Beer Type Guards - Edge Cases isBeer - Unicode and Special Characters should accept object with zero-width characters" time="0">
-    </testcase>
-    <testcase classname="isBeerfinder - Edge Cases Type Discrimination should reject regular Beer without Beerfinder properties" name="isBeerfinder - Edge Cases Type Discrimination should reject regular Beer without Beerfinder properties" time="0">
-    </testcase>
-    <testcase classname="isBeerfinder - Edge Cases Type Discrimination should accept Beer with at least one Beerfinder property" name="isBeerfinder - Edge Cases Type Discrimination should accept Beer with at least one Beerfinder property" time="0">
-    </testcase>
-    <testcase classname="isBeerfinder - Edge Cases Type Discrimination should accept Beer with multiple Beerfinder properties" name="isBeerfinder - Edge Cases Type Discrimination should accept Beer with multiple Beerfinder properties" time="0">
-    </testcase>
-    <testcase classname="isBeerfinder - Edge Cases Type Discrimination should reject if Beerfinder property is undefined explicitly" name="isBeerfinder - Edge Cases Type Discrimination should reject if Beerfinder property is undefined explicitly" time="0">
-    </testcase>
-    <testcase classname="isBeerfinder - Edge Cases Type Discrimination should accept if Beerfinder property is null" name="isBeerfinder - Edge Cases Type Discrimination should accept if Beerfinder property is null" time="0">
-    </testcase>
-    <testcase classname="isBeerfinder - Edge Cases Type Discrimination should accept if Beerfinder property is empty string" name="isBeerfinder - Edge Cases Type Discrimination should accept if Beerfinder property is empty string" time="0.001">
-    </testcase>
-    <testcase classname="isBeerfinder - Edge Cases Type Discrimination should accept object with roh_lap only" name="isBeerfinder - Edge Cases Type Discrimination should accept object with roh_lap only" time="0">
-    </testcase>
-    <testcase classname="isBeerfinder - Edge Cases Type Discrimination should accept object with chit_code only" name="isBeerfinder - Edge Cases Type Discrimination should accept object with chit_code only" time="0">
-    </testcase>
-    <testcase classname="isBeerDetails - Edge Cases Type Discrimination should reject regular Beer without BeerDetails properties" name="isBeerDetails - Edge Cases Type Discrimination should reject regular Beer without BeerDetails properties" time="0.001">
-    </testcase>
-    <testcase classname="isBeerDetails - Edge Cases Type Discrimination should accept Beer with at least one BeerDetails property" name="isBeerDetails - Edge Cases Type Discrimination should accept Beer with at least one BeerDetails property" time="0">
-    </testcase>
-    <testcase classname="isBeerDetails - Edge Cases Type Discrimination should accept Beer with multiple BeerDetails properties" name="isBeerDetails - Edge Cases Type Discrimination should accept Beer with multiple BeerDetails properties" time="0">
-    </testcase>
-    <testcase classname="isBeerDetails - Edge Cases Type Discrimination should accept object with untappd_ratings_count as 0" name="isBeerDetails - Edge Cases Type Discrimination should accept object with untappd_ratings_count as 0" time="0">
-    </testcase>
-    <testcase classname="isBeerDetails - Edge Cases Type Discrimination should accept object with seasonal as false" name="isBeerDetails - Edge Cases Type Discrimination should accept object with seasonal as false" time="0.001">
-    </testcase>
-    <testcase classname="isBeerDetails - Edge Cases Type Discrimination should accept object with null BeerDetails property" name="isBeerDetails - Edge Cases Type Discrimination should accept object with null BeerDetails property" time="0">
-    </testcase>
-    <testcase classname="isSessionData - Edge Cases Required Fields Validation should reject object missing memberId" name="isSessionData - Edge Cases Required Fields Validation should reject object missing memberId" time="0">
-    </testcase>
-    <testcase classname="isSessionData - Edge Cases Required Fields Validation should reject object missing storeId" name="isSessionData - Edge Cases Required Fields Validation should reject object missing storeId" time="0">
-    </testcase>
-    <testcase classname="isSessionData - Edge Cases Required Fields Validation should reject object missing storeName" name="isSessionData - Edge Cases Required Fields Validation should reject object missing storeName" time="0">
-    </testcase>
-    <testcase classname="isSessionData - Edge Cases Required Fields Validation should reject object missing sessionId" name="isSessionData - Edge Cases Required Fields Validation should reject object missing sessionId" time="0">
-    </testcase>
-    <testcase classname="isSessionData - Edge Cases Required Fields Validation should accept object with all required fields plus optional fields" name="isSessionData - Edge Cases Required Fields Validation should accept object with all required fields plus optional fields" time="0">
-    </testcase>
-    <testcase classname="isSessionData - Edge Cases Required Fields Validation should reject object with required field as null" name="isSessionData - Edge Cases Required Fields Validation should reject object with required field as null" time="0">
-    </testcase>
-    <testcase classname="isSessionData - Edge Cases Required Fields Validation should reject object with required field as number" name="isSessionData - Edge Cases Required Fields Validation should reject object with required field as number" time="0">
-    </testcase>
-    <testcase classname="isApiResponse - Edge Cases Required Fields Validation should reject object missing success field" name="isApiResponse - Edge Cases Required Fields Validation should reject object missing success field" time="0">
-    </testcase>
-    <testcase classname="isApiResponse - Edge Cases Required Fields Validation should reject object missing statusCode field" name="isApiResponse - Edge Cases Required Fields Validation should reject object missing statusCode field" time="0">
-    </testcase>
-    <testcase classname="isApiResponse - Edge Cases Required Fields Validation should reject object missing data field" name="isApiResponse - Edge Cases Required Fields Validation should reject object missing data field" time="0">
-    </testcase>
-    <testcase classname="isApiResponse - Edge Cases Required Fields Validation should accept object with data as null" name="isApiResponse - Edge Cases Required Fields Validation should accept object with data as null" time="0">
-    </testcase>
-    <testcase classname="isApiResponse - Edge Cases Required Fields Validation should accept object with data as empty object" name="isApiResponse - Edge Cases Required Fields Validation should accept object with data as empty object" time="0">
-    </testcase>
-    <testcase classname="isApiResponse - Edge Cases Required Fields Validation should accept object with data as array" name="isApiResponse - Edge Cases Required Fields Validation should accept object with data as array" time="0">
-    </testcase>
-    <testcase classname="isApiResponse - Edge Cases Required Fields Validation should reject object with success as string" name="isApiResponse - Edge Cases Required Fields Validation should reject object with success as string" time="0">
-    </testcase>
-    <testcase classname="isApiResponse - Edge Cases Required Fields Validation should reject object with statusCode as string" name="isApiResponse - Edge Cases Required Fields Validation should reject object with statusCode as string" time="0">
-    </testcase>
-    <testcase classname="isApiResponse - Edge Cases Required Fields Validation should accept object with statusCode as 0" name="isApiResponse - Edge Cases Required Fields Validation should accept object with statusCode as 0" time="0">
-    </testcase>
-    <testcase classname="isApiResponse - Edge Cases Required Fields Validation should accept object with optional error field" name="isApiResponse - Edge Cases Required Fields Validation should accept object with optional error field" time="0">
-    </testcase>
-    <testcase classname="isLoginResult - Edge Cases Required Fields Validation should reject object missing success field" name="isLoginResult - Edge Cases Required Fields Validation should reject object missing success field" time="0.002">
-    </testcase>
-    <testcase classname="isLoginResult - Edge Cases Required Fields Validation should accept object with only success field" name="isLoginResult - Edge Cases Required Fields Validation should accept object with only success field" time="0">
-    </testcase>
-    <testcase classname="isLoginResult - Edge Cases Required Fields Validation should accept object with success and all optional fields" name="isLoginResult - Edge Cases Required Fields Validation should accept object with success and all optional fields" time="0">
-    </testcase>
-    <testcase classname="isLoginResult - Edge Cases Required Fields Validation should reject object with success as number" name="isLoginResult - Edge Cases Required Fields Validation should reject object with success as number" time="0">
-    </testcase>
-    <testcase classname="isLoginResult - Edge Cases Required Fields Validation should reject object with success as string" name="isLoginResult - Edge Cases Required Fields Validation should reject object with success as string" time="0">
-    </testcase>
-    <testcase classname="isPreference - Edge Cases Required Fields Validation should reject object missing key" name="isPreference - Edge Cases Required Fields Validation should reject object missing key" time="0">
-    </testcase>
-    <testcase classname="isPreference - Edge Cases Required Fields Validation should reject object missing value" name="isPreference - Edge Cases Required Fields Validation should reject object missing value" time="0">
-    </testcase>
-    <testcase classname="isPreference - Edge Cases Required Fields Validation should reject object missing description" name="isPreference - Edge Cases Required Fields Validation should reject object missing description" time="0">
-    </testcase>
-    <testcase classname="isPreference - Edge Cases Required Fields Validation should accept object with all three fields" name="isPreference - Edge Cases Required Fields Validation should accept object with all three fields" time="0">
-    </testcase>
-    <testcase classname="isPreference - Edge Cases Required Fields Validation should accept object with empty strings" name="isPreference - Edge Cases Required Fields Validation should accept object with empty strings" time="0">
-    </testcase>
-    <testcase classname="isPreference - Edge Cases Required Fields Validation should reject object with key as number" name="isPreference - Edge Cases Required Fields Validation should reject object with key as number" time="0">
-    </testcase>
-    <testcase classname="isPreference - Edge Cases Required Fields Validation should reject object with value as object" name="isPreference - Edge Cases Required Fields Validation should reject object with value as object" time="0">
-    </testcase>
-    <testcase classname="isReward - Edge Cases Required Fields Validation should reject object missing reward_id" name="isReward - Edge Cases Required Fields Validation should reject object missing reward_id" time="0">
-    </testcase>
-    <testcase classname="isReward - Edge Cases Required Fields Validation should reject object missing redeemed" name="isReward - Edge Cases Required Fields Validation should reject object missing redeemed" time="0">
-    </testcase>
-    <testcase classname="isReward - Edge Cases Required Fields Validation should reject object missing reward_type" name="isReward - Edge Cases Required Fields Validation should reject object missing reward_type" time="0">
-    </testcase>
-    <testcase classname="isReward - Edge Cases Required Fields Validation should accept object with all three fields" name="isReward - Edge Cases Required Fields Validation should accept object with all three fields" time="0">
-    </testcase>
-    <testcase classname="isReward - Edge Cases Required Fields Validation should accept object with redeemed as &quot;0&quot;" name="isReward - Edge Cases Required Fields Validation should accept object with redeemed as &quot;0&quot;" time="0">
-    </testcase>
-    <testcase classname="isReward - Edge Cases Required Fields Validation should accept object with redeemed as &quot;1&quot;" name="isReward - Edge Cases Required Fields Validation should accept object with redeemed as &quot;1&quot;" time="0">
-    </testcase>
-    <testcase classname="isReward - Edge Cases Required Fields Validation should accept object with empty strings" name="isReward - Edge Cases Required Fields Validation should accept object with empty strings" time="0">
-    </testcase>
-    <testcase classname="isReward - Edge Cases Required Fields Validation should reject object with reward_id as number" name="isReward - Edge Cases Required Fields Validation should reject object with reward_id as number" time="0">
-    </testcase>
-    <testcase classname="isCheckInResponse - Edge Cases Required Fields Validation should accept object with only success field" name="isCheckInResponse - Edge Cases Required Fields Validation should accept object with only success field" time="0">
-    </testcase>
-    <testcase classname="isCheckInResponse - Edge Cases Required Fields Validation should accept object with success false" name="isCheckInResponse - Edge Cases Required Fields Validation should accept object with success false" time="0.001">
-    </testcase>
-    <testcase classname="isCheckInResponse - Edge Cases Required Fields Validation should accept object with all optional fields" name="isCheckInResponse - Edge Cases Required Fields Validation should accept object with all optional fields" time="0">
-    </testcase>
-    <testcase classname="isCheckInResponse - Edge Cases Required Fields Validation should reject object with success as string" name="isCheckInResponse - Edge Cases Required Fields Validation should reject object with success as string" time="0">
-    </testcase>
-    <testcase classname="isCheckInResponse - Edge Cases Required Fields Validation should reject object with success as number" name="isCheckInResponse - Edge Cases Required Fields Validation should reject object with success as number" time="0">
-    </testcase>
-    <testcase classname="isCheckInResponse - Edge Cases Required Fields Validation should reject object missing success" name="isCheckInResponse - Edge Cases Required Fields Validation should reject object missing success" time="0">
+    <testcase classname="enrichmentService Cache Functions bustTaplistCache should return false when enrichment is not configured" name="enrichmentService Cache Functions bustTaplistCache should return false when enrichment is not configured" time="0.001">
     </testcase>
   </testsuite>
 </testsuites>

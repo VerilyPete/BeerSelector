@@ -39,7 +39,7 @@ try {
 export interface EnrichmentData {
   enriched_abv: number | null;
   enrichment_confidence: number | null;
-  enrichment_source: 'perplexity' | 'manual' | null;
+  enrichment_source: 'description' | 'perplexity' | 'manual' | null;
 }
 
 /**
@@ -59,7 +59,7 @@ export interface EnrichedBeerResponse {
   // Enrichment fields from Worker
   enriched_abv: number | null;
   enrichment_confidence: number | null;
-  enrichment_source: 'perplexity' | 'manual' | null;
+  enrichment_source: 'description' | 'perplexity' | 'manual' | null;
 }
 
 /**
