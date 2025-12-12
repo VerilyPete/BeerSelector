@@ -80,7 +80,9 @@ export const allBeersRowSchema = z.object({
   abv: z.number().nullable().optional(),
   // Enrichment fields (added in schema v7)
   enrichment_confidence: z.number().nullable().optional(),
-  enrichment_source: z.union([z.literal('perplexity'), z.literal('manual'), z.null()]).optional(),
+  enrichment_source: z
+    .union([z.literal('description'), z.literal('perplexity'), z.literal('manual'), z.null()])
+    .optional(),
 });
 
 /**
@@ -205,7 +207,9 @@ export const tastedBrewRowSchema = z.object({
   abv: z.number().nullable().optional(),
   // Enrichment fields (added in schema v7)
   enrichment_confidence: z.number().nullable().optional(),
-  enrichment_source: z.union([z.literal('perplexity'), z.literal('manual'), z.null()]).optional(),
+  enrichment_source: z
+    .union([z.literal('description'), z.literal('perplexity'), z.literal('manual'), z.null()])
+    .optional(),
 });
 
 /**

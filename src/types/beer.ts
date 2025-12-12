@@ -6,8 +6,12 @@ import { ContainerType } from '@/src/utils/beerGlassType';
 
 /**
  * Valid enrichment source values
+ * - 'description': ABV parsed from brew_description HTML
+ * - 'perplexity': ABV fetched from Perplexity API
+ * - 'manual': ABV manually verified/entered
+ * - null: Not yet enriched
  */
-export type EnrichmentSource = 'perplexity' | 'manual' | null;
+export type EnrichmentSource = 'description' | 'perplexity' | 'manual' | null;
 
 /**
  * Base Beer interface representing a beer in the system
@@ -120,7 +124,11 @@ export function isBeer(obj: unknown): obj is Beer {
 
   // Validate enrichment_source if present
   if (o.enrichment_source !== undefined && o.enrichment_source !== null) {
-    if (o.enrichment_source !== 'perplexity' && o.enrichment_source !== 'manual') {
+    if (
+      o.enrichment_source !== 'description' &&
+      o.enrichment_source !== 'perplexity' &&
+      o.enrichment_source !== 'manual'
+    ) {
       return false;
     }
   }
@@ -196,7 +204,11 @@ export function isBeerWithContainerType(obj: unknown): obj is BeerWithContainerT
 
   // Validate enrichment_source value if not null
   if (beer.enrichment_source !== null) {
-    if (beer.enrichment_source !== 'perplexity' && beer.enrichment_source !== 'manual') {
+    if (
+      beer.enrichment_source !== 'description' &&
+      beer.enrichment_source !== 'perplexity' &&
+      beer.enrichment_source !== 'manual'
+    ) {
       return false;
     }
   }
