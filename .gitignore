@@ -95,3 +95,7 @@ test-results/
 .flashlight/reports/
 *.junit.xml
 junit.xml
+
+# Data files (test data, personal data)
+mybeers.json
+allbeers.json
