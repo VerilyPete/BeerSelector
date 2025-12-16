@@ -18,7 +18,8 @@ import { calculateContainerTypes } from '../database/utils/glassTypeCalculator';
 import { config } from '@/src/config';
 import {
   fetchBeersFromProxy,
-  fetchEnrichmentBatch,
+  fetchEnrichmentBatchWithMissing,
+  syncBeersToWorker,
   bustTaplistCache,
   mergeEnrichmentData,
   recordFallback,
@@ -33,6 +34,44 @@ export interface DataUpdateResult {
   error?: ErrorResponse;
   dataUpdated: boolean;
   itemCount?: number;
+}
+
+/**
+ * Sync missing beers to Worker in background (fire-and-forget pattern).
+ *
+ * When batch enrichment returns IDs not found in the Worker database,
+ * this helper syncs those beers to the Worker for enrichment processing.
+ * Runs asynchronously without blocking the caller.
+ *
+ * @param missingIds - Array of beer IDs missing from Worker database
+ * @param allBeers - Array of beers to filter from (must include beers with missingIds)
+ * @param operation - Name of calling operation for logging context
+ */
+async function syncMissingBeersInBackground(
+  missingIds: string[],
+  allBeers: BeerWithContainerType[],
+  operation: string
+): Promise<void> {
+  if (missingIds.length === 0) return;
+
+  console.log(`[${operation}] Found ${missingIds.length} beers missing from Worker, syncing...`);
+  const missingBeers = allBeers.filter(b => missingIds.includes(b.id));
+
+  syncBeersToWorker(missingBeers)
+    .then(syncResult => {
+      if (syncResult && syncResult.queued_for_cleanup > 0) {
+        console.log(
+          `[${operation}] Synced ${syncResult.synced} beers, ${syncResult.queued_for_cleanup} queued for cleanup`
+        );
+      }
+    })
+    .catch(syncError => {
+      logWarning('Background sync of missing beers failed', {
+        operation,
+        component: 'dataUpdateService',
+        additionalData: { error: String(syncError) },
+      });
+    });
 }
 
 /**
@@ -552,13 +591,18 @@ export async function fetchAndUpdateMyBeers(): Promise<DataUpdateResult> {
           `[dataUpdateService] Fetching enrichment for ${beerIds.length} tasted beers...`
         );
 
-        const enrichmentData = await fetchEnrichmentBatch(beerIds);
+        // Use fetchEnrichmentBatchWithMissing to also get IDs not in Worker database
+        const { enrichments: enrichmentData, missing: missingIds } =
+          await fetchEnrichmentBatchWithMissing(beerIds);
         const enrichedCount = Object.keys(enrichmentData).length;
 
         if (enrichedCount > 0) {
           console.log(`[dataUpdateService] Got enrichment data for ${enrichedCount} beers`);
           enrichedBeers = mergeEnrichmentData(beersWithContainerTypes, enrichmentData);
         }
+
+        // Sync missing beers to Worker for enrichment (in background)
+        syncMissingBeersInBackground(missingIds, beersWithContainerTypes, 'dataUpdateService');
       } catch (enrichmentError) {
         // Log but don't fail - enrichment is optional enhancement
         logWarning('Failed to fetch enrichment for tasted beers, continuing without', {
@@ -844,13 +888,19 @@ export async function sequentialRefreshAllData(): Promise<ManualRefreshResult> {
           console.log(
             `[sequentialRefresh] Fetching enrichment for ${beerIds.length} tasted beers...`
           );
-          const enrichmentData = await fetchEnrichmentBatch(beerIds);
+
+          // Use fetchEnrichmentBatchWithMissing to also get IDs not in Worker database
+          const { enrichments: enrichmentData, missing: missingIds } =
+            await fetchEnrichmentBatchWithMissing(beerIds);
           const enrichedCount = Object.keys(enrichmentData).length;
 
           if (enrichedCount > 0) {
             console.log(`[sequentialRefresh] Got enrichment for ${enrichedCount} tasted beers`);
             enrichedMyBeers = mergeEnrichmentData(myBeersWithContainerTypes, enrichmentData);
           }
+
+          // Sync missing beers to Worker for enrichment (in background)
+          syncMissingBeersInBackground(missingIds, myBeersWithContainerTypes, 'sequentialRefresh');
         } catch (enrichmentError) {
           logWarning('Batch enrichment failed in sequential refresh, continuing without', {
             operation: 'sequentialRefreshAllData',
@@ -1218,13 +1268,23 @@ export const refreshAllDataFromAPI = async (): Promise<{
         console.log(
           `[refreshAllDataFromAPI] Fetching enrichment for ${beerIds.length} tasted beers...`
         );
-        const enrichmentData = await fetchEnrichmentBatch(beerIds);
+
+        // Use fetchEnrichmentBatchWithMissing to also get IDs not in Worker database
+        const { enrichments: enrichmentData, missing: missingIds } =
+          await fetchEnrichmentBatchWithMissing(beerIds);
         const enrichedCount = Object.keys(enrichmentData).length;
 
         if (enrichedCount > 0) {
           console.log(`[refreshAllDataFromAPI] Got enrichment for ${enrichedCount} tasted beers`);
           enrichedMyBeers = mergeEnrichmentData(myBeersWithContainerTypes, enrichmentData);
         }
+
+        // Sync missing beers to Worker for enrichment (in background)
+        syncMissingBeersInBackground(
+          missingIds,
+          myBeersWithContainerTypes,
+          'refreshAllDataFromAPI'
+        );
       } catch (enrichmentError) {
         logWarning('Batch enrichment failed in refreshAllDataFromAPI, continuing without', {
           operation: 'refreshAllDataFromAPI',

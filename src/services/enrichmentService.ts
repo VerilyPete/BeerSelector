@@ -35,11 +35,16 @@ try {
 
 /**
  * Enrichment data returned by the Worker for a single beer
+ * Note: Worker now returns merged description (consistent with GET /beers)
  */
 export interface EnrichmentData {
   enriched_abv: number | null;
   enrichment_confidence: number | null;
   enrichment_source: 'description' | 'perplexity' | 'manual' | null;
+  /** Merged description: prefers cleaned version, falls back to original (like GET /beers) */
+  brew_description: string | null;
+  /** True if the brew_description came from the cleaned version */
+  has_cleaned_description: boolean;
 }
 
 /**
@@ -80,9 +85,32 @@ export interface BeersProxyResponse {
  */
 export interface BatchEnrichmentResponse {
   enrichments: Record<string, EnrichmentData>;
+  missing: string[]; // IDs not found in enriched_beers table
   requestId: string;
-  found: number;
-  notFound: number;
+}
+
+/**
+ * Request body for POST /beers/sync
+ * Accepts beer data from mobile client for syncing to enriched_beers table
+ */
+export interface SyncBeersRequest {
+  beers: {
+    id: string;
+    brew_name: string;
+    brewer?: string;
+    brew_description?: string;
+  }[];
+}
+
+/**
+ * Response for POST /beers/sync
+ * Returns counts of synced and queued beers
+ */
+export interface SyncBeersResponse {
+  synced: number;
+  queued_for_cleanup: number;
+  requestId: string;
+  errors?: string[];
 }
 
 /**
@@ -600,6 +628,471 @@ export async function fetchEnrichmentBatch(
   return results;
 }
 
+/**
+ * Extended result from fetchEnrichmentBatchWithMissing
+ * Includes both enrichment data and IDs not found in the Worker database
+ */
+export interface EnrichmentBatchResult {
+  enrichments: Record<string, EnrichmentData>;
+  missing: string[];
+}
+
+/**
+ * Fetch enrichment data for a batch of beer IDs, including missing IDs.
+ *
+ * This is an extended version of fetchEnrichmentBatch that also returns
+ * the IDs of beers that are not in the Worker's enriched_beers table.
+ * These missing beers can then be synced to the Worker for enrichment.
+ *
+ * @param beerIds - Array of beer IDs to look up
+ * @returns Object with enrichments map and array of missing IDs
+ *
+ * @example
+ * ```typescript
+ * const result = await fetchEnrichmentBatchWithMissing(['123', '456', '789']);
+ * if (result.missing.length > 0) {
+ *   // Sync missing beers to Worker
+ *   const missingBeers = allBeers.filter(b => result.missing.includes(b.id));
+ *   await syncBeersToWorker(missingBeers);
+ * }
+ * ```
+ */
+export async function fetchEnrichmentBatchWithMissing(
+  beerIds: string[]
+): Promise<EnrichmentBatchResult> {
+  const { enrichment } = config;
+
+  if (!enrichment.isConfigured() || beerIds.length === 0) {
+    return { enrichments: {}, missing: [] };
+  }
+
+  // Chunk IDs into batches using config batch size
+  const chunks: string[][] = [];
+  for (let i = 0; i < beerIds.length; i += enrichment.batchSize) {
+    chunks.push(beerIds.slice(i, i + enrichment.batchSize));
+  }
+
+  // Check if ALL chunks are allowed upfront
+  if (!isRequestAllowed(chunks.length)) {
+    metrics.rateLimitedRequests++;
+    const waitTime = getTimeUntilNextRequest();
+    logWarning(
+      `Client rate limited while batch enriching ${beerIds.length} beers (${chunks.length} chunks). Try again in ${Math.ceil(waitTime / 1000)} seconds.`,
+      {
+        operation: 'fetchEnrichmentBatchWithMissing',
+        component: 'enrichmentService',
+        additionalData: { beerCount: beerIds.length, chunkCount: chunks.length },
+      }
+    );
+    return { enrichments: {}, missing: [] };
+  }
+
+  const results: Record<string, EnrichmentData> = {};
+  const allMissing: string[] = [];
+  const clientId = await getClientId();
+  let successCount = 0;
+  let failureCount = 0;
+
+  // Process chunks sequentially to avoid rate limiting
+  for (const chunk of chunks) {
+    metrics.proxyRequests++;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), enrichment.timeout);
+
+    try {
+      const response = await fetch(enrichment.getFullUrl('batch'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-API-Key': enrichment.apiKey!,
+          'X-Client-ID': clientId,
+        },
+        body: JSON.stringify({ ids: chunk }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      // Handle server-side rate limiting
+      if (response.status === 429) {
+        metrics.rateLimitedRequests++;
+        syncRateLimitFromServer();
+        failureCount++;
+        logWarning(
+          `Batch enrichment rate limited at chunk ${successCount + failureCount}/${chunks.length}`,
+          {
+            operation: 'fetchEnrichmentBatchWithMissing',
+            component: 'enrichmentService',
+            additionalData: { processedChunks: successCount, totalChunks: chunks.length },
+          }
+        );
+        break;
+      }
+
+      if (!response.ok) {
+        failureCount++;
+        logWarning(`Batch enrichment chunk failed: ${response.status}`, {
+          operation: 'fetchEnrichmentBatchWithMissing',
+          component: 'enrichmentService',
+          additionalData: { chunkIndex: successCount + failureCount, status: response.status },
+        });
+        continue;
+      }
+
+      const data: BatchEnrichmentResponse = await response.json();
+      successCount++;
+
+      // Merge results
+      const enrichmentCount = Object.keys(data.enrichments || {}).length;
+      metrics.enrichedBeerCount += enrichmentCount;
+      metrics.unenrichedBeerCount += chunk.length - enrichmentCount;
+
+      Object.assign(results, data.enrichments || {});
+
+      // Collect missing IDs from this chunk
+      if (data.missing && data.missing.length > 0) {
+        allMissing.push(...data.missing);
+      }
+    } catch (error) {
+      clearTimeout(timeoutId);
+      failureCount++;
+
+      if (error instanceof Error && error.name === 'AbortError') {
+        logWarning(
+          `Batch enrichment request timed out for chunk ${successCount + failureCount}/${chunks.length}`,
+          {
+            operation: 'fetchEnrichmentBatchWithMissing',
+            component: 'enrichmentService',
+            additionalData: { chunkIndex: successCount + failureCount },
+          }
+        );
+        continue;
+      }
+
+      logWarning('Batch enrichment chunk failed', {
+        operation: 'fetchEnrichmentBatchWithMissing',
+        component: 'enrichmentService',
+        additionalData: { error: String(error), chunkIndex: successCount + failureCount },
+      });
+      break;
+    }
+  }
+
+  metrics.proxySuccesses += successCount;
+  metrics.proxyFailures += failureCount;
+
+  console.log(
+    `[EnrichmentService] Batch enrichment complete: ${Object.keys(results).length} enriched, ${allMissing.length} missing`
+  );
+
+  return { enrichments: results, missing: allMissing };
+}
+
+/**
+ * Sync missing beers to the Worker for enrichment.
+ *
+ * When batch enrichment returns missing IDs, the mobile client can sync
+ * those beers to the Worker so they can be enriched (ABV lookup, description cleanup).
+ *
+ * @param beers - Array of beers to sync (should include id, brew_name, brewer, brew_description)
+ * @returns SyncBeersResponse with sync counts, or null if sync failed
+ *
+ * @example
+ * ```typescript
+ * // After batch enrichment returns missing IDs
+ * const missingBeers = allBeers.filter(b => missingIds.includes(b.id));
+ * const syncResult = await syncBeersToWorker(missingBeers);
+ * if (syncResult) {
+ *   console.log(`Synced ${syncResult.synced} beers, ${syncResult.queued_for_cleanup} queued for cleanup`);
+ * }
+ * ```
+ */
+export async function syncBeersToWorker(
+  beers: { id: string; brew_name: string; brewer?: string; brew_description?: string }[]
+): Promise<SyncBeersResponse | null> {
+  const { enrichment } = config;
+
+  if (!enrichment.isConfigured() || beers.length === 0) {
+    return null;
+  }
+
+  // Chunk beers into batches (sync endpoint has max 50 beers per request)
+  const MAX_SYNC_BATCH_SIZE = 50;
+  const chunks: (typeof beers)[] = [];
+  for (let i = 0; i < beers.length; i += MAX_SYNC_BATCH_SIZE) {
+    chunks.push(beers.slice(i, i + MAX_SYNC_BATCH_SIZE));
+  }
+
+  // Check client-side rate limit for all chunks upfront
+  if (!isRequestAllowed(chunks.length)) {
+    metrics.rateLimitedRequests++;
+    const waitTime = getTimeUntilNextRequest();
+    logWarning(
+      `Client rate limited while syncing ${beers.length} beers (${chunks.length} chunks). Try again in ${Math.ceil(waitTime / 1000)} seconds.`,
+      {
+        operation: 'syncBeersToWorker',
+        component: 'enrichmentService',
+        additionalData: { beerCount: beers.length, chunkCount: chunks.length },
+      }
+    );
+    return null;
+  }
+
+  const clientId = await getClientId();
+  let totalSynced = 0;
+  let totalQueuedForCleanup = 0;
+  const allErrors: string[] = [];
+  let lastRequestId = '';
+
+  // Process chunks sequentially to avoid rate limiting
+  for (const chunk of chunks) {
+    metrics.proxyRequests++;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), enrichment.timeout);
+
+    try {
+      const requestBody: SyncBeersRequest = {
+        beers: chunk.map(b => ({
+          id: b.id,
+          brew_name: b.brew_name,
+          brewer: b.brewer,
+          brew_description: b.brew_description,
+        })),
+      };
+
+      const response = await fetch(enrichment.getFullUrl('sync'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-API-Key': enrichment.apiKey!,
+          'X-Client-ID': clientId,
+        },
+        body: JSON.stringify(requestBody),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      // Handle server-side rate limiting - stop processing further chunks
+      if (response.status === 429) {
+        metrics.rateLimitedRequests++;
+        syncRateLimitFromServer();
+        logWarning('Sync rate limited, returning partial results', {
+          operation: 'syncBeersToWorker',
+          component: 'enrichmentService',
+          additionalData: { syncedSoFar: totalSynced, totalBeers: beers.length },
+        });
+        break;
+      }
+
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => 'Unknown error');
+        allErrors.push(`Sync failed: ${response.status} - ${errorText}`);
+        logWarning(`Sync chunk failed: ${response.status}`, {
+          operation: 'syncBeersToWorker',
+          component: 'enrichmentService',
+          additionalData: { status: response.status, error: errorText },
+        });
+        continue;
+      }
+
+      const data: SyncBeersResponse = await response.json();
+      totalSynced += data.synced;
+      totalQueuedForCleanup += data.queued_for_cleanup;
+      lastRequestId = data.requestId;
+
+      if (data.errors && data.errors.length > 0) {
+        allErrors.push(...data.errors);
+      }
+
+      metrics.proxySuccesses++;
+    } catch (error) {
+      clearTimeout(timeoutId);
+      metrics.proxyFailures++;
+
+      if (error instanceof Error && error.name === 'AbortError') {
+        logWarning('Sync request timed out', {
+          operation: 'syncBeersToWorker',
+          component: 'enrichmentService',
+        });
+        allErrors.push('Sync request timed out');
+        continue;
+      }
+
+      logWarning('Sync chunk failed', {
+        operation: 'syncBeersToWorker',
+        component: 'enrichmentService',
+        additionalData: { error: String(error) },
+      });
+      allErrors.push(`Sync error: ${String(error)}`);
+      break; // Stop on network errors
+    }
+  }
+
+  console.log(
+    `[EnrichmentService] Synced ${totalSynced} beers, ${totalQueuedForCleanup} queued for cleanup`
+  );
+
+  return {
+    synced: totalSynced,
+    queued_for_cleanup: totalQueuedForCleanup,
+    requestId: lastRequestId,
+    errors: allErrors.length > 0 ? allErrors : undefined,
+  };
+}
+
+/**
+ * Helper function to sleep for a given duration.
+ * @param ms - Duration in milliseconds
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Poll for enrichment updates with exponential backoff.
+ *
+ * After syncing beers to the Worker, this function polls the batch endpoint
+ * to check when enrichment data becomes available (ABV lookup, description cleanup).
+ *
+ * Uses exponential backoff: 5s, 10s, 15s, 20s (max), repeating for up to 2 minutes.
+ *
+ * @param pendingIds - Beer IDs to poll for
+ * @param maxDurationMs - Maximum polling duration (default: 120000ms = 2 minutes)
+ * @returns Map of beer ID to enrichment data for beers that got enriched
+ *
+ * @example
+ * ```typescript
+ * // After syncing missing beers
+ * const syncResult = await syncBeersToWorker(missingBeers);
+ * if (syncResult && syncResult.queued_for_cleanup > 0) {
+ *   const enrichedResults = await pollForEnrichmentUpdates(missingIds);
+ *   // Update UI with enriched results
+ * }
+ * ```
+ */
+export async function pollForEnrichmentUpdates(
+  pendingIds: string[],
+  maxDurationMs: number = 120000
+): Promise<Record<string, EnrichmentData>> {
+  const { enrichment } = config;
+
+  if (!enrichment.isConfigured() || pendingIds.length === 0) {
+    return {};
+  }
+
+  const startTime = Date.now();
+  const results: Record<string, EnrichmentData> = {};
+  const remainingIds = new Set(pendingIds);
+
+  // Exponential backoff: 5s, 10s, 15s, 20s, 20s, 20s...
+  const baseDelay = 5000;
+  const maxDelay = 20000;
+  let attempt = 0;
+
+  console.log(`[EnrichmentService] Starting polling for ${pendingIds.length} pending beers`);
+
+  while (remainingIds.size > 0 && Date.now() - startTime < maxDurationMs) {
+    // Calculate delay with exponential backoff
+    const delay = Math.min(baseDelay * (attempt + 1), maxDelay);
+    await sleep(delay);
+    attempt++;
+
+    // Check if we've exceeded the time limit during sleep
+    if (Date.now() - startTime >= maxDurationMs) {
+      console.log(
+        `[EnrichmentService] Polling timeout reached after ${attempt} attempts, ${remainingIds.size} IDs still pending`
+      );
+      break;
+    }
+
+    try {
+      // Fetch current batch - use internal function to avoid rate limit overhead
+      // since polling is already rate-limited by the backoff
+      const response = await fetchEnrichmentBatchInternal(Array.from(remainingIds));
+
+      // Update results and remove found IDs (those with actual enrichment data)
+      for (const [id, data] of Object.entries(response)) {
+        // Consider a beer "enriched" if it has ABV or description (Worker returns merged brew_description)
+        if (data.enriched_abv !== null || data.brew_description !== null) {
+          results[id] = data;
+          remainingIds.delete(id);
+        }
+      }
+
+      console.log(
+        `[EnrichmentService] Polling attempt ${attempt}: ${Object.keys(results).length}/${pendingIds.length} complete, ${remainingIds.size} remaining`
+      );
+
+      // If all IDs are enriched, we're done
+      if (remainingIds.size === 0) {
+        console.log(`[EnrichmentService] All pending beers enriched after ${attempt} attempts`);
+        break;
+      }
+    } catch (error) {
+      logWarning(`Polling attempt ${attempt} failed`, {
+        operation: 'pollForEnrichmentUpdates',
+        component: 'enrichmentService',
+        additionalData: { error: String(error), attempt },
+      });
+      // Continue polling despite errors
+    }
+  }
+
+  console.log(
+    `[EnrichmentService] Polling complete: ${Object.keys(results).length}/${pendingIds.length} beers enriched`
+  );
+
+  return results;
+}
+
+/**
+ * Internal batch fetch function that bypasses rate limit checks.
+ * Used by polling to avoid rate limit overhead since polling already
+ * has exponential backoff built in.
+ *
+ * @param beerIds - Array of beer IDs to look up
+ * @returns Map of beer ID to enrichment data
+ */
+async function fetchEnrichmentBatchInternal(
+  beerIds: string[]
+): Promise<Record<string, EnrichmentData>> {
+  const { enrichment } = config;
+
+  if (!enrichment.isConfigured() || beerIds.length === 0) {
+    return {};
+  }
+
+  const clientId = await getClientId();
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), enrichment.timeout);
+
+  try {
+    const response = await fetch(enrichment.getFullUrl('batch'), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-API-Key': enrichment.apiKey!,
+        'X-Client-ID': clientId,
+      },
+      body: JSON.stringify({ ids: beerIds }),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      return {};
+    }
+
+    const data: BatchEnrichmentResponse = await response.json();
+    return data.enrichments || {};
+  } catch {
+    clearTimeout(timeoutId);
+    return {};
+  }
+}
+
 // ============================================================================
 // Helper Functions
 // ============================================================================
@@ -637,6 +1130,8 @@ export function mergeEnrichmentData<T extends BeerWithContainerType | Beerfinder
         abv: enrichment.enriched_abv ?? beer.abv,
         enrichment_confidence: enrichment.enrichment_confidence,
         enrichment_source: enrichment.enrichment_source,
+        // Worker now returns merged description (cleaned ?? original), fall back to beer's existing
+        brew_description: enrichment.brew_description ?? beer.brew_description,
       };
     }
     return beer;

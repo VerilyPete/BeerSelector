@@ -189,11 +189,15 @@ describe('enrichmentService', () => {
           enriched_abv: 6.5,
           enrichment_confidence: 0.95,
           enrichment_source: 'perplexity',
+          brew_description: 'Cleaned description 1',
+          has_cleaned_description: true,
         },
         '3': {
           enriched_abv: 8.0,
           enrichment_confidence: 1.0,
           enrichment_source: 'manual',
+          brew_description: 'Original description 3',
+          has_cleaned_description: false,
         },
       };
 
@@ -203,6 +207,7 @@ describe('enrichmentService', () => {
       expect(result[0].abv).toBe(6.5);
       expect(result[0].enrichment_confidence).toBe(0.95);
       expect(result[0].enrichment_source).toBe('perplexity');
+      expect(result[0].brew_description).toBe('Cleaned description 1');
 
       // Beer 2 should be unchanged
       expect(result[1].abv).toBeNull();
@@ -213,6 +218,7 @@ describe('enrichmentService', () => {
       expect(result[2].abv).toBe(8.0);
       expect(result[2].enrichment_confidence).toBe(1.0);
       expect(result[2].enrichment_source).toBe('manual');
+      expect(result[2].brew_description).toBe('Original description 3');
     });
 
     it('should preserve existing ABV if enriched_abv is null', () => {
@@ -222,6 +228,8 @@ describe('enrichmentService', () => {
           enriched_abv: null, // No ABV enrichment
           enrichment_confidence: 0.8,
           enrichment_source: 'perplexity',
+          brew_description: 'Cleaned description',
+          has_cleaned_description: true,
         },
       };
 
@@ -238,6 +246,8 @@ describe('enrichmentService', () => {
           enriched_abv: 7.2,
           enrichment_confidence: 0.9,
           enrichment_source: 'perplexity',
+          brew_description: 'Cleaned beerfinder desc',
+          has_cleaned_description: true,
         },
       };
 
@@ -256,6 +266,8 @@ describe('enrichmentService', () => {
           enriched_abv: 6.5,
           enrichment_confidence: 0.95,
           enrichment_source: 'perplexity',
+          brew_description: 'Cleaned description',
+          has_cleaned_description: true,
         },
       };
 
@@ -274,12 +286,50 @@ describe('enrichmentService', () => {
           enriched_abv: 6.5,
           enrichment_confidence: 0.95,
           enrichment_source: 'perplexity',
+          brew_description: 'Cleaned description',
+          has_cleaned_description: true,
         },
       };
 
       const result = mergeEnrichmentData(beers, enrichmentData);
 
       expect(result).toEqual([]);
+    });
+
+    it('should use Worker merged description over original beer description', () => {
+      const beers = [{ ...createMockBeer('1'), brew_description: 'Original from Flying Saucer' }];
+      const enrichmentData: Record<string, EnrichmentData> = {
+        '1': {
+          enriched_abv: 5.5,
+          enrichment_confidence: 0.9,
+          enrichment_source: 'description',
+          brew_description: 'Cleaned description from Worker',
+          has_cleaned_description: true,
+        },
+      };
+
+      const result = mergeEnrichmentData(beers, enrichmentData);
+
+      // Should use Worker's merged description
+      expect(result[0].brew_description).toBe('Cleaned description from Worker');
+    });
+
+    it('should keep beer description when Worker returns null', () => {
+      const beers = [{ ...createMockBeer('1'), brew_description: 'Original from Flying Saucer' }];
+      const enrichmentData: Record<string, EnrichmentData> = {
+        '1': {
+          enriched_abv: 5.5,
+          enrichment_confidence: 0.9,
+          enrichment_source: 'description',
+          brew_description: null, // Worker has no description
+          has_cleaned_description: false,
+        },
+      };
+
+      const result = mergeEnrichmentData(beers, enrichmentData);
+
+      // Should fall back to beer's original description
+      expect(result[0].brew_description).toBe('Original from Flying Saucer');
     });
   });
 
