@@ -17,7 +17,7 @@ import { OptimisticStatusBadge } from './optimistic/OptimisticStatusBadge';
 
 export const TastedBrewList = () => {
   // MP-4 Step 2: Use context for beer data instead of local state
-  const { beers, loading, errors, setTastedBeers, setAllBeers, setRewards } = useAppContext();
+  const { beers, loading, errors, refreshBeerData } = useAppContext();
 
   // Responsive layout: 1 column on phone, 2 on tablet portrait, 3 on tablet landscape
   const { numColumns } = useBreakpoint();
@@ -50,25 +50,9 @@ export const TastedBrewList = () => {
   const activeButtonColor = useThemeColor({}, 'tint');
 
   // Use the shared data refresh hook
-  // Reload data from database into AppContext after refresh completes
+  // Use AppContext's refreshBeerData to reload from database after refresh
   const { refreshing, handleRefresh } = useDataRefresh({
-    onDataReloaded: async () => {
-      // Reload all data from database into AppContext
-      const { beerRepository } = await import('@/src/database/repositories/BeerRepository');
-      const { myBeersRepository } = await import('@/src/database/repositories/MyBeersRepository');
-      const { rewardsRepository } = await import('@/src/database/repositories/RewardsRepository');
-
-      const [allBeersData, tastedBeersData, rewardsData] = await Promise.all([
-        beerRepository.getAll(),
-        myBeersRepository.getAll(),
-        rewardsRepository.getAll(),
-      ]);
-
-      setAllBeers(allBeersData);
-      setTastedBeers(tastedBeersData);
-      setRewards(rewardsData);
-      console.log(`[TastedBrewList] Reloaded: ${tastedBeersData.length} tasted beers`);
-    },
+    onDataReloaded: refreshBeerData,
     componentName: 'TastedBrewList',
   });
 

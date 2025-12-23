@@ -33,7 +33,7 @@ import { updateLiveActivityWithQueue } from '@/src/services/liveActivityService'
 
 export const Beerfinder = () => {
   // MP-4 Step 2: Use context for beer data instead of local state
-  const { beers, loading, errors, syncQueuedBeerIds } = useAppContext();
+  const { beers, loading, errors, syncQueuedBeerIds, refreshBeerData } = useAppContext();
 
   // Responsive layout: 1 column on phone, 2 on tablet portrait, 3 on tablet landscape
   const { numColumns } = useBreakpoint();
@@ -85,11 +85,9 @@ export const Beerfinder = () => {
   const overlayColor = useThemeColor({}, 'overlay');
 
   // Use the shared data refresh hook
-  // Note: Data loading now happens in _layout.tsx via AppContext
+  // Use AppContext's refreshBeerData to reload from database after refresh
   const { refreshing, handleRefresh: baseHandleRefresh } = useDataRefresh({
-    onDataReloaded: async () => {
-      // Data refresh is handled by _layout.tsx, no need to update local state
-    },
+    onDataReloaded: refreshBeerData,
     componentName: 'Beerfinder',
   });
 

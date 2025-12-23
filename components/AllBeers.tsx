@@ -59,9 +59,7 @@ export const AllBeers = () => {
     try {
       setLoadingBeers(true);
       const data = await beerRepository.getAll();
-      // Filter out any beers with empty or null brew_name
-      const filteredData = data.filter(beer => beer.brew_name && beer.brew_name.trim() !== '');
-      setAllBeers(filteredData);
+      setAllBeers(data);
       setBeerError(null);
     } catch (err) {
       console.error('Failed to load beers:', err);
@@ -75,10 +73,7 @@ export const AllBeers = () => {
   const { refreshing, handleRefresh } = useDataRefresh({
     onDataReloaded: async () => {
       const freshBeers = await beerRepository.getAll();
-      const filteredData = freshBeers.filter(
-        beer => beer.brew_name && beer.brew_name.trim() !== ''
-      );
-      setAllBeers(filteredData);
+      setAllBeers(freshBeers);
       setBeerError(null);
     },
     componentName: 'AllBeers',
