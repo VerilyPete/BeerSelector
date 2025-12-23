@@ -283,6 +283,45 @@ describe('BeerRepository', () => {
       );
     });
 
+    it('should not return beers with null or empty brew_name (SQL filtering verification)', async () => {
+      // This test verifies that the SQL WHERE clause correctly filters out
+      // beers with empty or null brew_name. Since we're using mocks, we verify
+      // that only valid beers are returned when the SQL filtering is applied.
+      const validBeers: BeerWithContainerType[] = [
+        {
+          id: 'test-valid',
+          brew_name: 'Valid Beer',
+          brewer: 'Test Brewer',
+          brew_style: 'IPA',
+          container_type: 'pint',
+          abv: null,
+          added_date: undefined,
+          brew_container: undefined,
+          brew_description: undefined,
+          brewer_loc: undefined,
+          review_count: undefined,
+          review_rating: undefined,
+          enrichment_confidence: null,
+          enrichment_source: null,
+        },
+      ];
+
+      // Mock returns only valid beers (as the SQL WHERE clause would filter)
+      mockDatabase.getAllAsync.mockResolvedValue(validBeers);
+
+      const beers = await repository.getAll();
+
+      // Verify the SQL query includes the filtering clause
+      expect(mockDatabase.getAllAsync).toHaveBeenCalledWith(
+        'SELECT * FROM allbeers WHERE brew_name IS NOT NULL AND brew_name != "" ORDER BY added_date DESC'
+      );
+
+      // Should only return the valid beer
+      expect(beers.length).toBe(1);
+      expect(beers[0].id).toBe('test-valid');
+      expect(beers.every(b => b.brew_name && b.brew_name.length > 0)).toBe(true);
+    });
+
     it('should throw error on database failure', async () => {
       mockDatabase.getAllAsync.mockRejectedValueOnce(new Error('Database error'));
 
