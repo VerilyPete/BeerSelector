@@ -83,7 +83,7 @@ describe('Database Schema', () => {
         expect.stringContaining('CREATE TABLE IF NOT EXISTS preferences')
       );
       expect(mockExecAsync).toHaveBeenCalledWith(
-        expect.stringContaining('CREATE TABLE IF NOT EXISTS untappd')
+        expect.stringContaining('CREATE TABLE IF NOT EXISTS operation_queue')
       );
     });
 
@@ -166,19 +166,21 @@ describe('Database Schema', () => {
       expect(sql).toContain('description TEXT');
     });
 
-    it('should create untappd table with correct columns', async () => {
+    it('should create operation_queue table with correct columns', async () => {
       await setupDatabase();
 
-      const untappdCall = (mockExecAsync as jest.Mock).mock.calls.find(call =>
-        call[0].includes('CREATE TABLE IF NOT EXISTS untappd')
+      const operationQueueCall = (mockExecAsync as jest.Mock).mock.calls.find(call =>
+        call[0].includes('CREATE TABLE IF NOT EXISTS operation_queue')
       );
 
-      expect(untappdCall).toBeDefined();
-      const sql = untappdCall[0];
+      expect(operationQueueCall).toBeDefined();
+      const sql = operationQueueCall[0];
 
-      expect(sql).toContain('key TEXT PRIMARY KEY');
-      expect(sql).toContain('value TEXT');
-      expect(sql).toContain('description TEXT');
+      expect(sql).toContain('id TEXT PRIMARY KEY');
+      expect(sql).toContain('type TEXT');
+      expect(sql).toContain('payload TEXT');
+      expect(sql).toContain('timestamp INTEGER');
+      expect(sql).toContain('status TEXT');
     });
 
     it('should initialize default preferences if table is empty', async () => {
@@ -276,16 +278,16 @@ describe('Database Schema', () => {
   });
 
   describe('Table Schema Verification', () => {
-    it('should have 7 tables total', async () => {
+    it('should have 6 tables total', async () => {
       await setupDatabase();
 
       // Count the number of CREATE TABLE calls
-      // Tables: allbeers, tasted_brew_current_round, rewards, preferences, untappd, operation_queue, schema_version
+      // Tables: allbeers, tasted_brew_current_round, rewards, preferences, operation_queue, schema_version
       const createTableCalls = (mockExecAsync as jest.Mock).mock.calls.filter(call =>
         call[0].includes('CREATE TABLE IF NOT EXISTS')
       );
 
-      expect(createTableCalls.length).toBe(7);
+      expect(createTableCalls.length).toBe(6);
     });
 
     it('should use TEXT type for all columns', async () => {
