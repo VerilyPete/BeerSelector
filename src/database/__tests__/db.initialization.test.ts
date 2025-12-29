@@ -6,11 +6,13 @@
  * - API configuration: behavior when API URLs not configured
  * - Visitor mode: skipping authenticated-only imports
  * - Error handling: graceful degradation on failures
- * - Background timing: correct delays for My Beers and Rewards
+ * - Import sequencing: correct order of operations
+ *
+ * Note: The new implementation uses immediate (blocking) fetches for all data,
+ * with only enrichment running in the background (fire-and-forget).
  */
 
 import { initializeBeerDatabase } from '../db';
-import { setupDatabase } from '../db';
 import { areApiUrlsConfigured, getPreference } from '../preferences';
 import { fetchBeersFromAPI, fetchMyBeersFromAPI, fetchRewardsFromAPI } from '../../api/beerApi';
 import { beerRepository } from '../repositories/BeerRepository';
@@ -57,12 +59,14 @@ jest.mock('../initializationState', () => ({
 jest.mock('../repositories/BeerRepository', () => ({
   beerRepository: {
     insertMany: jest.fn().mockResolvedValue(undefined),
+    updateEnrichmentData: jest.fn().mockResolvedValue(0),
   },
 }));
 
 jest.mock('../repositories/MyBeersRepository', () => ({
   myBeersRepository: {
     insertMany: jest.fn().mockResolvedValue(undefined),
+    updateEnrichmentData: jest.fn().mockResolvedValue(0),
   },
 }));
 
@@ -76,6 +80,21 @@ jest.mock('../../api/beerApi', () => ({
   fetchBeersFromAPI: jest.fn(),
   fetchMyBeersFromAPI: jest.fn(),
   fetchRewardsFromAPI: jest.fn(),
+}));
+
+// Mock enrichment service - enrichment runs in background (fire-and-forget)
+jest.mock('../../services/enrichmentService', () => ({
+  fetchEnrichmentBatchWithMissing: jest.fn().mockResolvedValue({ enrichments: {}, missing: [] }),
+  syncBeersToWorker: jest.fn().mockResolvedValue({ synced: 0, failed: 0 }),
+}));
+
+// Mock config
+jest.mock('../../config', () => ({
+  config: {
+    enrichment: {
+      isConfigured: jest.fn().mockReturnValue(false), // Disable enrichment by default in tests
+    },
+  },
 }));
 
 // Mock console methods to reduce test noise
@@ -126,7 +145,6 @@ describe('initializeBeerDatabase', () => {
   beforeEach(() => {
     // Clear all mocks before each test
     jest.clearAllMocks();
-    jest.useRealTimers();
 
     // Default mock implementations
     (areApiUrlsConfigured as jest.Mock).mockResolvedValue(true);
@@ -134,10 +152,6 @@ describe('initializeBeerDatabase', () => {
     (fetchBeersFromAPI as jest.Mock).mockResolvedValue(mockBeers);
     (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(mockMyBeers);
     (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(mockRewards);
-  });
-
-  afterEach(() => {
-    jest.useRealTimers();
   });
 
   afterAll(() => {
@@ -151,30 +165,25 @@ describe('initializeBeerDatabase', () => {
 
   describe('Happy Path', () => {
     test('should complete initialization successfully when API URLs configured and not visitor mode', async () => {
-      jest.useFakeTimers();
-
       await initializeBeerDatabase();
 
-      // Verify all beers fetched and populated (synchronous)
+      // Verify all beers fetched and populated
       expect(fetchBeersFromAPI).toHaveBeenCalled();
       expect(beerRepository.insertMany).toHaveBeenCalledWith(mockBeers);
 
-      // Advance timers to trigger background imports
-      await jest.advanceTimersByTimeAsync(100);
+      // Verify My Beers fetched and populated (immediate, not scheduled)
       expect(fetchMyBeersFromAPI).toHaveBeenCalled();
       expect(myBeersRepository.insertMany).toHaveBeenCalledWith(mockMyBeers);
 
-      await jest.advanceTimersByTimeAsync(100);
+      // Verify Rewards fetched and populated (immediate, not scheduled)
       expect(fetchRewardsFromAPI).toHaveBeenCalled();
       expect(rewardsRepository.insertMany).toHaveBeenCalledWith(mockRewards);
-
-      jest.useRealTimers();
     });
 
     test('should fetch and populate all beers synchronously', async () => {
       await initializeBeerDatabase();
 
-      // Verify that all beers fetch is not in a setTimeout (blocks)
+      // Verify that all beers fetch is blocking
       expect(fetchBeersFromAPI).toHaveBeenCalled();
       expect(beerRepository.insertMany).toHaveBeenCalledWith(mockBeers);
 
@@ -216,7 +225,6 @@ describe('initializeBeerDatabase', () => {
 
   describe('Visitor Mode', () => {
     test('should skip My Beers import when in visitor mode', async () => {
-      jest.useFakeTimers();
       (getPreference as jest.Mock).mockResolvedValue('true'); // Visitor mode
 
       await initializeBeerDatabase();
@@ -225,34 +233,27 @@ describe('initializeBeerDatabase', () => {
       expect(fetchBeersFromAPI).toHaveBeenCalled();
       expect(beerRepository.insertMany).toHaveBeenCalledWith(mockBeers);
 
-      // Advance timers - My Beers should NOT be called
-      await jest.advanceTimersByTimeAsync(100);
+      // My Beers should NOT be called in visitor mode
       expect(fetchMyBeersFromAPI).not.toHaveBeenCalled();
       expect(myBeersRepository.insertMany).not.toHaveBeenCalled();
 
       expect(consoleLogSpy).toHaveBeenCalledWith(
-        'In visitor mode - skipping scheduled My Beers import'
+        '[db] Visitor mode - skipping My Beers and Rewards import'
       );
-
-      jest.useRealTimers();
     });
 
     test('should skip Rewards import when in visitor mode', async () => {
-      jest.useFakeTimers();
       (getPreference as jest.Mock).mockResolvedValue('true'); // Visitor mode
 
       await initializeBeerDatabase();
 
-      // Advance timers - Rewards should NOT be called
-      await jest.advanceTimersByTimeAsync(200);
+      // Rewards should NOT be called in visitor mode
       expect(fetchRewardsFromAPI).not.toHaveBeenCalled();
       expect(rewardsRepository.insertMany).not.toHaveBeenCalled();
 
       expect(consoleLogSpy).toHaveBeenCalledWith(
-        'In visitor mode - skipping scheduled Rewards import'
+        '[db] Visitor mode - skipping My Beers and Rewards import'
       );
-
-      jest.useRealTimers();
     });
 
     test('should still fetch all beers in visitor mode', async () => {
@@ -281,11 +282,13 @@ describe('initializeBeerDatabase', () => {
       await expect(initializeBeerDatabase()).rejects.toThrow('Database setup failed');
 
       // Verify error is logged
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Error initializing beer database:', mockError);
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        '[db] Error initializing beer database:',
+        mockError
+      );
     });
 
-    test('should continue when My Beers background import fails', async () => {
-      jest.useFakeTimers();
+    test('should continue when My Beers import fails', async () => {
       const mockError = new Error('My Beers API error');
       (fetchMyBeersFromAPI as jest.Mock).mockRejectedValue(mockError);
 
@@ -295,23 +298,21 @@ describe('initializeBeerDatabase', () => {
       expect(fetchBeersFromAPI).toHaveBeenCalled();
       expect(beerRepository.insertMany).toHaveBeenCalledWith(mockBeers);
 
-      // Advance timers to trigger My Beers import
-      await jest.advanceTimersByTimeAsync(100);
-
       // Verify error logged but doesn't crash
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'Error in scheduled My Beers import:',
+        '[db] Error fetching and populating my beers:',
         mockError
       );
 
       // My Beers repository should not have been called
       expect(myBeersRepository.insertMany).not.toHaveBeenCalled();
 
-      jest.useRealTimers();
+      // Rewards should still be fetched
+      expect(fetchRewardsFromAPI).toHaveBeenCalled();
+      expect(rewardsRepository.insertMany).toHaveBeenCalledWith(mockRewards);
     });
 
-    test('should continue when Rewards background import fails', async () => {
-      jest.useFakeTimers();
+    test('should continue when Rewards import fails', async () => {
       const mockError = new Error('Rewards API error');
       (fetchRewardsFromAPI as jest.Mock).mockRejectedValue(mockError);
 
@@ -321,16 +322,17 @@ describe('initializeBeerDatabase', () => {
       expect(fetchBeersFromAPI).toHaveBeenCalled();
       expect(beerRepository.insertMany).toHaveBeenCalledWith(mockBeers);
 
-      // Advance timers to trigger Rewards import
-      await jest.advanceTimersByTimeAsync(200);
-
       // Verify error logged but doesn't crash
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Error in scheduled Rewards import:', mockError);
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        '[db] Error fetching and populating rewards:',
+        mockError
+      );
 
       // Rewards repository should not have been called
       expect(rewardsRepository.insertMany).not.toHaveBeenCalled();
 
-      jest.useRealTimers();
+      // Function should complete successfully
+      expect(consoleLogSpy).toHaveBeenCalledWith('[db] Beer database initialization completed');
     });
 
     test('should log error but continue when all beers fetch fails', async () => {
@@ -342,108 +344,46 @@ describe('initializeBeerDatabase', () => {
 
       // Verify error logged
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'Error fetching and populating all beers:',
+        '[db] Error fetching and populating all beers:',
         mockError
       );
 
       // Verify function completes (doesn't crash app)
-      expect(consoleLogSpy).toHaveBeenCalledWith('Beer database initialization completed');
+      expect(consoleLogSpy).toHaveBeenCalledWith('[db] Beer database initialization completed');
     });
 
     test('should handle multiple simultaneous failures gracefully', async () => {
-      jest.useFakeTimers();
       (fetchBeersFromAPI as jest.Mock).mockRejectedValue(new Error('All beers error'));
       (fetchMyBeersFromAPI as jest.Mock).mockRejectedValue(new Error('My beers error'));
       (fetchRewardsFromAPI as jest.Mock).mockRejectedValue(new Error('Rewards error'));
 
       await initializeBeerDatabase();
 
-      // Advance timers to trigger all background imports
-      await jest.advanceTimersByTimeAsync(300);
-
       // All errors should be logged
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'Error fetching and populating all beers:',
+        '[db] Error fetching and populating all beers:',
         expect.any(Error)
       );
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'Error in scheduled My Beers import:',
+        '[db] Error fetching and populating my beers:',
         expect.any(Error)
       );
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'Error in scheduled Rewards import:',
+        '[db] Error fetching and populating rewards:',
         expect.any(Error)
       );
 
       // Function should complete successfully
-      expect(consoleLogSpy).toHaveBeenCalledWith('Beer database initialization completed');
-
-      jest.useRealTimers();
+      expect(consoleLogSpy).toHaveBeenCalledWith('[db] Beer database initialization completed');
     });
   });
 
   // ============================================================================
-  // BACKGROUND IMPORT TIMING TESTS
+  // IMPORT SEQUENCING TESTS
   // ============================================================================
 
-  describe('Background Import Timing', () => {
-    test('should schedule My Beers import with 100ms delay', async () => {
-      jest.useFakeTimers();
-
-      await initializeBeerDatabase();
-
-      // Advance timers by 50ms - verify My Beers NOT called yet
-      await jest.advanceTimersByTimeAsync(50);
-      expect(fetchMyBeersFromAPI).not.toHaveBeenCalled();
-      expect(myBeersRepository.insertMany).not.toHaveBeenCalled();
-
-      // Advance timers to 100ms - verify My Beers IS called
-      await jest.advanceTimersByTimeAsync(50);
-      expect(fetchMyBeersFromAPI).toHaveBeenCalled();
-      expect(myBeersRepository.insertMany).toHaveBeenCalledWith(mockMyBeers);
-
-      jest.useRealTimers();
-    });
-
-    test('should schedule Rewards import with 200ms delay', async () => {
-      jest.useFakeTimers();
-
-      await initializeBeerDatabase();
-
-      // Advance timers by 150ms - verify Rewards NOT called yet
-      await jest.advanceTimersByTimeAsync(150);
-      expect(fetchRewardsFromAPI).not.toHaveBeenCalled();
-      expect(rewardsRepository.insertMany).not.toHaveBeenCalled();
-
-      // Advance timers to 200ms - verify Rewards IS called
-      await jest.advanceTimersByTimeAsync(50);
-      expect(fetchRewardsFromAPI).toHaveBeenCalled();
-      expect(rewardsRepository.insertMany).toHaveBeenCalledWith(mockRewards);
-
-      jest.useRealTimers();
-    });
-
-    test('should schedule My Beers before Rewards (staggered timing)', async () => {
-      jest.useFakeTimers();
-
-      await initializeBeerDatabase();
-
-      // At 100ms, My Beers should be called but not Rewards
-      await jest.advanceTimersByTimeAsync(100);
-      expect(fetchMyBeersFromAPI).toHaveBeenCalled();
-      expect(fetchRewardsFromAPI).not.toHaveBeenCalled();
-
-      // At 200ms, both should be called
-      await jest.advanceTimersByTimeAsync(100);
-      expect(fetchMyBeersFromAPI).toHaveBeenCalled();
-      expect(fetchRewardsFromAPI).toHaveBeenCalled();
-
-      jest.useRealTimers();
-    });
-
-    test('should execute all beers fetch before any background imports', async () => {
-      jest.useFakeTimers();
-
+  describe('Import Sequencing', () => {
+    test('should execute all beers fetch first', async () => {
       // Track call order
       const callOrder: string[] = [];
       (fetchBeersFromAPI as jest.Mock).mockImplementation(async () => {
@@ -463,15 +403,36 @@ describe('initializeBeerDatabase', () => {
 
       // All beers should be first
       expect(callOrder[0]).toBe('allBeers');
-
-      // Advance timers to trigger background imports
-      await jest.advanceTimersByTimeAsync(100);
+      // My beers second
       expect(callOrder[1]).toBe('myBeers');
-
-      await jest.advanceTimersByTimeAsync(100);
+      // Rewards third
       expect(callOrder[2]).toBe('rewards');
+    });
 
-      jest.useRealTimers();
+    test('should insert all beers before my beers', async () => {
+      const insertOrder: string[] = [];
+      (beerRepository.insertMany as jest.Mock).mockImplementation(async () => {
+        insertOrder.push('allBeers');
+      });
+      (myBeersRepository.insertMany as jest.Mock).mockImplementation(async () => {
+        insertOrder.push('myBeers');
+      });
+      (rewardsRepository.insertMany as jest.Mock).mockImplementation(async () => {
+        insertOrder.push('rewards');
+      });
+
+      await initializeBeerDatabase();
+
+      expect(insertOrder).toEqual(['allBeers', 'myBeers', 'rewards']);
+    });
+
+    test('should complete all inserts synchronously (not scheduled)', async () => {
+      await initializeBeerDatabase();
+
+      // All repositories should have been called immediately
+      expect(beerRepository.insertMany).toHaveBeenCalledTimes(1);
+      expect(myBeersRepository.insertMany).toHaveBeenCalledTimes(1);
+      expect(rewardsRepository.insertMany).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -481,13 +442,7 @@ describe('initializeBeerDatabase', () => {
 
   describe('Integration', () => {
     test('should complete full initialization flow with all components', async () => {
-      jest.useFakeTimers();
-
       await initializeBeerDatabase();
-
-      // Verify database setup was called
-      const { databaseInitializer } = require('../initializationState');
-      // setupDatabase is called, which checks and potentially waits for initialization
 
       // Verify API configuration check
       expect(areApiUrlsConfigured).toHaveBeenCalled();
@@ -499,20 +454,16 @@ describe('initializeBeerDatabase', () => {
       expect(fetchBeersFromAPI).toHaveBeenCalled();
       expect(beerRepository.insertMany).toHaveBeenCalledWith(mockBeers);
 
-      // Verify My Beers background flow
-      await jest.advanceTimersByTimeAsync(100);
+      // Verify My Beers flow (now immediate, not scheduled)
       expect(fetchMyBeersFromAPI).toHaveBeenCalled();
       expect(myBeersRepository.insertMany).toHaveBeenCalledWith(mockMyBeers);
 
-      // Verify Rewards background flow
-      await jest.advanceTimersByTimeAsync(100);
+      // Verify Rewards flow (now immediate, not scheduled)
       expect(fetchRewardsFromAPI).toHaveBeenCalled();
       expect(rewardsRepository.insertMany).toHaveBeenCalledWith(mockRewards);
 
       // Verify completion log
-      expect(consoleLogSpy).toHaveBeenCalledWith('Beer database initialization completed');
-
-      jest.useRealTimers();
+      expect(consoleLogSpy).toHaveBeenCalledWith('[db] Beer database initialization completed');
     });
   });
 });

@@ -12,7 +12,7 @@
 
 import * as SQLite from 'expo-sqlite';
 import { getDatabase } from './connection';
-import { getPreference, areApiUrlsConfigured } from './preferences';
+import { getPreference, setPreference, areApiUrlsConfigured } from './preferences';
 import { setupTables } from './schema';
 import { databaseInitializer } from './initializationState';
 import { fetchBeersFromAPI, fetchMyBeersFromAPI, fetchRewardsFromAPI } from '../api/beerApi';
@@ -20,6 +20,10 @@ import { beerRepository } from './repositories/BeerRepository';
 import { myBeersRepository } from './repositories/MyBeersRepository';
 import { rewardsRepository } from './repositories/RewardsRepository';
 import { calculateContainerTypes } from './utils/glassTypeCalculator';
+import { config } from '../config';
+import { BeerWithContainerType, BeerfinderWithContainerType } from '@/src/types/beer';
+import { EnrichmentUpdate } from '@/src/types/enrichment';
+import { fetchEnrichmentBatchWithMissing, syncBeersToWorker } from '../services/enrichmentService';
 
 // ============================================================================
 // DATABASE INITIALIZATION CONFIGURATION
@@ -33,18 +37,107 @@ import { calculateContainerTypes } from './utils/glassTypeCalculator';
 const DATABASE_INITIALIZATION_TIMEOUT_MS = 30000;
 
 /**
- * Delay before starting background import of user's tasted beers.
- * Set to 100ms to allow the critical all-beers fetch to complete first,
- * ensuring UI is responsive before background operations begin.
+ * Delay before retrying enrichment after a failure.
  */
-const MY_BEERS_IMPORT_DELAY_MS = 100;
+const ENRICHMENT_RETRY_DELAY_MS = 5000;
 
 /**
- * Delay before starting background import of user rewards.
- * Set to 200ms (after My Beers) to stagger background operations
- * and prevent concurrent API calls from overwhelming the server or network.
+ * Maximum number of enrichment fetch attempts.
  */
-const REWARDS_IMPORT_DELAY_MS = 200;
+const ENRICHMENT_MAX_ATTEMPTS = 2;
+
+// ============================================================================
+// BACKGROUND ENRICHMENT
+// ============================================================================
+
+/**
+ * Perform unified background enrichment.
+ * Fire-and-forget with single retry - errors are logged but don't block.
+ *
+ * Note: BeerfinderWithContainerType extends BeerWithContainerType.
+ * We accept the base type for myBeers since we only use id/abv fields.
+ */
+async function enrichBeersInBackground(
+  allBeers: BeerWithContainerType[],
+  myBeers: BeerfinderWithContainerType[]
+): Promise<void> {
+  if (!config.enrichment.isConfigured()) return;
+
+  const allBeersNeedingEnrichment = allBeers.filter(b => !b.abv);
+  const myBeersNeedingEnrichment = myBeers.filter(b => !b.abv);
+  const allBeerIds = new Set(allBeersNeedingEnrichment.map(b => b.id));
+  const myBeerIds = new Set(myBeersNeedingEnrichment.map(b => b.id));
+  const uniqueIds = [...new Set([...allBeerIds, ...myBeerIds])];
+
+  if (uniqueIds.length === 0) {
+    console.log('[db] All beers already have ABV, skipping enrichment');
+    return;
+  }
+
+  console.log(
+    `[db] Fetching enrichment for ${uniqueIds.length} unique beers ` +
+      `(${allBeerIds.size} from All Beers, ${myBeerIds.size} from My Beers, ` +
+      `${allBeerIds.size + myBeerIds.size - uniqueIds.length} overlap)`
+  );
+
+  for (let attempt = 1; attempt <= ENRICHMENT_MAX_ATTEMPTS; attempt++) {
+    try {
+      const { enrichments: enrichmentData, missing: missingIds } =
+        await fetchEnrichmentBatchWithMissing(uniqueIds);
+
+      if (Object.keys(enrichmentData).length > 0) {
+        const allBeersEnrichments: Record<string, EnrichmentUpdate> = {};
+        const myBeersEnrichments: Record<string, EnrichmentUpdate> = {};
+
+        for (const [id, data] of Object.entries(enrichmentData)) {
+          const update: EnrichmentUpdate = {
+            enriched_abv: data.enriched_abv,
+            enrichment_confidence: data.enrichment_confidence,
+            enrichment_source: data.enrichment_source,
+            brew_description: data.brew_description,
+          };
+          if (allBeerIds.has(id)) allBeersEnrichments[id] = update;
+          if (myBeerIds.has(id)) myBeersEnrichments[id] = update;
+        }
+
+        if (Object.keys(allBeersEnrichments).length > 0) {
+          await beerRepository.updateEnrichmentData(allBeersEnrichments);
+        }
+        if (Object.keys(myBeersEnrichments).length > 0) {
+          await myBeersRepository.updateEnrichmentData(myBeersEnrichments);
+        }
+
+        await setPreference('beers_last_enrichment', new Date().toISOString());
+        console.log(`[db] Both tables updated with enriched beer data (attempt ${attempt})`);
+      }
+
+      // Sync missing beers to Worker (fire-and-forget)
+      if (missingIds.length > 0) {
+        const allMissingBeers = [
+          ...allBeersNeedingEnrichment.filter(b => missingIds.includes(b.id)),
+          ...myBeersNeedingEnrichment.filter(b => missingIds.includes(b.id)),
+        ];
+        const uniqueMissingBeers = Array.from(
+          new Map(allMissingBeers.map(b => [b.id, b])).values()
+        );
+        syncBeersToWorker(uniqueMissingBeers).catch(err =>
+          console.error('[db] Failed to sync missing beers:', err)
+        );
+      }
+
+      return; // Success - exit retry loop
+    } catch (error) {
+      console.error(`[db] Background enrichment attempt ${attempt} failed:`, error);
+      if (attempt < ENRICHMENT_MAX_ATTEMPTS) {
+        console.log(`[db] Retrying enrichment in ${ENRICHMENT_RETRY_DELAY_MS / 1000}s...`);
+        await new Promise(resolve => setTimeout(resolve, ENRICHMENT_RETRY_DELAY_MS));
+      }
+    }
+  }
+
+  // All retries exhausted
+  console.error('[db] Background enrichment failed after all retry attempts');
+}
 
 // ============================================================================
 // DATABASE INITIALIZATION
@@ -122,9 +215,10 @@ export const setupDatabase = async (): Promise<void> => {
  * Flow:
  * 1. Setup database schema (tables, indexes)
  * 2. Check if API URLs are configured
- * 3. Fetch and populate all beers (blocking - needed immediately)
- * 4. Schedule My Beers import (non-blocking, skipped in visitor mode)
- * 5. Schedule Rewards import (non-blocking, skipped in visitor mode)
+ * 3. Fetch and insert All Beers immediately (blocking - needed for UI)
+ * 4. Fetch and insert My Beers immediately (blocking, members only)
+ * 5. Fetch and insert Rewards immediately (blocking, members only)
+ * 6. Trigger unified background enrichment (fire-and-forget)
  */
 export const initializeBeerDatabase = async (): Promise<void> => {
   console.log('Initializing beer database...');
@@ -143,48 +237,52 @@ export const initializeBeerDatabase = async (): Promise<void> => {
     // Check for visitor mode to handle differently
     const isVisitorMode = (await getPreference('is_visitor_mode')) === 'true';
 
-    // Schedule My Beers import in background (non-blocking)
-    if (!isVisitorMode) {
-      setTimeout(async () => {
-        try {
-          const myBeers = await fetchMyBeersFromAPI();
-          const myBeersWithContainerTypes = calculateContainerTypes(myBeers);
-          await myBeersRepository.insertMany(myBeersWithContainerTypes);
-        } catch (error) {
-          console.error('Error in scheduled My Beers import:', error);
-        }
-      }, MY_BEERS_IMPORT_DELAY_MS);
-    } else {
-      console.log('In visitor mode - skipping scheduled My Beers import');
-    }
+    // Track data for unified enrichment
+    let allBeersData: BeerWithContainerType[] = [];
+    let myBeersData: BeerfinderWithContainerType[] = [];
 
-    // Schedule rewards import (non-blocking)
-    if (!isVisitorMode) {
-      setTimeout(async () => {
-        try {
-          const rewards = await fetchRewardsFromAPI();
-          await rewardsRepository.insertMany(rewards);
-        } catch (error) {
-          console.error('Error in scheduled Rewards import:', error);
-        }
-      }, REWARDS_IMPORT_DELAY_MS);
-    } else {
-      console.log('In visitor mode - skipping scheduled Rewards import');
-    }
-
-    // Fetch all beers (blocking - we need this immediately for the UI)
+    // 1. Fetch and Insert All Beers Immediately (blocking - needed for UI)
     try {
       const beers = await fetchBeersFromAPI();
-      // Calculate container types before insertion
-      const beersWithContainerTypes = calculateContainerTypes(beers);
-      await beerRepository.insertMany(beersWithContainerTypes);
+      allBeersData = calculateContainerTypes(beers);
+      await beerRepository.insertMany(allBeersData);
+      console.log('[db] All beers inserted');
     } catch (error) {
-      console.error('Error fetching and populating all beers:', error);
+      console.error('[db] Error fetching and populating all beers:', error);
     }
 
-    console.log('Beer database initialization completed');
+    // 2. Fetch and Insert My Beers/Rewards Immediately (for members only)
+    if (!isVisitorMode) {
+      try {
+        const myBeers = await fetchMyBeersFromAPI();
+        myBeersData = calculateContainerTypes(myBeers) as BeerfinderWithContainerType[];
+        await myBeersRepository.insertMany(myBeersData);
+        console.log('[db] My beers inserted');
+      } catch (error) {
+        console.error('[db] Error fetching and populating my beers:', error);
+      }
+
+      // Fetch and insert Rewards
+      try {
+        const rewards = await fetchRewardsFromAPI();
+        await rewardsRepository.insertMany(rewards);
+        console.log('[db] Rewards inserted');
+      } catch (error) {
+        console.error('[db] Error fetching and populating rewards:', error);
+      }
+    } else {
+      console.log('[db] Visitor mode - skipping My Beers and Rewards import');
+    }
+
+    // 3. Trigger Unified Background Enrichment (fire-and-forget)
+    // Note: For visitors, myBeersData will be empty, which is fine
+    enrichBeersInBackground(allBeersData, myBeersData).catch(err =>
+      console.error('[db] Unhandled error in background enrichment:', err)
+    );
+
+    console.log('[db] Beer database initialization completed');
   } catch (error) {
-    console.error('Error initializing beer database:', error);
+    console.error('[db] Error initializing beer database:', error);
     throw error;
   }
 };
