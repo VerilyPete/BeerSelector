@@ -64,7 +64,7 @@ export interface EnrichmentConfig {
   rateLimitWindow: number;
   rateLimitMaxRequests: number;
   isConfigured: () => boolean;
-  getFullUrl: (endpoint: 'beers' | 'batch' | 'sync' | 'health' | 'cache') => string;
+  getFullUrl: (endpoint: 'beers' | 'batch' | 'sync' | 'health') => string;
 }
 
 /**
@@ -292,7 +292,6 @@ const ENRICHMENT_ENDPOINTS = {
   batch: '/beers/batch', // POST /beers/batch
   sync: '/beers/sync', // POST /beers/sync - sync missing beers to Worker
   health: '/health', // GET /health
-  cache: '/cache', // DELETE /cache?sid={storeId}
 } as const;
 
 type EnrichmentEndpoint = keyof typeof ENRICHMENT_ENDPOINTS;

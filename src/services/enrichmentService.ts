@@ -950,12 +950,12 @@ function sleep(ms: number): Promise<void> {
 }
 
 /**
- * Poll for enrichment updates with exponential backoff.
+ * Poll for enrichment updates with linear backoff with cap.
  *
  * After syncing beers to the Worker, this function polls the batch endpoint
  * to check when enrichment data becomes available (ABV lookup, description cleanup).
  *
- * Uses exponential backoff: 5s, 10s, 15s, 20s (max), repeating for up to 2 minutes.
+ * Uses linear backoff with cap: 5s, 10s, 15s, 20s (max), repeating for up to 2 minutes.
  *
  * @param pendingIds - Beer IDs to poll for
  * @param maxDurationMs - Maximum polling duration (default: 120000ms = 2 minutes)
@@ -985,7 +985,7 @@ export async function pollForEnrichmentUpdates(
   const results: Record<string, EnrichmentData> = {};
   const remainingIds = new Set(pendingIds);
 
-  // Exponential backoff: 5s, 10s, 15s, 20s, 20s, 20s...
+  // Linear backoff with cap: 5s, 10s, 15s, 20s, 20s, 20s...
   const baseDelay = 5000;
   const maxDelay = 20000;
   let attempt = 0;
@@ -993,7 +993,7 @@ export async function pollForEnrichmentUpdates(
   console.log(`[EnrichmentService] Starting polling for ${pendingIds.length} pending beers`);
 
   while (remainingIds.size > 0 && Date.now() - startTime < maxDurationMs) {
-    // Calculate delay with exponential backoff
+    // Calculate delay with linear backoff (capped at maxDelay)
     const delay = Math.min(baseDelay * (attempt + 1), maxDelay);
     await sleep(delay);
     attempt++;
@@ -1049,7 +1049,7 @@ export async function pollForEnrichmentUpdates(
 /**
  * Internal batch fetch function that bypasses rate limit checks.
  * Used by polling to avoid rate limit overhead since polling already
- * has exponential backoff built in.
+ * has linear backoff with cap built in.
  *
  * @param beerIds - Array of beer IDs to look up
  * @returns Map of beer ID to enrichment data
@@ -1229,63 +1229,5 @@ export async function getEnrichmentHealthDetails(): Promise<HealthResponse | nul
   } catch {
     clearTimeout(timeoutId);
     return null;
-  }
-}
-
-/**
- * Bust the cache for a specific store's taplist.
- *
- * Call this before refreshing to ensure fresh data from Flying Saucer.
- * Useful when user wants to see newly tapped beers immediately after
- * a known taplist update.
- *
- * @param storeId - Flying Saucer store ID (e.g., '13879' for Sugar Land)
- * @returns true if cache was cleared, false otherwise
- *
- * @example
- * ```typescript
- * // Before manual refresh, bust the cache to ensure fresh data
- * await bustTaplistCache('13879');
- * const beers = await fetchBeersFromProxy('13879');
- * ```
- */
-export async function bustTaplistCache(storeId: string): Promise<boolean> {
-  const { enrichment } = config;
-
-  if (!enrichment.isConfigured()) {
-    return false;
-  }
-
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 5000);
-
-  try {
-    const clientId = await getClientId();
-    const response = await fetch(`${enrichment.getFullUrl('cache')}?sid=${storeId}`, {
-      method: 'DELETE',
-      headers: {
-        'X-API-Key': enrichment.apiKey!,
-        'X-Client-ID': clientId,
-      },
-      signal: controller.signal,
-    });
-
-    clearTimeout(timeoutId);
-
-    if (response.ok) {
-      const data = (await response.json()) as { cacheCleared: boolean };
-      console.debug(`[EnrichmentService] Cache bust for store ${storeId}: ${data.cacheCleared}`);
-      return data.cacheCleared;
-    }
-
-    return false;
-  } catch (error) {
-    clearTimeout(timeoutId);
-    logWarning('Failed to bust cache', {
-      operation: 'bustTaplistCache',
-      component: 'enrichmentService',
-      additionalData: { storeId, error: String(error) },
-    });
-    return false;
   }
 }

@@ -16,12 +16,15 @@ import {
   mergeEnrichmentData,
   checkEnrichmentHealth,
   getEnrichmentHealthDetails,
-  bustTaplistCache,
   __resetRateLimitStateForTests,
   fetchBeersFromProxy,
   fetchEnrichmentBatch,
+  fetchEnrichmentBatchWithMissing,
+  syncBeersToWorker,
+  pollForEnrichmentUpdates,
   getClientId,
   EnrichmentData,
+  EnrichmentBatchResult,
 } from '../enrichmentService';
 import { BeerWithContainerType, BeerfinderWithContainerType } from '@/src/types/beer';
 
@@ -933,75 +936,516 @@ describe('enrichmentService', () => {
     });
   });
 
-  describe('Cache Functions', () => {
-    describe('bustTaplistCache', () => {
-      // Note: Need to mock getClientId as well
-      const mockGetPreference = require('@/src/database/preferences').getPreference;
+  describe('syncBeersToWorker', () => {
+    const mockGetPreference = require('@/src/database/preferences').getPreference;
 
-      beforeEach(() => {
-        // Setup mock for client ID
-        mockGetPreference.mockResolvedValue('test-client-id');
+    beforeEach(() => {
+      resetEnrichmentMetrics();
+      __resetRateLimitStateForTests();
+      mockGetPreference.mockResolvedValue('test-client-id');
+    });
+
+    it('should return null when not configured', async () => {
+      const { config } = require('@/src/config');
+      config.enrichment.isConfigured.mockReturnValueOnce(false);
+
+      const result = await syncBeersToWorker([{ id: '123', brew_name: 'Test Beer' }]);
+
+      expect(result).toBeNull();
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it('should return null for empty beers array', async () => {
+      const result = await syncBeersToWorker([]);
+
+      expect(result).toBeNull();
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it('should sync beers successfully', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          synced: 2,
+          queued_for_cleanup: 1,
+          requestId: 'req-123',
+        }),
       });
 
-      it('should return true when cache is successfully cleared', async () => {
-        mockFetch.mockResolvedValueOnce({
+      const beers = [
+        { id: '123', brew_name: 'Test IPA', brewer: 'Test Brewery', brew_description: 'Hoppy' },
+        { id: '456', brew_name: 'Test Stout', brewer: 'Other Brewery' },
+      ];
+
+      const result = await syncBeersToWorker(beers);
+
+      expect(result).not.toBeNull();
+      expect(result!.synced).toBe(2);
+      expect(result!.queued_for_cleanup).toBe(1);
+      expect(result!.requestId).toBe('req-123');
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://test-api.example.com/sync',
+        expect.objectContaining({
+          method: 'POST',
+          headers: expect.objectContaining({
+            'Content-Type': 'application/json',
+            'X-API-Key': 'test-api-key',
+          }),
+        })
+      );
+    });
+
+    it('should chunk large arrays (max 50 per request)', async () => {
+      // Create 75 beers to test chunking (50 + 25)
+      const beers = Array.from({ length: 75 }, (_, i) => ({
+        id: `beer-${i}`,
+        brew_name: `Test Beer ${i}`,
+      }));
+
+      mockFetch
+        .mockResolvedValueOnce({
           ok: true,
-          json: async () => ({ cacheCleared: true }),
+          status: 200,
+          json: async () => ({
+            synced: 50,
+            queued_for_cleanup: 10,
+            requestId: 'req-1',
+          }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            synced: 25,
+            queued_for_cleanup: 5,
+            requestId: 'req-2',
+          }),
         });
 
-        const result = await bustTaplistCache('13879');
+      const result = await syncBeersToWorker(beers);
 
-        expect(result).toBe(true);
-        expect(mockFetch).toHaveBeenCalledWith(
-          'https://test-api.example.com/cache?sid=13879',
-          expect.objectContaining({
-            method: 'DELETE',
-            headers: expect.objectContaining({
-              'X-API-Key': 'test-api-key',
-            }),
-          })
-        );
-      });
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      expect(result).not.toBeNull();
+      expect(result!.synced).toBe(75); // 50 + 25
+      expect(result!.queued_for_cleanup).toBe(15); // 10 + 5
+    });
 
-      it('should return false when cache was not cleared', async () => {
-        mockFetch.mockResolvedValueOnce({
+    it('should handle rate limiting and return partial results', async () => {
+      const beers = Array.from({ length: 75 }, (_, i) => ({
+        id: `beer-${i}`,
+        brew_name: `Test Beer ${i}`,
+      }));
+
+      mockFetch
+        .mockResolvedValueOnce({
           ok: true,
-          json: async () => ({ cacheCleared: false }),
-        });
-
-        const result = await bustTaplistCache('13879');
-
-        expect(result).toBe(false);
-      });
-
-      it('should return false when response is not ok', async () => {
-        mockFetch.mockResolvedValueOnce({
+          status: 200,
+          json: async () => ({
+            synced: 50,
+            queued_for_cleanup: 10,
+            requestId: 'req-1',
+          }),
+        })
+        .mockResolvedValueOnce({
           ok: false,
-          status: 500,
+          status: 429,
+          headers: new Headers({ 'Retry-After': '60' }),
         });
 
-        const result = await bustTaplistCache('13879');
+      const result = await syncBeersToWorker(beers);
 
-        expect(result).toBe(false);
+      expect(result).not.toBeNull();
+      expect(result!.synced).toBe(50); // Only first chunk
+      expect(result!.queued_for_cleanup).toBe(10);
+
+      const metrics = getEnrichmentMetrics();
+      expect(metrics.rateLimitedRequests).toBeGreaterThan(0);
+    });
+
+    it('should handle server errors', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        text: async () => 'Internal Server Error',
       });
 
-      it('should return false when fetch throws', async () => {
-        mockFetch.mockRejectedValueOnce(new Error('Network error'));
+      const beers = [{ id: '123', brew_name: 'Test Beer' }];
+      const result = await syncBeersToWorker(beers);
 
-        const result = await bustTaplistCache('13879');
+      expect(result).not.toBeNull();
+      expect(result!.synced).toBe(0);
+      expect(result!.errors).toBeDefined();
+      expect(result!.errors!.length).toBeGreaterThan(0);
+    });
 
-        expect(result).toBe(false);
+    it('should handle client rate limiting before requests', async () => {
+      // Exhaust rate limit first
+      for (let i = 0; i < 10; i++) {
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ success: true, storeId: '13879', beers: [], total: 0 }),
+          headers: new Headers(),
+        });
+        await fetchBeersFromProxy('13879').catch(() => {});
+      }
+
+      const beers = [{ id: '123', brew_name: 'Test Beer' }];
+      const result = await syncBeersToWorker(beers);
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('fetchEnrichmentBatchWithMissing', () => {
+    const mockGetPreference = require('@/src/database/preferences').getPreference;
+
+    beforeEach(() => {
+      resetEnrichmentMetrics();
+      __resetRateLimitStateForTests();
+      mockGetPreference.mockResolvedValue('test-client-id');
+    });
+
+    it('should return empty when not configured', async () => {
+      const { config } = require('@/src/config');
+      config.enrichment.isConfigured.mockReturnValueOnce(false);
+
+      const result = await fetchEnrichmentBatchWithMissing(['123', '456']);
+
+      expect(result.enrichments).toEqual({});
+      expect(result.missing).toEqual([]);
+    });
+
+    it('should return empty for empty IDs array', async () => {
+      const result = await fetchEnrichmentBatchWithMissing([]);
+
+      expect(result.enrichments).toEqual({});
+      expect(result.missing).toEqual([]);
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it('should return enrichments and missing IDs', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          enrichments: {
+            '123': {
+              enriched_abv: 6.5,
+              enrichment_confidence: 0.95,
+              enrichment_source: 'perplexity',
+              brew_description: 'A hoppy IPA',
+              has_cleaned_description: true,
+            },
+          },
+          missing: ['456', '789'],
+          requestId: 'req-123',
+        }),
       });
 
-      it('should return false when enrichment is not configured', async () => {
-        const { config } = require('@/src/config');
-        config.enrichment.isConfigured.mockReturnValueOnce(false);
+      const result = await fetchEnrichmentBatchWithMissing(['123', '456', '789']);
 
-        const result = await bustTaplistCache('13879');
+      expect(result.enrichments['123']).toBeDefined();
+      expect(result.enrichments['123'].enriched_abv).toBe(6.5);
+      expect(result.missing).toEqual(['456', '789']);
+    });
 
-        expect(result).toBe(false);
-        expect(mockFetch).not.toHaveBeenCalled();
+    it('should aggregate missing IDs across chunks', async () => {
+      // Create 150 IDs to test chunking (batchSize is 100)
+      const ids = Array.from({ length: 150 }, (_, i) => `beer-${i}`);
+
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            enrichments: {
+              'beer-0': {
+                enriched_abv: 5.0,
+                enrichment_confidence: 0.9,
+                enrichment_source: 'perplexity',
+                brew_description: null,
+                has_cleaned_description: false,
+              },
+            },
+            missing: ['beer-1', 'beer-2'],
+            requestId: 'req-1',
+          }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            enrichments: {
+              'beer-100': {
+                enriched_abv: 6.0,
+                enrichment_confidence: 0.85,
+                enrichment_source: 'description',
+                brew_description: 'A dark stout',
+                has_cleaned_description: true,
+              },
+            },
+            missing: ['beer-101'],
+            requestId: 'req-2',
+          }),
+        });
+
+      const result = await fetchEnrichmentBatchWithMissing(ids);
+
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      expect(result.enrichments['beer-0']).toBeDefined();
+      expect(result.enrichments['beer-100']).toBeDefined();
+      expect(result.missing).toContain('beer-1');
+      expect(result.missing).toContain('beer-2');
+      expect(result.missing).toContain('beer-101');
+      expect(result.missing).toHaveLength(3);
+    });
+
+    it('should handle rate limiting and return partial results', async () => {
+      const ids = Array.from({ length: 150 }, (_, i) => `beer-${i}`);
+
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            enrichments: {
+              'beer-0': {
+                enriched_abv: 5.0,
+                enrichment_confidence: 0.9,
+                enrichment_source: 'perplexity',
+                brew_description: null,
+                has_cleaned_description: false,
+              },
+            },
+            missing: ['beer-1'],
+            requestId: 'req-1',
+          }),
+        })
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 429,
+          headers: new Headers({ 'Retry-After': '60' }),
+        });
+
+      const result = await fetchEnrichmentBatchWithMissing(ids);
+
+      // Should return partial results from first chunk
+      expect(result.enrichments['beer-0']).toBeDefined();
+      expect(result.missing).toContain('beer-1');
+    });
+  });
+
+  describe('pollForEnrichmentUpdates', () => {
+    const mockGetPreference = require('@/src/database/preferences').getPreference;
+
+    beforeEach(() => {
+      jest.useFakeTimers();
+      resetEnrichmentMetrics();
+      __resetRateLimitStateForTests();
+      mockGetPreference.mockResolvedValue('test-client-id');
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('should return empty when not configured', async () => {
+      const { config } = require('@/src/config');
+      config.enrichment.isConfigured.mockReturnValueOnce(false);
+
+      const result = await pollForEnrichmentUpdates(['123', '456']);
+
+      expect(result).toEqual({});
+    });
+
+    it('should return empty for empty IDs array', async () => {
+      const result = await pollForEnrichmentUpdates([]);
+
+      expect(result).toEqual({});
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it('should poll with linear backoff with cap (5s, 10s, 15s, 20s max)', async () => {
+      // Mock responses: first returns nothing, then enriched data
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            enrichments: {},
+            requestId: 'req-1',
+          }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            enrichments: {
+              '123': {
+                enriched_abv: 6.5,
+                enrichment_confidence: 0.95,
+                enrichment_source: 'perplexity',
+                brew_description: 'Enriched description',
+                has_cleaned_description: true,
+              },
+            },
+            requestId: 'req-2',
+          }),
+        });
+
+      const pollPromise = pollForEnrichmentUpdates(['123']);
+
+      // First poll after 5s
+      await jest.advanceTimersByTimeAsync(5000);
+      // Second poll after 10s (5 + 10 = 15s total, but capped calculation)
+      await jest.advanceTimersByTimeAsync(10000);
+
+      const result = await pollPromise;
+
+      expect(result['123']).toBeDefined();
+      expect(result['123'].enriched_abv).toBe(6.5);
+    });
+
+    it('should stop polling when all IDs enriched', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          enrichments: {
+            '123': {
+              enriched_abv: 6.5,
+              enrichment_confidence: 0.95,
+              enrichment_source: 'perplexity',
+              brew_description: 'Done',
+              has_cleaned_description: true,
+            },
+            '456': {
+              enriched_abv: 5.0,
+              enrichment_confidence: 0.9,
+              enrichment_source: 'manual',
+              brew_description: 'Also done',
+              has_cleaned_description: true,
+            },
+          },
+          requestId: 'req-1',
+        }),
       });
+
+      const pollPromise = pollForEnrichmentUpdates(['123', '456']);
+
+      // First poll after 5s
+      await jest.advanceTimersByTimeAsync(5000);
+
+      const result = await pollPromise;
+
+      expect(Object.keys(result)).toHaveLength(2);
+      expect(result['123']).toBeDefined();
+      expect(result['456']).toBeDefined();
+      // Should only have made one request since all were enriched
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('should stop polling after max duration', async () => {
+      // Always return empty enrichments
+      mockFetch.mockImplementation(() =>
+        Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            enrichments: {},
+            requestId: 'req-poll',
+          }),
+        })
+      );
+
+      // Use a short max duration for testing (10 seconds)
+      const pollPromise = pollForEnrichmentUpdates(['123'], 10000);
+
+      // Advance past max duration
+      await jest.advanceTimersByTimeAsync(15000);
+
+      const result = await pollPromise;
+
+      expect(result).toEqual({});
+      // Should have stopped polling after max duration
+    });
+
+    it('should continue polling despite individual poll failures', async () => {
+      mockFetch.mockRejectedValueOnce(new Error('Network error')).mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          enrichments: {
+            '123': {
+              enriched_abv: 6.5,
+              enrichment_confidence: 0.95,
+              enrichment_source: 'perplexity',
+              brew_description: 'Finally got it',
+              has_cleaned_description: true,
+            },
+          },
+          requestId: 'req-2',
+        }),
+      });
+
+      const pollPromise = pollForEnrichmentUpdates(['123']);
+
+      // First poll fails after 5s
+      await jest.advanceTimersByTimeAsync(5000);
+      // Second poll succeeds after 10s
+      await jest.advanceTimersByTimeAsync(10000);
+
+      const result = await pollPromise;
+
+      expect(result['123']).toBeDefined();
+      expect(result['123'].enriched_abv).toBe(6.5);
+    });
+
+    it('should use 20s max delay (cap) after 4 attempts', async () => {
+      // Return empty enrichments for multiple polls
+      let pollCount = 0;
+      mockFetch.mockImplementation(() => {
+        pollCount++;
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            enrichments:
+              pollCount >= 5
+                ? {
+                    '123': {
+                      enriched_abv: 6.5,
+                      enrichment_confidence: 0.95,
+                      enrichment_source: 'perplexity',
+                      brew_description: 'Finally',
+                      has_cleaned_description: true,
+                    },
+                  }
+                : {},
+            requestId: `req-${pollCount}`,
+          }),
+        });
+      });
+
+      const pollPromise = pollForEnrichmentUpdates(['123'], 120000);
+
+      // Poll 1 at 5s
+      await jest.advanceTimersByTimeAsync(5000);
+      // Poll 2 at 10s
+      await jest.advanceTimersByTimeAsync(10000);
+      // Poll 3 at 15s
+      await jest.advanceTimersByTimeAsync(15000);
+      // Poll 4 at 20s (max cap reached)
+      await jest.advanceTimersByTimeAsync(20000);
+      // Poll 5 at 20s (still capped at 20s)
+      await jest.advanceTimersByTimeAsync(20000);
+
+      const result = await pollPromise;
+
+      expect(result['123']).toBeDefined();
+      expect(pollCount).toBe(5);
     });
   });
 });
