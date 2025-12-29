@@ -20,9 +20,9 @@ import {
   fetchBeersFromProxy,
   fetchEnrichmentBatchWithMissing,
   syncBeersToWorker,
-  bustTaplistCache,
   mergeEnrichmentData,
   recordFallback,
+  pollForEnrichmentUpdates,
   EnrichedBeerResponse,
 } from './enrichmentService';
 
@@ -63,6 +63,23 @@ async function syncMissingBeersInBackground(
         console.log(
           `[${operation}] Synced ${syncResult.synced} beers, ${syncResult.queued_for_cleanup} queued for cleanup`
         );
+
+        // Start polling in background (fire-and-forget)
+        // Results logged but UI updates on next manual refresh
+        pollForEnrichmentUpdates(missingIds)
+          .then(enrichments => {
+            const count = Object.keys(enrichments).length;
+            if (count > 0) {
+              console.log(`[${operation}] Polling completed: ${count} beers enriched`);
+            }
+          })
+          .catch(pollError => {
+            logWarning('Polling for enrichment updates failed', {
+              operation,
+              component: 'dataUpdateService',
+              additionalData: { error: String(pollError) },
+            });
+          });
       }
     })
     .catch(syncError => {
@@ -1030,16 +1047,6 @@ export async function manualRefreshAllData(): Promise<ManualRefreshResult> {
     await setPreference('all_beers_last_check', '');
     await setPreference('my_beers_last_update', '');
     await setPreference('my_beers_last_check', '');
-
-    // Bust the enrichment proxy cache before manual refresh to ensure fresh data
-    if (apiUrl && config.enrichment.isConfigured()) {
-      const storeId = extractStoreIdFromUrl(apiUrl);
-      if (storeId) {
-        console.log(`[manualRefresh] Busting cache for store ${storeId}...`);
-        const cacheBusted = await bustTaplistCache(storeId);
-        console.log(`[manualRefresh] Cache bust result: ${cacheBusted}`);
-      }
-    }
 
     // Delegate to sequential refresh for proper lock coordination (CI-4 fix)
     // This avoids the lock contention that occurred with parallel Promise.allSettled()
