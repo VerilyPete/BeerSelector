@@ -16,6 +16,7 @@ import {
   tastedBrewRowToBeerfinderWithContainerType,
   isCountResult,
 } from '../schemaTypes';
+import { EnrichmentUpdate } from '../../types/enrichment';
 
 /**
  * Repository class for tasted beers (Beerfinder) operations
@@ -41,7 +42,7 @@ export class MyBeersRepository {
     console.log(`DB: Populating My Beers table with ${beers.length} beers`);
 
     // Acquire database lock to prevent concurrent operations
-    if (!(await databaseLockManager.acquireLock('MyBeersRepository.insertMany'))) {
+    if (!(await databaseLockManager.acquireLock('MyBeersRepository'))) {
       throw new Error('Could not acquire database lock for my beers insertion');
     }
 
@@ -169,7 +170,7 @@ export class MyBeersRepository {
       throw error;
     } finally {
       // Always release the lock
-      databaseLockManager.releaseLock('MyBeersRepository.insertMany');
+      databaseLockManager.releaseLock('MyBeersRepository');
     }
   }
 
@@ -438,6 +439,63 @@ export class MyBeersRepository {
     } catch (error) {
       console.error('Error getting tasted beers count:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Update enrichment data for existing tasted beers without deleting/re-inserting.
+   *
+   * This method performs partial updates to only the enrichment-related columns
+   * (abv, enrichment_confidence, enrichment_source, brew_description) without
+   * affecting other beer data or requiring a full table refresh.
+   *
+   * Uses database lock to prevent concurrent operations.
+   *
+   * @param enrichments - Record mapping beer IDs to their enrichment data
+   * @returns Number of beers successfully updated
+   */
+  async updateEnrichmentData(enrichments: Record<string, EnrichmentUpdate>): Promise<number> {
+    const ids = Object.keys(enrichments);
+    if (ids.length === 0) return 0;
+
+    if (!(await databaseLockManager.acquireLock('MyBeersRepository'))) {
+      throw new Error('Could not acquire database lock for enrichment update');
+    }
+
+    try {
+      const database = await getDatabase();
+      let updatedCount = 0;
+
+      await database.withTransactionAsync(async () => {
+        const stmt = await database.prepareAsync(
+          `UPDATE tasted_brew_current_round SET
+            abv = COALESCE(?, abv),
+            enrichment_confidence = ?,
+            enrichment_source = ?,
+            brew_description = COALESCE(?, brew_description)
+           WHERE id = ?`
+        );
+
+        try {
+          for (const [id, data] of Object.entries(enrichments)) {
+            const result = await stmt.executeAsync([
+              data.enriched_abv,
+              data.enrichment_confidence ?? null,
+              data.enrichment_source ?? null,
+              data.brew_description ?? null,
+              id,
+            ]);
+            if (result.changes > 0) updatedCount++;
+          }
+        } finally {
+          await stmt.finalizeAsync();
+        }
+      });
+
+      console.log(`[MyBeersRepository] Updated enrichment for ${updatedCount} beers`);
+      return updatedCount;
+    } finally {
+      databaseLockManager.releaseLock('MyBeersRepository');
     }
   }
 }
