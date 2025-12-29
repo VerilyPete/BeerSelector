@@ -1,15 +1,20 @@
 import { Beer, Beerfinder } from '../database/types';
 import { Reward } from '../types/database';
 import { getPreference } from '../database/preferences';
+import { config } from '../config';
 
 /**
  * Helper function to retry fetch operations with exponential backoff
  * @param url - The URL to fetch
  * @param retries - Number of retry attempts (default: 3)
- * @param delay - Initial delay between retries in ms (default: 1000)
+ * @param delay - Initial delay between retries in ms (default from config)
  * @returns Promise with the JSON response
  */
-export const fetchWithRetry = async (url: string, retries = 3, delay = 1000): Promise<unknown> => {
+export const fetchWithRetry = async (
+  url: string,
+  retries = 3,
+  delay = config.network.retryDelay
+): Promise<unknown> => {
   // Special handling for none:// protocol which is used as a placeholder in visitor mode
   if (url.startsWith('none://')) {
     console.log(
