@@ -6,6 +6,7 @@
  * Unlike unit tests, these make real HTTP calls to validate end-to-end flow.
  */
 
+// Speed up retry tests by setting shorter delay BEFORE config is loaded
 import {
   setupMockServer,
   FlyingSaucerResponses,
@@ -18,6 +19,8 @@ import {
   fetchWithRetry,
 } from '../beerApi';
 import * as preferences from '@/src/database/preferences';
+
+process.env.EXPO_PUBLIC_API_RETRY_DELAY = '100';
 
 // Mock the preferences module
 jest.mock('@/src/database/preferences');
@@ -183,7 +186,7 @@ describe('API Integration with Mock Server', () => {
       mockServer.setResponse('/slow.php', {
         status: 200,
         body: [null, { brewInStock: [] }],
-        delay: 5000, // 5 second delay for slow response
+        delay: 500, // 500ms delay for slow response (reduced from 5s for faster tests)
       });
 
       // Set a short timeout and expect it to eventually complete (or timeout in Jest)
@@ -198,7 +201,7 @@ describe('API Integration with Mock Server', () => {
 
       // Should have taken at least some time (not instant)
       expect(duration).toBeGreaterThan(100);
-    }, 8000);
+    }, 2000);
 
     it('should handle empty response data gracefully', async () => {
       mockGetPreference.mockResolvedValue(`${mockServer.getUrl()}/empty.php`);
