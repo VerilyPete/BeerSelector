@@ -59,7 +59,7 @@ describe('BeerItem', () => {
     expect(getByText(/16oz Can/)).toBeTruthy();
 
     // Should NOT show description in collapsed state
-    expect(queryByText('Description:')).toBeNull();
+    expect(queryByText('Description')).toBeNull();
     expect(queryByText(/delicious test beer/)).toBeNull();
   });
 
@@ -70,7 +70,7 @@ describe('BeerItem', () => {
     );
 
     // Should show description when expanded
-    expect(getByText('Description:')).toBeTruthy();
+    expect(getByText('Description')).toBeTruthy();
     expect(getByText(/delicious test beer/)).toBeTruthy();
   });
 
