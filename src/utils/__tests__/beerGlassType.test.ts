@@ -1,4 +1,4 @@
-import { extractABV, getGlassType } from '../beerGlassType';
+import { extractABV, getGlassType, getContainerType } from '../beerGlassType';
 
 describe('extractABV', () => {
   describe('percentage format patterns', () => {
@@ -119,16 +119,16 @@ describe('getGlassType', () => {
   });
 
   describe('draft beer glass selection', () => {
-    it('should return pint for draft beer < 7.4% ABV', () => {
+    it('should return pint for draft beer < 8% ABV', () => {
       expect(getGlassType('Draft', 'ABV 5.2')).toBe('pint');
       expect(getGlassType('draft', '6.5%')).toBe('pint');
       expect(getGlassType('Draught', 'ABV: 7.3')).toBe('pint');
-      expect(getGlassType('Draft', '7.0%')).toBe('pint');
+      expect(getGlassType('Draft', '7.9%')).toBe('pint');
     });
 
-    it('should return tulip for draft beer >= 7.4% ABV', () => {
-      expect(getGlassType('Draft', 'ABV 7.4')).toBe('tulip');
-      expect(getGlassType('draft', '8.0%')).toBe('tulip');
+    it('should return tulip for draft beer >= 8% ABV', () => {
+      expect(getGlassType('Draft', 'ABV 8.0')).toBe('tulip');
+      expect(getGlassType('draft', '8.5%')).toBe('tulip');
       expect(getGlassType('Draught', 'ABV: 10.5')).toBe('tulip');
       expect(getGlassType('Draft', '18.0%')).toBe('tulip');
       expect(getGlassType('Draft', '25%')).toBe('tulip');
@@ -201,7 +201,7 @@ describe('getGlassType', () => {
     });
 
     it('should handle typical beer description at threshold', () => {
-      const description = '<p>Strong pale ale. ABV 7.4</p>';
+      const description = '<p>Strong pale ale. ABV 8.0</p>';
       expect(getGlassType('Draft', description)).toBe('tulip');
     });
 
@@ -214,6 +214,119 @@ describe('getGlassType', () => {
       expect(getGlassType('DRAFT', 'ABV 5.0')).toBe('pint');
       expect(getGlassType('Draft', 'ABV 5.0')).toBe('pint');
       expect(getGlassType('draft', 'ABV 5.0')).toBe('pint');
+    });
+  });
+});
+
+describe('getContainerType', () => {
+  describe('flight detection', () => {
+    it('returns flight for "Hop Head Flight" with draught container', () => {
+      expect(getContainerType('Draught', undefined, undefined, 'Hop Head Flight')).toBe('flight');
+    });
+
+    it('returns flight for "Build Your Flight" with empty container', () => {
+      expect(getContainerType('', undefined, undefined, 'Build Your Flight')).toBe('flight');
+    });
+
+    it('returns flight when brew_style is "Flight"', () => {
+      expect(getContainerType('Draught', undefined, 'Flight', 'Sour Flight')).toBe('flight');
+    });
+
+    it('returns flight with null/undefined container', () => {
+      expect(getContainerType(undefined, undefined, undefined, 'Texas Flight')).toBe('flight');
+    });
+
+    it('returns flight for draft container with "flight" in name', () => {
+      expect(getContainerType('Draft', undefined, undefined, 'IPA Flight')).toBe('flight');
+    });
+
+    it('returns flight when brew_style is "Flight" (case insensitive)', () => {
+      expect(getContainerType('Draft', undefined, 'flight', 'Some Beer')).toBe('flight');
+      expect(getContainerType('Draft', undefined, 'FLIGHT', 'Some Beer')).toBe('flight');
+    });
+
+    it('returns flight when brew_container is "Flight"', () => {
+      expect(getContainerType('Flight', undefined, 'Flight', 'Fall Favorites Flight SL 2025')).toBe(
+        'flight'
+      );
+    });
+
+    it('does NOT return flight for "Nightflight Stout" (no word boundary)', () => {
+      expect(getContainerType('Draft', '5.2%', undefined, 'Nightflight Stout')).toBe('pint');
+    });
+
+    it('does NOT return flight for "Inflight IPA" (no word boundary)', () => {
+      expect(getContainerType('Draft', '6.5%', undefined, 'Inflight IPA')).toBe('pint');
+    });
+
+    it('returns can for "Flight Pack" in cans (can takes precedence)', () => {
+      expect(getContainerType('Can', undefined, undefined, 'Flight Pack')).toBe('can');
+    });
+
+    it('returns bottle for flight beer in bottle (bottle takes precedence)', () => {
+      expect(getContainerType('Bottle', undefined, undefined, 'Flight of Fancy')).toBe('bottle');
+    });
+  });
+
+  describe('can detection', () => {
+    it('returns can for canned beer', () => {
+      expect(getContainerType('Can', undefined, undefined, 'Test Beer')).toBe('can');
+      expect(getContainerType('can', undefined, undefined, 'Test Beer')).toBe('can');
+      expect(getContainerType('CAN', undefined, undefined, 'Test Beer')).toBe('can');
+    });
+
+    it('returns can for "16oz Can" container', () => {
+      expect(getContainerType('16oz Can', '5.5%', undefined, 'Test Lager')).toBe('can');
+    });
+  });
+
+  describe('bottle detection', () => {
+    it('returns bottle for bottled beer', () => {
+      expect(getContainerType('Bottle', undefined, undefined, 'Test Beer')).toBe('bottle');
+      expect(getContainerType('bottle', undefined, undefined, 'Test Beer')).toBe('bottle');
+      expect(getContainerType('Bottled', undefined, undefined, 'Test Beer')).toBe('bottle');
+    });
+
+    it('returns bottle for "22oz Bottle" container', () => {
+      expect(getContainerType('22oz Bottle', '8.0%', undefined, 'Imperial Stout')).toBe('bottle');
+    });
+  });
+
+  describe('draft glass selection', () => {
+    it('returns pint for draft beer < 8% ABV', () => {
+      expect(getContainerType('Draft', '5.2%', undefined, 'Session IPA')).toBe('pint');
+      expect(getContainerType('Draught', 'ABV 6.5', undefined, 'Pale Ale')).toBe('pint');
+    });
+
+    it('returns tulip for draft beer >= 8% ABV', () => {
+      expect(getContainerType('Draft', '8.0%', undefined, 'Double IPA')).toBe('tulip');
+      expect(getContainerType('Draught', 'ABV 10.5', undefined, 'Imperial Stout')).toBe('tulip');
+    });
+
+    it('returns pint for 16oz draft regardless of ABV', () => {
+      expect(getContainerType('16oz Draft', '10.0%', undefined, 'Strong Ale')).toBe('pint');
+    });
+
+    it('returns tulip for 13oz draft regardless of ABV', () => {
+      expect(getContainerType('13oz Draft', '5.0%', undefined, 'Light Lager')).toBe('tulip');
+    });
+  });
+
+  describe('null/unknown container', () => {
+    it('returns null for unknown container with no flight indicators', () => {
+      expect(getContainerType(undefined, '5.2%', undefined, 'Test Beer')).toBeNull();
+    });
+
+    it('returns null for non-draft, non-can, non-bottle container', () => {
+      expect(getContainerType('Cask', '5.2%', undefined, 'Cask Ale')).toBeNull();
+    });
+  });
+
+  describe('backward compatibility', () => {
+    it('works without brewName parameter', () => {
+      expect(getContainerType('Can', undefined)).toBe('can');
+      expect(getContainerType('Bottle', undefined)).toBe('bottle');
+      expect(getContainerType('Draft', '5.0%')).toBe('pint');
     });
   });
 });

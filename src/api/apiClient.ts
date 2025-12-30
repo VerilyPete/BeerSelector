@@ -1,4 +1,3 @@
-import { getSessionData } from './sessionManager';
 import { getCurrentSession } from './sessionValidator';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
@@ -33,7 +32,7 @@ export class ApiClient {
     // Network connectivity will be detected through fetch errors
     this.networkStatus = {
       isConnected: true,
-      type: 'unknown'
+      type: 'unknown',
     };
 
     // Make a lightweight request to check connectivity
@@ -42,9 +41,9 @@ export class ApiClient {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
 
-      const response = await fetch(config.api.baseUrl, {
+      await fetch(config.api.baseUrl, {
         method: 'HEAD',
-        signal: controller.signal
+        signal: controller.signal,
       });
 
       clearTimeout(timeoutId);
@@ -104,12 +103,23 @@ export class ApiClient {
   }
 
   private getHeaders(sessionData: SessionData): Record<string, string> {
-    const { memberId, storeId, storeName, sessionId, username, firstName, lastName, email, cardNum } = sessionData;
+    const {
+      memberId,
+      storeId,
+      storeName,
+      sessionId,
+      username,
+      firstName,
+      lastName,
+      email,
+      cardNum,
+    } = sessionData;
 
     // Get the device's native user agent or use a fallback
-    const userAgent = Platform.OS === 'web'
-      ? window.navigator.userAgent
-      : `BeerSelector/${Constants.expoConfig?.version || '1.0.0'} (${Platform.OS}; ${Platform.Version})`;
+    const userAgent =
+      Platform.OS === 'web'
+        ? window.navigator.userAgent
+        : `BeerSelector/${Constants.expoConfig?.version || '1.0.0'} (${Platform.OS}; ${Platform.Version})`;
 
     // Build cookie string with proper encoding and null checks
     const cookieParts = [
@@ -127,11 +137,11 @@ export class ApiClient {
     if (cardNum) cookieParts.push(`cardNum=${cardNum}`);
 
     return {
-      'accept': '*/*',
+      accept: '*/*',
       'accept-language': 'en-US,en;q=0.9',
       'content-type': 'application/x-www-form-urlencoded; charset=UTF-8',
-      'origin': this.baseUrl,
-      'referer': config.api.referers.memberDashboard,
+      origin: this.baseUrl,
+      referer: config.api.referers.memberDashboard,
       'sec-ch-ua': '"Chromium";v="134", "Not:A-Brand";v="24", "Google Chrome";v="134"',
       'sec-ch-ua-mobile': '?0',
       'sec-ch-ua-platform': '"macOS"',
@@ -140,11 +150,15 @@ export class ApiClient {
       'sec-fetch-site': 'same-origin',
       'user-agent': userAgent,
       'x-requested-with': 'XMLHttpRequest',
-      'Cookie': cookieParts.join('; ')
+      Cookie: cookieParts.join('; '),
     };
   }
 
-  private async fetchWithRetry(url: string, options: RequestInit, retries = this.retries): Promise<Response> {
+  private async fetchWithRetry(
+    url: string,
+    options: RequestInit,
+    retries = this.retries
+  ): Promise<Response> {
     // Network connectivity will be detected through fetch errors
     // No pre-check needed
 
@@ -155,7 +169,7 @@ export class ApiClient {
     try {
       const fetchOptions = {
         ...options,
-        signal: controller.signal
+        signal: controller.signal,
       };
 
       const response = await fetch(url, fetchOptions);
@@ -170,19 +184,20 @@ export class ApiClient {
       }
 
       return response;
-    } catch (error) {
+    } catch (error: unknown) {
       // Clear the timeout to prevent memory leaks
       clearTimeout(timeoutId);
 
       // Handle different types of errors
-      if (error.name === 'AbortError') {
+      if (error instanceof Error && error.name === 'AbortError') {
         throw new ApiError('Request timed out', 408, false, true);
       }
 
       // Check if it's a network error
-      const isNetworkError = error instanceof TypeError &&
+      const isNetworkError =
+        error instanceof TypeError &&
         (error.message.includes('Network request failed') ||
-         error.message.includes('Failed to fetch'));
+          error.message.includes('Failed to fetch'));
 
       if (isNetworkError) {
         throw new ApiError('Network request failed', 0, true, false);
@@ -192,7 +207,9 @@ export class ApiClient {
       if (error instanceof ApiError) {
         // If we have retries left and the error is retryable, retry
         if (retries > 1 && error.retryable) {
-          console.log(`Fetch failed (${error.message}), retrying in ${this.retryDelay}ms... (${retries-1} retries left)`);
+          console.log(
+            `Fetch failed (${error.message}), retrying in ${this.retryDelay}ms... (${retries - 1} retries left)`
+          );
           await new Promise(resolve => setTimeout(resolve, this.retryDelay));
           return this.fetchWithRetry(url, options, retries - 1);
         }
@@ -208,7 +225,9 @@ export class ApiClient {
       );
 
       if (retries > 1 && apiError.retryable) {
-        console.log(`Fetch failed (${apiError.message}), retrying in ${this.retryDelay}ms... (${retries-1} retries left)`);
+        console.log(
+          `Fetch failed (${apiError.message}), retrying in ${this.retryDelay}ms... (${retries - 1} retries left)`
+        );
         await new Promise(resolve => setTimeout(resolve, this.retryDelay));
         return this.fetchWithRetry(url, options, retries - 1);
       }
@@ -217,7 +236,10 @@ export class ApiClient {
     }
   }
 
-  public async request<T = unknown>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
+  public async request<T = unknown>(
+    endpoint: string,
+    options: RequestInit = {}
+  ): Promise<ApiResponse<T>> {
     const sessionData = await this.getSession();
     const headers = this.getHeaders(sessionData);
 
@@ -242,7 +264,7 @@ export class ApiClient {
         return {
           data: {} as T,
           success: true,
-          statusCode: response.status
+          statusCode: response.status,
         };
       }
 
@@ -252,14 +274,14 @@ export class ApiClient {
         return {
           data,
           success: true,
-          statusCode: response.status
+          statusCode: response.status,
         };
       } catch (jsonError) {
         // If JSON parsing fails, return the text as-is
         return {
           data: responseText as unknown as T,
           success: true,
-          statusCode: response.status
+          statusCode: response.status,
         };
       }
     } catch (error) {
@@ -269,7 +291,7 @@ export class ApiClient {
           data: null as unknown as T,
           success: false,
           error: error.message,
-          statusCode: error.statusCode
+          statusCode: error.statusCode,
         };
       }
 
@@ -285,12 +307,15 @@ export class ApiClient {
         data: null as unknown as T,
         success: false,
         error: apiError.message,
-        statusCode: apiError.statusCode
+        statusCode: apiError.statusCode,
       };
     }
   }
 
-  public async post<T = unknown>(endpoint: string, data: Record<string, unknown>): Promise<ApiResponse<T>> {
+  public async post<T = unknown>(
+    endpoint: string,
+    data: Record<string, unknown>
+  ): Promise<ApiResponse<T>> {
     const formData = new URLSearchParams();
     for (const [key, value] of Object.entries(data)) {
       if (value !== undefined && value !== null) {
@@ -304,7 +329,10 @@ export class ApiClient {
     });
   }
 
-  public async get<T = unknown>(endpoint: string, queryParams?: Record<string, unknown>): Promise<ApiResponse<T>> {
+  public async get<T = unknown>(
+    endpoint: string,
+    queryParams?: Record<string, unknown>
+  ): Promise<ApiResponse<T>> {
     let url = endpoint;
 
     // Add query parameters if provided
@@ -330,9 +358,9 @@ export class ApiClient {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
 
-      const response = await fetch(config.api.baseUrl, {
+      await fetch(config.api.baseUrl, {
         method: 'HEAD',
-        signal: controller.signal
+        signal: controller.signal,
       });
 
       clearTimeout(timeoutId);
@@ -340,14 +368,14 @@ export class ApiClient {
       // If we get here, we're online
       this.networkStatus = {
         isConnected: true,
-        type: 'unknown'
+        type: 'unknown',
       };
       return true;
     } catch (error) {
       // If fetch fails, we're likely offline
       this.networkStatus = {
         isConnected: false,
-        type: 'unknown'
+        type: 'unknown',
       };
       console.log('Network connectivity check failed:', error);
       return false;

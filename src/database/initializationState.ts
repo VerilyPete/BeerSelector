@@ -17,14 +17,14 @@ export enum DatabaseInitializationState {
   UNINITIALIZED = 'UNINITIALIZED',
   INITIALIZING = 'INITIALIZING',
   READY = 'READY',
-  ERROR = 'ERROR'
+  ERROR = 'ERROR',
 }
 
 export class DatabaseInitializer {
   private state: DatabaseInitializationState = DatabaseInitializationState.UNINITIALIZED;
   private errorMessage: string | null = null;
-  private waiters: Array<(value: void) => void> = [];
-  private errorWaiters: Array<(error: Error) => void> = [];
+  private waiters: ((value: void) => void)[] = [];
+  private errorWaiters: ((error: Error) => void)[] = [];
 
   /**
    * Get the current initialization state
@@ -73,7 +73,9 @@ export class DatabaseInitializer {
     }
 
     if (this.state === DatabaseInitializationState.INITIALIZING) {
-      throw new Error(`Cannot transition to INITIALIZING from ${this.state} (already initializing)`);
+      throw new Error(
+        `Cannot transition to INITIALIZING from ${this.state} (already initializing)`
+      );
     }
 
     const previousState = this.state;

@@ -71,10 +71,10 @@ function warnIfPerformanceDegraded(
     const excessPercent = ((measuredTime / threshold - 1) * 100).toFixed(1);
     console.warn(
       `\n⚠️ Performance degradation detected:\n` +
-      `  Metric: ${metricName}\n` +
-      `  Measured: ${measuredTime.toFixed(6)}ms\n` +
-      `  Threshold: ${threshold}ms\n` +
-      `  Excess: ${excessPercent}%\n`
+        `  Metric: ${metricName}\n` +
+        `  Measured: ${measuredTime.toFixed(6)}ms\n` +
+        `  Threshold: ${threshold}ms\n` +
+        `  Excess: ${excessPercent}%\n`
     );
   }
 }
@@ -100,7 +100,7 @@ const PERFORMANCE_THRESHOLDS = {
   BULK_OPERATIONS_1000: 10 * CI_MULTIPLIER, // 10ms local, 100ms in CI
 
   // URL construction with parameters
-  URL_WITH_PARAMS: 0.02 * CI_MULTIPLIER // 20μs local, 200μs in CI
+  URL_WITH_PARAMS: 0.02 * CI_MULTIPLIER, // 20μs local, 200μs in CI
 };
 
 describe('Config Module Performance Benchmarks', () => {
@@ -125,36 +125,56 @@ describe('Config Module Performance Benchmarks', () => {
     it('should access config.api.baseUrl in <1μs on average', () => {
       const avgTime = measureAverageTime(() => {
         const _baseUrl = config.api.baseUrl;
+        void _baseUrl; // Intentionally accessed for performance measurement
       }, 1000);
 
-      warnIfPerformanceDegraded('config.api.baseUrl access', avgTime, PERFORMANCE_THRESHOLDS.SIMPLE_GETTER);
+      warnIfPerformanceDegraded(
+        'config.api.baseUrl access',
+        avgTime,
+        PERFORMANCE_THRESHOLDS.SIMPLE_GETTER
+      );
       expect(avgTime).toBeLessThan(PERFORMANCE_THRESHOLDS.SIMPLE_GETTER);
     });
 
     it('should access config.environment in <1μs on average', () => {
       const avgTime = measureAverageTime(() => {
         const _env = config.environment;
+        void _env; // Intentionally accessed for performance measurement
       }, 1000);
 
-      warnIfPerformanceDegraded('config.environment access', avgTime, PERFORMANCE_THRESHOLDS.SIMPLE_GETTER);
+      warnIfPerformanceDegraded(
+        'config.environment access',
+        avgTime,
+        PERFORMANCE_THRESHOLDS.SIMPLE_GETTER
+      );
       expect(avgTime).toBeLessThan(PERFORMANCE_THRESHOLDS.SIMPLE_GETTER);
     });
 
     it('should access config.api.endpoints in <1μs on average', () => {
       const avgTime = measureAverageTime(() => {
         const _endpoints = config.api.endpoints;
+        void _endpoints; // Intentionally accessed for performance measurement
       }, 1000);
 
-      warnIfPerformanceDegraded('config.api.endpoints access', avgTime, PERFORMANCE_THRESHOLDS.SIMPLE_GETTER);
+      warnIfPerformanceDegraded(
+        'config.api.endpoints access',
+        avgTime,
+        PERFORMANCE_THRESHOLDS.SIMPLE_GETTER
+      );
       expect(avgTime).toBeLessThan(PERFORMANCE_THRESHOLDS.SIMPLE_GETTER);
     });
 
     it('should access config.api.referers in <1μs on average', () => {
       const avgTime = measureAverageTime(() => {
         const _referers = config.api.referers;
+        void _referers; // Intentionally accessed for performance measurement
       }, 1000);
 
-      warnIfPerformanceDegraded('config.api.referers access', avgTime, PERFORMANCE_THRESHOLDS.SIMPLE_GETTER);
+      warnIfPerformanceDegraded(
+        'config.api.referers access',
+        avgTime,
+        PERFORMANCE_THRESHOLDS.SIMPLE_GETTER
+      );
       expect(avgTime).toBeLessThan(PERFORMANCE_THRESHOLDS.SIMPLE_GETTER);
     });
 
@@ -163,7 +183,11 @@ describe('Config Module Performance Benchmarks', () => {
         config.getEnvironment();
       }, 1000);
 
-      warnIfPerformanceDegraded('config.getEnvironment() call', avgTime, PERFORMANCE_THRESHOLDS.SIMPLE_GETTER);
+      warnIfPerformanceDegraded(
+        'config.getEnvironment() call',
+        avgTime,
+        PERFORMANCE_THRESHOLDS.SIMPLE_GETTER
+      );
       expect(avgTime).toBeLessThan(PERFORMANCE_THRESHOLDS.SIMPLE_GETTER);
     });
   });
@@ -174,7 +198,11 @@ describe('Config Module Performance Benchmarks', () => {
         config.api.getFullUrl('memberQueues');
       }, 1000);
 
-      warnIfPerformanceDegraded('getFullUrl() without params', avgTime, PERFORMANCE_THRESHOLDS.URL_CONSTRUCTION);
+      warnIfPerformanceDegraded(
+        'getFullUrl() without params',
+        avgTime,
+        PERFORMANCE_THRESHOLDS.URL_CONSTRUCTION
+      );
       expect(avgTime).toBeLessThan(PERFORMANCE_THRESHOLDS.URL_CONSTRUCTION);
     });
 
@@ -183,7 +211,11 @@ describe('Config Module Performance Benchmarks', () => {
         config.api.getFullUrl('deleteQueuedBrew', { cid: '12345' });
       }, 1000);
 
-      warnIfPerformanceDegraded('getFullUrl() with params', avgTime, PERFORMANCE_THRESHOLDS.URL_WITH_PARAMS);
+      warnIfPerformanceDegraded(
+        'getFullUrl() with params',
+        avgTime,
+        PERFORMANCE_THRESHOLDS.URL_WITH_PARAMS
+      );
       expect(avgTime).toBeLessThan(PERFORMANCE_THRESHOLDS.URL_WITH_PARAMS);
     });
 
@@ -192,11 +224,15 @@ describe('Config Module Performance Benchmarks', () => {
         config.api.getFullUrl('memberQueues', {
           page: '1',
           limit: '50',
-          sort: 'name'
+          sort: 'name',
         });
       }, 1000);
 
-      warnIfPerformanceDegraded('getFullUrl() with multiple params', avgTime, PERFORMANCE_THRESHOLDS.URL_WITH_PARAMS);
+      warnIfPerformanceDegraded(
+        'getFullUrl() with multiple params',
+        avgTime,
+        PERFORMANCE_THRESHOLDS.URL_WITH_PARAMS
+      );
       expect(avgTime).toBeLessThan(PERFORMANCE_THRESHOLDS.URL_WITH_PARAMS);
     });
 
@@ -231,7 +267,11 @@ describe('Config Module Performance Benchmarks', () => {
         envIndex++;
       }, 1000);
 
-      warnIfPerformanceDegraded('setEnvironment()', avgTime, PERFORMANCE_THRESHOLDS.ENVIRONMENT_SWITCH);
+      warnIfPerformanceDegraded(
+        'setEnvironment()',
+        avgTime,
+        PERFORMANCE_THRESHOLDS.ENVIRONMENT_SWITCH
+      );
       expect(avgTime).toBeLessThan(PERFORMANCE_THRESHOLDS.ENVIRONMENT_SWITCH);
     });
 
@@ -258,7 +298,11 @@ describe('Config Module Performance Benchmarks', () => {
         config.api.getFullUrl('memberQueues');
       }, 1000);
 
-      warnIfPerformanceDegraded('getFullUrl() after environment switch', avgTime, PERFORMANCE_THRESHOLDS.URL_CONSTRUCTION);
+      warnIfPerformanceDegraded(
+        'getFullUrl() after environment switch',
+        avgTime,
+        PERFORMANCE_THRESHOLDS.URL_CONSTRUCTION
+      );
       expect(avgTime).toBeLessThan(PERFORMANCE_THRESHOLDS.URL_CONSTRUCTION);
     });
 
@@ -281,27 +325,42 @@ describe('Config Module Performance Benchmarks', () => {
     it('should access config.network.timeout in <5μs on average', () => {
       const avgTime = measureAverageTime(() => {
         const _timeout = config.network.timeout;
+        void _timeout; // Intentionally accessed for performance measurement
       }, 1000);
 
-      warnIfPerformanceDegraded('config.network.timeout access', avgTime, PERFORMANCE_THRESHOLDS.NETWORK_CONFIG_GETTER);
+      warnIfPerformanceDegraded(
+        'config.network.timeout access',
+        avgTime,
+        PERFORMANCE_THRESHOLDS.NETWORK_CONFIG_GETTER
+      );
       expect(avgTime).toBeLessThan(PERFORMANCE_THRESHOLDS.NETWORK_CONFIG_GETTER);
     });
 
     it('should access config.network.retries in <5μs on average', () => {
       const avgTime = measureAverageTime(() => {
         const _retries = config.network.retries;
+        void _retries; // Intentionally accessed for performance measurement
       }, 1000);
 
-      warnIfPerformanceDegraded('config.network.retries access', avgTime, PERFORMANCE_THRESHOLDS.NETWORK_CONFIG_GETTER);
+      warnIfPerformanceDegraded(
+        'config.network.retries access',
+        avgTime,
+        PERFORMANCE_THRESHOLDS.NETWORK_CONFIG_GETTER
+      );
       expect(avgTime).toBeLessThan(PERFORMANCE_THRESHOLDS.NETWORK_CONFIG_GETTER);
     });
 
     it('should access config.network.retryDelay in <5μs on average', () => {
       const avgTime = measureAverageTime(() => {
         const _retryDelay = config.network.retryDelay;
+        void _retryDelay; // Intentionally accessed for performance measurement
       }, 1000);
 
-      warnIfPerformanceDegraded('config.network.retryDelay access', avgTime, PERFORMANCE_THRESHOLDS.NETWORK_CONFIG_GETTER);
+      warnIfPerformanceDegraded(
+        'config.network.retryDelay access',
+        avgTime,
+        PERFORMANCE_THRESHOLDS.NETWORK_CONFIG_GETTER
+      );
       expect(avgTime).toBeLessThan(PERFORMANCE_THRESHOLDS.NETWORK_CONFIG_GETTER);
     });
 
@@ -310,6 +369,7 @@ describe('Config Module Performance Benchmarks', () => {
         const _timeout = config.network.timeout;
         const _retries = config.network.retries;
         const _retryDelay = config.network.retryDelay;
+        void _timeout; void _retries; void _retryDelay; // Intentionally accessed for performance measurement
       }, 1000);
 
       const threshold = PERFORMANCE_THRESHOLDS.NETWORK_CONFIG_GETTER * 3;
@@ -323,18 +383,28 @@ describe('Config Module Performance Benchmarks', () => {
     it('should access config.external.untappd.baseUrl in <10μs on average', () => {
       const avgTime = measureAverageTime(() => {
         const _baseUrl = config.external.untappd.baseUrl;
+        void _baseUrl; // Intentionally accessed for performance measurement
       }, 1000);
 
-      warnIfPerformanceDegraded('config.external.untappd.baseUrl access', avgTime, PERFORMANCE_THRESHOLDS.EXTERNAL_SERVICES_GETTER);
+      warnIfPerformanceDegraded(
+        'config.external.untappd.baseUrl access',
+        avgTime,
+        PERFORMANCE_THRESHOLDS.EXTERNAL_SERVICES_GETTER
+      );
       expect(avgTime).toBeLessThan(PERFORMANCE_THRESHOLDS.EXTERNAL_SERVICES_GETTER);
     });
 
     it('should access config.external.untappd.loginUrl in <10μs on average', () => {
       const avgTime = measureAverageTime(() => {
         const _loginUrl = config.external.untappd.loginUrl;
+        void _loginUrl; // Intentionally accessed for performance measurement
       }, 1000);
 
-      warnIfPerformanceDegraded('config.external.untappd.loginUrl access', avgTime, PERFORMANCE_THRESHOLDS.EXTERNAL_SERVICES_GETTER);
+      warnIfPerformanceDegraded(
+        'config.external.untappd.loginUrl access',
+        avgTime,
+        PERFORMANCE_THRESHOLDS.EXTERNAL_SERVICES_GETTER
+      );
       expect(avgTime).toBeLessThan(PERFORMANCE_THRESHOLDS.EXTERNAL_SERVICES_GETTER);
     });
 
@@ -343,12 +413,17 @@ describe('Config Module Performance Benchmarks', () => {
         config.external.untappd.searchUrl('Test Beer Name');
       }, 1000);
 
-      warnIfPerformanceDegraded('untappd.searchUrl()', avgTime, PERFORMANCE_THRESHOLDS.URL_WITH_PARAMS);
+      warnIfPerformanceDegraded(
+        'untappd.searchUrl()',
+        avgTime,
+        PERFORMANCE_THRESHOLDS.URL_WITH_PARAMS
+      );
       expect(avgTime).toBeLessThan(PERFORMANCE_THRESHOLDS.URL_WITH_PARAMS);
     });
 
     it('should handle complex beer names efficiently', () => {
-      const complexName = 'Super Long Beer Name With (Lots) Of (Parentheses) And Special Characters!';
+      const complexName =
+        'Super Long Beer Name With (Lots) Of (Parentheses) And Special Characters!';
 
       const avgTime = measureAverageTime(() => {
         config.external.untappd.searchUrl(complexName);
@@ -380,9 +455,14 @@ describe('Config Module Performance Benchmarks', () => {
 
       const avgTime = measureAverageTime(() => {
         const _baseUrl = config.api.baseUrl;
+        void _baseUrl; // Intentionally accessed for performance measurement
       }, 1000);
 
-      warnIfPerformanceDegraded('baseUrl access after setCustomApiUrl()', avgTime, PERFORMANCE_THRESHOLDS.SIMPLE_GETTER);
+      warnIfPerformanceDegraded(
+        'baseUrl access after setCustomApiUrl()',
+        avgTime,
+        PERFORMANCE_THRESHOLDS.SIMPLE_GETTER
+      );
       expect(avgTime).toBeLessThan(PERFORMANCE_THRESHOLDS.SIMPLE_GETTER);
     });
 
@@ -393,7 +473,11 @@ describe('Config Module Performance Benchmarks', () => {
         config.api.getFullUrl('memberQueues');
       }, 1000);
 
-      warnIfPerformanceDegraded('getFullUrl() with custom baseUrl', avgTime, PERFORMANCE_THRESHOLDS.URL_CONSTRUCTION);
+      warnIfPerformanceDegraded(
+        'getFullUrl() with custom baseUrl',
+        avgTime,
+        PERFORMANCE_THRESHOLDS.URL_CONSTRUCTION
+      );
       expect(avgTime).toBeLessThan(PERFORMANCE_THRESHOLDS.URL_CONSTRUCTION);
     });
   });
@@ -462,6 +546,7 @@ describe('Config Module Performance Benchmarks', () => {
           config.api.getFullUrl('deleteQueuedBrew', { cid: '123' });
           const _baseUrl = config.api.baseUrl;
           const _timeout = config.network.timeout;
+          void _baseUrl; void _timeout; // Intentionally accessed for performance measurement
           config.external.untappd.searchUrl('Test Beer');
         }
       });
@@ -478,53 +563,97 @@ describe('Config Module Performance Benchmarks', () => {
         simpleGetter: measureAverageTime(() => config.api.baseUrl, 1000),
         environmentGetter: measureAverageTime(() => config.getEnvironment(), 1000),
         urlConstruction: measureAverageTime(() => config.api.getFullUrl('memberQueues'), 1000),
-        urlWithParams: measureAverageTime(() =>
-          config.api.getFullUrl('deleteQueuedBrew', { cid: '123' }), 1000
+        urlWithParams: measureAverageTime(
+          () => config.api.getFullUrl('deleteQueuedBrew', { cid: '123' }),
+          1000
         ),
         environmentSwitch: measureAverageTime(() => config.setEnvironment('development'), 1000),
         networkConfigGetter: measureAverageTime(() => config.network.timeout, 1000),
         externalServicesGetter: measureAverageTime(() => config.external.untappd.baseUrl, 1000),
-        untappdSearchUrl: measureAverageTime(() =>
-          config.external.untappd.searchUrl('Test Beer'), 1000
-        )
+        untappdSearchUrl: measureAverageTime(
+          () => config.external.untappd.searchUrl('Test Beer'),
+          1000
+        ),
       };
 
       // Log measurements for documentation purposes
       // Note: These are measured in milliseconds, which are very small numbers (< 0.001ms typically)
       console.log('\n=== Config Module Performance Baselines ===');
-      console.log(`Simple Getter (config.api.baseUrl): ${measurements.simpleGetter.toFixed(6)}ms avg`);
+      console.log(
+        `Simple Getter (config.api.baseUrl): ${measurements.simpleGetter.toFixed(6)}ms avg`
+      );
       console.log(`Environment Getter: ${measurements.environmentGetter.toFixed(6)}ms avg`);
       console.log(`URL Construction: ${measurements.urlConstruction.toFixed(6)}ms avg`);
       console.log(`URL with Params: ${measurements.urlWithParams.toFixed(6)}ms avg`);
       console.log(`Environment Switch: ${measurements.environmentSwitch.toFixed(6)}ms avg`);
       console.log(`Network Config Getter: ${measurements.networkConfigGetter.toFixed(6)}ms avg`);
-      console.log(`External Services Getter: ${measurements.externalServicesGetter.toFixed(6)}ms avg`);
+      console.log(
+        `External Services Getter: ${measurements.externalServicesGetter.toFixed(6)}ms avg`
+      );
       console.log(`Untappd Search URL: ${measurements.untappdSearchUrl.toFixed(6)}ms avg`);
       console.log('==========================================\n');
 
       // All measurements should meet our thresholds
-      warnIfPerformanceDegraded('baseline: simpleGetter', measurements.simpleGetter, PERFORMANCE_THRESHOLDS.SIMPLE_GETTER);
+      warnIfPerformanceDegraded(
+        'baseline: simpleGetter',
+        measurements.simpleGetter,
+        PERFORMANCE_THRESHOLDS.SIMPLE_GETTER
+      );
       expect(measurements.simpleGetter).toBeLessThan(PERFORMANCE_THRESHOLDS.SIMPLE_GETTER);
-      warnIfPerformanceDegraded('baseline: environmentGetter', measurements.environmentGetter, PERFORMANCE_THRESHOLDS.SIMPLE_GETTER);
+      warnIfPerformanceDegraded(
+        'baseline: environmentGetter',
+        measurements.environmentGetter,
+        PERFORMANCE_THRESHOLDS.SIMPLE_GETTER
+      );
       expect(measurements.environmentGetter).toBeLessThan(PERFORMANCE_THRESHOLDS.SIMPLE_GETTER);
-      warnIfPerformanceDegraded('baseline: urlConstruction', measurements.urlConstruction, PERFORMANCE_THRESHOLDS.URL_CONSTRUCTION);
+      warnIfPerformanceDegraded(
+        'baseline: urlConstruction',
+        measurements.urlConstruction,
+        PERFORMANCE_THRESHOLDS.URL_CONSTRUCTION
+      );
       expect(measurements.urlConstruction).toBeLessThan(PERFORMANCE_THRESHOLDS.URL_CONSTRUCTION);
-      warnIfPerformanceDegraded('baseline: urlWithParams', measurements.urlWithParams, PERFORMANCE_THRESHOLDS.URL_WITH_PARAMS);
+      warnIfPerformanceDegraded(
+        'baseline: urlWithParams',
+        measurements.urlWithParams,
+        PERFORMANCE_THRESHOLDS.URL_WITH_PARAMS
+      );
       expect(measurements.urlWithParams).toBeLessThan(PERFORMANCE_THRESHOLDS.URL_WITH_PARAMS);
-      warnIfPerformanceDegraded('baseline: environmentSwitch', measurements.environmentSwitch, PERFORMANCE_THRESHOLDS.ENVIRONMENT_SWITCH);
-      expect(measurements.environmentSwitch).toBeLessThan(PERFORMANCE_THRESHOLDS.ENVIRONMENT_SWITCH);
-      warnIfPerformanceDegraded('baseline: networkConfigGetter', measurements.networkConfigGetter, PERFORMANCE_THRESHOLDS.NETWORK_CONFIG_GETTER);
-      expect(measurements.networkConfigGetter).toBeLessThan(PERFORMANCE_THRESHOLDS.NETWORK_CONFIG_GETTER);
-      warnIfPerformanceDegraded('baseline: externalServicesGetter', measurements.externalServicesGetter, PERFORMANCE_THRESHOLDS.EXTERNAL_SERVICES_GETTER);
-      expect(measurements.externalServicesGetter).toBeLessThan(PERFORMANCE_THRESHOLDS.EXTERNAL_SERVICES_GETTER);
-      warnIfPerformanceDegraded('baseline: untappdSearchUrl', measurements.untappdSearchUrl, PERFORMANCE_THRESHOLDS.URL_WITH_PARAMS);
+      warnIfPerformanceDegraded(
+        'baseline: environmentSwitch',
+        measurements.environmentSwitch,
+        PERFORMANCE_THRESHOLDS.ENVIRONMENT_SWITCH
+      );
+      expect(measurements.environmentSwitch).toBeLessThan(
+        PERFORMANCE_THRESHOLDS.ENVIRONMENT_SWITCH
+      );
+      warnIfPerformanceDegraded(
+        'baseline: networkConfigGetter',
+        measurements.networkConfigGetter,
+        PERFORMANCE_THRESHOLDS.NETWORK_CONFIG_GETTER
+      );
+      expect(measurements.networkConfigGetter).toBeLessThan(
+        PERFORMANCE_THRESHOLDS.NETWORK_CONFIG_GETTER
+      );
+      warnIfPerformanceDegraded(
+        'baseline: externalServicesGetter',
+        measurements.externalServicesGetter,
+        PERFORMANCE_THRESHOLDS.EXTERNAL_SERVICES_GETTER
+      );
+      expect(measurements.externalServicesGetter).toBeLessThan(
+        PERFORMANCE_THRESHOLDS.EXTERNAL_SERVICES_GETTER
+      );
+      warnIfPerformanceDegraded(
+        'baseline: untappdSearchUrl',
+        measurements.untappdSearchUrl,
+        PERFORMANCE_THRESHOLDS.URL_WITH_PARAMS
+      );
       expect(measurements.untappdSearchUrl).toBeLessThan(PERFORMANCE_THRESHOLDS.URL_WITH_PARAMS);
     });
   });
 
   describe('Edge Case Performance', () => {
     it('should handle all endpoints efficiently in a loop', () => {
-      const endpoints: Array<keyof typeof config.api.endpoints> = [
+      const endpoints: (keyof typeof config.api.endpoints)[] = [
         'memberQueues',
         'deleteQueuedBrew',
         'addToQueue',
@@ -532,7 +661,7 @@ describe('Config Module Performance Benchmarks', () => {
         'memberDashboard',
         'memberRewards',
         'kiosk',
-        'visitor'
+        'visitor',
       ];
 
       const totalTime = measureTime(() => {
@@ -571,6 +700,7 @@ describe('Config Module Performance Benchmarks', () => {
           const _referers = config.api.referers;
           const _timeout = config.network.timeout;
           const _env = config.environment;
+          void _baseUrl; void _endpoints; void _referers; void _timeout; void _env; // Intentionally accessed for performance measurement
         }
       });
 

@@ -21,10 +21,12 @@
 
 import { renderHook, act } from '@testing-library/react-native';
 import { useBeerFilters, applyFilters } from '../useBeerFilters';
-import { BeerWithGlassType } from '@/src/types/beer';
+import { BeerWithContainerType } from '@/src/types/beer';
 
 describe('useBeerFilters - Optimization (Bottleneck #3)', () => {
-  const createMockBeer = (overrides: Partial<BeerWithGlassType> = {}): BeerWithGlassType => ({
+  const createMockBeer = (
+    overrides: Partial<BeerWithContainerType> = {}
+  ): BeerWithContainerType => ({
     id: '1',
     brew_name: 'Test IPA',
     brewer: 'Test Brewery',
@@ -33,18 +35,22 @@ describe('useBeerFilters - Optimization (Bottleneck #3)', () => {
     brewer_loc: 'Austin, TX',
     brew_container: 'Draft',
     brew_description: 'Test description',
-    glass_type: 'tulip', // Pre-computed glass type for IPA
+    container_type: 'tulip', // Pre-computed glass type for IPA
+    enrichment_confidence: null,
+    enrichment_source: null,
     ...overrides,
   });
 
-  const createMockBeers = (count: number): BeerWithGlassType[] =>
-    Array.from({ length: count }, (_, i) => createMockBeer({
-      id: String(i + 1),
-      brew_name: `Beer ${i + 1}`,
-      brew_style: i % 3 === 0 ? 'IPA' : i % 3 === 1 ? 'Stout' : 'Porter',
-      brew_container: i % 2 === 0 ? 'Draft' : 'Bottle',
-      glass_type: i % 3 === 0 ? 'tulip' : 'pint', // Pre-computed glass type based on style
-    }));
+  const createMockBeers = (count: number): BeerWithContainerType[] =>
+    Array.from({ length: count }, (_, i) =>
+      createMockBeer({
+        id: String(i + 1),
+        brew_name: `Beer ${i + 1}`,
+        brew_style: i % 3 === 0 ? 'IPA' : i % 3 === 1 ? 'Stout' : 'Porter',
+        brew_container: i % 2 === 0 ? 'Draft' : 'Bottle',
+        container_type: i % 3 === 0 ? 'tulip' : 'pint', // Pre-computed glass type based on style
+      })
+    );
 
   describe('Early Exit Optimization', () => {
     it('should skip filtering when no filters are active', () => {
@@ -305,9 +311,24 @@ describe('useBeerFilters - Optimization (Bottleneck #3)', () => {
 
     it('should correctly combine search and filters', () => {
       const beers = [
-        createMockBeer({ id: '1', brew_name: 'Hazy IPA', brew_style: 'IPA', brew_container: 'Draft' }),
-        createMockBeer({ id: '2', brew_name: 'Clear IPA', brew_style: 'IPA', brew_container: 'Bottle' }),
-        createMockBeer({ id: '3', brew_name: 'Hazy Stout', brew_style: 'Stout', brew_container: 'Draft' }),
+        createMockBeer({
+          id: '1',
+          brew_name: 'Hazy IPA',
+          brew_style: 'IPA',
+          brew_container: 'Draft',
+        }),
+        createMockBeer({
+          id: '2',
+          brew_name: 'Clear IPA',
+          brew_style: 'IPA',
+          brew_container: 'Bottle',
+        }),
+        createMockBeer({
+          id: '3',
+          brew_name: 'Hazy Stout',
+          brew_style: 'Stout',
+          brew_container: 'Draft',
+        }),
       ];
 
       const result = applyFilters(beers, {
@@ -376,10 +397,34 @@ describe('useBeerFilters - Optimization (Bottleneck #3)', () => {
 
     it('should search across multiple beer fields', () => {
       const beers = [
-        createMockBeer({ id: '1', brew_name: 'Test Beer', brewer: 'Other', brew_style: 'Lager', brewer_loc: 'NYC' }),
-        createMockBeer({ id: '2', brew_name: 'Other Beer', brewer: 'Searchable Brewery', brew_style: 'Lager', brewer_loc: 'NYC' }),
-        createMockBeer({ id: '3', brew_name: 'Other Beer', brewer: 'Other', brew_style: 'Searchable Style', brewer_loc: 'NYC' }),
-        createMockBeer({ id: '4', brew_name: 'Other Beer', brewer: 'Other', brew_style: 'Lager', brewer_loc: 'Searchable City' }),
+        createMockBeer({
+          id: '1',
+          brew_name: 'Test Beer',
+          brewer: 'Other',
+          brew_style: 'Lager',
+          brewer_loc: 'NYC',
+        }),
+        createMockBeer({
+          id: '2',
+          brew_name: 'Other Beer',
+          brewer: 'Searchable Brewery',
+          brew_style: 'Lager',
+          brewer_loc: 'NYC',
+        }),
+        createMockBeer({
+          id: '3',
+          brew_name: 'Other Beer',
+          brewer: 'Other',
+          brew_style: 'Searchable Style',
+          brewer_loc: 'NYC',
+        }),
+        createMockBeer({
+          id: '4',
+          brew_name: 'Other Beer',
+          brewer: 'Other',
+          brew_style: 'Lager',
+          brewer_loc: 'Searchable City',
+        }),
       ];
 
       const result = applyFilters(beers, {
@@ -404,13 +449,13 @@ describe('useBeerFilters - Optimization (Bottleneck #3)', () => {
       const startTime = performance.now();
 
       // No filters active - should use early exit
-      const filtered = result.current.filteredBeers;
+      const _filtered = result.current.filteredBeers;
 
       const endTime = performance.now();
 
       // EXPECTED: Fast return with no filters
       expect(endTime - startTime).toBeLessThan(2);
-      expect(filtered).toHaveLength(200);
+      expect(_filtered).toHaveLength(200);
     });
 
     it('should maintain performance when toggling filters', () => {
@@ -447,10 +492,12 @@ describe('useBeerFilters - Optimization (Bottleneck #3)', () => {
           result.current.toggleFilter('isDraft');
         });
 
-        const filtered = result.current.filteredBeers;
+        const _filtered = result.current.filteredBeers;
         const endTime = performance.now();
 
         times.push(endTime - startTime);
+        // Use _filtered to avoid unused variable warning
+        void _filtered;
       }
 
       // All operations should be fast

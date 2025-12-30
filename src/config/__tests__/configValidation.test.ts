@@ -177,7 +177,7 @@ describe('Configuration Validation', () => {
 
         try {
           const { config: freshConfig } = require('../config');
-          const network = freshConfig.network;
+          freshConfig.network; // Access to trigger validation
           fail('Should have thrown InvalidNetworkConfigError');
         } catch (error: any) {
           expect(error.name).toBe('InvalidNetworkConfigError');
@@ -190,7 +190,7 @@ describe('Configuration Validation', () => {
 
         try {
           const { config: freshConfig } = require('../config');
-          const network = freshConfig.network;
+          freshConfig.network; // Access to trigger validation
           fail('Should have thrown InvalidNetworkConfigError');
         } catch (error: any) {
           expect(error.name).toBe('InvalidNetworkConfigError');
@@ -203,7 +203,7 @@ describe('Configuration Validation', () => {
 
         try {
           const { config: freshConfig } = require('../config');
-          const network = freshConfig.network;
+          freshConfig.network; // Access to trigger validation
           fail('Should have thrown InvalidNetworkConfigError');
         } catch (error: any) {
           expect(error.name).toBe('InvalidNetworkConfigError');
@@ -215,7 +215,7 @@ describe('Configuration Validation', () => {
         process.env.EXPO_PUBLIC_API_TIMEOUT = '-5000';
         try {
           const { config: freshConfig } = require('../config');
-          const network = freshConfig.network;
+          freshConfig.network; // Access to trigger validation
           fail('Should have thrown InvalidNetworkConfigError');
         } catch (error: any) {
           expect(error.name).toBe('InvalidNetworkConfigError');
@@ -244,7 +244,7 @@ describe('Configuration Validation', () => {
 
         try {
           const { config: freshConfig } = require('../config');
-          const network = freshConfig.network;
+          freshConfig.network; // Access to trigger validation
           fail('Should have thrown InvalidNetworkConfigError');
         } catch (error: any) {
           expect(error.name).toBe('InvalidNetworkConfigError');
@@ -257,7 +257,7 @@ describe('Configuration Validation', () => {
 
         try {
           const { config: freshConfig } = require('../config');
-          const network = freshConfig.network;
+          freshConfig.network; // Access to trigger validation
           fail('Should have thrown InvalidNetworkConfigError');
         } catch (error: any) {
           expect(error.name).toBe('InvalidNetworkConfigError');
@@ -269,7 +269,7 @@ describe('Configuration Validation', () => {
         process.env.EXPO_PUBLIC_API_RETRIES = '20';
         try {
           const { config: freshConfig } = require('../config');
-          const network = freshConfig.network;
+          freshConfig.network; // Access to trigger validation
           fail('Should have thrown InvalidNetworkConfigError');
         } catch (error: any) {
           expect(error.name).toBe('InvalidNetworkConfigError');
@@ -292,7 +292,7 @@ describe('Configuration Validation', () => {
 
         try {
           const { config: freshConfig } = require('../config');
-          const network = freshConfig.network;
+          freshConfig.network; // Access to trigger validation
           fail('Should have thrown InvalidNetworkConfigError');
         } catch (error: any) {
           expect(error.name).toBe('InvalidNetworkConfigError');
@@ -305,7 +305,7 @@ describe('Configuration Validation', () => {
 
         try {
           const { config: freshConfig } = require('../config');
-          const network = freshConfig.network;
+          freshConfig.network; // Access to trigger validation
           fail('Should have thrown InvalidNetworkConfigError');
         } catch (error: any) {
           expect(error.name).toBe('InvalidNetworkConfigError');
@@ -318,7 +318,7 @@ describe('Configuration Validation', () => {
 
         try {
           const { config: freshConfig } = require('../config');
-          const network = freshConfig.network;
+          freshConfig.network; // Access to trigger validation
           fail('Should have thrown InvalidNetworkConfigError');
         } catch (error: any) {
           expect(error.name).toBe('InvalidNetworkConfigError');
@@ -330,7 +330,7 @@ describe('Configuration Validation', () => {
         process.env.EXPO_PUBLIC_API_RETRY_DELAY = '-1000';
         try {
           const { config: freshConfig } = require('../config');
-          const network = freshConfig.network;
+          freshConfig.network; // Access to trigger validation
           fail('Should have thrown InvalidNetworkConfigError');
         } catch (error: any) {
           expect(error.name).toBe('InvalidNetworkConfigError');
@@ -383,7 +383,7 @@ describe('Configuration Validation', () => {
       try {
         config.setEnvironment('invalid-env' as any);
         fail('Should have thrown InvalidEnvironmentError');
-      } catch (error) {
+      } catch (error: any) {
         expect(error).toBeInstanceOf(InvalidEnvironmentError);
         expect(error.message).toContain('Invalid environment');
         expect(error.message).toContain('invalid-env');
@@ -493,7 +493,7 @@ describe('Configuration Validation', () => {
 
       try {
         const { config: freshConfig } = require('../config');
-        const network = freshConfig.network;
+        freshConfig.network; // Access to trigger validation
         fail('Should have thrown InvalidNetworkConfigError');
       } catch (error: any) {
         expect(error.name).toBe('InvalidNetworkConfigError');

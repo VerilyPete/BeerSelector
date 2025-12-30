@@ -1,6 +1,5 @@
 import React from 'react';
-import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import Ionicons from '@expo/vector-icons/Ionicons';
+import BeerIcon from './BeerIcon';
 import { GlassType } from '@/src/utils/beerGlassType';
 
 type GlassIconProps = {
@@ -11,16 +10,16 @@ type GlassIconProps = {
 
 /**
  * Renders the appropriate glass icon based on type
- * - Pint glass for draft beers < 7.4% ABV
- * - Tulip glass for draft beers >= 7.4% ABV
+ * - Pint glass for draft beers < 8% ABV
+ * - Tulip glass for draft beers >= 8% ABV
  */
 export function GlassIcon({ type, size = 24, color = '#000000' }: GlassIconProps) {
   if (type === 'pint') {
-    return <Ionicons name="pint" size={size} color={color} />;
+    return <BeerIcon name="pint" size={size} color={color} />;
   }
 
   if (type === 'tulip') {
-    return <MaterialCommunityIcons name="glass-tulip" size={size} color={color} />;
+    return <BeerIcon name="tulip" size={size} color={color} />;
   }
 
   return null;

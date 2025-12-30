@@ -13,17 +13,14 @@ import {
   TastedBrewRow,
   RewardRow,
   PreferenceRow,
-  UntappdCookieRow,
   allBeersRowSchema,
   tastedBrewRowSchema,
   rewardRowSchema,
   preferenceRowSchema,
-  untappdCookieRowSchema,
   isAllBeersRow,
   isTastedBrewRow,
   isRewardRow,
   isPreferenceRow,
-  isUntappdCookieRow,
   allBeersRowToBeer,
   tastedBrewRowToBeerfinder,
   rewardRowToReward,
@@ -42,7 +39,7 @@ describe('AllBeersRow type and schema', () => {
       brew_container: 'Draft',
       review_count: '10',
       review_rating: '4.5',
-      brew_description: 'A great beer'
+      brew_description: 'A great beer',
     };
 
     const result = allBeersRowSchema.safeParse(validRow);
@@ -55,7 +52,7 @@ describe('AllBeersRow type and schema', () => {
   it('should validate AllBeersRow with only required fields (id, brew_name)', () => {
     const minimalRow = {
       id: '123',
-      brew_name: 'Test Beer'
+      brew_name: 'Test Beer',
     };
 
     const result = allBeersRowSchema.safeParse(minimalRow);
@@ -64,7 +61,7 @@ describe('AllBeersRow type and schema', () => {
 
   it('should reject AllBeersRow missing id', () => {
     const invalidRow = {
-      brew_name: 'Test Beer'
+      brew_name: 'Test Beer',
     };
 
     const result = allBeersRowSchema.safeParse(invalidRow);
@@ -73,7 +70,7 @@ describe('AllBeersRow type and schema', () => {
 
   it('should reject AllBeersRow missing brew_name', () => {
     const invalidRow = {
-      id: '123'
+      id: '123',
     };
 
     const result = allBeersRowSchema.safeParse(invalidRow);
@@ -83,7 +80,7 @@ describe('AllBeersRow type and schema', () => {
   it('should reject AllBeersRow with null id', () => {
     const invalidRow = {
       id: null,
-      brew_name: 'Test Beer'
+      brew_name: 'Test Beer',
     };
 
     const result = allBeersRowSchema.safeParse(invalidRow);
@@ -93,7 +90,7 @@ describe('AllBeersRow type and schema', () => {
   it('should reject AllBeersRow with empty string brew_name', () => {
     const invalidRow = {
       id: '123',
-      brew_name: ''
+      brew_name: '',
     };
 
     const result = allBeersRowSchema.safeParse(invalidRow);
@@ -104,7 +101,7 @@ describe('AllBeersRow type and schema', () => {
     const validRow = {
       id: '123',
       brew_name: 'Test Beer',
-      brewer: 'Test Brewery'
+      brewer: 'Test Brewery',
     };
 
     expect(isAllBeersRow(validRow)).toBe(true);
@@ -127,7 +124,7 @@ describe('TastedBrewRow type and schema', () => {
       review_count: '10',
       review_ratings: '4.5',
       brew_description: 'A great beer',
-      chit_code: 'ABC123'
+      chit_code: 'ABC123',
     };
 
     const result = tastedBrewRowSchema.safeParse(validRow);
@@ -140,7 +137,7 @@ describe('TastedBrewRow type and schema', () => {
   it('should validate TastedBrewRow with only required fields (id, brew_name)', () => {
     const minimalRow = {
       id: '123',
-      brew_name: 'Test Beer'
+      brew_name: 'Test Beer',
     };
 
     const result = tastedBrewRowSchema.safeParse(minimalRow);
@@ -149,7 +146,7 @@ describe('TastedBrewRow type and schema', () => {
 
   it('should reject TastedBrewRow missing id', () => {
     const invalidRow = {
-      brew_name: 'Test Beer'
+      brew_name: 'Test Beer',
     };
 
     const result = tastedBrewRowSchema.safeParse(invalidRow);
@@ -160,7 +157,7 @@ describe('TastedBrewRow type and schema', () => {
     const validRow = {
       id: '123',
       brew_name: 'Test Beer',
-      tasted_date: '2024-01-01'
+      tasted_date: '2024-01-01',
     };
 
     expect(isTastedBrewRow(validRow)).toBe(true);
@@ -174,7 +171,7 @@ describe('RewardRow type and schema', () => {
     const validRow = {
       reward_id: '123',
       redeemed: 'true',
-      reward_type: 'plate'
+      reward_type: 'plate',
     };
 
     const result = rewardRowSchema.safeParse(validRow);
@@ -186,7 +183,7 @@ describe('RewardRow type and schema', () => {
 
   it('should validate RewardRow with only required field (reward_id)', () => {
     const minimalRow = {
-      reward_id: '123'
+      reward_id: '123',
     };
 
     const result = rewardRowSchema.safeParse(minimalRow);
@@ -196,7 +193,7 @@ describe('RewardRow type and schema', () => {
   it('should reject RewardRow missing reward_id', () => {
     const invalidRow = {
       redeemed: 'true',
-      reward_type: 'plate'
+      reward_type: 'plate',
     };
 
     const result = rewardRowSchema.safeParse(invalidRow);
@@ -207,7 +204,7 @@ describe('RewardRow type and schema', () => {
     const validRow = {
       reward_id: '123',
       redeemed: 'true',
-      reward_type: 'plate'
+      reward_type: 'plate',
     };
 
     expect(isRewardRow(validRow)).toBe(true);
@@ -221,7 +218,7 @@ describe('PreferenceRow type and schema', () => {
     const validRow = {
       key: 'all_beers_api_url',
       value: 'https://example.com/api',
-      description: 'API endpoint for fetching all beers'
+      description: 'API endpoint for fetching all beers',
     };
 
     const result = preferenceRowSchema.safeParse(validRow);
@@ -234,7 +231,7 @@ describe('PreferenceRow type and schema', () => {
   it('should validate PreferenceRow with only required fields (key, value)', () => {
     const minimalRow = {
       key: 'test_key',
-      value: 'test_value'
+      value: 'test_value',
     };
 
     const result = preferenceRowSchema.safeParse(minimalRow);
@@ -243,7 +240,7 @@ describe('PreferenceRow type and schema', () => {
 
   it('should reject PreferenceRow missing key', () => {
     const invalidRow = {
-      value: 'test_value'
+      value: 'test_value',
     };
 
     const result = preferenceRowSchema.safeParse(invalidRow);
@@ -252,7 +249,7 @@ describe('PreferenceRow type and schema', () => {
 
   it('should reject PreferenceRow missing value', () => {
     const invalidRow = {
-      key: 'test_key'
+      key: 'test_key',
     };
 
     const result = preferenceRowSchema.safeParse(invalidRow);
@@ -263,59 +260,12 @@ describe('PreferenceRow type and schema', () => {
     const validRow = {
       key: 'test_key',
       value: 'test_value',
-      description: 'test description'
+      description: 'test description',
     };
 
     expect(isPreferenceRow(validRow)).toBe(true);
     expect(isPreferenceRow(null)).toBe(false);
     expect(isPreferenceRow({ key: 'test_key' })).toBe(false);
-  });
-});
-
-describe('UntappdCookieRow type and schema', () => {
-  it('should validate valid UntappdCookieRow with all fields', () => {
-    const validRow = {
-      key: 'auth_token',
-      value: 'abc123xyz',
-      description: 'Untappd authentication token'
-    };
-
-    const result = untappdCookieRowSchema.safeParse(validRow);
-    expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data).toEqual(validRow);
-    }
-  });
-
-  it('should validate UntappdCookieRow with only required fields (key, value)', () => {
-    const minimalRow = {
-      key: 'auth_token',
-      value: 'abc123xyz'
-    };
-
-    const result = untappdCookieRowSchema.safeParse(minimalRow);
-    expect(result.success).toBe(true);
-  });
-
-  it('should reject UntappdCookieRow missing key', () => {
-    const invalidRow = {
-      value: 'abc123xyz'
-    };
-
-    const result = untappdCookieRowSchema.safeParse(invalidRow);
-    expect(result.success).toBe(false);
-  });
-
-  it('should provide type guard for UntappdCookieRow', () => {
-    const validRow = {
-      key: 'auth_token',
-      value: 'abc123xyz',
-      description: 'Untappd authentication token'
-    };
-
-    expect(isUntappdCookieRow(validRow)).toBe(true);
-    expect(isUntappdCookieRow(null)).toBe(false);
-    expect(isUntappdCookieRow({ key: 'auth_token' })).toBe(false);
   });
 });
 
@@ -331,7 +281,7 @@ describe('Database row to domain model conversions', () => {
       brew_container: 'Draft',
       review_count: '10',
       review_rating: '4.5',
-      brew_description: 'A great beer'
+      brew_description: 'A great beer',
     };
 
     const beer = allBeersRowToBeer(dbRow);
@@ -346,7 +296,7 @@ describe('Database row to domain model conversions', () => {
       brew_container: 'Draft',
       review_count: '10',
       review_rating: '4.5',
-      brew_description: 'A great beer'
+      brew_description: 'A great beer',
     });
   });
 
@@ -363,7 +313,7 @@ describe('Database row to domain model conversions', () => {
       review_count: '10',
       review_ratings: '4.5',
       brew_description: 'A great beer',
-      chit_code: 'ABC123'
+      chit_code: 'ABC123',
     };
 
     const beerfinder = tastedBrewRowToBeerfinder(dbRow);
@@ -380,7 +330,7 @@ describe('Database row to domain model conversions', () => {
       review_count: '10',
       review_ratings: '4.5',
       brew_description: 'A great beer',
-      chit_code: 'ABC123'
+      chit_code: 'ABC123',
     });
   });
 
@@ -388,7 +338,7 @@ describe('Database row to domain model conversions', () => {
     const dbRow = {
       reward_id: '123',
       redeemed: 'true',
-      reward_type: 'plate'
+      reward_type: 'plate',
     };
 
     const reward = rewardRowToReward(dbRow);
@@ -396,7 +346,7 @@ describe('Database row to domain model conversions', () => {
     expect(reward).toEqual({
       reward_id: '123',
       redeemed: 'true',
-      reward_type: 'plate'
+      reward_type: 'plate',
     });
   });
 
@@ -404,7 +354,7 @@ describe('Database row to domain model conversions', () => {
     const dbRow = {
       key: 'all_beers_api_url',
       value: 'https://example.com/api',
-      description: 'API endpoint for fetching all beers'
+      description: 'API endpoint for fetching all beers',
     };
 
     const preference = preferenceRowToPreference(dbRow);
@@ -412,7 +362,7 @@ describe('Database row to domain model conversions', () => {
     expect(preference).toEqual({
       key: 'all_beers_api_url',
       value: 'https://example.com/api',
-      description: 'API endpoint for fetching all beers'
+      description: 'API endpoint for fetching all beers',
     });
   });
 });
@@ -422,7 +372,7 @@ describe('Query result validation', () => {
     const rows = [
       { id: '1', brew_name: 'Beer 1', brewer: 'Brewery 1' },
       { id: '2', brew_name: 'Beer 2', brewer: 'Brewery 2' },
-      { id: '3', brew_name: 'Beer 3', brewer: 'Brewery 3' }
+      { id: '3', brew_name: 'Beer 3', brewer: 'Brewery 3' },
     ];
 
     const arraySchema = allBeersRowSchema.array();
@@ -438,7 +388,7 @@ describe('Query result validation', () => {
     const rows = [
       { id: '1', brew_name: 'Beer 1' },
       { id: '2' }, // Missing brew_name
-      { id: '3', brew_name: 'Beer 3' }
+      { id: '3', brew_name: 'Beer 3' },
     ];
 
     const arraySchema = allBeersRowSchema.array();
@@ -450,7 +400,7 @@ describe('Query result validation', () => {
   it('should provide detailed error messages for validation failures', () => {
     const invalidRow = {
       id: 123, // Should be string
-      brew_name: ''  // Should not be empty
+      brew_name: '', // Should not be empty
     };
 
     const result = allBeersRowSchema.safeParse(invalidRow);

@@ -12,11 +12,7 @@
  * @module config
  */
 
-import {
-  InvalidUrlError,
-  InvalidNetworkConfigError,
-  InvalidEnvironmentError
-} from './errors';
+import { InvalidUrlError, InvalidNetworkConfigError, InvalidEnvironmentError } from './errors';
 
 /**
  * Supported application environments
@@ -58,6 +54,20 @@ export interface ExternalServices {
 }
 
 /**
+ * Enrichment service configuration
+ */
+export interface EnrichmentConfig {
+  apiUrl: string | undefined;
+  apiKey: string | undefined;
+  timeout: number;
+  batchSize: number;
+  rateLimitWindow: number;
+  rateLimitMaxRequests: number;
+  isConfigured: () => boolean;
+  getFullUrl: (endpoint: 'beers' | 'batch' | 'sync' | 'health') => string;
+}
+
+/**
  * API configuration interface
  */
 export interface ApiConfig {
@@ -79,6 +89,7 @@ export interface AppConfig {
   api: ApiConfig;
   network: NetworkConfig;
   external: ExternalServices;
+  enrichment: EnrichmentConfig;
   getEnvironment: () => AppEnvironment;
   setEnvironment: (env: AppEnvironment) => void;
   setCustomApiUrl: (url: string) => void;
@@ -95,6 +106,7 @@ export interface AppConfig {
  * @returns Environment variable value or default
  */
 function getEnvString(key: string, defaultValue: string): string {
+  // eslint-disable-next-line expo/no-dynamic-env-var
   const value = process.env[key];
   if (!value) {
     return defaultValue;
@@ -110,6 +122,7 @@ function getEnvString(key: string, defaultValue: string): string {
  * @returns Parsed number or default
  */
 function getEnvNumber(key: string, defaultValue: number): number {
+  // eslint-disable-next-line expo/no-dynamic-env-var
   const value = process.env[key];
   if (!value) {
     return defaultValue;
@@ -129,6 +142,7 @@ function getEnvNumber(key: string, defaultValue: number): number {
  * @returns Valid AppEnvironment or default
  */
 function getEnvEnvironment(key: string, defaultValue: AppEnvironment): AppEnvironment {
+  // eslint-disable-next-line expo/no-dynamic-env-var
   const value = process.env[key];
   if (!value) {
     return defaultValue;
@@ -175,40 +189,39 @@ function isValidUrl(url: string): boolean {
 function validateUrl(url: string, context: string = 'URL'): void {
   if (!url || url.trim() === '') {
     throw new InvalidUrlError(
-      `Invalid ${context}: URL cannot be empty. ` +
-      `Must start with http:// or https://.`
+      `Invalid ${context}: URL cannot be empty. ` + `Must start with http:// or https://.`
     );
   }
 
   if (!url.match(/^https?:\/\//)) {
     throw new InvalidUrlError(
       `Invalid ${context}: "${url}". ` +
-      `Must start with http:// or https://. ` +
-      `Example: https://example.com`
+        `Must start with http:// or https://. ` +
+        `Example: https://example.com`
     );
   }
 
   if (url === 'http://' || url === 'https://') {
     throw new InvalidUrlError(
       `Invalid ${context}: "${url}". ` +
-      `URL must include a domain name. ` +
-      `Example: https://example.com`
+        `URL must include a domain name. ` +
+        `Example: https://example.com`
     );
   }
 
   if (url.includes(' ')) {
     throw new InvalidUrlError(
       `Invalid ${context}: "${url}". ` +
-      `URL cannot contain spaces. ` +
-      `Use proper URL encoding for special characters.`
+        `URL cannot contain spaces. ` +
+        `Use proper URL encoding for special characters.`
     );
   }
 
   if (!isValidUrl(url)) {
     throw new InvalidUrlError(
       `Invalid ${context}: "${url}". ` +
-      `URL is malformed. Must be a valid HTTP or HTTPS URL. ` +
-      `Example: https://api.example.com`
+        `URL is malformed. Must be a valid HTTP or HTTPS URL. ` +
+        `Example: https://api.example.com`
     );
   }
 }
@@ -223,8 +236,8 @@ function validateNetworkConfig(config: NetworkConfig): void {
   if (config.timeout <= 0 || config.timeout > 60000) {
     throw new InvalidNetworkConfigError(
       `Invalid timeout value: ${config.timeout}ms. ` +
-      `Must be between 1 and 60000 (1 minute max). ` +
-      `Check EXPO_PUBLIC_API_TIMEOUT environment variable.`
+        `Must be between 1 and 60000 (1 minute max). ` +
+        `Check EXPO_PUBLIC_API_TIMEOUT environment variable.`
     );
   }
 
@@ -232,8 +245,8 @@ function validateNetworkConfig(config: NetworkConfig): void {
   if (config.retries < 0 || config.retries > 5) {
     throw new InvalidNetworkConfigError(
       `Invalid retries value: ${config.retries}. ` +
-      `Must be between 0 and 5. ` +
-      `Check EXPO_PUBLIC_API_RETRIES environment variable.`
+        `Must be between 0 and 5. ` +
+        `Check EXPO_PUBLIC_API_RETRIES environment variable.`
     );
   }
 
@@ -241,8 +254,8 @@ function validateNetworkConfig(config: NetworkConfig): void {
   if (config.retryDelay <= 0 || config.retryDelay > 10000) {
     throw new InvalidNetworkConfigError(
       `Invalid retry delay value: ${config.retryDelay}ms. ` +
-      `Must be between 1 and 10000 (10 seconds max). ` +
-      `Check EXPO_PUBLIC_API_RETRY_DELAY environment variable.`
+        `Must be between 1 and 10000 (10 seconds max). ` +
+        `Check EXPO_PUBLIC_API_RETRY_DELAY environment variable.`
     );
   }
 }
@@ -254,7 +267,7 @@ function validateNetworkConfig(config: NetworkConfig): void {
 const ENV_BASE_URLS: Record<AppEnvironment, string> = {
   development: 'https://tapthatapp.beerknurd.com', // Same as production for now
   staging: 'https://tapthatapp.beerknurd.com', // Can be changed to staging server when available
-  production: 'https://tapthatapp.beerknurd.com'
+  production: 'https://tapthatapp.beerknurd.com',
 };
 
 /**
@@ -268,8 +281,20 @@ const API_ENDPOINTS: ApiEndpoints = {
   memberDashboard: '/member-dash.php',
   memberRewards: '/memberRewards.php',
   kiosk: '/kiosk.php',
-  visitor: '/visitor.php'
+  visitor: '/visitor.php',
 };
+
+/**
+ * Enrichment service endpoint paths
+ */
+const ENRICHMENT_ENDPOINTS = {
+  beers: '/beers', // GET /beers?sid={storeId}
+  batch: '/beers/batch', // POST /beers/batch
+  sync: '/beers/sync', // POST /beers/sync - sync missing beers to Worker
+  health: '/health', // GET /health
+} as const;
+
+type EnrichmentEndpoint = keyof typeof ENRICHMENT_ENDPOINTS;
 
 /**
  * Gets network configuration dynamically from environment variables
@@ -281,7 +306,7 @@ function getNetworkConfig(): NetworkConfig {
   const config: NetworkConfig = {
     timeout: getEnvNumber('EXPO_PUBLIC_API_TIMEOUT', 15000), // 15 seconds default
     retries: getEnvNumber('EXPO_PUBLIC_API_RETRIES', 3), // 3 retries default
-    retryDelay: getEnvNumber('EXPO_PUBLIC_API_RETRY_DELAY', 1000) // 1 second default
+    retryDelay: getEnvNumber('EXPO_PUBLIC_API_RETRY_DELAY', 1000), // 1 second default
   };
 
   // Validate the configuration
@@ -305,8 +330,34 @@ function getExternalServices(): ExternalServices {
         // Parse out words in parentheses from the beer name
         const parsedBeerName = beerName.replace(/\s*\([^)]*\)\s*/g, ' ').trim();
         return `${untappdBaseUrl}/search?q=${encodeURIComponent(parsedBeerName)}`;
+      },
+    },
+  };
+}
+
+/**
+ * Gets enrichment configuration dynamically from environment variables
+ * This allows tests to set env vars and have them picked up immediately
+ * @returns EnrichmentConfig object
+ */
+function getEnrichmentConfig(): EnrichmentConfig {
+  const apiUrl = process.env.EXPO_PUBLIC_ENRICHMENT_API_URL?.replace(/\/$/, '');
+  const apiKey = process.env.EXPO_PUBLIC_ENRICHMENT_API_KEY;
+
+  return {
+    apiUrl,
+    apiKey,
+    timeout: getEnvNumber('EXPO_PUBLIC_ENRICHMENT_TIMEOUT', 15000),
+    batchSize: getEnvNumber('EXPO_PUBLIC_ENRICHMENT_BATCH_SIZE', 100), // Worker limit
+    rateLimitWindow: getEnvNumber('EXPO_PUBLIC_ENRICHMENT_RATE_WINDOW', 60000), // 1 minute
+    rateLimitMaxRequests: getEnvNumber('EXPO_PUBLIC_ENRICHMENT_RATE_MAX', 10), // 10 requests per minute
+    isConfigured: () => Boolean(apiUrl && apiKey),
+    getFullUrl: (endpoint: EnrichmentEndpoint) => {
+      if (!apiUrl) {
+        throw new Error('Enrichment API URL not configured');
       }
-    }
+      return `${apiUrl}${ENRICHMENT_ENDPOINTS[endpoint]}`;
+    },
   };
 }
 
@@ -331,8 +382,8 @@ function validateEnvironment(env: AppEnvironment): void {
   if (!env || !validEnvs.includes(env)) {
     throw new InvalidEnvironmentError(
       `Invalid environment: "${env}". ` +
-      `Must be one of: ${validEnvs.join(', ')}. ` +
-      `Set EXPO_PUBLIC_DEFAULT_ENV or use config.setEnvironment().`
+        `Must be one of: ${validEnvs.join(', ')}. ` +
+        `Set EXPO_PUBLIC_DEFAULT_ENV or use config.setEnvironment().`
     );
   }
 }
@@ -348,9 +399,10 @@ function getEnvironmentBaseUrl(env: AppEnvironment): string {
   const envVarMap: Record<AppEnvironment, string> = {
     development: 'EXPO_PUBLIC_DEV_API_BASE_URL',
     staging: 'EXPO_PUBLIC_STAGING_API_BASE_URL',
-    production: 'EXPO_PUBLIC_PROD_API_BASE_URL'
+    production: 'EXPO_PUBLIC_PROD_API_BASE_URL',
   };
 
+  // eslint-disable-next-line expo/no-dynamic-env-var
   const envSpecificVar = process.env[envVarMap[env]];
 
   if (envSpecificVar && isValidUrl(envSpecificVar)) {
@@ -387,7 +439,7 @@ function getReferers(): ApiConfig['referers'] {
   return {
     memberDashboard: `${baseUrl}/member-dash.php`,
     memberRewards: `${baseUrl}/memberRewards.php`,
-    memberQueues: `${baseUrl}/memberQueues.php`
+    memberQueues: `${baseUrl}/memberQueues.php`,
   };
 }
 
@@ -430,7 +482,7 @@ export const config: AppConfig = {
       baseUrl: getBaseUrl(),
       endpoints: API_ENDPOINTS,
       referers: getReferers(),
-      getFullUrl
+      getFullUrl,
     };
   },
 
@@ -446,6 +498,13 @@ export const config: AppConfig = {
    */
   get external(): ExternalServices {
     return getExternalServices();
+  },
+
+  /**
+   * Enrichment service configuration (dynamic getter)
+   */
+  get enrichment(): EnrichmentConfig {
+    return getEnrichmentConfig();
   },
 
   /**
@@ -480,31 +539,18 @@ export const config: AppConfig = {
 
     // Remove trailing slash(es) if present
     customApiUrl = url.replace(/\/+$/, '');
-  }
+  },
 };
-
-/**
- * Export types for external use
- */
-export type { ApiConfig };
 
 /**
  * Export error classes for error handling
  */
-export {
-  InvalidUrlError,
-  InvalidNetworkConfigError,
-  InvalidEnvironmentError
-} from './errors';
+export { InvalidUrlError, InvalidNetworkConfigError, InvalidEnvironmentError } from './errors';
 
 /**
  * Convenience exports for commonly used values
  */
-export const {
-  getEnvironment,
-  setEnvironment,
-  setCustomApiUrl
-} = config;
+export const { getEnvironment, setEnvironment, setCustomApiUrl } = config;
 
 /**
  * Default export

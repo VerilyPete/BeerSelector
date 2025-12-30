@@ -10,7 +10,7 @@ import {
   createSequentialResponses,
   createConditionalResponse,
   networkErrorResponse,
-  timeoutResponse
+  timeoutResponse,
 } from './mockServer';
 import { config } from '@/src/config';
 
@@ -82,7 +82,7 @@ describe('MockServer', () => {
     it('should handle port conflicts gracefully', async () => {
       // Start first server
       const server1 = new MockServer();
-      const port1 = await server1.start(3457);
+      await server1.start(3457);
 
       // Try to start second server on same port
       const server2 = new MockServer();
@@ -113,7 +113,7 @@ describe('MockServer', () => {
     it('should set and serve static responses', async () => {
       mockServer.setResponse('/test', {
         status: 200,
-        body: { message: 'Hello, World!' }
+        body: { message: 'Hello, World!' },
       });
 
       const response = await fetch(`${mockServer.getUrl()}/test`);
@@ -126,7 +126,7 @@ describe('MockServer', () => {
     it('should set multiple responses at once', async () => {
       mockServer.setResponses({
         '/api/users': { status: 200, body: [{ id: 1, name: 'User 1' }] },
-        '/api/posts': { status: 200, body: [{ id: 1, title: 'Post 1' }] }
+        '/api/posts': { status: 200, body: [{ id: 1, title: 'Post 1' }] },
       });
 
       const usersResponse = await fetch(`${mockServer.getUrl()}/api/users`);
@@ -149,7 +149,7 @@ describe('MockServer', () => {
     it('should allow setting custom default response', async () => {
       mockServer.setDefaultResponse({
         status: 418,
-        body: { message: "I'm a teapot" }
+        body: { message: "I'm a teapot" },
       });
 
       const response = await fetch(`${mockServer.getUrl()}/unknown`);
@@ -165,8 +165,8 @@ describe('MockServer', () => {
         body: 'OK',
         headers: {
           'X-Custom-Header': 'custom-value',
-          'Content-Type': 'text/plain'
-        }
+          'Content-Type': 'text/plain',
+        },
       });
 
       const response = await fetch(`${mockServer.getUrl()}/with-headers`);
@@ -177,7 +177,7 @@ describe('MockServer', () => {
     it('should support wildcard patterns', async () => {
       mockServer.setResponse('/api/users/*', {
         status: 200,
-        body: { user: 'data' }
+        body: { user: 'data' },
       });
 
       const response = await fetch(`${mockServer.getUrl()}/api/users/123`);
@@ -198,7 +198,7 @@ describe('MockServer', () => {
     it('should clear all responses', async () => {
       mockServer.setResponses({
         '/test1': { status: 200, body: 'OK1' },
-        '/test2': { status: 200, body: 'OK2' }
+        '/test2': { status: 200, body: 'OK2' },
       });
 
       mockServer.clearAllResponses();
@@ -226,7 +226,7 @@ describe('MockServer', () => {
       expect(requests[0]).toMatchObject({
         method: 'GET',
         path: '/track-me',
-        query: { param: 'value' }
+        query: { param: 'value' },
       });
       expect(requests[0].timestamp).toBeInstanceOf(Date);
     });
@@ -238,7 +238,7 @@ describe('MockServer', () => {
       await fetch(`${mockServer.getUrl()}/api/data`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
+        body: JSON.stringify(body),
       });
 
       const requests = mockServer.getRequests();
@@ -246,7 +246,7 @@ describe('MockServer', () => {
       expect(requests[0]).toMatchObject({
         method: 'POST',
         path: '/api/data',
-        body: body
+        body: body,
       });
     });
 
@@ -256,21 +256,21 @@ describe('MockServer', () => {
       await fetch(`${mockServer.getUrl()}/with-headers`, {
         headers: {
           'X-Custom-Header': 'custom-value',
-          'Cookie': 'session=abc123'
-        }
+          Cookie: 'session=abc123',
+        },
       });
 
       const requests = mockServer.getRequests();
       expect(requests[0].headers).toMatchObject({
         'x-custom-header': 'custom-value',
-        'cookie': 'session=abc123'
+        cookie: 'session=abc123',
       });
     });
 
     it('should filter requests by path', async () => {
       mockServer.setResponses({
         '/api/users': { status: 200, body: [] },
-        '/api/posts': { status: 200, body: [] }
+        '/api/posts': { status: 200, body: [] },
       });
 
       await fetch(`${mockServer.getUrl()}/api/users`);
@@ -314,7 +314,7 @@ describe('MockServer', () => {
       mockServer.setResponse('/slow', {
         status: 200,
         body: 'Delayed response',
-        delay: 100
+        delay: 100,
       });
 
       const startTime = Date.now();
@@ -333,7 +333,7 @@ describe('MockServer', () => {
 
       try {
         await fetch(`${mockServer.getUrl()}/timeout`, {
-          signal: controller.signal
+          signal: controller.signal,
         });
         fail('Should have timed out');
       } catch (error: any) {
@@ -351,15 +351,15 @@ describe('MockServer', () => {
 
     it('should support dynamic response handlers', async () => {
       let callCount = 0;
-      mockServer.setResponse('/dynamic', (req) => {
+      mockServer.setResponse('/dynamic', req => {
         callCount++;
         return {
           status: 200,
           body: {
             count: callCount,
             method: req.method,
-            query: req.query
-          }
+            query: req.query,
+          },
         };
       });
 
@@ -368,7 +368,7 @@ describe('MockServer', () => {
       expect(data1).toEqual({
         count: 1,
         method: 'GET',
-        query: { test: '1' }
+        query: { test: '1' },
       });
 
       const response2 = await fetch(`${mockServer.getUrl()}/dynamic?test=2`);
@@ -376,7 +376,7 @@ describe('MockServer', () => {
       expect(data2).toEqual({
         count: 2,
         method: 'GET',
-        query: { test: '2' }
+        query: { test: '2' },
       });
     });
 
@@ -384,7 +384,7 @@ describe('MockServer', () => {
       const responses = [
         { status: 200, body: { message: 'First' } },
         { status: 201, body: { message: 'Second' } },
-        { status: 202, body: { message: 'Third' } }
+        { status: 202, body: { message: 'Third' } },
       ];
 
       mockServer.setResponse('/sequential', createSequentialResponses(responses));
@@ -408,14 +408,17 @@ describe('MockServer', () => {
     });
 
     it('should support conditional responses helper', async () => {
-      mockServer.setResponse('/conditional', createConditionalResponse(
-        [
-          [req => req.query.type === 'success', { status: 200, body: { result: 'success' } }],
-          [req => req.query.type === 'error', { status: 500, body: { error: 'Server error' } }],
-          [req => req.method === 'POST', { status: 201, body: { created: true } }]
-        ],
-        { status: 400, body: { error: 'Bad request' } }
-      ));
+      mockServer.setResponse(
+        '/conditional',
+        createConditionalResponse(
+          [
+            [req => req.query.type === 'success', { status: 200, body: { result: 'success' } }],
+            [req => req.query.type === 'error', { status: 500, body: { error: 'Server error' } }],
+            [req => req.method === 'POST', { status: 201, body: { created: true } }],
+          ],
+          { status: 400, body: { error: 'Bad request' } }
+        )
+      );
 
       // Test success condition
       const successResponse = await fetch(`${mockServer.getUrl()}/conditional?type=success`);
@@ -429,7 +432,7 @@ describe('MockServer', () => {
 
       // Test POST condition
       const postResponse = await fetch(`${mockServer.getUrl()}/conditional`, {
-        method: 'POST'
+        method: 'POST',
       });
       expect(postResponse.status).toBe(201);
       expect(await postResponse.json()).toEqual({ created: true });
@@ -452,7 +455,7 @@ describe('MockServer', () => {
       const response = await fetch(`${mockServer.getUrl()}/test`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: 'not json'
+        body: 'not json',
       });
 
       expect(response.status).toBe(200);
@@ -553,7 +556,7 @@ describe('MockServer', () => {
       // Set up mock response
       mockServer.setResponse('/memberQueues.php', {
         status: 200,
-        body: [null, { brewInStock: [{ id: 1, name: 'Test Beer' }] }]
+        body: [null, { brewInStock: [{ id: 1, name: 'Test Beer' }] }],
       });
 
       // Configure the config module to use our mock server
@@ -583,7 +586,7 @@ describe('MockServer', () => {
     it('should handle referer headers from config', async () => {
       mockServer.setResponse('/member-dash.php', {
         status: 200,
-        body: '<html>Dashboard</html>'
+        body: '<html>Dashboard</html>',
       });
 
       const mockUrl = mockServer.getUrl();
@@ -594,8 +597,8 @@ describe('MockServer', () => {
       // Make request with referer from config
       const response = await fetch(config.api.getFullUrl('memberDashboard'), {
         headers: {
-          'referer': config.api.referers.memberDashboard
-        }
+          referer: config.api.referers.memberDashboard,
+        },
       });
 
       expect(response.status).toBe(200);
@@ -607,7 +610,7 @@ describe('MockServer', () => {
     it('should handle query parameters with config URLs', async () => {
       mockServer.setResponse('/deleteQueuedBrew.php', {
         status: 200,
-        body: { success: true }
+        body: { success: true },
       });
 
       const mockUrl = mockServer.getUrl();
@@ -638,7 +641,7 @@ describe('MockServer helpers', () => {
       expect(response).toEqual({
         status: 0,
         body: undefined,
-        headers: {}
+        headers: {},
       });
     });
   });
@@ -649,7 +652,7 @@ describe('MockServer helpers', () => {
       expect(response).toEqual({
         status: 200,
         body: { message: 'This will timeout' },
-        delay: 30000
+        delay: 30000,
       });
     });
 
@@ -658,7 +661,7 @@ describe('MockServer helpers', () => {
       expect(response).toEqual({
         status: 200,
         body: { message: 'This will timeout' },
-        delay: 5000
+        delay: 5000,
       });
     });
   });
@@ -719,7 +722,7 @@ describe('setupMockServer helper', () => {
 
     result.mockServer.setResponse('/test', {
       status: 200,
-      body: { success: true }
+      body: { success: true },
     });
 
     const response = await nodeFetch(`${result.mockServer.getUrl()}/test`);
@@ -759,7 +762,7 @@ describe('FlyingSaucerResponses presets', () => {
       const { FlyingSaucerResponses } = require('./mockServer');
       const testBeers = [
         { id: 1, name: 'IPA', brewery: 'Local' },
-        { id: 2, name: 'Stout', brewery: 'Craft' }
+        { id: 2, name: 'Stout', brewery: 'Craft' },
       ];
 
       mockServer.setResponse('/memberQueues.php', FlyingSaucerResponses.beers(testBeers));
@@ -786,9 +789,7 @@ describe('FlyingSaucerResponses presets', () => {
   describe('myBeers()', () => {
     it('should create proper tasted beers response', async () => {
       const { FlyingSaucerResponses } = require('./mockServer');
-      const tastedBeers = [
-        { id: 1, name: 'Tasted IPA', tasted: true }
-      ];
+      const tastedBeers = [{ id: 1, name: 'Tasted IPA', tasted: true }];
 
       mockServer.setResponse('/myBeers.php', FlyingSaucerResponses.myBeers(tastedBeers));
 
@@ -803,9 +804,7 @@ describe('FlyingSaucerResponses presets', () => {
   describe('rewards()', () => {
     it('should create proper rewards response', async () => {
       const { FlyingSaucerResponses } = require('./mockServer');
-      const rewardsList = [
-        { id: 1, name: 'Plate 1', earned: true }
-      ];
+      const rewardsList = [{ id: 1, name: 'Plate 1', earned: true }];
 
       mockServer.setResponse('/rewards.php', FlyingSaucerResponses.rewards(rewardsList));
 
@@ -954,7 +953,7 @@ describe('RequestMatcher', () => {
 
       expect(() => {
         mockServer.expectRequest('/api/search').toHaveBeenCalledWith({
-          query: { q: 'test', page: '1' }
+          query: { q: 'test', page: '1' },
         });
       }).not.toThrow();
     });
@@ -965,12 +964,12 @@ describe('RequestMatcher', () => {
       await fetch(`${mockServer.getUrl()}/api/create`, {
         method: 'POST',
         body: JSON.stringify({ name: 'Test' }),
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
       });
 
       expect(() => {
         mockServer.expectRequest('/api/create').toHaveBeenCalledWith({
-          method: 'POST'
+          method: 'POST',
         });
       }).not.toThrow();
     });
@@ -982,12 +981,12 @@ describe('RequestMatcher', () => {
       await fetch(`${mockServer.getUrl()}/api/create`, {
         method: 'POST',
         body: JSON.stringify(testData),
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
       });
 
       expect(() => {
         mockServer.expectRequest('/api/create').toHaveBeenCalledWith({
-          body: testData
+          body: testData,
         });
       }).not.toThrow();
     });
@@ -998,13 +997,13 @@ describe('RequestMatcher', () => {
       await fetch(`${mockServer.getUrl()}/api/auth`, {
         headers: {
           'X-Auth-Token': 'abc123',
-          'Content-Type': 'application/json'
-        }
+          'Content-Type': 'application/json',
+        },
       });
 
       expect(() => {
         mockServer.expectRequest('/api/auth').toHaveBeenCalledWith({
-          headers: { 'x-auth-token': 'abc123' }
+          headers: { 'x-auth-token': 'abc123' },
         });
       }).not.toThrow();
     });
@@ -1016,7 +1015,7 @@ describe('RequestMatcher', () => {
 
       expect(() => {
         mockServer.expectRequest('/api/test').toHaveBeenCalledWith({
-          query: { foo: 'baz' }
+          query: { foo: 'baz' },
         });
       }).toThrow('Expected /api/test to have been called with');
     });

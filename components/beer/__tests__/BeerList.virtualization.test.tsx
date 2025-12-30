@@ -22,7 +22,7 @@ import React from 'react';
 import { render } from '@testing-library/react-native';
 import { FlatList } from 'react-native';
 import { BeerList } from '../BeerList';
-import { BeerWithGlassType } from '@/src/types/beer';
+import { BeerWithContainerType } from '@/src/types/beer';
 
 // Mock dependencies
 jest.mock('@/hooks/useThemeColor', () => ({
@@ -30,11 +30,11 @@ jest.mock('@/hooks/useThemeColor', () => ({
 }));
 
 jest.mock('../../ThemedView', () => ({
-  ThemedView: ({ children, ...props }: any) => <>{children}</>,
+  ThemedView: ({ children }: { children?: React.ReactNode }) => <>{children}</>,
 }));
 
 jest.mock('../../ThemedText', () => ({
-  ThemedText: ({ children, ...props }: any) => <>{children}</>,
+  ThemedText: ({ children }: { children?: React.ReactNode }) => <>{children}</>,
 }));
 
 jest.mock('../BeerItem', () => ({
@@ -42,7 +42,7 @@ jest.mock('../BeerItem', () => ({
 }));
 
 describe('BeerList - Virtualization Window Tuning (Bottleneck #6)', () => {
-  const createMockBeer = (id: string): BeerWithGlassType => ({
+  const createMockBeer = (id: string): BeerWithContainerType => ({
     id,
     brew_name: `Test Beer ${id}`,
     brewer: 'Test Brewery',
@@ -51,10 +51,12 @@ describe('BeerList - Virtualization Window Tuning (Bottleneck #6)', () => {
     brewer_loc: 'Austin, TX',
     brew_container: 'Draft',
     brew_description: 'Test description',
-    glass_type: 'tulip', // Pre-computed glass type for IPA
+    container_type: 'tulip', // Pre-computed glass type for IPA
+    enrichment_confidence: null,
+    enrichment_source: null,
   });
 
-  const mockBeers: BeerWithGlassType[] = Array.from({ length: 200 }, (_, i) =>
+  const mockBeers: BeerWithContainerType[] = Array.from({ length: 200 }, (_, i) =>
     createMockBeer(String(i + 1))
   );
 
@@ -154,16 +156,18 @@ describe('BeerList - Virtualization Window Tuning (Bottleneck #6)', () => {
       // - Above: 10 screens * 10 items = 100 items
       // - Below: 10 screens * 10 items = 100 items
       // - Total: 210 items
-      const currentRendered = VISIBLE_ITEMS_PER_SCREEN +
-        (Math.floor(WINDOW_SIZE_CURRENT / 2) * VISIBLE_ITEMS_PER_SCREEN * 2);
+      const currentRendered =
+        VISIBLE_ITEMS_PER_SCREEN +
+        Math.floor(WINDOW_SIZE_CURRENT / 2) * VISIBLE_ITEMS_PER_SCREEN * 2;
 
       // Optimized rendering (windowSize=11):
       // - Visible: 10 items
       // - Above: 5 screens * 10 items = 50 items
       // - Below: 5 screens * 10 items = 50 items
       // - Total: 110 items
-      const optimizedRendered = VISIBLE_ITEMS_PER_SCREEN +
-        (Math.floor(WINDOW_SIZE_OPTIMIZED / 2) * VISIBLE_ITEMS_PER_SCREEN * 2);
+      const optimizedRendered =
+        VISIBLE_ITEMS_PER_SCREEN +
+        Math.floor(WINDOW_SIZE_OPTIMIZED / 2) * VISIBLE_ITEMS_PER_SCREEN * 2;
 
       // Memory reduction calculation
       const reduction = ((currentRendered - optimizedRendered) / currentRendered) * 100;
@@ -234,9 +238,7 @@ describe('BeerList - Virtualization Window Tuning (Bottleneck #6)', () => {
     });
 
     it('should have optimized props for large datasets', () => {
-      const largeBeers = Array.from({ length: 1000 }, (_, i) =>
-        createMockBeer(String(i + 1))
-      );
+      const largeBeers = Array.from({ length: 1000 }, (_, i) => createMockBeer(String(i + 1)));
 
       const { UNSAFE_getByType } = render(
         <BeerList
@@ -320,9 +322,7 @@ describe('BeerList - Virtualization Window Tuning (Bottleneck #6)', () => {
 
   describe('Memory Efficiency Scenarios', () => {
     it('should optimize memory with small datasets (< 50 beers)', () => {
-      const smallBeers = Array.from({ length: 30 }, (_, i) =>
-        createMockBeer(String(i + 1))
-      );
+      const smallBeers = Array.from({ length: 30 }, (_, i) => createMockBeer(String(i + 1)));
 
       const { UNSAFE_getByType } = render(
         <BeerList
@@ -342,9 +342,7 @@ describe('BeerList - Virtualization Window Tuning (Bottleneck #6)', () => {
     });
 
     it('should optimize memory with medium datasets (50-200 beers)', () => {
-      const mediumBeers = Array.from({ length: 150 }, (_, i) =>
-        createMockBeer(String(i + 1))
-      );
+      const mediumBeers = Array.from({ length: 150 }, (_, i) => createMockBeer(String(i + 1)));
 
       const { UNSAFE_getByType } = render(
         <BeerList
@@ -364,9 +362,7 @@ describe('BeerList - Virtualization Window Tuning (Bottleneck #6)', () => {
     });
 
     it('should optimize memory with large datasets (> 200 beers)', () => {
-      const largeBeers = Array.from({ length: 500 }, (_, i) =>
-        createMockBeer(String(i + 1))
-      );
+      const largeBeers = Array.from({ length: 500 }, (_, i) => createMockBeer(String(i + 1)));
 
       const { UNSAFE_getByType } = render(
         <BeerList
@@ -461,9 +457,7 @@ describe('BeerList - Virtualization Window Tuning (Bottleneck #6)', () => {
     });
 
     it('should handle exactly windowSize items', () => {
-      const exactBeers = Array.from({ length: 11 }, (_, i) =>
-        createMockBeer(String(i + 1))
-      );
+      const exactBeers = Array.from({ length: 11 }, (_, i) => createMockBeer(String(i + 1)));
 
       const { UNSAFE_getByType } = render(
         <BeerList

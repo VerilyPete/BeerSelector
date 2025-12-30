@@ -28,7 +28,7 @@ import { useOperationQueue } from '@/context/OperationQueueContext';
 import { useOptimisticUpdate } from '@/context/OptimisticUpdateContext';
 import { useAppContext } from '@/context/AppContext';
 import { checkInBeer as checkInBeerApi } from '@/src/api/beerService';
-import { BeerWithGlassType } from '@/src/types/beer';
+import { BeerWithContainerType } from '@/src/types/beer';
 import { OperationType, CheckInBeerPayload } from '@/src/types/operationQueue';
 import { OptimisticUpdateType, OptimisticUpdateStatus } from '@/src/types/optimisticUpdate';
 import { getSessionData } from '@/src/api/sessionManager';
@@ -37,7 +37,7 @@ import { updateLiveActivityWithQueue } from '@/src/services/liveActivityService'
 
 export interface UseOptimisticCheckInResult {
   /** Execute a check-in with optimistic UI updates */
-  checkInBeer: (beer: BeerWithGlassType) => Promise<void>;
+  checkInBeer: (beer: BeerWithContainerType) => Promise<void>;
 
   /** Whether a check-in is currently in progress */
   isChecking: boolean;
@@ -66,7 +66,7 @@ export const useOptimisticCheckIn = (): UseOptimisticCheckInResult => {
    * Check in a beer with optimistic UI update
    */
   const checkInBeer = useCallback(
-    async (beer: BeerWithGlassType): Promise<void> => {
+    async (beer: BeerWithContainerType): Promise<void> => {
       setIsChecking(true);
 
       try {
@@ -165,11 +165,13 @@ export const useOptimisticCheckIn = (): UseOptimisticCheckInResult => {
           addQueuedBeer(beer.id);
 
           // Update Live Activity with current queue (iOS only)
-          // Note: sessionData is already available from the outer scope, no need to re-fetch
           if (Platform.OS === 'ios') {
             try {
               const queuedBeers = await getQueuedBeers();
-              await updateLiveActivityWithQueue(queuedBeers, sessionData, false);
+              const currentSessionData = await getSessionData();
+              if (currentSessionData) {
+                await updateLiveActivityWithQueue(queuedBeers, currentSessionData, false);
+              }
             } catch (liveActivityError) {
               // Live Activity errors should never block the main flow
               console.log('[useOptimisticCheckIn] Live Activity update failed:', liveActivityError);

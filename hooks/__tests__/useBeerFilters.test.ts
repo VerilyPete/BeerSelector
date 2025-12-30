@@ -1,18 +1,8 @@
 import { applyFilters, applySorting } from '../useBeerFilters';
-
-type Beer = {
-  id: string;
-  brew_name: string;
-  brewer: string;
-  brewer_loc: string;
-  brew_style: string;
-  brew_container: string;
-  brew_description: string;
-  added_date: string;
-};
+import { BeerWithContainerType } from '@/src/types/beer';
 
 describe('useBeerFilters - Filter Logic', () => {
-  const mockBeers: Beer[] = [
+  const mockBeers: BeerWithContainerType[] = [
     {
       id: '1',
       brew_name: 'Alpha IPA',
@@ -22,6 +12,9 @@ describe('useBeerFilters - Filter Logic', () => {
       brew_container: 'Draft',
       brew_description: 'A hoppy beer',
       added_date: '1704067200', // Jan 1, 2024
+      container_type: 'tulip',
+      enrichment_confidence: null,
+      enrichment_source: null,
     },
     {
       id: '2',
@@ -32,6 +25,9 @@ describe('useBeerFilters - Filter Logic', () => {
       brew_container: 'Bottle',
       brew_description: 'A dark beer',
       added_date: '1704153600', // Jan 2, 2024
+      container_type: 'pint',
+      enrichment_confidence: null,
+      enrichment_source: null,
     },
     {
       id: '3',
@@ -42,6 +38,9 @@ describe('useBeerFilters - Filter Logic', () => {
       brew_container: 'Draft',
       brew_description: 'A smooth porter',
       added_date: '1704240000', // Jan 3, 2024
+      container_type: 'pint',
+      enrichment_confidence: null,
+      enrichment_source: null,
     },
     {
       id: '4',
@@ -52,6 +51,9 @@ describe('useBeerFilters - Filter Logic', () => {
       brew_container: 'Can',
       brew_description: 'A crisp lager',
       added_date: '1704326400', // Jan 4, 2024
+      container_type: 'pint',
+      enrichment_confidence: null,
+      enrichment_source: null,
     },
     {
       id: '5',
@@ -62,6 +64,9 @@ describe('useBeerFilters - Filter Logic', () => {
       brew_container: 'Draft',
       brew_description: 'A juicy IPA',
       added_date: '1704412800', // Jan 5, 2024
+      container_type: 'tulip',
+      enrichment_confidence: null,
+      enrichment_source: null,
     },
   ];
 
@@ -106,7 +111,7 @@ describe('useBeerFilters - Filter Logic', () => {
       });
 
       it('should handle case-insensitive style matching for heavies', () => {
-        const beersWithVariedCase: Beer[] = [
+        const beersWithVariedCase: BeerWithContainerType[] = [
           {
             ...mockBeers[0],
             id: '10',
@@ -140,7 +145,7 @@ describe('useBeerFilters - Filter Logic', () => {
         });
 
         expect(result).toHaveLength(2); // IDs 1 (IPA), 5 (Hazy IPA)
-        expect(result.every(b => b.brew_style.toLowerCase().includes('ipa'))).toBe(true);
+        expect(result.every(b => b.brew_style?.toLowerCase().includes('ipa'))).toBe(true);
       });
     });
 
@@ -154,9 +159,11 @@ describe('useBeerFilters - Filter Logic', () => {
         });
 
         expect(result).toHaveLength(2); // IDs 1, 5 (both Draft IPAs)
-        expect(result.every(b =>
-          b.brew_container === 'Draft' && b.brew_style.toLowerCase().includes('ipa')
-        )).toBe(true);
+        expect(
+          result.every(
+            b => b.brew_container === 'Draft' && b.brew_style?.toLowerCase().includes('ipa')
+          )
+        ).toBe(true);
       });
 
       it('should combine Draft and Heavies filters', () => {
@@ -271,7 +278,7 @@ describe('useBeerFilters - Filter Logic', () => {
       });
 
       it('should handle beers with null/undefined fields', () => {
-        const beersWithNulls: Beer[] = [
+        const beersWithNulls: BeerWithContainerType[] = [
           {
             id: '1',
             brew_name: 'Test Beer',
@@ -281,6 +288,9 @@ describe('useBeerFilters - Filter Logic', () => {
             brew_container: '',
             brew_description: '',
             added_date: '',
+            container_type: 'pint',
+            enrichment_confidence: null,
+            enrichment_source: null,
           },
         ];
 
@@ -329,7 +339,7 @@ describe('useBeerFilters - Filter Logic', () => {
     });
 
     it('should handle beers with null/empty names', () => {
-      const beersWithEmptyNames: Beer[] = [
+      const beersWithEmptyNames: BeerWithContainerType[] = [
         { ...mockBeers[0], brew_name: '' },
         { ...mockBeers[1], brew_name: 'Alpha' },
       ];
@@ -340,7 +350,7 @@ describe('useBeerFilters - Filter Logic', () => {
     });
 
     it('should handle beers with null/empty dates', () => {
-      const beersWithEmptyDates: Beer[] = [
+      const beersWithEmptyDates: BeerWithContainerType[] = [
         { ...mockBeers[0], added_date: '' },
         { ...mockBeers[1], added_date: '1704153600' },
       ];

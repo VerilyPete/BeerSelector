@@ -1,6 +1,6 @@
 import { SQLiteDatabase } from 'expo-sqlite';
 
-export const CURRENT_SCHEMA_VERSION = 3;
+export const CURRENT_SCHEMA_VERSION = 7;
 
 export const CREATE_SCHEMA_VERSION_TABLE = `
   CREATE TABLE IF NOT EXISTS schema_version (
@@ -29,16 +29,18 @@ export async function getCurrentSchemaVersion(db: SQLiteDatabase): Promise<numbe
  * Record that a migration has been applied
  */
 export async function recordMigration(db: SQLiteDatabase, version: number): Promise<void> {
-  await db.runAsync(
-    'INSERT INTO schema_version (version, applied_at) VALUES (?, ?)',
-    [version, new Date().toISOString()]
-  );
+  await db.runAsync('INSERT INTO schema_version (version, applied_at) VALUES (?, ?)', [
+    version,
+    new Date().toISOString(),
+  ]);
 }
 
 /**
  * Get migration history
  */
-export async function getMigrationHistory(db: SQLiteDatabase): Promise<Array<{ version: number; applied_at: string }>> {
+export async function getMigrationHistory(
+  db: SQLiteDatabase
+): Promise<{ version: number; applied_at: string }[]> {
   try {
     return await db.getAllAsync<{ version: number; applied_at: string }>(
       'SELECT version, applied_at FROM schema_version ORDER BY version ASC'

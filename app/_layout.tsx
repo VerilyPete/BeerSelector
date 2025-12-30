@@ -78,6 +78,7 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
   const [loaded] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
+    BeerIcons: require('../assets/fonts/BeerIcons.ttf'),
   });
   const [initialRoute, setInitialRoute] = useState<string | null>(null);
   const [migrationProgress, setMigrationProgress] = useState<number | null>(null);

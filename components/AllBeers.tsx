@@ -5,6 +5,7 @@ import { beerRepository } from '@/src/database/repositories/BeerRepository';
 import { ThemedText } from './ThemedText';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { useUntappdColor } from '@/hooks/useUntappdColor';
+import { useBreakpoint } from '@/hooks/useBreakpoint';
 import { SearchBar } from './SearchBar';
 import { useBeerFilters } from '@/hooks/useBeerFilters';
 import { useDataRefresh } from '@/hooks/useDataRefresh';
@@ -12,13 +13,16 @@ import { FilterBar } from './beer/FilterBar';
 import { BeerList } from './beer/BeerList';
 import { UntappdWebView } from './UntappdWebView';
 import { SkeletonLoader } from './beer/SkeletonLoader';
-import { BeerWithGlassType } from '@/src/types/beer';
+import { BeerWithContainerType } from '@/src/types/beer';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useAppContext } from '@/context/AppContext';
 
 export const AllBeers = () => {
   // MP-4 Step 2: Use context for beer data instead of local state
   const { beers, loading, errors, setAllBeers, setLoadingBeers, setBeerError } = useAppContext();
+
+  // Responsive layout: 1 column on phone, 2 on tablet portrait, 3 on tablet landscape
+  const { numColumns } = useBreakpoint();
 
   const [untappdModalVisible, setUntappdModalVisible] = useState(false);
   const [selectedBeerName, setSelectedBeerName] = useState('');
@@ -35,7 +39,6 @@ export const AllBeers = () => {
     filteredBeers,
     filters,
     sortBy,
-    searchText,
     expandedId,
     setSearchText,
     toggleFilter,
@@ -56,9 +59,7 @@ export const AllBeers = () => {
     try {
       setLoadingBeers(true);
       const data = await beerRepository.getAll();
-      // Filter out any beers with empty or null brew_name
-      const filteredData = data.filter(beer => beer.brew_name && beer.brew_name.trim() !== '');
-      setAllBeers(filteredData);
+      setAllBeers(data);
       setBeerError(null);
     } catch (err) {
       console.error('Failed to load beers:', err);
@@ -72,8 +73,7 @@ export const AllBeers = () => {
   const { refreshing, handleRefresh } = useDataRefresh({
     onDataReloaded: async () => {
       const freshBeers = await beerRepository.getAll();
-      const filteredData = freshBeers.filter(beer => beer.brew_name && beer.brew_name.trim() !== '');
-      setAllBeers(filteredData);
+      setAllBeers(freshBeers);
       setBeerError(null);
     },
     componentName: 'AllBeers',
@@ -106,21 +106,24 @@ export const AllBeers = () => {
 
   // No useCallback wrapper - matches Beerfinder pattern
   // Function is called during render for each visible item, memoization doesn't help
-  const renderBeerActions = (item: BeerWithGlassType) => (
+  const renderBeerActions = (item: BeerWithContainerType) => (
     <View style={styles.buttonContainer}>
       <TouchableOpacity
-        style={[styles.checkInButton, {
-          backgroundColor: untappdColor,
-          width: '48%'
-        }]}
+        style={[
+          styles.checkInButton,
+          {
+            backgroundColor: untappdColor,
+            width: '48%',
+          },
+        ]}
         onPress={() => handleUntappdSearch(item.brew_name)}
         activeOpacity={0.7}
         accessible={true}
         accessibilityLabel={`Check ${item.brew_name} on Untappd`}
         accessibilityRole="button"
       >
-        <ThemedText style={styles.checkInButtonText}>
-          Check Untappd
+        <ThemedText style={styles.checkInButtonText} numberOfLines={1}>
+          Untappd
         </ThemedText>
       </TouchableOpacity>
     </View>
@@ -144,15 +147,15 @@ export const AllBeers = () => {
         </>
       ) : errors.beerError ? (
         <View style={styles.centered} testID="error-container">
-          <ThemedText style={styles.errorText} testID="error-message">{errors.beerError}</ThemedText>
+          <ThemedText style={styles.errorText} testID="error-message">
+            {errors.beerError}
+          </ThemedText>
           <TouchableOpacity
             style={[styles.refreshButton, { backgroundColor: activeButtonColor }]}
             onPress={loadBeers}
             testID="try-again-button"
           >
-            <ThemedText style={[styles.buttonText, { color: 'white' }]}>
-              Try Again
-            </ThemedText>
+            <ThemedText style={[styles.buttonText, { color: 'white' }]}>Try Again</ThemedText>
           </TouchableOpacity>
         </View>
       ) : (
@@ -187,6 +190,7 @@ export const AllBeers = () => {
             expandedId={expandedId}
             onToggleExpand={toggleExpand}
             renderItemActions={renderBeerActions}
+            numColumns={numColumns}
           />
 
           <UntappdWebView
