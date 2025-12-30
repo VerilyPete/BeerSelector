@@ -1,6 +1,8 @@
 import React from 'react';
 import { render, fireEvent } from '@testing-library/react-native';
 
+import { BeerItem } from '../BeerItem';
+
 // Mock theme hooks before importing component
 jest.mock('@/hooks/useColorScheme', () => ({
   useColorScheme: jest.fn(() => 'light'),
@@ -13,8 +15,6 @@ jest.mock('@/hooks/useThemeColor', () => ({
 // Mock ThemedText and ThemedView to use plain React Native components
 jest.mock('@/components/ThemedText');
 jest.mock('@/components/ThemedView');
-
-import { BeerItem } from '../BeerItem';
 
 // Use real timers for this test suite to avoid hanging
 beforeAll(() => {
@@ -35,7 +35,9 @@ describe('BeerItem', () => {
     brew_container: '16oz Can',
     brew_description: '<p>A delicious test beer with hoppy notes.</p>',
     added_date: '1699564800', // Unix timestamp (Nov 10, 2023)
-    glass_type: 'tulip' as const, // Pre-computed glass type (tulip for IPA)
+    container_type: 'tulip' as const, // Pre-computed container type (tulip for draft IPA)
+    enrichment_confidence: null,
+    enrichment_source: null,
   };
 
   const mockOnToggle = jest.fn();
@@ -47,11 +49,7 @@ describe('BeerItem', () => {
   // Test 1: Renders collapsed state correctly
   test('renders collapsed state correctly', () => {
     const { getByText, queryByText } = render(
-      <BeerItem
-        beer={mockBeer}
-        isExpanded={false}
-        onToggle={mockOnToggle}
-      />
+      <BeerItem beer={mockBeer} isExpanded={false} onToggle={mockOnToggle} />
     );
 
     // Should show basic info
@@ -61,33 +59,25 @@ describe('BeerItem', () => {
     expect(getByText(/16oz Can/)).toBeTruthy();
 
     // Should NOT show description in collapsed state
-    expect(queryByText('Description:')).toBeNull();
+    expect(queryByText('Description')).toBeNull();
     expect(queryByText(/delicious test beer/)).toBeNull();
   });
 
   // Test 2: Renders expanded state with description
   test('renders expanded state with description', () => {
     const { getByText } = render(
-      <BeerItem
-        beer={mockBeer}
-        isExpanded={true}
-        onToggle={mockOnToggle}
-      />
+      <BeerItem beer={mockBeer} isExpanded={true} onToggle={mockOnToggle} />
     );
 
     // Should show description when expanded
-    expect(getByText('Description:')).toBeTruthy();
+    expect(getByText('Description')).toBeTruthy();
     expect(getByText(/delicious test beer/)).toBeTruthy();
   });
 
   // Test 3: Toggles expand/collapse on press
   test('calls onToggle with beer id when pressed', () => {
     const { getByText } = render(
-      <BeerItem
-        beer={mockBeer}
-        isExpanded={false}
-        onToggle={mockOnToggle}
-      />
+      <BeerItem beer={mockBeer} isExpanded={false} onToggle={mockOnToggle} />
     );
 
     // Press the beer item
@@ -101,12 +91,7 @@ describe('BeerItem', () => {
   // Test 4: Formats timestamp date correctly (added_date)
   test('formats unix timestamp date correctly', () => {
     const { getByText } = render(
-      <BeerItem
-        beer={mockBeer}
-        isExpanded={false}
-        onToggle={mockOnToggle}
-        dateLabel="Date Added"
-      />
+      <BeerItem beer={mockBeer} isExpanded={false} onToggle={mockOnToggle} dateLabel="Date Added" />
     );
 
     // Should display formatted date
@@ -124,12 +109,7 @@ describe('BeerItem', () => {
     };
 
     const { getByText } = render(
-      <BeerItem
-        beer={tastedBeer}
-        isExpanded={false}
-        onToggle={mockOnToggle}
-        dateLabel="Tasted"
-      />
+      <BeerItem beer={tastedBeer} isExpanded={false} onToggle={mockOnToggle} dateLabel="Tasted" />
     );
 
     // Should display formatted tasted date
@@ -145,11 +125,7 @@ describe('BeerItem', () => {
     };
 
     const { getByText } = render(
-      <BeerItem
-        beer={beerWithInvalidDate}
-        isExpanded={false}
-        onToggle={mockOnToggle}
-      />
+      <BeerItem beer={beerWithInvalidDate} isExpanded={false} onToggle={mockOnToggle} />
     );
 
     // Should show "Invalid Date" for malformed dates (note capitalization)
@@ -167,15 +143,13 @@ describe('BeerItem', () => {
       brew_container: '',
       brew_description: '',
       added_date: '1699564800',
-      glass_type: null as const, // Pre-computed glass type (null for Lager)
+      container_type: null, // Pre-computed container type (null for unknown containers)
+      enrichment_confidence: null,
+      enrichment_source: null,
     };
 
-    const { getByText, queryByText } = render(
-      <BeerItem
-        beer={minimalBeer}
-        isExpanded={false}
-        onToggle={mockOnToggle}
-      />
+    const { getByText } = render(
+      <BeerItem beer={minimalBeer} isExpanded={false} onToggle={mockOnToggle} />
     );
 
     // Should render without crashing
@@ -195,7 +169,7 @@ describe('BeerItem', () => {
       return <View testID="custom-action" />;
     };
 
-    const { getByTestId, queryByTestId } = render(
+    const { getByTestId } = render(
       <BeerItem
         beer={mockBeer}
         isExpanded={true}
@@ -229,11 +203,7 @@ describe('BeerItem', () => {
     };
 
     const { getByText } = render(
-      <BeerItem
-        beer={beerWithEmptyDate}
-        isExpanded={false}
-        onToggle={mockOnToggle}
-      />
+      <BeerItem beer={beerWithEmptyDate} isExpanded={false} onToggle={mockOnToggle} />
     );
 
     // Should show "Unknown date" for empty dates
@@ -248,11 +218,7 @@ describe('BeerItem', () => {
     };
 
     const { getByText } = render(
-      <BeerItem
-        beer={beerWithHtmlDescription}
-        isExpanded={true}
-        onToggle={mockOnToggle}
-      />
+      <BeerItem beer={beerWithHtmlDescription} isExpanded={true} onToggle={mockOnToggle} />
     );
 
     // Should strip <p> and <br> tags
@@ -262,11 +228,7 @@ describe('BeerItem', () => {
   // Test 11: Uses default date label when not provided
   test('uses default date label when not provided', () => {
     const { getByText } = render(
-      <BeerItem
-        beer={mockBeer}
-        isExpanded={false}
-        onToggle={mockOnToggle}
-      />
+      <BeerItem beer={mockBeer} isExpanded={false} onToggle={mockOnToggle} />
     );
 
     // Should use default "Date Added" label
@@ -281,11 +243,7 @@ describe('BeerItem', () => {
     };
 
     const { getByText } = render(
-      <BeerItem
-        beer={unnamedBeer}
-        isExpanded={false}
-        onToggle={mockOnToggle}
-      />
+      <BeerItem beer={unnamedBeer} isExpanded={false} onToggle={mockOnToggle} />
     );
 
     // Should show "Unnamed Beer" fallback

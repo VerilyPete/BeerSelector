@@ -1,7 +1,6 @@
 import { checkInBeer, getBeerDetails, searchBeers } from '../beerService';
 import { getSessionData } from '../sessionManager';
 import { autoLogin } from '../authService';
-import { ApiError } from '../../types/api';
 
 // Mock dependencies
 jest.mock('../sessionManager');
@@ -28,7 +27,7 @@ describe('beerService', () => {
       memberId: 'test-member-id',
       storeId: 'test-store-id',
       storeName: 'Test Store',
-      sessionId: 'test-session-id'
+      sessionId: 'test-session-id',
     });
 
     (autoLogin as jest.Mock).mockResolvedValue({
@@ -37,8 +36,8 @@ describe('beerService', () => {
         memberId: 'test-member-id',
         storeId: 'test-store-id',
         storeName: 'Test Store',
-        sessionId: 'test-session-id'
-      }
+        sessionId: 'test-session-id',
+      },
     });
   });
 
@@ -48,20 +47,20 @@ describe('beerService', () => {
       mockApiClient.post.mockResolvedValue({
         success: true,
         data: { message: 'Check-in successful' },
-        statusCode: 200
+        statusCode: 200,
       });
 
       const beer = {
         id: 'beer-123',
         brew_name: 'Test Beer',
-        brewer: 'Test Brewery'
+        brewer: 'Test Brewery',
       };
 
       const result = await checkInBeer(beer);
 
       expect(result).toEqual({
         success: true,
-        message: 'Check-in processed successfully (empty response)'
+        message: 'Check-in processed successfully (empty response)',
       });
 
       expect(mockApiClient.post).toHaveBeenCalledWith(
@@ -70,7 +69,7 @@ describe('beerService', () => {
           chitCode: 'beer-123-test-store-id-test-member-id',
           chitBrewId: 'beer-123',
           chitBrewName: 'Test Beer',
-          chitStoreName: 'Test Store'
+          chitStoreName: 'Test Store',
         })
       );
     });
@@ -82,12 +81,12 @@ describe('beerService', () => {
       mockApiClient.post.mockResolvedValue({
         success: true,
         data: { message: 'Check-in successful' },
-        statusCode: 200
+        statusCode: 200,
       });
 
       const beer = {
         id: 'beer-123',
-        brew_name: 'Test Beer'
+        brew_name: 'Test Beer',
       };
 
       await checkInBeer(beer);
@@ -100,12 +99,12 @@ describe('beerService', () => {
       mockApiClient.post.mockResolvedValue({
         success: false,
         error: 'API error',
-        statusCode: 500
+        statusCode: 500,
       });
 
       const beer = {
         id: 'beer-123',
-        brew_name: 'Test Beer'
+        brew_name: 'Test Beer',
       };
 
       const result = await checkInBeer(beer);
@@ -113,7 +112,7 @@ describe('beerService', () => {
       expect(result).toEqual({
         success: false,
         error: 'API error',
-        message: 'Check-in failed due to API error'
+        message: 'Check-in failed due to API error',
       });
     });
   });
@@ -125,9 +124,9 @@ describe('beerService', () => {
         data: {
           id: 'beer-123',
           brew_name: 'Test Beer',
-          brewer: 'Test Brewery'
+          brewer: 'Test Brewery',
         },
-        statusCode: 200
+        statusCode: 200,
       });
 
       const result = await getBeerDetails('beer-123');
@@ -137,7 +136,7 @@ describe('beerService', () => {
       expect(result.data).toEqual({
         id: 'beer-123',
         brew_name: 'Test Beer',
-        brewer: 'Test Brewery'
+        brewer: 'Test Brewery',
       });
 
       expect(mockApiClient.get).toHaveBeenCalledWith('/beer-details.php?id=beer-123');
@@ -157,9 +156,9 @@ describe('beerService', () => {
         success: true,
         data: [
           { id: 'beer-123', brew_name: 'Test Beer 1' },
-          { id: 'beer-456', brew_name: 'Test Beer 2' }
+          { id: 'beer-456', brew_name: 'Test Beer 2' },
         ],
-        statusCode: 200
+        statusCode: 200,
       });
 
       const result = await searchBeers('test');

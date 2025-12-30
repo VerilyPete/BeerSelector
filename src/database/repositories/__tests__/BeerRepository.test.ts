@@ -4,7 +4,7 @@
  */
 
 import { BeerRepository } from '../BeerRepository';
-import { Beer, BeerWithGlassType } from '../../../types/beer';
+import { Beer, BeerWithContainerType } from '../../../types/beer';
 import * as connection from '../../connection';
 
 // Mock the database connection module
@@ -23,7 +23,7 @@ describe('BeerRepository', () => {
       withTransactionAsync: jest.fn(async (callback: any) => await callback()),
       runAsync: jest.fn(),
       getAllAsync: jest.fn(),
-      getFirstAsync: jest.fn()
+      getFirstAsync: jest.fn(),
     };
 
     // Mock getDatabase to return our mock database
@@ -34,14 +34,16 @@ describe('BeerRepository', () => {
 
   describe('insertMany', () => {
     it('should insert multiple beers in batches', async () => {
-      const beers: BeerWithGlassType[] = [
+      const beers: BeerWithContainerType[] = [
         {
           id: '1',
           brew_name: 'Test IPA',
           brewer: 'Test Brewery',
           brew_style: 'IPA',
           added_date: '2024-01-01',
-          glass_type: 'pint'
+          container_type: 'pint',
+          enrichment_confidence: null,
+          enrichment_source: null,
         },
         {
           id: '2',
@@ -49,8 +51,10 @@ describe('BeerRepository', () => {
           brewer: 'Another Brewery',
           brew_style: 'Stout',
           added_date: '2024-01-02',
-          glass_type: 'tulip'
-        }
+          container_type: 'tulip',
+          enrichment_confidence: null,
+          enrichment_source: null,
+        },
       ];
 
       mockDatabase.getFirstAsync.mockResolvedValue({ count: 0 });
@@ -71,25 +75,31 @@ describe('BeerRepository', () => {
     });
 
     it('should skip beers without IDs', async () => {
-      const beers: BeerWithGlassType[] = [
+      const beers: BeerWithContainerType[] = [
         {
           id: '1',
           brew_name: 'Valid Beer',
           brewer: 'Test Brewery',
-          glass_type: 'pint'
+          container_type: 'pint',
+          enrichment_confidence: null,
+          enrichment_source: null,
         },
         {
           id: '',
           brew_name: 'Invalid Beer - No ID',
           brewer: 'Test Brewery',
-          glass_type: 'pint'
-        } as BeerWithGlassType,
+          container_type: 'pint',
+          enrichment_confidence: null,
+          enrichment_source: null,
+        } as BeerWithContainerType,
         {
           id: '2',
           brew_name: 'Another Valid Beer',
           brewer: 'Test Brewery',
-          glass_type: 'tulip'
-        }
+          container_type: 'tulip',
+          enrichment_confidence: null,
+          enrichment_source: null,
+        },
       ];
 
       mockDatabase.getFirstAsync.mockResolvedValue({ count: 0 });
@@ -107,11 +117,13 @@ describe('BeerRepository', () => {
     });
 
     it('should process beers in batches of 50', async () => {
-      const beers: BeerWithGlassType[] = Array.from({ length: 120 }, (_, i) => ({
+      const beers: BeerWithContainerType[] = Array.from({ length: 120 }, (_, i) => ({
         id: `beer-${i}`,
         brew_name: `Beer ${i}`,
         brewer: 'Test Brewery',
-        glass_type: i % 2 === 0 ? 'pint' as const : 'tulip' as const
+        container_type: i % 2 === 0 ? ('pint' as const) : ('tulip' as const),
+        enrichment_confidence: null,
+        enrichment_source: null,
       }));
 
       mockDatabase.getFirstAsync.mockResolvedValue({ count: 0 });
@@ -144,20 +156,22 @@ describe('BeerRepository', () => {
     });
 
     it('should handle beers with optional fields missing', async () => {
-      const beers: BeerWithGlassType[] = [
+      const beers: BeerWithContainerType[] = [
         {
           id: '1',
           brew_name: 'Minimal Beer',
-          glass_type: 'pint'
+          container_type: 'pint',
+          enrichment_confidence: null,
+          enrichment_source: null,
           // All optional fields missing
-        }
+        },
       ];
 
       mockDatabase.getFirstAsync.mockResolvedValue({ count: 0 });
 
       await repository.insertMany(beers);
 
-      // Should insert beer with empty strings for missing fields and glass_type
+      // Should insert beer with empty strings for missing fields and container_type
       expect(mockDatabase.runAsync).toHaveBeenCalledWith(
         expect.stringContaining('INSERT OR REPLACE INTO allbeers'),
         expect.arrayContaining(['1', '', 'Minimal Beer', '', '', '', '', '', '', '', 'pint'])
@@ -165,8 +179,15 @@ describe('BeerRepository', () => {
     });
 
     it('should throw error on database failure', async () => {
-      const beers: BeerWithGlassType[] = [
-        { id: '1', brew_name: 'Test Beer', brewer: 'Test Brewery', glass_type: 'pint' }
+      const beers: BeerWithContainerType[] = [
+        {
+          id: '1',
+          brew_name: 'Test Beer',
+          brewer: 'Test Brewery',
+          container_type: 'pint',
+          enrichment_confidence: null,
+          enrichment_source: null,
+        },
       ];
 
       mockDatabase.runAsync.mockRejectedValueOnce(new Error('Database error'));
@@ -176,11 +197,13 @@ describe('BeerRepository', () => {
 
     it('should log progress during import', async () => {
       const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
-      const beers: BeerWithGlassType[] = Array.from({ length: 10 }, (_, i) => ({
+      const beers: BeerWithContainerType[] = Array.from({ length: 10 }, (_, i) => ({
         id: `beer-${i}`,
         brew_name: `Beer ${i}`,
         brewer: 'Test Brewery',
-        glass_type: 'pint' as const
+        container_type: 'pint' as const,
+        enrichment_confidence: null,
+        enrichment_source: null,
       }));
 
       mockDatabase.getFirstAsync.mockResolvedValue({ count: 0 });
@@ -196,21 +219,39 @@ describe('BeerRepository', () => {
 
   describe('getAll', () => {
     it('should return all beers ordered by added_date DESC', async () => {
-      const mockBeers: BeerWithGlassType[] = [
+      const mockBeers: BeerWithContainerType[] = [
         {
           id: '2',
           brew_name: 'Newer Beer',
           brewer: 'Test Brewery',
           added_date: '2024-01-02',
-          glass_type: 'pint'
+          container_type: 'pint',
+          abv: null,
+          brew_container: undefined,
+          brew_description: undefined,
+          brew_style: undefined,
+          brewer_loc: undefined,
+          review_count: undefined,
+          review_rating: undefined,
+          enrichment_confidence: null,
+          enrichment_source: null,
         },
         {
           id: '1',
           brew_name: 'Older Beer',
           brewer: 'Test Brewery',
           added_date: '2024-01-01',
-          glass_type: 'tulip'
-        }
+          container_type: 'tulip',
+          abv: null,
+          brew_container: undefined,
+          brew_description: undefined,
+          brew_style: undefined,
+          brewer_loc: undefined,
+          review_count: undefined,
+          review_rating: undefined,
+          enrichment_confidence: null,
+          enrichment_source: null,
+        },
       ];
 
       mockDatabase.getAllAsync.mockResolvedValue(mockBeers);
@@ -242,6 +283,45 @@ describe('BeerRepository', () => {
       );
     });
 
+    it('should not return beers with null or empty brew_name (SQL filtering verification)', async () => {
+      // This test verifies that the SQL WHERE clause correctly filters out
+      // beers with empty or null brew_name. Since we're using mocks, we verify
+      // that only valid beers are returned when the SQL filtering is applied.
+      const validBeers: BeerWithContainerType[] = [
+        {
+          id: 'test-valid',
+          brew_name: 'Valid Beer',
+          brewer: 'Test Brewer',
+          brew_style: 'IPA',
+          container_type: 'pint',
+          abv: null,
+          added_date: undefined,
+          brew_container: undefined,
+          brew_description: undefined,
+          brewer_loc: undefined,
+          review_count: undefined,
+          review_rating: undefined,
+          enrichment_confidence: null,
+          enrichment_source: null,
+        },
+      ];
+
+      // Mock returns only valid beers (as the SQL WHERE clause would filter)
+      mockDatabase.getAllAsync.mockResolvedValue(validBeers);
+
+      const beers = await repository.getAll();
+
+      // Verify the SQL query includes the filtering clause
+      expect(mockDatabase.getAllAsync).toHaveBeenCalledWith(
+        'SELECT * FROM allbeers WHERE brew_name IS NOT NULL AND brew_name != "" ORDER BY added_date DESC'
+      );
+
+      // Should only return the valid beer
+      expect(beers.length).toBe(1);
+      expect(beers[0].id).toBe('test-valid');
+      expect(beers.every(b => b.brew_name && b.brew_name.length > 0)).toBe(true);
+    });
+
     it('should throw error on database failure', async () => {
       mockDatabase.getAllAsync.mockRejectedValueOnce(new Error('Database error'));
 
@@ -251,11 +331,21 @@ describe('BeerRepository', () => {
 
   describe('getById', () => {
     it('should return beer when found', async () => {
-      const mockBeer: BeerWithGlassType = {
+      const mockBeer: BeerWithContainerType = {
         id: '123',
         brew_name: 'Test IPA',
         brewer: 'Test Brewery',
-        glass_type: 'pint'
+        container_type: 'pint',
+        abv: null,
+        added_date: undefined,
+        brew_container: undefined,
+        brew_description: undefined,
+        brew_style: undefined,
+        brewer_loc: undefined,
+        review_count: undefined,
+        review_rating: undefined,
+        enrichment_confidence: null,
+        enrichment_source: null,
       };
 
       mockDatabase.getFirstAsync.mockResolvedValue(mockBeer);
@@ -298,14 +388,23 @@ describe('BeerRepository', () => {
 
   describe('search', () => {
     it('should search beers by name, brewer, style, and description', async () => {
-      const mockBeers: BeerWithGlassType[] = [
+      const mockBeers: BeerWithContainerType[] = [
         {
           id: '1',
           brew_name: 'Hoppy IPA',
           brewer: 'Test Brewery',
           brew_style: 'IPA',
-          glass_type: 'pint'
-        }
+          container_type: 'pint',
+          abv: null,
+          added_date: undefined,
+          brew_container: undefined,
+          brew_description: undefined,
+          brewer_loc: undefined,
+          review_count: undefined,
+          review_rating: undefined,
+          enrichment_confidence: null,
+          enrichment_source: null,
+        },
       ];
 
       mockDatabase.getAllAsync.mockResolvedValue(mockBeers);
@@ -320,8 +419,23 @@ describe('BeerRepository', () => {
     });
 
     it('should return all beers when query is empty', async () => {
-      const mockBeers: BeerWithGlassType[] = [
-        { id: '1', brew_name: 'Beer 1', brewer: 'Brewery 1', glass_type: 'pint' }
+      const mockBeers: BeerWithContainerType[] = [
+        {
+          id: '1',
+          brew_name: 'Beer 1',
+          brewer: 'Brewery 1',
+          container_type: 'pint',
+          abv: null,
+          added_date: undefined,
+          brew_container: undefined,
+          brew_description: undefined,
+          brew_style: undefined,
+          brewer_loc: undefined,
+          review_count: undefined,
+          review_rating: undefined,
+          enrichment_confidence: null,
+          enrichment_source: null,
+        },
       ];
 
       mockDatabase.getAllAsync.mockResolvedValue(mockBeers);
@@ -340,10 +454,12 @@ describe('BeerRepository', () => {
 
       await repository.search('  test query  ');
 
-      expect(mockDatabase.getAllAsync).toHaveBeenCalledWith(
-        expect.any(String),
-        ['%test query%', '%test query%', '%test query%', '%test query%']
-      );
+      expect(mockDatabase.getAllAsync).toHaveBeenCalledWith(expect.any(String), [
+        '%test query%',
+        '%test query%',
+        '%test query%',
+        '%test query%',
+      ]);
     });
 
     it('should handle special characters in search query', async () => {
@@ -351,10 +467,12 @@ describe('BeerRepository', () => {
 
       await repository.search('50% ABV');
 
-      expect(mockDatabase.getAllAsync).toHaveBeenCalledWith(
-        expect.any(String),
-        ['%50% ABV%', '%50% ABV%', '%50% ABV%', '%50% ABV%']
-      );
+      expect(mockDatabase.getAllAsync).toHaveBeenCalledWith(expect.any(String), [
+        '%50% ABV%',
+        '%50% ABV%',
+        '%50% ABV%',
+        '%50% ABV%',
+      ]);
     });
 
     it('should search across all text fields', async () => {
@@ -390,21 +508,39 @@ describe('BeerRepository', () => {
 
   describe('getByStyle', () => {
     it('should return beers matching the style', async () => {
-      const mockBeers: BeerWithGlassType[] = [
+      const mockBeers: BeerWithContainerType[] = [
         {
           id: '1',
           brew_name: 'IPA 1',
           brewer: 'Brewery 1',
           brew_style: 'IPA',
-          glass_type: 'pint'
+          container_type: 'pint',
+          abv: null,
+          added_date: undefined,
+          brew_container: undefined,
+          brew_description: undefined,
+          brewer_loc: undefined,
+          review_count: undefined,
+          review_rating: undefined,
+          enrichment_confidence: null,
+          enrichment_source: null,
         },
         {
           id: '2',
           brew_name: 'IPA 2',
           brewer: 'Brewery 2',
           brew_style: 'IPA',
-          glass_type: 'tulip'
-        }
+          container_type: 'tulip',
+          abv: null,
+          added_date: undefined,
+          brew_container: undefined,
+          brew_description: undefined,
+          brewer_loc: undefined,
+          review_count: undefined,
+          review_rating: undefined,
+          enrichment_confidence: null,
+          enrichment_source: null,
+        },
       ];
 
       mockDatabase.getAllAsync.mockResolvedValue(mockBeers);
@@ -432,10 +568,7 @@ describe('BeerRepository', () => {
       const result = await repository.getByStyle('');
 
       expect(result).toEqual([]);
-      expect(mockDatabase.getAllAsync).toHaveBeenCalledWith(
-        expect.any(String),
-        ['']
-      );
+      expect(mockDatabase.getAllAsync).toHaveBeenCalledWith(expect.any(String), ['']);
     });
 
     it('should throw error on database failure', async () => {
@@ -447,21 +580,39 @@ describe('BeerRepository', () => {
 
   describe('getByBrewer', () => {
     it('should return beers from the specified brewer', async () => {
-      const mockBeers: BeerWithGlassType[] = [
+      const mockBeers: BeerWithContainerType[] = [
         {
           id: '1',
           brew_name: 'IPA',
           brewer: 'Test Brewery',
           brew_style: 'IPA',
-          glass_type: 'pint'
+          container_type: 'pint',
+          abv: null,
+          added_date: undefined,
+          brew_container: undefined,
+          brew_description: undefined,
+          brewer_loc: undefined,
+          review_count: undefined,
+          review_rating: undefined,
+          enrichment_confidence: null,
+          enrichment_source: null,
         },
         {
           id: '2',
           brew_name: 'Stout',
           brewer: 'Test Brewery',
           brew_style: 'Stout',
-          glass_type: 'tulip'
-        }
+          container_type: 'tulip',
+          abv: null,
+          added_date: undefined,
+          brew_container: undefined,
+          brew_description: undefined,
+          brewer_loc: undefined,
+          review_count: undefined,
+          review_rating: undefined,
+          enrichment_confidence: null,
+          enrichment_source: null,
+        },
       ];
 
       mockDatabase.getAllAsync.mockResolvedValue(mockBeers);
@@ -489,10 +640,7 @@ describe('BeerRepository', () => {
       const result = await repository.getByBrewer('');
 
       expect(result).toEqual([]);
-      expect(mockDatabase.getAllAsync).toHaveBeenCalledWith(
-        expect.any(String),
-        ['']
-      );
+      expect(mockDatabase.getAllAsync).toHaveBeenCalledWith(expect.any(String), ['']);
     });
 
     it('should throw error on database failure', async () => {
@@ -504,19 +652,39 @@ describe('BeerRepository', () => {
 
   describe('getUntasted', () => {
     it('should return beers not in tasted_brew_current_round table', async () => {
-      const mockBeers: BeerWithGlassType[] = [
+      const mockBeers: BeerWithContainerType[] = [
         {
           id: '1',
           brew_name: 'Untasted Beer 1',
           brewer: 'Brewery 1',
-          glass_type: 'pint'
+          container_type: 'pint',
+          abv: null,
+          added_date: undefined,
+          brew_container: undefined,
+          brew_description: undefined,
+          brew_style: undefined,
+          brewer_loc: undefined,
+          review_count: undefined,
+          review_rating: undefined,
+          enrichment_confidence: null,
+          enrichment_source: null,
         },
         {
           id: '2',
           brew_name: 'Untasted Beer 2',
           brewer: 'Brewery 2',
-          glass_type: 'tulip'
-        }
+          container_type: 'tulip',
+          abv: null,
+          added_date: undefined,
+          brew_container: undefined,
+          brew_description: undefined,
+          brew_style: undefined,
+          brewer_loc: undefined,
+          review_count: undefined,
+          review_rating: undefined,
+          enrichment_confidence: null,
+          enrichment_source: null,
+        },
       ];
 
       mockDatabase.getAllAsync.mockResolvedValue(mockBeers);

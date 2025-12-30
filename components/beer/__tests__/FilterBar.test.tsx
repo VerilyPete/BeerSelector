@@ -1,13 +1,27 @@
 import React from 'react';
 import { render, fireEvent } from '@testing-library/react-native';
 
+import { FilterBar } from '../FilterBar';
+
 // Mock theme hooks before importing component
 jest.mock('@/hooks/useColorScheme', () => ({
   useColorScheme: jest.fn(() => 'light'),
 }));
 
 jest.mock('@/hooks/useThemeColor', () => ({
-  useThemeColor: jest.fn(() => '#000000'),
+  useThemeColor: jest.fn((_props, colorName) => {
+    const colors: Record<string, string> = {
+      tint: '#0a7ea4',
+      textOnPrimary: '#FFFFFF',
+      backgroundSecondary: '#F5F5F0',
+      backgroundTertiary: 'rgba(150, 150, 150, 0.1)',
+      text: '#11181C',
+      background: '#FAFAFA',
+      border: '#E7E5E4',
+      accent: '#FFC107',
+    };
+    return colors[colorName] || '#000000';
+  }),
 }));
 
 // Mock IconSymbol component
@@ -22,7 +36,15 @@ jest.mock('@/components/ui/IconSymbol', () => ({
 jest.mock('@/components/ThemedText');
 jest.mock('@/components/ThemedView');
 
-import { FilterBar } from '../FilterBar';
+// Mock expo-haptics
+jest.mock('expo-haptics', () => ({
+  impactAsync: jest.fn(),
+  ImpactFeedbackStyle: {
+    Light: 'light',
+    Medium: 'medium',
+    Heavy: 'heavy',
+  },
+}));
 
 // Use real timers for this test suite to avoid hanging
 beforeAll(() => {
@@ -116,7 +138,7 @@ describe('FilterBar', () => {
 
   // Test 5: Calls onToggleSort when sort button pressed
   test('calls onToggleSort when sort button pressed', () => {
-    const { getByText } = render(
+    const { getByTestId } = render(
       <FilterBar
         filters={mockFilters}
         sortBy="name"
@@ -125,7 +147,7 @@ describe('FilterBar', () => {
       />
     );
 
-    fireEvent.press(getByText(/Sort by:/));
+    fireEvent.press(getByTestId('sort-toggle-button'));
     expect(mockOnToggleSort).toHaveBeenCalled();
     expect(mockOnToggleSort).toHaveBeenCalledTimes(1);
   });
@@ -152,7 +174,7 @@ describe('FilterBar', () => {
 
   // Test 7: Shows correct sort label for name sorting
   test('shows correct sort label for name sorting', () => {
-    const { getByText } = render(
+    const { getByTestId } = render(
       <FilterBar
         filters={mockFilters}
         sortBy="name"
@@ -161,13 +183,13 @@ describe('FilterBar', () => {
       />
     );
 
-    // When sorted by name, button should offer "Sort by: Date"
-    expect(getByText('Sort by: Date')).toBeTruthy();
+    // When sorted by name, button should offer "Date" (to switch to date sort)
+    expect(getByTestId('sort-button-text').props.children).toBe('Date');
   });
 
   // Test 8: Shows correct sort label for date sorting
   test('shows correct sort label for date sorting', () => {
-    const { getByText } = render(
+    const { getByTestId } = render(
       <FilterBar
         filters={mockFilters}
         sortBy="date"
@@ -176,8 +198,8 @@ describe('FilterBar', () => {
       />
     );
 
-    // When sorted by date, button should offer "Sort by: Name"
-    expect(getByText('Sort by: Name')).toBeTruthy();
+    // When sorted by date, button should offer "Name" (to switch to name sort)
+    expect(getByTestId('sort-button-text').props.children).toBe('Name');
   });
 
   // Test 9: Renders Draft filter as active
@@ -295,7 +317,7 @@ describe('FilterBar', () => {
 
   // Test 16: Filters remain independent
   test('filter buttons work independently', () => {
-    const { getByText, rerender } = render(
+    const { getByText } = render(
       <FilterBar
         filters={mockFilters}
         sortBy="name"

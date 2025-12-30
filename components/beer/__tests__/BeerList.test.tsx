@@ -1,6 +1,8 @@
 import React from 'react';
 import { render } from '@testing-library/react-native';
 
+import { BeerList } from '../BeerList';
+
 // Mock theme hooks before importing component
 jest.mock('@/hooks/useColorScheme', () => ({
   useColorScheme: jest.fn(() => 'light'),
@@ -26,8 +28,6 @@ jest.mock('../BeerItem', () => ({
   },
 }));
 
-import { BeerList } from '../BeerList';
-
 // Use real timers for this test suite to avoid hanging
 beforeAll(() => {
   jest.useRealTimers();
@@ -49,7 +49,9 @@ describe('BeerList', () => {
       brew_description: 'A test beer',
       added_date: '1699564800',
       brewer_loc: 'Texas',
-      glass_type: 'tulip' as const, // Pre-computed glass type for IPA
+      container_type: 'tulip' as const, // Pre-computed glass type for IPA
+      enrichment_confidence: null,
+      enrichment_source: null,
     },
     {
       id: '2',
@@ -61,7 +63,9 @@ describe('BeerList', () => {
       brew_description: 'Another test beer',
       added_date: '1699651200',
       brewer_loc: 'Colorado',
-      glass_type: 'pint' as const, // Pre-computed glass type for Stout
+      container_type: 'pint' as const, // Pre-computed glass type for Stout
+      enrichment_confidence: null,
+      enrichment_source: null,
     },
   ];
 
@@ -285,15 +289,10 @@ describe('BeerList', () => {
 
   // Test 13: Handles different empty message scenarios
   test('handles various empty message formats', () => {
-    const messages = [
-      'No beers available',
-      'Try searching for a beer!',
-      'Your list is empty',
-      '',
-    ];
+    const messages = ['No beers available', 'Try searching for a beer!', 'Your list is empty', ''];
 
-    messages.forEach((msg) => {
-      const { rerender } = render(
+    messages.forEach(msg => {
+      render(
         <BeerList
           beers={[]}
           loading={false}
@@ -323,7 +322,9 @@ describe('BeerList', () => {
         brew_description: 'A valid beer',
         added_date: '1699910400',
         brewer_loc: 'Oregon',
-        glass_type: 'pint' as const, // Pre-computed glass type for Ale
+        container_type: 'pint' as const, // Pre-computed glass type for Ale
+        enrichment_confidence: null,
+        enrichment_source: null,
       },
     ];
 

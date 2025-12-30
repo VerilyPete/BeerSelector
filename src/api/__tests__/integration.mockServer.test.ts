@@ -6,12 +6,21 @@
  * Unlike unit tests, these make real HTTP calls to validate end-to-end flow.
  */
 
-import { config } from '@/src/config';
-import { setupMockServer, FlyingSaucerResponses, createSequentialResponses } from '../../__tests__/utils/mockServer';
-import { fetchBeersFromAPI, fetchMyBeersFromAPI, fetchRewardsFromAPI, fetchWithRetry } from '../beerApi';
+// Speed up retry tests by setting shorter delay BEFORE config is loaded
+import {
+  setupMockServer,
+  FlyingSaucerResponses,
+  RequestRecord,
+} from '../../__tests__/utils/mockServer';
+import {
+  fetchBeersFromAPI,
+  fetchMyBeersFromAPI,
+  fetchRewardsFromAPI,
+  fetchWithRetry,
+} from '../beerApi';
 import * as preferences from '@/src/database/preferences';
-import { Beer } from '@/src/database/types';
-import { Reward } from '@/src/types/database';
+
+process.env.EXPO_PUBLIC_API_RETRY_DELAY = '100';
 
 // Mock the preferences module
 jest.mock('@/src/database/preferences');
@@ -23,7 +32,9 @@ const realFetch = global.fetch;
 describe('API Integration with Mock Server', () => {
   let mockServer: any;
   let cleanup: () => Promise<void>;
-  const mockGetPreference = preferences.getPreference as jest.MockedFunction<typeof preferences.getPreference>;
+  const mockGetPreference = preferences.getPreference as jest.MockedFunction<
+    typeof preferences.getPreference
+  >;
 
   beforeAll(async () => {
     // Use real timers for integration tests (we need real HTTP delays)
@@ -73,16 +84,13 @@ describe('API Integration with Mock Server', () => {
           beer_advocate_rating: '85',
           beer_advocate_reviews: '100',
           untappd_rating: '4.0',
-          untappd_reviews: '500'
-        }
+          untappd_reviews: '500',
+        },
       ];
 
       mockGetPreference.mockResolvedValue(`${mockServer.getUrl()}/visitor.php`);
 
-      mockServer.setResponse(
-        '/visitor.php',
-        FlyingSaucerResponses.beers(mockBeers)
-      );
+      mockServer.setResponse('/visitor.php', FlyingSaucerResponses.beers(mockBeers));
 
       const beers = await fetchBeersFromAPI();
 
@@ -98,8 +106,8 @@ describe('API Integration with Mock Server', () => {
           brew_name: 'Tasted IPA',
           brewer: 'Test Brewery',
           tasted: true,
-          tasted_date: '2025-01-01'
-        }
+          tasted_date: '2025-01-01',
+        },
       ];
 
       mockGetPreference.mockImplementation((key: string) => {
@@ -112,10 +120,7 @@ describe('API Integration with Mock Server', () => {
         return Promise.resolve(null);
       });
 
-      mockServer.setResponse(
-        '/mybeers.php',
-        FlyingSaucerResponses.myBeers(mockTastedBeers)
-      );
+      mockServer.setResponse('/mybeers.php', FlyingSaucerResponses.myBeers(mockTastedBeers));
 
       const tastedBeers = await fetchMyBeersFromAPI();
 
@@ -131,8 +136,8 @@ describe('API Integration with Mock Server', () => {
           description: 'A test reward',
           points: 100,
           earned_date: '2025-01-01',
-          reward_type: 'badge'
-        }
+          reward_type: 'badge',
+        },
       ];
 
       // Rewards use my_beers_api_url and expect data in position [2].reward
@@ -149,7 +154,7 @@ describe('API Integration with Mock Server', () => {
       // Rewards are at data[2].reward, not using the helper
       mockServer.setResponse('/rewards.php', {
         status: 200,
-        body: [null, null, { reward: mockRewards }]
+        body: [null, null, { reward: mockRewards }],
       });
 
       const rewards = await fetchRewardsFromAPI();
@@ -161,10 +166,7 @@ describe('API Integration with Mock Server', () => {
     it('should handle 500 server error from beer endpoint', async () => {
       mockGetPreference.mockResolvedValue(`${mockServer.getUrl()}/visitor.php`);
 
-      mockServer.setResponse(
-        '/visitor.php',
-        FlyingSaucerResponses.serverError()
-      );
+      mockServer.setResponse('/visitor.php', FlyingSaucerResponses.serverError());
 
       await expect(fetchBeersFromAPI()).rejects.toThrow();
     });
@@ -172,10 +174,7 @@ describe('API Integration with Mock Server', () => {
     it('should handle 404 not found error', async () => {
       mockGetPreference.mockResolvedValue(`${mockServer.getUrl()}/notfound.php`);
 
-      mockServer.setResponse(
-        '/notfound.php',
-        FlyingSaucerResponses.notFound()
-      );
+      mockServer.setResponse('/notfound.php', FlyingSaucerResponses.notFound());
 
       await expect(fetchBeersFromAPI()).rejects.toThrow();
     });
@@ -184,14 +183,11 @@ describe('API Integration with Mock Server', () => {
       const slowUrl = `${mockServer.getUrl()}/slow.php`;
       mockGetPreference.mockResolvedValue(slowUrl);
 
-      mockServer.setResponse(
-        '/slow.php',
-        {
-          status: 200,
-          body: [null, { brewInStock: [] }],
-          delay: 5000 // 5 second delay for slow response
-        }
-      );
+      mockServer.setResponse('/slow.php', {
+        status: 200,
+        body: [null, { brewInStock: [] }],
+        delay: 500, // 500ms delay for slow response (reduced from 5s for faster tests)
+      });
 
       // Set a short timeout and expect it to eventually complete (or timeout in Jest)
       // Since this is a real HTTP test, we'll just verify it takes time
@@ -205,18 +201,15 @@ describe('API Integration with Mock Server', () => {
 
       // Should have taken at least some time (not instant)
       expect(duration).toBeGreaterThan(100);
-    }, 8000);
+    }, 2000);
 
     it('should handle empty response data gracefully', async () => {
       mockGetPreference.mockResolvedValue(`${mockServer.getUrl()}/empty.php`);
 
-      mockServer.setResponse(
-        '/empty.php',
-        {
-          status: 200,
-          body: [null, { brewInStock: [] }]
-        }
-      );
+      mockServer.setResponse('/empty.php', {
+        status: 200,
+        body: [null, { brewInStock: [] }],
+      });
 
       const beers = await fetchBeersFromAPI();
 
@@ -235,13 +228,18 @@ describe('API Integration with Mock Server', () => {
         }
         return {
           status: 200,
-          body: [null, { brewInStock: [
+          body: [
+            null,
             {
-              id: '1',
-              brew_name: 'Success After Retry',
-              brewer: 'Persistent Brewery'
-            }
-          ]}]
+              brewInStock: [
+                {
+                  id: '1',
+                  brew_name: 'Success After Retry',
+                  brewer: 'Persistent Brewery',
+                },
+              ],
+            },
+          ],
         };
       });
 
@@ -264,16 +262,13 @@ describe('API Integration with Mock Server', () => {
         memberId: '12345',
         storeId: '1',
         storeName: 'Austin',
-        sessionId: 'test-session-123'
+        sessionId: 'test-session-123',
       };
 
-      mockServer.setResponse(
-        '/validate-session.php',
-        {
-          status: 200,
-          body: { session: mockSessionData }
-        }
-      );
+      mockServer.setResponse('/validate-session.php', {
+        status: 200,
+        body: { session: mockSessionData },
+      });
 
       const response = await fetch(`${mockServer.getUrl()}/validate-session.php`);
       const data = await response.json();
@@ -285,12 +280,12 @@ describe('API Integration with Mock Server', () => {
     it('should handle cookie-based authentication', async () => {
       const testCookies = 'session_id=abc123; user_id=456';
 
-      mockServer.setResponse('/auth-test.php', (req) => {
+      mockServer.setResponse('/auth-test.php', (req: RequestRecord) => {
         const cookieHeader = req.headers['cookie'];
         if (cookieHeader === testCookies) {
           return {
             status: 200,
-            body: { authenticated: true }
+            body: { authenticated: true },
           };
         }
         return FlyingSaucerResponses.notAuthenticated();
@@ -299,8 +294,8 @@ describe('API Integration with Mock Server', () => {
       // Make request with cookies
       const response = await fetch(`${mockServer.getUrl()}/auth-test.php`, {
         headers: {
-          'Cookie': testCookies
-        }
+          Cookie: testCookies,
+        },
       });
 
       const data = await response.json();
@@ -308,10 +303,7 @@ describe('API Integration with Mock Server', () => {
     });
 
     it('should handle 401 authentication failure', async () => {
-      mockServer.setResponse(
-        '/secure-endpoint.php',
-        FlyingSaucerResponses.notAuthenticated()
-      );
+      mockServer.setResponse('/secure-endpoint.php', FlyingSaucerResponses.notAuthenticated());
 
       const response = await fetch(`${mockServer.getUrl()}/secure-endpoint.php`);
 
@@ -323,17 +315,12 @@ describe('API Integration with Mock Server', () => {
     it('should handle visitor mode (no authentication)', async () => {
       mockGetPreference.mockResolvedValue(`${mockServer.getUrl()}/visitor.php`);
 
-      const mockBeers = [
-        { id: '1', brew_name: 'Public Beer', brewer: 'Public Brewery' }
-      ];
+      const mockBeers = [{ id: '1', brew_name: 'Public Beer', brewer: 'Public Brewery' }];
 
-      mockServer.setResponse(
-        '/visitor.php',
-        {
-          status: 200,
-          body: [null, { brewInStock: mockBeers }]
-        }
-      );
+      mockServer.setResponse('/visitor.php', {
+        status: 200,
+        body: [null, { brewInStock: mockBeers }],
+      });
 
       // Should work without authentication
       const beers = await fetchBeersFromAPI();
@@ -350,7 +337,7 @@ describe('API Integration with Mock Server', () => {
         if (requestCount === 1) {
           return {
             status: 200,
-            body: { data: 'success' }
+            body: { data: 'success' },
           };
         }
         // Session expired on subsequent request
@@ -367,17 +354,17 @@ describe('API Integration with Mock Server', () => {
     });
 
     it('should handle referer header requirement', async () => {
-      mockServer.setResponse('/referer-required.php', (req) => {
+      mockServer.setResponse('/referer-required.php', (req: RequestRecord) => {
         const referer = req.headers['referer'];
         if (referer && referer.includes('flyingsaucer.com')) {
           return {
             status: 200,
-            body: { access: 'granted' }
+            body: { access: 'granted' },
           };
         }
         return {
           status: 403,
-          body: { error: 'Missing or invalid referer' }
+          body: { error: 'Missing or invalid referer' },
         };
       });
 
@@ -388,8 +375,8 @@ describe('API Integration with Mock Server', () => {
       // Request with referer succeeds
       const response2 = await fetch(`${mockServer.getUrl()}/referer-required.php`, {
         headers: {
-          'Referer': 'https://flyingsaucer.com'
-        }
+          Referer: 'https://flyingsaucer.com',
+        },
       });
       expect(response2.status).toBe(200);
     });
@@ -403,10 +390,7 @@ describe('API Integration with Mock Server', () => {
     it('should handle retry exhaustion after multiple failures', async () => {
       const url = `${mockServer.getUrl()}/always-fails.php`;
 
-      mockServer.setResponse(
-        '/always-fails.php',
-        FlyingSaucerResponses.serverError()
-      );
+      mockServer.setResponse('/always-fails.php', FlyingSaucerResponses.serverError());
 
       await expect(fetchWithRetry(url, 3, 10)).rejects.toThrow();
 
@@ -419,8 +403,8 @@ describe('API Integration with Mock Server', () => {
         status: 200,
         body: 'This is not JSON',
         headers: {
-          'Content-Type': 'application/json'
-        }
+          'Content-Type': 'application/json',
+        },
       });
 
       await expect(
@@ -436,12 +420,12 @@ describe('API Integration with Mock Server', () => {
         if (attempts === 1) {
           return {
             status: 500, // Return error instead of timeout
-            body: { error: 'temporary failure' }
+            body: { error: 'temporary failure' },
           };
         }
         return {
           status: 200,
-          body: { data: 'success' }
+          body: { data: 'success' },
         };
       });
 
@@ -453,10 +437,7 @@ describe('API Integration with Mock Server', () => {
     }, 5000);
 
     it('should handle 429 rate limiting', async () => {
-      mockServer.setResponse(
-        '/rate-limited.php',
-        FlyingSaucerResponses.rateLimited()
-      );
+      mockServer.setResponse('/rate-limited.php', FlyingSaucerResponses.rateLimited());
 
       const response = await fetch(`${mockServer.getUrl()}/rate-limited.php`);
 
@@ -471,7 +452,7 @@ describe('API Integration with Mock Server', () => {
       // Return wrong format (not the expected Flying Saucer format)
       mockServer.setResponse('/bad-format.php', {
         status: 200,
-        body: { unexpected: 'format' }
+        body: { unexpected: 'format' },
       });
 
       // Should throw error on invalid format
@@ -485,16 +466,13 @@ describe('API Integration with Mock Server', () => {
       const mixedBeers = [
         { id: '1', brew_name: 'Good Beer', brewer: 'Test Brewery' },
         { id: null, brew_name: null }, // Missing required fields
-        { id: '3', brew_name: 'Another Good Beer', brewer: 'Test Brewery' }
+        { id: '3', brew_name: 'Another Good Beer', brewer: 'Test Brewery' },
       ];
 
-      mockServer.setResponse(
-        '/partial-data.php',
-        {
-          status: 200,
-          body: [null, { brewInStock: mixedBeers }]
-        }
-      );
+      mockServer.setResponse('/partial-data.php', {
+        status: 200,
+        body: [null, { brewInStock: mixedBeers }],
+      });
 
       const beers = await fetchBeersFromAPI();
 
@@ -512,13 +490,13 @@ describe('API Integration with Mock Server', () => {
       const customUrl = `${mockServer.getUrl()}/custom-endpoint.php`;
       mockGetPreference.mockResolvedValue(customUrl);
 
-      mockServer.setResponse(
-        '/custom-endpoint.php',
-        {
-          status: 200,
-          body: [null, { brewInStock: [{ id: '1', brew_name: 'Custom Beer', brewer: 'Custom Brewery' }] }]
-        }
-      );
+      mockServer.setResponse('/custom-endpoint.php', {
+        status: 200,
+        body: [
+          null,
+          { brewInStock: [{ id: '1', brew_name: 'Custom Beer', brewer: 'Custom Brewery' }] },
+        ],
+      });
 
       const beers = await fetchBeersFromAPI();
 
@@ -532,12 +510,15 @@ describe('API Integration with Mock Server', () => {
 
       mockServer.setResponse('/dev-api.php', {
         status: 200,
-        body: [null, { brewInStock: [{ id: '1', brew_name: 'Dev Beer', brewer: 'Dev Brewery' }] }]
+        body: [null, { brewInStock: [{ id: '1', brew_name: 'Dev Beer', brewer: 'Dev Brewery' }] }],
       });
 
       mockServer.setResponse('/prod-api.php', {
         status: 200,
-        body: [null, { brewInStock: [{ id: '2', brew_name: 'Prod Beer', brewer: 'Prod Brewery' }] }]
+        body: [
+          null,
+          { brewInStock: [{ id: '2', brew_name: 'Prod Beer', brewer: 'Prod Brewery' }] },
+        ],
       });
 
       // Test dev environment
@@ -556,7 +537,7 @@ describe('API Integration with Mock Server', () => {
 
       mockServer.setResponse('/timeout-test.php', {
         status: 200,
-        body: { data: 'test' }
+        body: { data: 'test' },
       });
 
       const result = await fetchWithRetry(url, 1, 10);
@@ -577,7 +558,10 @@ describe('API Integration with Mock Server', () => {
         }
         return {
           status: 200,
-          body: [null, { brewInStock: [{ id: '1', brew_name: 'Success', brewer: 'Success Brewery' }] }]
+          body: [
+            null,
+            { brewInStock: [{ id: '1', brew_name: 'Success', brewer: 'Success Brewery' }] },
+          ],
         };
       });
 
@@ -605,13 +589,13 @@ describe('API Integration with Mock Server', () => {
       let attempts = 0;
       let headersSeen: string[] = [];
 
-      mockServer.setResponse('/header-test.php', (req) => {
+      mockServer.setResponse('/header-test.php', (req: RequestRecord) => {
         attempts++;
 
         // Track headers from each request
         const userAgent = req.headers['user-agent'];
         if (userAgent) {
-          headersSeen.push(userAgent);
+          headersSeen.push(userAgent as string);
         }
 
         if (attempts < 2) {
@@ -619,7 +603,7 @@ describe('API Integration with Mock Server', () => {
         }
         return {
           status: 200,
-          body: { success: true }
+          body: { success: true },
         };
       });
 
@@ -627,8 +611,8 @@ describe('API Integration with Mock Server', () => {
       try {
         await fetch(url, {
           headers: {
-            'User-Agent': 'BeerSelector/1.0'
-          }
+            'User-Agent': 'BeerSelector/1.0',
+          },
         });
       } catch (error) {
         // Expected to fail
@@ -637,8 +621,8 @@ describe('API Integration with Mock Server', () => {
       // Retry with same headers
       const response = await fetch(url, {
         headers: {
-          'User-Agent': 'BeerSelector/1.0'
-        }
+          'User-Agent': 'BeerSelector/1.0',
+        },
       });
 
       expect(response.ok).toBe(true);
@@ -658,16 +642,13 @@ describe('API Integration with Mock Server', () => {
 
       const mockBeers = [
         { id: '1', brew_name: 'Beer 1', brewer: 'Brewery 1' },
-        { id: '2', brew_name: 'Beer 2', brewer: 'Brewery 2' }
+        { id: '2', brew_name: 'Beer 2', brewer: 'Brewery 2' },
       ];
 
-      mockServer.setResponse(
-        '/beers.php',
-        {
-          status: 200,
-          body: [null, { brewInStock: mockBeers }]
-        }
-      );
+      mockServer.setResponse('/beers.php', {
+        status: 200,
+        body: [null, { brewInStock: mockBeers }],
+      });
 
       const beers = await fetchBeersFromAPI();
 
@@ -686,17 +667,12 @@ describe('API Integration with Mock Server', () => {
         return Promise.resolve(null);
       });
 
-      const mockTastedBeers = [
-        { id: '1', brew_name: 'Tasted 1', tasted: true }
-      ];
+      const mockTastedBeers = [{ id: '1', brew_name: 'Tasted 1', tasted: true }];
 
-      mockServer.setResponse(
-        '/mybeers.php',
-        {
-          status: 200,
-          body: [null, { tasted_brew_current_round: mockTastedBeers }]
-        }
-      );
+      mockServer.setResponse('/mybeers.php', {
+        status: 200,
+        body: [null, { tasted_brew_current_round: mockTastedBeers }],
+      });
 
       const beers = await fetchMyBeersFromAPI();
 
@@ -721,17 +697,14 @@ describe('API Integration with Mock Server', () => {
           description: 'First reward',
           points: 100,
           earned_date: '2025-01-01',
-          reward_type: 'badge'
-        }
+          reward_type: 'badge',
+        },
       ];
 
-      mockServer.setResponse(
-        '/rewards.php',
-        {
-          status: 200,
-          body: [null, null, { reward: mockRewards }]
-        }
-      );
+      mockServer.setResponse('/rewards.php', {
+        status: 200,
+        body: [null, null, { reward: mockRewards }],
+      });
 
       const rewards = await fetchRewardsFromAPI();
 
@@ -744,7 +717,7 @@ describe('API Integration with Mock Server', () => {
       // Flying Saucer format: [null, { brewInStock: [...] }]
       mockServer.setResponse('/beers.php', {
         status: 200,
-        body: [null, { brewInStock: [{ id: '1', brew_name: 'Test' }] }]
+        body: [null, { brewInStock: [{ id: '1', brew_name: 'Test' }] }],
       });
 
       const beers = await fetchBeersFromAPI();

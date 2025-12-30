@@ -3,22 +3,28 @@ import { render, fireEvent, waitFor } from '@testing-library/react-native';
 import { Alert } from 'react-native';
 import { config } from '@/src/config';
 
-// Test URL constants
-const TEST_BASE_URL = 'https://test.beerknurd.com';
-const UNTAPPD_BASE_URL = 'https://untappd.com';
-const FSBS_BASE_URL = 'https://fsbs.beerknurd.com';
+// Import after mocks
+import LoginWebView from '@/components/LoginWebView';
+import { setPreference } from '@/src/database/preferences';
+import { saveSessionData } from '@/src/api/sessionManager';
+import { handleVisitorLogin } from '@/src/api/authService';
 
-// Test network configuration constants
-const TEST_TIMEOUT = 15000;
-const TEST_RETRIES = 3;
-const TEST_RETRY_DELAY = 1000;
+// Test URL constants - prefixed with 'mock' to allow use in jest.mock() factory
+const mockTestBaseUrl = 'https://test.beerknurd.com';
+const mockUntappdBaseUrl = 'https://untappd.com';
+const mockFsbsBaseUrl = 'https://fsbs.beerknurd.com';
+
+// Test network configuration constants - prefixed with 'mock' for jest.mock()
+const mockTestTimeout = 15000;
+const mockTestRetries = 3;
+const mockTestRetryDelay = 1000;
 
 // Mock config module (following gold standard pattern)
 jest.mock('@/src/config', () => ({
   config: {
     api: {
-      getFullUrl: jest.fn((endpoint) => `${TEST_BASE_URL}/${endpoint}.php`),
-      baseUrl: TEST_BASE_URL,
+      getFullUrl: jest.fn(endpoint => `${mockTestBaseUrl}/${endpoint}.php`),
+      baseUrl: mockTestBaseUrl,
       endpoints: {
         kiosk: '/kiosk.php',
         visitor: '/visitor.php',
@@ -27,28 +33,28 @@ jest.mock('@/src/config', () => ({
         addToQueue: '/addToQueue.php',
         deleteQueuedBrew: '/deleteQueuedBrew.php',
         addToRewardQueue: '/addToRewardQueue.php',
-        memberRewards: '/memberRewards.php'
+        memberRewards: '/memberRewards.php',
       },
       referers: {
-        memberDashboard: `${TEST_BASE_URL}/member-dash.php`,
-        memberRewards: `${TEST_BASE_URL}/memberRewards.php`,
-        memberQueues: `${TEST_BASE_URL}/memberQueues.php`
-      }
+        memberDashboard: `${mockTestBaseUrl}/member-dash.php`,
+        memberRewards: `${mockTestBaseUrl}/memberRewards.php`,
+        memberQueues: `${mockTestBaseUrl}/memberQueues.php`,
+      },
     },
     network: {
-      timeout: TEST_TIMEOUT,
-      retries: TEST_RETRIES,
-      retryDelay: TEST_RETRY_DELAY
+      timeout: mockTestTimeout,
+      retries: mockTestRetries,
+      retryDelay: mockTestRetryDelay,
     },
     external: {
       untappd: {
-        baseUrl: UNTAPPD_BASE_URL,
-        loginUrl: `${UNTAPPD_BASE_URL}/login`
-      }
+        baseUrl: mockUntappdBaseUrl,
+        loginUrl: `${mockUntappdBaseUrl}/login`,
+      },
     },
     setEnvironment: jest.fn(),
-    setCustomApiUrl: jest.fn()
-  }
+    setCustomApiUrl: jest.fn(),
+  },
 }));
 
 // Mock theme hooks
@@ -82,14 +88,7 @@ const mockWebViewRef = {
 jest.mock('react-native-webview', () => {
   const { View } = require('react-native');
   return {
-    WebView: ({
-      onMessage,
-      onLoadEnd,
-      onNavigationStateChange,
-      onLoadStart,
-      testID,
-      ref
-    }: any) => {
+    WebView: ({ onMessage, onLoadEnd, onNavigationStateChange, onLoadStart, testID, ref }: any) => {
       // Expose the mock ref
       if (ref) {
         Object.assign(ref, mockWebViewRef);
@@ -129,12 +128,6 @@ jest.mock('@/src/api/sessionManager', () => ({
 jest.mock('@/src/api/authService', () => ({
   handleVisitorLogin: jest.fn().mockResolvedValue({ success: true }),
 }));
-
-// Import after mocks
-import LoginWebView from '@/components/LoginWebView';
-import { setPreference } from '@/src/database/preferences';
-import { saveSessionData, extractSessionDataFromResponse } from '@/src/api/sessionManager';
-import { handleVisitorLogin } from '@/src/api/authService';
 
 describe('LoginWebView', () => {
   const mockOnLoginSuccess = jest.fn();
@@ -272,10 +265,7 @@ describe('LoginWebView', () => {
       const closeButton = getByTestId('close-webview-button');
       fireEvent.press(closeButton);
 
-      expect(alertSpy).toHaveBeenCalledWith(
-        'Login Cancelled',
-        'The login process was cancelled.'
-      );
+      expect(alertSpy).toHaveBeenCalledWith('Login Cancelled', 'The login process was cancelled.');
     });
 
     it('should clear processed URLs when closed', () => {
@@ -309,8 +299,8 @@ describe('LoginWebView', () => {
 
       const webview = getByTestId('webview-mock');
 
-      const testUserUrl = `${FSBS_BASE_URL}/bk-member-json.php?uid=12345`;
-      const testStoreUrl = `${FSBS_BASE_URL}/bk-store-json.php?sid=67`;
+      const testUserUrl = `${mockFsbsBaseUrl}/bk-member-json.php?uid=12345`;
+      const testStoreUrl = `${mockFsbsBaseUrl}/bk-store-json.php?sid=67`;
 
       const message = {
         nativeEvent: {
@@ -376,8 +366,8 @@ describe('LoginWebView', () => {
         nativeEvent: {
           data: JSON.stringify({
             type: 'URLs',
-            userJsonUrl: `${TEST_BASE_URL}/user.php`,
-            storeJsonUrl: `${TEST_BASE_URL}/store.php`,
+            userJsonUrl: `${mockTestBaseUrl}/user.php`,
+            storeJsonUrl: `${mockTestBaseUrl}/store.php`,
             cookies: testCookies,
           }),
         },
@@ -410,8 +400,8 @@ describe('LoginWebView', () => {
         nativeEvent: {
           data: JSON.stringify({
             type: 'URLs',
-            userJsonUrl: `${TEST_BASE_URL}/user.php`,
-            storeJsonUrl: `${TEST_BASE_URL}/store.php`,
+            userJsonUrl: `${mockTestBaseUrl}/user.php`,
+            storeJsonUrl: `${mockTestBaseUrl}/store.php`,
             cookies: {},
           }),
         },
@@ -446,8 +436,8 @@ describe('LoginWebView', () => {
         nativeEvent: {
           data: JSON.stringify({
             type: 'URLs',
-            userJsonUrl: `${TEST_BASE_URL}/user.php`,
-            storeJsonUrl: `${TEST_BASE_URL}/store.php`,
+            userJsonUrl: `${mockTestBaseUrl}/user.php`,
+            storeJsonUrl: `${mockTestBaseUrl}/store.php`,
             cookies: {},
           }),
         },
@@ -559,7 +549,7 @@ describe('LoginWebView', () => {
               store__id: '67',
             },
             rawCookies: 'store__id=67',
-            url: `${TEST_BASE_URL}/visitor.php`,
+            url: `${mockTestBaseUrl}/visitor.php`,
           }),
         },
       };
@@ -609,7 +599,7 @@ describe('LoginWebView', () => {
       await waitFor(() => {
         expect(setPreference).toHaveBeenCalledWith(
           'all_beers_api_url',
-          `${FSBS_BASE_URL}/bk-store-json.php?sid=${testStoreId}`,
+          `${mockFsbsBaseUrl}/bk-store-json.php?sid=${testStoreId}`,
           'API endpoint for fetching all beers'
         );
       });
@@ -664,7 +654,7 @@ describe('LoginWebView', () => {
       const alertSpy = jest.spyOn(Alert, 'alert');
       (handleVisitorLogin as jest.Mock).mockResolvedValue({
         success: false,
-        error: 'Failed to login'
+        error: 'Failed to login',
       });
 
       const { getByTestId } = render(
@@ -1303,7 +1293,7 @@ describe('LoginWebView', () => {
 
   describe('Props and State Management', () => {
     it('should accept custom loading state', () => {
-      const { rerender, getByTestId } = render(
+      const { rerender } = render(
         <LoginWebView
           visible={true}
           onLoginSuccess={mockOnLoginSuccess}
@@ -1403,7 +1393,7 @@ describe('LoginWebView', () => {
   describe('Config Integration', () => {
     describe('Component Config Usage', () => {
       it('should use config for WebView source URL', () => {
-        const { getByTestId } = render(
+        render(
           <LoginWebView
             visible={true}
             onLoginSuccess={mockOnLoginSuccess}
@@ -1429,7 +1419,7 @@ describe('LoginWebView', () => {
         );
 
         // Verify the URL returned from config is the expected kiosk URL
-        expect(expectedUrl).toBe(`${TEST_BASE_URL}/kiosk.php`);
+        expect(expectedUrl).toBe(`${mockTestBaseUrl}/kiosk.php`);
         expect(config.api.getFullUrl).toHaveBeenCalledWith('kiosk');
       });
 
@@ -1443,7 +1433,7 @@ describe('LoginWebView', () => {
           />
         );
 
-        const expectedUrl = `${TEST_BASE_URL}/kiosk.php`;
+        const expectedUrl = `${mockTestBaseUrl}/kiosk.php`;
         expect(config.api.getFullUrl('kiosk')).toBe(expectedUrl);
       });
 
@@ -1457,7 +1447,7 @@ describe('LoginWebView', () => {
           />
         );
 
-        expect(config.api.baseUrl).toBe(TEST_BASE_URL);
+        expect(config.api.baseUrl).toBe(mockTestBaseUrl);
       });
 
       it('should handle config getFullUrl for different endpoints', () => {
@@ -1533,7 +1523,9 @@ describe('LoginWebView', () => {
         );
 
         // Component should call config again on rerender
-        expect((config.api.getFullUrl as jest.Mock).mock.calls.length).toBeGreaterThan(initialCallCount);
+        expect((config.api.getFullUrl as jest.Mock).mock.calls.length).toBeGreaterThan(
+          initialCallCount
+        );
       });
 
       it('should handle custom API URL change gracefully', () => {
@@ -1549,11 +1541,11 @@ describe('LoginWebView', () => {
           />
         );
 
-        expect(config.api.baseUrl).toBe(TEST_BASE_URL);
+        expect(config.api.baseUrl).toBe(mockTestBaseUrl);
 
         // Simulate environment change
-        (config.api.getFullUrl as jest.Mock).mockImplementation((endpoint) =>
-          `${CUSTOM_URL}/${endpoint}.php`
+        (config.api.getFullUrl as jest.Mock).mockImplementation(
+          endpoint => `${CUSTOM_URL}/${endpoint}.php`
         );
         (config.api.baseUrl as any) = CUSTOM_URL;
 
@@ -1613,8 +1605,8 @@ describe('LoginWebView', () => {
       it('should work with production environment URLs', () => {
         // Mock production config
         const PROD_BASE_URL = 'https://tapthatapp.beerknurd.com';
-        (config.api.getFullUrl as jest.Mock).mockImplementation((endpoint) =>
-          `${PROD_BASE_URL}/${endpoint}.php`
+        (config.api.getFullUrl as jest.Mock).mockImplementation(
+          endpoint => `${PROD_BASE_URL}/${endpoint}.php`
         );
         (config.api.baseUrl as any) = PROD_BASE_URL;
 
@@ -1634,8 +1626,8 @@ describe('LoginWebView', () => {
       it('should work with custom API URLs', () => {
         // Mock custom config
         const CUSTOM_BASE_URL = 'https://custom.example.com';
-        (config.api.getFullUrl as jest.Mock).mockImplementation((endpoint) =>
-          `${CUSTOM_BASE_URL}/${endpoint}.php`
+        (config.api.getFullUrl as jest.Mock).mockImplementation(
+          endpoint => `${CUSTOM_BASE_URL}/${endpoint}.php`
         );
         (config.api.baseUrl as any) = CUSTOM_BASE_URL;
 
@@ -1655,8 +1647,8 @@ describe('LoginWebView', () => {
       it('should handle development environment', () => {
         // Mock development config
         const DEV_BASE_URL = 'http://localhost:3000';
-        (config.api.getFullUrl as jest.Mock).mockImplementation((endpoint) =>
-          `${DEV_BASE_URL}/${endpoint}.php`
+        (config.api.getFullUrl as jest.Mock).mockImplementation(
+          endpoint => `${DEV_BASE_URL}/${endpoint}.php`
         );
         (config.api.baseUrl as any) = DEV_BASE_URL;
 
@@ -1734,7 +1726,7 @@ describe('LoginWebView', () => {
 
       it('should handle config errors in message handlers gracefully', () => {
         // Reset config mock for normal rendering
-        (config.api.getFullUrl as jest.Mock).mockReturnValue(`${TEST_BASE_URL}/kiosk.php`);
+        (config.api.getFullUrl as jest.Mock).mockReturnValue(`${mockTestBaseUrl}/kiosk.php`);
 
         const { getByTestId } = render(
           <LoginWebView
@@ -1863,11 +1855,10 @@ describe('LoginWebView', () => {
 
           // All URLs should be valid HTTPS URLs
           expect(url).toMatch(/^https:\/\//);
-          expect(url).toContain(TEST_BASE_URL);
+          expect(url).toContain(mockTestBaseUrl);
           expect(url).toContain('.php');
         });
       });
     });
-
   });
 });

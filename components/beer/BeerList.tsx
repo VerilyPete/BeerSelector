@@ -1,15 +1,15 @@
-import React, { useCallback } from 'react';
-import { StyleSheet, FlatList, RefreshControl } from 'react-native';
+import React, { useCallback, useMemo } from 'react';
+import { StyleSheet, FlatList, RefreshControl, View, ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemedView } from '../ThemedView';
 import { ThemedText } from '../ThemedText';
 import { BeerItem } from './BeerItem';
 import { useThemeColor } from '@/hooks/useThemeColor';
-import { BeerWithGlassType, BeerfinderWithGlassType } from '@/src/types/beer';
+import { BeerWithContainerType, BeerfinderWithContainerType } from '@/src/types/beer';
 
-// Union type to accept both BeerWithGlassType and BeerfinderWithGlassType
-// These branded types guarantee the glass_type property is present
-type DisplayableBeer = BeerWithGlassType | BeerfinderWithGlassType;
+// Union type to accept both BeerWithContainerType and BeerfinderWithContainerType
+// These types have the container_type property (which can be null)
+type DisplayableBeer = BeerWithContainerType | BeerfinderWithContainerType;
 
 type BeerListProps = {
   beers: DisplayableBeer[];
@@ -21,6 +21,8 @@ type BeerListProps = {
   onToggleExpand: (id: string) => void;
   dateLabel?: string;
   renderItemActions?: (beer: DisplayableBeer) => React.ReactNode;
+  /** Number of columns for grid layout (1 for phone, 2 for tablet portrait, 3 for tablet landscape) */
+  numColumns?: number;
 };
 
 /**
@@ -46,25 +48,59 @@ export const BeerList: React.FC<BeerListProps> = ({
   onToggleExpand,
   dateLabel,
   renderItemActions,
+  numColumns = 1,
 }) => {
   const insets = useSafeAreaInsets();
   const tintColor = useThemeColor({}, 'tint');
 
+  // Calculate column wrapper style for multi-column layouts
+  const columnWrapperStyle = useMemo<ViewStyle | undefined>(() => {
+    if (numColumns <= 1) return undefined;
+    return {
+      justifyContent: 'flex-start',
+      gap: 8,
+    };
+  }, [numColumns]);
+
+  // Memoize item wrapper style for multi-column layouts to avoid creating new objects per render
+  const itemWrapperStyle = useMemo<ViewStyle | null>(() => {
+    if (numColumns <= 1) return null;
+    return {
+      flex: 1,
+      maxWidth: `${100 / numColumns}%`,
+    };
+  }, [numColumns]);
+
   // Memoize renderItem to prevent unnecessary re-renders of FlatList items
-  const renderItem = useCallback(({ item }: { item: DisplayableBeer }) => (
-    <BeerItem
-      beer={item}
-      isExpanded={expandedId === item.id}
-      onToggle={onToggleExpand}
-      dateLabel={dateLabel}
-      renderActions={renderItemActions ? () => renderItemActions(item) : undefined}
-    />
-  ), [expandedId, onToggleExpand, dateLabel, renderItemActions]);
+  // For multi-column layouts, wrap in a View with flex basis for equal width columns
+  const renderItem = useCallback(
+    ({ item }: { item: DisplayableBeer }) => {
+      const content = (
+        <BeerItem
+          beer={item}
+          isExpanded={expandedId === item.id}
+          onToggle={onToggleExpand}
+          dateLabel={dateLabel}
+          renderActions={renderItemActions ? () => renderItemActions(item) : undefined}
+        />
+      );
+
+      // For multi-column layouts, wrap in a View with proper flex sizing
+      if (numColumns > 1 && itemWrapperStyle) {
+        return <View style={itemWrapperStyle}>{content}</View>;
+      }
+
+      return content;
+    },
+    [expandedId, onToggleExpand, dateLabel, renderItemActions, numColumns, itemWrapperStyle]
+  );
 
   if (!loading && beers.length === 0) {
     return (
       <ThemedView style={styles.emptyContainer} testID="beer-list-empty">
-        <ThemedText style={styles.emptyText} testID="beer-list-empty-message">{emptyMessage}</ThemedText>
+        <ThemedText style={styles.emptyText} testID="beer-list-empty-message">
+          {emptyMessage}
+        </ThemedText>
       </ThemedView>
     );
   }
@@ -73,12 +109,18 @@ export const BeerList: React.FC<BeerListProps> = ({
     <FlatList
       testID="beer-list"
       data={beers}
-      keyExtractor={(item) => item.id}
+      keyExtractor={item => item.id}
       renderItem={renderItem}
+      // Key prop forces re-render when numColumns changes (required by FlatList)
+      key={`beer-list-${numColumns}`}
+      numColumns={numColumns}
+      // columnWrapperStyle is only applied when numColumns > 1
+      columnWrapperStyle={columnWrapperStyle}
       contentContainerStyle={[
         styles.listContent,
-        { paddingBottom: TAB_BAR_HEIGHT + insets.bottom + 16 }
+        { paddingBottom: TAB_BAR_HEIGHT + insets.bottom + 16 },
       ]}
+      // Native RefreshControl for pull-to-refresh
       refreshControl={
         <RefreshControl
           refreshing={refreshing}
@@ -96,10 +138,14 @@ export const BeerList: React.FC<BeerListProps> = ({
       windowSize={7}
       removeClippedSubviews={true}
       updateCellsBatchingPeriod={50}
-      getItemLayout={(data, index) => ({
-        length: EXPECTED_ITEM_HEIGHT,
-        offset: EXPECTED_ITEM_HEIGHT * index,
-        index,
+      // Note: getItemLayout is disabled for multi-column layouts as row heights vary
+      // This is a minor performance tradeoff for correct layout calculation
+      {...(numColumns === 1 && {
+        getItemLayout: (_data: ArrayLike<DisplayableBeer> | null | undefined, index: number) => ({
+          length: EXPECTED_ITEM_HEIGHT,
+          offset: EXPECTED_ITEM_HEIGHT * index,
+          index,
+        }),
       })}
     />
   );

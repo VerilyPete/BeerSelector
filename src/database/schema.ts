@@ -30,7 +30,10 @@ export const CREATE_ALLBEERS_TABLE = `
     review_count TEXT,
     review_rating TEXT,
     brew_description TEXT,
-    glass_type TEXT
+    container_type TEXT,
+    abv REAL,
+    enrichment_confidence REAL,
+    enrichment_source TEXT
   )
 `;
 
@@ -57,7 +60,10 @@ export const CREATE_TASTED_BREW_TABLE = `
     review_ratings TEXT,
     brew_description TEXT,
     chit_code TEXT,
-    glass_type TEXT
+    container_type TEXT,
+    abv REAL,
+    enrichment_confidence REAL,
+    enrichment_source TEXT
   )
 `;
 
@@ -91,23 +97,6 @@ export const CREATE_PREFERENCES_TABLE = `
 `;
 
 /**
- * SQL statement to create the untappd table
- * Stores Untappd authentication tokens and cookies
- */
-export const CREATE_UNTAPPD_TABLE = `
-  CREATE TABLE IF NOT EXISTS untappd (
-    key TEXT PRIMARY KEY,
-    value TEXT,
-    description TEXT
-  )
-`;
-
-/**
- * Alias for compatibility with existing code
- */
-export const CREATE_UNTAPPD_COOKIES_TABLE = CREATE_UNTAPPD_TABLE;
-
-/**
  * SQL statement to create the operation_queue table
  * Stores queued operations for retry when network connection is restored
  */
@@ -131,18 +120,18 @@ export const DEFAULT_PREFERENCES: Preference[] = [
   {
     key: 'all_beers_api_url',
     value: '',
-    description: 'API endpoint for fetching all beers'
+    description: 'API endpoint for fetching all beers',
   },
   {
     key: 'my_beers_api_url',
     value: '',
-    description: 'API endpoint for fetching Beerfinder beers'
+    description: 'API endpoint for fetching Beerfinder beers',
   },
   {
     key: 'first_launch',
     value: 'true',
-    description: 'Flag indicating if this is the first app launch'
-  }
+    description: 'Flag indicating if this is the first app launch',
+  },
 ];
 
 /**
@@ -195,7 +184,6 @@ export const setupTables = async (database: SQLiteDatabase): Promise<void> => {
           await database.execAsync(CREATE_TASTED_BREW_TABLE);
           await database.execAsync(CREATE_REWARDS_TABLE);
           await database.execAsync(CREATE_PREFERENCES_TABLE);
-          await database.execAsync(CREATE_UNTAPPD_TABLE);
           await database.execAsync(CREATE_OPERATION_QUEUE_TABLE);
 
           // Create indexes for operation_queue table
@@ -250,8 +238,33 @@ async function runMigrations(database: SQLiteDatabase, fromVersion: number): Pro
     console.log('Migration to version 3 complete');
   }
 
-  // Future migrations go here
-  // if (fromVersion < 4) { await migrateToVersion4(database); }
+  // Run migration to v4 (rename glass_type to container_type, add can/bottle support)
+  if (fromVersion < 4) {
+    const { migrateToVersion4 } = await import('./migrations/migrateToV4');
+    await migrateToVersion4(database);
+    console.log('Migration to version 4 complete');
+  }
+
+  // Run migration to v5 (add flight container type detection)
+  if (fromVersion < 5) {
+    const { migrateToVersion5 } = await import('./migrations/migrateToV5');
+    await migrateToVersion5(database);
+    console.log('Migration to version 5 complete');
+  }
+
+  // Run migration to v6 (add abv column)
+  if (fromVersion < 6) {
+    const { migrateToVersion6 } = await import('./migrations/migrateToV6');
+    await migrateToVersion6(database);
+    console.log('Migration to version 6 complete');
+  }
+
+  // Run migration to v7 (add enrichment columns)
+  if (fromVersion < 7) {
+    const { migrateToVersion7 } = await import('./migrations/migrateToV7');
+    await migrateToVersion7(database);
+    console.log('Migration to version 7 complete');
+  }
 }
 
 /**
@@ -266,7 +279,9 @@ async function runMigrations(database: SQLiteDatabase, fromVersion: number): Pro
 const initializeDefaultPreferences = async (database: SQLiteDatabase): Promise<void> => {
   try {
     // Check if preferences already exist
-    const count = await database.getFirstAsync<{ count: number }>('SELECT COUNT(*) as count FROM preferences');
+    const count = await database.getFirstAsync<{ count: number }>(
+      'SELECT COUNT(*) as count FROM preferences'
+    );
 
     // Only add default preferences if the table is empty
     if (!count || count.count === 0) {

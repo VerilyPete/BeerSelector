@@ -13,56 +13,56 @@
 
 import { databaseLockManager } from '../../database/DatabaseLockManager';
 
+// Import after mocking
+import {
+  sequentialRefreshAllData,
+  manualRefreshAllData,
+  refreshAllDataFromAPI,
+} from '../dataUpdateService';
+import { getPreference, setPreference, areApiUrlsConfigured } from '../../database/preferences';
+import { fetchBeersFromAPI, fetchMyBeersFromAPI, fetchRewardsFromAPI } from '../../api/beerApi';
+
 // Mock database operations
 jest.mock('../../database/db', () => ({
   getPreference: jest.fn(),
-  setPreference: jest.fn()
+  setPreference: jest.fn(),
 }));
 
 // Mock preferences module
 jest.mock('../../database/preferences', () => ({
   getPreference: jest.fn(),
   setPreference: jest.fn(),
-  areApiUrlsConfigured: jest.fn()
+  areApiUrlsConfigured: jest.fn(),
 }));
 
 // Mock API functions
 jest.mock('../../api/beerApi', () => ({
   fetchBeersFromAPI: jest.fn(),
   fetchMyBeersFromAPI: jest.fn(),
-  fetchRewardsFromAPI: jest.fn()
+  fetchRewardsFromAPI: jest.fn(),
 }));
 
 // Mock repositories
 jest.mock('../../database/repositories/BeerRepository', () => ({
   beerRepository: {
     insertMany: jest.fn(),
-    insertManyUnsafe: jest.fn()
-  }
+    insertManyUnsafe: jest.fn(),
+  },
 }));
 
 jest.mock('../../database/repositories/MyBeersRepository', () => ({
   myBeersRepository: {
     insertMany: jest.fn(),
-    insertManyUnsafe: jest.fn()
-  }
+    insertManyUnsafe: jest.fn(),
+  },
 }));
 
 jest.mock('../../database/repositories/RewardsRepository', () => ({
   rewardsRepository: {
     insertMany: jest.fn(),
-    insertManyUnsafe: jest.fn()
-  }
+    insertManyUnsafe: jest.fn(),
+  },
 }));
-
-// Import after mocking
-import {
-  sequentialRefreshAllData,
-  manualRefreshAllData,
-  refreshAllDataFromAPI
-} from '../dataUpdateService';
-import { getPreference, setPreference, areApiUrlsConfigured } from '../../database/preferences';
-import { fetchBeersFromAPI, fetchMyBeersFromAPI, fetchRewardsFromAPI } from '../../api/beerApi';
 
 describe('Sequential Refresh Coordination', () => {
   beforeEach(() => {
@@ -89,8 +89,12 @@ describe('Sequential Refresh Coordination', () => {
     });
     (setPreference as jest.Mock).mockResolvedValue(undefined);
     (areApiUrlsConfigured as jest.Mock).mockResolvedValue(true);
-    (fetchBeersFromAPI as jest.Mock).mockResolvedValue([{ id: '1', brew_name: 'Test Beer', brewer: 'Test Brewery' }]);
-    (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue([{ id: '2', brew_name: 'Tasted Beer', brewer: 'Test Brewery' }]);
+    (fetchBeersFromAPI as jest.Mock).mockResolvedValue([
+      { id: '1', brew_name: 'Test Beer', brewer: 'Test Brewery' },
+    ]);
+    (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue([
+      { id: '2', brew_name: 'Tasted Beer', brewer: 'Test Brewery' },
+    ]);
     (fetchRewardsFromAPI as jest.Mock).mockResolvedValue([{ id: 3, name: 'Test Reward' }]);
   });
 
@@ -146,11 +150,11 @@ describe('Sequential Refresh Coordination', () => {
       // Verify sequential execution: each operation must COMPLETE before next starts
       expect(executionLog).toEqual([
         'allBeers-start',
-        'allBeers-end',      // All beers must finish before my beers starts
+        'allBeers-end', // All beers must finish before my beers starts
         'myBeers-start',
-        'myBeers-end',       // My beers must finish before rewards starts
+        'myBeers-end', // My beers must finish before rewards starts
         'rewards-start',
-        'rewards-end'
+        'rewards-end',
       ]);
 
       // Also verify all three were called
@@ -171,7 +175,8 @@ describe('Sequential Refresh Coordination', () => {
 
       // Spy on lock acquisitions
       const originalAcquire = databaseLockManager.acquireLock.bind(databaseLockManager);
-      const acquireSpy = jest.spyOn(databaseLockManager, 'acquireLock')
+      const acquireSpy = jest
+        .spyOn(databaseLockManager, 'acquireLock')
         .mockImplementation(async (operation: string) => {
           lockAcquisitionLog.push(`acquire-${operation}`);
           return originalAcquire(operation);
@@ -221,7 +226,9 @@ describe('Sequential Refresh Coordination', () => {
      * STATUS: ✅ This test verifies Step 5c implementation (sequential refresh coordination)
      */
     it('should release master lock even if an operation fails', async () => {
-      (fetchBeersFromAPI as jest.Mock).mockResolvedValue([{ id: '1', brew_name: 'Test Beer', brewer: 'Test Brewery' }]);
+      (fetchBeersFromAPI as jest.Mock).mockResolvedValue([
+        { id: '1', brew_name: 'Test Beer', brewer: 'Test Brewery' },
+      ]);
       (fetchMyBeersFromAPI as jest.Mock).mockRejectedValue(new Error('Network error')); // Simulate failure
       (fetchRewardsFromAPI as jest.Mock).mockResolvedValue([{ id: 3, name: 'Test Reward' }]);
 
@@ -265,16 +272,16 @@ describe('Sequential Refresh Coordination', () => {
     it('should use unsafe repository methods to avoid nested lock acquisition', async () => {
       // Track lock acquisitions
       const lockOperations: string[] = [];
-      const acquireSpy = jest.spyOn(databaseLockManager, 'acquireLock')
+      const acquireSpy = jest
+        .spyOn(databaseLockManager, 'acquireLock')
         .mockImplementation(async (operation: string) => {
           lockOperations.push(operation);
           return true; // Just return success, don't call through
         });
 
-      const releaseSpy = jest.spyOn(databaseLockManager, 'releaseLock')
-        .mockImplementation(() => {
-          // Just track, don't call through
-        });
+      const releaseSpy = jest.spyOn(databaseLockManager, 'releaseLock').mockImplementation(() => {
+        // Just track, don't call through
+      });
 
       await sequentialRefreshAllData();
 
@@ -300,17 +307,17 @@ describe('Sequential Refresh Coordination', () => {
       const lockQueue: string[] = [];
 
       // Track when operations acquire locks
-      const acquireSpy = jest.spyOn(databaseLockManager, 'acquireLock')
+      const acquireSpy = jest
+        .spyOn(databaseLockManager, 'acquireLock')
         .mockImplementation(async (operation: string) => {
           lockQueue.push(`${operation}-waiting`);
           lockQueue.push(`${operation}-acquired`);
           return true; // Just return success without actual locking
         });
 
-      const releaseSpy = jest.spyOn(databaseLockManager, 'releaseLock')
-        .mockImplementation(() => {
-          // Just track, don't call through
-        });
+      const releaseSpy = jest.spyOn(databaseLockManager, 'releaseLock').mockImplementation(() => {
+        // Just track, don't call through
+      });
 
       const mockOp1 = async () => {
         await databaseLockManager.acquireLock('allBeers');
@@ -331,11 +338,7 @@ describe('Sequential Refresh Coordination', () => {
       };
 
       // Simulate current parallel execution
-      await Promise.allSettled([
-        mockOp1(),
-        mockOp2(),
-        mockOp3()
-      ]);
+      await Promise.allSettled([mockOp1(), mockOp2(), mockOp3()]);
 
       // With parallel execution, operations QUEUE for locks
       // We should see 3 operations each acquiring a lock
@@ -389,7 +392,7 @@ describe('Sequential Refresh Coordination', () => {
         'myBeers-start',
         'myBeers-end',
         'rewards-start',
-        'rewards-end'
+        'rewards-end',
       ]);
     });
 
@@ -404,7 +407,8 @@ describe('Sequential Refresh Coordination', () => {
       const lockAcquisitionLog: string[] = [];
 
       const originalAcquire = databaseLockManager.acquireLock.bind(databaseLockManager);
-      const acquireSpy = jest.spyOn(databaseLockManager, 'acquireLock')
+      const acquireSpy = jest
+        .spyOn(databaseLockManager, 'acquireLock')
         .mockImplementation(async (operation: string) => {
           lockAcquisitionLog.push(`acquire-${operation}`);
           return originalAcquire(operation);
@@ -486,7 +490,7 @@ describe('Sequential Refresh Coordination', () => {
         'myBeers-start',
         'myBeers-end',
         'rewards-start',
-        'rewards-end'
+        'rewards-end',
       ]);
     });
 
@@ -501,7 +505,8 @@ describe('Sequential Refresh Coordination', () => {
       const lockAcquisitionLog: string[] = [];
 
       const originalAcquire = databaseLockManager.acquireLock.bind(databaseLockManager);
-      const acquireSpy = jest.spyOn(databaseLockManager, 'acquireLock')
+      const acquireSpy = jest
+        .spyOn(databaseLockManager, 'acquireLock')
         .mockImplementation(async (operation: string) => {
           lockAcquisitionLog.push(`acquire-${operation}`);
           return originalAcquire(operation);

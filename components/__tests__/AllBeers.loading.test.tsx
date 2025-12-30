@@ -57,7 +57,7 @@ describe('AllBeers Loading States (MP-3 Step 3a)', () => {
       brewer_loc: 'Austin, TX',
       abv: '6.5',
       ibu: '60',
-      glass_type: 'tulip' as const, // Pre-computed glass type for IPA
+      container_type: 'tulip' as const, // Pre-computed glass type for IPA
     },
     {
       id: '2',
@@ -70,7 +70,7 @@ describe('AllBeers Loading States (MP-3 Step 3a)', () => {
       brewer_loc: 'Denver, CO',
       abv: '8.0',
       ibu: '45',
-      glass_type: 'pint' as const, // Pre-computed glass type for Stout
+      container_type: 'pint' as const, // Pre-computed glass type for Stout
     },
   ];
 
@@ -146,7 +146,7 @@ describe('AllBeers Loading States (MP-3 Step 3a)', () => {
         () => new Promise(resolve => setTimeout(() => resolve(mockBeers), 500))
       );
 
-      const { getByTestId, queryByTestId } = render(<AllBeers />);
+      const { getByTestId } = render(<AllBeers />);
 
       // Skeleton should be shown
       expect(getByTestId('skeleton-loader')).toBeDefined();
@@ -260,9 +260,7 @@ describe('AllBeers Loading States (MP-3 Step 3a)', () => {
     });
 
     it('should show error message text', async () => {
-      (beerRepository.getAll as jest.Mock).mockRejectedValue(
-        new Error('Network error')
-      );
+      (beerRepository.getAll as jest.Mock).mockRejectedValue(new Error('Network error'));
 
       const { getByTestId } = render(<AllBeers />);
 
@@ -274,9 +272,7 @@ describe('AllBeers Loading States (MP-3 Step 3a)', () => {
     });
 
     it('should show try again button on error', async () => {
-      (beerRepository.getAll as jest.Mock).mockRejectedValue(
-        new Error('Database error')
-      );
+      (beerRepository.getAll as jest.Mock).mockRejectedValue(new Error('Database error'));
 
       const { getByTestId } = render(<AllBeers />);
 
@@ -286,9 +282,7 @@ describe('AllBeers Loading States (MP-3 Step 3a)', () => {
     });
 
     it('should not show beer list on error', async () => {
-      (beerRepository.getAll as jest.Mock).mockRejectedValue(
-        new Error('Failed')
-      );
+      (beerRepository.getAll as jest.Mock).mockRejectedValue(new Error('Failed'));
 
       const { queryByTestId } = render(<AllBeers />);
 

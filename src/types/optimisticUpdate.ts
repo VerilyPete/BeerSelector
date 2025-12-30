@@ -5,7 +5,7 @@
  * feedback to users while operations are queued or in progress.
  */
 
-import { Beer, Beerfinder } from './beer';
+import { Beer } from './beer';
 
 /**
  * Type of optimistic update

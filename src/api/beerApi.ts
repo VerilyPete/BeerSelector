@@ -1,18 +1,25 @@
 import { Beer, Beerfinder } from '../database/types';
 import { Reward } from '../types/database';
 import { getPreference } from '../database/preferences';
+import { config } from '../config';
 
 /**
  * Helper function to retry fetch operations with exponential backoff
  * @param url - The URL to fetch
  * @param retries - Number of retry attempts (default: 3)
- * @param delay - Initial delay between retries in ms (default: 1000)
+ * @param delay - Initial delay between retries in ms (default from config)
  * @returns Promise with the JSON response
  */
-export const fetchWithRetry = async (url: string, retries = 3, delay = 1000): Promise<unknown> => {
+export const fetchWithRetry = async (
+  url: string,
+  retries = 3,
+  delay = config.network.retryDelay
+): Promise<unknown> => {
   // Special handling for none:// protocol which is used as a placeholder in visitor mode
   if (url.startsWith('none://')) {
-    console.log(`Detected none:// protocol URL: ${url}. Returning empty data instead of making network request.`);
+    console.log(
+      `Detected none:// protocol URL: ${url}. Returning empty data instead of making network request.`
+    );
     // Return an empty array structure that matches the expected format
     return [null, { tasted_brew_current_round: [] }];
   }
@@ -30,7 +37,7 @@ export const fetchWithRetry = async (url: string, retries = 3, delay = 1000): Pr
       throw error;
     }
 
-    console.log(`Fetch failed, retrying in ${delay}ms... (${retries-1} retries left)`);
+    console.log(`Fetch failed, retrying in ${delay}ms... (${retries - 1} retries left)`);
     await new Promise(resolve => setTimeout(resolve, delay));
     return fetchWithRetry(url, retries - 1, delay * 1.5);
   }
@@ -55,14 +62,16 @@ export const fetchBeersFromAPI = async (): Promise<Beer[]> => {
 
     // Log the structure to help debug
     console.log('API response type:', typeof data);
-    if (typeof data === 'object') {
-      console.log('API response keys:', Object.keys(data));
+    if (typeof data === 'object' && data !== null) {
+      console.log('API response keys:', Object.keys(data as object));
     }
 
     // Handle different response formats based on API endpoint
     // 1. Regular format: Array with brewInStock in second element
     if (data && Array.isArray(data) && data.length >= 2 && data[1] && data[1].brewInStock) {
-      console.log(`Found regular format with brewInStock array (${data[1].brewInStock.length} beers)`);
+      console.log(
+        `Found regular format with brewInStock array (${data[1].brewInStock.length} beers)`
+      );
       return data[1].brewInStock;
     }
 
@@ -74,8 +83,12 @@ export const fetchBeersFromAPI = async (): Promise<Beer[]> => {
         // If we have an array, check if it looks like beers
         if (Array.isArray(obj)) {
           // Check if this looks like an array of beers
-          if (obj.length > 0 && obj[0] && typeof obj[0] === 'object' &&
-              ('brew_name' in obj[0] || 'id' in obj[0] || 'brewer' in obj[0])) {
+          if (
+            obj.length > 0 &&
+            obj[0] &&
+            typeof obj[0] === 'object' &&
+            ('brew_name' in obj[0] || 'id' in obj[0] || 'brewer' in obj[0])
+          ) {
             console.log(`Found potential beer array with ${obj.length} items`);
             return obj as Beer[];
           }
@@ -88,15 +101,18 @@ export const fetchBeersFromAPI = async (): Promise<Beer[]> => {
         }
         // If we have an object, check each property
         else if (typeof obj === 'object' && obj !== null) {
+          const objRecord = obj as Record<string, unknown>;
           // Check direct properties first
-          for (const key of Object.keys(obj)) {
+          for (const key of Object.keys(objRecord)) {
             if (key === 'brewInStock' || key === 'beers' || key === 'beer_list') {
-              console.log(`Found beer array at key "${key}" with ${obj[key].length} items`);
-              return obj[key] as Beer[];
+              console.log(
+                `Found beer array at key "${key}" with ${(objRecord[key] as Beer[]).length} items`
+              );
+              return objRecord[key] as Beer[];
             }
 
             // Then recursively check nested objects
-            const result = findBeersArray(obj[key]);
+            const result = findBeersArray(objRecord[key]);
             if (result) return result;
           }
         }
@@ -136,9 +152,11 @@ export const fetchBeersFromAPI = async (): Promise<Beer[]> => {
 export const fetchMyBeersFromAPI = async (): Promise<Beerfinder[]> => {
   try {
     // First check if in visitor mode to immediately return empty array
-    const isVisitorMode = await getPreference('is_visitor_mode') === 'true';
+    const isVisitorMode = (await getPreference('is_visitor_mode')) === 'true';
     if (isVisitorMode) {
-      console.log('DB: In visitor mode - fetchMyBeersFromAPI returning empty array without making network request');
+      console.log(
+        'DB: In visitor mode - fetchMyBeersFromAPI returning empty array without making network request'
+      );
       return [];
     }
 
@@ -180,25 +198,45 @@ export const fetchMyBeersFromAPI = async (): Promise<Beerfinder[]> => {
     }
 
     // Extract the tasted_brew_current_round array from the response
-    if (data && Array.isArray(data) && data.length >= 2 && data[1] && data[1].tasted_brew_current_round) {
+    if (
+      data &&
+      Array.isArray(data) &&
+      data.length >= 2 &&
+      data[1] &&
+      data[1].tasted_brew_current_round
+    ) {
       const beers = data[1].tasted_brew_current_round;
       console.log(`DB: Found tasted_brew_current_round with ${beers.length} beers`);
 
       // Handle empty array as a valid state (user has no tasted beers or round has rolled over)
       if (beers.length === 0) {
-        console.log('DB: Empty tasted beers array - user has no tasted beers in current round (new user or round rollover at 200 beers)');
+        console.log(
+          'DB: Empty tasted beers array - user has no tasted beers in current round (new user or round rollover at 200 beers)'
+        );
         return [];
       }
 
       // Validate the beers array - check for missing IDs
-      const validBeers = beers.filter((beer: unknown): beer is Beerfinder =>
-        typeof beer === 'object' && beer !== null && 'id' in beer && beer.id !== null && beer.id !== undefined
+      const validBeers = beers.filter(
+        (beer: unknown): beer is Beerfinder =>
+          typeof beer === 'object' &&
+          beer !== null &&
+          'id' in beer &&
+          beer.id !== null &&
+          beer.id !== undefined
       );
-      const invalidBeers = beers.filter((beer: unknown) =>
-        !beer || typeof beer !== 'object' || !('id' in beer) || beer.id === null || beer.id === undefined
+      const invalidBeers = beers.filter(
+        (beer: unknown) =>
+          !beer ||
+          typeof beer !== 'object' ||
+          !('id' in beer) ||
+          beer.id === null ||
+          beer.id === undefined
       );
 
-      console.log(`DB: Found ${validBeers.length} valid beers with IDs and ${invalidBeers.length} invalid beers without IDs`);
+      console.log(
+        `DB: Found ${validBeers.length} valid beers with IDs and ${invalidBeers.length} invalid beers without IDs`
+      );
 
       // Log details about invalid beers for debugging
       if (invalidBeers.length > 0) {
@@ -212,7 +250,9 @@ export const fetchMyBeersFromAPI = async (): Promise<Beerfinder[]> => {
       if (validBeers.length > 0) {
         return validBeers;
       } else {
-        console.log('DB: No valid beers with IDs found in response, but returning empty array instead of error');
+        console.log(
+          'DB: No valid beers with IDs found in response, but returning empty array instead of error'
+        );
         return [];
       }
     }
@@ -232,7 +272,7 @@ export const fetchMyBeersFromAPI = async (): Promise<Beerfinder[]> => {
 export const fetchRewardsFromAPI = async (): Promise<Reward[]> => {
   try {
     // Check if in visitor mode first
-    const isVisitorMode = await getPreference('is_visitor_mode') === 'true';
+    const isVisitorMode = (await getPreference('is_visitor_mode')) === 'true';
     if (isVisitorMode) {
       console.log('In visitor mode - rewards not available, returning empty array');
       return [];

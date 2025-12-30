@@ -21,11 +21,11 @@
  */
 
 import { useOptimisticCheckIn } from './useOptimisticCheckIn';
-import { BeerWithGlassType } from '@/src/types/beer';
+import { BeerWithContainerType } from '@/src/types/beer';
 
 export interface UseQueuedCheckInResult {
   /** Execute a check-in (immediate or queued based on network status) */
-  queuedCheckIn: (beer: BeerWithGlassType) => Promise<void>;
+  queuedCheckIn: (beer: BeerWithContainerType) => Promise<void>;
 
   /** Whether a check-in is currently in progress */
   isLoading: boolean;

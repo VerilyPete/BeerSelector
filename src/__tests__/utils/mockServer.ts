@@ -66,7 +66,7 @@ export class MockServer {
   private responseMap: Map<string, MockResponse | DynamicResponseHandler> = new Map();
   private defaultResponse: MockResponse = {
     status: 404,
-    body: { error: 'Not Found' }
+    body: { error: 'Not Found' },
   };
 
   /**
@@ -130,7 +130,7 @@ export class MockServer {
         return;
       }
 
-      this.server.close((err) => {
+      this.server.close(err => {
         if (err) {
           reject(err);
         } else {
@@ -148,7 +148,7 @@ export class MockServer {
    * @param path - Path to match (exact match)
    * @param response - Response configuration or dynamic handler
    */
-  setResponse<T = any>(path: string, response: MockResponse | DynamicResponseHandler): void {
+  setResponse(path: string, response: MockResponse | DynamicResponseHandler): void {
     this.responseMap.set(path, response);
   }
 
@@ -272,7 +272,7 @@ export class MockServer {
         headers: req.headers,
         query,
         body,
-        timestamp: new Date()
+        timestamp: new Date(),
       };
       this.requestHistory.push(requestRecord);
 
@@ -313,7 +313,7 @@ export class MockServer {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type, Cookie, Referer',
-        ...finalResponse.headers
+        ...finalResponse.headers,
       };
 
       Object.entries(headers).forEach(([key, value]) => {
@@ -324,9 +324,10 @@ export class MockServer {
       res.statusCode = finalResponse.status;
 
       if (finalResponse.body !== undefined) {
-        const responseBody = typeof finalResponse.body === 'string'
-          ? finalResponse.body
-          : JSON.stringify(finalResponse.body);
+        const responseBody =
+          typeof finalResponse.body === 'string'
+            ? finalResponse.body
+            : JSON.stringify(finalResponse.body);
         res.end(responseBody);
       } else {
         res.end();
@@ -348,7 +349,7 @@ export class MockServer {
     return new Promise((resolve, reject) => {
       let body = '';
 
-      req.on('data', (chunk) => {
+      req.on('data', chunk => {
         body += chunk.toString();
       });
 
@@ -380,9 +381,7 @@ export class MockServer {
    * @private
    */
   private matchesPattern(path: string, pattern: string): boolean {
-    const regexPattern = pattern
-      .replace(/[.+?^${}()|[\\\]]/g, '\\$&')
-      .replace(/\*/g, '.*');
+    const regexPattern = pattern.replace(/[.+?^${}()|[\\\]]/g, '\\$&').replace(/\*/g, '.*');
     const regex = new RegExp(`^${regexPattern}$`);
     return regex.test(path);
   }
@@ -418,7 +417,7 @@ export function createSequentialResponses(responses: MockResponse[]): DynamicRes
  * @returns Dynamic response handler
  */
 export function createConditionalResponse(
-  conditions: Array<[(req: RequestRecord) => boolean, MockResponse]>,
+  conditions: [(req: RequestRecord) => boolean, MockResponse][],
   defaultResponse: MockResponse
 ): DynamicResponseHandler {
   return (req: RequestRecord) => {
@@ -439,7 +438,7 @@ export function networkErrorResponse(): MockResponse {
   return {
     status: 0,
     body: undefined,
-    headers: {}
+    headers: {},
   };
 }
 
@@ -452,7 +451,7 @@ export function timeoutResponse(delayMs: number = 30000): MockResponse {
   return {
     status: 200,
     body: { message: 'This will timeout' },
-    delay: delayMs
+    delay: delayMs,
   };
 }
 
@@ -500,7 +499,7 @@ export async function setupMockServer(port?: number): Promise<{
     cleanup: async () => {
       await mockServer.stop();
       config.setEnvironment(originalEnv);
-    }
+    },
   };
 }
 
@@ -537,7 +536,7 @@ export const FlyingSaucerResponses = {
    */
   beers: (beers: any[]): MockResponse => ({
     status: 200,
-    body: [null, { brewInStock: beers }]
+    body: [null, { brewInStock: beers }],
   }),
 
   /**
@@ -547,7 +546,7 @@ export const FlyingSaucerResponses = {
    */
   myBeers: (beers: any[]): MockResponse => ({
     status: 200,
-    body: [null, { tasted_brew_current_round: beers }]
+    body: [null, { tasted_brew_current_round: beers }],
   }),
 
   /**
@@ -557,7 +556,7 @@ export const FlyingSaucerResponses = {
    */
   rewards: (rewards: any[]): MockResponse => ({
     status: 200,
-    body: [null, { rewards: rewards }]
+    body: [null, { rewards: rewards }],
   }),
 
   /**
@@ -566,7 +565,7 @@ export const FlyingSaucerResponses = {
    */
   empty: (): MockResponse => ({
     status: 200,
-    body: [null, { brewInStock: [] }]
+    body: [null, { brewInStock: [] }],
   }),
 
   /**
@@ -575,7 +574,7 @@ export const FlyingSaucerResponses = {
    */
   serverError: (): MockResponse => ({
     status: 500,
-    body: { error: 'Internal Server Error' }
+    body: { error: 'Internal Server Error' },
   }),
 
   /**
@@ -584,7 +583,7 @@ export const FlyingSaucerResponses = {
    */
   notAuthenticated: (): MockResponse => ({
     status: 401,
-    body: { error: 'Not authenticated' }
+    body: { error: 'Not authenticated' },
   }),
 
   /**
@@ -593,7 +592,7 @@ export const FlyingSaucerResponses = {
    */
   notFound: (): MockResponse => ({
     status: 404,
-    body: { error: 'Not found' }
+    body: { error: 'Not found' },
   }),
 
   /**
@@ -602,8 +601,8 @@ export const FlyingSaucerResponses = {
    */
   rateLimited: (): MockResponse => ({
     status: 429,
-    body: { error: 'Rate limit exceeded' }
-  })
+    body: { error: 'Rate limit exceeded' },
+  }),
 };
 
 /**
@@ -762,11 +761,11 @@ export class RequestMatcher {
         method: req.method,
         headers: req.headers,
         query: req.query,
-        body: req.body
+        body: req.body,
       }));
       throw new Error(
         `Expected ${this.path} to have been called with ${JSON.stringify(params)}, ` +
-        `but actual requests were: ${JSON.stringify(requestDetails, null, 2)}`
+          `but actual requests were: ${JSON.stringify(requestDetails, null, 2)}`
       );
     }
   }
@@ -784,7 +783,7 @@ export class RequestMatcher {
           `Expected ${this.path} not to have been called, but it was called ${requests.length} times`
         );
       }
-    }
+    },
   };
 }
 
@@ -798,6 +797,6 @@ declare module './mockServer' {
 }
 
 // Add the method to MockServer prototype
-MockServer.prototype.expectRequest = function(path: string): RequestMatcher {
+MockServer.prototype.expectRequest = function (path: string): RequestMatcher {
   return new RequestMatcher(this, path);
 };

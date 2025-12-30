@@ -2,26 +2,27 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { StyleSheet, View, TouchableOpacity } from 'react-native';
 import { ThemedText } from './ThemedText';
 import { useThemeColor } from '@/hooks/useThemeColor';
+import { useBreakpoint } from '@/hooks/useBreakpoint';
 import { SearchBar } from './SearchBar';
 import { useBeerFilters } from '@/hooks/useBeerFilters';
 import { useDataRefresh } from '@/hooks/useDataRefresh';
 import { FilterBar } from './beer/FilterBar';
 import { BeerList } from './beer/BeerList';
 import { SkeletonLoader } from './beer/SkeletonLoader';
-import { BeerfinderWithGlassType } from '@/src/types/beer';
+import { BeerfinderWithContainerType } from '@/src/types/beer';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useAppContext } from '@/context/AppContext';
-import { useOptimisticUpdate } from '@/context/OptimisticUpdateContext';
 import { useOptimisticCheckIn } from '@/hooks/useOptimisticCheckIn';
 import { OptimisticStatusBadge } from './optimistic/OptimisticStatusBadge';
-import { OptimisticUpdateType, CheckInRollbackData } from '@/src/types/optimisticUpdate';
 
 export const TastedBrewList = () => {
   // MP-4 Step 2: Use context for beer data instead of local state
-  const { beers, loading, errors, setTastedBeers, setAllBeers, setRewards } = useAppContext();
+  const { beers, loading, errors, refreshBeerData } = useAppContext();
+
+  // Responsive layout: 1 column on phone, 2 on tablet portrait, 3 on tablet landscape
+  const { numColumns } = useBreakpoint();
 
   // MP-7 Step 3: Optimistic UI updates
-  const { pendingUpdates } = useOptimisticUpdate();
   const { getPendingBeer, retryCheckIn, rollbackCheckIn } = useOptimisticCheckIn();
 
   /**
@@ -49,25 +50,9 @@ export const TastedBrewList = () => {
   const activeButtonColor = useThemeColor({}, 'tint');
 
   // Use the shared data refresh hook
-  // Reload data from database into AppContext after refresh completes
+  // Use AppContext's refreshBeerData to reload from database after refresh
   const { refreshing, handleRefresh } = useDataRefresh({
-    onDataReloaded: async () => {
-      // Reload all data from database into AppContext
-      const { beerRepository } = await import('@/src/database/repositories/BeerRepository');
-      const { myBeersRepository } = await import('@/src/database/repositories/MyBeersRepository');
-      const { rewardsRepository } = await import('@/src/database/repositories/RewardsRepository');
-
-      const [allBeersData, tastedBeersData, rewardsData] = await Promise.all([
-        beerRepository.getAll(),
-        myBeersRepository.getAll(),
-        rewardsRepository.getAll(),
-      ]);
-
-      setAllBeers(allBeersData);
-      setTastedBeers(tastedBeersData);
-      setRewards(rewardsData);
-      console.log(`[TastedBrewList] Reloaded: ${tastedBeersData.length} tasted beers`);
-    },
+    onDataReloaded: refreshBeerData,
     componentName: 'TastedBrewList',
   });
 
@@ -91,26 +76,29 @@ export const TastedBrewList = () => {
   /**
    * MP-7 Step 3: Render optimistic status badge for tasted beers
    */
-  const renderTastedBeerActions = useCallback((item: BeerfinderWithGlassType) => {
-    const pendingStatus = getPendingBeer(item.id);
+  const renderTastedBeerActions = useCallback(
+    (item: BeerfinderWithContainerType) => {
+      const pendingStatus = getPendingBeer(item.id);
 
-    if (pendingStatus) {
-      return (
-        <OptimisticStatusBadge
-          status={pendingStatus.status}
-          error={pendingStatus.error}
-          onRetry={() => retryCheckIn(item.id)}
-          onCancel={() => rollbackCheckIn(item.id)}
-        />
-      );
-    }
+      if (pendingStatus) {
+        return (
+          <OptimisticStatusBadge
+            status={pendingStatus.status}
+            error={pendingStatus.error}
+            onRetry={() => retryCheckIn(item.id)}
+            onCancel={() => rollbackCheckIn(item.id)}
+          />
+        );
+      }
 
-    return null;
-  }, [getPendingBeer, retryCheckIn, rollbackCheckIn]);
+      return null;
+    },
+    [getPendingBeer, retryCheckIn, rollbackCheckIn]
+  );
 
   const emptyMessage = searchText
-    ? "No tasted beer matches your search criteria."
-    : "No beers in your current round yet. Start exploring and log some brews!";
+    ? 'No tasted beer matches your search criteria.'
+    : 'No beers in your current round yet. Start exploring and log some brews!';
 
   return (
     <View testID="tasted-brews-container" style={styles.container}>
@@ -135,9 +123,7 @@ export const TastedBrewList = () => {
             style={[styles.refreshButton, { backgroundColor: activeButtonColor }]}
             onPress={handleRefresh}
           >
-            <ThemedText style={[styles.buttonText, { color: 'white' }]}>
-              Try Again
-            </ThemedText>
+            <ThemedText style={[styles.buttonText, { color: 'white' }]}>Try Again</ThemedText>
           </TouchableOpacity>
         </View>
       ) : (
@@ -174,6 +160,7 @@ export const TastedBrewList = () => {
             onToggleExpand={toggleExpand}
             dateLabel="Tasted"
             renderItemActions={renderTastedBeerActions}
+            numColumns={numColumns}
           />
         </>
       )}

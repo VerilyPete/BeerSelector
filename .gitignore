@@ -71,11 +71,11 @@ yarn-error.*
 .env
 .env.local
 .env*.local
-# But DO commit environment templates and examples
+.env.development
+.env.staging
+.env.production
+# Only commit the example template
 !.env.example
-!.env.development
-!.env.staging
-!.env.production
 
 # typescript
 *.tsbuildinfo

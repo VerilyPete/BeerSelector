@@ -18,7 +18,6 @@ import {
   OptimisticUpdateStatus,
   OptimisticUpdateType,
   RollbackData,
-  isOptimisticUpdate,
 } from '@/src/types/optimisticUpdate';
 
 /**

@@ -2,7 +2,7 @@ import { saveSessionData, clearSessionData } from './sessionManager';
 import { getApiClient } from './apiClientInstance';
 import { getPreference, setPreference } from '../database/preferences';
 import { refreshAllDataFromAPI } from '../services/dataUpdateService';
-import { SessionData, ApiError, ApiResponse, LoginResult, isSessionData } from '../types/api';
+import { SessionData, ApiError, LoginResult } from '../types/api';
 
 // Using LoginResult interface from ../types/api
 
@@ -22,7 +22,7 @@ export async function autoLogin(): Promise<LoginResult> {
       // Check if user is in visitor mode
       const isVisitor = await getPreference('is_visitor_mode');
       const isVisitorMode = isVisitor === 'true';
-      
+
       // Refresh all data if autologin was successful
       if (!isVisitorMode) {
         try {
@@ -40,13 +40,13 @@ export async function autoLogin(): Promise<LoginResult> {
         data: response.data,
         sessionData: response.data.session,
         statusCode: response.statusCode,
-        isVisitorMode: isVisitorMode
+        isVisitorMode: isVisitorMode,
       };
     } else {
       return {
         success: false,
         error: response.error || 'Auto-login failed',
-        statusCode: response.statusCode || 401
+        statusCode: response.statusCode || 401,
       };
     }
   } catch (error) {
@@ -56,14 +56,14 @@ export async function autoLogin(): Promise<LoginResult> {
       return {
         success: false,
         error: error.message,
-        statusCode: error.statusCode
+        statusCode: error.statusCode,
       };
     }
 
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error occurred',
-      statusCode: 500
+      statusCode: 500,
     };
   }
 }
@@ -78,31 +78,29 @@ export const handleVisitorLogin = async (
 ): Promise<LoginResult> => {
   try {
     // Parse cookies if they're in string format
-    const parsedCookies = typeof cookies === 'string'
-      ? parseCookiesString(cookies)
-      : cookies;
+    const parsedCookies = typeof cookies === 'string' ? parseCookiesString(cookies) : cookies;
 
     console.log('Visitor login - parsing cookies:', JSON.stringify(parsedCookies));
 
     // For visitor mode, we ONLY need the store ID from cookies
     const storeId = parsedCookies.store__id || parsedCookies.store || '';
-    
+
     // Validate that we have a store ID (the only required field)
     if (!storeId) {
       console.error('Missing store ID in cookies for visitor mode');
       return {
         success: false,
         error: 'Missing store ID required for visitor mode',
-        statusCode: 401
+        statusCode: 401,
       };
     }
-    
+
     // Create minimal session data for visitor mode
     const sessionData: Partial<SessionData> = {
       sessionId: parsedCookies.PHPSESSID || 'visitor_session', // Use placeholder if missing
       storeId: storeId,
       memberId: 'visitor', // Setting a placeholder member ID for visitor
-      storeName: 'Flying Saucer' // Default store name
+      storeName: 'Flying Saucer', // Default store name
     };
 
     // Try to get the store name if available
@@ -115,13 +113,17 @@ export const handleVisitorLogin = async (
     }
 
     // Store information about visitor mode
-    await setPreference('is_visitor_mode', 'true', 'Flag indicating whether the user is in visitor mode');
-    
+    await setPreference(
+      'is_visitor_mode',
+      'true',
+      'Flag indicating whether the user is in visitor mode'
+    );
+
     // Store additional information if available
     if (parsedCookies.store_code) {
       await setPreference('store_code', parsedCookies.store_code, 'Store code for visitor');
     }
-    
+
     if (parsedCookies.store__state) {
       await setPreference('store_state', parsedCookies.store__state, 'Store state for visitor');
     }
@@ -135,7 +137,7 @@ export const handleVisitorLogin = async (
       message: 'Visitor login successful',
       sessionData: sessionData as SessionData,
       statusCode: 200,
-      isVisitorMode: true
+      isVisitorMode: true,
     };
   } catch (error) {
     console.error('Error handling visitor login:', error);
@@ -144,14 +146,14 @@ export const handleVisitorLogin = async (
       return {
         success: false,
         error: error.message,
-        statusCode: error.statusCode
+        statusCode: error.statusCode,
       };
     }
 
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error during visitor login',
-      statusCode: 500
+      statusCode: 500,
     };
   }
 };
@@ -164,19 +166,17 @@ export const handleVisitorLogin = async (
  */
 export const handleTapThatAppLogin = async (
   cookies: string | Record<string, string>,
-  headers?: Headers
+  _headers?: Headers
 ): Promise<LoginResult> => {
   try {
     // Parse cookies if they're in string format
-    const parsedCookies = typeof cookies === 'string'
-      ? parseCookiesString(cookies)
-      : cookies;
+    const parsedCookies = typeof cookies === 'string' ? parseCookiesString(cookies) : cookies;
 
     // Extract relevant session data with safe decoding
     const sessionData: Partial<SessionData> = {
       sessionId: parsedCookies.PHPSESSID || '',
       storeId: parsedCookies.store__id || parsedCookies.store || '',
-      memberId: parsedCookies.member_id || ''
+      memberId: parsedCookies.member_id || '',
     };
 
     // Safely decode URI components with error handling
@@ -230,14 +230,18 @@ export const handleTapThatAppLogin = async (
     }
 
     // This is a regular login, not a visitor login
-    await setPreference('is_visitor_mode', 'false', 'Flag indicating whether the user is in visitor mode');
+    await setPreference(
+      'is_visitor_mode',
+      'false',
+      'Flag indicating whether the user is in visitor mode'
+    );
 
     // Validate that we have the minimum required data
     if (!sessionData.sessionId || !sessionData.memberId || !sessionData.storeId) {
       return {
         success: false,
         error: 'Missing required login data',
-        statusCode: 401
+        statusCode: 401,
       };
     }
 
@@ -249,7 +253,7 @@ export const handleTapThatAppLogin = async (
       message: 'Login successful',
       sessionData: sessionData as SessionData,
       statusCode: 200,
-      isVisitorMode: false
+      isVisitorMode: false,
     };
   } catch (error) {
     console.error('Error handling login:', error);
@@ -258,14 +262,14 @@ export const handleTapThatAppLogin = async (
       return {
         success: false,
         error: error.message,
-        statusCode: error.statusCode
+        statusCode: error.statusCode,
       };
     }
 
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error during login',
-      statusCode: 500
+      statusCode: 500,
     };
   }
 };
@@ -277,16 +281,20 @@ export const handleTapThatAppLogin = async (
 export async function logout(): Promise<LoginResult> {
   try {
     const apiClient = getApiClient();
-    const response = await apiClient.post('/logout.php', {});
+    await apiClient.post('/logout.php', {});
     await clearSessionData();
-    
+
     // Clear visitor mode flag on logout
-    await setPreference('is_visitor_mode', 'false', 'Flag indicating whether the user is in visitor mode');
+    await setPreference(
+      'is_visitor_mode',
+      'false',
+      'Flag indicating whether the user is in visitor mode'
+    );
 
     return {
       success: true,
       message: 'Logout successful',
-      statusCode: 200
+      statusCode: 200,
     };
   } catch (error) {
     console.error('Error during logout:', error);
@@ -295,14 +303,14 @@ export async function logout(): Promise<LoginResult> {
       return {
         success: false,
         error: error.message,
-        statusCode: error.statusCode
+        statusCode: error.statusCode,
       };
     }
 
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error during logout',
-      statusCode: 500
+      statusCode: 500,
     };
   }
 }
@@ -356,22 +364,26 @@ export async function login(username: string, password: string): Promise<LoginRe
       return {
         success: false,
         error: 'Username and password are required',
-        statusCode: 400
+        statusCode: 400,
       };
     }
 
     const apiClient = getApiClient();
     const response = await apiClient.post<{ session: SessionData }>('/login.php', {
       username,
-      password
+      password,
     });
 
     if (response.success && response.data && response.data.session) {
       // Save the session data
       await saveSessionData(response.data.session);
-      
+
       // Clear visitor mode flag on regular login
-      await setPreference('is_visitor_mode', 'false', 'Flag indicating whether the user is in visitor mode');
+      await setPreference(
+        'is_visitor_mode',
+        'false',
+        'Flag indicating whether the user is in visitor mode'
+      );
 
       // Refresh all data from the API, including rewards
       try {
@@ -388,13 +400,13 @@ export async function login(username: string, password: string): Promise<LoginRe
         data: response.data,
         sessionData: response.data.session,
         statusCode: response.statusCode,
-        isVisitorMode: false
+        isVisitorMode: false,
       };
     } else {
       return {
         success: false,
         error: response.error || 'Login failed',
-        statusCode: response.statusCode || 401
+        statusCode: response.statusCode || 401,
       };
     }
   } catch (error) {
@@ -404,14 +416,14 @@ export async function login(username: string, password: string): Promise<LoginRe
       return {
         success: false,
         error: error.message,
-        statusCode: error.statusCode
+        statusCode: error.statusCode,
       };
     }
 
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error occurred',
-      statusCode: 500
+      statusCode: 500,
     };
   }
 }
@@ -419,7 +431,7 @@ export async function login(username: string, password: string): Promise<LoginRe
 // Cache for visitor mode to reduce database access
 let visitorModeCache: { value: boolean | null; timestamp: number } = {
   value: null,
-  timestamp: 0
+  timestamp: 0,
 };
 
 /**
@@ -430,22 +442,26 @@ let visitorModeCache: { value: boolean | null; timestamp: number } = {
 export async function isVisitorMode(forceRefresh = false): Promise<boolean> {
   const now = Date.now();
   const cacheExpiryMs = 1000; // Cache expires after 1 second (reduced from 5 seconds)
-  
+
   // Use cached value if available and not expired, unless forceRefresh is true
-  if (!forceRefresh && visitorModeCache.value !== null && now - visitorModeCache.timestamp < cacheExpiryMs) {
+  if (
+    !forceRefresh &&
+    visitorModeCache.value !== null &&
+    now - visitorModeCache.timestamp < cacheExpiryMs
+  ) {
     return visitorModeCache.value;
   }
-  
+
   try {
     const mode = await getPreference('is_visitor_mode');
     const isVisitor = mode === 'true';
-    
+
     // Update cache
     visitorModeCache = {
       value: isVisitor,
-      timestamp: now
+      timestamp: now,
     };
-    
+
     return isVisitor;
   } catch (error) {
     console.error('Error checking visitor mode:', error);
