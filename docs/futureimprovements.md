@@ -4,6 +4,34 @@ This document tracks potential enhancements that have been considered but deferr
 
 ---
 
+## Session Progress (2025-12-30)
+
+### Completed This Session
+
+**ufobeer Worker (Cloudflare):**
+
+- ✅ Implemented `POST /admin/cleanup/trigger` endpoint with 13 fixes
+- ✅ Added description_hash computation when queuing beers
+- ✅ 34 tests passing, production deployed
+- ✅ Security audit passed - ready for public repo
+- ✅ Created `futureimprovements.md` in ufobeer with sliding window rate limiter note
+
+**BeerSelector (React Native):**
+
+- ✅ Merged `ui-refactor` branch to main (PR #2)
+- ✅ 29 commits: Design system, enrichment service, tablet support, test fixes
+- ✅ 168 files changed (+23,261 / -11,972 lines)
+- ✅ All 1753 tests passing
+- ✅ Cleaned up branch (deleted local + remote)
+- ✅ Removed enrichment docs (moved to ufobeer repo)
+
+### Ready for Next Session
+
+- Build and test iOS app with new UI
+- Items below in this document
+
+---
+
 ## Enrichment Service
 
 ### Polling Error Boundary Strategy
