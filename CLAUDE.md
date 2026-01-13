@@ -76,6 +76,8 @@ https://fsbs.beerknurd.com/bk-store-json.php?sid={store_id}
 
 - **UI.md** - Container types, icons, theming, dark mode patterns. Refer when working on UI components or styling.
 - **TESTING.md** - Jest vs Maestro patterns, hanging test prevention. Refer when writing or debugging tests.
+- **[.claude/key-files.md](.claude/key-files.md)** - Quick reference for important files in the codebase.
+- **[.claude/ios-build.md](.claude/ios-build.md)** - iOS build approach and Live Activities documentation.
 
 ## Common Commands
 
@@ -392,30 +394,14 @@ if (isBeer(data)) {
 
 ## Key Files Reference
 
-### Data Access Layer (Primary)
+See **[.claude/key-files.md](.claude/key-files.md)** for the complete file reference.
 
-- `src/database/repositories/` - Data access via repository pattern (use these directly)
-  - `BeerRepository.ts` - All beers CRUD operations with lock management
-  - `MyBeersRepository.ts` - Tasted beers (Beerfinder) operations with lock management
-  - `RewardsRepository.ts` - UFO Club rewards operations with lock management
-  - `OperationQueueRepository.ts` - Queued operations for offline retry
-- `src/database/db.ts` - Database initialization orchestration
-- `src/database/preferences.ts` - App preferences management
-
-### Core Application Files
-
-- `app/_layout.tsx` - App initialization, database setup, auto-refresh
-- `src/services/dataUpdateService.ts` - Data fetching and refresh logic with sequential coordination
-- `src/api/authService.ts` - Authentication flow (member and visitor modes)
-- `app/settings.tsx` - Settings UI with login/logout
-
-### Expo Local Modules
-
-- `modules/live-activity/` - iOS Live Activity native module (Expo Modules API)
-  - `ios/LiveActivityModule.swift` - Pure Swift implementation
-  - `ios/LiveActivity.podspec` - CocoaPods configuration (must have `DEFINES_MODULE = YES`)
-  - `src/index.ts` - TypeScript interface and types
-  - `expo-module.config.json` - Module configuration for autolinking
+**Most Important Files:**
+- `src/database/repositories/` - All database operations (BeerRepository, MyBeersRepository, RewardsRepository)
+- `app/_layout.tsx` - App initialization and auto-refresh
+- `src/services/dataUpdateService.ts` - Data fetching and sync
+- `src/api/authService.ts` - Authentication (member/visitor modes)
+- `modules/live-activity/` - iOS Live Activity module
 
 ## API Response Format
 
@@ -439,45 +425,15 @@ Extract beers from `brewInStock` property in second array element.
 
 ### iOS Build Approach
 
-**Local Xcode Builds**: This project uses **local Xcode builds**, not EAS (Expo Application Services).
+See **[.claude/ios-build.md](.claude/ios-build.md)** for detailed iOS build and Live Activities documentation.
 
-- Build iOS app directly in Xcode (not `eas build`)
-- Manual code signing and provisioning profile configuration
-- Widget Extensions and App Groups configured directly in Xcode project
-- CocoaPods for native dependencies (`pod install`)
-- No Expo config plugins needed for native iOS features
-- Direct access to Xcode project for native feature development
-
-**iOS Live Activities**:
-
-- **Expo Module**: `modules/live-activity/` (Expo Modules API with pure Swift)
-- Widget Extension: `ios/BeerQueueWidget/` (Swift/SwiftUI)
-- **Local updates only** (no push notifications, no remote updates)
+**Key Points:**
+- **Local Xcode builds** (not EAS) - open `ios/BeerSelector.xcworkspace`
+- Bundle ID: `org.verily.FSbeerselector`
+- CocoaPods for native dependencies (`cd ios && pod install`)
+- Live Activities via `modules/live-activity/` (Expo Modules API, pure Swift)
+- Widget Extension: `ios/BeerQueueWidget/`
 - App Group: `group.org.verily.FSbeerselector.beerqueue`
-- Shows beer queue status when user checks in beers
-- Updates locally when queue changes (no backend required)
-- **Auto-dismiss**: Activities auto-dismiss 3 hours after last update using end-and-restart pattern
-
-**Live Activity Module Usage**:
-
-```typescript
-import LiveActivityModule from '@/modules/live-activity';
-
-// Check if enabled
-const enabled = await LiveActivityModule.areActivitiesEnabled();
-
-// Start/restart activity (recommended for auto-dismiss)
-const activityId = await LiveActivityModule.restartActivity({
-  memberId: 'M123',
-  storeId: 'S456',
-  beers: [{ id: '1', name: 'Test IPA' }],
-});
-
-// End all activities
-await LiveActivityModule.endAllActivities();
-```
-
-See `docs/liveactivity/IMPLEMENTATION_COMPLETE.md` for full documentation.
 
 ## Development Guidelines
 
