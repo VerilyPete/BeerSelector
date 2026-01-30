@@ -53,7 +53,7 @@ export default function AboutSection({
 
   // Get platform-specific build number
   const buildNumber = Platform.select({
-    ios: Constants.expoConfig?.ios?.buildNumber,
+    ios: Constants.platform?.ios?.buildNumber,
     android: Constants.expoConfig?.android?.versionCode?.toString(),
     default: undefined,
   });

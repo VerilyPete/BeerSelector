@@ -56,6 +56,11 @@ jest.mock('expo-constants', () => ({
       apiUrl: 'https://test-api.example.com',
     },
   },
+  platform: {
+    ios: {
+      buildNumber: '24',
+    },
+  },
 }));
 
 // Mock react-native-safe-area-context
