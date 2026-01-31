@@ -36,13 +36,15 @@ export const TastedBrewList = () => {
   // Pass 'tasted_date' to sort by the date the beer was tasted instead of added_date
   const {
     filteredBeers,
-    filters,
+    containerFilter,
     sortBy,
+    sortDirection,
     searchText,
     expandedId,
     setSearchText,
-    toggleFilter,
-    toggleSort,
+    cycleContainerFilter,
+    cycleSort,
+    toggleSortDirection,
     toggleExpand,
   } = useBeerFilters(beers.tastedBeers, 'tasted_date');
 
@@ -142,11 +144,12 @@ export const TastedBrewList = () => {
             </View>
 
             <FilterBar
-              filters={filters}
+              containerFilter={containerFilter}
               sortBy={sortBy}
-              onToggleFilter={toggleFilter}
-              onToggleSort={toggleSort}
-              showHeaviesAndIpa={false}
+              sortDirection={sortDirection}
+              onCycleContainerFilter={cycleContainerFilter}
+              onCycleSort={cycleSort}
+              onToggleSortDirection={toggleSortDirection}
             />
           </View>
 

@@ -1,5 +1,11 @@
-import { applyFilters, applySorting } from '../useBeerFilters';
-import { BeerWithContainerType } from '@/src/types/beer';
+import {
+  applyFilters,
+  applySorting,
+  nextContainerFilter,
+  nextSortOption,
+  defaultDirectionForSort,
+} from '../useBeerFilters';
+import { BeerWithContainerType, BeerfinderWithContainerType } from '@/src/types/beer';
 
 describe('useBeerFilters - Filter Logic', () => {
   const mockBeers: BeerWithContainerType[] = [
@@ -12,6 +18,7 @@ describe('useBeerFilters - Filter Logic', () => {
       brew_container: 'Draft',
       brew_description: 'A hoppy beer',
       added_date: '1704067200', // Jan 1, 2024
+      abv: 6.5,
       container_type: 'tulip',
       enrichment_confidence: null,
       enrichment_source: null,
@@ -25,6 +32,7 @@ describe('useBeerFilters - Filter Logic', () => {
       brew_container: 'Bottle',
       brew_description: 'A dark beer',
       added_date: '1704153600', // Jan 2, 2024
+      abv: 8.2,
       container_type: 'pint',
       enrichment_confidence: null,
       enrichment_source: null,
@@ -35,9 +43,10 @@ describe('useBeerFilters - Filter Logic', () => {
       brewer: 'Test Brewery C',
       brewer_loc: 'Denver, CO',
       brew_style: 'Porter',
-      brew_container: 'Draft',
+      brew_container: 'Draught',
       brew_description: 'A smooth porter',
       added_date: '1704240000', // Jan 3, 2024
+      abv: 5.4,
       container_type: 'pint',
       enrichment_confidence: null,
       enrichment_source: null,
@@ -51,19 +60,21 @@ describe('useBeerFilters - Filter Logic', () => {
       brew_container: 'Can',
       brew_description: 'A crisp lager',
       added_date: '1704326400', // Jan 4, 2024
+      abv: 4.8,
       container_type: 'pint',
       enrichment_confidence: null,
       enrichment_source: null,
     },
     {
       id: '5',
-      brew_name: 'Delta Hazy IPA',
+      brew_name: 'Delta Hazy',
       brewer: 'Test Brewery E',
       brewer_loc: 'San Diego, CA',
       brew_style: 'Hazy IPA',
       brew_container: 'Draft',
-      brew_description: 'A juicy IPA',
+      brew_description: 'A juicy hazy',
       added_date: '1704412800', // Jan 5, 2024
+      abv: null,
       container_type: 'tulip',
       enrichment_confidence: null,
       enrichment_source: null,
@@ -71,24 +82,10 @@ describe('useBeerFilters - Filter Logic', () => {
   ];
 
   describe('applyFilters', () => {
-    describe('Draft Filter', () => {
-      it('should filter beers by draft container', () => {
+    describe('Container Filter - all', () => {
+      it('should return all beers when containerFilter is all', () => {
         const result = applyFilters(mockBeers, {
-          isDraft: true,
-          isHeavies: false,
-          isIpa: false,
-          searchText: '',
-        });
-
-        expect(result).toHaveLength(3); // IDs 1, 3, 5 are draft
-        expect(result.every(b => b.brew_container === 'Draft')).toBe(true);
-      });
-
-      it('should return all beers when draft filter is off', () => {
-        const result = applyFilters(mockBeers, {
-          isDraft: false,
-          isHeavies: false,
-          isIpa: false,
+          containerFilter: 'all',
           searchText: '',
         });
 
@@ -96,99 +93,81 @@ describe('useBeerFilters - Filter Logic', () => {
       });
     });
 
-    describe('Heavies Filter', () => {
-      it('should filter beers by heavy styles (porter, stout, barleywine, quad, tripel)', () => {
+    describe('Container Filter - draft', () => {
+      it('should filter beers matching "Draft" (case-insensitive)', () => {
         const result = applyFilters(mockBeers, {
-          isDraft: false,
-          isHeavies: true,
-          isIpa: false,
+          containerFilter: 'draft',
           searchText: '',
         });
 
-        expect(result).toHaveLength(2); // IDs 2 (Stout), 3 (Porter)
-        expect(result.some(b => b.id === '2')).toBe(true);
-        expect(result.some(b => b.id === '3')).toBe(true);
+        // IDs 1 (Draft), 3 (Draught), 5 (Draft)
+        expect(result).toHaveLength(3);
+        expect(result.map(b => b.id).sort()).toEqual(['1', '3', '5']);
       });
 
-      it('should handle case-insensitive style matching for heavies', () => {
-        const beersWithVariedCase: BeerWithContainerType[] = [
-          {
-            ...mockBeers[0],
-            id: '10',
-            brew_style: 'PORTER',
-          },
-          {
-            ...mockBeers[0],
-            id: '11',
-            brew_style: 'BarleyWine',
-          },
+      it('should filter beers matching "Draught" (case-insensitive)', () => {
+        const beersWithDraught: BeerWithContainerType[] = [
+          { ...mockBeers[0], id: '10', brew_container: 'draught' },
+          { ...mockBeers[0], id: '11', brew_container: 'DRAUGHT' },
+          { ...mockBeers[0], id: '12', brew_container: 'Bottle' },
         ];
 
-        const result = applyFilters(beersWithVariedCase, {
-          isDraft: false,
-          isHeavies: true,
-          isIpa: false,
+        const result = applyFilters(beersWithDraught, {
+          containerFilter: 'draft',
           searchText: '',
         });
 
         expect(result).toHaveLength(2);
+        expect(result.map(b => b.id).sort()).toEqual(['10', '11']);
       });
     });
 
-    describe('IPA Filter', () => {
-      it('should filter beers by IPA style', () => {
+    describe('Container Filter - cans', () => {
+      it('should filter beers matching "Bottle" (case-insensitive)', () => {
         const result = applyFilters(mockBeers, {
-          isDraft: false,
-          isHeavies: false,
-          isIpa: true,
+          containerFilter: 'cans',
           searchText: '',
         });
 
-        expect(result).toHaveLength(2); // IDs 1 (IPA), 5 (Hazy IPA)
-        expect(result.every(b => b.brew_style?.toLowerCase().includes('ipa'))).toBe(true);
+        // IDs 2 (Bottle), 4 (Can)
+        expect(result).toHaveLength(2);
+        expect(result.map(b => b.id).sort()).toEqual(['2', '4']);
+      });
+
+      it('should filter beers matching "Can" (case-insensitive)', () => {
+        const beersWithCans: BeerWithContainerType[] = [
+          { ...mockBeers[0], id: '10', brew_container: 'can' },
+          { ...mockBeers[0], id: '11', brew_container: 'CAN' },
+          { ...mockBeers[0], id: '12', brew_container: 'Draft' },
+        ];
+
+        const result = applyFilters(beersWithCans, {
+          containerFilter: 'cans',
+          searchText: '',
+        });
+
+        expect(result).toHaveLength(2);
+        expect(result.map(b => b.id).sort()).toEqual(['10', '11']);
       });
     });
 
-    describe('Combined Filters', () => {
-      it('should combine Draft and IPA filters', () => {
+    describe('Combined container filter + search text', () => {
+      it('should apply both container filter and search text', () => {
         const result = applyFilters(mockBeers, {
-          isDraft: true,
-          isHeavies: false,
-          isIpa: true,
-          searchText: '',
+          containerFilter: 'draft',
+          searchText: 'alpha',
         });
 
-        expect(result).toHaveLength(2); // IDs 1, 5 (both Draft IPAs)
-        expect(
-          result.every(
-            b => b.brew_container === 'Draft' && b.brew_style?.toLowerCase().includes('ipa')
-          )
-        ).toBe(true);
+        expect(result).toHaveLength(1);
+        expect(result[0].id).toBe('1');
       });
 
-      it('should combine Draft and Heavies filters', () => {
+      it('should return empty when container matches but search does not', () => {
         const result = applyFilters(mockBeers, {
-          isDraft: true,
-          isHeavies: true,
-          isIpa: false,
-          searchText: '',
+          containerFilter: 'cans',
+          searchText: 'nonexistent',
         });
 
-        expect(result).toHaveLength(1); // ID 3 (Draft Porter)
-        expect(result[0].id).toBe('3');
-      });
-
-      it('should apply both Heavies and IPA as AND if both are true', () => {
-        // Note: In the actual hook usage, Heavies and IPA are mutually exclusive
-        // But the filter function should handle the edge case where both are true
-        const result = applyFilters(mockBeers, {
-          isDraft: false,
-          isHeavies: true,
-          isIpa: true,
-          searchText: '',
-        });
-
-        // Both filters applied as AND = no results (no beer is both heavy style AND IPA)
         expect(result).toHaveLength(0);
       });
     });
@@ -196,32 +175,27 @@ describe('useBeerFilters - Filter Logic', () => {
     describe('Search Text', () => {
       it('should filter beers by search text in brew_name', () => {
         const result = applyFilters(mockBeers, {
-          isDraft: false,
-          isHeavies: false,
-          isIpa: false,
-          searchText: 'ipa',
+          containerFilter: 'all',
+          searchText: 'alpha',
         });
 
-        expect(result).toHaveLength(2); // Alpha IPA, Delta Hazy IPA
+        expect(result).toHaveLength(1);
+        expect(result[0].id).toBe('1');
       });
 
       it('should filter beers by search text in brewer', () => {
         const result = applyFilters(mockBeers, {
-          isDraft: false,
-          isHeavies: false,
-          isIpa: false,
+          containerFilter: 'all',
           searchText: 'Brewery B',
         });
 
         expect(result).toHaveLength(1);
-        expect(result[0].id).toBe('2'); // Zeta Stout
+        expect(result[0].id).toBe('2');
       });
 
       it('should filter beers by search text in brew_style', () => {
         const result = applyFilters(mockBeers, {
-          isDraft: false,
-          isHeavies: false,
-          isIpa: false,
+          containerFilter: 'all',
           searchText: 'stout',
         });
 
@@ -231,9 +205,7 @@ describe('useBeerFilters - Filter Logic', () => {
 
       it('should filter beers by search text in brewer_loc', () => {
         const result = applyFilters(mockBeers, {
-          isDraft: false,
-          isHeavies: false,
-          isIpa: false,
+          containerFilter: 'all',
           searchText: 'Portland',
         });
 
@@ -243,42 +215,38 @@ describe('useBeerFilters - Filter Logic', () => {
 
       it('should be case-insensitive', () => {
         const result = applyFilters(mockBeers, {
-          isDraft: false,
-          isHeavies: false,
-          isIpa: false,
+          containerFilter: 'all',
           searchText: 'ALPHA',
         });
 
         expect(result).toHaveLength(1);
         expect(result[0].id).toBe('1');
       });
+    });
 
-      it('should combine search with filters', () => {
+    describe('Early Exit', () => {
+      it('should return original array reference when no filters active', () => {
         const result = applyFilters(mockBeers, {
-          isDraft: true,
-          isHeavies: false,
-          isIpa: false,
-          searchText: 'ipa',
+          containerFilter: 'all',
+          searchText: '',
         });
 
-        expect(result).toHaveLength(2); // Both IPAs are draft
+        expect(result).toBe(mockBeers); // Same reference, not just equal
       });
     });
 
     describe('Edge Cases', () => {
       it('should handle empty beer list', () => {
         const result = applyFilters([], {
-          isDraft: false,
-          isHeavies: false,
-          isIpa: false,
+          containerFilter: 'draft',
           searchText: '',
         });
 
         expect(result).toEqual([]);
       });
 
-      it('should handle beers with null/undefined fields', () => {
-        const beersWithNulls: BeerWithContainerType[] = [
+      it('should handle beers with empty brew_container', () => {
+        const beersWithEmpty: BeerWithContainerType[] = [
           {
             id: '1',
             brew_name: 'Test Beer',
@@ -294,21 +262,17 @@ describe('useBeerFilters - Filter Logic', () => {
           },
         ];
 
-        const result = applyFilters(beersWithNulls, {
-          isDraft: true,
-          isHeavies: false,
-          isIpa: false,
+        const result = applyFilters(beersWithEmpty, {
+          containerFilter: 'draft',
           searchText: '',
         });
 
-        expect(result).toHaveLength(0); // Doesn't match 'Draft'
+        expect(result).toHaveLength(0);
       });
 
       it('should handle search with no results', () => {
         const result = applyFilters(mockBeers, {
-          isDraft: false,
-          isHeavies: false,
-          isIpa: false,
+          containerFilter: 'all',
           searchText: 'nonexistent',
         });
 
@@ -318,52 +282,248 @@ describe('useBeerFilters - Filter Logic', () => {
   });
 
   describe('applySorting', () => {
-    it('should sort by date descending (most recent first)', () => {
-      const result = applySorting(mockBeers, 'date');
+    describe('Name sort', () => {
+      it('should sort by name ascending (A-Z)', () => {
+        const result = applySorting(mockBeers, 'name', 'asc');
 
-      expect(result[0].id).toBe('5'); // Jan 5
-      expect(result[1].id).toBe('4'); // Jan 4
-      expect(result[2].id).toBe('3'); // Jan 3
-      expect(result[3].id).toBe('2'); // Jan 2
-      expect(result[4].id).toBe('1'); // Jan 1
+        expect(result[0].brew_name).toBe('Alpha IPA');
+        expect(result[1].brew_name).toBe('Beta Porter');
+        expect(result[2].brew_name).toBe('Delta Hazy');
+        expect(result[3].brew_name).toBe('Gamma Lager');
+        expect(result[4].brew_name).toBe('Zeta Stout');
+      });
+
+      it('should sort by name descending (Z-A)', () => {
+        const result = applySorting(mockBeers, 'name', 'desc');
+
+        expect(result[0].brew_name).toBe('Zeta Stout');
+        expect(result[1].brew_name).toBe('Gamma Lager');
+        expect(result[2].brew_name).toBe('Delta Hazy');
+        expect(result[3].brew_name).toBe('Beta Porter');
+        expect(result[4].brew_name).toBe('Alpha IPA');
+      });
     });
 
-    it('should sort by name alphabetically', () => {
-      const result = applySorting(mockBeers, 'name');
+    describe('Date sort with added_date', () => {
+      it('should sort by date descending (newest first)', () => {
+        const result = applySorting(mockBeers, 'date', 'desc', 'added_date');
 
-      expect(result[0].brew_name).toBe('Alpha IPA');
-      expect(result[1].brew_name).toBe('Beta Porter');
-      expect(result[2].brew_name).toBe('Delta Hazy IPA');
-      expect(result[3].brew_name).toBe('Gamma Lager');
-      expect(result[4].brew_name).toBe('Zeta Stout');
+        expect(result[0].id).toBe('5'); // Jan 5
+        expect(result[1].id).toBe('4'); // Jan 4
+        expect(result[2].id).toBe('3'); // Jan 3
+        expect(result[3].id).toBe('2'); // Jan 2
+        expect(result[4].id).toBe('1'); // Jan 1
+      });
+
+      it('should sort by date ascending (oldest first)', () => {
+        const result = applySorting(mockBeers, 'date', 'asc', 'added_date');
+
+        expect(result[0].id).toBe('1'); // Jan 1
+        expect(result[1].id).toBe('2'); // Jan 2
+        expect(result[2].id).toBe('3'); // Jan 3
+        expect(result[3].id).toBe('4'); // Jan 4
+        expect(result[4].id).toBe('5'); // Jan 5
+      });
     });
 
-    it('should handle beers with null/empty names', () => {
-      const beersWithEmptyNames: BeerWithContainerType[] = [
-        { ...mockBeers[0], brew_name: '' },
-        { ...mockBeers[1], brew_name: 'Alpha' },
+    describe('Date sort with tasted_date', () => {
+      const tastedBeers: BeerfinderWithContainerType[] = [
+        {
+          id: '1',
+          brew_name: 'Beer A',
+          brewer: 'Brewery A',
+          brewer_loc: '',
+          brew_style: '',
+          brew_container: 'Draft',
+          brew_description: '',
+          added_date: '',
+          tasted_date: '01/15/2024', // MM/DD/YYYY
+          container_type: 'pint',
+          enrichment_confidence: null,
+          enrichment_source: null,
+        },
+        {
+          id: '2',
+          brew_name: 'Beer B',
+          brewer: 'Brewery B',
+          brewer_loc: '',
+          brew_style: '',
+          brew_container: 'Draft',
+          brew_description: '',
+          added_date: '',
+          tasted_date: '03/20/2024',
+          container_type: 'pint',
+          enrichment_confidence: null,
+          enrichment_source: null,
+        },
+        {
+          id: '3',
+          brew_name: 'Beer C',
+          brewer: 'Brewery C',
+          brewer_loc: '',
+          brew_style: '',
+          brew_container: 'Draft',
+          brew_description: '',
+          added_date: '',
+          tasted_date: '02/10/2024',
+          container_type: 'pint',
+          enrichment_confidence: null,
+          enrichment_source: null,
+        },
       ];
 
-      const result = applySorting(beersWithEmptyNames, 'name');
+      it('should sort tasted_date descending (newest first)', () => {
+        const result = applySorting(tastedBeers, 'date', 'desc', 'tasted_date');
 
-      expect(result).toHaveLength(2); // Should not crash
+        expect(result[0].id).toBe('2'); // Mar 20
+        expect(result[1].id).toBe('3'); // Feb 10
+        expect(result[2].id).toBe('1'); // Jan 15
+      });
+
+      it('should sort tasted_date ascending (oldest first)', () => {
+        const result = applySorting(tastedBeers, 'date', 'asc', 'tasted_date');
+
+        expect(result[0].id).toBe('1'); // Jan 15
+        expect(result[1].id).toBe('3'); // Feb 10
+        expect(result[2].id).toBe('2'); // Mar 20
+      });
     });
 
-    it('should handle beers with null/empty dates', () => {
-      const beersWithEmptyDates: BeerWithContainerType[] = [
-        { ...mockBeers[0], added_date: '' },
-        { ...mockBeers[1], added_date: '1704153600' },
-      ];
+    describe('ABV sort', () => {
+      it('should sort by ABV ascending (lowest first)', () => {
+        // mockBeers ABVs: 6.5, 8.2, 5.4, 4.8, null
+        const result = applySorting(mockBeers, 'abv', 'asc');
 
-      const result = applySorting(beersWithEmptyDates, 'date');
+        expect(result[0].id).toBe('4'); // 4.8
+        expect(result[1].id).toBe('3'); // 5.4
+        expect(result[2].id).toBe('1'); // 6.5
+        expect(result[3].id).toBe('2'); // 8.2
+      });
 
-      expect(result).toHaveLength(2); // Should not crash
+      it('should sort by ABV descending (highest first)', () => {
+        const result = applySorting(mockBeers, 'abv', 'desc');
+
+        expect(result[0].id).toBe('2'); // 8.2
+        expect(result[1].id).toBe('1'); // 6.5
+        expect(result[2].id).toBe('3'); // 5.4
+        expect(result[3].id).toBe('4'); // 4.8
+      });
+
+      it('should sort null ABV values to end when ascending', () => {
+        const result = applySorting(mockBeers, 'abv', 'asc');
+
+        // null ABV (id 5) should be last
+        expect(result[result.length - 1].id).toBe('5');
+      });
+
+      it('should sort null ABV values to end when descending', () => {
+        const result = applySorting(mockBeers, 'abv', 'desc');
+
+        // null ABV (id 5) should be last
+        expect(result[result.length - 1].id).toBe('5');
+      });
+
+      it('should sort undefined ABV values to end when ascending', () => {
+        const beersWithUndefinedAbv: BeerWithContainerType[] = [
+          { ...mockBeers[0], id: '10', abv: 5.0 },
+          { ...mockBeers[0], id: '11', abv: undefined },
+          { ...mockBeers[0], id: '12', abv: 3.0 },
+        ];
+
+        const result = applySorting(beersWithUndefinedAbv, 'abv', 'asc');
+
+        expect(result[0].id).toBe('12'); // 3.0
+        expect(result[1].id).toBe('10'); // 5.0
+        expect(result[2].id).toBe('11'); // undefined at end
+      });
+
+      it('should sort undefined ABV values to end when descending', () => {
+        const beersWithUndefinedAbv: BeerWithContainerType[] = [
+          { ...mockBeers[0], id: '10', abv: 5.0 },
+          { ...mockBeers[0], id: '11', abv: undefined },
+          { ...mockBeers[0], id: '12', abv: 3.0 },
+        ];
+
+        const result = applySorting(beersWithUndefinedAbv, 'abv', 'desc');
+
+        expect(result[0].id).toBe('10'); // 5.0
+        expect(result[1].id).toBe('12'); // 3.0
+        expect(result[2].id).toBe('11'); // undefined at end
+      });
     });
 
-    it('should handle empty list', () => {
-      const result = applySorting([], 'date');
+    describe('Edge Cases', () => {
+      it('should handle empty list', () => {
+        const result = applySorting([], 'date', 'desc');
 
-      expect(result).toEqual([]);
+        expect(result).toEqual([]);
+      });
+
+      it('should handle beers with null/empty names', () => {
+        const beersWithEmptyNames: BeerWithContainerType[] = [
+          { ...mockBeers[0], brew_name: '' },
+          { ...mockBeers[1], brew_name: 'Alpha' },
+        ];
+
+        const result = applySorting(beersWithEmptyNames, 'name', 'asc');
+
+        expect(result).toHaveLength(2);
+      });
+
+      it('should handle beers with null/empty dates', () => {
+        const beersWithEmptyDates: BeerWithContainerType[] = [
+          { ...mockBeers[0], added_date: '' },
+          { ...mockBeers[1], added_date: '1704153600' },
+        ];
+
+        const result = applySorting(beersWithEmptyDates, 'date', 'desc');
+
+        expect(result).toHaveLength(2);
+      });
+    });
+  });
+
+  describe('Pure Cycling Helpers', () => {
+    describe('nextContainerFilter', () => {
+      it('should cycle all -> draft', () => {
+        expect(nextContainerFilter('all')).toBe('draft');
+      });
+
+      it('should cycle draft -> cans', () => {
+        expect(nextContainerFilter('draft')).toBe('cans');
+      });
+
+      it('should cycle cans -> all', () => {
+        expect(nextContainerFilter('cans')).toBe('all');
+      });
+    });
+
+    describe('nextSortOption', () => {
+      it('should cycle date -> name', () => {
+        expect(nextSortOption('date')).toBe('name');
+      });
+
+      it('should cycle name -> abv', () => {
+        expect(nextSortOption('name')).toBe('abv');
+      });
+
+      it('should cycle abv -> date', () => {
+        expect(nextSortOption('abv')).toBe('date');
+      });
+    });
+
+    describe('defaultDirectionForSort', () => {
+      it('should return desc for date', () => {
+        expect(defaultDirectionForSort('date')).toBe('desc');
+      });
+
+      it('should return asc for name', () => {
+        expect(defaultDirectionForSort('name')).toBe('asc');
+      });
+
+      it('should return asc for abv', () => {
+        expect(defaultDirectionForSort('abv')).toBe('asc');
+      });
     });
   });
 });
