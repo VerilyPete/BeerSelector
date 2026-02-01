@@ -3,6 +3,7 @@ import { StyleSheet, View, TouchableOpacity, ScrollView } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { ThemedText } from '../ThemedText';
 import { IconSymbol, IconSymbolName } from '../ui/IconSymbol';
+import BeerIcon from '../icons/BeerIcon';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { spacing } from '@/constants/spacing';
 import { ContainerFilter, SortOption, SortDirection } from '@/hooks/useBeerFilters';
@@ -35,6 +36,12 @@ const SORT_ICONS: Record<SortOption, IconSymbolName> = {
   date: 'calendar',
   name: 'textformat',
   abv: 'percent',
+};
+
+const DIRECTION_LABELS: Record<SortOption, Record<SortDirection, string>> = {
+  date: { asc: 'Oldest', desc: 'Newest' },
+  name: { asc: 'A–Z', desc: 'Z–A' },
+  abv: { asc: 'Low', desc: 'High' },
 };
 
 // These maps duplicate the cycling logic from nextContainerFilter/nextSortOption
@@ -132,7 +139,11 @@ const FilterBarComponent: React.FC<FilterBarProps> = ({
           accessibilityRole="button"
           accessibilityLabel={`Sort by ${SORT_LABELS[sortBy]}. Double tap to sort by ${NEXT_SORT[sortBy]}.`}
         >
-          <IconSymbol name={SORT_ICONS[sortBy]} size={16} color={text} style={styles.sortIcon} />
+          {sortBy === 'abv' ? (
+            <BeerIcon name="bottle" size={16} color={text} style={styles.sortIcon} />
+          ) : (
+            <IconSymbol name={SORT_ICONS[sortBy]} size={16} color={text} style={styles.sortIcon} />
+          )}
           <ThemedText style={[styles.sortButtonText, { color: text }]} testID="sort-button-text">
             {SORT_LABELS[sortBy]}
           </ThemedText>
@@ -144,6 +155,7 @@ const FilterBarComponent: React.FC<FilterBarProps> = ({
             alignItems: 'center',
             justifyContent: 'center',
             minHeight: CHIP_MIN_HEIGHT,
+            minWidth: 62,
             paddingVertical: spacing.sm,
             paddingHorizontal: spacing.m,
             borderRadius: CHIP_MIN_HEIGHT / 2,
@@ -155,13 +167,11 @@ const FilterBarComponent: React.FC<FilterBarProps> = ({
           activeOpacity={0.7}
           testID="sort-direction-button"
           accessibilityRole="button"
-          accessibilityLabel={`Sort ${sortDirection === 'asc' ? 'ascending' : 'descending'}. Double tap to sort ${sortDirection === 'asc' ? 'descending' : 'ascending'}.`}
+          accessibilityLabel={`Sort: ${DIRECTION_LABELS[sortBy][sortDirection]}. Double tap for ${DIRECTION_LABELS[sortBy][sortDirection === 'asc' ? 'desc' : 'asc']}.`}
         >
-          <IconSymbol
-            name={sortDirection === 'asc' ? 'arrow.up' : 'arrow.down'}
-            size={16}
-            color={text}
-          />
+          <ThemedText style={[styles.chipText, { color: text }]}>
+            {DIRECTION_LABELS[sortBy][sortDirection]}
+          </ThemedText>
         </TouchableOpacity>
       </ScrollView>
     </View>
