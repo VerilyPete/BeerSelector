@@ -33,6 +33,12 @@ jest.mock('@/components/ui/IconSymbol', () => ({
   },
 }));
 
+// Mock BeerIcon component
+jest.mock('@/components/icons/BeerIcon', () => {
+  const { View } = require('react-native');
+  return ({ name, testID }: any) => <View testID={testID || `beericon-${name}`} />;
+});
+
 // Mock ThemedText and ThemedView to use plain React Native components
 jest.mock('@/components/ThemedText');
 jest.mock('@/components/ThemedView');
@@ -151,9 +157,9 @@ describe('FilterBar', () => {
       expect(getByTestId('icon-textformat')).toBeTruthy();
     });
 
-    test('shows percent icon when sortBy is abv', () => {
+    test('shows bottle icon when sortBy is abv', () => {
       const { getByTestId } = render(<FilterBar {...defaultProps} sortBy="abv" />);
-      expect(getByTestId('icon-percent')).toBeTruthy();
+      expect(getByTestId('beericon-bottle')).toBeTruthy();
     });
   });
 
@@ -164,14 +170,18 @@ describe('FilterBar', () => {
       expect(mockOnToggleSortDirection).toHaveBeenCalledTimes(1);
     });
 
-    test('shows arrow.up icon for ascending direction', () => {
-      const { getByTestId } = render(<FilterBar {...defaultProps} sortDirection="asc" />);
-      expect(getByTestId('icon-arrow.up')).toBeTruthy();
-    });
-
-    test('shows arrow.down icon for descending direction', () => {
-      const { getByTestId } = render(<FilterBar {...defaultProps} sortDirection="desc" />);
-      expect(getByTestId('icon-arrow.down')).toBeTruthy();
+    test.each([
+      { sortBy: 'date' as const, direction: 'asc' as const, label: 'Oldest' },
+      { sortBy: 'date' as const, direction: 'desc' as const, label: 'Newest' },
+      { sortBy: 'name' as const, direction: 'asc' as const, label: 'A–Z' },
+      { sortBy: 'name' as const, direction: 'desc' as const, label: 'Z–A' },
+      { sortBy: 'abv' as const, direction: 'asc' as const, label: 'Low' },
+      { sortBy: 'abv' as const, direction: 'desc' as const, label: 'High' },
+    ])('shows "$label" for sortBy=$sortBy direction=$direction', ({ sortBy, direction, label }) => {
+      const { getByText } = render(
+        <FilterBar {...defaultProps} sortBy={sortBy} sortDirection={direction} />
+      );
+      expect(getByText(label)).toBeTruthy();
     });
   });
 
@@ -226,17 +236,39 @@ describe('FilterBar', () => {
       );
     });
 
-    test('direction "asc" label describes next state as descending', () => {
-      const { getByTestId } = render(<FilterBar {...defaultProps} sortDirection="asc" />);
+    test('direction label for date/asc shows contextual labels', () => {
+      const { getByTestId } = render(
+        <FilterBar {...defaultProps} sortBy="date" sortDirection="asc" />
+      );
       expect(getByTestId('sort-direction-button').props.accessibilityLabel).toBe(
-        'Sort ascending. Double tap to sort descending.'
+        'Sort: Oldest. Double tap for Newest.'
       );
     });
 
-    test('direction "desc" label describes next state as ascending', () => {
-      const { getByTestId } = render(<FilterBar {...defaultProps} sortDirection="desc" />);
+    test('direction label for date/desc shows contextual labels', () => {
+      const { getByTestId } = render(
+        <FilterBar {...defaultProps} sortBy="date" sortDirection="desc" />
+      );
       expect(getByTestId('sort-direction-button').props.accessibilityLabel).toBe(
-        'Sort descending. Double tap to sort ascending.'
+        'Sort: Newest. Double tap for Oldest.'
+      );
+    });
+
+    test('direction label for name/asc shows contextual labels', () => {
+      const { getByTestId } = render(
+        <FilterBar {...defaultProps} sortBy="name" sortDirection="asc" />
+      );
+      expect(getByTestId('sort-direction-button').props.accessibilityLabel).toBe(
+        'Sort: A–Z. Double tap for Z–A.'
+      );
+    });
+
+    test('direction label for abv/desc shows contextual labels', () => {
+      const { getByTestId } = render(
+        <FilterBar {...defaultProps} sortBy="abv" sortDirection="desc" />
+      );
+      expect(getByTestId('sort-direction-button').props.accessibilityLabel).toBe(
+        'Sort: High. Double tap for Low.'
       );
     });
   });
