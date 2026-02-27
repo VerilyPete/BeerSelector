@@ -36,7 +36,6 @@ Beers display different icons based on their serving container. The `container_t
 - `src/database/utils/glassTypeCalculator.ts` - Calculates container_type and ABV during sync
 - `components/icons/ContainerIcon.tsx` - Renders appropriate icon based on type
 - `components/icons/BeerIcon.tsx` - Custom IcoMoon font with beer glyphs
-- `components/icons/GlassIcon.tsx` - Legacy glass-only icon (deprecated, use ContainerIcon)
 
 ## Custom Beer Icon Font
 
