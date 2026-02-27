@@ -24,10 +24,6 @@ jest.mock('react-native', () => ({
 }));
 
 describe('notificationUtils', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
-
   // ============================================================
   // Alert functions
   // ============================================================
