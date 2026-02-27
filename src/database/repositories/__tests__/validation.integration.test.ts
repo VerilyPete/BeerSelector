@@ -25,32 +25,22 @@ type MockDatabase = {
   getFirstAsync: jest.Mock;
 };
 
+function createMockDatabase(): MockDatabase {
+  const mockDatabase: MockDatabase = {
+    withTransactionAsync: jest.fn(async (callback: () => Promise<void>) => await callback()),
+    runAsync: jest.fn(),
+    getAllAsync: jest.fn(),
+    getFirstAsync: jest.fn(),
+  };
+  (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+  return mockDatabase;
+}
+
 describe('Repository Validation Integration', () => {
-  let mockDatabase: MockDatabase;
-
-  beforeEach(() => {
-    // Setup mock database with all required async methods
-    mockDatabase = {
-      withTransactionAsync: jest.fn(async (callback: () => Promise<void>) => await callback()),
-      runAsync: jest.fn(),
-      getAllAsync: jest.fn(),
-      getFirstAsync: jest.fn(),
-    };
-
-    // Mock getDatabase to return our mock database
-    (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
-
-    jest.clearAllMocks();
-  });
-
   describe('BeerRepository - Malformed Database Data', () => {
-    let repository: BeerRepository;
-
-    beforeEach(() => {
-      repository = new BeerRepository();
-    });
-
     it('should filter out beers with missing required fields from database', async () => {
+      const mockDatabase = createMockDatabase();
+      const repository = new BeerRepository();
       // Mock database returning beers with missing required fields
       mockDatabase.getAllAsync.mockResolvedValue([
         { id: '1', brew_name: 'Valid Beer' },
@@ -68,6 +58,8 @@ describe('Repository Validation Integration', () => {
     });
 
     it('should throw error when database returns null (current implementation)', async () => {
+      const mockDatabase = createMockDatabase();
+      const repository = new BeerRepository();
       mockDatabase.getAllAsync.mockResolvedValue(null);
 
       // Current implementation doesn't handle null gracefully
@@ -75,6 +67,8 @@ describe('Repository Validation Integration', () => {
     });
 
     it('should throw error when database returns undefined (current implementation)', async () => {
+      const mockDatabase = createMockDatabase();
+      const repository = new BeerRepository();
       mockDatabase.getAllAsync.mockResolvedValue(undefined);
 
       // Current implementation doesn't handle undefined gracefully
@@ -82,6 +76,8 @@ describe('Repository Validation Integration', () => {
     });
 
     it('should throw error when database returns non-array (current implementation)', async () => {
+      const mockDatabase = createMockDatabase();
+      const repository = new BeerRepository();
       mockDatabase.getAllAsync.mockResolvedValue({ not: 'an array' });
 
       // Current implementation doesn't handle non-array gracefully
@@ -89,6 +85,8 @@ describe('Repository Validation Integration', () => {
     });
 
     it('should accept numeric IDs and convert to string (schema allows union)', async () => {
+      const mockDatabase = createMockDatabase();
+      const repository = new BeerRepository();
       mockDatabase.getAllAsync.mockResolvedValue([
         { id: '1', brew_name: 'Valid Beer' },
         { id: 123, brew_name: 'ID is number' }, // Schema accepts number IDs
@@ -105,6 +103,8 @@ describe('Repository Validation Integration', () => {
     });
 
     it('should filter out beers with null values in required fields', async () => {
+      const mockDatabase = createMockDatabase();
+      const repository = new BeerRepository();
       mockDatabase.getAllAsync.mockResolvedValue([
         { id: '1', brew_name: 'Valid Beer' },
         { id: null, brew_name: 'Null ID' },
@@ -118,6 +118,8 @@ describe('Repository Validation Integration', () => {
     });
 
     it('should convert numeric IDs to strings', async () => {
+      const mockDatabase = createMockDatabase();
+      const repository = new BeerRepository();
       mockDatabase.getAllAsync.mockResolvedValue([
         { id: 123, brew_name: 'Beer with numeric ID' }
       ]);
@@ -131,6 +133,8 @@ describe('Repository Validation Integration', () => {
     });
 
     it('should handle empty array from database', async () => {
+      const mockDatabase = createMockDatabase();
+      const repository = new BeerRepository();
       mockDatabase.getAllAsync.mockResolvedValue([]);
 
       const result = await repository.getAll();
@@ -139,6 +143,8 @@ describe('Repository Validation Integration', () => {
     });
 
     it('should handle getById with malformed data', async () => {
+      const mockDatabase = createMockDatabase();
+      const repository = new BeerRepository();
       // Mock returning invalid beer object
       mockDatabase.getFirstAsync.mockResolvedValue({ id: '1' }); // Missing brew_name
 
@@ -149,6 +155,8 @@ describe('Repository Validation Integration', () => {
     });
 
     it('should handle getById with null from database', async () => {
+      const mockDatabase = createMockDatabase();
+      const repository = new BeerRepository();
       mockDatabase.getFirstAsync.mockResolvedValue(null);
 
       const result = await repository.getById('1');
@@ -157,6 +165,8 @@ describe('Repository Validation Integration', () => {
     });
 
     it('should handle getById with wrong type values', async () => {
+      const mockDatabase = createMockDatabase();
+      const repository = new BeerRepository();
       mockDatabase.getFirstAsync.mockResolvedValue({
         id: 123, // Should be string
         brew_name: 456 // Should be string
@@ -168,6 +178,8 @@ describe('Repository Validation Integration', () => {
     });
 
     it('should handle search with malformed results', async () => {
+      const mockDatabase = createMockDatabase();
+      const repository = new BeerRepository();
       mockDatabase.getAllAsync.mockResolvedValue([
         { id: '1', brew_name: 'Valid Beer' },
         { id: '2' }, // Invalid
@@ -184,13 +196,9 @@ describe('Repository Validation Integration', () => {
   });
 
   describe('MyBeersRepository - Malformed Database Data', () => {
-    let repository: MyBeersRepository;
-
-    beforeEach(() => {
-      repository = new MyBeersRepository();
-    });
-
     it('should filter out tasted brews with missing required fields', async () => {
+      const mockDatabase = createMockDatabase();
+      const repository = new MyBeersRepository();
       mockDatabase.getAllAsync.mockResolvedValue([
         { id: '1', brew_name: 'Valid Tasted Beer' },
         { id: '2' }, // Missing brew_name
@@ -204,6 +212,8 @@ describe('Repository Validation Integration', () => {
     });
 
     it('should throw error when database returns null (current implementation)', async () => {
+      const mockDatabase = createMockDatabase();
+      const repository = new MyBeersRepository();
       mockDatabase.getAllAsync.mockResolvedValue(null);
 
       // Current implementation doesn't handle null gracefully
@@ -211,6 +221,8 @@ describe('Repository Validation Integration', () => {
     });
 
     it('should filter out brews with wrong type values', async () => {
+      const mockDatabase = createMockDatabase();
+      const repository = new MyBeersRepository();
       mockDatabase.getAllAsync.mockResolvedValue([
         { id: '1', brew_name: 'Valid Beer' },
         { id: 123, brew_name: 'Invalid - numeric ID' },
@@ -223,6 +235,8 @@ describe('Repository Validation Integration', () => {
     });
 
     it('should handle getById with malformed data', async () => {
+      const mockDatabase = createMockDatabase();
+      const repository = new MyBeersRepository();
       mockDatabase.getFirstAsync.mockResolvedValue({ id: '1' }); // Missing brew_name
 
       const result = await repository.getById('1');
@@ -231,6 +245,8 @@ describe('Repository Validation Integration', () => {
     });
 
     it('should handle getCount with invalid data', async () => {
+      const mockDatabase = createMockDatabase();
+      const repository = new MyBeersRepository();
       mockDatabase.getFirstAsync.mockResolvedValue({ count: 'invalid' });
 
       const result = await repository.getCount();
@@ -240,13 +256,9 @@ describe('Repository Validation Integration', () => {
   });
 
   describe('RewardsRepository - Malformed Database Data', () => {
-    let repository: RewardsRepository;
-
-    beforeEach(() => {
-      repository = new RewardsRepository();
-    });
-
     it('should filter out rewards with missing required fields', async () => {
+      const mockDatabase = createMockDatabase();
+      const repository = new RewardsRepository();
       mockDatabase.getAllAsync.mockResolvedValue([
         { reward_id: '1', redeemed: 'true', reward_type: 'plate' },
         { redeemed: 'true', reward_type: 'plate' }, // Missing reward_id
@@ -259,6 +271,8 @@ describe('Repository Validation Integration', () => {
     });
 
     it('should return empty array when database returns null', async () => {
+      const mockDatabase = createMockDatabase();
+      const repository = new RewardsRepository();
       mockDatabase.getAllAsync.mockResolvedValue(null);
 
       const result = await repository.getAll();
@@ -268,6 +282,8 @@ describe('Repository Validation Integration', () => {
     });
 
     it('should filter out rewards with wrong type values', async () => {
+      const mockDatabase = createMockDatabase();
+      const repository = new RewardsRepository();
       mockDatabase.getAllAsync.mockResolvedValue([
         { reward_id: '1', redeemed: 'true', reward_type: 'plate' },
         { reward_id: 123, redeemed: 'true', reward_type: 'plate' }, // reward_id should be string
@@ -284,6 +300,8 @@ describe('Repository Validation Integration', () => {
     });
 
     it('should handle getById with malformed data', async () => {
+      const mockDatabase = createMockDatabase();
+      const repository = new RewardsRepository();
       mockDatabase.getFirstAsync.mockResolvedValue({ redeemed: 'true' }); // Missing reward_id
 
       const result = await repository.getById('1');
@@ -292,6 +310,8 @@ describe('Repository Validation Integration', () => {
     });
 
     it('should handle getByType with malformed data', async () => {
+      const mockDatabase = createMockDatabase();
+      const repository = new RewardsRepository();
       mockDatabase.getAllAsync.mockResolvedValue([
         { reward_id: '1', redeemed: 'true', reward_type: 'plate' },
         { reward_id: 123, redeemed: 'true' }, // Invalid
@@ -304,6 +324,8 @@ describe('Repository Validation Integration', () => {
     });
 
     it('should handle getRedeemed with malformed data', async () => {
+      const mockDatabase = createMockDatabase();
+      const repository = new RewardsRepository();
       mockDatabase.getAllAsync.mockResolvedValue([
         { reward_id: '1', redeemed: 'true', reward_type: 'plate' },
         { redeemed: 'true' }, // Invalid - missing reward_id
@@ -316,6 +338,8 @@ describe('Repository Validation Integration', () => {
     });
 
     it('should handle getUnredeemed with malformed data', async () => {
+      const mockDatabase = createMockDatabase();
+      const repository = new RewardsRepository();
       mockDatabase.getAllAsync.mockResolvedValue([
         { reward_id: '1', redeemed: '0', reward_type: 'plate' },
         { reward_type: 'plate' }, // Invalid - missing reward_id
@@ -328,6 +352,8 @@ describe('Repository Validation Integration', () => {
     });
 
     it('should handle getCount with invalid data', async () => {
+      const mockDatabase = createMockDatabase();
+      const repository = new RewardsRepository();
       mockDatabase.getFirstAsync.mockResolvedValue({ count: 'not a number' });
 
       const result = await repository.getCount();
@@ -338,6 +364,7 @@ describe('Repository Validation Integration', () => {
 
   describe('Database Error Scenarios', () => {
     it('should handle database query throwing error', async () => {
+      const mockDatabase = createMockDatabase();
       const repository = new BeerRepository();
       mockDatabase.getAllAsync.mockRejectedValue(new Error('Database error'));
 
@@ -346,6 +373,7 @@ describe('Repository Validation Integration', () => {
     });
 
     it('should throw error on corrupted data (current implementation)', async () => {
+      const mockDatabase = createMockDatabase();
       const repository = new BeerRepository();
       mockDatabase.getAllAsync.mockResolvedValue('corrupted string'); // Not an array
 
@@ -354,6 +382,7 @@ describe('Repository Validation Integration', () => {
     });
 
     it('should handle database returning circular reference objects', async () => {
+      const mockDatabase = createMockDatabase();
       const repository = new BeerRepository();
       const circularObj: Record<string, unknown> = { id: '1', brew_name: 'Test' };
       circularObj['self'] = circularObj;
@@ -369,6 +398,7 @@ describe('Repository Validation Integration', () => {
 
   describe('Performance with Large Invalid Datasets', () => {
     it('should efficiently filter 10,000 mixed valid/invalid beers', async () => {
+      const mockDatabase = createMockDatabase();
       const repository = new BeerRepository();
       const mixedData = Array.from({ length: 10000 }, (_, i) => {
         if (i % 2 === 0) {
@@ -389,6 +419,7 @@ describe('Repository Validation Integration', () => {
     });
 
     it('should efficiently handle 10,000 completely invalid beers', async () => {
+      const mockDatabase = createMockDatabase();
       const repository = new BeerRepository();
       const invalidData = Array.from({ length: 10000 }, (_, i) => ({
         id: String(i)
