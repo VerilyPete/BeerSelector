@@ -4,27 +4,24 @@ import * as SQLite from 'expo-sqlite';
 // Mock expo-sqlite
 jest.mock('expo-sqlite');
 
+type MockDatabase = {
+  withTransactionAsync: jest.Mock;
+  runAsync?: jest.Mock;
+};
+
+function createMockDatabase(): MockDatabase {
+  return {
+    withTransactionAsync: jest.fn(),
+  };
+}
+
 describe('Database Transactions', () => {
-  let mockDatabase: any;
-  let mockWithTransactionAsync: jest.Mock;
-
-  beforeEach(() => {
-    // Create mock database with transaction method
-    mockWithTransactionAsync = jest.fn();
-    mockDatabase = {
-      withTransactionAsync: mockWithTransactionAsync,
-    };
-  });
-
-  afterEach(() => {
-    jest.clearAllMocks();
-  });
-
   describe('withDatabaseTransaction', () => {
     it('should execute operation within transaction successfully', async () => {
+      const mockDatabase = createMockDatabase();
       const mockOperation = jest.fn().mockResolvedValue({ success: true, recordsAffected: 10 });
 
-      mockWithTransactionAsync.mockImplementation(async (callback: any) => {
+      mockDatabase.withTransactionAsync.mockImplementation(async (callback: () => Promise<unknown>) => {
         return await callback();
       });
 
@@ -32,15 +29,16 @@ describe('Database Transactions', () => {
 
       expect(result.success).toBe(true);
       expect(result.recordsAffected).toBe(10);
-      expect(mockWithTransactionAsync).toHaveBeenCalledTimes(1);
+      expect(mockDatabase.withTransactionAsync).toHaveBeenCalledTimes(1);
       expect(mockOperation).toHaveBeenCalledTimes(1);
     });
 
     it('should rollback transaction on operation failure', async () => {
+      const mockDatabase = createMockDatabase();
       const mockError = new Error('Database operation failed');
       const mockOperation = jest.fn().mockRejectedValue(mockError);
 
-      mockWithTransactionAsync.mockImplementation(async (callback: any) => {
+      mockDatabase.withTransactionAsync.mockImplementation(async (callback: () => Promise<unknown>) => {
         try {
           await callback();
         } catch (error) {
@@ -53,14 +51,15 @@ describe('Database Transactions', () => {
         'Database operation failed'
       );
 
-      expect(mockWithTransactionAsync).toHaveBeenCalledTimes(1);
+      expect(mockDatabase.withTransactionAsync).toHaveBeenCalledTimes(1);
       expect(mockOperation).toHaveBeenCalledTimes(1);
     });
 
     it('should pass database to operation callback', async () => {
+      const mockDatabase = createMockDatabase();
       const mockOperation = jest.fn().mockResolvedValue({ success: true });
 
-      mockWithTransactionAsync.mockImplementation(async (callback: any) => {
+      mockDatabase.withTransactionAsync.mockImplementation(async (callback: () => Promise<unknown>) => {
         return await callback();
       });
 
@@ -70,15 +69,16 @@ describe('Database Transactions', () => {
     });
 
     it('should handle multiple operations in single transaction', async () => {
+      const mockDatabase = createMockDatabase();
       let insertCalled = false;
       let updateCalled = false;
 
-      const mockOperation = jest.fn(async (db: any) => {
+      const mockOperation = jest.fn(async (db: MockDatabase) => {
         // Simulate multiple database operations
-        await db.runAsync('INSERT INTO table1...');
+        await db.runAsync?.('INSERT INTO table1...');
         insertCalled = true;
 
-        await db.runAsync('UPDATE table2...');
+        await db.runAsync?.('UPDATE table2...');
         updateCalled = true;
 
         return { success: true, recordsAffected: 2 };
@@ -86,7 +86,7 @@ describe('Database Transactions', () => {
 
       mockDatabase.runAsync = jest.fn().mockResolvedValue(undefined);
 
-      mockWithTransactionAsync.mockImplementation(async (callback: any) => {
+      mockDatabase.withTransactionAsync.mockImplementation(async (callback: () => Promise<unknown>) => {
         return await callback();
       });
 
@@ -95,21 +95,25 @@ describe('Database Transactions', () => {
       expect(result.success).toBe(true);
       expect(insertCalled).toBe(true);
       expect(updateCalled).toBe(true);
-      expect(mockWithTransactionAsync).toHaveBeenCalledTimes(1);
+      expect(mockDatabase.withTransactionAsync).toHaveBeenCalledTimes(1);
     });
 
     it('should rollback all operations if any operation fails', async () => {
-      const mockOperation = jest.fn(async (db: any) => {
+      const mockDatabase = createMockDatabase();
+      const mockOperation = jest.fn(async (db: MockDatabase) => {
         // First operation succeeds
-        await db.runAsync('INSERT INTO table1...');
+        await db.runAsync?.('INSERT INTO table1...');
 
         // Second operation fails
         throw new Error('Second operation failed');
+
+        // Step 3: Never reached
+        await db.runAsync?.('UPDATE preferences SET value = ?');
       });
 
       mockDatabase.runAsync = jest.fn().mockResolvedValue(undefined);
 
-      mockWithTransactionAsync.mockImplementation(async (callback: any) => {
+      mockDatabase.withTransactionAsync.mockImplementation(async (callback: () => Promise<unknown>) => {
         try {
           await callback();
         } catch (error) {
@@ -128,6 +132,7 @@ describe('Database Transactions', () => {
     });
 
     it('should return operation result on success', async () => {
+      const mockDatabase = createMockDatabase();
       const expectedResult: DatabaseOperationResult = {
         success: true,
         recordsAffected: 25,
@@ -136,7 +141,7 @@ describe('Database Transactions', () => {
 
       const mockOperation = jest.fn().mockResolvedValue(expectedResult);
 
-      mockWithTransactionAsync.mockImplementation(async (callback: any) => {
+      mockDatabase.withTransactionAsync.mockImplementation(async (callback: () => Promise<unknown>) => {
         return await callback();
       });
 
@@ -146,9 +151,10 @@ describe('Database Transactions', () => {
     });
 
     it('should handle operation returning undefined', async () => {
+      const mockDatabase = createMockDatabase();
       const mockOperation = jest.fn().mockResolvedValue(undefined);
 
-      mockWithTransactionAsync.mockImplementation(async (callback: any) => {
+      mockDatabase.withTransactionAsync.mockImplementation(async (callback: () => Promise<unknown>) => {
         return await callback();
       });
 
@@ -158,9 +164,10 @@ describe('Database Transactions', () => {
     });
 
     it('should handle concurrent transaction attempts gracefully', async () => {
+      const mockDatabase = createMockDatabase();
       const mockOperation = jest.fn().mockResolvedValue({ success: true });
 
-      mockWithTransactionAsync.mockImplementation(async (callback: any) => {
+      mockDatabase.withTransactionAsync.mockImplementation(async (callback: () => Promise<unknown>) => {
         return await callback();
       });
 
@@ -175,16 +182,17 @@ describe('Database Transactions', () => {
       results.forEach(result => {
         expect(result.success).toBe(true);
       });
-      expect(mockWithTransactionAsync).toHaveBeenCalledTimes(3);
+      expect(mockDatabase.withTransactionAsync).toHaveBeenCalledTimes(3);
     });
 
     it('should propagate error details from failed operation', async () => {
+      const mockDatabase = createMockDatabase();
       const mockError = new Error('Constraint violation');
       mockError.name = 'SQLiteError';
 
       const mockOperation = jest.fn().mockRejectedValue(mockError);
 
-      mockWithTransactionAsync.mockImplementation(async (callback: any) => {
+      mockDatabase.withTransactionAsync.mockImplementation(async (callback: () => Promise<unknown>) => {
         try {
           await callback();
         } catch (error) {
@@ -203,9 +211,10 @@ describe('Database Transactions', () => {
     });
 
     it('should handle operation with complex return type', async () => {
+      const mockDatabase = createMockDatabase();
       interface ComplexResult extends DatabaseOperationResult {
-        validRecords: any[];
-        invalidRecords: any[];
+        validRecords: Record<string, unknown>[];
+        invalidRecords: Record<string, unknown>[];
         summary: { valid: number; invalid: number };
       }
 
@@ -219,7 +228,7 @@ describe('Database Transactions', () => {
 
       const mockOperation = jest.fn().mockResolvedValue(expectedResult);
 
-      mockWithTransactionAsync.mockImplementation(async (callback: any) => {
+      mockDatabase.withTransactionAsync.mockImplementation(async (callback: () => Promise<unknown>) => {
         return await callback();
       });
 
@@ -233,17 +242,18 @@ describe('Database Transactions', () => {
 
   describe('Real-world transaction scenarios', () => {
     it('should handle beer insertion with validation', async () => {
+      const mockDatabase = createMockDatabase();
       const beers = [
         { id: 1, brew_name: 'Beer 1' },
         { id: 2, brew_name: 'Beer 2' },
         { id: 3, brew_name: 'Beer 3' },
       ];
 
-      const mockOperation = jest.fn(async (db: any) => {
+      const mockOperation = jest.fn(async (db: MockDatabase) => {
         let recordsInserted = 0;
 
         for (const beer of beers) {
-          await db.runAsync(
+          await db.runAsync?.(
             'INSERT INTO allbeers (id, brew_name) VALUES (?, ?)',
             [beer.id, beer.brew_name]
           );
@@ -255,7 +265,7 @@ describe('Database Transactions', () => {
 
       mockDatabase.runAsync = jest.fn().mockResolvedValue(undefined);
 
-      mockWithTransactionAsync.mockImplementation(async (callback: any) => {
+      mockDatabase.withTransactionAsync.mockImplementation(async (callback: () => Promise<unknown>) => {
         return await callback();
       });
 
@@ -267,15 +277,16 @@ describe('Database Transactions', () => {
     });
 
     it('should rollback beer insertion on constraint violation', async () => {
+      const mockDatabase = createMockDatabase();
       const beers = [
         { id: 1, brew_name: 'Beer 1' },
         { id: 2, brew_name: 'Beer 2' },
         { id: 1, brew_name: 'Duplicate ID' }, // Duplicate ID should fail
       ];
 
-      const mockOperation = jest.fn(async (db: any) => {
+      const mockOperation = jest.fn(async (db: MockDatabase) => {
         for (const beer of beers) {
-          await db.runAsync(
+          await db.runAsync?.(
             'INSERT INTO allbeers (id, brew_name) VALUES (?, ?)',
             [beer.id, beer.brew_name]
           );
@@ -290,7 +301,7 @@ describe('Database Transactions', () => {
         .mockResolvedValueOnce(undefined)
         .mockRejectedValueOnce(new Error('UNIQUE constraint failed'));
 
-      mockWithTransactionAsync.mockImplementation(async (callback: any) => {
+      mockDatabase.withTransactionAsync.mockImplementation(async (callback: () => Promise<unknown>) => {
         try {
           await callback();
         } catch (error) {
@@ -307,18 +318,19 @@ describe('Database Transactions', () => {
     });
 
     it('should handle multi-table update transaction', async () => {
-      const mockOperation = jest.fn(async (db: any) => {
+      const mockDatabase = createMockDatabase();
+      const mockOperation = jest.fn(async (db: MockDatabase) => {
         // Update beers table
-        await db.runAsync('UPDATE allbeers SET style = ? WHERE id = ?', ['IPA', 1]);
+        await db.runAsync?.('UPDATE allbeers SET style = ? WHERE id = ?', ['IPA', 1]);
 
         // Update tasted_brew table
-        await db.runAsync(
+        await db.runAsync?.(
           'INSERT INTO tasted_brew_current_round (beer_id, tasted_date) VALUES (?, ?)',
           [1, Date.now()]
         );
 
         // Update preferences
-        await db.runAsync(
+        await db.runAsync?.(
           'UPDATE preferences SET value = ? WHERE key = ?',
           [Date.now().toString(), 'last_update']
         );
@@ -328,7 +340,7 @@ describe('Database Transactions', () => {
 
       mockDatabase.runAsync = jest.fn().mockResolvedValue(undefined);
 
-      mockWithTransactionAsync.mockImplementation(async (callback: any) => {
+      mockDatabase.withTransactionAsync.mockImplementation(async (callback: () => Promise<unknown>) => {
         return await callback();
       });
 
@@ -339,18 +351,19 @@ describe('Database Transactions', () => {
     });
 
     it('should handle delete old and insert new data transaction', async () => {
+      const mockDatabase = createMockDatabase();
       const newBeers = [
         { id: 1, brew_name: 'New Beer 1' },
         { id: 2, brew_name: 'New Beer 2' },
       ];
 
-      const mockOperation = jest.fn(async (db: any) => {
+      const mockOperation = jest.fn(async (db: MockDatabase) => {
         // Delete old data
-        await db.runAsync('DELETE FROM allbeers');
+        await db.runAsync?.('DELETE FROM allbeers');
 
         // Insert new data
         for (const beer of newBeers) {
-          await db.runAsync(
+          await db.runAsync?.(
             'INSERT INTO allbeers (id, brew_name) VALUES (?, ?)',
             [beer.id, beer.brew_name]
           );
@@ -361,7 +374,7 @@ describe('Database Transactions', () => {
 
       mockDatabase.runAsync = jest.fn().mockResolvedValue(undefined);
 
-      mockWithTransactionAsync.mockImplementation(async (callback: any) => {
+      mockDatabase.withTransactionAsync.mockImplementation(async (callback: () => Promise<unknown>) => {
         return await callback();
       });
 
@@ -373,22 +386,18 @@ describe('Database Transactions', () => {
     });
 
     it('should ensure all-or-nothing behavior for data refresh', async () => {
-      const mockOperation = jest.fn(async (db: any) => {
+      const mockDatabase = createMockDatabase();
+      const mockOperation = jest.fn(async (db: MockDatabase) => {
         // Step 1: Clear old data
-        await db.runAsync('DELETE FROM allbeers');
+        await db.runAsync?.('DELETE FROM allbeers');
 
         // Step 2: Insert new data (this fails)
         throw new Error('Network error during data fetch');
-
-        // Step 3: Never reached
-        await db.runAsync('UPDATE preferences SET value = ?', [Date.now()]);
-
-        return { success: true };
       });
 
       mockDatabase.runAsync = jest.fn().mockResolvedValue(undefined);
 
-      mockWithTransactionAsync.mockImplementation(async (callback: any) => {
+      mockDatabase.withTransactionAsync.mockImplementation(async (callback: () => Promise<unknown>) => {
         try {
           await callback();
         } catch (error) {
