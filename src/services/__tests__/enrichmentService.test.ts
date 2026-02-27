@@ -42,6 +42,11 @@ jest.mock('@/src/config', () => ({
       getFullUrl: jest.fn((endpoint: string) => `https://test-api.example.com/${endpoint}`),
     },
   },
+  assertEnrichmentConfigured: jest.fn((enrichment: { isConfigured: () => boolean }) => {
+    if (!enrichment.isConfigured()) {
+      throw new Error('Enrichment service is not configured: missing API key');
+    }
+  }),
 }));
 
 // Mock preferences
@@ -526,7 +531,7 @@ describe('enrichmentService', () => {
         config.enrichment.isConfigured.mockReturnValueOnce(false);
 
         await expect(fetchBeersFromProxy('13879')).rejects.toThrow(
-          'Enrichment service not configured'
+          'Enrichment service is not configured: missing API key'
         );
       });
 

@@ -29,7 +29,7 @@ export enum LogLevel {
 /**
  * Context information for error logging
  */
-export interface ErrorContext {
+export type ErrorContext = {
   /** The operation that was being performed when the error occurred */
   operation: string;
   /** The component or module where the error occurred */
@@ -38,19 +38,19 @@ export interface ErrorContext {
   userId?: string;
   /** Additional contextual data (API URLs, record counts, etc.) */
   additionalData?: Record<string, unknown>;
-}
+};
 
 /**
  * Structured error log entry
  */
-interface ErrorLogEntry {
+type ErrorLogEntry = {
   level: LogLevel;
   message: string;
   name?: string;
   stack?: string;
   timestamp: string;
   context: ErrorContext;
-}
+};
 
 /**
  * Sensitive data keys that should be redacted from logs

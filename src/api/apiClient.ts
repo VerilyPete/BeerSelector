@@ -77,7 +77,7 @@ export class ApiClient {
         if (!sessionData) {
           throw new ApiError('No valid session available', 401, false, false);
         }
-        this.sessionData = sessionData as SessionData;
+        this.sessionData = sessionData;
         return this.sessionData;
       } catch (error) {
         console.error('Error getting session:', error);
@@ -277,10 +277,11 @@ export class ApiClient {
           statusCode: response.status,
         };
       } catch (jsonError) {
-        // If JSON parsing fails, return the text as-is
+        // If JSON parsing fails, return as failure — caller expects T, not raw text
         return {
-          data: responseText as unknown as T,
-          success: true,
+          data: null,
+          success: false,
+          error: `Response is not valid JSON: ${responseText.substring(0, 100)}`,
           statusCode: response.status,
         };
       }
@@ -288,7 +289,7 @@ export class ApiClient {
       // If it's already an ApiError, just rethrow it with the response structure
       if (error instanceof ApiError) {
         return {
-          data: null as unknown as T,
+          data: null,
           success: false,
           error: error.message,
           statusCode: error.statusCode,
@@ -304,7 +305,7 @@ export class ApiClient {
       );
 
       return {
-        data: null as unknown as T,
+        data: null,
         success: false,
         error: apiError.message,
         statusCode: apiError.statusCode,

@@ -13,75 +13,75 @@
  * The name should already be stripped of container type (e.g., "(Draft)", "(BTL)")
  * before being passed to the Live Activity.
  */
-export interface LiveActivityQueuedBeer {
+export type LiveActivityQueuedBeer = {
   /** Unique identifier for the queued beer */
   id: string;
 
   /** Beer name (stripped of container type) */
   name: string;
-}
+};
 
 /**
  * Current state of the beer queue for Live Activity updates.
  * This is the ContentState that gets sent to the Live Activity.
  */
-export interface LiveActivityQueueState {
+export type LiveActivityQueueState = {
   /** Array of beers currently in the queue */
   beers: LiveActivityQueuedBeer[];
-}
+};
 
 /**
  * Static attributes set when starting a Live Activity.
  * These values don't change during the activity's lifecycle.
  */
-export interface LiveActivityAttributes {
+export type LiveActivityAttributes = {
   /** Member ID from Flying Saucer */
   memberId: string;
 
   /** Store ID */
   storeId: string;
-}
+};
 
 /**
  * Combined data for starting a Live Activity.
  */
-export interface LiveActivityStartData {
+export type LiveActivityStartData = {
   /** Static attributes */
   attributes: LiveActivityAttributes;
 
   /** Initial content state */
   contentState: LiveActivityQueueState;
-}
+};
 
 /**
  * Result of checking Live Activity support.
  */
-export interface LiveActivitySupportResult {
+export type LiveActivitySupportResult = {
   /** Whether Live Activities are supported on this device */
   isSupported: boolean;
 
   /** Reason if not supported (e.g., "Android device", "iOS version too low") */
   reason?: string;
-}
+};
 
 /**
  * A queued beer for native module communication.
  * Alias for LiveActivityQueuedBeer for clarity in native module data structures.
  */
-export interface QueuedBeer {
+export type QueuedBeer = {
   /** Unique identifier for the queued beer */
   id: string;
 
   /** Beer name (stripped of container type) */
   name: string;
-}
+};
 
 /**
  * Data passed to startActivity native method.
  * Combines attributes and initial queue state into a flat structure
  * for easier native module communication.
  */
-export interface StartActivityData {
+export type StartActivityData = {
   /** Member ID from Flying Saucer */
   memberId: string;
 
@@ -90,22 +90,22 @@ export interface StartActivityData {
 
   /** Array of beers currently in the queue */
   beers: QueuedBeer[];
-}
+};
 
 /**
  * Data passed to updateActivity native method.
  * Contains only the content state (beers array) since attributes are static.
  */
-export interface UpdateActivityData {
+export type UpdateActivityData = {
   /** Array of beers currently in the queue */
   beers: QueuedBeer[];
-}
+};
 
 /**
  * Configuration for the restart activity debouncer.
  * Used to prevent UI flicker from rapid consecutive updates.
  */
-export interface RestartDebounceConfig {
+export type RestartDebounceConfig = {
   /** Debounce delay in milliseconds (default: 500) */
   delayMs: number;
 
@@ -114,13 +114,13 @@ export interface RestartDebounceConfig {
 
   /** Whether to log debug information */
   debug?: boolean;
-}
+};
 
 /**
  * Result of a restart activity operation.
  * Provides detailed information about the restart outcome.
  */
-export interface RestartActivityResult {
+export type RestartActivityResult = {
   /** Whether the restart was successful */
   success: boolean;
 
@@ -132,7 +132,7 @@ export interface RestartActivityResult {
 
   /** Error message if failed */
   error?: string;
-}
+};
 
 /**
  * State of the activity for observation.

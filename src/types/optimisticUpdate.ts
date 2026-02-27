@@ -41,7 +41,7 @@ export enum OptimisticUpdateStatus {
 /**
  * Rollback data for beer check-in
  */
-export interface CheckInRollbackData {
+export type CheckInRollbackData = {
   /** Type of rollback */
   type: 'CHECK_IN_BEER';
 
@@ -53,12 +53,12 @@ export interface CheckInRollbackData {
 
   /** Whether beer was in tastedBeers before check-in */
   wasInTastedBeers: boolean;
-}
+};
 
 /**
  * Rollback data for reward redemption
  */
-export interface RewardRollbackData {
+export type RewardRollbackData = {
   /** Type of rollback */
   type: 'REDEEM_REWARD';
 
@@ -67,7 +67,7 @@ export interface RewardRollbackData {
 
   /** Whether reward was available before redemption */
   wasAvailable: boolean;
-}
+};
 
 /**
  * Union type for all rollback data
@@ -77,7 +77,7 @@ export type RollbackData = CheckInRollbackData | RewardRollbackData;
 /**
  * Optimistic update structure
  */
-export interface OptimisticUpdate {
+export type OptimisticUpdate = {
   /** Unique update ID (matches operation ID if queued) */
   id: string;
 
@@ -98,12 +98,12 @@ export interface OptimisticUpdate {
 
   /** Linked operation ID (if queued) */
   operationId?: string;
-}
+};
 
 /**
  * Database row representation of an optimistic update
  */
-export interface OptimisticUpdateRow {
+export type OptimisticUpdateRow = {
   id: string;
   type: string;
   status: string;
@@ -111,7 +111,7 @@ export interface OptimisticUpdateRow {
   rollback_data: string; // JSON stringified
   error_message?: string;
   operation_id?: string;
-}
+};
 
 /**
  * Type guard for CheckInRollbackData
@@ -174,7 +174,7 @@ export function isOptimisticUpdate(obj: unknown): obj is OptimisticUpdate {
 /**
  * Configuration for optimistic updates
  */
-export interface OptimisticUpdateConfig {
+export type OptimisticUpdateConfig = {
   /** Auto-confirm updates after this many milliseconds (for offline mode) */
   autoConfirmDelayMs: number;
 
@@ -183,7 +183,7 @@ export interface OptimisticUpdateConfig {
 
   /** Maximum number of pending updates to track in memory */
   maxPendingUpdates: number;
-}
+};
 
 /**
  * Default optimistic update configuration

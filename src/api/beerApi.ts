@@ -1,4 +1,5 @@
 import { Beer, Beerfinder } from '../database/types';
+import { isBeer } from '../types/beer';
 import { Reward } from '../types/database';
 import { getPreference } from '../database/preferences';
 import { config } from '../config';
@@ -90,7 +91,7 @@ export const fetchBeersFromAPI = async (): Promise<Beer[]> => {
             ('brew_name' in obj[0] || 'id' in obj[0] || 'brewer' in obj[0])
           ) {
             console.log(`Found potential beer array with ${obj.length} items`);
-            return obj as Beer[];
+            return obj.filter(isBeer);
           }
 
           // If not, check each element if it's an object that might contain beers
@@ -105,10 +106,11 @@ export const fetchBeersFromAPI = async (): Promise<Beer[]> => {
           // Check direct properties first
           for (const key of Object.keys(objRecord)) {
             if (key === 'brewInStock' || key === 'beers' || key === 'beer_list') {
-              console.log(
-                `Found beer array at key "${key}" with ${(objRecord[key] as Beer[]).length} items`
-              );
-              return objRecord[key] as Beer[];
+              const value = objRecord[key];
+              if (Array.isArray(value)) {
+                console.log(`Found beer array at key "${key}" with ${value.length} items`);
+                return value.filter(isBeer);
+              }
             }
 
             // Then recursively check nested objects

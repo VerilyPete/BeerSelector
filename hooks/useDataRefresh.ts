@@ -7,7 +7,7 @@ import { getUserFriendlyErrorMessage } from '@/src/utils/notificationUtils';
 /**
  * Parameters for the useDataRefresh hook
  */
-export interface UseDataRefreshParams {
+export type UseDataRefreshParams = {
   /**
    * Callback to reload local data after a successful or partial refresh
    * This should fetch data from the local database and update component state
@@ -18,12 +18,12 @@ export interface UseDataRefreshParams {
    * Optional name for logging purposes (e.g., 'AllBeers', 'Beerfinder')
    */
   componentName?: string;
-}
+};
 
 /**
  * Return value of the useDataRefresh hook
  */
-export interface UseDataRefreshResult {
+export type UseDataRefreshResult = {
   /**
    * Whether a refresh operation is currently in progress
    */
@@ -39,7 +39,7 @@ export interface UseDataRefreshResult {
    * Handles API URL configuration check, network errors, and partial errors
    */
   handleRefresh: () => Promise<void>;
-}
+};
 
 /**
  * Custom hook to handle manual data refresh for beer list components

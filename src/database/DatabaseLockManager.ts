@@ -14,13 +14,13 @@
 /**
  * Lock request in the queue
  */
-interface LockRequest {
+type LockRequest = {
   operationName: string;
   resolve: (acquired: boolean) => void;
   reject: (error: Error) => void;
   timestamp: number;
   acquisitionTimeoutId?: ReturnType<typeof setTimeout>;
-}
+};
 
 /**
  * DatabaseLockManager class to handle database operation locks with queue mechanism

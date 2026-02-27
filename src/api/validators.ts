@@ -6,14 +6,16 @@
  * API responses.
  */
 
+import { Beer } from '../types/beer';
+
 /**
  * Validation result structure
  */
-export interface ValidationResult<T> {
+export type ValidationResult<T> = {
   isValid: boolean;
   errors: string[];
   data?: T;
-}
+};
 
 /**
  * Validates the Flying Saucer API brewInStock response structure.
@@ -101,7 +103,7 @@ export function validateBrewInStockResponse(response: unknown): ValidationResult
  *   console.warn('Skipping invalid beer:', result.errors);
  * }
  */
-export function validateBeer(beer: unknown): ValidationResult<unknown> {
+export function validateBeer(beer: unknown): ValidationResult<Beer> {
   const errors: string[] = [];
 
   // Check for null/undefined
@@ -137,10 +139,12 @@ export function validateBeer(beer: unknown): ValidationResult<unknown> {
     return { isValid: false, errors, data: undefined };
   }
 
+  // Safe to treat as Beer after validation — id and brew_name are confirmed present.
+  // API may send numeric id which gets coerced to string downstream in allBeersRowToBeer.
   return {
     isValid: true,
     errors: [],
-    data: beer,
+    data: beer as Beer,
   };
 }
 
@@ -156,7 +160,7 @@ export function validateBeer(beer: unknown): ValidationResult<unknown> {
  * await insertBeersIntoDatabase(validBeers);
  */
 export function validateBeerArray(beers: unknown[]): {
-  validBeers: unknown[];
+  validBeers: Beer[];
   invalidBeers: { beer: unknown; errors: string[] }[];
   summary: {
     total: number;
@@ -164,12 +168,12 @@ export function validateBeerArray(beers: unknown[]): {
     invalid: number;
   };
 } {
-  const validBeers: unknown[] = [];
+  const validBeers: Beer[] = [];
   const invalidBeers: { beer: unknown; errors: string[] }[] = [];
 
   for (const beer of beers) {
     const result = validateBeer(beer);
-    if (result.isValid) {
+    if (result.isValid && result.data) {
       validBeers.push(result.data);
     } else {
       invalidBeers.push({

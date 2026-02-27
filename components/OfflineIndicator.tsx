@@ -28,10 +28,10 @@ import { ThemedText } from './ThemedText';
 import { useNetwork } from '@/context/NetworkContext';
 import { useColorScheme } from '@/hooks/useColorScheme';
 
-export interface OfflineIndicatorProps {
+export type OfflineIndicatorProps = {
   /** Optional custom message to display when offline */
   message?: string;
-}
+};
 
 /**
  * OfflineIndicator component - Shows banner when device is offline

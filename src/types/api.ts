@@ -5,17 +5,17 @@
 /**
  * API client configuration options
  */
-export interface ApiClientOptions {
+export type ApiClientOptions = {
   baseUrl?: string;
   retries?: number;
   retryDelay?: number;
   timeout?: number;
-}
+};
 
 /**
- * Session data interface for user sessions
+ * Session data type for user sessions
  */
-export interface SessionData {
+export type SessionData = {
   memberId: string;
   storeId: string;
   storeName: string;
@@ -25,17 +25,16 @@ export interface SessionData {
   lastName?: string;
   email?: string;
   cardNum?: string;
-}
+};
 
 /**
- * API response interface for typed API responses
+ * API response as a discriminated union.
+ * On success, `data` contains the typed payload.
+ * On failure, `data` is null and `error` describes the problem.
  */
-export interface ApiResponse<T> {
-  data: T;
-  success: boolean;
-  error?: string;
-  statusCode: number;
-}
+export type ApiResponse<T> =
+  | { success: true; data: T; statusCode: number }
+  | { success: false; data: null; error: string; statusCode: number };
 
 /**
  * API error class for handling API errors
@@ -63,17 +62,32 @@ export class ApiError extends Error {
 }
 
 /**
- * Login result interface for authentication responses
+ * Login result as a discriminated union.
+ * On success, `sessionData` is guaranteed present.
+ * On failure, `error` describes the problem.
  */
-export interface LoginResult {
-  success: boolean;
-  error?: string;
-  message?: string;
-  data?: unknown;
-  sessionData?: SessionData;
-  statusCode?: number;
-  isVisitorMode?: boolean; // Indicates if the user is in visitor mode
-}
+export type LoginResult =
+  | {
+      success: true;
+      sessionData: SessionData;
+      message?: string;
+      data?: unknown;
+      statusCode: number;
+      isVisitorMode?: boolean;
+    }
+  | {
+      success: false;
+      error: string;
+      statusCode: number;
+    };
+
+/**
+ * Logout result — separate from LoginResult since logout
+ * has no session data on success.
+ */
+export type LogoutResult =
+  | { success: true; message: string; statusCode: number }
+  | { success: false; error: string; statusCode: number };
 
 /**
  * Type guard to check if an object is a SessionData
@@ -97,9 +111,9 @@ export function isSessionData(obj: unknown): obj is SessionData {
 export function isApiResponse<T>(obj: unknown): obj is ApiResponse<T> {
   if (!obj || typeof obj !== 'object') return false;
   const o = obj as Record<string, unknown>;
-  return typeof o.success === 'boolean' &&
-    typeof o.statusCode === 'number' &&
-    'data' in o;
+  if (typeof o.success !== 'boolean' || typeof o.statusCode !== 'number') return false;
+  if (o.success) return 'data' in o;
+  return o.data === null && typeof o.error === 'string';
 }
 
 /**
@@ -110,5 +124,7 @@ export function isApiResponse<T>(obj: unknown): obj is ApiResponse<T> {
 export function isLoginResult(obj: unknown): obj is LoginResult {
   if (!obj || typeof obj !== 'object') return false;
   const o = obj as Record<string, unknown>;
-  return typeof o.success === 'boolean';
+  if (typeof o.success !== 'boolean' || typeof o.statusCode !== 'number') return false;
+  if (o.success) return 'sessionData' in o;
+  return typeof o.error === 'string';
 }

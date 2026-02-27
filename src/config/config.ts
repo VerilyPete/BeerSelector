@@ -22,7 +22,7 @@ export type AppEnvironment = 'development' | 'staging' | 'production';
 /**
  * Flying Saucer API endpoint paths
  */
-export interface ApiEndpoints {
+export type ApiEndpoints = {
   memberQueues: string;
   deleteQueuedBrew: string;
   addToQueue: string;
@@ -31,27 +31,27 @@ export interface ApiEndpoints {
   memberRewards: string;
   kiosk: string;
   visitor: string;
-}
+};
 
 /**
  * Network configuration settings
  */
-export interface NetworkConfig {
+export type NetworkConfig = {
   timeout: number;
   retries: number;
   retryDelay: number;
-}
+};
 
 /**
  * External services configuration
  */
-export interface ExternalServices {
+export type ExternalServices = {
   untappd: {
     baseUrl: string;
     loginUrl: string;
     searchUrl: (beerName: string) => string;
   };
-}
+};
 
 /**
  * Enrichment service configuration
@@ -541,6 +541,27 @@ export const config: AppConfig = {
     customApiUrl = url.replace(/\/+$/, '');
   },
 };
+
+/**
+ * Represents an EnrichmentConfig that has been confirmed to have an apiKey.
+ * Use assertEnrichmentConfigured() to narrow an EnrichmentConfig to this type.
+ */
+export type ConfiguredEnrichment = EnrichmentConfig & { readonly apiKey: string };
+
+/**
+ * Asserts that the enrichment config has an apiKey, narrowing its type.
+ * Call this before accessing enrichment.apiKey to avoid non-null assertions.
+ *
+ * @param enrichment - The enrichment config to assert against
+ * @throws Error if enrichment is not configured (missing API key)
+ */
+export function assertEnrichmentConfigured(
+  enrichment: EnrichmentConfig
+): asserts enrichment is ConfiguredEnrichment {
+  if (!enrichment.isConfigured()) {
+    throw new Error('Enrichment service is not configured: missing API key');
+  }
+}
 
 /**
  * Export error classes for error handling

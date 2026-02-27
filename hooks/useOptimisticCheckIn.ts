@@ -35,7 +35,7 @@ import { getSessionData } from '@/src/api/sessionManager';
 import { getQueuedBeers } from '@/src/api/queueService';
 import { updateLiveActivityWithQueue } from '@/src/services/liveActivityService';
 
-export interface UseOptimisticCheckInResult {
+export type UseOptimisticCheckInResult = {
   /** Execute a check-in with optimistic UI updates */
   checkInBeer: (beer: BeerWithContainerType) => Promise<void>;
 
@@ -50,7 +50,7 @@ export interface UseOptimisticCheckInResult {
 
   /** Manually rollback a check-in */
   rollbackCheckIn: (beerId: string) => Promise<void>;
-}
+};
 
 /**
  * Hook for optimistic beer check-ins with UI updates and rollback

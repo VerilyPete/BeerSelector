@@ -570,14 +570,25 @@ describe('isApiResponse - Edge Cases', () => {
       expect(isApiResponse(obj)).toBe(false);
     });
 
-    it('should accept object with data as null', () => {
+    it('should accept failure response with data as null and error string', () => {
+      const obj = {
+        success: false,
+        data: null,
+        error: 'Not found',
+        statusCode: 404,
+      };
+
+      expect(isApiResponse(obj)).toBe(true);
+    });
+
+    it('should reject failure response without error string', () => {
       const obj = {
         success: false,
         data: null,
         statusCode: 404,
       };
 
-      expect(isApiResponse(obj)).toBe(true);
+      expect(isApiResponse(obj)).toBe(false);
     });
 
     it('should accept object with data as empty object', () => {
@@ -620,10 +631,11 @@ describe('isApiResponse - Edge Cases', () => {
       expect(isApiResponse(obj)).toBe(false);
     });
 
-    it('should accept object with statusCode as 0', () => {
+    it('should accept failure response with statusCode as 0', () => {
       const obj = {
         success: false,
         data: null,
+        error: 'Network error',
         statusCode: 0,
       };
 
@@ -653,18 +665,27 @@ describe('isLoginResult - Edge Cases', () => {
       expect(isLoginResult(obj)).toBe(false);
     });
 
-    it('should accept object with only success field', () => {
+    it('should reject success LoginResult without sessionData', () => {
       const obj = {
         success: true,
+        statusCode: 200,
       };
 
-      expect(isLoginResult(obj)).toBe(true);
+      expect(isLoginResult(obj)).toBe(false);
     });
 
-    it('should accept object with success and all optional fields', () => {
+    it('should reject LoginResult without statusCode', () => {
       const obj = {
         success: true,
-        error: undefined,
+        sessionData: { memberId: '1', storeId: '2', storeName: 'S', sessionId: '3' },
+      };
+
+      expect(isLoginResult(obj)).toBe(false);
+    });
+
+    it('should accept success LoginResult with all fields', () => {
+      const obj = {
+        success: true,
         message: 'Login successful',
         data: { userId: '123' },
         sessionData: {
@@ -678,6 +699,25 @@ describe('isLoginResult - Edge Cases', () => {
       };
 
       expect(isLoginResult(obj)).toBe(true);
+    });
+
+    it('should accept failure LoginResult with error string', () => {
+      const obj = {
+        success: false,
+        error: 'Invalid credentials',
+        statusCode: 401,
+      };
+
+      expect(isLoginResult(obj)).toBe(true);
+    });
+
+    it('should reject failure LoginResult without error string', () => {
+      const obj = {
+        success: false,
+        statusCode: 401,
+      };
+
+      expect(isLoginResult(obj)).toBe(false);
     });
 
     it('should reject object with success as number', () => {

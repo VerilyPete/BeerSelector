@@ -56,7 +56,7 @@ const DEFAULT_SIDEBAR_WIDTHS = {
 /**
  * Props for the ResponsiveLayout component
  */
-export interface ResponsiveLayoutProps {
+export type ResponsiveLayoutProps = {
   /**
    * Content to render in the sidebar (left pane) on tablets.
    * Ignored on phone layouts.

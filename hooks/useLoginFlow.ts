@@ -6,18 +6,18 @@ import { setPreference } from '@/src/database/preferences';
 /**
  * Parameters for the useLoginFlow hook
  */
-export interface UseLoginFlowProps {
+export type UseLoginFlowProps = {
   /**
    * Optional callback to refresh data after successful login
    * This will typically call manualRefreshAllData() to fetch fresh data from APIs
    */
   onRefreshData?: () => Promise<void>;
-}
+};
 
 /**
  * Return value of the useLoginFlow hook
  */
-export interface UseLoginFlowReturn {
+export type UseLoginFlowReturn = {
   /**
    * Whether a login operation is currently in progress
    * Used to prevent duplicate login attempts and show loading states
@@ -62,7 +62,7 @@ export interface UseLoginFlowReturn {
    * Resets all login state without navigation or data refresh
    */
   handleLoginCancel: () => void;
-}
+};
 
 /**
  * Navigation delay constant

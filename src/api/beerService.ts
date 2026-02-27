@@ -33,7 +33,7 @@ export const checkInBeer = async (beer: Beer): Promise<CheckInResponse> => {
       }
 
       // Use the new session data from auto-login
-      sessionData = loginResult.sessionData!;
+      sessionData = loginResult.sessionData;
       console.log('Auto-login successful, continuing with check-in');
     }
 
@@ -60,7 +60,7 @@ export const checkInBeer = async (beer: Beer): Promise<CheckInResponse> => {
     // Use the ApiClient to make the request
     const response = await apiClient.post<Record<string, unknown>>(
       config.api.endpoints.addToQueue,
-      requestData as unknown as Record<string, unknown>
+      { ...requestData }
     );
 
     // If the request was successful but returned no data
@@ -118,7 +118,7 @@ export async function getBeerDetails(beerId: string): Promise<ApiResponse<Beer>>
     if (!beerId) {
       return {
         success: false,
-        data: null as unknown as Beer,
+        data: null,
         error: 'Beer ID is required',
         statusCode: 400,
       };
@@ -133,7 +133,7 @@ export async function getBeerDetails(beerId: string): Promise<ApiResponse<Beer>>
     if (error instanceof ApiError) {
       return {
         success: false,
-        data: null as unknown as Beer,
+        data: null,
         error: error.message,
         statusCode: error.statusCode,
       };
@@ -141,7 +141,7 @@ export async function getBeerDetails(beerId: string): Promise<ApiResponse<Beer>>
 
     return {
       success: false,
-      data: null as unknown as Beer,
+      data: null,
       error: error instanceof Error ? error.message : 'Unknown error occurred',
       statusCode: 500,
     };
@@ -159,7 +159,7 @@ export async function searchBeers(query: string): Promise<ApiResponse<Beer[]>> {
     if (!query || query.trim().length === 0) {
       return {
         success: false,
-        data: [] as Beer[],
+        data: null,
         error: 'Search query is required',
         statusCode: 400,
       };
@@ -174,7 +174,7 @@ export async function searchBeers(query: string): Promise<ApiResponse<Beer[]>> {
     if (error instanceof ApiError) {
       return {
         success: false,
-        data: [] as Beer[],
+        data: null,
         error: error.message,
         statusCode: error.statusCode,
       };
@@ -182,7 +182,7 @@ export async function searchBeers(query: string): Promise<ApiResponse<Beer[]>> {
 
     return {
       success: false,
-      data: [] as Beer[],
+      data: null,
       error: error instanceof Error ? error.message : 'Unknown error occurred',
       statusCode: 500,
     };
@@ -204,7 +204,7 @@ export async function getAllBeers(): Promise<ApiResponse<Beer[]>> {
     if (error instanceof ApiError) {
       return {
         success: false,
-        data: [] as Beer[],
+        data: null,
         error: error.message,
         statusCode: error.statusCode,
       };
@@ -212,7 +212,7 @@ export async function getAllBeers(): Promise<ApiResponse<Beer[]>> {
 
     return {
       success: false,
-      data: [] as Beer[],
+      data: null,
       error: error instanceof Error ? error.message : 'Unknown error occurred',
       statusCode: 500,
     };
@@ -234,7 +234,7 @@ export async function getMyBeers(): Promise<ApiResponse<Beerfinder[]>> {
     if (error instanceof ApiError) {
       return {
         success: false,
-        data: [] as Beerfinder[],
+        data: null,
         error: error.message,
         statusCode: error.statusCode,
       };
@@ -242,7 +242,7 @@ export async function getMyBeers(): Promise<ApiResponse<Beerfinder[]>> {
 
     return {
       success: false,
-      data: [] as Beerfinder[],
+      data: null,
       error: error instanceof Error ? error.message : 'Unknown error occurred',
       statusCode: 500,
     };

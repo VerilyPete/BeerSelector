@@ -1,21 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { router } from 'expo-router';
 import { getAllPreferences } from '@/src/database/preferences';
-
-/**
- * Preference type matching database structure
- */
-interface Preference {
-  key: string;
-  value: string;
-  description: string;
-  editable?: boolean;
-}
+import { Preference } from '@/src/types/database';
 
 /**
  * Return value of the useSettingsState hook
  */
-export interface UseSettingsStateReturn {
+export type UseSettingsStateReturn = {
   /**
    * All preferences loaded from database
    */
@@ -45,7 +36,7 @@ export interface UseSettingsStateReturn {
    * Reload preferences from database
    */
   loadPreferences: () => Promise<void>;
-}
+};
 
 /**
  * Custom hook to manage settings screen state

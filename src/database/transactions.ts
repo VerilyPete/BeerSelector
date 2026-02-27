@@ -21,7 +21,7 @@ import { logError, logInfo } from '../utils/errorLogger';
 /**
  * Result of a database operation
  */
-export interface DatabaseOperationResult<T = unknown> {
+export type DatabaseOperationResult<T = unknown> = {
   success: boolean;
   recordsAffected?: number;
   data?: T;
@@ -31,7 +31,7 @@ export interface DatabaseOperationResult<T = unknown> {
     valid: number;
     invalid: number;
   };
-}
+};
 
 /**
  * Type for database operation callbacks

@@ -12,31 +12,31 @@ import { rewardRowSchema } from './schemaTypes';
 /**
  * Result of validating a single beer object
  */
-export interface BeerValidationResult {
+export type BeerValidationResult = {
   isValid: boolean;
   errors: string[];
-}
+};
 
 /**
  * Summary of a batch validation operation
  */
-export interface ValidationSummary {
+export type ValidationSummary = {
   total: number;
   valid: number;
   invalid: number;
-}
+};
 
 /**
  * Result of validating multiple beer objects
  */
-export interface BeersValidationResult<T = Beer> {
+export type BeersValidationResult<T = Beer> = {
   validBeers: T[];
   invalidBeers: {
     beer: unknown;
     errors: string[];
   }[];
   summary: ValidationSummary;
-}
+};
 
 /**
  * Validates a single beer object has required fields for database insertion.
@@ -138,6 +138,7 @@ export function validateBeersForInsertion(beers: unknown[]): BeersValidationResu
     const validationResult = validateBeerForInsertion(beer);
 
     if (validationResult.isValid) {
+      // Safe after validateBeerForInsertion confirms id and brew_name exist
       validBeers.push(beer as Beer);
     } else {
       invalidBeers.push({

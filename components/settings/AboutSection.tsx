@@ -14,7 +14,7 @@ import SettingsItem from './SettingsItem';
 /**
  * Props for AboutSection component
  */
-interface AboutSectionProps {
+type AboutSectionProps = {
   /** URL for help/documentation link (optional) */
   helpUrl?: string;
   /** URL for privacy policy link (optional) */
@@ -23,7 +23,7 @@ interface AboutSectionProps {
   style?: ViewStyle;
   /** Test ID for testing */
   testID?: string;
-}
+};
 
 /**
  * AboutSection Component

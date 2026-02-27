@@ -33,7 +33,7 @@ import { useOperationQueue } from '@/context/OperationQueueContext';
 import {
   OperationType,
   OperationStatus,
-  CheckInBeerPayload,
+  QueuedOperation,
   isCheckInBeerPayload,
 } from '@/src/types/operationQueue';
 import { useThemeColor } from '@/hooks/useThemeColor';
@@ -42,13 +42,13 @@ import { useThemeColor } from '@/hooks/useThemeColor';
 // TYPE DEFINITIONS
 // ============================================================================
 
-interface QueuedOperationsModalProps {
+type QueuedOperationsModalProps = {
   /** Whether the modal is visible */
   visible: boolean;
 
   /** Callback when modal is closed */
   onClose: () => void;
-}
+};
 
 // ============================================================================
 // COMPONENT
@@ -97,12 +97,11 @@ export const QueuedOperationsModal: React.FC<QueuedOperationsModalProps> = ({
   /**
    * Get operation details for display
    */
-  const getOperationDetails = (operation: any): string => {
+  const getOperationDetails = (operation: QueuedOperation): string => {
     switch (operation.type) {
       case OperationType.CHECK_IN_BEER:
         if (isCheckInBeerPayload(operation.payload)) {
-          const payload = operation.payload as CheckInBeerPayload;
-          return `${payload.beerName} at ${payload.storeName}`;
+          return `${operation.payload.beerName} at ${operation.payload.storeName}`;
         }
         return 'Beer check-in';
 

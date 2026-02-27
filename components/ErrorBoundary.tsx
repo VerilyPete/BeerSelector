@@ -20,7 +20,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { logError } from '../src/utils/errorLogger';
 import { Colors } from '@/constants/Colors';
 
-interface ErrorBoundaryProps {
+type ErrorBoundaryProps = {
   /** Content to render when no error occurs */
   children: ReactNode;
   /** Custom message to display in error state */
@@ -31,16 +31,16 @@ interface ErrorBoundaryProps {
   onReset?: () => void;
   /** Whether to show stack trace (useful in development) */
   showStack?: boolean;
-}
+};
 
-interface ErrorBoundaryState {
+type ErrorBoundaryState = {
   hasError: boolean;
   error: Error | null;
   errorInfo: ErrorInfo | null;
-}
+};
 
-/** Theme colors interface passed from wrapper */
-interface ThemeColors {
+/** Theme colors type passed from wrapper */
+type ThemeColors = {
   text: string;
   textSecondary: string;
   textMuted: string;
@@ -49,7 +49,7 @@ interface ThemeColors {
   border: string;
   tint: string;
   textOnPrimary: string;
-}
+};
 
 /**
  * Error boundary component for catching React component errors

@@ -7,7 +7,7 @@ import { getUserFriendlyErrorMessage } from '@/src/utils/notificationUtils';
 /**
  * Return value of the useSettingsRefresh hook
  */
-export interface UseSettingsRefreshReturn {
+export type UseSettingsRefreshReturn = {
   /**
    * Whether a refresh operation is currently in progress
    */
@@ -20,7 +20,7 @@ export interface UseSettingsRefreshReturn {
    * @param silent - If true, suppresses success alerts (errors still shown)
    */
   handleRefresh: (silent?: boolean) => Promise<void>;
-}
+};
 
 /**
  * Custom hook to manage data refresh operations for settings screen

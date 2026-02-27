@@ -45,7 +45,7 @@ export enum OperationStatus {
 /**
  * Beer check-in operation payload
  */
-export interface CheckInBeerPayload {
+export type CheckInBeerPayload = {
   /** Beer ID to check in */
   beerId: string;
 
@@ -60,12 +60,12 @@ export interface CheckInBeerPayload {
 
   /** Member ID who is checking in */
   memberId: string;
-}
+};
 
 /**
  * Reward redemption operation payload
  */
-export interface RewardRedemptionPayload {
+export type RewardRedemptionPayload = {
   /** Reward ID to redeem */
   rewardId: string;
 
@@ -74,26 +74,26 @@ export interface RewardRedemptionPayload {
 
   /** Member ID who is redeeming */
   memberId: string;
-}
+};
 
 /**
  * Refresh data operation payload
  */
-export interface RefreshDataPayload {
+export type RefreshDataPayload = {
   /** What data to refresh (all, rewards, beers) */
   dataType: 'all' | 'rewards' | 'beers';
-}
+};
 
 /**
  * Update preferences operation payload
  */
-export interface UpdatePreferencesPayload {
+export type UpdatePreferencesPayload = {
   /** Preference key */
   key: string;
 
   /** Preference value */
   value: string;
-}
+};
 
 /**
  * Union type for all operation payloads
@@ -107,7 +107,7 @@ export type OperationPayload =
 /**
  * Queued operation structure
  */
-export interface QueuedOperation {
+export type QueuedOperation = {
   /** Unique operation ID */
   id: string;
 
@@ -131,12 +131,12 @@ export interface QueuedOperation {
 
   /** Timestamp of last retry attempt (milliseconds) */
   lastRetryTimestamp?: number;
-}
+};
 
 /**
  * Database row representation of a queued operation
  */
-export interface QueuedOperationRow {
+export type QueuedOperationRow = {
   id: string;
   type: string;
   payload: string; // JSON stringified
@@ -145,7 +145,7 @@ export interface QueuedOperationRow {
   status: string;
   error_message?: string;
   last_retry_timestamp?: number;
-}
+};
 
 /**
  * Type guard to check if an object is a QueuedOperation
@@ -209,7 +209,7 @@ export function isRewardRedemptionPayload(payload: unknown): payload is RewardRe
 /**
  * Configuration for retry behavior
  */
-export interface RetryConfig {
+export type RetryConfig = {
   /** Maximum number of retry attempts */
   maxRetries: number;
 
@@ -221,7 +221,7 @@ export interface RetryConfig {
 
   /** Debounce delay after network reconnection before retrying (milliseconds) */
   reconnectionDebounceMs: number;
-}
+};
 
 /**
  * Default retry configuration
@@ -236,7 +236,7 @@ export const DEFAULT_RETRY_CONFIG: RetryConfig = {
 /**
  * Result of executing a queued operation
  */
-export interface OperationExecutionResult {
+export type OperationExecutionResult = {
   /** Whether the operation succeeded */
   success: boolean;
 
@@ -245,4 +245,4 @@ export interface OperationExecutionResult {
 
   /** Whether the error is retryable (network error) */
   isRetryable?: boolean;
-}
+};
