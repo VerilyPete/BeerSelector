@@ -40,14 +40,9 @@ describe('BeerItem', () => {
     enrichment_source: null,
   };
 
-  const mockOnToggle = jest.fn();
-
-  beforeEach(() => {
-    mockOnToggle.mockClear();
-  });
-
   // Test 1: Renders collapsed state correctly
   test('renders collapsed state correctly', () => {
+    const mockOnToggle = jest.fn();
     const { getByText, queryByText } = render(
       <BeerItem beer={mockBeer} isExpanded={false} onToggle={mockOnToggle} />
     );
@@ -65,6 +60,7 @@ describe('BeerItem', () => {
 
   // Test 2: Renders expanded state with description
   test('renders expanded state with description', () => {
+    const mockOnToggle = jest.fn();
     const { getByText } = render(
       <BeerItem beer={mockBeer} isExpanded={true} onToggle={mockOnToggle} />
     );
@@ -76,6 +72,7 @@ describe('BeerItem', () => {
 
   // Test 3: Toggles expand/collapse on press
   test('calls onToggle with beer id when pressed', () => {
+    const mockOnToggle = jest.fn();
     const { getByText } = render(
       <BeerItem beer={mockBeer} isExpanded={false} onToggle={mockOnToggle} />
     );
@@ -90,6 +87,7 @@ describe('BeerItem', () => {
 
   // Test 4: Formats timestamp date correctly (added_date)
   test('formats unix timestamp date correctly', () => {
+    const mockOnToggle = jest.fn();
     const { getByText } = render(
       <BeerItem beer={mockBeer} isExpanded={false} onToggle={mockOnToggle} dateLabel="Date Added" />
     );
@@ -103,6 +101,7 @@ describe('BeerItem', () => {
 
   // Test 5: Formats MM/DD/YYYY date correctly (tasted_date)
   test('formats MM/DD/YYYY date correctly for tasted beers', () => {
+    const mockOnToggle = jest.fn();
     const tastedBeer = {
       ...mockBeer,
       tasted_date: '11/10/2023',
@@ -119,6 +118,7 @@ describe('BeerItem', () => {
 
   // Test 6: Handles invalid/missing dates gracefully
   test('handles invalid dates gracefully', () => {
+    const mockOnToggle = jest.fn();
     const beerWithInvalidDate = {
       ...mockBeer,
       added_date: 'invalid',
@@ -134,6 +134,7 @@ describe('BeerItem', () => {
 
   // Test 7: Handles missing optional fields
   test('handles missing optional fields gracefully', () => {
+    const mockOnToggle = jest.fn();
     const minimalBeer = {
       id: '456',
       brew_name: 'Minimal Beer',
@@ -164,6 +165,7 @@ describe('BeerItem', () => {
 
   // Test 8: Renders custom actions when provided
   test('renders custom actions when expanded and provided', () => {
+    const mockOnToggle = jest.fn();
     const { View } = require('react-native');
     const renderActions = () => {
       return <View testID="custom-action" />;
@@ -197,6 +199,7 @@ describe('BeerItem', () => {
 
   // Test 9: Handles empty date string
   test('handles empty date string', () => {
+    const mockOnToggle = jest.fn();
     const beerWithEmptyDate = {
       ...mockBeer,
       added_date: '',
@@ -212,6 +215,7 @@ describe('BeerItem', () => {
 
   // Test 10: Strips <p> and <br> tags from description
   test('strips <p> and <br> tags from description', () => {
+    const mockOnToggle = jest.fn();
     const beerWithHtmlDescription = {
       ...mockBeer,
       brew_description: '<p>This beer has <strong>bold</strong> flavors and <br/>hops.</p>',
@@ -227,6 +231,7 @@ describe('BeerItem', () => {
 
   // Test 11: Uses default date label when not provided
   test('uses default date label when not provided', () => {
+    const mockOnToggle = jest.fn();
     const { getByText } = render(
       <BeerItem beer={mockBeer} isExpanded={false} onToggle={mockOnToggle} />
     );
@@ -237,6 +242,7 @@ describe('BeerItem', () => {
 
   // Test 12: Renders beer name fallback
   test('renders fallback for unnamed beer', () => {
+    const mockOnToggle = jest.fn();
     const unnamedBeer = {
       ...mockBeer,
       brew_name: '',

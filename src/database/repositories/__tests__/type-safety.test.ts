@@ -37,15 +37,13 @@ jest.mock('../../locks', () => ({
 
 describe('Repository Type Safety', () => {
   describe('BeerRepository Type Safety', () => {
-    let repository: BeerRepository;
-
-    beforeEach(() => {
-      repository = new BeerRepository();
+    function createBeerRepository() {
       jest.clearAllMocks();
-    });
+      return new BeerRepository();
+    }
 
     it('getAll() should return Promise<Beer[]>', async () => {
-      // Mock database response
+      const repository = createBeerRepository();
       const mockDb = {
         getAllAsync: jest.fn().mockResolvedValue([
           {
@@ -79,6 +77,7 @@ describe('Repository Type Safety', () => {
     });
 
     it('getById() should return Promise<Beer | null>', async () => {
+      const repository = createBeerRepository();
       const mockDb = {
         getFirstAsync: jest.fn().mockResolvedValue({
           id: '1',
@@ -107,6 +106,7 @@ describe('Repository Type Safety', () => {
     });
 
     it('search() should return Promise<Beer[]>', async () => {
+      const repository = createBeerRepository();
       const mockDb = {
         getAllAsync: jest.fn().mockResolvedValue([]),
       };
@@ -122,6 +122,7 @@ describe('Repository Type Safety', () => {
     });
 
     it('insertMany() should only accept Beer[]', async () => {
+      const repository = createBeerRepository();
       const mockDb = {
         withTransactionAsync: jest.fn(async (callback: () => Promise<void>) => {
           await callback();
@@ -156,14 +157,13 @@ describe('Repository Type Safety', () => {
   });
 
   describe('MyBeersRepository Type Safety', () => {
-    let repository: MyBeersRepository;
-
-    beforeEach(() => {
-      repository = new MyBeersRepository();
+    function createMyBeersRepository() {
       jest.clearAllMocks();
-    });
+      return new MyBeersRepository();
+    }
 
     it('getAll() should return Promise<BeerfinderWithContainerType[]>', async () => {
+      const repository = createMyBeersRepository();
       const mockDb = {
         getAllAsync: jest.fn().mockResolvedValue([
           {
@@ -202,6 +202,7 @@ describe('Repository Type Safety', () => {
     });
 
     it('getById() should return Promise<Beerfinder | null>', async () => {
+      const repository = createMyBeersRepository();
       const mockDb = {
         getFirstAsync: jest.fn().mockResolvedValue(null),
       };
@@ -217,6 +218,7 @@ describe('Repository Type Safety', () => {
     });
 
     it('getCount() should return Promise<number>', async () => {
+      const repository = createMyBeersRepository();
       const mockDb = {
         getFirstAsync: jest.fn().mockResolvedValue({ count: 42 }),
       };
@@ -232,6 +234,7 @@ describe('Repository Type Safety', () => {
     });
 
     it('insertMany() should only accept BeerfinderWithContainerType[]', async () => {
+      const repository = createMyBeersRepository();
       const mockDb = {
         withTransactionAsync: jest.fn(async (callback: () => Promise<void>) => {
           await callback();
@@ -266,14 +269,13 @@ describe('Repository Type Safety', () => {
   });
 
   describe('RewardsRepository Type Safety', () => {
-    let repository: RewardsRepository;
-
-    beforeEach(() => {
-      repository = new RewardsRepository();
+    function createRewardsRepository() {
       jest.clearAllMocks();
-    });
+      return new RewardsRepository();
+    }
 
     it('getAll() should return Promise<Reward[]>', async () => {
+      const repository = createRewardsRepository();
       const mockDb = {
         getAllAsync: jest.fn().mockResolvedValue([
           {
@@ -300,6 +302,7 @@ describe('Repository Type Safety', () => {
     });
 
     it('getById() should return Promise<Reward | null>', async () => {
+      const repository = createRewardsRepository();
       const mockDb = {
         getFirstAsync: jest.fn().mockResolvedValue({
           reward_id: 'PLATE_1',
@@ -321,6 +324,7 @@ describe('Repository Type Safety', () => {
     });
 
     it('getByType() should return Promise<Reward[]>', async () => {
+      const repository = createRewardsRepository();
       const mockDb = {
         getAllAsync: jest.fn().mockResolvedValue([]),
       };
@@ -336,6 +340,7 @@ describe('Repository Type Safety', () => {
     });
 
     it('getCount() should return Promise<number>', async () => {
+      const repository = createRewardsRepository();
       const mockDb = {
         getFirstAsync: jest.fn().mockResolvedValue({ count: 5 }),
       };
@@ -351,6 +356,7 @@ describe('Repository Type Safety', () => {
     });
 
     it('insertMany() should only accept Reward[]', async () => {
+      const repository = createRewardsRepository();
       const mockDb = {
         withTransactionAsync: jest.fn(async (callback: () => Promise<void>) => {
           await callback();
@@ -379,6 +385,7 @@ describe('Repository Type Safety', () => {
 
   describe('Type Guard Integration', () => {
     it('should use type guards to validate data at runtime', async () => {
+      jest.clearAllMocks();
       const repository = new BeerRepository();
 
       const mockDb = {
@@ -438,8 +445,6 @@ describe('Repository Type Safety', () => {
       const _assert1: AssertBeerType = true;
       const _assert2: AssertBeerfinderType = true;
       const _assert3: AssertRewardType = true;
-
-      expect(true).toBe(true); // Dummy assertion for Jest
     });
 
     it('should prevent assigning wrong entity types', () => {
@@ -452,8 +457,6 @@ describe('Repository Type Safety', () => {
 
       // @ts-expect-error - Cannot assign Promise<BeerfinderWithContainerType[]> to Promise<Beer[]>
       const _wrong2: Promise<Beer[]> = myBeersRepo.getAll();
-
-      expect(true).toBe(true); // Dummy assertion for Jest
     });
   });
 });
