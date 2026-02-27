@@ -38,9 +38,9 @@ describe('API Response Validators', () => {
     });
 
     it('should reject response that is not an array', () => {
-      const invalidResponse = { brewInStock: [] };
+      const invalidResponse: unknown = { brewInStock: [] };
 
-      const result = validateBrewInStockResponse(invalidResponse as any);
+      const result = validateBrewInStockResponse(invalidResponse);
 
       expect(result.isValid).toBe(false);
       expect(result.errors).toContain('Response is not an array');
@@ -80,8 +80,8 @@ describe('API Response Validators', () => {
     });
 
     it('should reject null or undefined response', () => {
-      const nullResult = validateBrewInStockResponse(null as any);
-      const undefinedResult = validateBrewInStockResponse(undefined as any);
+      const nullResult = validateBrewInStockResponse(null);
+      const undefinedResult = validateBrewInStockResponse(undefined);
 
       expect(nullResult.isValid).toBe(false);
       expect(nullResult.errors).toContain('Response is null or undefined');
@@ -219,8 +219,8 @@ describe('API Response Validators', () => {
     });
 
     it('should reject null or undefined beer object', () => {
-      const nullResult = validateBeer(null as any);
-      const undefinedResult = validateBeer(undefined as any);
+      const nullResult = validateBeer(null);
+      const undefinedResult = validateBeer(undefined);
 
       expect(nullResult.isValid).toBe(false);
       expect(nullResult.errors).toContain('Beer object is null or undefined');
@@ -230,13 +230,13 @@ describe('API Response Validators', () => {
     });
 
     it('should reject beer object that is not an object', () => {
-      const stringBeer = 'not an object';
-      const numberBeer = 123;
-      const arrayBeer: unknown[] = [];
+      const stringBeer: unknown = 'not an object';
+      const numberBeer: unknown = 123;
+      const arrayBeer: unknown = [];
 
-      expect(validateBeer(stringBeer as any).isValid).toBe(false);
-      expect(validateBeer(numberBeer as any).isValid).toBe(false);
-      expect(validateBeer(arrayBeer as any).isValid).toBe(false);
+      expect(validateBeer(stringBeer).isValid).toBe(false);
+      expect(validateBeer(numberBeer).isValid).toBe(false);
+      expect(validateBeer(arrayBeer).isValid).toBe(false);
     });
 
     it('should accept beer object with only required fields', () => {

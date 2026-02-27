@@ -52,9 +52,24 @@ const mockScheduleCleanupTask = jest.fn();
 const mockCancelCleanupTask = jest.fn();
 const mockGetActivityStaleDate = jest.fn();
 
+type LiveActivitiesModuleMock = {
+  areActivitiesEnabled: jest.Mock;
+  startActivity: jest.Mock;
+  updateActivity: jest.Mock;
+  endActivity: jest.Mock;
+  endAllActivities: jest.Mock;
+  restartActivity: jest.Mock;
+  getAllActivityIds: jest.Mock;
+  endActivitiesOlderThan: jest.Mock;
+  endAllActivitiesSync: jest.Mock;
+  scheduleCleanupTask: jest.Mock;
+  cancelCleanupTask: jest.Mock;
+  getActivityStaleDate: jest.Mock;
+};
+
 // Mock Platform and NativeModules from react-native
 let mockPlatformOS = 'ios';
-let mockLiveActivitiesModule: any = {
+let mockLiveActivitiesModule: LiveActivitiesModuleMock | undefined = {
   areActivitiesEnabled: mockAreActivitiesEnabled,
   startActivity: mockStartActivity,
   updateActivity: mockUpdateActivity,
@@ -636,7 +651,7 @@ describe('liveActivityService', () => {
       await updateLiveActivityWithQueue(mockQueuedBeers, {
         ...mockSessionData,
         memberId: undefined,
-      } as any);
+      } as unknown as SessionData);
 
       expect(console.log).toHaveBeenCalledWith('[LiveActivity] No valid session data');
     });
@@ -645,7 +660,7 @@ describe('liveActivityService', () => {
       await updateLiveActivityWithQueue(mockQueuedBeers, {
         ...mockSessionData,
         storeId: undefined,
-      } as any);
+      } as unknown as SessionData);
 
       expect(console.log).toHaveBeenCalledWith('[LiveActivity] No valid session data');
     });
