@@ -7,15 +7,14 @@
 
 import { DatabaseLockManager } from '../DatabaseLockManager';
 
+function createLockManager(): DatabaseLockManager {
+  return new DatabaseLockManager();
+}
+
 describe('DatabaseLockManager', () => {
-  let lockManager: DatabaseLockManager;
-
-  beforeEach(() => {
-    lockManager = new DatabaseLockManager();
-  });
-
   describe('Basic lock acquisition', () => {
     it('should acquire lock when available', async () => {
+      const lockManager = createLockManager();
       const acquired = await lockManager.acquireLock('test-operation');
       expect(acquired).toBe(true);
       expect(lockManager.isLocked()).toBe(true);
@@ -23,18 +22,21 @@ describe('DatabaseLockManager', () => {
     });
 
     it('should release lock successfully', async () => {
+      const lockManager = createLockManager();
       await lockManager.acquireLock('test-operation');
       lockManager.releaseLock('test-operation');
       expect(lockManager.isLocked()).toBe(false);
     });
 
     it('should check lock status correctly', () => {
+      const lockManager = createLockManager();
       expect(lockManager.isLocked()).toBe(false);
     });
   });
 
   describe('Queue mechanism (FIFO)', () => {
     it('should queue lock requests and process in FIFO order', async () => {
+      const lockManager = createLockManager();
       const executionOrder: number[] = [];
 
       // Acquire first lock
@@ -66,6 +68,7 @@ describe('DatabaseLockManager', () => {
     });
 
     it('should handle multiple simultaneous lock requests', async () => {
+      const lockManager = createLockManager();
       const results: boolean[] = [];
 
       // Acquire first lock
@@ -95,6 +98,7 @@ describe('DatabaseLockManager', () => {
     });
 
     it('should propagate lock to next waiter on release', async () => {
+      const lockManager = createLockManager();
       let op2Acquired = false;
 
       // First operation acquires lock
@@ -118,6 +122,7 @@ describe('DatabaseLockManager', () => {
     });
 
     it('should track queue length correctly', async () => {
+      const lockManager = createLockManager();
       expect(lockManager.getQueueLength()).toBe(0);
 
       // Hold lock
@@ -154,6 +159,7 @@ describe('DatabaseLockManager', () => {
     });
 
     it('should auto-release lock after timeout', async () => {
+      const lockManager = createLockManager();
       const acquirePromise = lockManager.acquireLock('long-operation');
 
       // Let the promise resolve
@@ -169,6 +175,7 @@ describe('DatabaseLockManager', () => {
     });
 
     it('should log warning when lock is forcibly released', async () => {
+      const lockManager = createLockManager();
       const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
 
       await lockManager.acquireLock('timeout-test');
@@ -184,6 +191,7 @@ describe('DatabaseLockManager', () => {
     });
 
     it('should clear timeout when lock is released normally', async () => {
+      const lockManager = createLockManager();
       const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
 
       await lockManager.acquireLock('normal-operation');
@@ -199,6 +207,7 @@ describe('DatabaseLockManager', () => {
 
   describe('Concurrent operations', () => {
     it('should prevent concurrent database operations', async () => {
+      const lockManager = createLockManager();
       const operationLog: string[] = [];
 
       const operation1 = async () => {
@@ -227,6 +236,7 @@ describe('DatabaseLockManager', () => {
     });
 
     it('should handle rapid lock requests without race conditions', async () => {
+      const lockManager = createLockManager();
       const results: boolean[] = [];
       const operations = Array.from({ length: 10 }, (_, i) =>
         lockManager.acquireLock(`rapid-op-${i}`).then(acquired => {
@@ -246,6 +256,7 @@ describe('DatabaseLockManager', () => {
 
   describe('Error recovery', () => {
     it('should allow new operations after failed operation', async () => {
+      const lockManager = createLockManager();
       await lockManager.acquireLock('failing-operation');
 
       // Simulate operation failure (lock released in finally)
@@ -258,6 +269,7 @@ describe('DatabaseLockManager', () => {
     });
 
     it('should handle multiple releases gracefully', async () => {
+      const lockManager = createLockManager();
       await lockManager.acquireLock('test-operation');
 
       lockManager.releaseLock('test-operation');
@@ -272,6 +284,7 @@ describe('DatabaseLockManager', () => {
 
   describe('Operation tracking', () => {
     it('should track current operation name', async () => {
+      const lockManager = createLockManager();
       expect(lockManager.getCurrentOperation()).toBeNull();
 
       await lockManager.acquireLock('tracked-operation');
@@ -282,6 +295,7 @@ describe('DatabaseLockManager', () => {
     });
 
     it('should update current operation as queue processes', async () => {
+      const lockManager = createLockManager();
       await lockManager.acquireLock('op1');
       expect(lockManager.getCurrentOperation()).toBe('op1');
 
@@ -297,6 +311,7 @@ describe('DatabaseLockManager', () => {
 
   describe('Logging', () => {
     it('should log lock acquisition', async () => {
+      const lockManager = createLockManager();
       const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
 
       await lockManager.acquireLock('logged-operation');
@@ -310,6 +325,7 @@ describe('DatabaseLockManager', () => {
     });
 
     it('should log lock release', async () => {
+      const lockManager = createLockManager();
       await lockManager.acquireLock('logged-operation');
 
       const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
@@ -323,6 +339,7 @@ describe('DatabaseLockManager', () => {
     });
 
     it('should log when waiting for lock', async () => {
+      const lockManager = createLockManager();
       const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
 
       // First operation holds lock
@@ -362,6 +379,7 @@ describe('DatabaseLockManager', () => {
      * This test will FAIL until Step 5d-b is implemented
      */
     it('should reject promise if lock not acquired within custom timeout', async () => {
+      const lockManager = createLockManager();
       // Hold lock indefinitely
       await lockManager.acquireLock('blocking-operation');
 
@@ -387,6 +405,7 @@ describe('DatabaseLockManager', () => {
      * This test will FAIL until Step 5d-b is implemented
      */
     it('should use default 30-second timeout if not specified', async () => {
+      const lockManager = createLockManager();
       // Part 1: Verify default timeout is 30 seconds (not some other value)
       // We'll verify this by checking that operation is still pending at 10s
       await lockManager.acquireLock('blocking-operation');
@@ -433,6 +452,7 @@ describe('DatabaseLockManager', () => {
      * This test will FAIL until Step 5d-b is implemented
      */
     it('should have separate acquisition timeout (30s) and hold timeout (15s)', async () => {
+      const lockManager = createLockManager();
       // Operation 1 acquires lock
       const acquire1 = await lockManager.acquireLock('operation-1');
       expect(acquire1).toBe(true);
@@ -463,6 +483,7 @@ describe('DatabaseLockManager', () => {
      * This test will FAIL until Step 5d-b is implemented
      */
     it('should clear acquisition timeout if lock is granted before timeout', async () => {
+      const lockManager = createLockManager();
       // Operation 1 holds lock
       await lockManager.acquireLock('operation-1');
 
@@ -504,6 +525,7 @@ describe('DatabaseLockManager', () => {
      * This test will FAIL until Step 5d-b is implemented
      */
     it('should remove timed-out operation from queue', async () => {
+      const lockManager = createLockManager();
       // Operation 1 holds lock
       await lockManager.acquireLock('operation-1');
 
@@ -542,6 +564,7 @@ describe('DatabaseLockManager', () => {
      * This test will FAIL until Step 5d-b is implemented
      */
     it('should handle multiple queued operations with different timeouts', async () => {
+      const lockManager = createLockManager();
       // Operation 1 holds lock
       await lockManager.acquireLock('operation-1');
 
@@ -582,6 +605,7 @@ describe('DatabaseLockManager', () => {
      * This test will FAIL until Step 5d-b is implemented
      */
     it('should log warning when acquisition timeout occurs', async () => {
+      const lockManager = createLockManager();
       const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
 
       // Operation 1 holds lock
@@ -607,13 +631,23 @@ describe('DatabaseLockManager', () => {
   });
 
   describe('Graceful Shutdown', () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
     it('should prepare for shutdown successfully when lock is free', async () => {
+      const lockManager = createLockManager();
       const result = await lockManager.prepareForShutdown(5000);
 
       expect(result).toBe(true);
     });
 
     it('should wait for active operation to complete before shutdown', async () => {
+      const lockManager = createLockManager();
       // Acquire lock
       await lockManager.acquireLock('active-operation');
 
@@ -637,6 +671,7 @@ describe('DatabaseLockManager', () => {
     });
 
     it('should timeout if operation takes too long during shutdown', async () => {
+      const lockManager = createLockManager();
       // Acquire lock
       await lockManager.acquireLock('long-running-operation');
 
@@ -657,6 +692,7 @@ describe('DatabaseLockManager', () => {
     });
 
     it('should prevent new lock acquisitions after shutdown initiated', async () => {
+      const lockManager = createLockManager();
       // Start shutdown (don't await, just initiate)
       const shutdownPromise = lockManager.prepareForShutdown(5000);
 
@@ -674,6 +710,7 @@ describe('DatabaseLockManager', () => {
     });
 
     it('should warn when forcing shutdown with lock held', async () => {
+      const lockManager = createLockManager();
       const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
 
       // Acquire lock
@@ -699,6 +736,7 @@ describe('DatabaseLockManager', () => {
     });
 
     it('should warn when shutting down with non-empty queue', async () => {
+      const lockManager = createLockManager();
       const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
 
       // Acquire lock
@@ -727,6 +765,7 @@ describe('DatabaseLockManager', () => {
     });
 
     it('should log when entering shutdown state', async () => {
+      const lockManager = createLockManager();
       const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
 
       await lockManager.prepareForShutdown(5000);
@@ -739,6 +778,7 @@ describe('DatabaseLockManager', () => {
     });
 
     it('should handle shutdown when already in shutdown state', async () => {
+      const lockManager = createLockManager();
       // First shutdown
       await lockManager.prepareForShutdown(5000);
 
@@ -748,6 +788,7 @@ describe('DatabaseLockManager', () => {
     });
 
     it('should poll lock status during shutdown', async () => {
+      const lockManager = createLockManager();
       // Acquire lock
       await lockManager.acquireLock('operation');
 
@@ -775,6 +816,7 @@ describe('DatabaseLockManager', () => {
     });
 
     it('should use custom timeout when provided', async () => {
+      const lockManager = createLockManager();
       // Acquire lock
       await lockManager.acquireLock('operation');
 
@@ -793,6 +835,7 @@ describe('DatabaseLockManager', () => {
     });
 
     it('should use default timeout (5 seconds) when not specified', async () => {
+      const lockManager = createLockManager();
       // Acquire lock
       await lockManager.acquireLock('operation');
 

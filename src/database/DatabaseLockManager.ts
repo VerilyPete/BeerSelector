@@ -399,6 +399,31 @@ export class DatabaseLockManager {
     console.log('Database lock manager: Resetting shutdown state');
     this.isShuttingDown = false;
   }
+
+  /**
+   * Reset all internal state for testing purposes
+   *
+   * Clears held locks, empties the queue, cancels any pending timeouts,
+   * and resets tracking state. Should only be called in test setup/teardown.
+   *
+   * @internal Only for use in tests
+   */
+  resetForTesting(): void {
+    this.lockHeld = false;
+    if (this.timeoutId) {
+      clearTimeout(this.timeoutId);
+      this.timeoutId = null;
+    }
+    this.queue.forEach(req => {
+      if (req.acquisitionTimeoutId) {
+        clearTimeout(req.acquisitionTimeoutId);
+      }
+    });
+    this.queue = [];
+    this.currentOperation = null;
+    this.isShuttingDown = false;
+    this.recentWaitTimes = [];
+  }
 }
 
 /**

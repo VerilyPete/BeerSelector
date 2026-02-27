@@ -4,14 +4,11 @@
 
 import { DatabaseLockManager, databaseLockManager } from '../locks';
 
+function createLockManager(): DatabaseLockManager {
+  return new DatabaseLockManager();
+}
+
 describe('DatabaseLockManager', () => {
-  let lockManager: DatabaseLockManager;
-
-  beforeEach(() => {
-    lockManager = new DatabaseLockManager();
-    jest.clearAllMocks();
-  });
-
   describe('module exports (HP-2 Step 6a)', () => {
     it('should export DatabaseLockManager class from locks.ts', () => {
       expect(DatabaseLockManager).toBeDefined();
@@ -35,6 +32,7 @@ describe('DatabaseLockManager', () => {
 
   describe('acquireLock', () => {
     it('should successfully acquire lock when available', async () => {
+      const lockManager = createLockManager();
       const result = await lockManager.acquireLock('test-operation');
 
       expect(result).toBe(true);
@@ -42,6 +40,7 @@ describe('DatabaseLockManager', () => {
     });
 
     it('should log lock acquisition', async () => {
+      const lockManager = createLockManager();
       const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
 
       await lockManager.acquireLock('test-operation');
@@ -54,6 +53,7 @@ describe('DatabaseLockManager', () => {
 
   describe('releaseLock', () => {
     it('should release the lock', async () => {
+      const lockManager = createLockManager();
       await lockManager.acquireLock('operation1');
       expect(lockManager.isLocked()).toBe(true);
 
@@ -66,6 +66,7 @@ describe('DatabaseLockManager', () => {
     });
 
     it('should log lock release', () => {
+      const lockManager = createLockManager();
       const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
 
       lockManager.releaseLock('test-operation');
@@ -76,6 +77,7 @@ describe('DatabaseLockManager', () => {
     });
 
     it('should handle releasing lock when not held', () => {
+      const lockManager = createLockManager();
       // Should not throw error
       expect(() => lockManager.releaseLock('non-existent-operation')).not.toThrow();
     });
@@ -83,6 +85,7 @@ describe('DatabaseLockManager', () => {
 
   describe('concurrent operations', () => {
     it('should handle rapid acquire/release cycles', async () => {
+      const lockManager = createLockManager();
       const results: boolean[] = [];
 
       for (let i = 0; i < 5; i++) {
@@ -101,6 +104,7 @@ describe('DatabaseLockManager', () => {
 
   describe('error scenarios', () => {
     it('should handle errors without leaving lock in bad state', async () => {
+      const lockManager = createLockManager();
       await lockManager.acquireLock('operation1');
 
       try {
@@ -119,16 +123,19 @@ describe('DatabaseLockManager', () => {
 
   describe('isLocked', () => {
     it('should return false when no lock is held', () => {
+      const lockManager = createLockManager();
       expect(lockManager.isLocked()).toBe(false);
     });
 
     it('should return true when lock is held', async () => {
+      const lockManager = createLockManager();
       await lockManager.acquireLock('test-operation');
 
       expect(lockManager.isLocked()).toBe(true);
     });
 
     it('should return false after lock is released', async () => {
+      const lockManager = createLockManager();
       await lockManager.acquireLock('test-operation');
       lockManager.releaseLock('test-operation');
 
@@ -138,10 +145,12 @@ describe('DatabaseLockManager', () => {
 
   describe('getQueueLength (HP-2 Step 6a edge cases)', () => {
     it('should return 0 when queue is empty', () => {
+      const lockManager = createLockManager();
       expect(lockManager.getQueueLength()).toBe(0);
     });
 
     it('should return correct queue length when operations are waiting', async () => {
+      const lockManager = createLockManager();
       // First operation acquires lock
       await lockManager.acquireLock('operation1');
 
@@ -169,10 +178,12 @@ describe('DatabaseLockManager', () => {
 
   describe('getCurrentOperation (HP-2 Step 6a edge cases)', () => {
     it('should return null when no lock is held', () => {
+      const lockManager = createLockManager();
       expect(lockManager.getCurrentOperation()).toBeNull();
     });
 
     it('should return current operation name', async () => {
+      const lockManager = createLockManager();
       await lockManager.acquireLock('my-operation');
 
       expect(lockManager.getCurrentOperation()).toBe('my-operation');
@@ -181,6 +192,7 @@ describe('DatabaseLockManager', () => {
     });
 
     it('should return null after lock is released', async () => {
+      const lockManager = createLockManager();
       await lockManager.acquireLock('operation');
       lockManager.releaseLock('operation');
 
@@ -190,6 +202,7 @@ describe('DatabaseLockManager', () => {
 
   describe('concurrent access patterns (HP-2 Step 6a)', () => {
     it('should handle 10 concurrent lock requests sequentially', async () => {
+      const lockManager = createLockManager();
       const operations: Promise<boolean>[] = [];
       const executionOrder: number[] = [];
 
@@ -211,6 +224,7 @@ describe('DatabaseLockManager', () => {
     });
 
     it('should maintain correct state with rapid queue/dequeue', async () => {
+      const lockManager = createLockManager();
       // Acquire initial lock
       await lockManager.acquireLock('operation1');
 
@@ -273,6 +287,7 @@ describe('DatabaseLockManager', () => {
 
   describe('lock metrics (HP-2 Step 8)', () => {
     it('should return correct metrics when no lock held', () => {
+      const lockManager = createLockManager();
       const metrics = lockManager.getLockMetrics();
 
       expect(metrics.currentOperation).toBeNull();
@@ -281,6 +296,7 @@ describe('DatabaseLockManager', () => {
     });
 
     it('should return current operation in metrics', async () => {
+      const lockManager = createLockManager();
       await lockManager.acquireLock('test-operation');
 
       const metrics = lockManager.getLockMetrics();
@@ -292,6 +308,7 @@ describe('DatabaseLockManager', () => {
     });
 
     it('should return queue length in metrics', async () => {
+      const lockManager = createLockManager();
       await lockManager.acquireLock('operation1');
 
       // Queue additional operations
@@ -312,6 +329,7 @@ describe('DatabaseLockManager', () => {
     });
 
     it('should track queue wait times', async () => {
+      const lockManager = createLockManager();
       await lockManager.acquireLock('operation1');
 
       // Queue another operation
@@ -331,6 +349,7 @@ describe('DatabaseLockManager', () => {
     });
 
     it('should limit wait time history to 10 entries', async () => {
+      const lockManager = createLockManager();
       // Perform 15 lock operations to exceed the MAX_WAIT_TIME_HISTORY of 10
       for (let i = 0; i < 15; i++) {
         await lockManager.acquireLock(`operation-${i}-holder`);
@@ -349,6 +368,7 @@ describe('DatabaseLockManager', () => {
     });
 
     it('should return a copy of wait times array', () => {
+      const lockManager = createLockManager();
       const metrics1 = lockManager.getLockMetrics();
       const metrics2 = lockManager.getLockMetrics();
 
@@ -360,6 +380,7 @@ describe('DatabaseLockManager', () => {
 
   describe('debug logging (HP-2 Step 8)', () => {
     it('should enable debug logging', () => {
+      const lockManager = createLockManager();
       const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
 
       lockManager.setDebugLogging(true);
@@ -370,6 +391,7 @@ describe('DatabaseLockManager', () => {
     });
 
     it('should log detailed lock acquisition when debug enabled', async () => {
+      const lockManager = createLockManager();
       const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
 
       lockManager.setDebugLogging(true);
@@ -384,6 +406,7 @@ describe('DatabaseLockManager', () => {
     });
 
     it('should log wait time when debug enabled for queued operations', async () => {
+      const lockManager = createLockManager();
       const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
 
       lockManager.setDebugLogging(true);
@@ -404,6 +427,7 @@ describe('DatabaseLockManager', () => {
 
   describe('queue warning (HP-2 Step 8)', () => {
     it('should warn when queue length exceeds threshold', async () => {
+      const lockManager = createLockManager();
       const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
 
       await lockManager.acquireLock('operation1');

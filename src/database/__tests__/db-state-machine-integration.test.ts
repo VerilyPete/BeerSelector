@@ -15,8 +15,15 @@ jest.mock('../schema');
 const mockGetDatabase = connection.getDatabase as jest.MockedFunction<typeof connection.getDatabase>;
 const mockSetupTables = schema.setupTables as jest.MockedFunction<typeof schema.setupTables>;
 
+type MockDatabase = {
+  execAsync: jest.Mock;
+  runAsync: jest.Mock;
+  getAllAsync: jest.Mock;
+  getFirstAsync: jest.Mock;
+};
+
 describe('Database State Machine Integration', () => {
-  let mockDatabase: any;
+  let mockDatabase: MockDatabase;
 
   beforeEach(() => {
     // Reset state machine before each test

@@ -68,18 +68,8 @@ describe('Sequential Refresh Coordination', () => {
   beforeEach(() => {
     jest.clearAllMocks();
 
-    // Force release any held locks BEFORE test starts
-    try {
-      (databaseLockManager as any).lockHeld = false;
-      (databaseLockManager as any).queue = [];
-      if ((databaseLockManager as any).timeoutId) {
-        clearTimeout((databaseLockManager as any).timeoutId);
-        (databaseLockManager as any).timeoutId = null;
-      }
-      (databaseLockManager as any).currentOperation = null;
-    } catch (e) {
-      // Ignore cleanup errors
-    }
+    // Reset all lock state before each test
+    databaseLockManager.resetForTesting();
 
     // Set default mock implementations
     (getPreference as jest.Mock).mockImplementation(async (key: string) => {
@@ -99,17 +89,8 @@ describe('Sequential Refresh Coordination', () => {
   });
 
   afterEach(() => {
-    // Force release any held locks to prevent test interference
-    try {
-      (databaseLockManager as any).lockHeld = false;
-      (databaseLockManager as any).queue = [];
-      if ((databaseLockManager as any).timeoutId) {
-        clearTimeout((databaseLockManager as any).timeoutId);
-        (databaseLockManager as any).timeoutId = null;
-      }
-    } catch (e) {
-      // Ignore cleanup errors
-    }
+    // Reset lock state to prevent test interference
+    databaseLockManager.resetForTesting();
   });
 
   describe('sequentialRefreshAllData', () => {

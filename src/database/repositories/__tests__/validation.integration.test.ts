@@ -18,16 +18,23 @@ import * as connection from '../../connection';
 // Mock the database connection module
 jest.mock('../../connection');
 
+type MockDatabase = {
+  withTransactionAsync: jest.Mock;
+  runAsync: jest.Mock;
+  getAllAsync: jest.Mock;
+  getFirstAsync: jest.Mock;
+};
+
 describe('Repository Validation Integration', () => {
-  let mockDatabase: any;
+  let mockDatabase: MockDatabase;
 
   beforeEach(() => {
     // Setup mock database with all required async methods
     mockDatabase = {
-      withTransactionAsync: jest.fn(async (callback: any) => await callback()),
+      withTransactionAsync: jest.fn(async (callback: () => Promise<void>) => await callback()),
       runAsync: jest.fn(),
       getAllAsync: jest.fn(),
-      getFirstAsync: jest.fn()
+      getFirstAsync: jest.fn(),
     };
 
     // Mock getDatabase to return our mock database
@@ -348,8 +355,8 @@ describe('Repository Validation Integration', () => {
 
     it('should handle database returning circular reference objects', async () => {
       const repository = new BeerRepository();
-      const circularObj: any = { id: '1', brew_name: 'Test' };
-      circularObj.self = circularObj;
+      const circularObj: Record<string, unknown> = { id: '1', brew_name: 'Test' };
+      circularObj['self'] = circularObj;
 
       mockDatabase.getAllAsync.mockResolvedValue([circularObj]);
 

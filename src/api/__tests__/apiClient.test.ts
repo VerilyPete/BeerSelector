@@ -18,43 +18,32 @@ global.AbortController = jest.fn().mockImplementation(() => ({
 // Mock setTimeout and clearTimeout
 jest.useFakeTimers();
 
-describe('ApiClient', () => {
-  let apiClient: ApiClient;
-  const mockSessionData = {
-    memberId: 'test-member-id',
-    storeId: 'test-store-id',
-    storeName: 'Test Store',
-    sessionId: 'test-session-id',
-  };
+const mockSessionData = {
+  memberId: 'test-member-id',
+  storeId: 'test-store-id',
+  storeName: 'Test Store',
+  sessionId: 'test-session-id',
+};
 
-  beforeEach(() => {
-    jest.clearAllMocks();
-
-    // Set test environment
-    config.setCustomApiUrl('https://test-api.example.com');
-
-    // Mock getCurrentSession to return mock session data
-    (getCurrentSession as jest.Mock).mockResolvedValue(mockSessionData);
-
-    // Mock fetch to return a successful response
-    // This will be called during ApiClient instantiation for network monitoring
-    (global.fetch as jest.Mock).mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: jest.fn().mockResolvedValue({ success: true, data: { test: 'data' } }),
-      text: jest.fn().mockResolvedValue('{"success":true,"data":{"test":"data"}}'),
-    });
-
-    // Use singleton getInstance() instead of private constructor
-    apiClient = ApiClient.getInstance();
-
-    // Clear mock call count after initialization
-    // (ApiClient constructor calls fetch for network monitoring)
-    jest.clearAllMocks();
+function createApiTestContext() {
+  config.setCustomApiUrl('https://test-api.example.com');
+  (getCurrentSession as jest.Mock).mockClear();
+  (global.fetch as jest.Mock).mockClear();
+  (getCurrentSession as jest.Mock).mockResolvedValue(mockSessionData);
+  (global.fetch as jest.Mock).mockResolvedValue({
+    ok: true,
+    status: 200,
+    json: jest.fn().mockResolvedValue({ success: true, data: { test: 'data' } }),
+    text: jest.fn().mockResolvedValue('{"success":true,"data":{"test":"data"}}'),
   });
+  const apiClient = ApiClient.getInstance();
+  return { apiClient };
+}
 
+describe('ApiClient', () => {
   describe('get', () => {
     it('should make a GET request and return data', async () => {
+      const { apiClient } = createApiTestContext();
       const response = await apiClient.get('/test-endpoint');
 
       expect(global.fetch).toHaveBeenCalledWith(
@@ -73,6 +62,7 @@ describe('ApiClient', () => {
     });
 
     it('should handle query parameters correctly', async () => {
+      const { apiClient } = createApiTestContext();
       await apiClient.get('/test-endpoint', { param1: 'value1', param2: 'value2' });
 
       expect(global.fetch).toHaveBeenCalledWith(
@@ -82,6 +72,7 @@ describe('ApiClient', () => {
     });
 
     it('should handle errors correctly', async () => {
+      const { apiClient } = createApiTestContext();
       global.fetch = jest.fn().mockImplementation(() =>
         Promise.resolve({
           ok: false,
@@ -103,6 +94,7 @@ describe('ApiClient', () => {
     });
 
     it('should use config values for retry settings', () => {
+      createApiTestContext();
       // Verify that the ApiClient was instantiated with config values
       // The retry mechanism is tested in integration tests
       expect(config.network.retries).toBe(3);
@@ -122,6 +114,7 @@ describe('ApiClient', () => {
 
   describe('post', () => {
     it('should make a POST request with correct body', async () => {
+      const { apiClient } = createApiTestContext();
       const requestData = { name: 'Test', value: 123 };
 
       await apiClient.post('/test-endpoint', requestData);
@@ -170,6 +163,7 @@ describe('ApiClient', () => {
   describe('Config Integration', () => {
     describe('URL Configuration', () => {
       it('should use config base URL for API client initialization', () => {
+        createApiTestContext();
         const testUrl = 'https://test-config.example.com';
         config.setCustomApiUrl(testUrl);
 
@@ -185,6 +179,7 @@ describe('ApiClient', () => {
       });
 
       it('should construct URLs correctly with config base URL', async () => {
+        const { apiClient } = createApiTestContext();
         await apiClient.get('/test-path');
 
         expect(global.fetch).toHaveBeenCalledWith(
@@ -194,6 +189,7 @@ describe('ApiClient', () => {
       });
 
       it('should use config base URL for POST requests', async () => {
+        const { apiClient } = createApiTestContext();
         await apiClient.post('/test-path', { data: 'test' });
 
         expect(global.fetch).toHaveBeenCalledWith(
@@ -205,6 +201,7 @@ describe('ApiClient', () => {
 
     describe('Network Configuration', () => {
       it('should respect config retry settings', () => {
+        createApiTestContext();
         // Verify client can be created (getInstance returns existing instance or creates new one)
         ApiClient.getInstance({
           baseUrl: config.api.baseUrl,
@@ -219,6 +216,7 @@ describe('ApiClient', () => {
       });
 
       it('should respect config timeout settings', () => {
+        createApiTestContext();
         // Verify client can be created (getInstance returns existing instance or creates new one)
         ApiClient.getInstance({
           baseUrl: config.api.baseUrl,
@@ -233,6 +231,7 @@ describe('ApiClient', () => {
       });
 
       it('should use config network settings for client instantiation', () => {
+        createApiTestContext();
         // Verify that network settings from config are used
         const client1 = ApiClient.getInstance({
           baseUrl: config.api.baseUrl,
@@ -259,11 +258,6 @@ describe('ApiClient', () => {
     });
 
     describe('Environment Switching', () => {
-      beforeEach(() => {
-        // Reset to production environment
-        config.setEnvironment('production');
-      });
-
       afterEach(() => {
         // Reset to production environment
         config.setEnvironment('production');

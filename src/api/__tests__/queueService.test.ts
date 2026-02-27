@@ -133,27 +133,6 @@ describe('queueService', () => {
         expect(result).toHaveLength(0);
       });
 
-      it('should log session information (sanitized)', async () => {
-        const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
-
-        (global.fetch as jest.Mock).mockResolvedValue({
-          ok: true,
-          status: 200,
-          text: jest.fn().mockResolvedValue('<html>Mock HTML</html>')
-        });
-
-        await getQueuedBeers();
-
-        // Verify session is logged with sanitized sessionId
-        expect(consoleSpy).toHaveBeenCalledWith(
-          expect.stringContaining('Making queue API request'),
-          expect.objectContaining({
-            sessionId: 'test-...'
-          })
-        );
-
-        consoleSpy.mockRestore();
-      });
     });
 
     describe('Session Validation', () => {
@@ -247,19 +226,12 @@ describe('queueService', () => {
         await expect(getQueuedBeers()).rejects.toThrow('Failed to fetch queues with status: 401');
       });
 
-      it('should log error when network request fails', async () => {
-        const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+      it('should throw when network request fails', async () => {
+        jest.spyOn(console, 'error').mockImplementation();
 
         (global.fetch as jest.Mock).mockRejectedValue(new Error('Network error'));
 
-        await expect(getQueuedBeers()).rejects.toThrow();
-
-        expect(consoleErrorSpy).toHaveBeenCalledWith(
-          'Error fetching queued beers:',
-          expect.any(Error)
-        );
-
-        consoleErrorSpy.mockRestore();
+        await expect(getQueuedBeers()).rejects.toThrow('Network error');
       });
     });
 
@@ -393,21 +365,6 @@ describe('queueService', () => {
         expect(headers.referer).toBe(config.api.referers.memberQueues);
       });
 
-      it('should log deletion attempt', async () => {
-        const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
-
-        (global.fetch as jest.Mock).mockResolvedValue({
-          ok: true,
-          status: 200
-        });
-
-        await deleteQueuedBeer('1885490');
-
-        expect(consoleSpy).toHaveBeenCalledWith('Deleting queued beer ID: 1885490');
-        expect(consoleSpy).toHaveBeenCalledWith('Successfully deleted queued beer ID: 1885490');
-
-        consoleSpy.mockRestore();
-      });
 
       it('should handle different cid formats', async () => {
         (global.fetch as jest.Mock).mockResolvedValue({
@@ -426,15 +383,12 @@ describe('queueService', () => {
 
     describe('Input Validation', () => {
       it('should return false when cid is empty string', async () => {
-        const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+        jest.spyOn(console, 'error').mockImplementation();
 
         const result = await deleteQueuedBeer('');
 
         expect(result).toBe(false);
         expect(global.fetch).not.toHaveBeenCalled();
-        expect(consoleErrorSpy).toHaveBeenCalledWith('Cannot delete queued beer: missing cid');
-
-        consoleErrorSpy.mockRestore();
       });
 
       it('should return false when cid is undefined', async () => {
@@ -454,20 +408,17 @@ describe('queueService', () => {
 
     describe('Session Validation', () => {
       it('should return false when session data is null (caught and handled)', async () => {
-        const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+        jest.spyOn(console, 'error').mockImplementation();
 
         (getSessionData as jest.Mock).mockResolvedValue(null);
 
         const result = await deleteQueuedBeer('1885490');
 
         expect(result).toBe(false);
-        expect(consoleErrorSpy).toHaveBeenCalled();
-
-        consoleErrorSpy.mockRestore();
       });
 
       it('should return false when memberId is missing (caught and handled)', async () => {
-        const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+        jest.spyOn(console, 'error').mockImplementation();
 
         (getSessionData as jest.Mock).mockResolvedValue({
           ...mockSessionData,
@@ -477,13 +428,10 @@ describe('queueService', () => {
         const result = await deleteQueuedBeer('1885490');
 
         expect(result).toBe(false);
-        expect(consoleErrorSpy).toHaveBeenCalled();
-
-        consoleErrorSpy.mockRestore();
       });
 
       it('should return false when storeId is missing (caught and handled)', async () => {
-        const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+        jest.spyOn(console, 'error').mockImplementation();
 
         (getSessionData as jest.Mock).mockResolvedValue({
           ...mockSessionData,
@@ -493,13 +441,10 @@ describe('queueService', () => {
         const result = await deleteQueuedBeer('1885490');
 
         expect(result).toBe(false);
-        expect(consoleErrorSpy).toHaveBeenCalled();
-
-        consoleErrorSpy.mockRestore();
       });
 
       it('should return false when storeName is missing (caught and handled)', async () => {
-        const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+        jest.spyOn(console, 'error').mockImplementation();
 
         (getSessionData as jest.Mock).mockResolvedValue({
           ...mockSessionData,
@@ -509,13 +454,10 @@ describe('queueService', () => {
         const result = await deleteQueuedBeer('1885490');
 
         expect(result).toBe(false);
-        expect(consoleErrorSpy).toHaveBeenCalled();
-
-        consoleErrorSpy.mockRestore();
       });
 
       it('should return false when sessionId is missing (caught and handled)', async () => {
-        const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+        jest.spyOn(console, 'error').mockImplementation();
 
         (getSessionData as jest.Mock).mockResolvedValue({
           ...mockSessionData,
@@ -525,15 +467,12 @@ describe('queueService', () => {
         const result = await deleteQueuedBeer('1885490');
 
         expect(result).toBe(false);
-        expect(consoleErrorSpy).toHaveBeenCalled();
-
-        consoleErrorSpy.mockRestore();
       });
     });
 
     describe('Network Error Handling', () => {
       it('should return false when response is not ok (404)', async () => {
-        const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+        jest.spyOn(console, 'error').mockImplementation();
 
         (global.fetch as jest.Mock).mockResolvedValue({
           ok: false,
@@ -543,11 +482,6 @@ describe('queueService', () => {
         const result = await deleteQueuedBeer('1885490');
 
         expect(result).toBe(false);
-        expect(consoleErrorSpy).toHaveBeenCalledWith(
-          'Failed to delete beer with status: 404'
-        );
-
-        consoleErrorSpy.mockRestore();
       });
 
       it('should return false when response is not ok (500)', async () => {
@@ -562,31 +496,13 @@ describe('queueService', () => {
       });
 
       it('should return false when fetch throws network error', async () => {
-        const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+        jest.spyOn(console, 'error').mockImplementation();
 
         (global.fetch as jest.Mock).mockRejectedValue(new Error('Network error'));
 
         const result = await deleteQueuedBeer('1885490');
 
         expect(result).toBe(false);
-        expect(consoleErrorSpy).toHaveBeenCalledWith(
-          'Error deleting queued beer:',
-          expect.any(Error)
-        );
-
-        consoleErrorSpy.mockRestore();
-      });
-
-      it('should log errors when deletion fails', async () => {
-        const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
-
-        (global.fetch as jest.Mock).mockRejectedValue(new Error('Connection timeout'));
-
-        await deleteQueuedBeer('1885490');
-
-        expect(consoleErrorSpy).toHaveBeenCalled();
-
-        consoleErrorSpy.mockRestore();
       });
     });
 

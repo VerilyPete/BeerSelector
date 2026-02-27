@@ -5,40 +5,29 @@ import * as connection from '../connection';
 // Mock the connection module
 jest.mock('../connection');
 
-describe('Preference Functions', () => {
-  // Mock database methods
+type MockDatabase = {
+  runAsync: jest.Mock;
+  getFirstAsync: jest.Mock;
+  getAllAsync: jest.Mock;
+};
+
+function createMockPreferencesDb() {
   const mockRunAsync = jest.fn().mockResolvedValue({ rowsAffected: 1 });
   const mockGetFirstAsync = jest.fn();
   const mockGetAllAsync = jest.fn();
-
-  const mockDatabase = {
+  const mockDatabase: MockDatabase = {
     runAsync: mockRunAsync,
     getFirstAsync: mockGetFirstAsync,
     getAllAsync: mockGetAllAsync,
   };
+  return { mockDatabase, mockRunAsync, mockGetFirstAsync, mockGetAllAsync };
+}
 
-  let consoleErrorSpy: jest.SpyInstance;
-
-  beforeEach(() => {
-    jest.clearAllMocks();
-
-    // Mock getDatabase to return our mock database
-    (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
-
-    // Spy on console.error
-    consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
-
-    mockGetFirstAsync.mockReset();
-    mockGetAllAsync.mockReset();
-    mockRunAsync.mockReset().mockResolvedValue({ rowsAffected: 1 });
-  });
-
-  afterEach(() => {
-    consoleErrorSpy.mockRestore();
-  });
-
+describe('Preference Functions', () => {
   describe('getPreference', () => {
     it('should return preference value when it exists', async () => {
+      const { mockDatabase, mockGetFirstAsync } = createMockPreferencesDb();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       mockGetFirstAsync.mockResolvedValue({ value: 'test_value' });
 
       const result = await getPreference('test_key');
@@ -51,6 +40,8 @@ describe('Preference Functions', () => {
     });
 
     it('should return null when preference does not exist', async () => {
+      const { mockDatabase, mockGetFirstAsync } = createMockPreferencesDb();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       mockGetFirstAsync.mockResolvedValue(null);
 
       const result = await getPreference('nonexistent_key');
@@ -63,8 +54,11 @@ describe('Preference Functions', () => {
     });
 
     it('should return null on database error', async () => {
+      const { mockDatabase, mockGetFirstAsync } = createMockPreferencesDb();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       mockGetFirstAsync.mockRejectedValue(new Error('Database error'));
 
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
       const result = await getPreference('error_key');
 
       expect(result).toBeNull();
@@ -72,9 +66,12 @@ describe('Preference Functions', () => {
         'Error getting preference error_key:',
         expect.any(Error)
       );
+      consoleErrorSpy.mockRestore();
     });
 
     it('should handle empty string key', async () => {
+      const { mockDatabase, mockGetFirstAsync } = createMockPreferencesDb();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       mockGetFirstAsync.mockResolvedValue({ value: 'empty_key_value' });
 
       const result = await getPreference('');
@@ -87,6 +84,8 @@ describe('Preference Functions', () => {
     });
 
     it('should handle special characters in key', async () => {
+      const { mockDatabase, mockGetFirstAsync } = createMockPreferencesDb();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       const specialKey = "test'key\"with\\special";
       mockGetFirstAsync.mockResolvedValue({ value: 'special_value' });
 
@@ -102,6 +101,9 @@ describe('Preference Functions', () => {
 
   describe('setPreference', () => {
     it('should insert new preference with description', async () => {
+      const { mockDatabase } = createMockPreferencesDb();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+
       await setPreference('new_key', 'new_value', 'Test description');
 
       expect(mockDatabase.runAsync).toHaveBeenCalledWith(
@@ -111,6 +113,8 @@ describe('Preference Functions', () => {
     });
 
     it('should update existing preference value and preserve description', async () => {
+      const { mockDatabase, mockGetFirstAsync } = createMockPreferencesDb();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       mockGetFirstAsync.mockResolvedValue({ description: 'Existing description' });
 
       await setPreference('existing_key', 'updated_value');
@@ -126,6 +130,8 @@ describe('Preference Functions', () => {
     });
 
     it('should set empty description when updating non-existent preference without description', async () => {
+      const { mockDatabase, mockGetFirstAsync } = createMockPreferencesDb();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       mockGetFirstAsync.mockResolvedValue(null);
 
       await setPreference('new_key', 'new_value');
@@ -141,6 +147,9 @@ describe('Preference Functions', () => {
     });
 
     it('should handle empty string value', async () => {
+      const { mockDatabase } = createMockPreferencesDb();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+
       await setPreference('empty_key', '', 'Empty value');
 
       expect(mockDatabase.runAsync).toHaveBeenCalledWith(
@@ -150,7 +159,10 @@ describe('Preference Functions', () => {
     });
 
     it('should handle special characters in value', async () => {
+      const { mockDatabase } = createMockPreferencesDb();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       const specialValue = "value'with\"special\\chars";
+
       await setPreference('special_key', specialValue, 'Special chars test');
 
       expect(mockDatabase.runAsync).toHaveBeenCalledWith(
@@ -160,9 +172,12 @@ describe('Preference Functions', () => {
     });
 
     it('should throw error when database operation fails', async () => {
+      const { mockDatabase, mockRunAsync } = createMockPreferencesDb();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       const dbError = new Error('Database write error');
       mockRunAsync.mockRejectedValue(dbError);
 
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
       await expect(setPreference('error_key', 'error_value', 'Error test')).rejects.toThrow(
         'Database write error'
       );
@@ -171,9 +186,13 @@ describe('Preference Functions', () => {
         'Error setting preference error_key:',
         dbError
       );
+      consoleErrorSpy.mockRestore();
     });
 
     it('should handle description update when providing new description', async () => {
+      const { mockDatabase } = createMockPreferencesDb();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+
       // When description is provided, should not query existing description
       await setPreference('key', 'value', 'New description');
 
@@ -185,6 +204,8 @@ describe('Preference Functions', () => {
     });
 
     it('should handle undefined description parameter', async () => {
+      const { mockDatabase, mockGetFirstAsync } = createMockPreferencesDb();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       mockGetFirstAsync.mockResolvedValue({ description: 'Preserved description' });
 
       await setPreference('key', 'value', undefined);
@@ -199,6 +220,8 @@ describe('Preference Functions', () => {
 
   describe('getAllPreferences', () => {
     it('should return all preferences ordered by key', async () => {
+      const { mockDatabase, mockGetAllAsync } = createMockPreferencesDb();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       const mockPreferences: Preference[] = [
         { key: 'key1', value: 'value1', description: 'desc1' },
         { key: 'key2', value: 'value2', description: 'desc2' },
@@ -214,6 +237,8 @@ describe('Preference Functions', () => {
     });
 
     it('should return empty array when no preferences exist', async () => {
+      const { mockDatabase, mockGetAllAsync } = createMockPreferencesDb();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       mockGetAllAsync.mockResolvedValue([]);
 
       const result = await getAllPreferences();
@@ -225,8 +250,11 @@ describe('Preference Functions', () => {
     });
 
     it('should return empty array on database error', async () => {
+      const { mockDatabase, mockGetAllAsync } = createMockPreferencesDb();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       mockGetAllAsync.mockRejectedValue(new Error('Database error'));
 
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
       const result = await getAllPreferences();
 
       expect(result).toEqual([]);
@@ -234,9 +262,12 @@ describe('Preference Functions', () => {
         'Error getting all preferences:',
         expect.any(Error)
       );
+      consoleErrorSpy.mockRestore();
     });
 
     it('should handle null return from database', async () => {
+      const { mockDatabase, mockGetAllAsync } = createMockPreferencesDb();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       mockGetAllAsync.mockResolvedValue(null);
 
       const result = await getAllPreferences();
@@ -245,6 +276,8 @@ describe('Preference Functions', () => {
     });
 
     it('should return preferences with empty descriptions', async () => {
+      const { mockDatabase, mockGetAllAsync } = createMockPreferencesDb();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       const mockPreferences: Preference[] = [
         { key: 'key1', value: 'value1', description: '' },
         { key: 'key2', value: 'value2', description: '' },
@@ -258,6 +291,8 @@ describe('Preference Functions', () => {
     });
 
     it('should preserve preference ordering by key', async () => {
+      const { mockDatabase, mockGetAllAsync } = createMockPreferencesDb();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       const mockPreferences: Preference[] = [
         { key: 'a_key', value: 'value1', description: 'desc1' },
         { key: 'b_key', value: 'value2', description: 'desc2' },
@@ -275,6 +310,9 @@ describe('Preference Functions', () => {
 
   describe('Integration scenarios', () => {
     it('should handle set and get preference workflow', async () => {
+      const { mockDatabase, mockGetFirstAsync } = createMockPreferencesDb();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+
       // Set a preference
       await setPreference('workflow_key', 'workflow_value', 'Workflow test');
 
@@ -287,6 +325,8 @@ describe('Preference Functions', () => {
     });
 
     it('should handle multiple preference updates', async () => {
+      const { mockDatabase, mockGetFirstAsync } = createMockPreferencesDb();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       mockGetFirstAsync.mockResolvedValue({ description: 'Original description' });
 
       await setPreference('multi_key', 'value1');
