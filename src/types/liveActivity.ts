@@ -43,28 +43,6 @@ export type LiveActivityAttributes = {
 };
 
 /**
- * Combined data for starting a Live Activity.
- */
-export type LiveActivityStartData = {
-  /** Static attributes */
-  attributes: LiveActivityAttributes;
-
-  /** Initial content state */
-  contentState: LiveActivityQueueState;
-};
-
-/**
- * Result of checking Live Activity support.
- */
-export type LiveActivitySupportResult = {
-  /** Whether Live Activities are supported on this device */
-  isSupported: boolean;
-
-  /** Reason if not supported (e.g., "Android device", "iOS version too low") */
-  reason?: string;
-};
-
-/**
  * A queued beer for native module communication.
  * Alias for LiveActivityQueuedBeer for clarity in native module data structures.
  */
@@ -134,18 +112,3 @@ export type RestartActivityResult = {
   error?: string;
 };
 
-/**
- * State of the activity for observation.
- * Maps to iOS ActivityKit activity states.
- */
-export type ActivityState =
-  | 'active' // Activity is running
-  | 'ended' // Activity ended by app
-  | 'dismissed' // Activity dismissed by user
-  | 'stale'; // Activity is stale (past staleDate)
-
-/**
- * Callback for activity state changes.
- * Used to observe when an activity transitions between states.
- */
-export type ActivityStateCallback = (activityId: string, state: ActivityState) => void;
