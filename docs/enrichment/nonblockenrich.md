@@ -1,3 +1,7 @@
+> **Note**: This document describes the original design. `initializeBeerDatabase` and
+> `enrichBeersInBackground` have been removed. See `plans/abv-data-quality-fix-plan.md`
+> for the current architecture.
+
 # Non-Blocking Enrichment on App Initialization
 
 ## Problem Statement
