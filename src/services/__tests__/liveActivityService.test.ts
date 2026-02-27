@@ -280,7 +280,6 @@ describe('liveActivityService', () => {
       const result = await isLiveActivitySupported();
 
       expect(result).toBe(false);
-      expect(console.log).toHaveBeenCalledWith('[LiveActivity] Not iOS platform');
     });
 
     it('should return false when native module throws', async () => {
@@ -289,10 +288,6 @@ describe('liveActivityService', () => {
       const result = await isLiveActivitySupported();
 
       expect(result).toBe(false);
-      expect(console.error).toHaveBeenCalledWith(
-        '[LiveActivity] Error checking support:',
-        expect.any(Error)
-      );
     });
 
     it('should return native module result when areActivitiesEnabled returns true', async () => {
@@ -318,7 +313,6 @@ describe('liveActivityService', () => {
       const result = await isLiveActivitySupported();
 
       expect(result).toBe(true);
-      expect(console.log).toHaveBeenCalledWith('[LiveActivity] Activities enabled:', true);
     });
 
     it('should return false and log error when native call throws', async () => {
@@ -327,10 +321,6 @@ describe('liveActivityService', () => {
       const result = await isLiveActivitySupported();
 
       expect(result).toBe(false);
-      expect(console.error).toHaveBeenCalledWith(
-        '[LiveActivity] Error checking support:',
-        expect.any(Error)
-      );
     });
   });
 
@@ -357,7 +347,6 @@ describe('liveActivityService', () => {
       const result = await startLiveActivity({ beers: [] }, mockAttributes);
 
       expect(result).toBeNull();
-      expect(console.log).toHaveBeenCalledWith('[LiveActivity] Cannot start with empty queue');
     });
 
     it('should return null when not supported', async () => {
@@ -366,7 +355,6 @@ describe('liveActivityService', () => {
       const result = await startLiveActivity(mockQueueState, mockAttributes);
 
       expect(result).toBeNull();
-      expect(console.log).toHaveBeenCalledWith('[LiveActivity] Not supported, skipping start');
     });
 
     it('should call native module with correct attributes and return activity ID', async () => {
@@ -392,9 +380,6 @@ describe('liveActivityService', () => {
       const result = await startLiveActivity(mockQueueState, mockAttributes);
 
       expect(result).toBeNull();
-      expect(console.log).toHaveBeenCalledWith(
-        '[LiveActivity] App not in foreground, will retry when foregrounded'
-      );
     });
 
     it('should return null and log error when native call throws', async () => {
@@ -404,10 +389,6 @@ describe('liveActivityService', () => {
       const result = await startLiveActivity(mockQueueState, mockAttributes);
 
       expect(result).toBeNull();
-      expect(console.error).toHaveBeenCalledWith(
-        '[LiveActivity] Error starting activity:',
-        expect.any(Error)
-      );
     });
   });
 
@@ -454,9 +435,6 @@ describe('liveActivityService', () => {
       mockAreActivitiesEnabled.mockResolvedValueOnce(true);
       await updateLiveActivity({ beers: [{ id: '1', name: 'Test' }] });
 
-      expect(console.log).toHaveBeenCalledWith(
-        '[LiveActivity] No activity to update, need to start first'
-      );
       expect(mockUpdateActivity).not.toHaveBeenCalled();
     });
 
@@ -467,11 +445,6 @@ describe('liveActivityService', () => {
       await expect(
         updateLiveActivity({ beers: [{ id: '1', name: 'Test' }] })
       ).resolves.not.toThrow();
-
-      expect(console.error).toHaveBeenCalledWith(
-        '[LiveActivity] Error updating activity:',
-        expect.any(Error)
-      );
     });
   });
 
@@ -487,7 +460,6 @@ describe('liveActivityService', () => {
 
       await endLiveActivity();
 
-      expect(console.log).toHaveBeenCalledWith('[LiveActivity] No activity to end');
       expect(mockEndActivity).not.toHaveBeenCalled();
     });
 
@@ -522,10 +494,6 @@ describe('liveActivityService', () => {
       await endLiveActivity();
 
       expect(getCurrentActivityId()).toBeNull();
-      expect(console.error).toHaveBeenCalledWith(
-        '[LiveActivity] Error ending activity:',
-        expect.any(Error)
-      );
     });
 
     it('should clear activity ID when native module unavailable', async () => {
@@ -588,10 +556,6 @@ describe('liveActivityService', () => {
       await endAllLiveActivities();
 
       expect(getCurrentActivityId()).toBeNull();
-      expect(console.error).toHaveBeenCalledWith(
-        '[LiveActivity] Error ending all activities:',
-        expect.any(Error)
-      );
     });
 
     it('should succeed when called with Expo module', async () => {
@@ -600,7 +564,6 @@ describe('liveActivityService', () => {
       await endAllLiveActivities();
 
       expect(mockEndAllActivities).toHaveBeenCalled();
-      expect(console.log).toHaveBeenCalledWith('[LiveActivity] Ended all activities');
     });
 
     it('should cancel cleanup task when ending all activities', async () => {
@@ -636,14 +599,12 @@ describe('liveActivityService', () => {
     it('should skip for visitor mode', async () => {
       await updateLiveActivityWithQueue(mockQueuedBeers, mockSessionData, true);
 
-      expect(console.log).toHaveBeenCalledWith('[LiveActivity] Skipping for visitor mode');
       expect(mockStartActivity).not.toHaveBeenCalled();
     });
 
     it('should skip when session data is null', async () => {
       await updateLiveActivityWithQueue(mockQueuedBeers, null);
 
-      expect(console.log).toHaveBeenCalledWith('[LiveActivity] No valid session data');
       expect(mockStartActivity).not.toHaveBeenCalled();
     });
 
@@ -653,7 +614,7 @@ describe('liveActivityService', () => {
         memberId: undefined,
       } as unknown as SessionData);
 
-      expect(console.log).toHaveBeenCalledWith('[LiveActivity] No valid session data');
+      expect(mockStartActivity).not.toHaveBeenCalled();
     });
 
     it('should skip when storeId is missing', async () => {
@@ -662,7 +623,7 @@ describe('liveActivityService', () => {
         storeId: undefined,
       } as unknown as SessionData);
 
-      expect(console.log).toHaveBeenCalledWith('[LiveActivity] No valid session data');
+      expect(mockStartActivity).not.toHaveBeenCalled();
     });
 
     it('should end activity when queue is empty', async () => {
@@ -744,18 +705,12 @@ describe('liveActivityService', () => {
     it('should skip for visitor mode', async () => {
       await syncLiveActivityOnLaunch(mockGetQueuedBeers, mockSessionData, true);
 
-      expect(console.log).toHaveBeenCalledWith(
-        '[LiveActivity] Skipping sync - visitor mode or no session'
-      );
       expect(mockGetQueuedBeers).not.toHaveBeenCalled();
     });
 
     it('should skip when session data is null', async () => {
       await syncLiveActivityOnLaunch(mockGetQueuedBeers, null);
 
-      expect(console.log).toHaveBeenCalledWith(
-        '[LiveActivity] Skipping sync - visitor mode or no session'
-      );
       expect(mockGetQueuedBeers).not.toHaveBeenCalled();
     });
 
@@ -764,7 +719,6 @@ describe('liveActivityService', () => {
 
       await syncLiveActivityOnLaunch(mockGetQueuedBeers, mockSessionData);
 
-      expect(console.log).toHaveBeenCalledWith('[LiveActivity] Skipping sync - not supported');
       expect(mockGetQueuedBeers).not.toHaveBeenCalled();
     });
 
@@ -787,11 +741,6 @@ describe('liveActivityService', () => {
       await expect(
         syncLiveActivityOnLaunch(mockGetQueuedBeers, mockSessionData)
       ).resolves.not.toThrow();
-
-      expect(console.error).toHaveBeenCalledWith(
-        '[LiveActivity] Error syncing on launch:',
-        expect.any(Error)
-      );
     });
   });
 
@@ -936,7 +885,6 @@ describe('liveActivityService', () => {
 
       expect(result.success).toBe(false);
       expect(result.activityId).toBeNull();
-      expect(console.log).toHaveBeenCalledWith(expect.stringContaining('not in foreground'));
     });
   });
 

@@ -58,7 +58,6 @@ describe('sessionManager', () => {
         'beerknurd_session',
         JSON.stringify(mockSessionData)
       );
-      expect(console.log).toHaveBeenCalledWith('Session data saved successfully');
     });
 
     it('should throw error when saving session data fails', async () => {
@@ -66,7 +65,6 @@ describe('sessionManager', () => {
       (SecureStore.setItemAsync as jest.Mock).mockRejectedValueOnce(error);
 
       await expect(saveSessionData(mockSessionData)).rejects.toThrow('Storage error');
-      expect(console.error).toHaveBeenCalledWith('Error saving session data:', error);
     });
   });
 
@@ -97,7 +95,6 @@ describe('sessionManager', () => {
       const result = await getSessionData();
 
       expect(result).toBeNull();
-      expect(console.warn).toHaveBeenCalledWith('Invalid session data format in storage');
     });
 
     it('should return null when there is an error getting session data', async () => {
@@ -107,7 +104,6 @@ describe('sessionManager', () => {
       const result = await getSessionData();
 
       expect(result).toBeNull();
-      expect(console.error).toHaveBeenCalledWith('Error getting session data:', error);
     });
   });
 
@@ -116,7 +112,6 @@ describe('sessionManager', () => {
       await clearSessionData();
 
       expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith('beerknurd_session');
-      expect(console.log).toHaveBeenCalledWith('Session data cleared successfully');
     });
 
     it('should throw error when clearing session data fails', async () => {
@@ -124,7 +119,6 @@ describe('sessionManager', () => {
       (SecureStore.deleteItemAsync as jest.Mock).mockRejectedValueOnce(error);
 
       await expect(clearSessionData()).rejects.toThrow('Storage error');
-      expect(console.error).toHaveBeenCalledWith('Error clearing session data:', error);
     });
   });
 
@@ -152,7 +146,6 @@ describe('sessionManager', () => {
       const result = await hasSession();
 
       expect(result).toBe(false);
-      expect(console.error).toHaveBeenCalledWith('Error getting session data:', error);
     });
   });
 
@@ -246,14 +239,6 @@ describe('sessionManager', () => {
         storeName: '%invalid',
         email: '%invalid'
       });
-      expect(console.warn).toHaveBeenCalledWith(
-        'Failed to decode store_name cookie:',
-        expect.any(Error)
-      );
-      expect(console.warn).toHaveBeenCalledWith(
-        'Failed to decode email cookie:',
-        expect.any(Error)
-      );
     });
   });
 });

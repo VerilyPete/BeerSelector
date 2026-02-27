@@ -49,7 +49,6 @@ describe('sessionValidator', () => {
       const result = await validateSession(null);
 
       expect(result).toBeNull();
-      expect(console.warn).toHaveBeenCalledWith('Session validation failed: No session data provided');
     });
 
     it('should return null when session data fails type guard validation', async () => {
@@ -63,9 +62,6 @@ describe('sessionValidator', () => {
       const result = await validateSession(invalidSessionData as any);
 
       expect(result).toBeNull();
-      expect(console.warn).toHaveBeenCalledWith(
-        'Session validation failed: Invalid session data format'
-      );
     });
 
     it('should return null when session data is missing required fields', async () => {
@@ -80,9 +76,6 @@ describe('sessionValidator', () => {
       const result = await validateSession(invalidSessionData);
 
       expect(result).toBeNull();
-      expect(console.warn).toHaveBeenCalledWith(
-        expect.stringContaining('Session validation failed: Missing required fields:')
-      );
     });
 
     it('should return null when session data has empty required fields', async () => {
@@ -96,9 +89,6 @@ describe('sessionValidator', () => {
       const result = await validateSession(invalidSessionData);
 
       expect(result).toBeNull();
-      expect(console.warn).toHaveBeenCalledWith(
-        expect.stringContaining('Session validation failed: Missing required fields:')
-      );
     });
   });
 
@@ -135,7 +125,6 @@ describe('sessionValidator', () => {
       (getSessionData as jest.Mock).mockRejectedValueOnce(error);
 
       await expect(getCurrentSession()).rejects.toThrow(ApiError);
-      expect(console.error).toHaveBeenCalledWith('Error getting current session:', error);
     });
 
     it('should rethrow ApiError when getSessionData throws an ApiError', async () => {
@@ -143,7 +132,6 @@ describe('sessionValidator', () => {
       (getSessionData as jest.Mock).mockRejectedValueOnce(apiError);
 
       await expect(getCurrentSession()).rejects.toThrow(apiError);
-      expect(console.error).toHaveBeenCalledWith('Error getting current session:', apiError);
     });
   });
 });

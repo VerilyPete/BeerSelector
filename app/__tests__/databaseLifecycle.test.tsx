@@ -34,18 +34,9 @@ const handleAppStateChange = async (nextAppState: AppStateStatus): Promise<void>
 };
 
 describe('Database Lifecycle in RootLayout', () => {
-  let mockGetDatabase: jest.Mock;
-  let mockCloseDatabaseConnection: jest.Mock;
-
   beforeEach(() => {
-    jest.clearAllMocks();
-
-    // Mock database functions
-    mockGetDatabase = getDatabase as jest.Mock;
-    mockCloseDatabaseConnection = closeDatabaseConnection as jest.Mock;
-
-    mockGetDatabase.mockResolvedValue({ execAsync: jest.fn() });
-    mockCloseDatabaseConnection.mockResolvedValue(undefined);
+    (getDatabase as jest.Mock).mockClear();
+    (closeDatabaseConnection as jest.Mock).mockClear();
   });
 
   afterEach(() => {
@@ -54,18 +45,33 @@ describe('Database Lifecycle in RootLayout', () => {
 
   describe('AppState Handler Logic', () => {
     it('should call closeDatabaseConnection when app goes to background', async () => {
+      const mockGetDatabase = getDatabase as jest.Mock;
+      const mockCloseDatabaseConnection = closeDatabaseConnection as jest.Mock;
+      mockGetDatabase.mockResolvedValue({ execAsync: jest.fn() });
+      mockCloseDatabaseConnection.mockResolvedValue(undefined);
+
       await handleAppStateChange('background');
 
       expect(mockCloseDatabaseConnection).toHaveBeenCalledTimes(1);
     });
 
     it('should call getDatabase when app comes to foreground', async () => {
+      const mockGetDatabase = getDatabase as jest.Mock;
+      const mockCloseDatabaseConnection = closeDatabaseConnection as jest.Mock;
+      mockGetDatabase.mockResolvedValue({ execAsync: jest.fn() });
+      mockCloseDatabaseConnection.mockResolvedValue(undefined);
+
       await handleAppStateChange('active');
 
       expect(mockGetDatabase).toHaveBeenCalledTimes(1);
     });
 
     it('should not close database on inactive state', async () => {
+      const mockGetDatabase = getDatabase as jest.Mock;
+      const mockCloseDatabaseConnection = closeDatabaseConnection as jest.Mock;
+      mockGetDatabase.mockResolvedValue({ execAsync: jest.fn() });
+      mockCloseDatabaseConnection.mockResolvedValue(undefined);
+
       await handleAppStateChange('inactive');
 
       expect(mockCloseDatabaseConnection).not.toHaveBeenCalled();
@@ -75,6 +81,10 @@ describe('Database Lifecycle in RootLayout', () => {
 
   describe('Logging', () => {
     it('should log when app backgrounds', async () => {
+      const mockGetDatabase = getDatabase as jest.Mock;
+      const mockCloseDatabaseConnection = closeDatabaseConnection as jest.Mock;
+      mockGetDatabase.mockResolvedValue({ execAsync: jest.fn() });
+      mockCloseDatabaseConnection.mockResolvedValue(undefined);
       const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
 
       await handleAppStateChange('background');
@@ -84,6 +94,10 @@ describe('Database Lifecycle in RootLayout', () => {
     });
 
     it('should log when app foregrounds', async () => {
+      const mockGetDatabase = getDatabase as jest.Mock;
+      const mockCloseDatabaseConnection = closeDatabaseConnection as jest.Mock;
+      mockGetDatabase.mockResolvedValue({ execAsync: jest.fn() });
+      mockCloseDatabaseConnection.mockResolvedValue(undefined);
       const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
 
       await handleAppStateChange('active');
@@ -95,9 +109,11 @@ describe('Database Lifecycle in RootLayout', () => {
 
   describe('Error Handling', () => {
     it('should handle close errors when backgrounding', async () => {
-      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
-
+      const mockGetDatabase = getDatabase as jest.Mock;
+      const mockCloseDatabaseConnection = closeDatabaseConnection as jest.Mock;
+      mockGetDatabase.mockResolvedValue({ execAsync: jest.fn() });
       mockCloseDatabaseConnection.mockRejectedValueOnce(new Error('Close failed'));
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
 
       await handleAppStateChange('background');
 
@@ -110,9 +126,11 @@ describe('Database Lifecycle in RootLayout', () => {
     });
 
     it('should handle reopen errors when foregrounding', async () => {
-      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
-
+      const mockGetDatabase = getDatabase as jest.Mock;
+      const mockCloseDatabaseConnection = closeDatabaseConnection as jest.Mock;
+      mockCloseDatabaseConnection.mockResolvedValue(undefined);
       mockGetDatabase.mockRejectedValueOnce(new Error('Open failed'));
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
 
       await handleAppStateChange('active');
 
@@ -125,12 +143,18 @@ describe('Database Lifecycle in RootLayout', () => {
     });
 
     it('should not throw errors on background failure', async () => {
+      const mockGetDatabase = getDatabase as jest.Mock;
+      const mockCloseDatabaseConnection = closeDatabaseConnection as jest.Mock;
+      mockGetDatabase.mockResolvedValue({ execAsync: jest.fn() });
       mockCloseDatabaseConnection.mockRejectedValueOnce(new Error('Close failed'));
 
       await expect(handleAppStateChange('background')).resolves.not.toThrow();
     });
 
     it('should not throw errors on foreground failure', async () => {
+      const mockGetDatabase = getDatabase as jest.Mock;
+      const mockCloseDatabaseConnection = closeDatabaseConnection as jest.Mock;
+      mockCloseDatabaseConnection.mockResolvedValue(undefined);
       mockGetDatabase.mockRejectedValueOnce(new Error('Open failed'));
 
       await expect(handleAppStateChange('active')).resolves.not.toThrow();
@@ -139,6 +163,11 @@ describe('Database Lifecycle in RootLayout', () => {
 
   describe('State Transition Sequences', () => {
     it('should handle background followed by foreground', async () => {
+      const mockGetDatabase = getDatabase as jest.Mock;
+      const mockCloseDatabaseConnection = closeDatabaseConnection as jest.Mock;
+      mockGetDatabase.mockResolvedValue({ execAsync: jest.fn() });
+      mockCloseDatabaseConnection.mockResolvedValue(undefined);
+
       await handleAppStateChange('background');
       expect(mockCloseDatabaseConnection).toHaveBeenCalledTimes(1);
 
@@ -147,6 +176,11 @@ describe('Database Lifecycle in RootLayout', () => {
     });
 
     it('should handle multiple background/foreground cycles', async () => {
+      const mockGetDatabase = getDatabase as jest.Mock;
+      const mockCloseDatabaseConnection = closeDatabaseConnection as jest.Mock;
+      mockGetDatabase.mockResolvedValue({ execAsync: jest.fn() });
+      mockCloseDatabaseConnection.mockResolvedValue(undefined);
+
       for (let i = 0; i < 3; i++) {
         await handleAppStateChange('background');
         await handleAppStateChange('active');
@@ -157,6 +191,11 @@ describe('Database Lifecycle in RootLayout', () => {
     });
 
     it('should handle rapid state changes', async () => {
+      const mockGetDatabase = getDatabase as jest.Mock;
+      const mockCloseDatabaseConnection = closeDatabaseConnection as jest.Mock;
+      mockGetDatabase.mockResolvedValue({ execAsync: jest.fn() });
+      mockCloseDatabaseConnection.mockResolvedValue(undefined);
+
       await handleAppStateChange('background');
       await handleAppStateChange('active');
       await handleAppStateChange('background');
@@ -167,6 +206,9 @@ describe('Database Lifecycle in RootLayout', () => {
     });
 
     it('should recover from errors and continue handling state changes', async () => {
+      const mockGetDatabase = getDatabase as jest.Mock;
+      const mockCloseDatabaseConnection = closeDatabaseConnection as jest.Mock;
+      mockGetDatabase.mockResolvedValue({ execAsync: jest.fn() });
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
 
       // First close fails

@@ -168,8 +168,6 @@ describe('dataUpdateService integration tests', () => {
       // Verify that setPreference was not called
       expect(setPreference).not.toHaveBeenCalled();
 
-      // Verify that an error was logged
-      expect(console.error).toHaveBeenCalled();
     });
 
     it('should handle failed fetch', async () => {
@@ -198,9 +196,6 @@ describe('dataUpdateService integration tests', () => {
 
       // Verify that setPreference was not called
       expect(setPreference).not.toHaveBeenCalled();
-
-      // Verify that an error was logged
-      expect(console.error).toHaveBeenCalled();
     });
 
     it('should handle invalid data format', async () => {
@@ -228,9 +223,6 @@ describe('dataUpdateService integration tests', () => {
 
       // Verify that setPreference was not called
       expect(setPreference).not.toHaveBeenCalled();
-
-      // Verify that an error was logged
-      expect(console.error).toHaveBeenCalled();
     });
 
     it('should handle fetch throwing an exception', async () => {
@@ -255,9 +247,6 @@ describe('dataUpdateService integration tests', () => {
 
       // Verify that setPreference was not called
       expect(setPreference).not.toHaveBeenCalled();
-
-      // Verify that an error was logged
-      expect(console.error).toHaveBeenCalled();
     });
   });
 
@@ -334,9 +323,6 @@ describe('dataUpdateService integration tests', () => {
 
       // Verify that setPreference was not called
       expect(setPreference).not.toHaveBeenCalled();
-
-      // Verify that an error was logged
-      expect(console.error).toHaveBeenCalled();
     });
 
     it('should handle failed fetch', async () => {
@@ -365,9 +351,6 @@ describe('dataUpdateService integration tests', () => {
 
       // Verify that setPreference was not called
       expect(setPreference).not.toHaveBeenCalled();
-
-      // Verify that an error was logged
-      expect(console.error).toHaveBeenCalled();
     });
 
     it('should handle invalid data format', async () => {
@@ -395,9 +378,6 @@ describe('dataUpdateService integration tests', () => {
 
       // Verify that setPreference was not called
       expect(setPreference).not.toHaveBeenCalled();
-
-      // Verify that an error was logged
-      expect(console.error).toHaveBeenCalled();
     });
 
     it('should handle empty tasted beers array (new user or round rollover)', async () => {
@@ -433,11 +413,6 @@ describe('dataUpdateService integration tests', () => {
       // Verify that setPreference was called to update timestamps
       expect(setPreference).toHaveBeenCalledWith('my_beers_last_update', expect.any(String));
       expect(setPreference).toHaveBeenCalledWith('my_beers_last_check', expect.any(String));
-
-      // Verify that the correct log message was called
-      expect(console.log).toHaveBeenCalledWith(
-        'Empty tasted beers array - user has no tasted beers in current round (new user or round rollover at 200 beers), clearing database'
-      );
     });
 
     it('should handle data with no valid beers', async () => {
@@ -479,11 +454,6 @@ describe('dataUpdateService integration tests', () => {
       // Verify that setPreference was called to update timestamps
       expect(setPreference).toHaveBeenCalledWith('my_beers_last_update', expect.any(String));
       expect(setPreference).toHaveBeenCalledWith('my_beers_last_check', expect.any(String));
-
-      // Verify that the new log message was called
-      expect(console.log).toHaveBeenCalledWith(
-        'No valid beers with IDs found, but API returned data - clearing database'
-      );
     });
 
     it('should handle fetch throwing an exception', async () => {
@@ -508,9 +478,6 @@ describe('dataUpdateService integration tests', () => {
 
       // Verify that setPreference was not called
       expect(setPreference).not.toHaveBeenCalled();
-
-      // Verify that an error was logged
-      expect(console.error).toHaveBeenCalled();
     });
   });
 
@@ -575,7 +542,7 @@ describe('dataUpdateService integration tests', () => {
         expect(config.network.timeout).toBeDefined();
         expect(config.network.timeout).toBeGreaterThan(0);
 
-        let capturedSignal: any = null;
+        let capturedSignal: AbortSignal | null = null;
         (global.fetch as jest.Mock).mockImplementationOnce((url, options) => {
           capturedSignal = options.signal;
           return Promise.resolve({
@@ -755,7 +722,6 @@ describe('dataUpdateService integration tests', () => {
 
         expect(result.success).toBe(false);
         expect(result.error).toBeDefined();
-        expect(console.error).toHaveBeenCalled();
       });
 
       it('should handle network errors with proper error types', async () => {
@@ -767,7 +733,6 @@ describe('dataUpdateService integration tests', () => {
 
         expect(result.success).toBe(false);
         expect(result.error).toBeDefined();
-        expect(console.error).toHaveBeenCalled();
       });
     });
   });

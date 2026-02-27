@@ -666,7 +666,7 @@ describe('dataUpdateService', () => {
       it('should use 15 second timeout for fetch requests', async () => {
         (getPreference as jest.Mock).mockResolvedValueOnce(testAllBeersUrl);
 
-        let capturedSignal: any = null;
+        let capturedSignal: AbortSignal | null = null;
         (global.fetch as jest.Mock).mockImplementationOnce((url, options) => {
           capturedSignal = options.signal;
           // Return a resolved promise to avoid hanging
