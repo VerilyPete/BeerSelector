@@ -4,23 +4,12 @@
  * Purpose: Verify that filter logic is optimized for parallel evaluation and
  * early exit when no filters are active, reducing CPU overhead.
  *
- * Optimization:
- * - Implement early exit when no filters are active (skip filtering entirely)
- * - Use parallel filter evaluation instead of sequential chaining
- * - Reduce filter execution time from 15-20ms to < 10ms for 200 beers
- *
- * Expected Behavior (AFTER optimization):
- * - Early exit when no filters active (0ms processing time)
- * - Parallel evaluation of all filters in single pass
- * - Performance < 10ms for 200 beers with all filters active
- * - Correct filter results maintained
- *
- * Current Status: PARTIALLY OPTIMIZED (sequential filtering, no early exit)
- * These tests will fully pass after Step 2b implementation.
+ * Updated for filter-bar-redesign: uses new FilterOptions shape with
+ * containerFilter instead of isDraft/isHeavies/isIpa, and applySorting
+ * now takes a direction parameter.
  */
 
-import { renderHook, act } from '@testing-library/react-native';
-import { useBeerFilters, applyFilters } from '../useBeerFilters';
+import { applyFilters, applySorting } from '../useBeerFilters';
 import { BeerWithContainerType } from '@/src/types/beer';
 
 describe('useBeerFilters - Optimization (Bottleneck #3)', () => {
@@ -35,7 +24,7 @@ describe('useBeerFilters - Optimization (Bottleneck #3)', () => {
     brewer_loc: 'Austin, TX',
     brew_container: 'Draft',
     brew_description: 'Test description',
-    container_type: 'tulip', // Pre-computed glass type for IPA
+    container_type: 'tulip',
     enrichment_confidence: null,
     enrichment_source: null,
     ...overrides,
@@ -48,7 +37,7 @@ describe('useBeerFilters - Optimization (Bottleneck #3)', () => {
         brew_name: `Beer ${i + 1}`,
         brew_style: i % 3 === 0 ? 'IPA' : i % 3 === 1 ? 'Stout' : 'Porter',
         brew_container: i % 2 === 0 ? 'Draft' : 'Bottle',
-        container_type: i % 3 === 0 ? 'tulip' : 'pint', // Pre-computed glass type based on style
+        container_type: i % 3 === 0 ? 'tulip' : 'pint',
       })
     );
 
@@ -56,24 +45,17 @@ describe('useBeerFilters - Optimization (Bottleneck #3)', () => {
     it('should skip filtering when no filters are active', () => {
       const beers = createMockBeers(200);
 
-      // Measure time with no filters
       const startTime = performance.now();
 
       const result = applyFilters(beers, {
         searchText: '',
-        isDraft: false,
-        isHeavies: false,
-        isIpa: false,
+        containerFilter: 'all',
       });
 
       const endTime = performance.now();
       const duration = endTime - startTime;
 
-      // EXPECTED (after optimization): Should return immediately (< 1ms)
-      // CURRENT (before optimization): Still processes all beers (~5-10ms)
       expect(duration).toBeLessThan(1);
-
-      // Should return original array (no filtering needed)
       expect(result).toHaveLength(beers.length);
     });
 
@@ -84,14 +66,11 @@ describe('useBeerFilters - Optimization (Bottleneck #3)', () => {
 
       const result = applyFilters(beers, {
         searchText: '',
-        isDraft: false,
-        isHeavies: false,
-        isIpa: false,
+        containerFilter: 'all',
       });
 
       const endTime = performance.now();
 
-      // EXPECTED: Near-instant return with large dataset
       expect(endTime - startTime).toBeLessThan(1);
       expect(result.length).toBe(1000);
     });
@@ -101,61 +80,42 @@ describe('useBeerFilters - Optimization (Bottleneck #3)', () => {
 
       const result = applyFilters(beers, {
         searchText: 'IPA',
-        isDraft: false,
-        isHeavies: false,
-        isIpa: false,
+        containerFilter: 'all',
       });
 
-      // Should filter based on search text
       expect(result.length).toBeLessThan(beers.length);
     });
 
-    it('should not early exit when any filter is active', () => {
+    it('should not early exit when container filter is active', () => {
       const beers = createMockBeers(200);
 
       const resultDraft = applyFilters(beers, {
         searchText: '',
-        isDraft: true,
-        isHeavies: false,
-        isIpa: false,
+        containerFilter: 'draft',
       });
 
-      const resultIpa = applyFilters(beers, {
+      const resultCans = applyFilters(beers, {
         searchText: '',
-        isDraft: false,
-        isHeavies: false,
-        isIpa: true,
+        containerFilter: 'cans',
       });
 
-      // Should apply filters
       expect(resultDraft.length).toBeLessThan(beers.length);
-      expect(resultIpa.length).toBeLessThan(beers.length);
+      expect(resultCans.length).toBeLessThan(beers.length);
     });
   });
 
   describe('Parallel Filter Evaluation', () => {
-    it('should evaluate all filters in single pass', () => {
-      // Test that filters are applied in parallel, not sequentially
-
+    it('should evaluate container filter and search in single pass', () => {
       const beers = createMockBeers(200);
 
-      // Apply multiple filters
       const result = applyFilters(beers, {
         searchText: 'Beer',
-        isDraft: true,
-        isHeavies: false,
-        isIpa: true,
+        containerFilter: 'draft',
       });
 
-      // EXPECTED (after optimization): Single pass through array
-      // Each beer is evaluated against ALL filters once
-      // CURRENT: Multiple passes (filter by search, then draft, then IPA)
-
-      // Verify correct filtering (all conditions must be met)
       result.forEach(beer => {
         expect(beer.brew_name.includes('Beer')).toBe(true);
-        expect(beer.brew_container).toContain('Draft');
-        expect(beer.brew_style).toContain('IPA');
+        expect(beer.brew_container.toLowerCase()).toMatch(/draft|draught/);
       });
     });
 
@@ -166,16 +126,12 @@ describe('useBeerFilters - Optimization (Bottleneck #3)', () => {
 
       applyFilters(beers, {
         searchText: 'Beer',
-        isDraft: true,
-        isHeavies: false,
-        isIpa: true,
+        containerFilter: 'draft',
       });
 
       const endTime = performance.now();
       const duration = endTime - startTime;
 
-      // EXPECTED (after optimization): < 10ms
-      // CURRENT: 15-20ms (sequential filtering)
       expect(duration).toBeLessThan(10);
     });
 
@@ -186,14 +142,11 @@ describe('useBeerFilters - Optimization (Bottleneck #3)', () => {
 
       applyFilters(beers, {
         searchText: 'Test Brewery IPA Draft',
-        isDraft: true,
-        isHeavies: false,
-        isIpa: true,
+        containerFilter: 'draft',
       });
 
       const endTime = performance.now();
 
-      // Should remain efficient even with complex search
       expect(endTime - startTime).toBeLessThan(15);
     });
   });
@@ -206,14 +159,11 @@ describe('useBeerFilters - Optimization (Bottleneck #3)', () => {
 
       applyFilters(beers, {
         searchText: '',
-        isDraft: false,
-        isHeavies: false,
-        isIpa: false,
+        containerFilter: 'all',
       });
 
       const endTime = performance.now();
 
-      // EXPECTED: Early exit optimization
       expect(endTime - startTime).toBeLessThan(1);
     });
 
@@ -224,9 +174,7 @@ describe('useBeerFilters - Optimization (Bottleneck #3)', () => {
 
       applyFilters(beers, {
         searchText: 'IPA',
-        isDraft: false,
-        isHeavies: false,
-        isIpa: false,
+        containerFilter: 'all',
       });
 
       const endTime = performance.now();
@@ -234,16 +182,14 @@ describe('useBeerFilters - Optimization (Bottleneck #3)', () => {
       expect(endTime - startTime).toBeLessThan(8);
     });
 
-    it('should handle 200 beers with single filter in < 6ms', () => {
+    it('should handle 200 beers with container filter in < 6ms', () => {
       const beers = createMockBeers(200);
 
       const startTime = performance.now();
 
       applyFilters(beers, {
         searchText: '',
-        isDraft: true,
-        isHeavies: false,
-        isIpa: false,
+        containerFilter: 'draft',
       });
 
       const endTime = performance.now();
@@ -258,14 +204,11 @@ describe('useBeerFilters - Optimization (Bottleneck #3)', () => {
 
       applyFilters(beers, {
         searchText: 'Beer',
-        isDraft: true,
-        isHeavies: false,
-        isIpa: true,
+        containerFilter: 'draft',
       });
 
       const endTime = performance.now();
 
-      // EXPECTED: < 10ms (target from bottleneck analysis)
       expect(endTime - startTime).toBeLessThan(10);
     });
 
@@ -276,20 +219,17 @@ describe('useBeerFilters - Optimization (Bottleneck #3)', () => {
 
       applyFilters(beers, {
         searchText: 'IPA',
-        isDraft: true,
-        isHeavies: false,
-        isIpa: false,
+        containerFilter: 'draft',
       });
 
       const endTime = performance.now();
 
-      // Should scale linearly (500 beers ~= 2.5x 200 beers)
       expect(endTime - startTime).toBeLessThan(25);
     });
   });
 
   describe('Filter Correctness', () => {
-    it('should maintain correct results with parallel evaluation', () => {
+    it('should maintain correct results with container filter', () => {
       const beers = [
         createMockBeer({ id: '1', brew_style: 'IPA', brew_container: 'Draft' }),
         createMockBeer({ id: '2', brew_style: 'Stout', brew_container: 'Draft' }),
@@ -297,19 +237,25 @@ describe('useBeerFilters - Optimization (Bottleneck #3)', () => {
         createMockBeer({ id: '4', brew_style: 'Porter', brew_container: 'Can' }),
       ];
 
-      const result = applyFilters(beers, {
+      const draftResult = applyFilters(beers, {
         searchText: '',
-        isDraft: true,
-        isHeavies: false,
-        isIpa: true,
+        containerFilter: 'draft',
       });
 
-      // Should only return beer 1 (IPA + Draft)
-      expect(result).toHaveLength(1);
-      expect(result[0].id).toBe('1');
+      expect(draftResult).toHaveLength(2);
+      expect(draftResult.map(b => b.id).sort()).toEqual(['1', '2']);
+
+      const cansResult = applyFilters(beers, {
+        searchText: '',
+        containerFilter: 'cans',
+      });
+
+      // 'cans' matches "bottle" or "can"
+      expect(cansResult).toHaveLength(2);
+      expect(cansResult.map(b => b.id).sort()).toEqual(['3', '4']);
     });
 
-    it('should correctly combine search and filters', () => {
+    it('should correctly combine search and container filter', () => {
       const beers = [
         createMockBeer({
           id: '1',
@@ -333,14 +279,11 @@ describe('useBeerFilters - Optimization (Bottleneck #3)', () => {
 
       const result = applyFilters(beers, {
         searchText: 'Hazy',
-        isDraft: true,
-        isHeavies: false,
-        isIpa: true,
+        containerFilter: 'draft',
       });
 
-      // Should only return beer 1 (Hazy + IPA + Draft)
-      expect(result).toHaveLength(1);
-      expect(result[0].id).toBe('1');
+      expect(result).toHaveLength(2);
+      expect(result.map(b => b.id).sort()).toEqual(['1', '3']);
     });
 
     it('should handle edge case with no matches', () => {
@@ -348,9 +291,7 @@ describe('useBeerFilters - Optimization (Bottleneck #3)', () => {
 
       const result = applyFilters(beers, {
         searchText: 'NonExistentBeer',
-        isDraft: true,
-        isHeavies: true,
-        isIpa: true,
+        containerFilter: 'draft',
       });
 
       expect(result).toHaveLength(0);
@@ -358,25 +299,6 @@ describe('useBeerFilters - Optimization (Bottleneck #3)', () => {
   });
 
   describe('Filter Logic Optimization Details', () => {
-    it('should use AND logic for multiple filters', () => {
-      const beers = [
-        createMockBeer({ id: '1', brew_style: 'Imperial Stout', brew_container: 'Draft' }),
-        createMockBeer({ id: '2', brew_style: 'IPA', brew_container: 'Draft' }),
-        createMockBeer({ id: '3', brew_style: 'Imperial Stout', brew_container: 'Bottle' }),
-      ];
-
-      const result = applyFilters(beers, {
-        searchText: '',
-        isDraft: true,
-        isHeavies: true, // Stout
-        isIpa: false,
-      });
-
-      // Should only return beer 1 (Stout AND Draft)
-      expect(result).toHaveLength(1);
-      expect(result[0].id).toBe('1');
-    });
-
     it('should optimize case-insensitive search', () => {
       const beers = [
         createMockBeer({ id: '1', brew_name: 'HAZY IPA' }),
@@ -386,12 +308,9 @@ describe('useBeerFilters - Optimization (Bottleneck #3)', () => {
 
       const result = applyFilters(beers, {
         searchText: 'HaZy',
-        isDraft: false,
-        isHeavies: false,
-        isIpa: false,
+        containerFilter: 'all',
       });
 
-      // All should match (case-insensitive)
       expect(result).toHaveLength(3);
     });
 
@@ -429,196 +348,93 @@ describe('useBeerFilters - Optimization (Bottleneck #3)', () => {
 
       const result = applyFilters(beers, {
         searchText: 'Searchable',
-        isDraft: false,
-        isHeavies: false,
-        isIpa: false,
+        containerFilter: 'all',
       });
 
-      // Should find in brewer, style, and location
       expect(result).toHaveLength(3);
       expect(result.map(b => b.id).sort()).toEqual(['2', '3', '4']);
     });
   });
 
-  describe('Integration with useBeerFilters Hook', () => {
-    it('should apply optimizations in hook context', () => {
-      const beers = createMockBeers(200);
+  describe('Sorting with Direction', () => {
+    it('should sort by name ascending with direction parameter', () => {
+      const beers = [
+        createMockBeer({ id: '1', brew_name: 'Zebra Ale' }),
+        createMockBeer({ id: '2', brew_name: 'Alpha Beer' }),
+      ];
 
-      const { result } = renderHook(() => useBeerFilters(beers));
-
-      const startTime = performance.now();
-
-      // No filters active - should use early exit
-      const _filtered = result.current.filteredBeers;
-
-      const endTime = performance.now();
-
-      // EXPECTED: Fast return with no filters
-      expect(endTime - startTime).toBeLessThan(2);
-      expect(_filtered).toHaveLength(200);
+      const result = applySorting(beers, 'name', 'asc');
+      expect(result[0].brew_name).toBe('Alpha Beer');
+      expect(result[1].brew_name).toBe('Zebra Ale');
     });
 
-    it('should maintain performance when toggling filters', () => {
-      const beers = createMockBeers(200);
+    it('should sort by name descending with direction parameter', () => {
+      const beers = [
+        createMockBeer({ id: '1', brew_name: 'Alpha Beer' }),
+        createMockBeer({ id: '2', brew_name: 'Zebra Ale' }),
+      ];
 
-      const { result } = renderHook(() => useBeerFilters(beers));
-
-      // Toggle filter
-      act(() => {
-        result.current.toggleFilter('isDraft');
-      });
-
-      const startTime = performance.now();
-      const filtered = result.current.filteredBeers;
-      const endTime = performance.now();
-
-      // Should complete quickly
-      expect(endTime - startTime).toBeLessThan(5);
-      expect(filtered.length).toBeLessThan(beers.length);
+      const result = applySorting(beers, 'name', 'desc');
+      expect(result[0].brew_name).toBe('Zebra Ale');
+      expect(result[1].brew_name).toBe('Alpha Beer');
     });
 
-    it('should handle rapid filter changes efficiently', () => {
-      const beers = createMockBeers(200);
+    it('should sort by date descending with direction parameter', () => {
+      const beers = [
+        createMockBeer({ id: '1', added_date: '1000' }),
+        createMockBeer({ id: '2', added_date: '2000' }),
+      ];
 
-      const { result } = renderHook(() => useBeerFilters(beers));
+      const result = applySorting(beers, 'date', 'desc');
+      expect(result[0].id).toBe('2');
+      expect(result[1].id).toBe('1');
+    });
 
-      const times: number[] = [];
+    it('should sort by date ascending with direction parameter', () => {
+      const beers = [
+        createMockBeer({ id: '1', added_date: '2000' }),
+        createMockBeer({ id: '2', added_date: '1000' }),
+      ];
 
-      // Rapidly toggle filters
-      for (let i = 0; i < 5; i++) {
-        const startTime = performance.now();
-
-        act(() => {
-          result.current.toggleFilter('isDraft');
-        });
-
-        const _filtered = result.current.filteredBeers;
-        const endTime = performance.now();
-
-        times.push(endTime - startTime);
-        // Use _filtered to avoid unused variable warning
-        void _filtered;
-      }
-
-      // All operations should be fast
-      times.forEach(time => {
-        expect(time).toBeLessThan(10);
-      });
+      const result = applySorting(beers, 'date', 'asc');
+      expect(result[0].id).toBe('2');
+      expect(result[1].id).toBe('1');
     });
   });
 
   describe('Memory Efficiency', () => {
     it('should not create unnecessary intermediate arrays', () => {
-      // Test that optimization doesn't create multiple filtered copies
-
       const beers = createMockBeers(200);
 
-      // With early exit, should return original array reference
       const result1 = applyFilters(beers, {
         searchText: '',
-        isDraft: false,
-        isHeavies: false,
-        isIpa: false,
+        containerFilter: 'all',
       });
 
-      // EXPECTED (after optimization): Same reference (no filtering occurred)
-      // CURRENT: New array created even with no filters
-      expect(result1).toBe(beers); // Ideal optimization
-
-      // Note: This might not be achievable due to immutability requirements
-      // Alternative: verify no intermediate arrays during filtering
+      expect(result1).toBe(beers);
     });
 
     it('should efficiently handle filter combinations', () => {
       const beers = createMockBeers(1000);
 
-      // Multiple filter combinations shouldn't cause memory issues
       const result1 = applyFilters(beers, {
         searchText: 'IPA',
-        isDraft: true,
-        isHeavies: false,
-        isIpa: true,
+        containerFilter: 'draft',
       });
 
       const result2 = applyFilters(beers, {
         searchText: 'Stout',
-        isDraft: false,
-        isHeavies: true,
-        isIpa: false,
+        containerFilter: 'cans',
       });
 
       const result3 = applyFilters(beers, {
         searchText: '',
-        isDraft: true,
-        isHeavies: false,
-        isIpa: false,
+        containerFilter: 'draft',
       });
 
-      // All operations should complete without memory issues
       expect(result1).toBeDefined();
       expect(result2).toBeDefined();
       expect(result3).toBeDefined();
-    });
-  });
-
-  describe('Regression Prevention', () => {
-    it('should not break existing filter behavior', () => {
-      const beers = [
-        createMockBeer({ id: '1', brew_style: 'IPA', brew_container: 'Draft' }),
-        createMockBeer({ id: '2', brew_style: 'Stout', brew_container: 'Draft' }),
-        createMockBeer({ id: '3', brew_style: 'IPA', brew_container: 'Bottle' }),
-      ];
-
-      // Test each filter individually
-      const draftResult = applyFilters(beers, {
-        searchText: '',
-        isDraft: true,
-        isHeavies: false,
-        isIpa: false,
-      });
-      expect(draftResult).toHaveLength(2);
-
-      const ipaResult = applyFilters(beers, {
-        searchText: '',
-        isDraft: false,
-        isHeavies: false,
-        isIpa: true,
-      });
-      expect(ipaResult).toHaveLength(2);
-
-      const combinedResult = applyFilters(beers, {
-        searchText: '',
-        isDraft: true,
-        isHeavies: false,
-        isIpa: true,
-      });
-      expect(combinedResult).toHaveLength(1);
-      expect(combinedResult[0].id).toBe('1');
-    });
-
-    it('should maintain mutual exclusivity of Heavies and IPA filters', () => {
-      const beers = createMockBeers(100);
-
-      // Note: Mutual exclusivity is handled in useBeerFilters hook, not applyFilters
-      // This test documents the expected behavior
-
-      const { result } = renderHook(() => useBeerFilters(beers));
-
-      // Enable Heavies
-      act(() => {
-        result.current.toggleFilter('isHeavies');
-      });
-
-      expect(result.current.filters.isHeavies).toBe(true);
-      expect(result.current.filters.isIpa).toBe(false);
-
-      // Enable IPA (should disable Heavies)
-      act(() => {
-        result.current.toggleFilter('isIpa');
-      });
-
-      expect(result.current.filters.isHeavies).toBe(false);
-      expect(result.current.filters.isIpa).toBe(true);
     });
   });
 });

@@ -17,6 +17,7 @@ jest.mock('@/hooks/useThemeColor', () => ({
       backgroundTertiary: 'rgba(150, 150, 150, 0.1)',
       text: '#11181C',
       background: '#FAFAFA',
+      backgroundElevated: '#FFFFFF',
       border: '#E7E5E4',
       accent: '#FFC107',
     };
@@ -26,11 +27,19 @@ jest.mock('@/hooks/useThemeColor', () => ({
 
 // Mock IconSymbol component
 jest.mock('@/components/ui/IconSymbol', () => ({
-  IconSymbol: ({ name, testID }: any) => {
+  IconSymbol: ({ name, testID }: { name: string; testID?: string }) => {
     const { View } = require('react-native');
     return <View testID={testID || `icon-${name}`} />;
   },
 }));
+
+// Mock BeerIcon component
+jest.mock('@/components/icons/BeerIcon', () => {
+  const { View } = require('react-native');
+  return ({ name, testID }: { name: string; testID?: string }) => (
+    <View testID={testID || `beericon-${name}`} />
+  );
+});
 
 // Mock ThemedText and ThemedView to use plain React Native components
 jest.mock('@/components/ThemedText');
@@ -56,289 +65,253 @@ afterAll(() => {
 });
 
 describe('FilterBar', () => {
-  const mockFilters = {
-    isDraft: false,
-    isHeavies: false,
-    isIpa: false,
-  };
+  const mockOnCycleContainerFilter = jest.fn();
+  const mockOnCycleSort = jest.fn();
+  const mockOnToggleSortDirection = jest.fn();
 
-  const mockOnToggleFilter = jest.fn();
-  const mockOnToggleSort = jest.fn();
+  const defaultProps = {
+    containerFilter: 'all' as const,
+    sortBy: 'date' as const,
+    sortDirection: 'desc' as const,
+    onCycleContainerFilter: mockOnCycleContainerFilter,
+    onCycleSort: mockOnCycleSort,
+    onToggleSortDirection: mockOnToggleSortDirection,
+  };
 
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
-  // Test 1: Renders all filter buttons when showHeaviesAndIpa is true
-  test('renders all filter buttons', () => {
-    const { getByText } = render(
-      <FilterBar
-        filters={mockFilters}
-        sortBy="name"
-        onToggleFilter={mockOnToggleFilter}
-        onToggleSort={mockOnToggleSort}
-        showHeaviesAndIpa={true}
-      />
-    );
+  describe('Container filter button', () => {
+    test('renders showing "All" when containerFilter is all', () => {
+      const { getByText } = render(<FilterBar {...defaultProps} containerFilter="all" />);
+      expect(getByText('All')).toBeTruthy();
+    });
 
-    expect(getByText('Draft')).toBeTruthy();
-    expect(getByText('Heavies')).toBeTruthy();
-    expect(getByText('IPA')).toBeTruthy();
+    test('renders showing "Draft" when containerFilter is draft', () => {
+      const { getByText } = render(<FilterBar {...defaultProps} containerFilter="draft" />);
+      expect(getByText('Draft')).toBeTruthy();
+    });
+
+    test('renders showing "Cans" when containerFilter is cans', () => {
+      const { getByText } = render(<FilterBar {...defaultProps} containerFilter="cans" />);
+      expect(getByText('Cans')).toBeTruthy();
+    });
+
+    test('calls onCycleContainerFilter when pressed', () => {
+      const { getByText } = render(<FilterBar {...defaultProps} containerFilter="all" />);
+      fireEvent.press(getByText('All'));
+      expect(mockOnCycleContainerFilter).toHaveBeenCalledTimes(1);
+    });
+
+    test('has active styling when containerFilter is draft', () => {
+      const { getByTestId } = render(<FilterBar {...defaultProps} containerFilter="draft" />);
+      const button = getByTestId('filter-container-button');
+      // Active state should use tint background color
+      expect(button.props.style).toEqual(expect.objectContaining({ backgroundColor: '#0a7ea4' }));
+    });
+
+    test('has active styling when containerFilter is cans', () => {
+      const { getByTestId } = render(<FilterBar {...defaultProps} containerFilter="cans" />);
+      const button = getByTestId('filter-container-button');
+      expect(button.props.style).toEqual(expect.objectContaining({ backgroundColor: '#0a7ea4' }));
+    });
+
+    test('does not have active styling when containerFilter is all', () => {
+      const { getByTestId } = render(<FilterBar {...defaultProps} containerFilter="all" />);
+      const button = getByTestId('filter-container-button');
+      // Inactive state should use secondary background
+      expect(button.props.style).not.toEqual(
+        expect.objectContaining({ backgroundColor: '#0a7ea4' })
+      );
+    });
   });
 
-  // Test 2: Calls onToggleFilter when Draft button pressed
-  test('calls onToggleFilter when Draft button pressed', () => {
-    const { getByText } = render(
-      <FilterBar
-        filters={mockFilters}
-        sortBy="name"
-        onToggleFilter={mockOnToggleFilter}
-        onToggleSort={mockOnToggleSort}
-      />
-    );
+  describe('Sort button', () => {
+    test('shows "Date" when sortBy is date', () => {
+      const { getByTestId } = render(<FilterBar {...defaultProps} sortBy="date" />);
+      expect(getByTestId('sort-button-text').props.children).toBe('Date');
+    });
 
-    fireEvent.press(getByText('Draft'));
-    expect(mockOnToggleFilter).toHaveBeenCalledWith('isDraft');
-    expect(mockOnToggleFilter).toHaveBeenCalledTimes(1);
+    test('shows "Name" when sortBy is name', () => {
+      const { getByTestId } = render(<FilterBar {...defaultProps} sortBy="name" />);
+      expect(getByTestId('sort-button-text').props.children).toBe('Name');
+    });
+
+    test('shows "ABV" when sortBy is abv', () => {
+      const { getByTestId } = render(<FilterBar {...defaultProps} sortBy="abv" />);
+      expect(getByTestId('sort-button-text').props.children).toBe('ABV');
+    });
+
+    test('calls onCycleSort when pressed', () => {
+      const { getByTestId } = render(<FilterBar {...defaultProps} />);
+      fireEvent.press(getByTestId('sort-toggle-button'));
+      expect(mockOnCycleSort).toHaveBeenCalledTimes(1);
+    });
+
+    test('shows calendar icon when sortBy is date', () => {
+      const { getByTestId } = render(<FilterBar {...defaultProps} sortBy="date" />);
+      expect(getByTestId('icon-calendar')).toBeTruthy();
+    });
+
+    test('shows textformat icon when sortBy is name', () => {
+      const { getByTestId } = render(<FilterBar {...defaultProps} sortBy="name" />);
+      expect(getByTestId('icon-textformat')).toBeTruthy();
+    });
+
+    test('shows bottle icon when sortBy is abv', () => {
+      const { getByTestId } = render(<FilterBar {...defaultProps} sortBy="abv" />);
+      expect(getByTestId('beericon-bottle')).toBeTruthy();
+    });
   });
 
-  // Test 3: Calls onToggleFilter when Heavies button pressed
-  test('calls onToggleFilter when Heavies button pressed', () => {
-    const { getByText } = render(
-      <FilterBar
-        filters={mockFilters}
-        sortBy="name"
-        onToggleFilter={mockOnToggleFilter}
-        onToggleSort={mockOnToggleSort}
-        showHeaviesAndIpa={true}
-      />
-    );
+  describe('Sort direction button', () => {
+    test('calls onToggleSortDirection when pressed', () => {
+      const { getByTestId } = render(<FilterBar {...defaultProps} />);
+      fireEvent.press(getByTestId('sort-direction-button'));
+      expect(mockOnToggleSortDirection).toHaveBeenCalledTimes(1);
+    });
 
-    fireEvent.press(getByText('Heavies'));
-    expect(mockOnToggleFilter).toHaveBeenCalledWith('isHeavies');
-    expect(mockOnToggleFilter).toHaveBeenCalledTimes(1);
+    test.each([
+      { sortBy: 'date' as const, direction: 'asc' as const, label: 'Oldest' },
+      { sortBy: 'date' as const, direction: 'desc' as const, label: 'Newest' },
+      { sortBy: 'name' as const, direction: 'asc' as const, label: 'A–Z' },
+      { sortBy: 'name' as const, direction: 'desc' as const, label: 'Z–A' },
+      { sortBy: 'abv' as const, direction: 'asc' as const, label: 'Low' },
+      { sortBy: 'abv' as const, direction: 'desc' as const, label: 'High' },
+    ])('shows "$label" for sortBy=$sortBy direction=$direction', ({ sortBy, direction, label }) => {
+      const { getByText } = render(
+        <FilterBar {...defaultProps} sortBy={sortBy} sortDirection={direction} />
+      );
+      expect(getByText(label)).toBeTruthy();
+    });
   });
 
-  // Test 4: Calls onToggleFilter when IPA button pressed
-  test('calls onToggleFilter when IPA button pressed', () => {
-    const { getByText } = render(
-      <FilterBar
-        filters={mockFilters}
-        sortBy="name"
-        onToggleFilter={mockOnToggleFilter}
-        onToggleSort={mockOnToggleSort}
-        showHeaviesAndIpa={true}
-      />
-    );
+  describe('Haptics feedback', () => {
+    const Haptics = require('expo-haptics');
 
-    fireEvent.press(getByText('IPA'));
-    expect(mockOnToggleFilter).toHaveBeenCalledWith('isIpa');
-    expect(mockOnToggleFilter).toHaveBeenCalledTimes(1);
+    test('triggers haptics when container filter button is pressed', () => {
+      const { getByTestId } = render(<FilterBar {...defaultProps} />);
+      fireEvent.press(getByTestId('filter-container-button'));
+      expect(Haptics.impactAsync).toHaveBeenCalledWith(Haptics.ImpactFeedbackStyle.Light);
+    });
+
+    test('triggers haptics when sort button is pressed', () => {
+      const { getByTestId } = render(<FilterBar {...defaultProps} />);
+      fireEvent.press(getByTestId('sort-toggle-button'));
+      expect(Haptics.impactAsync).toHaveBeenCalledWith(Haptics.ImpactFeedbackStyle.Light);
+    });
+
+    test('triggers haptics when sort direction button is pressed', () => {
+      const { getByTestId } = render(<FilterBar {...defaultProps} />);
+      fireEvent.press(getByTestId('sort-direction-button'));
+      expect(Haptics.impactAsync).toHaveBeenCalledWith(Haptics.ImpactFeedbackStyle.Light);
+    });
   });
 
-  // Test 5: Calls onToggleSort when sort button pressed
-  test('calls onToggleSort when sort button pressed', () => {
-    const { getByTestId } = render(
-      <FilterBar
-        filters={mockFilters}
-        sortBy="name"
-        onToggleFilter={mockOnToggleFilter}
-        onToggleSort={mockOnToggleSort}
-      />
-    );
+  describe('Accessibility labels with next action', () => {
+    test('container "All" label describes next state as Draft', () => {
+      const { getByTestId } = render(<FilterBar {...defaultProps} containerFilter="all" />);
+      expect(getByTestId('filter-container-button').props.accessibilityLabel).toBe(
+        'Container filter: All. Double tap to show Draft.'
+      );
+    });
 
-    fireEvent.press(getByTestId('sort-toggle-button'));
-    expect(mockOnToggleSort).toHaveBeenCalled();
-    expect(mockOnToggleSort).toHaveBeenCalledTimes(1);
+    test('container "Draft" label describes next state as Cans', () => {
+      const { getByTestId } = render(<FilterBar {...defaultProps} containerFilter="draft" />);
+      expect(getByTestId('filter-container-button').props.accessibilityLabel).toBe(
+        'Container filter: Draft. Double tap to show Cans.'
+      );
+    });
+
+    test('sort "Date" label describes next state as Name', () => {
+      const { getByTestId } = render(<FilterBar {...defaultProps} sortBy="date" />);
+      expect(getByTestId('sort-toggle-button').props.accessibilityLabel).toBe(
+        'Sort by Date. Double tap to sort by Name.'
+      );
+    });
+
+    test('sort "ABV" label describes next state as Date', () => {
+      const { getByTestId } = render(<FilterBar {...defaultProps} sortBy="abv" />);
+      expect(getByTestId('sort-toggle-button').props.accessibilityLabel).toBe(
+        'Sort by ABV. Double tap to sort by Date.'
+      );
+    });
+
+    test('direction label for date/asc shows contextual labels', () => {
+      const { getByTestId } = render(
+        <FilterBar {...defaultProps} sortBy="date" sortDirection="asc" />
+      );
+      expect(getByTestId('sort-direction-button').props.accessibilityLabel).toBe(
+        'Sort: Oldest. Double tap for Newest.'
+      );
+    });
+
+    test('direction label for date/desc shows contextual labels', () => {
+      const { getByTestId } = render(
+        <FilterBar {...defaultProps} sortBy="date" sortDirection="desc" />
+      );
+      expect(getByTestId('sort-direction-button').props.accessibilityLabel).toBe(
+        'Sort: Newest. Double tap for Oldest.'
+      );
+    });
+
+    test('direction label for name/asc shows contextual labels', () => {
+      const { getByTestId } = render(
+        <FilterBar {...defaultProps} sortBy="name" sortDirection="asc" />
+      );
+      expect(getByTestId('sort-direction-button').props.accessibilityLabel).toBe(
+        'Sort: A–Z. Double tap for Z–A.'
+      );
+    });
+
+    test('direction label for abv/desc shows contextual labels', () => {
+      const { getByTestId } = render(
+        <FilterBar {...defaultProps} sortBy="abv" sortDirection="desc" />
+      );
+      expect(getByTestId('sort-direction-button').props.accessibilityLabel).toBe(
+        'Sort: High. Double tap for Low.'
+      );
+    });
   });
 
-  // Test 6: Hides Heavies and IPA when showHeaviesAndIpa is false
-  test('hides Heavies and IPA when showHeaviesAndIpa is false', () => {
-    const { queryByText, getByText } = render(
-      <FilterBar
-        filters={mockFilters}
-        sortBy="name"
-        onToggleFilter={mockOnToggleFilter}
-        onToggleSort={mockOnToggleSort}
-        showHeaviesAndIpa={false}
-      />
-    );
-
-    // Draft button should still be visible
-    expect(getByText('Draft')).toBeTruthy();
-
-    // Heavies and IPA buttons should NOT be visible
-    expect(queryByText('Heavies')).toBeNull();
-    expect(queryByText('IPA')).toBeNull();
+  describe('Theme colors', () => {
+    test('sort buttons use backgroundElevated color, not background', () => {
+      const { getByTestId } = render(<FilterBar {...defaultProps} />);
+      const sortButton = getByTestId('sort-toggle-button');
+      const directionButton = getByTestId('sort-direction-button');
+      // backgroundElevated is #FFFFFF, background is #FAFAFA
+      expect(sortButton.props.style).toEqual(
+        expect.objectContaining({ backgroundColor: '#FFFFFF' })
+      );
+      expect(directionButton.props.style).toEqual(
+        expect.objectContaining({ backgroundColor: '#FFFFFF' })
+      );
+    });
   });
 
-  // Test 7: Shows correct sort label for name sorting
-  test('shows correct sort label for name sorting', () => {
-    const { getByTestId } = render(
-      <FilterBar
-        filters={mockFilters}
-        sortBy="name"
-        onToggleFilter={mockOnToggleFilter}
-        onToggleSort={mockOnToggleSort}
-      />
-    );
+  describe('Layout', () => {
+    test('all buttons render at same height (CHIP_MIN_HEIGHT)', () => {
+      const { getByTestId } = render(<FilterBar {...defaultProps} />);
 
-    // When sorted by name, button should offer "Date" (to switch to date sort)
-    expect(getByTestId('sort-button-text').props.children).toBe('Date');
-  });
+      const containerButton = getByTestId('filter-container-button');
+      const sortButton = getByTestId('sort-toggle-button');
+      const directionButton = getByTestId('sort-direction-button');
 
-  // Test 8: Shows correct sort label for date sorting
-  test('shows correct sort label for date sorting', () => {
-    const { getByTestId } = render(
-      <FilterBar
-        filters={mockFilters}
-        sortBy="date"
-        onToggleFilter={mockOnToggleFilter}
-        onToggleSort={mockOnToggleSort}
-      />
-    );
+      const getMinHeight = (element: {
+        props: { style: Record<string, unknown> | readonly Record<string, unknown>[] };
+      }) => {
+        const style = element.props.style;
+        if (Array.isArray(style)) {
+          return style.reduce<Record<string, unknown>>((acc, s) => ({ ...acc, ...s }), {})
+            .minHeight;
+        }
+        return style?.minHeight;
+      };
 
-    // When sorted by date, button should offer "Name" (to switch to name sort)
-    expect(getByTestId('sort-button-text').props.children).toBe('Name');
-  });
-
-  // Test 9: Renders Draft filter as active
-  test('displays Draft filter as active when enabled', () => {
-    const activeFilters = { isDraft: true, isHeavies: false, isIpa: false };
-    const { getByText } = render(
-      <FilterBar
-        filters={activeFilters}
-        sortBy="name"
-        onToggleFilter={mockOnToggleFilter}
-        onToggleSort={mockOnToggleSort}
-      />
-    );
-
-    // Draft button should be present (testing it renders without error)
-    expect(getByText('Draft')).toBeTruthy();
-  });
-
-  // Test 10: Renders Heavies filter as active
-  test('displays Heavies filter as active when enabled', () => {
-    const activeFilters = { isDraft: false, isHeavies: true, isIpa: false };
-    const { getByText } = render(
-      <FilterBar
-        filters={activeFilters}
-        sortBy="name"
-        onToggleFilter={mockOnToggleFilter}
-        onToggleSort={mockOnToggleSort}
-        showHeaviesAndIpa={true}
-      />
-    );
-
-    expect(getByText('Heavies')).toBeTruthy();
-  });
-
-  // Test 11: Renders IPA filter as active
-  test('displays IPA filter as active when enabled', () => {
-    const activeFilters = { isDraft: false, isHeavies: false, isIpa: true };
-    const { getByText } = render(
-      <FilterBar
-        filters={activeFilters}
-        sortBy="name"
-        onToggleFilter={mockOnToggleFilter}
-        onToggleSort={mockOnToggleSort}
-        showHeaviesAndIpa={true}
-      />
-    );
-
-    expect(getByText('IPA')).toBeTruthy();
-  });
-
-  // Test 12: Handles multiple active filters
-  test('handles multiple active filters', () => {
-    const activeFilters = { isDraft: true, isHeavies: false, isIpa: true };
-    const { getByText } = render(
-      <FilterBar
-        filters={activeFilters}
-        sortBy="name"
-        onToggleFilter={mockOnToggleFilter}
-        onToggleSort={mockOnToggleSort}
-        showHeaviesAndIpa={true}
-      />
-    );
-
-    expect(getByText('Draft')).toBeTruthy();
-    expect(getByText('IPA')).toBeTruthy();
-    expect(getByText('Heavies')).toBeTruthy();
-  });
-
-  // Test 13: Shows correct icon for date sort
-  test('renders calendar icon when sorting by date', () => {
-    const { getByTestId } = render(
-      <FilterBar
-        filters={mockFilters}
-        sortBy="date"
-        onToggleFilter={mockOnToggleFilter}
-        onToggleSort={mockOnToggleSort}
-      />
-    );
-
-    // When sortBy is 'date', it should show 'textformat' icon
-    expect(getByTestId('icon-textformat')).toBeTruthy();
-  });
-
-  // Test 14: Shows correct icon for name sort
-  test('renders textformat icon when sorting by name', () => {
-    const { getByTestId } = render(
-      <FilterBar
-        filters={mockFilters}
-        sortBy="name"
-        onToggleFilter={mockOnToggleFilter}
-        onToggleSort={mockOnToggleSort}
-      />
-    );
-
-    // When sortBy is 'name', it should show 'calendar' icon
-    expect(getByTestId('icon-calendar')).toBeTruthy();
-  });
-
-  // Test 15: Uses default showHeaviesAndIpa when not provided
-  test('shows Heavies and IPA by default when showHeaviesAndIpa prop omitted', () => {
-    const { getByText } = render(
-      <FilterBar
-        filters={mockFilters}
-        sortBy="name"
-        onToggleFilter={mockOnToggleFilter}
-        onToggleSort={mockOnToggleSort}
-        // showHeaviesAndIpa not provided, should default to true
-      />
-    );
-
-    expect(getByText('Draft')).toBeTruthy();
-    expect(getByText('Heavies')).toBeTruthy();
-    expect(getByText('IPA')).toBeTruthy();
-  });
-
-  // Test 16: Filters remain independent
-  test('filter buttons work independently', () => {
-    const { getByText } = render(
-      <FilterBar
-        filters={mockFilters}
-        sortBy="name"
-        onToggleFilter={mockOnToggleFilter}
-        onToggleSort={mockOnToggleSort}
-      />
-    );
-
-    // Press Draft
-    fireEvent.press(getByText('Draft'));
-    expect(mockOnToggleFilter).toHaveBeenCalledWith('isDraft');
-
-    // Press Heavies
-    fireEvent.press(getByText('Heavies'));
-    expect(mockOnToggleFilter).toHaveBeenCalledWith('isHeavies');
-
-    // Press IPA
-    fireEvent.press(getByText('IPA'));
-    expect(mockOnToggleFilter).toHaveBeenCalledWith('isIpa');
-
-    // Each should have been called once
-    expect(mockOnToggleFilter).toHaveBeenCalledTimes(3);
+      expect(getMinHeight(containerButton)).toBe(44);
+      expect(getMinHeight(sortButton)).toBe(44);
+      expect(getMinHeight(directionButton)).toBe(44);
+    });
   });
 });

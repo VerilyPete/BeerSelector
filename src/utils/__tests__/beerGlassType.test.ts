@@ -1,5 +1,7 @@
 import { extractABV, getGlassType, getContainerType } from '../beerGlassType';
 
+// extractABV is deprecated in favor of Worker LLM enrichment.
+// It is only used as a transient fallback for container type icon display.
 describe('extractABV', () => {
   describe('percentage format patterns', () => {
     it('should extract ABV from "5.2%" format', () => {
@@ -56,8 +58,17 @@ describe('extractABV', () => {
       expect(extractABV('Just a plain description')).toBeNull();
     });
 
-    it('should return null for invalid ABV > 100', () => {
-      expect(extractABV('Invalid 150% ABV')).toBeNull();
+    it('should return null for invalid ABV > 30', () => {
+      expect(extractABV('Invalid 35% ABV')).toBeNull();
+    });
+
+    // Known limitation: the 30% bound means descriptions with a high percentage
+    // before a valid ABV (e.g., "100% hops, 6.5% IPA") return null because the
+    // regex only matches the first `number%` pattern. This is acceptable — the
+    // function is deprecated and only used for transient icon display; Worker LLM
+    // provides the correct ABV for persistence.
+    it('should return null for description with misleading percentage like "100% Mosaic hops"', () => {
+      expect(extractABV('Brewed with 100% Mosaic hops')).toBeNull();
     });
 
     it('should return null for negative ABV', () => {
