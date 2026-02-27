@@ -13,6 +13,11 @@ import { config } from '@/src/config';
 import { getPreference, setPreference } from '../../database/preferences';
 import { beerRepository } from '../../database/repositories/BeerRepository';
 import { myBeersRepository } from '../../database/repositories/MyBeersRepository';
+import {
+  fetchEnrichmentBatchWithMissing,
+  syncBeersToWorker,
+  pollForEnrichmentUpdates,
+} from '../enrichmentService';
 
 // Mock database preferences
 jest.mock('../../database/preferences', () => ({
@@ -24,14 +29,47 @@ jest.mock('../../database/preferences', () => ({
 jest.mock('../../database/repositories/BeerRepository', () => ({
   beerRepository: {
     insertMany: jest.fn(),
+    updateEnrichmentData: jest.fn().mockResolvedValue(0),
   },
 }));
 
 jest.mock('../../database/repositories/MyBeersRepository', () => ({
   myBeersRepository: {
     insertMany: jest.fn(),
+    updateEnrichmentData: jest.fn().mockResolvedValue(0),
   },
 }));
+
+// Mock enrichment service
+jest.mock('../enrichmentService', () => ({
+  fetchBeersFromProxy: jest.fn(),
+  fetchEnrichmentBatchWithMissing: jest.fn().mockResolvedValue({ enrichments: {}, missing: [] }),
+  syncBeersToWorker: jest.fn().mockResolvedValue({ synced: 0, failed: 0, queued_for_cleanup: 0 }),
+  mergeEnrichmentData: jest.fn().mockImplementation(beers => beers),
+  recordFallback: jest.fn(),
+  pollForEnrichmentUpdates: jest.fn().mockResolvedValue({}),
+}));
+
+// Mock error logger — pass through to console.error so existing assertions still work
+jest.mock('../../utils/errorLogger', () => ({
+  logError: jest.fn((...args: unknown[]) => console.error(...args)),
+  logWarning: jest.fn(),
+}));
+
+// Partial mock of config — only override enrichment.isConfigured
+jest.mock('@/src/config', () => {
+  const actual = jest.requireActual('@/src/config');
+  return {
+    ...actual,
+    config: {
+      ...actual.config,
+      enrichment: {
+        ...actual.config.enrichment,
+        isConfigured: jest.fn().mockReturnValue(false),
+      },
+    },
+  };
+});
 
 // Mock fetch
 global.fetch = jest.fn();
@@ -795,5 +833,101 @@ describe('dataUpdateService', () => {
         expect(result.error?.type).toBe('PARSE_ERROR');
       });
     });
+  });
+
+  describe('Polling Persistence via syncMissingBeersInBackground', () => {
+    it('should persist polling enrichment results to both repositories', async () => {
+      // Use real timers for this test since we need fire-and-forget promise chains to resolve
+      jest.useRealTimers();
+
+      const testMyBeersUrl = `${config.api.baseUrl}/api/my-beers`;
+
+      // Enable enrichment
+      (config.enrichment.isConfigured as jest.Mock).mockReturnValue(true);
+
+      // Set up preferences: not visitor mode, valid API URL
+      (getPreference as jest.Mock)
+        .mockResolvedValueOnce('false') // is_visitor_mode
+        .mockResolvedValueOnce(testMyBeersUrl); // my_beers_api_url
+
+      // Mock beers with IDs
+      const mockTastedBeers: Beerfinder[] = [
+        { id: 'beer-1', brew_name: 'Test Beer 1', tasted_date: '2023-01-01' },
+        { id: 'beer-2', brew_name: 'Test Beer 2', tasted_date: '2023-01-02' },
+      ];
+
+      // Mock fetch response
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValueOnce([{}, { tasted_brew_current_round: mockTastedBeers }]),
+      });
+
+      // Mock enrichment batch: return enrichments + missing IDs
+      (fetchEnrichmentBatchWithMissing as jest.Mock).mockResolvedValueOnce({
+        enrichments: {},
+        missing: ['beer-1', 'beer-2'],
+      });
+
+      // Mock pollForEnrichmentUpdates to return enrichment data
+      const mockPollingResults = {
+        'beer-1': {
+          enriched_abv: 5.5,
+          enrichment_confidence: 0.9,
+          enrichment_source: 'perplexity' as const,
+          brew_description: 'A hoppy IPA',
+        },
+        'beer-2': {
+          enriched_abv: 6.0,
+          enrichment_confidence: 0.85,
+          enrichment_source: 'description' as const,
+          brew_description: 'A smooth stout',
+        },
+      };
+      (pollForEnrichmentUpdates as jest.Mock).mockResolvedValueOnce(mockPollingResults);
+
+      // Mock syncBeersToWorker to return queued_for_cleanup > 0 (triggers polling path)
+      (syncBeersToWorker as jest.Mock).mockResolvedValueOnce({
+        synced: 2,
+        failed: 0,
+        queued_for_cleanup: 2,
+      });
+
+      // Mock repository methods
+      (myBeersRepository.insertMany as jest.Mock).mockResolvedValueOnce(undefined);
+      (setPreference as jest.Mock).mockResolvedValue(undefined);
+
+      await fetchAndUpdateMyBeers();
+
+      // Flush fire-and-forget promise chains with real timers
+      // syncBeersToWorker().then() -> pollForEnrichmentUpdates().then() -> persist
+      await new Promise(resolve => setTimeout(resolve, 50));
+
+      // Verify syncBeersToWorker was called with the missing beers
+      expect(syncBeersToWorker).toHaveBeenCalled();
+
+      // Verify pollForEnrichmentUpdates was called with missing IDs
+      expect(pollForEnrichmentUpdates).toHaveBeenCalledWith(['beer-1', 'beer-2']);
+
+      // Verify enrichment data was persisted to both repositories
+      const expectedUpdates = {
+        'beer-1': {
+          enriched_abv: 5.5,
+          enrichment_confidence: 0.9,
+          enrichment_source: 'perplexity',
+          brew_description: 'A hoppy IPA',
+        },
+        'beer-2': {
+          enriched_abv: 6.0,
+          enrichment_confidence: 0.85,
+          enrichment_source: 'description',
+          brew_description: 'A smooth stout',
+        },
+      };
+      expect(beerRepository.updateEnrichmentData).toHaveBeenCalledWith(expectedUpdates);
+      expect(myBeersRepository.updateEnrichmentData).toHaveBeenCalledWith(expectedUpdates);
+
+      // Restore fake timers for remaining tests
+      jest.useFakeTimers();
+    }, 10000);
   });
 });
