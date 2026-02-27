@@ -1,4 +1,4 @@
-import { isBeer, isBeerfinder, isBeerDetails } from '../beer';
+import { isBeer } from '../beer';
 import { isSessionData, isApiResponse, isLoginResult } from '../api';
 import { isPreference, isReward } from '../database';
 
@@ -33,49 +33,6 @@ describe('Type Guards', () => {
         expect(isBeer(wrongTypes)).toBe(false);
         expect(isBeer(null)).toBe(false);
         expect(isBeer(undefined)).toBe(false);
-      });
-    });
-
-    describe('isBeerfinder', () => {
-      it('should return true for valid Beerfinder objects', () => {
-        const validBeerfinder = {
-          id: 'beer-123',
-          brew_name: 'Test Beer',
-          tasted_date: '2023-01-01',
-        };
-
-        expect(isBeerfinder(validBeerfinder)).toBe(true);
-      });
-
-      it('should return false for objects that are not Beerfinder', () => {
-        const regularBeer = {
-          id: 'beer-123',
-          brew_name: 'Test Beer',
-        };
-
-        expect(isBeerfinder(regularBeer)).toBe(false);
-      });
-    });
-
-    describe('isBeerDetails', () => {
-      it('should return true for valid BeerDetails objects', () => {
-        const validBeerDetails = {
-          id: 'beer-123',
-          brew_name: 'Test Beer',
-          abv: '5.5%',
-          ibu: '45',
-        };
-
-        expect(isBeerDetails(validBeerDetails)).toBe(true);
-      });
-
-      it('should return false for objects that are not BeerDetails', () => {
-        const regularBeer = {
-          id: 'beer-123',
-          brew_name: 'Test Beer',
-        };
-
-        expect(isBeerDetails(regularBeer)).toBe(false);
       });
     });
   });

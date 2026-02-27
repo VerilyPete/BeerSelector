@@ -5,4 +5,4 @@
 
 export { Preference, Reward, DatabaseLock, isPreference, isReward } from '../types/database';
 
-export { Beer, Beerfinder, isBeer, isBeerfinder } from '../types/beer';
+export { Beer, Beerfinder, isBeer } from '../types/beer';
