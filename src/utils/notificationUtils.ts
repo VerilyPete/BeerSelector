@@ -16,12 +16,12 @@ export enum ApiErrorType {
 /**
  * Error response interface
  */
-export interface ErrorResponse {
+export type ErrorResponse = {
   type: ApiErrorType;
   message: string;
   statusCode?: number;
   originalError?: unknown;
-}
+};
 
 /**
  * Show an error alert to the user

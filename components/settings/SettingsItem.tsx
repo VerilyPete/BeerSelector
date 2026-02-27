@@ -28,7 +28,7 @@ type AccessoryType =
 /**
  * Props for SettingsItem component
  */
-interface SettingsItemProps {
+type SettingsItemProps = {
   /** SF Symbol icon name */
   icon?: SymbolViewProps['name'];
   /** Icon background color (optional, defaults to tint) */
@@ -59,7 +59,7 @@ interface SettingsItemProps {
   style?: ViewStyle;
   /** Test ID for testing */
   testID?: string;
-}
+};
 
 /**
  * SettingsItem Component

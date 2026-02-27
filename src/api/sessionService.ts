@@ -6,13 +6,13 @@ import { SessionData } from '../types/api';
 export async function refreshSession(): Promise<SessionData | null> {
   try {
     const apiClient = getApiClient();
-    const response = await apiClient.post('/auto-login.php', {});
-    const data = response.data as any;
-    
-    if (data.success) {
-      const sessionData = data.session;
-      await saveSessionData(sessionData);
-      return await validateSession(sessionData);
+    const response = await apiClient.post<{ success: boolean; session: SessionData }>('/auto-login.php', {});
+
+    if (!response.success) return null;
+
+    if (response.data.success && response.data.session) {
+      await saveSessionData(response.data.session);
+      return await validateSession(response.data.session);
     }
     return null;
   } catch (error) {

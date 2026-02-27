@@ -26,13 +26,13 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 // TYPE DEFINITIONS
 // ============================================================================
 
-interface QueuedOperationsIndicatorProps {
+type QueuedOperationsIndicatorProps = {
   /** Callback when indicator is tapped */
   onPress?: () => void;
 
   /** Whether to show the indicator even if no operations are queued */
   alwaysShow?: boolean;
-}
+};
 
 // ============================================================================
 // COMPONENT

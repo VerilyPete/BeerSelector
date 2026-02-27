@@ -8,7 +8,7 @@
  * 3. Refactor and improve (REFACTOR)
  */
 
-import { config, AppEnvironment, ApiEndpoints } from '../config';
+import { config, AppEnvironment, ApiEndpoints, assertEnrichmentConfigured, ConfiguredEnrichment, EnrichmentConfig } from '../config';
 
 describe('Configuration Module', () => {
   describe('Environment Configuration', () => {
@@ -218,6 +218,70 @@ describe('Configuration Module', () => {
       expect(config.setEnvironment).toBeDefined();
       expect(config.api.getFullUrl).toBeDefined();
     });
+  });
+});
+
+describe('assertEnrichmentConfigured', () => {
+  const makeEnrichmentConfig = (overrides: Partial<EnrichmentConfig> = {}): EnrichmentConfig => ({
+    apiUrl: 'https://api.example.com',
+    apiKey: 'test-key',
+    timeout: 15000,
+    batchSize: 100,
+    rateLimitWindow: 60000,
+    rateLimitMaxRequests: 10,
+    isConfigured: () => Boolean(overrides.apiUrl !== undefined ? overrides.apiUrl : 'https://api.example.com') && Boolean(overrides.apiKey !== undefined ? overrides.apiKey : 'test-key'),
+    getFullUrl: () => 'https://api.example.com/beers',
+    ...overrides,
+  });
+
+  it('should not throw when enrichment is configured with apiKey', () => {
+    const enrichment = makeEnrichmentConfig({
+      apiUrl: 'https://api.example.com',
+      apiKey: 'my-api-key',
+      isConfigured: () => true,
+    });
+
+    expect(() => assertEnrichmentConfigured(enrichment)).not.toThrow();
+  });
+
+  it('should throw a descriptive error when enrichment apiKey is missing', () => {
+    const enrichment = makeEnrichmentConfig({
+      apiUrl: 'https://api.example.com',
+      apiKey: undefined,
+      isConfigured: () => false,
+    });
+
+    expect(() => assertEnrichmentConfigured(enrichment)).toThrow(
+      'Enrichment service is not configured: missing API key'
+    );
+  });
+
+  it('should throw when both apiUrl and apiKey are missing', () => {
+    const enrichment = makeEnrichmentConfig({
+      apiUrl: undefined,
+      apiKey: undefined,
+      isConfigured: () => false,
+    });
+
+    expect(() => assertEnrichmentConfigured(enrichment)).toThrow(
+      'Enrichment service is not configured: missing API key'
+    );
+  });
+
+  it('should narrow the type to ConfiguredEnrichment after assertion', () => {
+    const enrichment = makeEnrichmentConfig({
+      apiUrl: 'https://api.example.com',
+      apiKey: 'my-api-key',
+      isConfigured: () => true,
+    });
+
+    assertEnrichmentConfigured(enrichment);
+
+    // After assertion, TypeScript narrows enrichment to ConfiguredEnrichment
+    // where apiKey is string (not string | undefined)
+    const narrowed: ConfiguredEnrichment = enrichment;
+    expect(narrowed.apiKey).toBe('my-api-key');
+    expect(typeof narrowed.apiKey).toBe('string');
   });
 });
 

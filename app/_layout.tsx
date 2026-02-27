@@ -1,6 +1,6 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
-import { Stack, router } from 'expo-router';
+import { Stack, router, Href } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState, useRef } from 'react';
@@ -339,7 +339,7 @@ export default function RootLayout() {
   useEffect(() => {
     if (loaded && initialRoute) {
       console.log(`Navigating to initial route: ${initialRoute}`);
-      router.replace(initialRoute as any);
+      router.replace(initialRoute as Href);
 
       // Hide splash screen after navigation starts
       // Small delay ensures the new screen has begun rendering

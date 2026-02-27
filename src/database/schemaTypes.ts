@@ -21,7 +21,6 @@ import {
   BeerWithContainerType,
   BeerfinderWithContainerType,
 } from '../types/beer';
-import { ContainerType } from '../utils/beerGlassType';
 import { Reward, Preference } from '../types/database';
 
 // ============================================================================
@@ -143,7 +142,7 @@ export function allBeersRowToBeerWithContainerType(row: AllBeersRow): BeerWithCo
     review_count: row.review_count,
     review_rating: row.review_rating,
     brew_description: row.brew_description,
-    container_type: (row.container_type ?? null) as ContainerType,
+    container_type: row.container_type ?? null,
     abv: row.abv ?? null,
     // Enrichment fields (default to null if not present)
     enrichment_confidence: row.enrichment_confidence ?? null,
@@ -272,7 +271,7 @@ export function tastedBrewRowToBeerfinderWithContainerType(
     review_ratings: row.review_ratings,
     brew_description: row.brew_description,
     chit_code: row.chit_code,
-    container_type: (row.container_type ?? null) as ContainerType,
+    container_type: row.container_type ?? null,
     abv: row.abv ?? null,
     // Enrichment fields (default to null if not present)
     enrichment_confidence: row.enrichment_confidence ?? null,

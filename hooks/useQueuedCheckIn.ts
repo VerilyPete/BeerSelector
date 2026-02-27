@@ -23,13 +23,13 @@
 import { useOptimisticCheckIn } from './useOptimisticCheckIn';
 import { BeerWithContainerType } from '@/src/types/beer';
 
-export interface UseQueuedCheckInResult {
+export type UseQueuedCheckInResult = {
   /** Execute a check-in (immediate or queued based on network status) */
   queuedCheckIn: (beer: BeerWithContainerType) => Promise<void>;
 
   /** Whether a check-in is currently in progress */
   isLoading: boolean;
-}
+};
 
 /**
  * Hook for queued check-ins with network awareness

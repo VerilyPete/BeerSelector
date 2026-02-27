@@ -14,7 +14,7 @@
  * @module enrichmentService
  */
 
-import { config } from '@/src/config';
+import { config, assertEnrichmentConfigured } from '@/src/config';
 import { getPreference, setPreference } from '@/src/database/preferences';
 import { logWarning } from '@/src/utils/errorLogger';
 import { BeerWithContainerType, BeerfinderWithContainerType } from '@/src/types/beer';
@@ -37,7 +37,7 @@ try {
  * Enrichment data returned by the Worker for a single beer
  * Note: Worker now returns merged description (consistent with GET /beers)
  */
-export interface EnrichmentData {
+export type EnrichmentData = {
   enriched_abv: number | null;
   enrichment_confidence: number | null;
   enrichment_source: 'description' | 'perplexity' | 'manual' | null;
@@ -45,12 +45,12 @@ export interface EnrichmentData {
   brew_description: string | null;
   /** True if the brew_description came from the cleaned version */
   has_cleaned_description: boolean;
-}
+};
 
 /**
  * Beer response from Worker's GET /beers endpoint
  */
-export interface EnrichedBeerResponse {
+export type EnrichedBeerResponse = {
   id: string;
   brew_name: string;
   brewer: string;
@@ -65,12 +65,12 @@ export interface EnrichedBeerResponse {
   enriched_abv: number | null;
   enrichment_confidence: number | null;
   enrichment_source: 'description' | 'perplexity' | 'manual' | null;
-}
+};
 
 /**
  * Response from GET /beers?sid={storeId}
  */
-export interface BeersProxyResponse {
+export type BeersProxyResponse = {
   success: boolean;
   storeId: string;
   beers: EnrichedBeerResponse[];
@@ -78,45 +78,45 @@ export interface BeersProxyResponse {
   requestId?: string;
   cached?: boolean;
   cacheAge?: number;
-}
+};
 
 /**
  * Response from POST /beers/batch
  */
-export interface BatchEnrichmentResponse {
+export type BatchEnrichmentResponse = {
   enrichments: Record<string, EnrichmentData>;
   missing: string[]; // IDs not found in enriched_beers table
   requestId: string;
-}
+};
 
 /**
  * Request body for POST /beers/sync
  * Accepts beer data from mobile client for syncing to enriched_beers table
  */
-export interface SyncBeersRequest {
+export type SyncBeersRequest = {
   beers: {
     id: string;
     brew_name: string;
     brewer?: string;
     brew_description?: string;
   }[];
-}
+};
 
 /**
  * Response for POST /beers/sync
  * Returns counts of synced and queued beers
  */
-export interface SyncBeersResponse {
+export type SyncBeersResponse = {
   synced: number;
   queued_for_cleanup: number;
   requestId: string;
   errors?: string[];
-}
+};
 
 /**
  * Response from GET /health
  */
-export interface HealthResponse {
+export type HealthResponse = {
   status: 'ok' | 'error';
   database: string;
   enrichment?: {
@@ -124,7 +124,7 @@ export interface HealthResponse {
     daily: { used: number; limit: number; remaining: number };
     monthly: { used: number; limit: number; remaining: number };
   };
-}
+};
 
 // ============================================================================
 // Metrics & Observability
@@ -133,7 +133,7 @@ export interface HealthResponse {
 /**
  * Metrics tracked for enrichment service operations
  */
-export interface EnrichmentMetrics {
+export type EnrichmentMetrics = {
   /** Total requests made to the proxy */
   proxyRequests: number;
   /** Successful proxy requests */
@@ -152,7 +152,7 @@ export interface EnrichmentMetrics {
   cacheHits: number;
   /** Last reset timestamp */
   lastReset: number;
-}
+};
 
 /** In-memory metrics storage */
 let metrics: EnrichmentMetrics = {
@@ -388,9 +388,7 @@ export async function getClientId(): Promise<string> {
 export async function fetchBeersFromProxy(storeId: string): Promise<BeersProxyResponse> {
   const { enrichment } = config;
 
-  if (!enrichment.isConfigured()) {
-    throw new Error('Enrichment service not configured');
-  }
+  assertEnrichmentConfigured(enrichment);
 
   // Check client-side rate limit
   if (!isRequestAllowed()) {
@@ -412,7 +410,7 @@ export async function fetchBeersFromProxy(storeId: string): Promise<BeersProxyRe
     const response = await fetch(url, {
       method: 'GET',
       headers: {
-        'X-API-Key': enrichment.apiKey!,
+        'X-API-Key': enrichment.apiKey,
         'X-Client-ID': clientId,
         Accept: 'application/json',
       },
@@ -514,6 +512,8 @@ export async function fetchEnrichmentBatch(
     return {};
   }
 
+  assertEnrichmentConfigured(enrichment);
+
   // Chunk IDs into batches using config batch size
   const chunks: string[][] = [];
   for (let i = 0; i < beerIds.length; i += enrichment.batchSize) {
@@ -552,7 +552,7 @@ export async function fetchEnrichmentBatch(
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-API-Key': enrichment.apiKey!,
+          'X-API-Key': enrichment.apiKey,
           'X-Client-ID': clientId,
         },
         body: JSON.stringify({ ids: chunk }),
@@ -632,10 +632,10 @@ export async function fetchEnrichmentBatch(
  * Extended result from fetchEnrichmentBatchWithMissing
  * Includes both enrichment data and IDs not found in the Worker database
  */
-export interface EnrichmentBatchResult {
+export type EnrichmentBatchResult = {
   enrichments: Record<string, EnrichmentData>;
   missing: string[];
-}
+};
 
 /**
  * Fetch enrichment data for a batch of beer IDs, including missing IDs.
@@ -665,6 +665,8 @@ export async function fetchEnrichmentBatchWithMissing(
   if (!enrichment.isConfigured() || beerIds.length === 0) {
     return { enrichments: {}, missing: [] };
   }
+
+  assertEnrichmentConfigured(enrichment);
 
   // Chunk IDs into batches using config batch size
   const chunks: string[][] = [];
@@ -704,7 +706,7 @@ export async function fetchEnrichmentBatchWithMissing(
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-API-Key': enrichment.apiKey!,
+          'X-API-Key': enrichment.apiKey,
           'X-Client-ID': clientId,
         },
         body: JSON.stringify({ ids: chunk }),
@@ -816,6 +818,8 @@ export async function syncBeersToWorker(
     return null;
   }
 
+  assertEnrichmentConfigured(enrichment);
+
   // Chunk beers into batches (sync endpoint has max 50 beers per request)
   const MAX_SYNC_BATCH_SIZE = 50;
   const chunks: (typeof beers)[] = [];
@@ -864,7 +868,7 @@ export async function syncBeersToWorker(
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-API-Key': enrichment.apiKey!,
+          'X-API-Key': enrichment.apiKey,
           'X-Client-ID': clientId,
         },
         body: JSON.stringify(requestBody),
@@ -1063,6 +1067,8 @@ async function fetchEnrichmentBatchInternal(
     return {};
   }
 
+  assertEnrichmentConfigured(enrichment);
+
   const clientId = await getClientId();
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), enrichment.timeout);
@@ -1072,7 +1078,7 @@ async function fetchEnrichmentBatchInternal(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-API-Key': enrichment.apiKey!,
+        'X-API-Key': enrichment.apiKey,
         'X-Client-ID': clientId,
       },
       body: JSON.stringify({ ids: beerIds }),

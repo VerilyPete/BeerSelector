@@ -11,7 +11,7 @@ import SettingsItem from './SettingsItem';
 /**
  * Props for WelcomeSection component
  */
-interface WelcomeSectionProps {
+type WelcomeSectionProps = {
   /**
    * Callback when user taps login button
    */
@@ -36,7 +36,7 @@ interface WelcomeSectionProps {
    * Test ID for testing
    */
   testID?: string;
-}
+};
 
 /**
  * WelcomeSection Component

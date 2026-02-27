@@ -26,7 +26,7 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 import { OptimisticUpdateStatus } from '@/src/types/optimisticUpdate';
 import { Colors } from '@/constants/Colors';
 
-interface OptimisticStatusBadgeProps {
+type OptimisticStatusBadgeProps = {
   /** Current status of the optimistic update */
   status: OptimisticUpdateStatus;
 
@@ -38,7 +38,7 @@ interface OptimisticStatusBadgeProps {
 
   /** Callback when user taps to rollback/cancel */
   onCancel?: () => void;
-}
+};
 
 export const OptimisticStatusBadge: React.FC<OptimisticStatusBadgeProps> = ({
   status,

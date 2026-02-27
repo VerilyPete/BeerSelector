@@ -30,12 +30,12 @@ import { EnrichmentUpdate } from '../types/enrichment';
 /**
  * Result of a data update operation
  */
-export interface DataUpdateResult {
+export type DataUpdateResult = {
   success: boolean;
   error?: ErrorResponse;
   dataUpdated: boolean;
   itemCount?: number;
-}
+};
 
 /**
  * Sync missing beers to Worker in background (fire-and-forget pattern).
@@ -185,7 +185,7 @@ export async function fetchAndUpdateAllBeers(): Promise<DataUpdateResult> {
     // Extract store ID from URL for proxy calls
     const storeId = extractStoreIdFromUrl(apiUrl);
 
-    let allBeers: Beer[] = [];
+    let allBeers: unknown[] = [];
     let usedProxy = false;
 
     // =========================================================================
@@ -391,7 +391,7 @@ export async function fetchAndUpdateAllBeers(): Promise<DataUpdateResult> {
     // Calculate container types BEFORE insertion
     // Note: calculateContainerTypes preserves enrichment fields if present
     console.log('Calculating container types for beers...');
-    const beersWithContainerTypes = calculateContainerTypes(validationResult.validBeers as Beer[]);
+    const beersWithContainerTypes = calculateContainerTypes(validationResult.validBeers);
 
     // Update the database with valid beers including container types
     await beerRepository.insertMany(beersWithContainerTypes);
@@ -617,7 +617,7 @@ export async function fetchAndUpdateMyBeers(): Promise<DataUpdateResult> {
 
     // Calculate container types BEFORE insertion
     console.log('Calculating container types for tasted beers...');
-    const beersWithContainerTypes = calculateContainerTypes(validBeers as Beer[]);
+    const beersWithContainerTypes = calculateContainerTypes(validBeers);
 
     // =========================================================================
     // ENRICHMENT: Fetch enrichment data via batch lookup if proxy is configured
@@ -717,21 +717,21 @@ export async function shouldRefreshData(
 /**
  * Result of a manual refresh operation
  */
-export interface ManualRefreshResult {
+export type ManualRefreshResult = {
   allBeersResult: DataUpdateResult;
   myBeersResult: DataUpdateResult;
   rewardsResult: DataUpdateResult;
   hasErrors: boolean;
   allNetworkErrors: boolean;
-}
+};
 
 /**
  * Result of an automatic refresh operation
  */
-export interface AutoRefreshResult {
+export type AutoRefreshResult = {
   updated: boolean;
   errors: ErrorResponse[];
-}
+};
 
 /**
  * Check and refresh data on app open if needed
@@ -772,26 +772,6 @@ export async function fetchAndUpdateRewards(): Promise<DataUpdateResult> {
       error: createErrorResponse(error),
     };
   }
-}
-
-// NOTE: These implementation variables and override function are currently unused.
-// They were intended for test injection but never fully implemented.
-// Keeping them for potential future use.
-// @ts-expect-error - Unused variable kept for future test injection
-let _fetchAllImpl = fetchAndUpdateAllBeers;
-// @ts-expect-error - Unused variable kept for future test injection
-let _fetchMyImpl = fetchAndUpdateMyBeers;
-// @ts-expect-error - Unused variable kept for future test injection
-let _fetchRewardsImpl = fetchAndUpdateRewards;
-
-export function __setRefreshImplementations(overrides: {
-  fetchAll?: typeof fetchAndUpdateAllBeers;
-  fetchMy?: typeof fetchAndUpdateMyBeers;
-  fetchRewards?: typeof fetchAndUpdateRewards;
-}) {
-  if (overrides.fetchAll) _fetchAllImpl = overrides.fetchAll;
-  if (overrides.fetchMy) _fetchMyImpl = overrides.fetchMy;
-  if (overrides.fetchRewards) _fetchRewardsImpl = overrides.fetchRewards;
 }
 
 /**
@@ -872,7 +852,7 @@ export async function sequentialRefreshAllData(): Promise<ManualRefreshResult> {
       // Calculate container types BEFORE insertion
       console.log('Sequential refresh: calculating container types for beers...');
       const beersWithContainerTypes = calculateContainerTypes(
-        validationResult.validBeers as Beer[]
+        validationResult.validBeers
       );
 
       await beerRepository.insertManyUnsafe(beersWithContainerTypes);
@@ -917,7 +897,7 @@ export async function sequentialRefreshAllData(): Promise<ManualRefreshResult> {
       // Calculate container types BEFORE insertion
       console.log('Sequential refresh: calculating container types for my beers...');
       const myBeersWithContainerTypes = calculateContainerTypes(
-        validationResult.validBeers as Beer[]
+        validationResult.validBeers
       );
 
       // Add batch enrichment for my beers if proxy is configured
@@ -1001,7 +981,7 @@ export async function sequentialRefreshAllData(): Promise<ManualRefreshResult> {
       [allBeersResult, myBeersResult, rewardsResult]
         .filter(result => !result.success && result.error)
         .every(
-          result => result.error!.type === 'NETWORK_ERROR' || result.error!.type === 'TIMEOUT_ERROR'
+          result => result.error?.type === 'NETWORK_ERROR' || result.error?.type === 'TIMEOUT_ERROR'
         );
 
     console.log('Sequential refresh completed:', {
@@ -1264,7 +1244,7 @@ export const refreshAllDataFromAPI = async (): Promise<{
     // Calculate container types BEFORE insertion
     console.log('Calculating container types for all beers...');
     const allBeersWithContainerTypes = calculateContainerTypes(
-      allBeersValidation.validBeers as Beer[]
+      allBeersValidation.validBeers
     );
 
     await beerRepository.insertManyUnsafe(allBeersWithContainerTypes);
@@ -1287,7 +1267,7 @@ export const refreshAllDataFromAPI = async (): Promise<{
     // Calculate container types for my beers BEFORE insertion
     console.log('Calculating container types for my beers...');
     const myBeersWithContainerTypes = calculateContainerTypes(
-      myBeersValidation.validBeers as Beer[]
+      myBeersValidation.validBeers
     );
 
     // Add batch enrichment for my beers if proxy is configured

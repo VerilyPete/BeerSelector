@@ -8,7 +8,7 @@ import SettingsItem from './SettingsItem';
 /**
  * Props for DataManagementSection component
  */
-interface DataManagementSectionProps {
+type DataManagementSectionProps = {
   /** Whether API URLs are configured */
   apiUrlsConfigured: boolean;
   /** Whether data refresh is in progress */
@@ -30,7 +30,7 @@ interface DataManagementSectionProps {
   style?: ViewStyle;
   /** Test ID for testing */
   testID?: string;
-}
+};
 
 /**
  * DataManagementSection Component

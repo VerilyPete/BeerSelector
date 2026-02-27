@@ -27,6 +27,10 @@ import {
   InvalidEnvironmentError
 } from '../errors';
 
+function assertError(value: unknown): asserts value is Error {
+  if (!(value instanceof Error)) throw new Error(`Expected Error, got ${typeof value}`);
+}
+
 describe('Configuration Validation', () => {
   // Store original process.env to restore after tests
   const originalEnv = process.env;
@@ -135,7 +139,8 @@ describe('Configuration Validation', () => {
         try {
           config.setCustomApiUrl('not-a-url');
           fail('Should have thrown InvalidUrlError');
-        } catch (error: any) {
+        } catch (error: unknown) {
+          assertError(error);
           expect(error).toBeInstanceOf(InvalidUrlError);
           // Message contains "Invalid API base URL" which includes "Invalid"
           expect(error.message).toContain('Invalid');
@@ -179,7 +184,8 @@ describe('Configuration Validation', () => {
           const { config: freshConfig } = require('../config');
           freshConfig.network; // Access to trigger validation
           fail('Should have thrown InvalidNetworkConfigError');
-        } catch (error: any) {
+        } catch (error: unknown) {
+          assertError(error);
           expect(error.name).toBe('InvalidNetworkConfigError');
           expect(error.message).toContain('timeout');
         }
@@ -192,7 +198,8 @@ describe('Configuration Validation', () => {
           const { config: freshConfig } = require('../config');
           freshConfig.network; // Access to trigger validation
           fail('Should have thrown InvalidNetworkConfigError');
-        } catch (error: any) {
+        } catch (error: unknown) {
+          assertError(error);
           expect(error.name).toBe('InvalidNetworkConfigError');
           expect(error.message).toContain('timeout');
         }
@@ -205,7 +212,8 @@ describe('Configuration Validation', () => {
           const { config: freshConfig } = require('../config');
           freshConfig.network; // Access to trigger validation
           fail('Should have thrown InvalidNetworkConfigError');
-        } catch (error: any) {
+        } catch (error: unknown) {
+          assertError(error);
           expect(error.name).toBe('InvalidNetworkConfigError');
           expect(error.message).toContain('timeout');
         }
@@ -217,7 +225,8 @@ describe('Configuration Validation', () => {
           const { config: freshConfig } = require('../config');
           freshConfig.network; // Access to trigger validation
           fail('Should have thrown InvalidNetworkConfigError');
-        } catch (error: any) {
+        } catch (error: unknown) {
+          assertError(error);
           expect(error.name).toBe('InvalidNetworkConfigError');
           expect(error.message).toContain('timeout');
           expect(error.message).toContain('-5000');
@@ -246,7 +255,8 @@ describe('Configuration Validation', () => {
           const { config: freshConfig } = require('../config');
           freshConfig.network; // Access to trigger validation
           fail('Should have thrown InvalidNetworkConfigError');
-        } catch (error: any) {
+        } catch (error: unknown) {
+          assertError(error);
           expect(error.name).toBe('InvalidNetworkConfigError');
           expect(error.message).toContain('retries');
         }
@@ -259,7 +269,8 @@ describe('Configuration Validation', () => {
           const { config: freshConfig } = require('../config');
           freshConfig.network; // Access to trigger validation
           fail('Should have thrown InvalidNetworkConfigError');
-        } catch (error: any) {
+        } catch (error: unknown) {
+          assertError(error);
           expect(error.name).toBe('InvalidNetworkConfigError');
           expect(error.message).toContain('retries');
         }
@@ -271,7 +282,8 @@ describe('Configuration Validation', () => {
           const { config: freshConfig } = require('../config');
           freshConfig.network; // Access to trigger validation
           fail('Should have thrown InvalidNetworkConfigError');
-        } catch (error: any) {
+        } catch (error: unknown) {
+          assertError(error);
           expect(error.name).toBe('InvalidNetworkConfigError');
           expect(error.message).toContain('retries');
           expect(error.message).toContain('20');
@@ -294,7 +306,8 @@ describe('Configuration Validation', () => {
           const { config: freshConfig } = require('../config');
           freshConfig.network; // Access to trigger validation
           fail('Should have thrown InvalidNetworkConfigError');
-        } catch (error: any) {
+        } catch (error: unknown) {
+          assertError(error);
           expect(error.name).toBe('InvalidNetworkConfigError');
           expect(error.message).toContain('retry delay');
         }
@@ -307,7 +320,8 @@ describe('Configuration Validation', () => {
           const { config: freshConfig } = require('../config');
           freshConfig.network; // Access to trigger validation
           fail('Should have thrown InvalidNetworkConfigError');
-        } catch (error: any) {
+        } catch (error: unknown) {
+          assertError(error);
           expect(error.name).toBe('InvalidNetworkConfigError');
           expect(error.message).toContain('retry delay');
         }
@@ -320,7 +334,8 @@ describe('Configuration Validation', () => {
           const { config: freshConfig } = require('../config');
           freshConfig.network; // Access to trigger validation
           fail('Should have thrown InvalidNetworkConfigError');
-        } catch (error: any) {
+        } catch (error: unknown) {
+          assertError(error);
           expect(error.name).toBe('InvalidNetworkConfigError');
           expect(error.message).toContain('retry delay');
         }
@@ -332,7 +347,8 @@ describe('Configuration Validation', () => {
           const { config: freshConfig } = require('../config');
           freshConfig.network; // Access to trigger validation
           fail('Should have thrown InvalidNetworkConfigError');
-        } catch (error: any) {
+        } catch (error: unknown) {
+          assertError(error);
           expect(error.name).toBe('InvalidNetworkConfigError');
           expect(error.message).toContain('retry delay');
           expect(error.message).toContain('-1000');
@@ -383,7 +399,8 @@ describe('Configuration Validation', () => {
       try {
         config.setEnvironment('invalid-env' as any);
         fail('Should have thrown InvalidEnvironmentError');
-      } catch (error: any) {
+      } catch (error: unknown) {
+        assertError(error);
         expect(error).toBeInstanceOf(InvalidEnvironmentError);
         expect(error.message).toContain('Invalid environment');
         expect(error.message).toContain('invalid-env');
@@ -495,7 +512,8 @@ describe('Configuration Validation', () => {
         const { config: freshConfig } = require('../config');
         freshConfig.network; // Access to trigger validation
         fail('Should have thrown InvalidNetworkConfigError');
-      } catch (error: any) {
+      } catch (error: unknown) {
+        assertError(error);
         expect(error.name).toBe('InvalidNetworkConfigError');
         expect(error.message).toContain('timeout');
       }
@@ -506,7 +524,8 @@ describe('Configuration Validation', () => {
     it('should include invalid value in error message', () => {
       try {
         config.setCustomApiUrl('not-a-url');
-      } catch (error: any) {
+      } catch (error: unknown) {
+        assertError(error);
         expect(error.message).toContain('not-a-url');
       }
     });
@@ -514,7 +533,8 @@ describe('Configuration Validation', () => {
     it('should suggest how to fix the error', () => {
       try {
         config.setCustomApiUrl('invalid');
-      } catch (error: any) {
+      } catch (error: unknown) {
+        assertError(error);
         expect(error.message).toContain('http://');
         expect(error.message).toContain('https://');
       }
@@ -525,7 +545,8 @@ describe('Configuration Validation', () => {
       try {
         const { config: freshConfig } = require('../config');
         freshConfig.network.timeout;
-      } catch (error: any) {
+      } catch (error: unknown) {
+        assertError(error);
         expect(error.message).toContain('EXPO_PUBLIC_API_TIMEOUT');
       }
     });
@@ -533,7 +554,8 @@ describe('Configuration Validation', () => {
     it('should list valid options for enum-like values', () => {
       try {
         config.setEnvironment('invalid' as any);
-      } catch (error: any) {
+      } catch (error: unknown) {
+        assertError(error);
         expect(error.message).toContain('development');
         expect(error.message).toContain('staging');
         expect(error.message).toContain('production');
@@ -545,7 +567,7 @@ describe('Configuration Validation', () => {
     it('should not significantly slow down config access', () => {
       const start = Date.now();
       for (let i = 0; i < 1000; i++) {
-        const baseUrl = config.api.baseUrl;
+        config.api.baseUrl;
       }
       const duration = Date.now() - start;
 

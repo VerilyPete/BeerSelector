@@ -133,13 +133,25 @@ describe('Type Guards', () => {
     });
 
     describe('isLoginResult', () => {
-      it('should return true for valid LoginResult objects', () => {
+      it('should return true for valid success LoginResult objects', () => {
         const validLoginResult = {
           success: true,
           message: 'Login successful',
+          sessionData: { memberId: '1', storeId: '2', storeName: 'S', sessionId: '3' },
+          statusCode: 200,
         };
 
         expect(isLoginResult(validLoginResult)).toBe(true);
+      });
+
+      it('should return true for valid failure LoginResult objects', () => {
+        const failureResult = {
+          success: false,
+          error: 'Login failed',
+          statusCode: 401,
+        };
+
+        expect(isLoginResult(failureResult)).toBe(true);
       });
 
       it('should return false for invalid LoginResult objects', () => {

@@ -7,12 +7,12 @@ import { IconSymbol } from './ui/IconSymbol';
 import { spacing, borderRadii } from '@/constants/spacing';
 import * as Haptics from 'expo-haptics';
 
-interface SearchBarProps {
+type SearchBarProps = {
   searchText: string;
   onSearchChange: (text: string) => void;
   onClear: () => void;
   placeholder?: string;
-}
+};
 
 const SearchBarComponent: React.FC<SearchBarProps> = ({
   searchText,

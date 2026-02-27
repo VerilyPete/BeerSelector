@@ -3,31 +3,31 @@
  */
 
 /**
- * Preference interface for app preferences stored in the database
+ * Preference type for app preferences stored in the database
  */
-export interface Preference {
+export type Preference = {
   key: string;
   value: string;
   description: string;
-}
+};
 
 /**
- * Reward interface for user rewards stored in the database
+ * Reward type for user rewards stored in the database
  */
-export interface Reward {
+export type Reward = {
   reward_id: string;
   redeemed: string;
   reward_type: string;
-}
+};
 
 /**
- * DatabaseLock interface for database locks
+ * DatabaseLock type for database locks
  */
-export interface DatabaseLock {
+export type DatabaseLock = {
   lock_key: string;
   acquired_at: number;
   expires_at: number;
-}
+};
 
 /**
  * Type guard to check if an object is a Preference

@@ -525,11 +525,11 @@ export async function syncLiveActivityOnLaunch(
  * Queue state for restart operations.
  * Combines member/store IDs with the beer queue.
  */
-export interface LiveActivityQueueStateWithIds {
+export type LiveActivityQueueStateWithIds = {
   memberId: string;
   storeId: string;
   beers: LiveActivityQueuedBeer[];
-}
+};
 
 /**
  * Restart the Live Activity with new queue state.

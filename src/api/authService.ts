@@ -2,7 +2,7 @@ import { saveSessionData, clearSessionData } from './sessionManager';
 import { getApiClient } from './apiClientInstance';
 import { getPreference, setPreference } from '../database/preferences';
 import { refreshAllDataFromAPI } from '../services/dataUpdateService';
-import { SessionData, ApiError, LoginResult } from '../types/api';
+import { SessionData, ApiError, LoginResult, LogoutResult } from '../types/api';
 
 // Using LoginResult interface from ../types/api
 
@@ -15,40 +15,47 @@ export async function autoLogin(): Promise<LoginResult> {
     const apiClient = getApiClient();
     const response = await apiClient.post<{ session: SessionData }>('/auto-login.php', {});
 
-    if (response.success && response.data && response.data.session) {
-      // Save the session data
-      await saveSessionData(response.data.session);
-
-      // Check if user is in visitor mode
-      const isVisitor = await getPreference('is_visitor_mode');
-      const isVisitorMode = isVisitor === 'true';
-
-      // Refresh all data if autologin was successful
-      if (!isVisitorMode) {
-        try {
-          await refreshAllDataFromAPI();
-          console.log('Successfully refreshed all data after auto-login');
-        } catch (refreshError) {
-          console.error('Error refreshing data after auto-login:', refreshError);
-          // Continue with login process even if refresh fails
-        }
-      }
-
-      return {
-        success: true,
-        message: 'Auto-login successful',
-        data: response.data,
-        sessionData: response.data.session,
-        statusCode: response.statusCode,
-        isVisitorMode: isVisitorMode,
-      };
-    } else {
+    if (!response.success) {
       return {
         success: false,
         error: response.error || 'Auto-login failed',
         statusCode: response.statusCode || 401,
       };
     }
+
+    if (!response.data?.session) {
+      return {
+        success: false,
+        error: 'Auto-login failed: no session data',
+        statusCode: response.statusCode || 401,
+      };
+    }
+
+    // Save the session data
+    await saveSessionData(response.data.session);
+
+    // Check if user is in visitor mode
+    const isVisitor = await getPreference('is_visitor_mode');
+    const isVisitorMode = isVisitor === 'true';
+
+    // Refresh all data if autologin was successful
+    if (!isVisitorMode) {
+      try {
+        await refreshAllDataFromAPI();
+        console.log('Successfully refreshed all data after auto-login');
+      } catch (refreshError) {
+        console.error('Error refreshing data after auto-login:', refreshError);
+      }
+    }
+
+    return {
+      success: true,
+      message: 'Auto-login successful',
+      data: response.data,
+      sessionData: response.data.session,
+      statusCode: response.statusCode,
+      isVisitorMode: isVisitorMode,
+    };
   } catch (error) {
     console.error('Error during auto-login:', error);
 
@@ -95,22 +102,23 @@ export const handleVisitorLogin = async (
       };
     }
 
-    // Create minimal session data for visitor mode
-    const sessionData: Partial<SessionData> = {
-      sessionId: parsedCookies.PHPSESSID || 'visitor_session', // Use placeholder if missing
-      storeId: storeId,
-      memberId: 'visitor', // Setting a placeholder member ID for visitor
-      storeName: 'Flying Saucer', // Default store name
-    };
-
-    // Try to get the store name if available
+    // Decode store name with fallback
+    let storeName = 'Flying Saucer';
     try {
       if (parsedCookies.store_name) {
-        sessionData.storeName = decodeURIComponent(parsedCookies.store_name);
+        storeName = decodeURIComponent(parsedCookies.store_name);
       }
     } catch (e) {
       console.warn('Failed to decode store_name cookie:', e);
     }
+
+    // Build complete session data for visitor mode
+    const sessionData: SessionData = {
+      sessionId: parsedCookies.PHPSESSID || 'visitor_session',
+      storeId: storeId,
+      memberId: 'visitor',
+      storeName: storeName,
+    };
 
     // Store information about visitor mode
     await setPreference(
@@ -130,12 +138,12 @@ export const handleVisitorLogin = async (
 
     // Save the session data
     console.log('Saving visitor session data:', JSON.stringify(sessionData));
-    await saveSessionData(sessionData as SessionData);
+    await saveSessionData(sessionData);
 
     return {
       success: true,
       message: 'Visitor login successful',
-      sessionData: sessionData as SessionData,
+      sessionData: sessionData,
       statusCode: 200,
       isVisitorMode: true,
     };
@@ -172,59 +180,54 @@ export const handleTapThatAppLogin = async (
     // Parse cookies if they're in string format
     const parsedCookies = typeof cookies === 'string' ? parseCookiesString(cookies) : cookies;
 
-    // Extract relevant session data with safe decoding
-    const sessionData: Partial<SessionData> = {
-      sessionId: parsedCookies.PHPSESSID || '',
-      storeId: parsedCookies.store__id || parsedCookies.store || '',
-      memberId: parsedCookies.member_id || '',
-    };
+    // Extract required fields
+    const sessionId = parsedCookies.PHPSESSID || '';
+    const storeId = parsedCookies.store__id || parsedCookies.store || '';
+    const memberId = parsedCookies.member_id || '';
 
-    // Safely decode URI components with error handling
+    // Validate that we have the minimum required data
+    if (!sessionId || !memberId || !storeId) {
+      return {
+        success: false,
+        error: 'Missing required login data',
+        statusCode: 401,
+      };
+    }
+
+    // Safely decode store name with fallback
+    let storeName = 'Flying Saucer';
     try {
       if (parsedCookies.store_name) {
-        sessionData.storeName = decodeURIComponent(parsedCookies.store_name);
+        storeName = decodeURIComponent(parsedCookies.store_name);
       }
     } catch (e) {
-      sessionData.storeName = parsedCookies.store_name || '';
+      storeName = parsedCookies.store_name || 'Flying Saucer';
       console.warn('Failed to decode store_name cookie:', e);
     }
 
-    try {
-      if (parsedCookies.username) {
-        sessionData.username = decodeURIComponent(parsedCookies.username);
-      }
-    } catch (e) {
-      sessionData.username = parsedCookies.username || '';
-      console.warn('Failed to decode username cookie:', e);
-    }
+    // Build complete session data with required fields
+    const sessionData: SessionData = {
+      sessionId,
+      storeId,
+      memberId,
+      storeName,
+    };
 
-    try {
-      if (parsedCookies.first_name) {
-        sessionData.firstName = decodeURIComponent(parsedCookies.first_name);
+    // Safely decode optional URI components
+    const decodeOptional = (value: string | undefined, field: string): string | undefined => {
+      if (!value) return undefined;
+      try {
+        return decodeURIComponent(value);
+      } catch (e) {
+        console.warn(`Failed to decode ${field} cookie:`, e);
+        return value;
       }
-    } catch (e) {
-      sessionData.firstName = parsedCookies.first_name || '';
-      console.warn('Failed to decode first_name cookie:', e);
-    }
+    };
 
-    try {
-      if (parsedCookies.last_name) {
-        sessionData.lastName = decodeURIComponent(parsedCookies.last_name);
-      }
-    } catch (e) {
-      sessionData.lastName = parsedCookies.last_name || '';
-      console.warn('Failed to decode last_name cookie:', e);
-    }
-
-    try {
-      if (parsedCookies.email) {
-        sessionData.email = decodeURIComponent(parsedCookies.email);
-      }
-    } catch (e) {
-      sessionData.email = parsedCookies.email || '';
-      console.warn('Failed to decode email cookie:', e);
-    }
-
+    sessionData.username = decodeOptional(parsedCookies.username, 'username');
+    sessionData.firstName = decodeOptional(parsedCookies.first_name, 'first_name');
+    sessionData.lastName = decodeOptional(parsedCookies.last_name, 'last_name');
+    sessionData.email = decodeOptional(parsedCookies.email, 'email');
     if (parsedCookies.cardNum) {
       sessionData.cardNum = parsedCookies.cardNum;
     }
@@ -236,22 +239,13 @@ export const handleTapThatAppLogin = async (
       'Flag indicating whether the user is in visitor mode'
     );
 
-    // Validate that we have the minimum required data
-    if (!sessionData.sessionId || !sessionData.memberId || !sessionData.storeId) {
-      return {
-        success: false,
-        error: 'Missing required login data',
-        statusCode: 401,
-      };
-    }
-
     // Save the session data
-    await saveSessionData(sessionData as SessionData);
+    await saveSessionData(sessionData);
 
     return {
       success: true,
       message: 'Login successful',
-      sessionData: sessionData as SessionData,
+      sessionData: sessionData,
       statusCode: 200,
       isVisitorMode: false,
     };
@@ -278,7 +272,7 @@ export const handleTapThatAppLogin = async (
  * Logs out the user by clearing the session data
  * @returns A login result indicating success or failure
  */
-export async function logout(): Promise<LoginResult> {
+export async function logout(): Promise<LogoutResult> {
   try {
     const apiClient = getApiClient();
     await apiClient.post('/logout.php', {});
@@ -374,41 +368,48 @@ export async function login(username: string, password: string): Promise<LoginRe
       password,
     });
 
-    if (response.success && response.data && response.data.session) {
-      // Save the session data
-      await saveSessionData(response.data.session);
-
-      // Clear visitor mode flag on regular login
-      await setPreference(
-        'is_visitor_mode',
-        'false',
-        'Flag indicating whether the user is in visitor mode'
-      );
-
-      // Refresh all data from the API, including rewards
-      try {
-        await refreshAllDataFromAPI();
-        console.log('Successfully refreshed all data after login');
-      } catch (refreshError) {
-        console.error('Error refreshing data after login:', refreshError);
-        // Continue with login process even if refresh fails
-      }
-
-      return {
-        success: true,
-        message: 'Login successful',
-        data: response.data,
-        sessionData: response.data.session,
-        statusCode: response.statusCode,
-        isVisitorMode: false,
-      };
-    } else {
+    if (!response.success) {
       return {
         success: false,
         error: response.error || 'Login failed',
         statusCode: response.statusCode || 401,
       };
     }
+
+    if (!response.data?.session) {
+      return {
+        success: false,
+        error: 'Login failed: no session data',
+        statusCode: response.statusCode || 401,
+      };
+    }
+
+    // Save the session data
+    await saveSessionData(response.data.session);
+
+    // Clear visitor mode flag on regular login
+    await setPreference(
+      'is_visitor_mode',
+      'false',
+      'Flag indicating whether the user is in visitor mode'
+    );
+
+    // Refresh all data from the API, including rewards
+    try {
+      await refreshAllDataFromAPI();
+      console.log('Successfully refreshed all data after login');
+    } catch (refreshError) {
+      console.error('Error refreshing data after login:', refreshError);
+    }
+
+    return {
+      success: true,
+      message: 'Login successful',
+      data: response.data,
+      sessionData: response.data.session,
+      statusCode: response.statusCode,
+      isVisitorMode: false,
+    };
   } catch (error) {
     console.error('Error during login:', error);
 

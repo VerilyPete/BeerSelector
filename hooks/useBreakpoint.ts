@@ -9,7 +9,7 @@ export type Breakpoint = 'phone' | 'tablet' | 'tabletLandscape';
 /**
  * Return type for useBreakpoint hook
  */
-export interface BreakpointResult {
+export type BreakpointResult = {
   /** Current breakpoint based on screen width */
   breakpoint: Breakpoint;
   /** True if device is a phone (width < 768) */
@@ -24,7 +24,7 @@ export interface BreakpointResult {
   height: number;
   /** Recommended number of columns for grid layouts */
   numColumns: number;
-}
+};
 
 /**
  * Breakpoint thresholds in pixels

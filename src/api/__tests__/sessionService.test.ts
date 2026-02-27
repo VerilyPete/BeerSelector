@@ -54,12 +54,14 @@ describe('sessionService', () => {
 
   describe('refreshSession', () => {
     it('should refresh session successfully', async () => {
-      // Mock successful API response (service uses response.data, not response.json())
+      // Mock successful API response matching ApiResponse<T> discriminated union
       mockApiClient.post.mockResolvedValueOnce({
+        success: true,
         data: {
           success: true,
           session: mockSessionData,
         },
+        statusCode: 200,
       });
 
       const result = await refreshSession();
@@ -78,12 +80,12 @@ describe('sessionService', () => {
     });
 
     it('should return null when refresh fails', async () => {
-      // Mock failed API response (service uses response.data, not response.json())
+      // Mock failed API response matching ApiResponse<T> discriminated union
       mockApiClient.post.mockResolvedValueOnce({
-        data: {
-          success: false,
-          error: 'Invalid credentials',
-        },
+        success: false,
+        data: null,
+        error: 'Invalid credentials',
+        statusCode: 401,
       });
 
       const result = await refreshSession();
@@ -131,12 +133,14 @@ describe('sessionService', () => {
         .mockResolvedValueOnce(null) // First call in getValidSession returns null
         .mockResolvedValueOnce(mockSessionData); // Second call in refreshSession returns data
 
-      // Mock successful refresh (service uses response.data, not response.json())
+      // Mock successful refresh matching ApiResponse<T> discriminated union
       mockApiClient.post.mockResolvedValueOnce({
+        success: true,
         data: {
           success: true,
           session: mockSessionData,
         },
+        statusCode: 200,
       });
 
       const result = await getValidSession();
@@ -154,12 +158,12 @@ describe('sessionService', () => {
       (getSessionData as jest.Mock).mockResolvedValueOnce(mockSessionData);
       (validateSession as jest.Mock).mockResolvedValueOnce(null);
 
-      // Mock failed refresh (service uses response.data, not response.json())
+      // Mock failed refresh matching ApiResponse<T> discriminated union
       mockApiClient.post.mockResolvedValueOnce({
-        data: {
-          success: false,
-          error: 'Invalid credentials',
-        },
+        success: false,
+        data: null,
+        error: 'Invalid credentials',
+        statusCode: 401,
       });
 
       const result = await getValidSession();

@@ -14,9 +14,9 @@ import { ContainerType } from '@/src/utils/beerGlassType';
 export type EnrichmentSource = 'description' | 'perplexity' | 'manual' | null;
 
 /**
- * Base Beer interface representing a beer in the system
+ * Base Beer type representing a beer in the system
  */
-export interface Beer {
+export type Beer = {
   id: string;
   brew_name: string;
   brewer?: string;
@@ -31,7 +31,7 @@ export interface Beer {
   // Enrichment fields (from Cloudflare Worker)
   enrichment_confidence?: number | null;
   enrichment_source?: EnrichmentSource;
-}
+};
 
 /**
  * Beer with container type property (after database fetch)
@@ -44,22 +44,22 @@ export interface Beer {
  *
  * Enrichment fields are inherited from Beer and explicitly typed here for clarity.
  */
-export interface BeerWithContainerType extends Beer {
+export type BeerWithContainerType = Beer & {
   container_type: ContainerType; // Field present, value can be null
   // Enrichment fields explicitly typed (inherited from Beer, made required with nullable values)
   enrichment_confidence: number | null;
   enrichment_source: EnrichmentSource;
-}
+};
 
 /**
- * Beerfinder interface representing a tasted beer with additional properties
+ * Beerfinder type representing a tasted beer with additional properties
  */
-export interface Beerfinder extends Beer {
+export type Beerfinder = Beer & {
   roh_lap?: string;
   tasted_date?: string;
   review_ratings?: string;
   chit_code?: string;
-}
+};
 
 /**
  * Beerfinder with container type (after database fetch)
@@ -68,45 +68,45 @@ export interface Beerfinder extends Beer {
  *
  * Enrichment fields are inherited and explicitly typed here for clarity.
  */
-export interface BeerfinderWithContainerType extends BeerWithContainerType {
+export type BeerfinderWithContainerType = BeerWithContainerType & {
   roh_lap?: string;
   tasted_date?: string;
   review_ratings?: string;
   chit_code?: string;
-}
+};
 
 /**
- * BeerDetails interface for detailed beer information
+ * BeerDetails type for detailed beer information
  * Note: abv is inherited from Beer as number | null, not overridden as string
  */
-export interface BeerDetails extends Beer {
+export type BeerDetails = Beer & {
   ibu?: string;
   availability?: string;
   seasonal?: boolean;
   origin_country?: string;
   untappd_rating?: string;
   untappd_ratings_count?: number;
-}
+};
 
 /**
- * CheckInRequestData interface for beer check-in requests
+ * CheckInRequestData type for beer check-in requests
  */
-export interface CheckInRequestData {
+export type CheckInRequestData = {
   chitCode: string;
   chitBrewId: string;
   chitBrewName: string;
   chitStoreName: string;
-}
+};
 
 /**
- * CheckInResponse interface for beer check-in responses
+ * CheckInResponse type for beer check-in responses
  */
-export interface CheckInResponse {
+export type CheckInResponse = {
   success: boolean;
   message?: string;
   rawResponse?: string;
   error?: string;
-}
+};
 
 /**
  * Type guard to check if an object is a Beer
@@ -188,27 +188,23 @@ export function isBeerDetails(obj: unknown): obj is BeerDetails {
 export function isBeerWithContainerType(obj: unknown): obj is BeerWithContainerType {
   if (!isBeer(obj)) return false;
 
-  const beer = obj as unknown as Record<string, unknown>;
+  // Check for container_type property (not on Beer, but required for BeerWithContainerType)
+  if (!('container_type' in obj)) return false;
 
-  // container_type must be present and valid
-  const validTypes = ['pint', 'tulip', 'can', 'bottle', 'flight', null];
-  if (!validTypes.includes(beer.container_type as string | null)) {
-    return false;
-  }
+  const validTypes: readonly (string | null)[] = ['pint', 'tulip', 'can', 'bottle', 'flight', null];
+  const containerType = (obj as { container_type: unknown }).container_type;
+  if (typeof containerType !== 'string' && containerType !== null) return false;
+  if (!validTypes.includes(containerType)) return false;
 
-  // For BeerWithContainerType, enrichment fields should be present (can be null)
-  // They are inherited from Beer but made required with nullable values
-  if (!('enrichment_confidence' in beer) || !('enrichment_source' in beer)) {
+  // Enrichment fields must be present (can be null)
+  if (!('enrichment_confidence' in obj) || !('enrichment_source' in obj)) {
     return false;
   }
 
   // Validate enrichment_source value if not null
-  if (beer.enrichment_source !== null) {
-    if (
-      beer.enrichment_source !== 'description' &&
-      beer.enrichment_source !== 'perplexity' &&
-      beer.enrichment_source !== 'manual'
-    ) {
+  const source = (obj as { enrichment_source: unknown }).enrichment_source;
+  if (source !== null) {
+    if (source !== 'description' && source !== 'perplexity' && source !== 'manual') {
       return false;
     }
   }

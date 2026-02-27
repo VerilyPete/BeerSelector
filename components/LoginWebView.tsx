@@ -12,13 +12,13 @@ import { saveSessionData, extractSessionDataFromResponse } from '@/src/api/sessi
 import { isSessionData } from '@/src/types/api';
 import { config } from '@/src/config';
 
-interface LoginWebViewProps {
+type LoginWebViewProps = {
   visible: boolean;
   onLoginSuccess: () => void;
   onLoginCancel: () => void;
   onRefreshData: () => Promise<void>;
   loading?: boolean;
-}
+};
 
 export default function LoginWebView({
   visible,

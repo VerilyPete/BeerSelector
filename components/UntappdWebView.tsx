@@ -2,11 +2,11 @@ import { useEffect } from 'react';
 import * as WebBrowser from 'expo-web-browser';
 import { config } from '@/src/config';
 
-interface UntappdWebViewProps {
+type UntappdWebViewProps = {
   visible: boolean;
   onClose: () => void;
   beerName: string;
-}
+};
 
 /**
  * UntappdWebView component

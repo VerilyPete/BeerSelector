@@ -15,7 +15,7 @@ import { useUntappdColor } from '@/hooks/useUntappdColor';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useBreakpoint } from '@/hooks/useBreakpoint';
 import { SearchBar } from './SearchBar';
-import { router } from 'expo-router';
+import { router, Href } from 'expo-router';
 import { UntappdWebView } from './UntappdWebView';
 import { useBeerFilters } from '@/hooks/useBeerFilters';
 import { useDataRefresh } from '@/hooks/useDataRefresh';
@@ -456,7 +456,7 @@ export const Beerfinder = () => {
                     backgroundColor: untappdColor,
                   },
                 ]}
-                onPress={() => router.push('/screens/rewards' as any)}
+                onPress={() => router.push('/screens/rewards' as Href)}
               >
                 <ThemedText
                   style={[
@@ -521,7 +521,7 @@ export const Beerfinder = () => {
                     backgroundColor: untappdColor,
                   },
                 ]}
-                onPress={() => router.push('/screens/rewards' as any)}
+                onPress={() => router.push('/screens/rewards' as Href)}
               >
                 <ThemedText
                   style={[

@@ -11,7 +11,7 @@ export type HomeScreenView = 'loading' | 'setup' | 'visitor' | 'member';
 /**
  * User data available from the session
  */
-export interface HomeScreenUserData {
+export type HomeScreenUserData = {
   /** Member name (first name if available, otherwise username) */
   memberName?: string;
   /** User's email address */
@@ -22,12 +22,12 @@ export interface HomeScreenUserData {
   storeName?: string;
   /** Member ID from Flying Saucer */
   memberId?: string;
-}
+};
 
 /**
  * Navigation action functions
  */
-export interface HomeScreenActions {
+export type HomeScreenActions = {
   /** Navigate to settings screen */
   navigateToSettings: () => void;
   /** Navigate to all beers tab */
@@ -38,12 +38,12 @@ export interface HomeScreenActions {
   navigateToTastedBrews: () => void;
   /** Navigate to rewards screen */
   navigateToRewards: () => void;
-}
+};
 
 /**
  * Return value of the useHomeScreenState hook
  */
-export interface UseHomeScreenStateReturn {
+export type UseHomeScreenStateReturn = {
   /**
    * Current view state of the home screen
    * - 'loading': Initial state while checking configuration
@@ -72,7 +72,7 @@ export interface UseHomeScreenStateReturn {
    * Navigation action functions
    */
   actions: HomeScreenActions;
-}
+};
 
 /**
  * Custom hook to manage home screen business logic and state

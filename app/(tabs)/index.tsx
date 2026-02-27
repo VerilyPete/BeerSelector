@@ -19,15 +19,16 @@ import { useAnimatedPress } from '@/animations';
 /**
  * Navigation card data structure
  */
-interface NavigationCardProps {
+type NavigationCardProps = {
   title: string;
   description: string;
-  iconName: string;
-  iconFamily: 'ionicons' | 'material-community';
   onPress: () => void;
   disabled?: boolean;
   testID?: string;
-}
+} & (
+  | { iconFamily: 'ionicons'; iconName: React.ComponentProps<typeof Ionicons>['name'] }
+  | { iconFamily: 'material-community'; iconName: React.ComponentProps<typeof MaterialCommunityIcons>['name'] }
+);
 
 /**
  * Navigation Card Component
@@ -55,8 +56,6 @@ function NavigationCard({
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     onPress();
   };
-
-  const IconComponent = iconFamily === 'ionicons' ? Ionicons : MaterialCommunityIcons;
 
   return (
     <TouchableOpacity
@@ -86,7 +85,11 @@ function NavigationCard({
             variant="elevated"
             style={[styles.iconContainer, { backgroundColor: colors.tint }]}
           >
-            <IconComponent name={iconName as any} size={28} color={colors.textOnPrimary} />
+            {iconFamily === 'ionicons' ? (
+              <Ionicons name={iconName} size={28} color={colors.textOnPrimary} />
+            ) : (
+              <MaterialCommunityIcons name={iconName} size={28} color={colors.textOnPrimary} />
+            )}
           </ThemedView>
           <ThemedView variant="elevated" style={styles.cardContent}>
             <ThemedText type="defaultSemiBold" style={styles.cardTitle}>

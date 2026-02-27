@@ -9,7 +9,7 @@ import { spacing, borderRadii } from '@/constants/spacing';
 /**
  * Props for SettingsSection component
  */
-interface SettingsSectionProps {
+type SettingsSectionProps = {
   /** Section header title */
   title: string;
   /** Section content (SettingsItem components) */
@@ -20,7 +20,7 @@ interface SettingsSectionProps {
   style?: ViewStyle;
   /** Test ID for testing */
   testID?: string;
-}
+};
 
 /**
  * SettingsSection Component

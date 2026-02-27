@@ -11,13 +11,13 @@ export type MigrationProgressCallback = (current: number, total: number) => void
 /**
  * Database row type for beer tables
  */
-interface BeerRow {
+type BeerRow = {
   id: string;
   brew_container: string | null;
   brew_description: string | null;
   brew_style: string | null;
   glass_type?: string | null;
-}
+};
 
 /**
  * Migration to version 3: Add glass_type column
