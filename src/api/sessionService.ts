@@ -6,7 +6,10 @@ import { SessionData } from '../types/api';
 export async function refreshSession(): Promise<SessionData | null> {
   try {
     const apiClient = getApiClient();
-    const response = await apiClient.post<{ success: boolean; session: SessionData }>('/auto-login.php', {});
+    const response = await apiClient.post<{ success: boolean; session: SessionData }>(
+      '/auto-login.php',
+      {}
+    );
 
     if (!response.success) return null;
 
@@ -25,15 +28,15 @@ export async function getValidSession(): Promise<SessionData | null> {
   try {
     const sessionData = await getSessionData();
     const validatedSession = await validateSession(sessionData);
-    
+
     if (!validatedSession) {
       console.log('Session invalid or missing, attempting refresh');
       return await refreshSession();
     }
-    
+
     return validatedSession;
   } catch (error) {
     console.error('Error getting valid session:', error);
     return null;
   }
-} 
+}

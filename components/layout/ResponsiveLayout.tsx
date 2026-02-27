@@ -86,7 +86,7 @@ export type ResponsiveLayoutProps = {
    * Test ID for the container, useful for testing
    */
   testID?: string;
-}
+};
 
 /**
  * ResponsiveLayout - A component that adapts between phone and tablet layouts

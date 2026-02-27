@@ -18,11 +18,7 @@
  */
 
 import { config } from '../config';
-import {
-  InvalidUrlError,
-  InvalidNetworkConfigError,
-  InvalidEnvironmentError
-} from '../errors';
+import { InvalidUrlError, InvalidNetworkConfigError, InvalidEnvironmentError } from '../errors';
 
 function assertError(value: unknown): asserts value is Error {
   if (!(value instanceof Error)) throw new Error(`Expected Error, got ${typeof value}`);
@@ -873,7 +869,7 @@ describe('Config Validation Error Tests', () => {
         'memberDashboard',
         'memberRewards',
         'kiosk',
-        'visitor'
+        'visitor',
       ] as const;
 
       endpoints.forEach(endpoint => {
@@ -886,7 +882,7 @@ describe('Config Validation Error Tests', () => {
     it('should handle query parameters with special characters', () => {
       const url = config.api.getFullUrl('deleteQueuedBrew', {
         cid: '12345',
-        special: 'hello world'
+        special: 'hello world',
       });
       expect(url).toContain('?');
       expect(url).toContain('cid=12345');
@@ -1060,8 +1056,16 @@ describe('Config Validation Error Tests', () => {
     it('all custom errors should have Error.captureStackTrace behavior', () => {
       const errors: unknown[] = [];
 
-      try { config.setCustomApiUrl('invalid'); } catch (e) { errors.push(e); }
-      try { config.setEnvironment('bad' as any); } catch (e) { errors.push(e); }
+      try {
+        config.setCustomApiUrl('invalid');
+      } catch (e) {
+        errors.push(e);
+      }
+      try {
+        config.setEnvironment('bad' as any);
+      } catch (e) {
+        errors.push(e);
+      }
 
       errors.forEach(error => {
         assertError(error);

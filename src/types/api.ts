@@ -53,11 +53,12 @@ export class ApiError extends Error {
     this.isTimeout = isTimeout;
 
     // Determine if the error is retryable
-    this.retryable = isNetworkError || isTimeout || (
+    this.retryable =
+      isNetworkError ||
+      isTimeout ||
       statusCode >= 500 || // Server errors
       statusCode === 429 || // Rate limiting
-      statusCode === 408    // Request timeout
-    );
+      statusCode === 408; // Request timeout
   }
 }
 
@@ -97,10 +98,12 @@ export type LogoutResult =
 export function isSessionData(obj: unknown): obj is SessionData {
   if (!obj || typeof obj !== 'object') return false;
   const o = obj as Record<string, unknown>;
-  return typeof o.memberId === 'string' &&
+  return (
+    typeof o.memberId === 'string' &&
     typeof o.storeId === 'string' &&
     typeof o.storeName === 'string' &&
-    typeof o.sessionId === 'string';
+    typeof o.sessionId === 'string'
+  );
 }
 
 /**

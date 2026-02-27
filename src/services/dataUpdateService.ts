@@ -851,9 +851,7 @@ export async function sequentialRefreshAllData(): Promise<ManualRefreshResult> {
 
       // Calculate container types BEFORE insertion
       console.log('Sequential refresh: calculating container types for beers...');
-      const beersWithContainerTypes = calculateContainerTypes(
-        validationResult.validBeers
-      );
+      const beersWithContainerTypes = calculateContainerTypes(validationResult.validBeers);
 
       await beerRepository.insertManyUnsafe(beersWithContainerTypes);
       await setPreference('all_beers_last_update', new Date().toISOString());
@@ -896,9 +894,7 @@ export async function sequentialRefreshAllData(): Promise<ManualRefreshResult> {
 
       // Calculate container types BEFORE insertion
       console.log('Sequential refresh: calculating container types for my beers...');
-      const myBeersWithContainerTypes = calculateContainerTypes(
-        validationResult.validBeers
-      );
+      const myBeersWithContainerTypes = calculateContainerTypes(validationResult.validBeers);
 
       // Add batch enrichment for my beers if proxy is configured
       let enrichedMyBeers = myBeersWithContainerTypes;
@@ -1243,9 +1239,7 @@ export const refreshAllDataFromAPI = async (): Promise<{
 
     // Calculate container types BEFORE insertion
     console.log('Calculating container types for all beers...');
-    const allBeersWithContainerTypes = calculateContainerTypes(
-      allBeersValidation.validBeers
-    );
+    const allBeersWithContainerTypes = calculateContainerTypes(allBeersValidation.validBeers);
 
     await beerRepository.insertManyUnsafe(allBeersWithContainerTypes);
 
@@ -1266,9 +1260,7 @@ export const refreshAllDataFromAPI = async (): Promise<{
 
     // Calculate container types for my beers BEFORE insertion
     console.log('Calculating container types for my beers...');
-    const myBeersWithContainerTypes = calculateContainerTypes(
-      myBeersValidation.validBeers
-    );
+    const myBeersWithContainerTypes = calculateContainerTypes(myBeersValidation.validBeers);
 
     // Add batch enrichment for my beers if proxy is configured
     let enrichedMyBeers = myBeersWithContainerTypes;

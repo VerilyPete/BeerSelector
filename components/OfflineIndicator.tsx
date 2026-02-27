@@ -47,10 +47,9 @@ export const OfflineIndicator: React.FC<OfflineIndicatorProps> = ({
 
   // Determine if we should show the indicator
   // Show if: explicitly disconnected OR connected but internet not reachable
-  const shouldShow = isInitialized && (
-    isConnected === false ||
-    (isConnected === true && isInternetReachable === false)
-  );
+  const shouldShow =
+    isInitialized &&
+    (isConnected === false || (isConnected === true && isInternetReachable === false));
 
   useEffect(() => {
     if (shouldShow) {
@@ -80,8 +79,8 @@ export const OfflineIndicator: React.FC<OfflineIndicatorProps> = ({
   // Determine message based on network state (Enhanced with Fix #4)
   let displayMessage = message;
   if (isConnected === true && isInternetReachable === false) {
-    const typeStr = connectionType === 'wifi' ? ' (WiFi)' :
-                    connectionType === 'cellular' ? ' (Cellular)' : '';
+    const typeStr =
+      connectionType === 'wifi' ? ' (WiFi)' : connectionType === 'cellular' ? ' (Cellular)' : '';
     displayMessage = `Connected but No Internet Access${typeStr}`;
   } else if (connectionType === 'cellular') {
     displayMessage = `${message} (Cellular)`;

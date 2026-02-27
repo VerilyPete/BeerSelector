@@ -123,7 +123,7 @@ export const useSettingsRefresh = (): UseSettingsRefreshReturn => {
           const tastedBeersCount = result.myBeersResult.itemCount || 0;
 
           // Check if user is in visitor mode to customize message
-          const isVisitor = await getPreference('is_visitor_mode') === 'true';
+          const isVisitor = (await getPreference('is_visitor_mode')) === 'true';
 
           let successMessage = `Beer data refreshed successfully!\n\nAll Beers: ${allBeersCount} beers\n`;
 
