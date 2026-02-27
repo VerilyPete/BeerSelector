@@ -374,11 +374,6 @@ export function preferenceRowToPreference(row: PreferenceRow): Preference {
 // ============================================================================
 
 /**
- * Union type of all database row types
- */
-export type DatabaseRow = AllBeersRow | TastedBrewRow | RewardRow | PreferenceRow;
-
-/**
  * Schema for count query results
  */
 export const countResultSchema = z.object({
@@ -417,40 +412,3 @@ export const columnInfoSchema = z.object({
 
 export type ColumnInfo = z.infer<typeof columnInfoSchema>;
 
-// ============================================================================
-// Export convenience object with all schemas
-// ============================================================================
-
-/**
- * Convenience object containing all Zod schemas for easy import
- */
-export const schemas = {
-  allBeersRow: allBeersRowSchema,
-  tastedBrewRow: tastedBrewRowSchema,
-  rewardRow: rewardRowSchema,
-  preferenceRow: preferenceRowSchema,
-  countResult: countResultSchema,
-  tableInfo: tableInfoSchema,
-  columnInfo: columnInfoSchema,
-} as const;
-
-/**
- * Convenience object containing all type guards for easy import
- */
-export const typeGuards = {
-  isAllBeersRow,
-  isTastedBrewRow,
-  isRewardRow,
-  isPreferenceRow,
-  isCountResult,
-} as const;
-
-/**
- * Convenience object containing all conversion functions for easy import
- */
-export const converters = {
-  allBeersRowToBeer,
-  tastedBrewRowToBeerfinder,
-  rewardRowToReward,
-  preferenceRowToPreference,
-} as const;
