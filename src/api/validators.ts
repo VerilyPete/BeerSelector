@@ -194,33 +194,3 @@ export function validateBeerArray(beers: unknown[]): {
   };
 }
 
-/**
- * Validates rewards API response structure.
- *
- * Expected structure: Array of reward objects with required fields.
- *
- * @param response - The API response to validate
- * @returns Validation result with rewards array if valid
- */
-export function validateRewardsResponse(response: unknown): ValidationResult<unknown[]> {
-  const errors: string[] = [];
-
-  // Check for null/undefined
-  if (response === null || response === undefined) {
-    errors.push('Response is null or undefined');
-    return { isValid: false, errors, data: undefined };
-  }
-
-  // Check if response is an array
-  if (!Array.isArray(response)) {
-    errors.push('Response is not an array');
-    return { isValid: false, errors, data: undefined };
-  }
-
-  // Valid response structure (even if empty array)
-  return {
-    isValid: true,
-    errors: [],
-    data: response,
-  };
-}
