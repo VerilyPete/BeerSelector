@@ -21,6 +21,8 @@ export type GlassType = 'pint' | 'tulip' | null;
  * - "5.2%" or "8%"
  * - "5.2 ABV" or "ABV 5.2"
  * - "5.2% ABV" or "ABV: 5.2%"
+ * @deprecated Legacy fallback for container type calculation only. Never persist to DB.
+ * Use Worker LLM enrichment instead.
  * @param description - HTML description string containing ABV percentage
  * @returns ABV as a number or null if not found/invalid
  */
@@ -37,7 +39,7 @@ export function extractABV(description: string | undefined): number | null {
   const percentageMatch = plainText.match(/(?<!-)\b(\d+(?:\.\d+)?)\s*%/);
   if (percentageMatch && percentageMatch[1]) {
     const abv = parseFloat(percentageMatch[1]);
-    if (!isNaN(abv) && abv >= 0 && abv <= 100) {
+    if (!isNaN(abv) && abv >= 0 && abv <= 30) {
       return abv;
     }
   }
@@ -52,7 +54,7 @@ export function extractABV(description: string | undefined): number | null {
     const abvString = abvMatch[1] || abvMatch[2];
     if (abvString) {
       const abv = parseFloat(abvString);
-      if (!isNaN(abv) && abv >= 0 && abv <= 100) {
+      if (!isNaN(abv) && abv >= 0 && abv <= 30) {
         return abv;
       }
     }

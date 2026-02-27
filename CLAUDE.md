@@ -142,7 +142,7 @@ The app uses SQLite for offline-first data storage with a **repository pattern**
 
 **IMPORTANT - Repository Pattern (HP-7 COMPLETED)**:
 
-- ❌ **DO NOT import from `src/database/db.ts`** - This file is deprecated
+- ⚠️ **`src/database/db.ts` exports bootstrap functions only** (`setupDatabase`, `cleanupBadAbvData`, `resetDatabaseState`) — do not add CRUD operations here
 - ✅ **USE repositories directly**:
   ```typescript
   import { beerRepository } from '@/src/database/repositories/BeerRepository';
@@ -276,9 +276,9 @@ See `.env.example` for complete configuration options.
 
 **Automatic Refresh** (in `app/_layout.tsx`):
 
-- Triggers on app open via `initializeBeerDatabase()` from `src/database/db.ts`
-- Fetches all beers (blocking), then schedules my beers and rewards in background
-- Timestamp-based: only refreshes if >12 hours since last refresh
+- Triggers on app open via `setupDatabase()` + `cleanupBadAbvData()` + three `fetchAndUpdate*` calls from `dataUpdateService.ts`
+- Fetches all beers, my beers, and rewards (each with individual error handling)
+- Timestamp-based: only refreshes if >12 hours since last refresh (checked inside each `fetchAndUpdate*` function)
 
 **Refresh Logic** (`src/services/dataUpdateService.ts`):
 
@@ -397,6 +397,7 @@ if (isBeer(data)) {
 See **[.claude/key-files.md](.claude/key-files.md)** for the complete file reference.
 
 **Most Important Files:**
+
 - `src/database/repositories/` - All database operations (BeerRepository, MyBeersRepository, RewardsRepository)
 - `app/_layout.tsx` - App initialization and auto-refresh
 - `src/services/dataUpdateService.ts` - Data fetching and sync
@@ -428,6 +429,7 @@ Extract beers from `brewInStock` property in second array element.
 See **[.claude/ios-build.md](.claude/ios-build.md)** for detailed iOS build and Live Activities documentation.
 
 **Key Points:**
+
 - **Local Xcode builds** (not EAS) - open `ios/BeerSelector.xcworkspace`
 - Bundle ID: `org.verily.FSbeerselector`
 - CocoaPods for native dependencies (`cd ios && pod install`)

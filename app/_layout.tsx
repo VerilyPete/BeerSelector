@@ -17,8 +17,13 @@ import {
 import { getQueuedBeers } from '@/src/api/queueService';
 import { getSessionData } from '@/src/api/sessionManager';
 import { isVisitorMode as checkIsVisitorMode } from '@/src/api/authService';
-// eslint-disable-next-line no-restricted-imports -- initializeBeerDatabase is the app bootstrap function, not CRUD
-import { initializeBeerDatabase } from '@/src/database/db';
+// eslint-disable-next-line no-restricted-imports -- setupDatabase, cleanupBadAbvData, and resetDatabaseState are bootstrap functions, not CRUD
+import { setupDatabase, cleanupBadAbvData, resetDatabaseState } from '@/src/database/db';
+import {
+  fetchAndUpdateAllBeers,
+  fetchAndUpdateMyBeers,
+  fetchAndUpdateRewards,
+} from '@/src/services/dataUpdateService';
 import { getPreference, setPreference, areApiUrlsConfigured } from '@/src/database/preferences';
 import { getDatabase, closeDatabaseConnection } from '@/src/database/connection';
 import { getCurrentSchemaVersion, CURRENT_SCHEMA_VERSION } from '@/src/database/schemaVersion';
@@ -96,15 +101,48 @@ export default function RootLayout() {
       }
       initializationStarted.current = true;
 
+      async function runPostSetupInit(): Promise<void> {
+        try {
+          await cleanupBadAbvData();
+        } catch (e) {
+          console.error('[_layout] ABV cleanup failed (non-fatal):', e);
+        }
+
+        const shouldFetchData = await areApiUrlsConfigured();
+        if (shouldFetchData) {
+          try {
+            await fetchAndUpdateAllBeers();
+          } catch (e) {
+            console.error('[_layout] All beers fetch failed:', e);
+          }
+
+          try {
+            await fetchAndUpdateMyBeers();
+          } catch (e) {
+            console.error('[_layout] My beers fetch failed:', e);
+          }
+
+          try {
+            await fetchAndUpdateRewards();
+          } catch (e) {
+            console.error('[_layout] Rewards fetch failed:', e);
+          }
+        } else {
+          console.log('API URLs not configured, skipping data fetch');
+        }
+      }
+
       try {
         // Initialize database with retry mechanism
         let dbInitialized = false;
 
         try {
           console.log('Initializing database first attempt...');
-          await initializeBeerDatabase();
+          await setupDatabase();
           dbInitialized = true;
           console.log('Database initialized successfully');
+
+          await runPostSetupInit();
 
           // Check for schema migrations
           const db = await getDatabase();
@@ -158,8 +196,7 @@ export default function RootLayout() {
             // Normal app startup flow
             setInitialRoute('(tabs)');
 
-            // Initial data load is handled by initializeBeerDatabase() above
-            // (all beers, my beers, and rewards are fetched during initialization)
+            // Initial data load is handled by fetchAndUpdate* calls above
             // User-triggered refreshes will still work via pull-to-refresh gestures
             console.log('Database initialization complete - initial data already loaded');
 
@@ -188,16 +225,16 @@ export default function RootLayout() {
           console.error('Database initialization failed, retrying once:', dbError);
 
           if (!dbInitialized) {
-            // Wait a moment and try again once
             await new Promise(resolve => setTimeout(resolve, 1000));
             try {
               console.log('Attempting database initialization retry...');
-              await initializeBeerDatabase();
+              resetDatabaseState();
+              await setupDatabase();
               console.log('Database initialized successfully on retry');
+              await runPostSetupInit();
               setInitialRoute('(tabs)');
             } catch (retryError) {
-              console.error('Database initialization failed on retry:', retryError);
-              // Continue anyway - we'll handle database errors in the components
+              console.error('Database setup failed on retry:', retryError);
               setInitialRoute('(tabs)');
             }
           } else {

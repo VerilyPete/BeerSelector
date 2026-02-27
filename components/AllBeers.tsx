@@ -37,12 +37,14 @@ export const AllBeers = () => {
   // Use the shared filtering hook with data from context
   const {
     filteredBeers,
-    filters,
+    containerFilter,
     sortBy,
+    sortDirection,
     expandedId,
     setSearchText,
-    toggleFilter,
-    toggleSort,
+    cycleContainerFilter,
+    cycleSort,
+    toggleSortDirection,
     toggleExpand,
   } = useBeerFilters(beers.allBeers);
 
@@ -174,10 +176,12 @@ export const AllBeers = () => {
             </View>
 
             <FilterBar
-              filters={filters}
+              containerFilter={containerFilter}
               sortBy={sortBy}
-              onToggleFilter={toggleFilter}
-              onToggleSort={toggleSort}
+              sortDirection={sortDirection}
+              onCycleContainerFilter={cycleContainerFilter}
+              onCycleSort={cycleSort}
+              onToggleSortDirection={toggleSortDirection}
             />
           </View>
 

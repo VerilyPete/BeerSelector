@@ -2,106 +2,88 @@ import React, { useCallback } from 'react';
 import { StyleSheet, View, TouchableOpacity, ScrollView } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { ThemedText } from '../ThemedText';
-import { IconSymbol } from '../ui/IconSymbol';
-import { useColorScheme } from '@/hooks/useColorScheme';
-import { Colors } from '@/constants/Colors';
+import { IconSymbol, IconSymbolName } from '../ui/IconSymbol';
+import BeerIcon from '../icons/BeerIcon';
+import { useThemeColor } from '@/hooks/useThemeColor';
 import { spacing } from '@/constants/spacing';
+import { ContainerFilter, SortOption, SortDirection } from '@/hooks/useBeerFilters';
 
 /** Minimum touch target size per Apple HIG */
 const CHIP_MIN_HEIGHT = 44;
 
-type SortOption = 'date' | 'name';
-
-type FilterState = {
-  isDraft: boolean;
-  isHeavies: boolean;
-  isIpa: boolean;
-};
-
 type FilterBarProps = {
-  filters: FilterState;
+  containerFilter: ContainerFilter;
   sortBy: SortOption;
-  onToggleFilter: (filterName: keyof FilterState) => void;
-  onToggleSort: () => void;
-  showHeaviesAndIpa?: boolean; // TastedBrewList doesn't have these filters
+  sortDirection: SortDirection;
+  onCycleContainerFilter: () => void;
+  onCycleSort: () => void;
+  onToggleSortDirection: () => void;
 };
 
-type FilterChipProps = {
-  label: string;
-  isActive: boolean;
-  onPress: () => void;
-  testID: string;
-  themeColors: (typeof Colors)['light'];
-  isDarkMode: boolean;
+const CONTAINER_LABELS: Record<ContainerFilter, string> = {
+  all: 'All',
+  draft: 'Draft',
+  cans: 'Cans',
 };
 
-/**
- * Individual filter chip with pill-shaped design
- * Supports active/inactive states with smooth visual transitions
- */
-const FilterChip: React.FC<FilterChipProps> = ({
-  label,
-  isActive,
-  onPress,
-  testID,
-  themeColors,
-  isDarkMode,
-}) => {
-  const handlePress = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    onPress();
-  }, [onPress]);
-
-  // Active state uses tint color, inactive uses secondary background with subtle border
-  const backgroundColor = isActive ? themeColors.tint : themeColors.backgroundSecondary;
-  const textColor = isActive ? themeColors.textOnPrimary : themeColors.text;
-  const borderColor = isActive ? 'transparent' : themeColors.border;
-
-  return (
-    <TouchableOpacity
-      style={[
-        styles.filterChip,
-        {
-          backgroundColor,
-          borderColor,
-          // Subtle shadow for active chips
-          ...(isActive && {
-            shadowColor: isDarkMode ? themeColors.tint : '#000',
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: isDarkMode ? 0.4 : 0.15,
-            shadowRadius: 4,
-            elevation: 3,
-          }),
-        },
-      ]}
-      onPress={handlePress}
-      activeOpacity={0.7}
-      testID={testID}
-      accessibilityRole="button"
-      accessibilityState={{ selected: isActive }}
-      accessibilityLabel={`${label} filter${isActive ? ', active' : ''}`}
-    >
-      <ThemedText style={[styles.filterChipText, { color: textColor }]}>{label}</ThemedText>
-    </TouchableOpacity>
-  );
+const SORT_LABELS: Record<SortOption, string> = {
+  date: 'Date',
+  name: 'Name',
+  abv: 'ABV',
 };
+
+const SORT_ICONS: Record<SortOption, IconSymbolName> = {
+  date: 'calendar',
+  name: 'textformat',
+  abv: 'percent',
+};
+
+const DIRECTION_LABELS: Record<SortOption, Record<SortDirection, string>> = {
+  date: { asc: 'Oldest', desc: 'Newest' },
+  name: { asc: 'A–Z', desc: 'Z–A' },
+  abv: { asc: 'Low', desc: 'High' },
+};
+
+// These maps duplicate the cycling logic from nextContainerFilter/nextSortOption
+// in useBeerFilters.ts. Keep them in sync when adding/removing filter or sort options.
+const NEXT_CONTAINER: Record<ContainerFilter, string> = {
+  all: 'Draft',
+  draft: 'Cans',
+  cans: 'All',
+};
+const NEXT_SORT: Record<SortOption, string> = { date: 'Name', name: 'ABV', abv: 'Date' };
 
 const FilterBarComponent: React.FC<FilterBarProps> = ({
-  filters,
+  containerFilter,
   sortBy,
-  onToggleFilter,
-  onToggleSort,
-  showHeaviesAndIpa = true,
+  sortDirection,
+  onCycleContainerFilter,
+  onCycleSort,
+  onToggleSortDirection,
 }) => {
-  const colorScheme = useColorScheme();
-  const isDarkMode = colorScheme === 'dark';
-  const theme = colorScheme ?? 'light';
-  const themeColors = Colors[theme];
+  const tint = useThemeColor({}, 'tint');
+  const textOnPrimary = useThemeColor({}, 'textOnPrimary');
+  const backgroundSecondary = useThemeColor({}, 'backgroundSecondary');
+  const text = useThemeColor({}, 'text');
+  const border = useThemeColor({}, 'border');
+  const backgroundElevated = useThemeColor({}, 'backgroundElevated');
+
+  const isContainerActive = containerFilter !== 'all';
+
+  const handleContainerPress = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    onCycleContainerFilter();
+  }, [onCycleContainerFilter]);
 
   const handleSortPress = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    onToggleSort();
-  }, [onToggleSort]);
+    onCycleSort();
+  }, [onCycleSort]);
+
+  const handleDirectionPress = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    onToggleSortDirection();
+  }, [onToggleSortDirection]);
 
   return (
     <View style={styles.container} testID="filter-bar">
@@ -111,63 +93,84 @@ const FilterBarComponent: React.FC<FilterBarProps> = ({
         contentContainerStyle={styles.scrollContent}
         bounces={false}
       >
-        {/* Filter chips */}
-        <FilterChip
-          label="Draft"
-          isActive={filters.isDraft}
-          onPress={() => onToggleFilter('isDraft')}
-          testID="filter-draft-button"
-          themeColors={themeColors}
-          isDarkMode={isDarkMode}
-        />
-
-        {showHeaviesAndIpa && (
-          <>
-            <FilterChip
-              label="Heavies"
-              isActive={filters.isHeavies}
-              onPress={() => onToggleFilter('isHeavies')}
-              testID="filter-heavies-button"
-              themeColors={themeColors}
-              isDarkMode={isDarkMode}
-            />
-            <FilterChip
-              label="IPA"
-              isActive={filters.isIpa}
-              onPress={() => onToggleFilter('isIpa')}
-              testID="filter-ipa-button"
-              themeColors={themeColors}
-              isDarkMode={isDarkMode}
-            />
-          </>
-        )}
-
-        {/* Sort button with secondary visual treatment */}
+        {/* Container filter button */}
         <TouchableOpacity
-          style={[
-            styles.sortButton,
-            {
-              backgroundColor: themeColors.backgroundElevated,
-              borderColor: themeColors.border,
-            },
-          ]}
+          style={{
+            minHeight: CHIP_MIN_HEIGHT,
+            paddingVertical: spacing.sm,
+            paddingHorizontal: spacing.m,
+            borderRadius: CHIP_MIN_HEIGHT / 2,
+            borderWidth: 1,
+            justifyContent: 'center',
+            alignItems: 'center',
+            backgroundColor: isContainerActive ? tint : backgroundSecondary,
+            borderColor: isContainerActive ? 'transparent' : border,
+          }}
+          onPress={handleContainerPress}
+          activeOpacity={0.7}
+          testID="filter-container-button"
+          accessibilityRole="button"
+          accessibilityState={{ selected: isContainerActive }}
+          accessibilityLabel={`Container filter: ${CONTAINER_LABELS[containerFilter]}. Double tap to show ${NEXT_CONTAINER[containerFilter]}.`}
+        >
+          <ThemedText
+            style={[styles.chipText, { color: isContainerActive ? textOnPrimary : text }]}
+          >
+            {CONTAINER_LABELS[containerFilter]}
+          </ThemedText>
+        </TouchableOpacity>
+
+        {/* Sort button */}
+        <TouchableOpacity
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            minHeight: CHIP_MIN_HEIGHT,
+            paddingVertical: spacing.sm,
+            paddingHorizontal: spacing.m,
+            borderRadius: CHIP_MIN_HEIGHT / 2,
+            borderWidth: 1,
+            backgroundColor: backgroundElevated,
+            borderColor: border,
+          }}
           onPress={handleSortPress}
           activeOpacity={0.7}
           testID="sort-toggle-button"
           accessibilityRole="button"
-          accessibilityLabel={`Sort by ${sortBy === 'date' ? 'name' : 'date'}`}
+          accessibilityLabel={`Sort by ${SORT_LABELS[sortBy]}. Double tap to sort by ${NEXT_SORT[sortBy]}.`}
         >
-          <IconSymbol
-            name={sortBy === 'date' ? 'textformat' : 'calendar'}
-            size={16}
-            color={themeColors.textSecondary}
-            style={styles.sortIcon}
-          />
-          <ThemedText
-            style={[styles.sortButtonText, { color: themeColors.textSecondary }]}
-            testID="sort-button-text"
-          >
-            {sortBy === 'date' ? 'Name' : 'Date'}
+          {sortBy === 'abv' ? (
+            <BeerIcon name="bottle" size={16} color={text} style={styles.sortIcon} />
+          ) : (
+            <IconSymbol name={SORT_ICONS[sortBy]} size={16} color={text} style={styles.sortIcon} />
+          )}
+          <ThemedText style={[styles.sortButtonText, { color: text }]} testID="sort-button-text">
+            {SORT_LABELS[sortBy]}
+          </ThemedText>
+        </TouchableOpacity>
+
+        {/* Sort direction button */}
+        <TouchableOpacity
+          style={{
+            alignItems: 'center',
+            justifyContent: 'center',
+            minHeight: CHIP_MIN_HEIGHT,
+            minWidth: 62,
+            paddingVertical: spacing.sm,
+            paddingHorizontal: spacing.m,
+            borderRadius: CHIP_MIN_HEIGHT / 2,
+            borderWidth: 1,
+            backgroundColor: backgroundElevated,
+            borderColor: border,
+          }}
+          onPress={handleDirectionPress}
+          activeOpacity={0.7}
+          testID="sort-direction-button"
+          accessibilityRole="button"
+          accessibilityLabel={`Sort: ${DIRECTION_LABELS[sortBy][sortDirection]}. Double tap for ${DIRECTION_LABELS[sortBy][sortDirection === 'asc' ? 'desc' : 'asc']}.`}
+        >
+          <ThemedText style={[styles.chipText, { color: text }]}>
+            {DIRECTION_LABELS[sortBy][sortDirection]}
           </ThemedText>
         </TouchableOpacity>
       </ScrollView>
@@ -185,29 +188,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.s,
   },
-  filterChip: {
-    minHeight: CHIP_MIN_HEIGHT,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.m,
-    borderRadius: CHIP_MIN_HEIGHT / 2, // Perfect pill shape
-    borderWidth: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  filterChipText: {
+  chipText: {
     fontSize: 14,
     fontWeight: '600',
     letterSpacing: 0.2,
-  },
-  sortButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    minHeight: CHIP_MIN_HEIGHT,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.m,
-    borderRadius: CHIP_MIN_HEIGHT / 2,
-    borderWidth: 1,
-    marginLeft: spacing.xs, // Extra separation from filter chips
   },
   sortButtonText: {
     fontSize: 14,
@@ -218,6 +202,4 @@ const styles = StyleSheet.create({
   },
 });
 
-// Export memoized component to prevent unnecessary re-renders
-// Default shallow comparison is sufficient for this component's props
 export const FilterBar = React.memo(FilterBarComponent);

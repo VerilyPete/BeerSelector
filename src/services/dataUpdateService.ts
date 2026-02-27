@@ -25,6 +25,7 @@ import {
   pollForEnrichmentUpdates,
   EnrichedBeerResponse,
 } from './enrichmentService';
+import { EnrichmentUpdate } from '../types/enrichment';
 
 /**
  * Result of a data update operation
@@ -67,10 +68,30 @@ async function syncMissingBeersInBackground(
         // Start polling in background (fire-and-forget)
         // Results logged but UI updates on next manual refresh
         pollForEnrichmentUpdates(missingIds)
-          .then(enrichments => {
+          .then(async enrichments => {
             const count = Object.keys(enrichments).length;
             if (count > 0) {
-              console.log(`[${operation}] Polling completed: ${count} beers enriched`);
+              try {
+                const updates: Record<string, EnrichmentUpdate> = {};
+                for (const [id, data] of Object.entries(enrichments)) {
+                  updates[id] = {
+                    enriched_abv: data.enriched_abv,
+                    enrichment_confidence: data.enrichment_confidence,
+                    enrichment_source: data.enrichment_source,
+                    brew_description: data.brew_description,
+                  };
+                }
+                // Persist to both tables — IDs not present in a table are no-ops
+                await beerRepository.updateEnrichmentData(updates);
+                await myBeersRepository.updateEnrichmentData(updates);
+                console.log(`[${operation}] Persisted ${count} enrichment results from polling`);
+              } catch (persistError) {
+                logWarning('Failed to persist polling enrichment results', {
+                  operation,
+                  component: 'dataUpdateService',
+                  additionalData: { error: String(persistError) },
+                });
+              }
             }
           })
           .catch(pollError => {
@@ -174,6 +195,8 @@ export async function fetchAndUpdateAllBeers(): Promise<DataUpdateResult> {
       try {
         console.log(`[dataUpdateService] Attempting enrichment proxy for store ${storeId}...`);
 
+        // TODO: Investigate triggering a refresh of the tapthatapp API endpoint
+        // when users hit this endpoint, to ensure the proxy always has the freshest taplist data.
         const proxyResponse = await fetchBeersFromProxy(storeId);
 
         // Map Worker response to Beer interface

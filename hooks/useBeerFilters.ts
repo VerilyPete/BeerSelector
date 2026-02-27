@@ -2,145 +2,127 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { BeerWithContainerType, BeerfinderWithContainerType } from '@/src/types/beer';
 
 // Union type to allow both BeerWithContainerType and BeerfinderWithContainerType
-// These types have the container_type property (which can be null)
 type FilterableBeer = BeerWithContainerType | BeerfinderWithContainerType;
 
-type SortOption = 'date' | 'name';
+export type SortOption = 'date' | 'name' | 'abv';
+export type SortDirection = 'asc' | 'desc';
+export type ContainerFilter = 'all' | 'draft' | 'cans';
 
-type FilterState = {
-  isDraft: boolean;
-  isHeavies: boolean;
-  isIpa: boolean;
+export type FilterState = {
+  containerFilter: ContainerFilter;
 };
 
-type FilterOptions = FilterState & {
+export type FilterOptions = {
+  containerFilter: ContainerFilter;
   searchText: string;
 };
 
 type DateSortField = 'added_date' | 'tasted_date';
 
-/**
- * MP-3 Bottleneck #3: Single-pass filter optimization
- *
- * OLD APPROACH (3 separate filter passes):
- * - let result = beers;
- * - if (isDraft) result = result.filter(...);
- * - if (isHeavies) result = result.filter(...);
- * - if (isIpa) result = result.filter(...);
- *
- * Problem: Multiple array iterations even if only 1 filter active.
- * For 200 beers with all filters on = 3 × 200 = 600 iterations.
- *
- * NEW APPROACH (single-pass filtering):
- * - Early exit if no filters active (0 iterations!)
- * - Single .filter() call that evaluates all conditions in parallel
- * - For 200 beers with all filters on = 1 × 200 = 200 iterations
- *
- * Expected improvement: 40-50% faster filtering, < 10ms for 200 beers
- */
-export const applyFilters = <T extends FilterableBeer>(beers: T[], options: FilterOptions): T[] => {
-  const { searchText, isDraft, isHeavies, isIpa } = options;
+// Pure cycling helpers
+export const nextContainerFilter = (current: ContainerFilter): ContainerFilter => {
+  const cycle: Record<ContainerFilter, ContainerFilter> = {
+    all: 'draft',
+    draft: 'cans',
+    cans: 'all',
+  };
+  return cycle[current];
+};
 
-  // Early exit: If no filters are active, return original array
-  if (!searchText && !isDraft && !isHeavies && !isIpa) {
+export const nextSortOption = (current: SortOption): SortOption => {
+  const cycle: Record<SortOption, SortOption> = { date: 'name', name: 'abv', abv: 'date' };
+  return cycle[current];
+};
+
+export const defaultDirectionForSort = (sort: SortOption): SortDirection => {
+  return sort === 'date' ? 'desc' : 'asc';
+};
+
+export const applyFilters = <T extends FilterableBeer>(beers: T[], options: FilterOptions): T[] => {
+  const { searchText, containerFilter } = options;
+
+  if (!searchText && containerFilter === 'all') {
     return beers;
   }
 
-  // Pre-compute search term for performance
   const searchLower = searchText ? searchText.toLowerCase() : '';
 
-  // Single-pass filtering: evaluate all conditions in one iteration
   return beers.filter(beer => {
-    // Search text filter
     if (searchLower) {
       const matchesSearch =
         (beer.brew_name && beer.brew_name.toLowerCase().includes(searchLower)) ||
         (beer.brewer && beer.brewer.toLowerCase().includes(searchLower)) ||
         (beer.brew_style && beer.brew_style.toLowerCase().includes(searchLower)) ||
         (beer.brewer_loc && beer.brewer_loc.toLowerCase().includes(searchLower));
-
       if (!matchesSearch) return false;
     }
 
-    // Draft filter
-    if (isDraft) {
+    if (containerFilter === 'draft') {
       if (!beer.brew_container) return false;
       const container = beer.brew_container.toLowerCase();
-      const isDraftBeer = container.includes('draft') || container.includes('draught');
-      if (!isDraftBeer) return false;
+      if (!container.includes('draft') && !container.includes('draught')) return false;
     }
 
-    // Heavies filter (porter, stout, barleywine, quad, tripel)
-    if (isHeavies) {
-      if (!beer.brew_style) return false;
-      const styleLower = beer.brew_style.toLowerCase();
-      const isHeavyBeer =
-        styleLower.includes('porter') ||
-        styleLower.includes('stout') ||
-        styleLower.includes('barleywine') ||
-        styleLower.includes('quad') ||
-        styleLower.includes('tripel');
-      if (!isHeavyBeer) return false;
+    if (containerFilter === 'cans') {
+      if (!beer.brew_container) return false;
+      const container = beer.brew_container.toLowerCase();
+      if (!container.includes('bottle') && !container.includes('can')) return false;
     }
 
-    // IPA filter
-    if (isIpa) {
-      if (!beer.brew_style) return false;
-      const isIpaBeer = beer.brew_style.toLowerCase().includes('ipa');
-      if (!isIpaBeer) return false;
-    }
-
-    // Passed all active filters
     return true;
   });
 };
 
-// Exported for testing
 export const applySorting = <T extends FilterableBeer>(
   beers: T[],
   sortBy: SortOption,
+  direction: SortDirection,
   dateField: DateSortField = 'added_date'
 ): T[] => {
   const sorted = [...beers];
+  const dir = direction === 'asc' ? 1 : -1;
 
   if (sortBy === 'name') {
-    sorted.sort((a, b) => (a.brew_name || '').localeCompare(b.brew_name || ''));
+    sorted.sort((a, b) => dir * (a.brew_name || '').localeCompare(b.brew_name || ''));
+  } else if (sortBy === 'abv') {
+    sorted.sort((a, b) => {
+      const aNull = a.abv == null || isNaN(a.abv);
+      const bNull = b.abv == null || isNaN(b.abv);
+      if (aNull && bNull) return 0;
+      if (aNull) return 1;
+      if (bNull) return -1;
+      // Non-null assertion safe: aNull/bNull guards above ensure both values are defined numbers
+      return dir * (a.abv! - b.abv!);
+    });
   } else {
-    // Sort by date descending (most recent first)
+    // date sort
     if (dateField === 'tasted_date') {
-      // Parse dates in format MM/DD/YYYY for tasted_date
       sorted.sort((a, b) => {
-        const tastedDateA = 'tasted_date' in a ? (a.tasted_date as string) : '';
-        const tastedDateB = 'tasted_date' in b ? (b.tasted_date as string) : '';
+        const tastedDateA = 'tasted_date' in a ? String(a.tasted_date ?? '') : '';
+        const tastedDateB = 'tasted_date' in b ? String(b.tasted_date ?? '') : '';
         const partsA = tastedDateA.split('/');
         const partsB = tastedDateB.split('/');
 
         if (partsA.length === 3 && partsB.length === 3) {
-          // Create Date objects with year, month (0-based), day
           const dateA = new Date(
             parseInt(partsA[2], 10),
             parseInt(partsA[0], 10) - 1,
             parseInt(partsA[1], 10)
           ).getTime();
-
           const dateB = new Date(
             parseInt(partsB[2], 10),
             parseInt(partsB[0], 10) - 1,
             parseInt(partsB[1], 10)
           ).getTime();
-
-          return dateB - dateA; // Descending order
+          return dir * (dateA - dateB);
         }
-
-        // Fallback if date parsing fails
         return 0;
       });
     } else {
-      // added_date is a timestamp
       sorted.sort((a, b) => {
         const dateA = parseInt(a.added_date || '0', 10);
         const dateB = parseInt(b.added_date || '0', 10);
-        return dateB - dateA;
+        return dir * (dateA - dateB);
       });
     }
   }
@@ -152,51 +134,33 @@ export const useBeerFilters = <T extends FilterableBeer>(
   beers: T[],
   dateField: DateSortField = 'added_date'
 ) => {
-  const [filters, setFilters] = useState<FilterState>({
-    isDraft: false,
-    isHeavies: false,
-    isIpa: false,
-  });
+  const [containerFilter, setContainerFilter] = useState<ContainerFilter>('all');
   const [sortBy, setSortBy] = useState<SortOption>('date');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [searchText, setSearchText] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  // Apply filters and sorting
   const filteredBeers = useMemo(() => {
-    const filtered = applyFilters(beers, { ...filters, searchText });
-    return applySorting(filtered, sortBy, dateField);
-  }, [beers, filters, searchText, sortBy, dateField]);
+    const filtered = applyFilters(beers, { containerFilter, searchText });
+    return applySorting(filtered, sortBy, sortDirection, dateField);
+  }, [beers, containerFilter, searchText, sortBy, sortDirection, dateField]);
 
-  // Reset expanded item when filters change
   useEffect(() => {
     setExpandedId(null);
-  }, [filters, searchText]);
+  }, [containerFilter, searchText]);
 
-  /**
-   * MP-3 Bottleneck #2: Memoize callbacks to ensure stable references for React.memo
-   * Without useCallback, these functions get recreated on every render, breaking
-   * React.memo's shallow comparison and causing unnecessary BeerItem re-renders.
-   */
-  const toggleFilter = useCallback((filterName: keyof FilterState) => {
-    setFilters(prev => {
-      const newFilters = { ...prev };
-
-      // Toggle the requested filter
-      newFilters[filterName] = !prev[filterName];
-
-      // Mutual exclusivity: Heavies and IPA can't both be on
-      if (filterName === 'isHeavies' && newFilters.isHeavies) {
-        newFilters.isIpa = false;
-      } else if (filterName === 'isIpa' && newFilters.isIpa) {
-        newFilters.isHeavies = false;
-      }
-
-      return newFilters;
-    });
+  const cycleContainerFilter = useCallback(() => {
+    setContainerFilter(prev => nextContainerFilter(prev));
   }, []);
 
-  const toggleSort = useCallback(() => {
-    setSortBy(prev => (prev === 'date' ? 'name' : 'date'));
+  const cycleSort = useCallback(() => {
+    const newSort = nextSortOption(sortBy);
+    setSortBy(newSort);
+    setSortDirection(defaultDirectionForSort(newSort));
+  }, [sortBy]);
+
+  const toggleSortDirection = useCallback(() => {
+    setSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
   }, []);
 
   const toggleExpand = useCallback((id: string) => {
@@ -205,13 +169,15 @@ export const useBeerFilters = <T extends FilterableBeer>(
 
   return {
     filteredBeers,
-    filters,
+    containerFilter,
     sortBy,
+    sortDirection,
     searchText,
     expandedId,
     setSearchText,
-    toggleFilter,
-    toggleSort,
+    cycleContainerFilter,
+    cycleSort,
+    toggleSortDirection,
     toggleExpand,
     setExpandedId,
   };
