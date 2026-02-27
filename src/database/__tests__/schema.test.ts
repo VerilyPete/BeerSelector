@@ -2,7 +2,7 @@
  * Tests for database schema and table creation
  */
 
-import { setupDatabase, initDatabase, resetDatabaseState } from '../db';
+import { setupDatabase, resetDatabaseState } from '../db';
 import * as connection from '../connection';
 
 // Mock the connection module
@@ -253,27 +253,6 @@ describe('Database Schema', () => {
       await setupDatabase();
 
       expect(consoleLogSpy).toHaveBeenCalledWith('Database setup complete');
-    });
-  });
-
-  describe('initDatabase', () => {
-    it('should call getDatabase from connection module', async () => {
-      const result = await initDatabase();
-
-      expect(connection.getDatabase).toHaveBeenCalled();
-      expect(result).toBe(mockDatabase);
-    });
-
-    it('should return the same database instance', async () => {
-      const db1 = await initDatabase();
-      const db2 = await initDatabase();
-
-      // Should call getDatabase twice
-      expect(connection.getDatabase).toHaveBeenCalledTimes(2);
-
-      // But both should return the same mock database
-      expect(db1).toBe(db2);
-      expect(db1).toBe(mockDatabase);
     });
   });
 
