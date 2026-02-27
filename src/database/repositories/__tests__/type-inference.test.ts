@@ -49,7 +49,6 @@ describe('Repository Type Inference', () => {
       const _test5: Test5 = true;
       const _test6: Test6 = true;
 
-      expect(true).toBe(true);
     });
 
     it('should accept correct parameter types', () => {
@@ -71,7 +70,6 @@ describe('Repository Type Inference', () => {
       const _test3: Test3 = true;
       const _test4: Test4 = true;
 
-      expect(true).toBe(true);
     });
   });
 
@@ -96,7 +94,6 @@ describe('Repository Type Inference', () => {
       const _test3: Test3 = true;
       const _test4: Test4 = true;
 
-      expect(true).toBe(true);
     });
 
     it('should accept correct parameter types', () => {
@@ -115,7 +112,6 @@ describe('Repository Type Inference', () => {
       const _test2: Test2 = true;
       const _test3: Test3 = true;
 
-      expect(true).toBe(true);
     });
   });
 
@@ -149,7 +145,6 @@ describe('Repository Type Inference', () => {
       const _test6: Test6 = true;
       const _test7: Test7 = true;
 
-      expect(true).toBe(true);
     });
 
     it('should accept correct parameter types', () => {
@@ -171,7 +166,6 @@ describe('Repository Type Inference', () => {
       const _test3: Test3 = true;
       const _test4: Test4 = true;
 
-      expect(true).toBe(true);
     });
   });
 
@@ -195,7 +189,6 @@ describe('Repository Type Inference', () => {
       const _notEqual2: NotEqual2 = true;
       const _notEqual3: NotEqual3 = true;
 
-      expect(true).toBe(true);
     });
 
     it('should prevent assigning results to wrong entity types', () => {
@@ -216,7 +209,6 @@ describe('Repository Type Inference', () => {
       // @ts-expect-error - Cannot assign Promise<Beerfinder | null> to Promise<Beer | null>
       const _wrong4: Promise<Beer | null> = myBeersRepo.getById('1');
 
-      expect(true).toBe(true);
     });
   });
 
@@ -234,7 +226,6 @@ describe('Repository Type Inference', () => {
       // Note: This will actually fail at runtime due to missing properties, but we're testing type safety
       const typedBeers: Beer[] = beers as unknown as Beer[];
 
-      expect(true).toBe(true);
     });
   });
 
