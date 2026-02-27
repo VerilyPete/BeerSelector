@@ -35,7 +35,7 @@ const DATABASE_INITIALIZATION_TIMEOUT_MS = 30000;
  * Initialize database connection
  * @returns Database instance
  */
-export const initDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
+const initDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
   return await getDatabase();
 };
 
