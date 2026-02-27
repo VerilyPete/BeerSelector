@@ -37,10 +37,6 @@ export const CREATE_ALLBEERS_TABLE = `
   )
 `;
 
-/**
- * Alias for compatibility with existing code
- */
-export const CREATE_ALL_BEERS_TABLE = CREATE_ALLBEERS_TABLE;
 
 /**
  * SQL statement to create the tasted_brew_current_round table
@@ -67,10 +63,6 @@ export const CREATE_TASTED_BREW_TABLE = `
   )
 `;
 
-/**
- * Alias for compatibility with existing code
- */
-export const CREATE_MY_BEERS_TABLE = CREATE_TASTED_BREW_TABLE;
 
 /**
  * SQL statement to create the rewards table
@@ -116,7 +108,7 @@ export const CREATE_OPERATION_QUEUE_TABLE = `
 /**
  * Default preferences to initialize on first app launch
  */
-export const DEFAULT_PREFERENCES: Preference[] = [
+const DEFAULT_PREFERENCES: Preference[] = [
   {
     key: 'all_beers_api_url',
     value: '',
