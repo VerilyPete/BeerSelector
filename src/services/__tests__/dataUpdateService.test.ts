@@ -19,6 +19,13 @@ import {
   pollForEnrichmentUpdates,
 } from '../enrichmentService';
 
+// Helper: flush all pending microtasks and macrotasks
+async function flushPromises(iterations = 10): Promise<void> {
+  for (let i = 0; i < iterations; i++) {
+    await new Promise(resolve => setImmediate(resolve));
+  }
+}
+
 // Mock database preferences
 jest.mock('../../database/preferences', () => ({
   getPreference: jest.fn(),
@@ -898,9 +905,9 @@ describe('dataUpdateService', () => {
 
       await fetchAndUpdateMyBeers();
 
-      // Flush fire-and-forget promise chains with real timers
+      // Flush fire-and-forget promise chains
       // syncBeersToWorker().then() -> pollForEnrichmentUpdates().then() -> persist
-      await new Promise(resolve => setTimeout(resolve, 50));
+      await flushPromises();
 
       // Verify syncBeersToWorker was called with the missing beers
       expect(syncBeersToWorker).toHaveBeenCalled();
