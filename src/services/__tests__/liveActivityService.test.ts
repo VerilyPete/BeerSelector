@@ -958,22 +958,82 @@ describe('liveActivityService', () => {
       cancelPendingRestart();
     });
 
-    // Skip debounce timing tests in Jest - these need real timer behavior
-    // that doesn't work well with Jest's async handling. These should be
-    // tested via Maestro E2E tests instead.
-    it.skip('should debounce rapid calls', async () => {
-      // This test requires real timer behavior that conflicts with Jest's async handling
-      // Test via Maestro E2E instead
+    it('should debounce rapid calls so only one native restart executes', async () => {
+      jest.useFakeTimers();
+      mockRestartActivity.mockResolvedValue('activity-id');
+
+      const p1 = debouncedRestartLiveActivity(mockQueueState);
+      const p2 = debouncedRestartLiveActivity(mockQueueState);
+
+      // Flush areActivitiesEnabled microtasks for both calls
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      jest.advanceTimersByTime(500);
+
+      // Flush the restartActivity promise
+      await Promise.resolve();
+      await Promise.resolve();
+
+      const [r1, r2] = await Promise.all([p1, p2]);
+
+      expect(mockRestartActivity).toHaveBeenCalledTimes(1);
+      expect(r1.success).toBe(true);
+      expect(r2.success).toBe(true);
+
+      jest.useRealTimers();
     });
 
-    it.skip('should use configured delay (500ms default)', async () => {
-      // This test requires real timer behavior that conflicts with Jest's async handling
-      // Test via Maestro E2E instead
+    it('should not execute before the 500ms debounce window elapses', async () => {
+      jest.useFakeTimers();
+      mockRestartActivity.mockResolvedValue('activity-id');
+
+      const promise = debouncedRestartLiveActivity(mockQueueState);
+
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(mockRestartActivity).not.toHaveBeenCalled();
+
+      jest.advanceTimersByTime(500);
+      await Promise.resolve();
+      await Promise.resolve();
+
+      await promise;
+
+      expect(mockRestartActivity).toHaveBeenCalledTimes(1);
+
+      jest.useRealTimers();
     });
 
-    it.skip('should use latest state for debounced execution', async () => {
-      // This test requires real timer behavior that conflicts with Jest's async handling
-      // Test via Maestro E2E instead
+    it('should use the latest state when multiple calls are debounced', async () => {
+      jest.useFakeTimers();
+      const firstState = { ...mockQueueState, beers: [{ id: '1', name: 'First Beer' }] };
+      const latestState = { ...mockQueueState, beers: [{ id: '2', name: 'Latest Beer' }] };
+      mockRestartActivity.mockResolvedValue('activity-id');
+
+      debouncedRestartLiveActivity(firstState);
+      await Promise.resolve();
+      await Promise.resolve();
+
+      const p2 = debouncedRestartLiveActivity(latestState);
+      await Promise.resolve();
+      await Promise.resolve();
+
+      jest.advanceTimersByTime(500);
+      await Promise.resolve();
+      await Promise.resolve();
+
+      await p2;
+
+      expect(mockRestartActivity).toHaveBeenCalledTimes(1);
+      expect(mockRestartActivity).toHaveBeenCalledWith(
+        expect.objectContaining({ beers: [{ id: '2', name: 'Latest Beer' }] })
+      );
+
+      jest.useRealTimers();
     });
 
     it('should skip debouncing when config.enabled is false', async () => {
@@ -988,9 +1048,25 @@ describe('liveActivityService', () => {
       expect(result.wasDebounced).toBe(false);
     });
 
-    it.skip('should return result with wasDebounced true for debounced calls', async () => {
-      // This test requires real timer behavior that conflicts with Jest's async handling
-      // Test via Maestro E2E instead
+    it('should return wasDebounced true for debounced calls', async () => {
+      jest.useFakeTimers();
+      mockRestartActivity.mockResolvedValue('new-activity-id');
+
+      const promise = debouncedRestartLiveActivity(mockQueueState);
+
+      await Promise.resolve();
+      await Promise.resolve();
+
+      jest.advanceTimersByTime(500);
+      await Promise.resolve();
+      await Promise.resolve();
+
+      const result = await promise;
+
+      expect(result.wasDebounced).toBe(true);
+      expect(result.success).toBe(true);
+
+      jest.useRealTimers();
     });
 
     it('should return success false when not on iOS', async () => {
@@ -1027,10 +1103,35 @@ describe('liveActivityService', () => {
       cancelPendingRestart();
     });
 
-    // Skip timing-dependent tests - these need real timer behavior
-    it.skip('should cancel pending debounced restart', async () => {
-      // This test requires real timer behavior that conflicts with Jest's async handling
-      // Test via Maestro E2E instead
+    it('should cancel a pending debounced restart so the native call never fires', async () => {
+      jest.useFakeTimers();
+      mockRestartActivity.mockResolvedValue('activity-id');
+
+      const mockQueueStateLocal = {
+        memberId: 'M123',
+        storeId: 'S456',
+        beers: [{ id: '1', name: 'Test Beer' }],
+      };
+
+      const promise = debouncedRestartLiveActivity(mockQueueStateLocal);
+
+      // Flush areActivitiesEnabled
+      await Promise.resolve();
+      await Promise.resolve();
+
+      // Cancel before the debounce fires
+      cancelPendingRestart();
+
+      jest.advanceTimersByTime(500);
+      await Promise.resolve();
+
+      const result = await promise;
+
+      expect(mockRestartActivity).not.toHaveBeenCalled();
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Cancelled');
+
+      jest.useRealTimers();
     });
 
     it('should be safe to call when no pending restart', () => {
@@ -1050,10 +1151,35 @@ describe('liveActivityService', () => {
       cancelPendingRestart();
     });
 
-    // Skip timing-dependent tests - these need real timer behavior
-    it.skip('should flush pending restart immediately', async () => {
-      // This test requires real timer behavior that conflicts with Jest's async handling
-      // Test via Maestro E2E instead
+    it('should execute a pending restart immediately without waiting for the timer', async () => {
+      jest.useFakeTimers();
+      mockRestartActivity.mockResolvedValue('activity-id');
+
+      const mockQueueStateLocal = {
+        memberId: 'M123',
+        storeId: 'S456',
+        beers: [{ id: '1', name: 'Test Beer' }],
+      };
+
+      const promise = debouncedRestartLiveActivity(mockQueueStateLocal);
+
+      // Flush areActivitiesEnabled
+      await Promise.resolve();
+      await Promise.resolve();
+
+      // Flush immediately without advancing timers
+      flushPendingRestart();
+
+      // Flush the restartActivity promise
+      await Promise.resolve();
+      await Promise.resolve();
+
+      const result = await promise;
+
+      expect(mockRestartActivity).toHaveBeenCalledTimes(1);
+      expect(result.success).toBe(true);
+
+      jest.useRealTimers();
     });
 
     it('should be safe to call when no pending restart', () => {
