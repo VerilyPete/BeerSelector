@@ -1,10 +1,50 @@
 # Test Quality Remediation Plan
 
-## Overview
+## Status: COMPLETED
 
-This plan addresses 7 categories of test quality issues identified by the TDD Guardian analysis, organized into phases that can each be completed independently while leaving tests green.
+**Final state**: 64 suites, 1750 tests, 0 skipped, 0 failing.
 
-**Reference template**: `src/database/repositories/__tests__/OptimisticUpdateRepository.test.ts` (recently fixed, demonstrates the target pattern for Issues 1 and 3).
+Executed in 3 waves using parallel agent teams:
+- **Wave 1** (Phases 1, 2, 4, 7, 8): Factory conversions + skipped tests + migration tests V3/V7
+- **Wave 2** (Phases 3, 5, 6, 9): Console assertions + as-any + coverage + enrichment refactor
+- **Wave 3** (cleanup): Remaining console assertions in session/liveActivity tests, let/beforeEach in lifecycle/validation/databaseLifecycle, migration tests V4/V5/V6, capturedSignal typing
+
+### Results Summary
+
+| Metric | Before | After |
+|--------|--------|-------|
+| Tests | 1669 | 1750 (+81) |
+| Suites | 59 | 64 (+5) |
+| Skipped | 2 | 0 |
+| let/beforeEach antipattern files | 13+ | 0 (remaining beforeEach is .mockClear() infrastructure) |
+| Console assertion count | ~150 | ~53 (all Tier C/D — acceptable) |
+| mockDatabase: any | 7+ files | 0 |
+| Migration test coverage | 0% | 100% (V3-V7) |
+| dataUpdateService coverage | 64% | 80% |
+
+### Remaining Console Assertions (53, all acceptable)
+
+- `errorLogger.test.ts` (22) — Tier D: testing a logging utility
+- `DatabaseLockManager.test.ts` (9) + `locks.test.ts` (6) — Tier D: lock state logging is the contract
+- `initializationState.test.ts` (3) — Tier D: state machine transition logging
+- `preferences.test.ts` (3) — Tier C: return value is ambiguous (null/[] for both empty and error)
+- `lifecycle.test.ts` (2) — Tier D: WAL mode fallback logging
+- `schema.test.ts` (2) — Tier D: database setup lifecycle
+- `databaseLifecycle.test.tsx` (4) — Tier D: app state change logging
+- `LoginWebView.test.tsx` (1) — Tier C: error recovery
+- `RewardsRepository.test.ts` (1) — Tier C: clear operation logging
+
+### Remaining `as any` (all justified)
+
+- ~28 in config validation tests — intentional invalid input testing (`'invalid' as any`)
+- ~4 in LoginWebView — config mutation for testing (design limitation)
+- ~2 in queueService/sessionValidator — null/undefined input testing
+
+---
+
+## Original Plan
+
+**Reference template**: `src/database/repositories/__tests__/OptimisticUpdateRepository.test.ts` (demonstrates the target pattern for Issues 1 and 3).
 
 ---
 
@@ -486,28 +526,19 @@ The transformations in Phases 1-4 are purely mechanical refactoring of test code
 
 ---
 
-## Effort Summary
+## Effort Summary (Actual)
 
-| Phase | Issue | Files | Effort | Priority |
-|-------|-------|-------|--------|----------|
-| 1 | let/beforeEach + MockDatabase type in repos | 4 | Medium | High |
-| 2 | let/beforeEach in database utilities | 4 | Medium-Low | High |
-| 3 | Console log assertions | ~15 | High | High |
-| 4 | let/beforeEach in API client | 1 | Low-Medium | High |
-| 5 | as any cleanup | ~5 | Medium | Medium |
-| 6 | dataUpdateService coverage | 1 (new tests) | High | Medium |
-| 7 | Skipped tests | 2 | Low | Medium |
-| 8 | Migration test coverage | 5 (new tests) | Medium | Medium |
-| 9 | enrichmentService refactoring | 1 | Medium-High | Low |
+| Phase | Issue | Files | Status |
+|-------|-------|-------|--------|
+| 1 | let/beforeEach + MockDatabase type in repos | 4 | DONE (Wave 1) |
+| 2 | let/beforeEach in database utilities | 4 | DONE (Wave 1) |
+| 3 | Console log assertions | ~15 | DONE (Wave 2 + 3) |
+| 4 | let/beforeEach in API client | 1 | DONE (Wave 1) |
+| 5 | as any cleanup + resetForTesting() | ~5 | DONE (Wave 2) |
+| 6 | dataUpdateService coverage | 1 (33 new tests) | DONE (Wave 2) |
+| 7 | Skipped tests | 2 | DONE (Wave 1) |
+| 8 | Migration test coverage | 5 (69 new tests) | DONE (Wave 1 + 3) |
+| 9 | enrichmentService refactoring | 1 | DONE (Wave 2) |
+| — | Cleanup (lifecycle, validation, databaseLifecycle, session tests) | 5 | DONE (Wave 3) |
 
-**Total estimated effort**: ~3-5 focused sessions for Phases 1-4 (mechanical), plus ~3-4 sessions for Phases 5-9 (requires more judgment).
-
----
-
-## Critical Files Reference
-
-- **Template**: `src/database/repositories/__tests__/OptimisticUpdateRepository.test.ts`
-- **Largest fix**: `src/database/repositories/__tests__/BeerRepository.test.ts`
-- **Highest console count**: `src/database/repositories/__tests__/MyBeersRepository.test.ts`
-- **Coverage gap**: `src/services/dataUpdateService.ts` (lines 673-1317)
-- **Migration pattern**: `src/database/migrations/migrateToV7.ts`
+One production code change: `DatabaseLockManager.resetForTesting()` method added (Phase 5).
