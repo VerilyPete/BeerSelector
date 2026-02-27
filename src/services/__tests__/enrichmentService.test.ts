@@ -64,13 +64,17 @@ jest.mock('@/src/utils/errorLogger', () => ({
 const mockFetch = jest.fn();
 global.fetch = mockFetch;
 
+function setupEnrichmentTest() {
+  resetEnrichmentMetrics();
+  __resetRateLimitStateForTests();
+  mockFetch.mockReset();
+  return { mockFetch };
+}
+
 describe('enrichmentService', () => {
   beforeEach(() => {
-    // Reset metrics and rate limit state before each test
-    resetEnrichmentMetrics();
-    __resetRateLimitStateForTests();
     jest.clearAllMocks();
-    mockFetch.mockReset();
+    setupEnrichmentTest();
   });
 
   describe('Metrics', () => {
@@ -94,7 +98,7 @@ describe('enrichmentService', () => {
         const metrics2 = getEnrichmentMetrics();
 
         // Modifying one should not affect the other
-        (metrics1 as any).proxyRequests = 999;
+        (metrics1 as Record<string, unknown>)['proxyRequests'] = 999;
         expect(metrics2.proxyRequests).toBe(0);
       });
     });
@@ -522,10 +526,6 @@ describe('enrichmentService', () => {
     });
 
     describe('fetchBeersFromProxy', () => {
-      beforeEach(() => {
-        mockGetPreference.mockResolvedValue('test-client-id');
-      });
-
       it('should throw when enrichment is not configured', async () => {
         const { config } = require('@/src/config');
         config.enrichment.isConfigured.mockReturnValueOnce(false);
@@ -674,12 +674,6 @@ describe('enrichmentService', () => {
     });
 
     describe('fetchEnrichmentBatch', () => {
-      beforeEach(() => {
-        resetEnrichmentMetrics();
-        __resetRateLimitStateForTests();
-        mockGetPreference.mockResolvedValue('test-client-id');
-      });
-
       it('should return empty object when not configured', async () => {
         const { config } = require('@/src/config');
         config.enrichment.isConfigured.mockReturnValueOnce(false);
@@ -945,8 +939,6 @@ describe('enrichmentService', () => {
     const mockGetPreference = require('@/src/database/preferences').getPreference;
 
     beforeEach(() => {
-      resetEnrichmentMetrics();
-      __resetRateLimitStateForTests();
       mockGetPreference.mockResolvedValue('test-client-id');
     });
 
@@ -1107,8 +1099,6 @@ describe('enrichmentService', () => {
     const mockGetPreference = require('@/src/database/preferences').getPreference;
 
     beforeEach(() => {
-      resetEnrichmentMetrics();
-      __resetRateLimitStateForTests();
       mockGetPreference.mockResolvedValue('test-client-id');
     });
 
@@ -1247,8 +1237,6 @@ describe('enrichmentService', () => {
 
     beforeEach(() => {
       jest.useFakeTimers();
-      resetEnrichmentMetrics();
-      __resetRateLimitStateForTests();
       mockGetPreference.mockResolvedValue('test-client-id');
     });
 

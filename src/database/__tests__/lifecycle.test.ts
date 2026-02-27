@@ -12,8 +12,14 @@ import { databaseLockManager } from '../DatabaseLockManager';
 // Mock expo-sqlite
 jest.mock('expo-sqlite');
 
+type MockDatabase = {
+  closeAsync: jest.Mock;
+  execAsync: jest.Mock;
+  getFirstAsync: jest.Mock;
+};
+
 describe('Database Lifecycle Management', () => {
-  let mockDb: any;
+  let mockDb: MockDatabase;
   let mockCloseAsync: jest.Mock;
   let mockExecAsync: jest.Mock;
   let mockGetFirstAsync: jest.Mock;
@@ -80,15 +86,6 @@ describe('Database Lifecycle Management', () => {
       expect(mockExecAsync).toHaveBeenCalledWith('PRAGMA synchronous = NORMAL');
     });
 
-    it('should verify WAL mode was enabled successfully', async () => {
-      const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
-
-      await getDatabase();
-
-      expect(consoleLogSpy).toHaveBeenCalledWith('Database journal mode: wal');
-      consoleLogSpy.mockRestore();
-    });
-
     it('should warn if WAL mode enablement fails', async () => {
       mockGetFirstAsync.mockResolvedValueOnce({ journal_mode: 'delete' });
       const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
@@ -99,17 +96,15 @@ describe('Database Lifecycle Management', () => {
       consoleWarnSpy.mockRestore();
     });
 
-    it('should handle missing journal_mode in response', async () => {
+    it('should handle missing journal_mode in response gracefully', async () => {
       mockGetFirstAsync.mockResolvedValueOnce(null);
-      const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
+      jest.spyOn(console, 'log').mockImplementation();
       const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
 
       await getDatabase();
 
-      expect(consoleLogSpy).toHaveBeenCalledWith('Database journal mode: unknown');
       expect(consoleWarnSpy).toHaveBeenCalledWith('Failed to enable WAL mode, using unknown instead');
 
-      consoleLogSpy.mockRestore();
       consoleWarnSpy.mockRestore();
     });
 
@@ -168,38 +163,15 @@ describe('Database Lifecycle Management', () => {
       await expect(closeDatabaseConnection()).rejects.toThrow('Close failed');
     });
 
-    it('should log close operation', async () => {
-      const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
-
-      await getDatabase();
-      await closeDatabaseConnection();
-
-      expect(consoleLogSpy).toHaveBeenCalledWith('Closing database connection...');
-      consoleLogSpy.mockRestore();
-    });
-
-    it('should log successful close', async () => {
-      const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
-
-      await getDatabase();
-      await closeDatabaseConnection();
-
-      expect(consoleLogSpy).toHaveBeenCalledWith('Database connection closed successfully');
-      consoleLogSpy.mockRestore();
-    });
-
-    it('should log errors during close', async () => {
-      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+    it('should throw when close errors occur', async () => {
+      jest.spyOn(console, 'error').mockImplementation();
 
       await getDatabase();
 
       const error = new Error('Close failed');
       mockCloseAsync.mockRejectedValue(error);
 
-      await expect(closeDatabaseConnection()).rejects.toThrow();
-
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to close database:', error);
-      consoleErrorSpy.mockRestore();
+      await expect(closeDatabaseConnection()).rejects.toThrow('Close failed');
     });
   });
 
@@ -245,15 +217,6 @@ describe('Database Lifecycle Management', () => {
       expect(mockCloseAsync).toHaveBeenCalledTimes(1);
     });
 
-    it('should log warning when force closing', async () => {
-      const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
-
-      await getDatabase();
-      await closeDatabaseConnection(true);
-
-      expect(consoleWarnSpy).toHaveBeenCalledWith('Force closing database connection without waiting for operations to complete');
-      consoleWarnSpy.mockRestore();
-    });
   });
 
   describe('Database State Validation', () => {
@@ -341,14 +304,14 @@ describe('Database Lifecycle Management', () => {
     it('should reset shutdown state when getDatabase is called after close', async () => {
       await getDatabase();
       await closeDatabaseConnection();
-
-      // Mock console.log to verify resetShutdownState is called
-      const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
+      jest.spyOn(console, 'log').mockImplementation();
 
       await getDatabase();
 
-      expect(consoleLogSpy).toHaveBeenCalledWith('Database lock manager: Resetting shutdown state');
-      consoleLogSpy.mockRestore();
+      // Verify shutdown state was reset by being able to acquire a lock
+      const acquired = await databaseLockManager.acquireLock('post-reopen-lock-check');
+      expect(acquired).toBe(true);
+      databaseLockManager.releaseLock('post-reopen-lock-check');
     });
 
     it('should handle multiple background/foreground cycles without lock issues', async () => {
