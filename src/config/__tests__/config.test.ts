@@ -8,7 +8,14 @@
  * 3. Refactor and improve (REFACTOR)
  */
 
-import { config, AppEnvironment, ApiEndpoints, assertEnrichmentConfigured, ConfiguredEnrichment, EnrichmentConfig } from '../config';
+import {
+  config,
+  AppEnvironment,
+  ApiEndpoints,
+  assertEnrichmentConfigured,
+  ConfiguredEnrichment,
+  EnrichmentConfig,
+} from '../config';
 
 describe('Configuration Module', () => {
   describe('Environment Configuration', () => {
@@ -62,7 +69,7 @@ describe('Configuration Module', () => {
           'addToQueue',
           'addToRewardQueue',
           'memberDashboard',
-          'memberRewards'
+          'memberRewards',
         ];
 
         requiredEndpoints.forEach(endpoint => {
@@ -195,7 +202,7 @@ describe('Configuration Module', () => {
         config.api.baseUrl,
         config.external.untappd.baseUrl,
         config.external.untappd.loginUrl,
-        ...Object.values(config.api.referers)
+        ...Object.values(config.api.referers),
       ];
 
       allUrls.forEach(url => {
@@ -229,7 +236,9 @@ describe('assertEnrichmentConfigured', () => {
     batchSize: 100,
     rateLimitWindow: 60000,
     rateLimitMaxRequests: 10,
-    isConfigured: () => Boolean(overrides.apiUrl !== undefined ? overrides.apiUrl : 'https://api.example.com') && Boolean(overrides.apiKey !== undefined ? overrides.apiKey : 'test-key'),
+    isConfigured: () =>
+      Boolean(overrides.apiUrl !== undefined ? overrides.apiUrl : 'https://api.example.com') &&
+      Boolean(overrides.apiKey !== undefined ? overrides.apiKey : 'test-key'),
     getFullUrl: () => 'https://api.example.com/beers',
     ...overrides,
   });

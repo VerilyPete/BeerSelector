@@ -10,7 +10,7 @@ export enum ApiErrorType {
   PARSE_ERROR = 'PARSE_ERROR',
   VALIDATION_ERROR = 'VALIDATION_ERROR',
   UNKNOWN_ERROR = 'UNKNOWN_ERROR',
-  INFO = 'INFO'
+  INFO = 'INFO',
 }
 
 /**
@@ -30,11 +30,7 @@ export type ErrorResponse = {
  * @param onOk Optional callback for OK button
  */
 export function showErrorAlert(title: string, message: string, onOk?: () => void): void {
-  Alert.alert(
-    title,
-    message,
-    [{ text: 'OK', onPress: onOk }]
-  );
+  Alert.alert(title, message, [{ text: 'OK', onPress: onOk }]);
 }
 
 /**
@@ -44,11 +40,7 @@ export function showErrorAlert(title: string, message: string, onOk?: () => void
  * @param onOk Optional callback for OK button
  */
 export function showSuccessAlert(title: string, message: string, onOk?: () => void): void {
-  Alert.alert(
-    title,
-    message,
-    [{ text: 'OK', onPress: onOk }]
-  );
+  Alert.alert(title, message, [{ text: 'OK', onPress: onOk }]);
 }
 
 /**
@@ -58,11 +50,7 @@ export function showSuccessAlert(title: string, message: string, onOk?: () => vo
  * @param onOk Optional callback for OK button
  */
 export function showInfoAlert(title: string, message: string, onOk?: () => void): void {
-  Alert.alert(
-    title,
-    message,
-    [{ text: 'OK', onPress: onOk }]
-  );
+  Alert.alert(title, message, [{ text: 'OK', onPress: onOk }]);
 }
 
 /**
@@ -79,9 +67,11 @@ export function formatApiErrorForUser(error: unknown): string {
   // If it's an Error object with a message
   if (error instanceof Error) {
     // Check for network errors
-    if (error.message.includes('Network request failed') ||
-        error.message.includes('Failed to fetch') ||
-        error.message.includes('Network error')) {
+    if (
+      error.message.includes('Network request failed') ||
+      error.message.includes('Failed to fetch') ||
+      error.message.includes('Network error')
+    ) {
       return 'Unable to connect to the server. Please check your internet connection and try again.';
     }
 
@@ -113,21 +103,26 @@ export function createErrorResponse(error: unknown): ErrorResponse {
   const errorResponse: ErrorResponse = {
     type: ApiErrorType.UNKNOWN_ERROR,
     message: 'An unknown error occurred',
-    originalError: error
+    originalError: error,
   };
 
   // If it's already an Error object
   if (error instanceof Error) {
     // Check for network errors
-    if (error.message.includes('Network request failed') ||
-        error.message.includes('Failed to fetch') ||
-        error.message.includes('Network error')) {
+    if (
+      error.message.includes('Network request failed') ||
+      error.message.includes('Failed to fetch') ||
+      error.message.includes('Network error')
+    ) {
       errorResponse.type = ApiErrorType.NETWORK_ERROR;
       errorResponse.message = 'Network connection error';
     }
     // Check for timeout errors - also treat as network errors for consolidated messaging
-    else if (error.message.includes('timeout') || error.message.includes('Timed out') ||
-             error.name === 'AbortError') {
+    else if (
+      error.message.includes('timeout') ||
+      error.message.includes('Timed out') ||
+      error.name === 'AbortError'
+    ) {
       errorResponse.type = ApiErrorType.NETWORK_ERROR; // Changed from TIMEOUT_ERROR to NETWORK_ERROR
       errorResponse.message = 'Network connection error: request timed out';
     }
@@ -135,8 +130,7 @@ export function createErrorResponse(error: unknown): ErrorResponse {
     else if (error instanceof SyntaxError && error.message.includes('JSON')) {
       errorResponse.type = ApiErrorType.PARSE_ERROR;
       errorResponse.message = 'Failed to parse server response';
-    }
-    else {
+    } else {
       errorResponse.message = error.message;
     }
   }
@@ -181,7 +175,7 @@ export function getUserFriendlyErrorMessage(error: ErrorResponse): string {
 
     case ApiErrorType.VALIDATION_ERROR:
       return error.message || 'There was a problem with your request. Please try again.';
-      
+
     case ApiErrorType.INFO:
       return error.message || 'Information notice.';
 

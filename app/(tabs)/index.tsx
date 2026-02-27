@@ -27,7 +27,10 @@ type NavigationCardProps = {
   testID?: string;
 } & (
   | { iconFamily: 'ionicons'; iconName: React.ComponentProps<typeof Ionicons>['name'] }
-  | { iconFamily: 'material-community'; iconName: React.ComponentProps<typeof MaterialCommunityIcons>['name'] }
+  | {
+      iconFamily: 'material-community';
+      iconName: React.ComponentProps<typeof MaterialCommunityIcons>['name'];
+    }
 );
 
 /**

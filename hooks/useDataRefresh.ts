@@ -81,7 +81,7 @@ export type UseDataRefreshResult = {
  */
 export const useDataRefresh = ({
   onDataReloaded,
-  componentName = 'Component'
+  componentName = 'Component',
 }: UseDataRefreshParams): UseDataRefreshResult => {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);

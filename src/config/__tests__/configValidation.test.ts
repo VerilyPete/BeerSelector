@@ -24,7 +24,7 @@ import {
   InvalidUrlError,
   MissingConfigError,
   InvalidNetworkConfigError,
-  InvalidEnvironmentError
+  InvalidEnvironmentError,
 } from '../errors';
 
 function assertError(value: unknown): asserts value is Error {

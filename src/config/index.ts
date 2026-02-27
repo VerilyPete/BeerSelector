@@ -48,13 +48,10 @@ export {
   // Error classes for error handling
   InvalidUrlError,
   InvalidNetworkConfigError,
-  InvalidEnvironmentError
+  InvalidEnvironmentError,
 } from './config';
 
 // Re-export all error classes from errors module
-export {
-  ConfigurationError,
-  MissingConfigError
-} from './errors';
+export { ConfigurationError, MissingConfigError } from './errors';
 
 export default configModule;

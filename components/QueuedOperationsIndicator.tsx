@@ -47,8 +47,8 @@ export const QueuedOperationsIndicator: React.FC<QueuedOperationsIndicatorProps>
 
   // Calculate counts
   const { pendingCount, failedCount, totalCount } = useMemo(() => {
-    const pending = queuedOperations.filter((op) => op.status === OperationStatus.PENDING).length;
-    const failed = queuedOperations.filter((op) => op.status === OperationStatus.FAILED).length;
+    const pending = queuedOperations.filter(op => op.status === OperationStatus.PENDING).length;
+    const failed = queuedOperations.filter(op => op.status === OperationStatus.FAILED).length;
     const total = queuedOperations.length;
 
     return {
@@ -108,9 +108,7 @@ export const QueuedOperationsIndicator: React.FC<QueuedOperationsIndicatorProps>
         </View>
 
         {/* Arrow indicator if tappable */}
-        {onPress && (
-          <Text style={[styles.arrow, { color: textColor, opacity: 0.5 }]}>›</Text>
-        )}
+        {onPress && <Text style={[styles.arrow, { color: textColor, opacity: 0.5 }]}>›</Text>}
       </View>
     </TouchableOpacity>
   );
