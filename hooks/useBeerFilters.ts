@@ -91,14 +91,15 @@ export const applySorting = <T extends FilterableBeer>(
       if (aNull && bNull) return 0;
       if (aNull) return 1;
       if (bNull) return -1;
+      // Non-null assertion safe: aNull/bNull guards above ensure both values are defined numbers
       return dir * (a.abv! - b.abv!);
     });
   } else {
     // date sort
     if (dateField === 'tasted_date') {
       sorted.sort((a, b) => {
-        const tastedDateA = 'tasted_date' in a ? (a.tasted_date as string) : '';
-        const tastedDateB = 'tasted_date' in b ? (b.tasted_date as string) : '';
+        const tastedDateA = 'tasted_date' in a ? String(a.tasted_date ?? '') : '';
+        const tastedDateB = 'tasted_date' in b ? String(b.tasted_date ?? '') : '';
         const partsA = tastedDateA.split('/');
         const partsB = tastedDateB.split('/');
 

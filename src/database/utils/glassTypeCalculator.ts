@@ -5,12 +5,12 @@ import { Beer, BeerWithContainerType, EnrichmentSource } from '@/src/types/beer'
  * Return type for calculateContainerType function
  * Explicitly includes all fields for type safety
  */
-interface BeerWithContainerTypeAndEnrichment extends Beer {
+type BeerWithContainerTypeAndEnrichment = Beer & {
   container_type: ContainerType;
   abv: number | null;
   enrichment_confidence: number | null;
   enrichment_source: EnrichmentSource;
-}
+};
 
 /**
  * Calculate and assign container type and ABV to a beer object

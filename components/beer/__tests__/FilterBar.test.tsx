@@ -27,7 +27,7 @@ jest.mock('@/hooks/useThemeColor', () => ({
 
 // Mock IconSymbol component
 jest.mock('@/components/ui/IconSymbol', () => ({
-  IconSymbol: ({ name, testID }: any) => {
+  IconSymbol: ({ name, testID }: { name: string; testID?: string }) => {
     const { View } = require('react-native');
     return <View testID={testID || `icon-${name}`} />;
   },
@@ -36,7 +36,9 @@ jest.mock('@/components/ui/IconSymbol', () => ({
 // Mock BeerIcon component
 jest.mock('@/components/icons/BeerIcon', () => {
   const { View } = require('react-native');
-  return ({ name, testID }: any) => <View testID={testID || `beericon-${name}`} />;
+  return ({ name, testID }: { name: string; testID?: string }) => (
+    <View testID={testID || `beericon-${name}`} />
+  );
 });
 
 // Mock ThemedText and ThemedView to use plain React Native components
@@ -296,11 +298,13 @@ describe('FilterBar', () => {
       const sortButton = getByTestId('sort-toggle-button');
       const directionButton = getByTestId('sort-direction-button');
 
-      // All buttons should have minHeight of 44 (CHIP_MIN_HEIGHT)
-      const getMinHeight = (element: any) => {
+      const getMinHeight = (element: {
+        props: { style: Record<string, unknown> | readonly Record<string, unknown>[] };
+      }) => {
         const style = element.props.style;
         if (Array.isArray(style)) {
-          return style.reduce((acc: any, s: any) => ({ ...acc, ...s }), {}).minHeight;
+          return style.reduce<Record<string, unknown>>((acc, s) => ({ ...acc, ...s }), {})
+            .minHeight;
         }
         return style?.minHeight;
       };
