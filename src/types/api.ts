@@ -106,28 +106,3 @@ export function isSessionData(obj: unknown): obj is SessionData {
   );
 }
 
-/**
- * Type guard to check if an object is an ApiResponse
- * @param obj The object to check
- * @returns True if the object is an ApiResponse, false otherwise
- */
-export function isApiResponse<T>(obj: unknown): obj is ApiResponse<T> {
-  if (!obj || typeof obj !== 'object') return false;
-  const o = obj as Record<string, unknown>;
-  if (typeof o.success !== 'boolean' || typeof o.statusCode !== 'number') return false;
-  if (o.success) return 'data' in o;
-  return o.data === null && typeof o.error === 'string';
-}
-
-/**
- * Type guard to check if an object is a LoginResult
- * @param obj The object to check
- * @returns True if the object is a LoginResult, false otherwise
- */
-export function isLoginResult(obj: unknown): obj is LoginResult {
-  if (!obj || typeof obj !== 'object') return false;
-  const o = obj as Record<string, unknown>;
-  if (typeof o.success !== 'boolean' || typeof o.statusCode !== 'number') return false;
-  if (o.success) return 'sessionData' in o;
-  return typeof o.error === 'string';
-}
