@@ -55,16 +55,10 @@ function createMockUpdate(overrides: Partial<OptimisticUpdate> = {}): Optimistic
 }
 
 describe('OptimisticUpdateRepository', () => {
-  let mockDatabase: MockDatabase;
-
-  beforeEach(() => {
-    mockDatabase = createMockDatabase();
-    (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
-    jest.clearAllMocks();
-  });
-
   describe('initialize', () => {
     it('should create the table and indexes', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       mockDatabase.execAsync.mockResolvedValue(undefined);
 
       await optimisticUpdateRepository.initialize();
@@ -82,6 +76,8 @@ describe('OptimisticUpdateRepository', () => {
     });
 
     it('should throw when database initialization fails', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       mockDatabase.execAsync.mockRejectedValueOnce(new Error('DB error'));
 
       await expect(optimisticUpdateRepository.initialize()).rejects.toThrow('DB error');
@@ -90,6 +86,8 @@ describe('OptimisticUpdateRepository', () => {
 
   describe('add', () => {
     it('should insert an optimistic update into the database', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       const update = createMockUpdate();
       mockDatabase.runAsync.mockResolvedValue(undefined);
 
@@ -102,6 +100,8 @@ describe('OptimisticUpdateRepository', () => {
     });
 
     it('should serialize rollbackData as JSON string', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       const update = createMockUpdate();
       mockDatabase.runAsync.mockResolvedValue(undefined);
 
@@ -114,6 +114,8 @@ describe('OptimisticUpdateRepository', () => {
     });
 
     it('should pass null for optional fields when not set', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       const update = createMockUpdate({ errorMessage: undefined, operationId: undefined });
       mockDatabase.runAsync.mockResolvedValue(undefined);
 
@@ -125,6 +127,8 @@ describe('OptimisticUpdateRepository', () => {
     });
 
     it('should include errorMessage and operationId when provided', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       const update = createMockUpdate({
         errorMessage: 'Network failed',
         operationId: 'op-abc',
@@ -139,6 +143,8 @@ describe('OptimisticUpdateRepository', () => {
     });
 
     it('should throw when database insert fails', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       const update = createMockUpdate();
       mockDatabase.runAsync.mockRejectedValueOnce(new Error('Insert failed'));
 
@@ -148,6 +154,8 @@ describe('OptimisticUpdateRepository', () => {
 
   describe('getAll', () => {
     it('should return all updates ordered by timestamp descending', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       const rows = [
         {
           id: 'update-2',
@@ -181,6 +189,8 @@ describe('OptimisticUpdateRepository', () => {
     });
 
     it('should deserialize rollbackData from JSON string', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       const rollback = { type: 'CHECK_IN_BEER', wasInAllBeers: true, wasInTastedBeers: false, beer: { id: 'b1', brew_name: 'Test' } };
       mockDatabase.getAllAsync.mockResolvedValue([
         {
@@ -198,6 +208,8 @@ describe('OptimisticUpdateRepository', () => {
     });
 
     it('should return empty array when no updates exist', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       mockDatabase.getAllAsync.mockResolvedValue([]);
 
       const result = await optimisticUpdateRepository.getAll();
@@ -206,6 +218,8 @@ describe('OptimisticUpdateRepository', () => {
     });
 
     it('should throw when database query fails', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       mockDatabase.getAllAsync.mockRejectedValueOnce(new Error('Query failed'));
 
       await expect(optimisticUpdateRepository.getAll()).rejects.toThrow('Query failed');
@@ -214,6 +228,8 @@ describe('OptimisticUpdateRepository', () => {
 
   describe('getById', () => {
     it('should return update when found', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       const rollback = { type: 'CHECK_IN_BEER', wasInAllBeers: true, wasInTastedBeers: false, beer: { id: 'b1', brew_name: 'Test' } };
       mockDatabase.getFirstAsync.mockResolvedValue({
         id: 'update-1',
@@ -234,6 +250,8 @@ describe('OptimisticUpdateRepository', () => {
     });
 
     it('should return null when update not found', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       mockDatabase.getFirstAsync.mockResolvedValue(null);
 
       const result = await optimisticUpdateRepository.getById('nonexistent');
@@ -242,6 +260,8 @@ describe('OptimisticUpdateRepository', () => {
     });
 
     it('should query by the given id', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       mockDatabase.getFirstAsync.mockResolvedValue(null);
 
       await optimisticUpdateRepository.getById('specific-id');
@@ -253,6 +273,8 @@ describe('OptimisticUpdateRepository', () => {
     });
 
     it('should throw when database query fails', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       mockDatabase.getFirstAsync.mockRejectedValueOnce(new Error('Read failed'));
 
       await expect(optimisticUpdateRepository.getById('update-1')).rejects.toThrow('Read failed');
@@ -261,6 +283,8 @@ describe('OptimisticUpdateRepository', () => {
 
   describe('getByStatus', () => {
     it('should return updates matching the given status', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       const rollback = { type: 'CHECK_IN_BEER', wasInAllBeers: true, wasInTastedBeers: false, beer: { id: 'b1', brew_name: 'Test' } };
       mockDatabase.getAllAsync.mockResolvedValue([
         {
@@ -282,6 +306,8 @@ describe('OptimisticUpdateRepository', () => {
     });
 
     it('should return empty array when no updates match status', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       mockDatabase.getAllAsync.mockResolvedValue([]);
 
       const result = await optimisticUpdateRepository.getByStatus(OptimisticUpdateStatus.SUCCESS);
@@ -290,6 +316,8 @@ describe('OptimisticUpdateRepository', () => {
     });
 
     it('should throw when database query fails', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       mockDatabase.getAllAsync.mockRejectedValueOnce(new Error('Query failed'));
 
       await expect(optimisticUpdateRepository.getByStatus(OptimisticUpdateStatus.PENDING)).rejects.toThrow(
@@ -300,6 +328,8 @@ describe('OptimisticUpdateRepository', () => {
 
   describe('getPendingUpdates', () => {
     it('should return updates with PENDING or SYNCING status', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       const rollback = { type: 'CHECK_IN_BEER', wasInAllBeers: true, wasInTastedBeers: false, beer: { id: 'b1', brew_name: 'Test' } };
       mockDatabase.getAllAsync.mockResolvedValue([
         {
@@ -328,6 +358,8 @@ describe('OptimisticUpdateRepository', () => {
     });
 
     it('should order results by timestamp ascending (oldest first)', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       mockDatabase.getAllAsync.mockResolvedValue([]);
 
       await optimisticUpdateRepository.getPendingUpdates();
@@ -339,6 +371,8 @@ describe('OptimisticUpdateRepository', () => {
     });
 
     it('should return empty array when no pending updates exist', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       mockDatabase.getAllAsync.mockResolvedValue([]);
 
       const result = await optimisticUpdateRepository.getPendingUpdates();
@@ -347,6 +381,8 @@ describe('OptimisticUpdateRepository', () => {
     });
 
     it('should throw when database query fails', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       mockDatabase.getAllAsync.mockRejectedValueOnce(new Error('Query failed'));
 
       await expect(optimisticUpdateRepository.getPendingUpdates()).rejects.toThrow('Query failed');
@@ -355,6 +391,8 @@ describe('OptimisticUpdateRepository', () => {
 
   describe('getByOperationId', () => {
     it('should return update matching the operation ID', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       const rollback = { type: 'CHECK_IN_BEER', wasInAllBeers: true, wasInTastedBeers: false, beer: { id: 'b1', brew_name: 'Test' } };
       mockDatabase.getFirstAsync.mockResolvedValue({
         id: 'update-1',
@@ -376,6 +414,8 @@ describe('OptimisticUpdateRepository', () => {
     });
 
     it('should return null when no update has the given operation ID', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       mockDatabase.getFirstAsync.mockResolvedValue(null);
 
       const result = await optimisticUpdateRepository.getByOperationId('nonexistent-op');
@@ -384,6 +424,8 @@ describe('OptimisticUpdateRepository', () => {
     });
 
     it('should throw when database query fails', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       mockDatabase.getFirstAsync.mockRejectedValueOnce(new Error('Query failed'));
 
       await expect(optimisticUpdateRepository.getByOperationId('op-xyz')).rejects.toThrow('Query failed');
@@ -392,6 +434,8 @@ describe('OptimisticUpdateRepository', () => {
 
   describe('updateStatus', () => {
     it('should update the status of an update', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       mockDatabase.runAsync.mockResolvedValue(undefined);
 
       await optimisticUpdateRepository.updateStatus('update-1', OptimisticUpdateStatus.SUCCESS);
@@ -403,6 +447,8 @@ describe('OptimisticUpdateRepository', () => {
     });
 
     it('should store the error message when provided', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       mockDatabase.runAsync.mockResolvedValue(undefined);
 
       await optimisticUpdateRepository.updateStatus('update-1', OptimisticUpdateStatus.FAILED, 'Server error');
@@ -414,6 +460,8 @@ describe('OptimisticUpdateRepository', () => {
     });
 
     it('should use null for error message when not provided', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       mockDatabase.runAsync.mockResolvedValue(undefined);
 
       await optimisticUpdateRepository.updateStatus('update-1', OptimisticUpdateStatus.SUCCESS);
@@ -426,6 +474,8 @@ describe('OptimisticUpdateRepository', () => {
     });
 
     it('should throw when database update fails', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       mockDatabase.runAsync.mockRejectedValueOnce(new Error('Update failed'));
 
       await expect(
@@ -436,6 +486,8 @@ describe('OptimisticUpdateRepository', () => {
 
   describe('linkOperation', () => {
     it('should associate an update with an operation ID', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       mockDatabase.runAsync.mockResolvedValue(undefined);
 
       await optimisticUpdateRepository.linkOperation('update-1', 'op-abc');
@@ -447,6 +499,8 @@ describe('OptimisticUpdateRepository', () => {
     });
 
     it('should throw when database update fails', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       mockDatabase.runAsync.mockRejectedValueOnce(new Error('Update failed'));
 
       await expect(optimisticUpdateRepository.linkOperation('update-1', 'op-abc')).rejects.toThrow('Update failed');
@@ -455,6 +509,8 @@ describe('OptimisticUpdateRepository', () => {
 
   describe('delete', () => {
     it('should delete the update with the given id', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       mockDatabase.runAsync.mockResolvedValue(undefined);
 
       await optimisticUpdateRepository.delete('update-1');
@@ -466,6 +522,8 @@ describe('OptimisticUpdateRepository', () => {
     });
 
     it('should throw when database delete fails', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       mockDatabase.runAsync.mockRejectedValueOnce(new Error('Delete failed'));
 
       await expect(optimisticUpdateRepository.delete('update-1')).rejects.toThrow('Delete failed');
@@ -474,6 +532,8 @@ describe('OptimisticUpdateRepository', () => {
 
   describe('clearAll', () => {
     it('should delete all optimistic updates', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       mockDatabase.runAsync.mockResolvedValue(undefined);
 
       await optimisticUpdateRepository.clearAll();
@@ -484,6 +544,8 @@ describe('OptimisticUpdateRepository', () => {
     });
 
     it('should throw when database operation fails', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       mockDatabase.runAsync.mockRejectedValueOnce(new Error('Clear failed'));
 
       await expect(optimisticUpdateRepository.clearAll()).rejects.toThrow('Clear failed');
@@ -492,6 +554,8 @@ describe('OptimisticUpdateRepository', () => {
 
   describe('clearOldCompleted', () => {
     it('should delete SUCCESS and FAILED updates older than the cutoff', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       mockDatabase.runAsync.mockResolvedValue({ changes: 3 });
 
       await optimisticUpdateRepository.clearOldCompleted(24 * 60 * 60 * 1000);
@@ -507,6 +571,8 @@ describe('OptimisticUpdateRepository', () => {
     });
 
     it('should use 24 hours as the default max age', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       mockDatabase.runAsync.mockResolvedValue({ changes: 0 });
       const before = Date.now();
 
@@ -523,6 +589,8 @@ describe('OptimisticUpdateRepository', () => {
     });
 
     it('should throw when database operation fails', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       mockDatabase.runAsync.mockRejectedValueOnce(new Error('Delete failed'));
 
       await expect(optimisticUpdateRepository.clearOldCompleted()).rejects.toThrow('Delete failed');
@@ -531,6 +599,8 @@ describe('OptimisticUpdateRepository', () => {
 
   describe('countByStatus', () => {
     it('should return the count of updates with the given status', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       mockDatabase.getFirstAsync.mockResolvedValue({ count: 5 });
 
       const result = await optimisticUpdateRepository.countByStatus(OptimisticUpdateStatus.PENDING);
@@ -543,6 +613,8 @@ describe('OptimisticUpdateRepository', () => {
     });
 
     it('should return 0 when no updates have the given status', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       mockDatabase.getFirstAsync.mockResolvedValue({ count: 0 });
 
       const result = await optimisticUpdateRepository.countByStatus(OptimisticUpdateStatus.FAILED);
@@ -551,6 +623,8 @@ describe('OptimisticUpdateRepository', () => {
     });
 
     it('should return 0 when the query returns null', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       mockDatabase.getFirstAsync.mockResolvedValue(null);
 
       const result = await optimisticUpdateRepository.countByStatus(OptimisticUpdateStatus.PENDING);
@@ -559,6 +633,8 @@ describe('OptimisticUpdateRepository', () => {
     });
 
     it('should throw when database query fails', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       mockDatabase.getFirstAsync.mockRejectedValueOnce(new Error('Query failed'));
 
       await expect(optimisticUpdateRepository.countByStatus(OptimisticUpdateStatus.PENDING)).rejects.toThrow(
