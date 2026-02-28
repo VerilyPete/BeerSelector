@@ -4,7 +4,6 @@ import {
   Beer,
   Beerfinder,
   BeerWithContainerType,
-  BeerfinderWithContainerType,
 } from '../types/beer';
 import { Reward } from '../types/database';
 import { ApiErrorType, ErrorResponse, createErrorResponse } from '../utils/notificationUtils';
@@ -1171,7 +1170,7 @@ export async function checkAndRefreshOnAppOpen(
  */
 export const refreshAllDataFromAPI = async (): Promise<{
   allBeers: BeerWithContainerType[];
-  myBeers: BeerfinderWithContainerType[];
+  myBeers: BeerWithContainerType[];
   rewards: Reward[];
 }> => {
   console.log('Refreshing all data from API...');
@@ -1307,7 +1306,7 @@ export const refreshAllDataFromAPI = async (): Promise<{
 
     return {
       allBeers: allBeersWithContainerTypes,
-      myBeers: enrichedMyBeers as BeerfinderWithContainerType[],
+      myBeers: enrichedMyBeers,
       rewards,
     };
   } finally {

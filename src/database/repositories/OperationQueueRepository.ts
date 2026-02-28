@@ -305,7 +305,12 @@ class OperationQueueRepository {
    */
   private rowToOperation(row: QueuedOperationRow): QueuedOperation | null {
     try {
-      const payload = JSON.parse(row.payload) as OperationPayload;
+      const parsed: unknown = JSON.parse(row.payload);
+      if (!parsed || typeof parsed !== 'object') {
+        console.error('[OperationQueueRepository] Invalid payload JSON in row:', row.id);
+        return null;
+      }
+      const payload = parsed as OperationPayload;
 
       const operation: QueuedOperation = {
         id: row.id,

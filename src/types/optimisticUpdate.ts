@@ -121,14 +121,14 @@ export function isCheckInRollbackData(data: unknown): data is CheckInRollbackDat
     return false;
   }
 
-  const d = data as CheckInRollbackData;
+  const d = data as Record<string, unknown>;
 
   return (
-    d.type === 'CHECK_IN_BEER' &&
-    typeof d.beer === 'object' &&
-    d.beer !== null &&
-    typeof d.wasInAllBeers === 'boolean' &&
-    typeof d.wasInTastedBeers === 'boolean'
+    d['type'] === 'CHECK_IN_BEER' &&
+    typeof d['beer'] === 'object' &&
+    d['beer'] !== null &&
+    typeof d['wasInAllBeers'] === 'boolean' &&
+    typeof d['wasInTastedBeers'] === 'boolean'
   );
 }
 
@@ -140,12 +140,12 @@ export function isRewardRollbackData(data: unknown): data is RewardRollbackData 
     return false;
   }
 
-  const d = data as RewardRollbackData;
+  const d = data as Record<string, unknown>;
 
   return (
-    d.type === 'REDEEM_REWARD' &&
-    typeof d.rewardId === 'string' &&
-    typeof d.wasAvailable === 'boolean'
+    d['type'] === 'REDEEM_REWARD' &&
+    typeof d['rewardId'] === 'string' &&
+    typeof d['wasAvailable'] === 'boolean'
   );
 }
 
@@ -157,17 +157,17 @@ export function isOptimisticUpdate(obj: unknown): obj is OptimisticUpdate {
     return false;
   }
 
-  const update = obj as OptimisticUpdate;
+  const update = obj as Record<string, unknown>;
 
   return (
-    typeof update.id === 'string' &&
-    typeof update.type === 'string' &&
-    Object.values(OptimisticUpdateType).includes(update.type as OptimisticUpdateType) &&
-    typeof update.status === 'string' &&
-    Object.values(OptimisticUpdateStatus).includes(update.status as OptimisticUpdateStatus) &&
-    typeof update.timestamp === 'number' &&
-    typeof update.rollbackData === 'object' &&
-    update.rollbackData !== null
+    typeof update['id'] === 'string' &&
+    typeof update['type'] === 'string' &&
+    Object.values(OptimisticUpdateType).includes(update['type'] as OptimisticUpdateType) &&
+    typeof update['status'] === 'string' &&
+    Object.values(OptimisticUpdateStatus).includes(update['status'] as OptimisticUpdateStatus) &&
+    typeof update['timestamp'] === 'number' &&
+    typeof update['rollbackData'] === 'object' &&
+    update['rollbackData'] !== null
   );
 }
 

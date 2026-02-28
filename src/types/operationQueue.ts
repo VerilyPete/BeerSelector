@@ -155,18 +155,18 @@ export function isQueuedOperation(obj: unknown): obj is QueuedOperation {
     return false;
   }
 
-  const op = obj as QueuedOperation;
+  const op = obj as Record<string, unknown>;
 
   return (
-    typeof op.id === 'string' &&
-    typeof op.type === 'string' &&
-    Object.values(OperationType).includes(op.type as OperationType) &&
-    typeof op.payload === 'object' &&
-    op.payload !== null &&
-    typeof op.timestamp === 'number' &&
-    typeof op.retryCount === 'number' &&
-    typeof op.status === 'string' &&
-    Object.values(OperationStatus).includes(op.status as OperationStatus)
+    typeof op['id'] === 'string' &&
+    typeof op['type'] === 'string' &&
+    Object.values(OperationType).includes(op['type'] as OperationType) &&
+    typeof op['payload'] === 'object' &&
+    op['payload'] !== null &&
+    typeof op['timestamp'] === 'number' &&
+    typeof op['retryCount'] === 'number' &&
+    typeof op['status'] === 'string' &&
+    Object.values(OperationStatus).includes(op['status'] as OperationStatus)
   );
 }
 
@@ -178,14 +178,14 @@ export function isCheckInBeerPayload(payload: unknown): payload is CheckInBeerPa
     return false;
   }
 
-  const p = payload as CheckInBeerPayload;
+  const p = payload as Record<string, unknown>;
 
   return (
-    typeof p.beerId === 'string' &&
-    typeof p.beerName === 'string' &&
-    typeof p.storeId === 'string' &&
-    typeof p.storeName === 'string' &&
-    typeof p.memberId === 'string'
+    typeof p['beerId'] === 'string' &&
+    typeof p['beerName'] === 'string' &&
+    typeof p['storeId'] === 'string' &&
+    typeof p['storeName'] === 'string' &&
+    typeof p['memberId'] === 'string'
   );
 }
 
@@ -197,12 +197,12 @@ export function isRewardRedemptionPayload(payload: unknown): payload is RewardRe
     return false;
   }
 
-  const p = payload as RewardRedemptionPayload;
+  const p = payload as Record<string, unknown>;
 
   return (
-    typeof p.rewardId === 'string' &&
-    typeof p.rewardType === 'string' &&
-    typeof p.memberId === 'string'
+    typeof p['rewardId'] === 'string' &&
+    typeof p['rewardType'] === 'string' &&
+    typeof p['memberId'] === 'string'
   );
 }
 

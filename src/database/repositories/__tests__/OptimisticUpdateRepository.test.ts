@@ -12,6 +12,9 @@ import {
 } from '../../../types/optimisticUpdate';
 import * as connection from '../../connection';
 
+// Silence expected console.error calls from rowToUpdate validation
+const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+
 jest.mock('../../connection');
 
 type MockDatabase = {
@@ -594,6 +597,112 @@ describe('OptimisticUpdateRepository', () => {
       mockDatabase.runAsync.mockRejectedValueOnce(new Error('Delete failed'));
 
       await expect(optimisticUpdateRepository.clearOldCompleted()).rejects.toThrow('Delete failed');
+    });
+  });
+
+  describe('rowToUpdate - corrupted rollback_data handling', () => {
+    it('filters out rows with invalid rollback_data JSON from getAll', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      mockDatabase.getAllAsync.mockResolvedValue([
+        {
+          id: 'update-valid',
+          type: 'CHECK_IN_BEER',
+          status: 'pending',
+          timestamp: 1700000000000,
+          rollback_data: JSON.stringify({ type: 'CHECK_IN_BEER', wasInAllBeers: true, wasInTastedBeers: false, beer: { id: 'b1', brew_name: 'Valid Beer' } }),
+        },
+        {
+          id: 'update-corrupt',
+          type: 'CHECK_IN_BEER',
+          status: 'pending',
+          timestamp: 1700000001000,
+          rollback_data: 'not-valid-json{{{',
+        },
+      ]);
+
+      const result = await optimisticUpdateRepository.getAll();
+
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe('update-valid');
+    });
+
+    it('filters out rows where rollback_data parses but fails type guard from getAll', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      mockDatabase.getAllAsync.mockResolvedValue([
+        {
+          id: 'update-valid',
+          type: 'CHECK_IN_BEER',
+          status: 'pending',
+          timestamp: 1700000000000,
+          rollback_data: JSON.stringify({ type: 'CHECK_IN_BEER', wasInAllBeers: true, wasInTastedBeers: false, beer: { id: 'b1', brew_name: 'Valid Beer' } }),
+        },
+        {
+          id: 'update-bad-shape',
+          type: 'CHECK_IN_BEER',
+          status: 'pending',
+          timestamp: 1700000001000,
+          rollback_data: JSON.stringify({ type: 'UNKNOWN_TYPE', someField: 'value' }),
+        },
+      ]);
+
+      const result = await optimisticUpdateRepository.getAll();
+
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe('update-valid');
+    });
+
+    it('filters out rows with invalid rollback_data from getByStatus', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      mockDatabase.getAllAsync.mockResolvedValue([
+        {
+          id: 'update-valid',
+          type: 'CHECK_IN_BEER',
+          status: 'pending',
+          timestamp: 1700000000000,
+          rollback_data: JSON.stringify({ type: 'CHECK_IN_BEER', wasInAllBeers: true, wasInTastedBeers: false, beer: { id: 'b1', brew_name: 'Valid Beer' } }),
+        },
+        {
+          id: 'update-corrupt',
+          type: 'CHECK_IN_BEER',
+          status: 'pending',
+          timestamp: 1700000001000,
+          rollback_data: 'corrupt-json',
+        },
+      ]);
+
+      const result = await optimisticUpdateRepository.getByStatus(OptimisticUpdateStatus.PENDING);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe('update-valid');
+    });
+
+    it('filters out rows with invalid rollback_data from getPendingUpdates', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      mockDatabase.getAllAsync.mockResolvedValue([
+        {
+          id: 'update-valid',
+          type: 'CHECK_IN_BEER',
+          status: 'pending',
+          timestamp: 1700000000000,
+          rollback_data: JSON.stringify({ type: 'CHECK_IN_BEER', wasInAllBeers: true, wasInTastedBeers: false, beer: { id: 'b1', brew_name: 'Valid Beer' } }),
+        },
+        {
+          id: 'update-corrupt',
+          type: 'CHECK_IN_BEER',
+          status: 'pending',
+          timestamp: 1700000001000,
+          rollback_data: 'corrupt-json',
+        },
+      ]);
+
+      const result = await optimisticUpdateRepository.getPendingUpdates();
+
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe('update-valid');
     });
   });
 

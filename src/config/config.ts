@@ -147,8 +147,8 @@ function getEnvEnvironment(key: string, defaultValue: AppEnvironment): AppEnviro
   if (!value) {
     return defaultValue;
   }
-  const validEnvs: AppEnvironment[] = ['development', 'staging', 'production'];
-  if (validEnvs.includes(value as AppEnvironment)) {
+  const validEnvs = ['development', 'staging', 'production'] as const;
+  if ((validEnvs as readonly string[]).includes(value)) {
     return value as AppEnvironment;
   }
   console.warn(`Invalid environment: ${value}, using default: ${defaultValue}`);

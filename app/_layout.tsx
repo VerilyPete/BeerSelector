@@ -85,7 +85,10 @@ export default function RootLayout() {
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
     BeerIcons: require('../assets/fonts/BeerIcons.ttf'),
   });
-  const [initialRoute, setInitialRoute] = useState<string | null>(null);
+  const VALID_INITIAL_ROUTES = ['(tabs)', '/settings'] as const;
+  type InitialRoute = typeof VALID_INITIAL_ROUTES[number];
+
+  const [initialRoute, setInitialRoute] = useState<InitialRoute | null>(null);
   const [migrationProgress, setMigrationProgress] = useState<number | null>(null);
   const initializationStarted = useRef(false);
   const lifecycleOperationInProgress = useRef(false);

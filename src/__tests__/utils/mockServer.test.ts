@@ -336,8 +336,11 @@ describe('MockServer', () => {
           signal: controller.signal,
         });
         fail('Should have timed out');
-      } catch (error: any) {
-        expect(error.name).toBe('AbortError');
+      } catch (error: unknown) {
+        expect(error).toBeInstanceOf(Error);
+        if (error instanceof Error) {
+          expect(error.name).toBe('AbortError');
+        }
       } finally {
         clearTimeout(timeout);
       }
