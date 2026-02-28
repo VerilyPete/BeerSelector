@@ -700,16 +700,19 @@ describe('enrichmentService', () => {
                 enriched_abv: 6.5,
                 enrichment_confidence: 0.95,
                 enrichment_source: 'perplexity',
+                brew_description: null,
+                has_cleaned_description: false,
               },
               '456': {
                 enriched_abv: 5.0,
                 enrichment_confidence: 1.0,
                 enrichment_source: 'manual',
+                brew_description: null,
+                has_cleaned_description: false,
               },
             },
+            missing: [],
             requestId: 'req-123',
-            found: 2,
-            notFound: 0,
           }),
         });
 
@@ -731,9 +734,8 @@ describe('enrichmentService', () => {
             status: 200,
             json: async () => ({
               enrichments: {},
+              missing: [],
               requestId: 'req-1',
-              found: 0,
-              notFound: 100,
             }),
           })
           .mockResolvedValueOnce({
@@ -741,9 +743,8 @@ describe('enrichmentService', () => {
             status: 200,
             json: async () => ({
               enrichments: {},
+              missing: [],
               requestId: 'req-2',
-              found: 0,
-              notFound: 50,
             }),
           });
 
@@ -766,11 +767,12 @@ describe('enrichmentService', () => {
                   enriched_abv: 5.0,
                   enrichment_confidence: 0.9,
                   enrichment_source: 'perplexity',
+                  brew_description: null,
+                  has_cleaned_description: false,
                 },
               },
+              missing: [],
               requestId: 'req-1',
-              found: 1,
-              notFound: 99,
             }),
           })
           .mockResolvedValueOnce({
@@ -804,11 +806,12 @@ describe('enrichmentService', () => {
                   enriched_abv: 5.0,
                   enrichment_confidence: 0.9,
                   enrichment_source: 'perplexity',
+                  brew_description: null,
+                  has_cleaned_description: false,
                 },
               },
+              missing: [],
               requestId: 'req-2',
-              found: 1,
-              notFound: 49,
             }),
           });
 
@@ -833,11 +836,12 @@ describe('enrichmentService', () => {
                 enriched_abv: 5.0,
                 enrichment_confidence: 0.9,
                 enrichment_source: 'perplexity',
+                brew_description: null,
+                has_cleaned_description: false,
               },
             },
+            missing: [],
             requestId: 'req-2',
-            found: 1,
-            notFound: 49,
           }),
         });
 
@@ -861,11 +865,12 @@ describe('enrichmentService', () => {
                   enriched_abv: 5.0,
                   enrichment_confidence: 0.9,
                   enrichment_source: 'perplexity',
+                  brew_description: null,
+                  has_cleaned_description: false,
                 },
               },
+              missing: [],
               requestId: 'req-1',
-              found: 1,
-              notFound: 99,
             }),
           })
           .mockResolvedValueOnce({
@@ -873,9 +878,8 @@ describe('enrichmentService', () => {
             status: 200,
             json: async () => ({
               enrichments: {},
+              missing: [],
               requestId: 'req-2',
-              found: 0,
-              notFound: 50,
             }),
           });
 
@@ -917,11 +921,12 @@ describe('enrichmentService', () => {
                   enriched_abv: 5.0,
                   enrichment_confidence: 0.9,
                   enrichment_source: 'perplexity',
+                  brew_description: null,
+                  has_cleaned_description: false,
                 },
               },
+              missing: [],
               requestId: 'req-1',
-              found: 1,
-              notFound: 99,
             }),
           })
           .mockRejectedValueOnce(new Error('Network error'));
@@ -1268,6 +1273,7 @@ describe('enrichmentService', () => {
           status: 200,
           json: async () => ({
             enrichments: {},
+            missing: [],
             requestId: 'req-1',
           }),
         })
@@ -1284,6 +1290,7 @@ describe('enrichmentService', () => {
                 has_cleaned_description: true,
               },
             },
+            missing: [],
             requestId: 'req-2',
           }),
         });
@@ -1322,6 +1329,7 @@ describe('enrichmentService', () => {
               has_cleaned_description: true,
             },
           },
+          missing: [],
           requestId: 'req-1',
         }),
       });
@@ -1348,6 +1356,7 @@ describe('enrichmentService', () => {
           status: 200,
           json: async () => ({
             enrichments: {},
+            missing: [],
             requestId: 'req-poll',
           }),
         })
@@ -1379,6 +1388,7 @@ describe('enrichmentService', () => {
               has_cleaned_description: true,
             },
           },
+          missing: [],
           requestId: 'req-2',
         }),
       });
@@ -1417,6 +1427,7 @@ describe('enrichmentService', () => {
                     },
                   }
                 : {},
+            missing: [],
             requestId: `req-${pollCount}`,
           }),
         });
@@ -1439,6 +1450,87 @@ describe('enrichmentService', () => {
 
       expect(result['123']).toBeDefined();
       expect(pollCount).toBe(5);
+    });
+  });
+
+  describe('fetchBeersFromProxy response validation', () => {
+    beforeEach(() => {
+      const mockGetPreference = require('@/src/database/preferences').getPreference;
+      mockGetPreference.mockResolvedValue('test-client-id');
+    });
+
+    it('throws descriptive error when proxy response has wrong shape', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ wrong_field: true }),
+        headers: new Headers(),
+      });
+
+      await expect(fetchBeersFromProxy('13879')).rejects.toThrow(
+        /invalid.*response|response.*invalid|schema|parse|validation/i
+      );
+    });
+
+    it('accepts response with missing optional fields (cached, requestId)', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          success: true,
+          storeId: '13879',
+          beers: [],
+          total: 0,
+          // No cached, requestId, cacheAge
+        }),
+        headers: new Headers(),
+      });
+
+      const result = await fetchBeersFromProxy('13879');
+
+      expect(result.success).toBe(true);
+      expect(result.beers).toEqual([]);
+    });
+  });
+
+  describe('fetchEnrichmentBatch response validation', () => {
+    beforeEach(() => {
+      const mockGetPreference = require('@/src/database/preferences').getPreference;
+      mockGetPreference.mockResolvedValue('test-client-id');
+    });
+
+    it('returns empty object when batch response is malformed', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ wrong_field: 'not enrichments' }),
+      });
+
+      const result = await fetchEnrichmentBatch(['123', '456']);
+
+      expect(result).toEqual({});
+    });
+  });
+
+  describe('syncBeersToWorker response validation', () => {
+    beforeEach(() => {
+      const mockGetPreference = require('@/src/database/preferences').getPreference;
+      mockGetPreference.mockResolvedValue('test-client-id');
+    });
+
+    it('returns null-equivalent result when sync response is malformed', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ wrong_field: 'bad response' }),
+      });
+
+      const result = await syncBeersToWorker([{ id: '123', brew_name: 'Test Beer' }]);
+
+      // Graceful degradation: result should still be returned but with zeroed counts
+      expect(result).not.toBeNull();
+      expect(result!.synced).toBe(0);
+      expect(result!.queued_for_cleanup).toBe(0);
     });
   });
 });

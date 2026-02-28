@@ -558,7 +558,7 @@ const styles = StyleSheet.create({
   skeletonBox: {
     overflow: 'hidden',
     position: 'relative',
-  } as ViewStyle,
+  },
 
   // Shimmer animation container
   shimmerContainer: {
@@ -568,18 +568,18 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     width: '200%',
-  } as ViewStyle,
+  },
 
   // Shimmer gradient
   shimmerGradient: {
     flex: 1,
     width: '100%',
-  } as ViewStyle,
+  },
 
   // Text container
   textContainer: {
     flexDirection: 'column',
-  } as ViewStyle,
+  },
 
   // Beer item card - matches BeerItem.tsx styles
   beerItemCard: {
@@ -589,32 +589,32 @@ const styles = StyleSheet.create({
     marginHorizontal: spacing.xs, // 4
     marginBottom: spacing.m, // 16
     minHeight: 140,
-  } as ViewStyle,
+  },
 
   // Beer item header row
   beerItemHeaderRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: spacing.s, // 8
-  } as ViewStyle,
+  },
 
   // Beer item name container
   beerItemNameContainer: {
     flex: 1,
-  } as ViewStyle,
+  },
 
   // Beer item glass icon placeholder
   beerItemGlassIcon: {
     width: 36,
     height: 36,
     borderRadius: borderRadii.s, // 4
-  } as ViewStyle,
+  },
 
   // List container
   listContainer: {
     paddingHorizontal: spacing.sm, // 12
     paddingTop: spacing.s, // 8
-  } as ViewStyle,
+  },
 });
 
 // ============================================================================

@@ -15,10 +15,10 @@ export interface Debouncer<TArgs extends unknown[], TResult> {
   flush: () => void;
 }
 
-interface PendingResolver<T> {
+type PendingResolver<T> = {
   resolve: (value: T) => void;
   reject: (error: Error) => void;
-}
+};
 
 /**
  * Creates a debouncer that coalesces rapid function calls.

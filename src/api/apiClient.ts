@@ -259,7 +259,9 @@ export class ApiClient {
       // Get response text first to handle empty responses
       const responseText = await response.text();
 
-      // If response is empty, return success with empty object
+      // Known limitation: empty body cannot satisfy arbitrary T.
+      // Only addToQueue.php returns empty body on success.
+      // beerService.ts:checkIn() guards with Object.keys(response.data).length === 0.
       if (!responseText || responseText.trim().length === 0) {
         return {
           data: {} as T,

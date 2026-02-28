@@ -147,7 +147,7 @@ describe('API Response Validators', () => {
 
       expect(result.isValid).toBe(true);
       expect(result.errors).toHaveLength(0);
-      expect(result.data).toEqual(validBeer);
+      expect(result.data).toEqual({ ...validBeer, id: '1' });
     });
 
     it('should reject beer object missing id field', () => {
@@ -248,7 +248,7 @@ describe('API Response Validators', () => {
       const result = validateBeer(minimalBeer);
 
       expect(result.isValid).toBe(true);
-      expect(result.data).toEqual(minimalBeer);
+      expect(result.data).toEqual({ ...minimalBeer, id: '1' });
     });
 
     it('should accept beer object with additional optional fields', () => {
@@ -262,7 +262,7 @@ describe('API Response Validators', () => {
       const result = validateBeer(beerWithExtras);
 
       expect(result.isValid).toBe(true);
-      expect(result.data).toEqual(beerWithExtras);
+      expect(result.data).toEqual({ ...beerWithExtras, id: '1' });
     });
 
     it('should reject beer object with multiple missing fields', () => {
@@ -276,6 +276,12 @@ describe('API Response Validators', () => {
       expect(result.errors.length).toBeGreaterThan(1);
       expect(result.errors).toContain('Beer object missing required field: id');
       expect(result.errors).toContain('Beer object missing required field: brew_name');
+    });
+
+    it('coerces numeric id to string', () => {
+      const result = validateBeer({ id: 12345, brew_name: 'Test Beer' });
+      expect(result.isValid).toBe(true);
+      expect(result.data?.id).toBe('12345');
     });
 
     it('should validate beer object with numeric string id', () => {
@@ -299,7 +305,7 @@ describe('API Response Validators', () => {
       const result = validateBeer(validBeer);
 
       expect(result.isValid).toBe(true);
-      expect(result.data).toEqual(validBeer);
+      expect(result.data).toEqual({ ...validBeer, id: '1' });
     });
   });
 

@@ -17,7 +17,8 @@ import {
   OptimisticUpdateRow,
   OptimisticUpdateStatus,
   OptimisticUpdateType,
-  RollbackData,
+  isCheckInRollbackData,
+  isRewardRollbackData,
 } from '@/src/types/optimisticUpdate';
 
 /**
@@ -65,18 +66,40 @@ class OptimisticUpdateRepository {
   }
 
   /**
-   * Convert database row to OptimisticUpdate object
+   * Convert database row to OptimisticUpdate object, returning null for invalid rows
    */
-  private rowToUpdate(row: OptimisticUpdateRow): OptimisticUpdate {
-    return {
-      id: row.id,
-      type: row.type as OptimisticUpdateType,
-      status: row.status as OptimisticUpdateStatus,
-      timestamp: row.timestamp,
-      rollbackData: JSON.parse(row.rollback_data) as RollbackData,
-      errorMessage: row.error_message,
-      operationId: row.operation_id,
-    };
+  private rowToUpdate(row: OptimisticUpdateRow): OptimisticUpdate | null {
+    try {
+      const parsed: unknown = JSON.parse(row.rollback_data);
+
+      if (!isCheckInRollbackData(parsed) && !isRewardRollbackData(parsed)) {
+        console.error('[OptimisticUpdateRepository] Invalid rollback data in row:', row.id);
+        return null;
+      }
+
+      if (!Object.values(OptimisticUpdateType).includes(row.type as OptimisticUpdateType)) {
+        console.error('[OptimisticUpdateRepository] Invalid type in row:', row.id, row.type);
+        return null;
+      }
+
+      if (!Object.values(OptimisticUpdateStatus).includes(row.status as OptimisticUpdateStatus)) {
+        console.error('[OptimisticUpdateRepository] Invalid status in row:', row.id, row.status);
+        return null;
+      }
+
+      return {
+        id: row.id,
+        type: row.type as OptimisticUpdateType,
+        status: row.status as OptimisticUpdateStatus,
+        timestamp: row.timestamp,
+        rollbackData: parsed,
+        errorMessage: row.error_message,
+        operationId: row.operation_id,
+      };
+    } catch (error) {
+      console.error('[OptimisticUpdateRepository] Error parsing rollback_data in row:', row.id, error);
+      return null;
+    }
   }
 
   /**
@@ -135,7 +158,9 @@ class OptimisticUpdateRepository {
         `SELECT * FROM ${this.tableName} ORDER BY timestamp DESC`
       );
 
-      return rows.map(this.rowToUpdate);
+      return rows
+        .map((row) => this.rowToUpdate(row))
+        .filter((u): u is OptimisticUpdate => u !== null);
     } catch (error) {
       console.error('[OptimisticUpdateRepository] Error getting all updates:', error);
       throw error;
@@ -173,7 +198,9 @@ class OptimisticUpdateRepository {
         [status]
       );
 
-      return rows.map(this.rowToUpdate);
+      return rows
+        .map((row) => this.rowToUpdate(row))
+        .filter((u): u is OptimisticUpdate => u !== null);
     } catch (error) {
       console.error('[OptimisticUpdateRepository] Error getting updates by status:', error);
       throw error;
@@ -194,7 +221,9 @@ class OptimisticUpdateRepository {
         [OptimisticUpdateStatus.PENDING, OptimisticUpdateStatus.SYNCING]
       );
 
-      return rows.map(this.rowToUpdate);
+      return rows
+        .map((row) => this.rowToUpdate(row))
+        .filter((u): u is OptimisticUpdate => u !== null);
     } catch (error) {
       console.error('[OptimisticUpdateRepository] Error getting pending updates:', error);
       throw error;

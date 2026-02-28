@@ -14,6 +14,7 @@
  * @module enrichmentService
  */
 
+import { z } from 'zod';
 import { config, assertEnrichmentConfigured } from '@/src/config';
 import { getPreference, setPreference } from '@/src/database/preferences';
 import { logWarning } from '@/src/utils/errorLogger';
@@ -30,6 +31,69 @@ try {
 }
 
 // ============================================================================
+// Zod Schemas (runtime validation at API trust boundaries)
+// ============================================================================
+
+const enrichmentDataSchema = z.object({
+  enriched_abv: z.number().nullable(),
+  enrichment_confidence: z.number().nullable(),
+  enrichment_source: z.enum(['description', 'perplexity', 'manual']).nullable(),
+  brew_description: z.string().nullable(),
+  has_cleaned_description: z.boolean(),
+});
+
+const enrichedBeerResponseSchema = z.object({
+  id: z.string(),
+  brew_name: z.string(),
+  brewer: z.string(),
+  brewer_loc: z.string().optional(),
+  brew_style: z.string().optional(),
+  brew_container: z.string().optional(),
+  review_count: z.string().optional(),
+  review_rating: z.string().optional(),
+  brew_description: z.string().optional(),
+  added_date: z.string().optional(),
+  enriched_abv: z.number().nullable(),
+  enrichment_confidence: z.number().nullable(),
+  enrichment_source: z.enum(['description', 'perplexity', 'manual']).nullable(),
+});
+
+const beersProxyResponseSchema = z.object({
+  success: z.boolean(),
+  storeId: z.string(),
+  beers: z.array(enrichedBeerResponseSchema),
+  total: z.number(),
+  requestId: z.string().optional(),
+  cached: z.boolean().optional(),
+  cacheAge: z.number().optional(),
+});
+
+const batchEnrichmentResponseSchema = z.object({
+  enrichments: z.record(z.string(), enrichmentDataSchema),
+  missing: z.array(z.string()),
+  requestId: z.string(),
+});
+
+const syncBeersResponseSchema = z.object({
+  synced: z.number(),
+  queued_for_cleanup: z.number(),
+  requestId: z.string(),
+  errors: z.array(z.string()).optional(),
+});
+
+const healthResponseSchema = z.object({
+  status: z.enum(['ok', 'error']),
+  database: z.string(),
+  enrichment: z
+    .object({
+      enabled: z.boolean(),
+      daily: z.object({ used: z.number(), limit: z.number(), remaining: z.number() }),
+      monthly: z.object({ used: z.number(), limit: z.number(), remaining: z.number() }),
+    })
+    .optional(),
+});
+
+// ============================================================================
 // Types
 // ============================================================================
 
@@ -37,57 +101,22 @@ try {
  * Enrichment data returned by the Worker for a single beer
  * Note: Worker now returns merged description (consistent with GET /beers)
  */
-export type EnrichmentData = {
-  enriched_abv: number | null;
-  enrichment_confidence: number | null;
-  enrichment_source: 'description' | 'perplexity' | 'manual' | null;
-  /** Merged description: prefers cleaned version, falls back to original (like GET /beers) */
-  brew_description: string | null;
-  /** True if the brew_description came from the cleaned version */
-  has_cleaned_description: boolean;
-};
+export type EnrichmentData = z.infer<typeof enrichmentDataSchema>;
 
 /**
  * Beer response from Worker's GET /beers endpoint
  */
-export type EnrichedBeerResponse = {
-  id: string;
-  brew_name: string;
-  brewer: string;
-  brewer_loc?: string;
-  brew_style?: string;
-  brew_container?: string;
-  review_count?: string;
-  review_rating?: string;
-  brew_description?: string;
-  added_date?: string;
-  // Enrichment fields from Worker
-  enriched_abv: number | null;
-  enrichment_confidence: number | null;
-  enrichment_source: 'description' | 'perplexity' | 'manual' | null;
-};
+export type EnrichedBeerResponse = z.infer<typeof enrichedBeerResponseSchema>;
 
 /**
  * Response from GET /beers?sid={storeId}
  */
-export type BeersProxyResponse = {
-  success: boolean;
-  storeId: string;
-  beers: EnrichedBeerResponse[];
-  total: number;
-  requestId?: string;
-  cached?: boolean;
-  cacheAge?: number;
-};
+export type BeersProxyResponse = z.infer<typeof beersProxyResponseSchema>;
 
 /**
  * Response from POST /beers/batch
  */
-export type BatchEnrichmentResponse = {
-  enrichments: Record<string, EnrichmentData>;
-  missing: string[]; // IDs not found in enriched_beers table
-  requestId: string;
-};
+export type BatchEnrichmentResponse = z.infer<typeof batchEnrichmentResponseSchema>;
 
 /**
  * Request body for POST /beers/sync
@@ -106,25 +135,12 @@ export type SyncBeersRequest = {
  * Response for POST /beers/sync
  * Returns counts of synced and queued beers
  */
-export type SyncBeersResponse = {
-  synced: number;
-  queued_for_cleanup: number;
-  requestId: string;
-  errors?: string[];
-};
+export type SyncBeersResponse = z.infer<typeof syncBeersResponseSchema>;
 
 /**
  * Response from GET /health
  */
-export type HealthResponse = {
-  status: 'ok' | 'error';
-  database: string;
-  enrichment?: {
-    enabled: boolean;
-    daily: { used: number; limit: number; remaining: number };
-    monthly: { used: number; limit: number; remaining: number };
-  };
-};
+export type HealthResponse = z.infer<typeof healthResponseSchema>;
 
 // ============================================================================
 // Metrics & Observability
@@ -455,7 +471,15 @@ export async function fetchBeersFromProxy(storeId: string): Promise<BeersProxyRe
       throw new Error(`Enrichment service error: ${response.status} ${response.statusText}`);
     }
 
-    const data: BeersProxyResponse = await response.json();
+    const rawData: unknown = await response.json();
+    const parseResult = beersProxyResponseSchema.safeParse(rawData);
+    if (!parseResult.success) {
+      metrics.proxyFailures++;
+      throw new Error(
+        `Enrichment service returned invalid response shape for store ${storeId}: ${parseResult.error.message}`
+      );
+    }
+    const data = parseResult.data;
 
     // Track metrics
     metrics.proxySuccesses++;
@@ -587,7 +611,18 @@ export async function fetchEnrichmentBatch(
         continue; // Try next chunk
       }
 
-      const data: BatchEnrichmentResponse = await response.json();
+      const rawData: unknown = await response.json();
+      const parseResult = batchEnrichmentResponseSchema.safeParse(rawData);
+      if (!parseResult.success) {
+        failureCount++;
+        logWarning(`Batch enrichment chunk returned invalid response shape`, {
+          operation: 'fetchEnrichmentBatch',
+          component: 'enrichmentService',
+          additionalData: { chunkIndex: successCount + failureCount, error: parseResult.error.message },
+        });
+        continue; // Try next chunk
+      }
+      const data = parseResult.data;
       successCount++;
 
       // Merge results and track metrics
@@ -741,7 +776,18 @@ export async function fetchEnrichmentBatchWithMissing(
         continue;
       }
 
-      const data: BatchEnrichmentResponse = await response.json();
+      const rawData: unknown = await response.json();
+      const parseResult = batchEnrichmentResponseSchema.safeParse(rawData);
+      if (!parseResult.success) {
+        failureCount++;
+        logWarning(`Batch enrichment chunk returned invalid response shape`, {
+          operation: 'fetchEnrichmentBatchWithMissing',
+          component: 'enrichmentService',
+          additionalData: { chunkIndex: successCount + failureCount, error: parseResult.error.message },
+        });
+        continue;
+      }
+      const data = parseResult.data;
       successCount++;
 
       // Merge results
@@ -900,7 +946,17 @@ export async function syncBeersToWorker(
         continue;
       }
 
-      const data: SyncBeersResponse = await response.json();
+      const rawData: unknown = await response.json();
+      const parseResult = syncBeersResponseSchema.safeParse(rawData);
+      if (!parseResult.success) {
+        logWarning('Sync response has invalid shape, skipping chunk', {
+          operation: 'syncBeersToWorker',
+          component: 'enrichmentService',
+          additionalData: { error: parseResult.error.message },
+        });
+        continue; // Graceful degradation: skip chunk with malformed response
+      }
+      const data = parseResult.data;
       totalSynced += data.synced;
       totalQueuedForCleanup += data.queued_for_cleanup;
       lastRequestId = data.requestId;
@@ -1091,8 +1147,12 @@ async function fetchEnrichmentBatchInternal(
       return {};
     }
 
-    const data: BatchEnrichmentResponse = await response.json();
-    return data.enrichments || {};
+    const rawData: unknown = await response.json();
+    const parseResult = batchEnrichmentResponseSchema.safeParse(rawData);
+    if (!parseResult.success) {
+      return {};
+    }
+    return parseResult.data.enrichments || {};
   } catch {
     clearTimeout(timeoutId);
     return {};
@@ -1185,8 +1245,12 @@ export async function checkEnrichmentHealth(): Promise<boolean> {
       return false;
     }
 
-    const data: HealthResponse = await response.json();
-    return data.status === 'ok';
+    const rawData: unknown = await response.json();
+    const parseResult = healthResponseSchema.safeParse(rawData);
+    if (!parseResult.success) {
+      return false;
+    }
+    return parseResult.data.status === 'ok';
   } catch {
     clearTimeout(timeoutId);
     return false;
@@ -1231,7 +1295,12 @@ export async function getEnrichmentHealthDetails(): Promise<HealthResponse | nul
       return null;
     }
 
-    return await response.json();
+    const rawData: unknown = await response.json();
+    const parseResult = healthResponseSchema.safeParse(rawData);
+    if (!parseResult.success) {
+      return null;
+    }
+    return parseResult.data;
   } catch {
     clearTimeout(timeoutId);
     return null;

@@ -92,6 +92,84 @@ describe('OperationQueueRepository', () => {
     });
   });
 
+  describe('rowToOperation - corrupted payload handling', () => {
+    it('filters out rows with non-JSON payload from getPendingOperations', async () => {
+      const mockRows = [
+        {
+          id: 'op-valid',
+          type: OperationType.CHECK_IN_BEER,
+          payload: JSON.stringify({
+            beerId: 'beer-1',
+            beerName: 'Beer 1',
+            storeId: 'store-1',
+            storeName: 'Store 1',
+            memberId: 'member-1',
+          }),
+          timestamp: Date.now(),
+          retry_count: 0,
+          status: OperationStatus.PENDING,
+          error_message: null,
+          last_retry_timestamp: null,
+        },
+        {
+          id: 'op-corrupt',
+          type: OperationType.CHECK_IN_BEER,
+          payload: 'not-valid-json{{{',
+          timestamp: Date.now(),
+          retry_count: 0,
+          status: OperationStatus.PENDING,
+          error_message: null,
+          last_retry_timestamp: null,
+        },
+      ];
+
+      mockDb.getAllAsync.mockResolvedValue(mockRows);
+
+      const operations = await operationQueueRepository.getPendingOperations();
+
+      expect(operations).toHaveLength(1);
+      expect(operations[0].id).toBe('op-valid');
+    });
+
+    it('filters out rows with non-object payload (e.g. a JSON number) from getAllOperations', async () => {
+      const mockRows = [
+        {
+          id: 'op-valid',
+          type: OperationType.CHECK_IN_BEER,
+          payload: JSON.stringify({
+            beerId: 'beer-1',
+            beerName: 'Beer 1',
+            storeId: 'store-1',
+            storeName: 'Store 1',
+            memberId: 'member-1',
+          }),
+          timestamp: Date.now(),
+          retry_count: 0,
+          status: OperationStatus.PENDING,
+          error_message: null,
+          last_retry_timestamp: null,
+        },
+        {
+          id: 'op-scalar',
+          type: OperationType.CHECK_IN_BEER,
+          payload: JSON.stringify(42), // valid JSON, but not an object
+          timestamp: Date.now(),
+          retry_count: 0,
+          status: OperationStatus.PENDING,
+          error_message: null,
+          last_retry_timestamp: null,
+        },
+      ];
+
+      mockDb.getAllAsync.mockResolvedValue(mockRows);
+
+      const operations = await operationQueueRepository.getAllOperations();
+
+      expect(operations).toHaveLength(1);
+      expect(operations[0].id).toBe('op-valid');
+    });
+  });
+
   describe('getPendingOperations', () => {
     it('should retrieve only pending operations', async () => {
       const mockRows = [

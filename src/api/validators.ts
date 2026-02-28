@@ -139,12 +139,11 @@ export function validateBeer(beer: unknown): ValidationResult<Beer> {
     return { isValid: false, errors, data: undefined };
   }
 
-  // Safe to treat as Beer after validation — id and brew_name are confirmed present.
-  // API may send numeric id which gets coerced to string downstream in allBeersRowToBeer.
+  const rawBeer = beer as Record<string, unknown>;
   return {
     isValid: true,
     errors: [],
-    data: beer as Beer,
+    data: { ...rawBeer, id: String(rawBeer['id']) } as Beer,
   };
 }
 
