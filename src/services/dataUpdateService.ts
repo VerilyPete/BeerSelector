@@ -4,6 +4,7 @@ import {
   Beer,
   Beerfinder,
   BeerWithContainerType,
+  BeerfinderWithContainerType,
 } from '../types/beer';
 import { Reward } from '../types/database';
 import { ApiErrorType, ErrorResponse, createErrorResponse } from '../utils/notificationUtils';
@@ -203,7 +204,7 @@ export async function fetchAndUpdateAllBeers(): Promise<DataUpdateResult> {
         usedProxy = true;
 
         console.log(
-          `[dataUpdateService] Fetched ${allBeers.length} beers via proxy${proxyResponse.cached ? ' (cached)' : ''}`
+          `[dataUpdateService] Fetched ${allBeers.length} beers via proxy (${proxyResponse.source ?? 'unknown'})`
         );
       } catch (proxyError) {
         // Log but don't fail - fall through to direct fetch
@@ -614,34 +615,32 @@ export async function fetchAndUpdateMyBeers(): Promise<DataUpdateResult> {
       };
     }
 
-    // Calculate container types BEFORE insertion
-    console.log('Calculating container types for tasted beers...');
-    const beersWithContainerTypes = calculateContainerTypes(validBeers);
-
     // =========================================================================
-    // ENRICHMENT: Fetch enrichment data via batch lookup if proxy is configured
+    // ENRICHMENT: Fetch enrichment data BEFORE container type calculation
+    // so that ABV from enrichment is available for glass type selection.
+    // Without this ordering, draft beers without ABV in their description
+    // would get container_type=null (question mark icon) even when the
+    // Worker has enriched ABV data.
     // =========================================================================
-    // Add batch enrichment for tasted beers if proxy is configured
-    let enrichedBeers = beersWithContainerTypes;
+    let beersForContainerCalc: Beerfinder[] = validBeers;
     if (config.enrichment.isConfigured()) {
       try {
-        const beerIds = beersWithContainerTypes.map(beer => beer.id);
+        const beerIds = validBeers.map(beer => beer.id);
         console.log(
           `[dataUpdateService] Fetching enrichment for ${beerIds.length} tasted beers...`
         );
 
-        // Use fetchEnrichmentBatchWithMissing to also get IDs not in Worker database
         const { enrichments: enrichmentData, missing: missingIds } =
           await fetchEnrichmentBatchWithMissing(beerIds);
         const enrichedCount = Object.keys(enrichmentData).length;
 
         if (enrichedCount > 0) {
           console.log(`[dataUpdateService] Got enrichment data for ${enrichedCount} beers`);
-          enrichedBeers = mergeEnrichmentData(beersWithContainerTypes, enrichmentData);
+          beersForContainerCalc = mergeEnrichmentData(validBeers, enrichmentData);
         }
 
         // Sync missing beers to Worker for enrichment (in background)
-        syncMissingBeersInBackground(missingIds, beersWithContainerTypes, 'dataUpdateService');
+        syncMissingBeersInBackground(missingIds, validBeers, 'dataUpdateService');
       } catch (enrichmentError) {
         // Log but don't fail - enrichment is optional enhancement
         logWarning('Failed to fetch enrichment for tasted beers, continuing without', {
@@ -655,8 +654,12 @@ export async function fetchAndUpdateMyBeers(): Promise<DataUpdateResult> {
       }
     }
 
+    // Calculate container types AFTER enrichment so ABV is available for glass selection
+    console.log('Calculating container types for tasted beers...');
+    const beersWithContainerTypes = calculateContainerTypes(beersForContainerCalc);
+
     // Update the database with the valid beers including container types and enrichment
-    await myBeersRepository.insertMany(enrichedBeers);
+    await myBeersRepository.insertMany(beersWithContainerTypes as BeerfinderWithContainerType[]);
 
     // Update the last update timestamp
     await setPreference('my_beers_last_update', new Date().toISOString());
@@ -891,31 +894,26 @@ export async function sequentialRefreshAllData(): Promise<ManualRefreshResult> {
         );
       }
 
-      // Calculate container types BEFORE insertion
-      console.log('Sequential refresh: calculating container types for my beers...');
-      const myBeersWithContainerTypes = calculateContainerTypes(validationResult.validBeers);
-
-      // Add batch enrichment for my beers if proxy is configured
-      let enrichedMyBeers = myBeersWithContainerTypes;
-      if (config.enrichment.isConfigured() && myBeersWithContainerTypes.length > 0) {
+      // Enrich BEFORE container type calculation so ABV is available for glass selection
+      let beersForContainerCalc = validationResult.validBeers;
+      if (config.enrichment.isConfigured() && validationResult.validBeers.length > 0) {
         try {
-          const beerIds = myBeersWithContainerTypes.map(beer => beer.id);
+          const beerIds = validationResult.validBeers.map(beer => beer.id);
           console.log(
             `[sequentialRefresh] Fetching enrichment for ${beerIds.length} tasted beers...`
           );
 
-          // Use fetchEnrichmentBatchWithMissing to also get IDs not in Worker database
           const { enrichments: enrichmentData, missing: missingIds } =
             await fetchEnrichmentBatchWithMissing(beerIds);
           const enrichedCount = Object.keys(enrichmentData).length;
 
           if (enrichedCount > 0) {
             console.log(`[sequentialRefresh] Got enrichment for ${enrichedCount} tasted beers`);
-            enrichedMyBeers = mergeEnrichmentData(myBeersWithContainerTypes, enrichmentData);
+            beersForContainerCalc = mergeEnrichmentData(validationResult.validBeers, enrichmentData);
           }
 
           // Sync missing beers to Worker for enrichment (in background)
-          syncMissingBeersInBackground(missingIds, myBeersWithContainerTypes, 'sequentialRefresh');
+          syncMissingBeersInBackground(missingIds, validationResult.validBeers, 'sequentialRefresh');
         } catch (enrichmentError) {
           logWarning('Batch enrichment failed in sequential refresh, continuing without', {
             operation: 'sequentialRefreshAllData',
@@ -924,8 +922,14 @@ export async function sequentialRefreshAllData(): Promise<ManualRefreshResult> {
         }
       }
 
+      // Calculate container types AFTER enrichment so ABV is available for glass selection
+      console.log('Sequential refresh: calculating container types for my beers...');
+      const myBeersWithContainerTypes = calculateContainerTypes(beersForContainerCalc);
+
       // Allow empty myBeers array (user may have no tasted beers)
-      await myBeersRepository.insertManyUnsafe(enrichedMyBeers);
+      await myBeersRepository.insertManyUnsafe(
+        myBeersWithContainerTypes as BeerfinderWithContainerType[]
+      );
       await setPreference('my_beers_last_update', new Date().toISOString());
       await setPreference('my_beers_last_check', new Date().toISOString());
       myBeersResult = {
@@ -1257,33 +1261,31 @@ export const refreshAllDataFromAPI = async (): Promise<{
       });
     }
 
-    // Calculate container types for my beers BEFORE insertion
-    console.log('Calculating container types for my beers...');
-    const myBeersWithContainerTypes = calculateContainerTypes(myBeersValidation.validBeers);
-
-    // Add batch enrichment for my beers if proxy is configured
-    let enrichedMyBeers = myBeersWithContainerTypes;
-    if (config.enrichment.isConfigured() && myBeersWithContainerTypes.length > 0) {
+    // Enrich BEFORE container type calculation so ABV is available for glass selection
+    let myBeersForContainerCalc = myBeersValidation.validBeers;
+    if (config.enrichment.isConfigured() && myBeersValidation.validBeers.length > 0) {
       try {
-        const beerIds = myBeersWithContainerTypes.map(beer => beer.id);
+        const beerIds = myBeersValidation.validBeers.map(beer => beer.id);
         console.log(
           `[refreshAllDataFromAPI] Fetching enrichment for ${beerIds.length} tasted beers...`
         );
 
-        // Use fetchEnrichmentBatchWithMissing to also get IDs not in Worker database
         const { enrichments: enrichmentData, missing: missingIds } =
           await fetchEnrichmentBatchWithMissing(beerIds);
         const enrichedCount = Object.keys(enrichmentData).length;
 
         if (enrichedCount > 0) {
           console.log(`[refreshAllDataFromAPI] Got enrichment for ${enrichedCount} tasted beers`);
-          enrichedMyBeers = mergeEnrichmentData(myBeersWithContainerTypes, enrichmentData);
+          myBeersForContainerCalc = mergeEnrichmentData(
+            myBeersValidation.validBeers,
+            enrichmentData
+          );
         }
 
         // Sync missing beers to Worker for enrichment (in background)
         syncMissingBeersInBackground(
           missingIds,
-          myBeersWithContainerTypes,
+          myBeersValidation.validBeers,
           'refreshAllDataFromAPI'
         );
       } catch (enrichmentError) {
@@ -1294,19 +1296,25 @@ export const refreshAllDataFromAPI = async (): Promise<{
       }
     }
 
-    await myBeersRepository.insertManyUnsafe(enrichedMyBeers);
+    // Calculate container types AFTER enrichment so ABV is available for glass selection
+    console.log('Calculating container types for my beers...');
+    const myBeersWithContainerTypes = calculateContainerTypes(myBeersForContainerCalc);
+
+    await myBeersRepository.insertManyUnsafe(
+      myBeersWithContainerTypes as BeerfinderWithContainerType[]
+    );
 
     console.log('Fetching rewards from API...');
     const rewards = await fetchRewardsFromAPI();
     await rewardsRepository.insertManyUnsafe(rewards);
 
     console.log(
-      `Refreshed all data: ${allBeersWithContainerTypes.length} beers, ${enrichedMyBeers.length} tasted beers, ${rewards.length} rewards`
+      `Refreshed all data: ${allBeersWithContainerTypes.length} beers, ${myBeersWithContainerTypes.length} tasted beers, ${rewards.length} rewards`
     );
 
     return {
       allBeers: allBeersWithContainerTypes,
-      myBeers: enrichedMyBeers,
+      myBeers: myBeersWithContainerTypes as BeerfinderWithContainerType[],
       rewards,
     };
   } finally {

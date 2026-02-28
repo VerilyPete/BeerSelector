@@ -18,7 +18,7 @@ import { z } from 'zod';
 import { config, assertEnrichmentConfigured } from '@/src/config';
 import { getPreference, setPreference } from '@/src/database/preferences';
 import { logWarning } from '@/src/utils/errorLogger';
-import { BeerWithContainerType, BeerfinderWithContainerType } from '@/src/types/beer';
+import { Beer } from '@/src/types/beer';
 
 // Conditionally import expo-application only in React Native environment
 let Application: { applicationId: string | null } | undefined;
@@ -49,8 +49,8 @@ const enrichedBeerResponseSchema = z.object({
   brewer_loc: z.string().optional(),
   brew_style: z.string().optional(),
   brew_container: z.string().optional(),
-  review_count: z.string().optional(),
-  review_rating: z.string().optional(),
+  review_count: z.string().nullish(),
+  review_rating: z.string().nullish(),
   brew_description: z.string().optional(),
   added_date: z.string().optional(),
   enriched_abv: z.number().nullable(),
@@ -59,13 +59,11 @@ const enrichedBeerResponseSchema = z.object({
 });
 
 const beersProxyResponseSchema = z.object({
-  success: z.boolean(),
   storeId: z.string(),
   beers: z.array(enrichedBeerResponseSchema),
-  total: z.number(),
   requestId: z.string().optional(),
-  cached: z.boolean().optional(),
-  cacheAge: z.number().optional(),
+  source: z.enum(['live', 'cache', 'stale']).optional(),
+  cached_at: z.string().optional(),
 });
 
 const batchEnrichmentResponseSchema = z.object({
@@ -483,7 +481,7 @@ export async function fetchBeersFromProxy(storeId: string): Promise<BeersProxyRe
 
     // Track metrics
     metrics.proxySuccesses++;
-    if (data.cached) {
+    if (data.source === 'cache' || data.source === 'stale') {
       metrics.cacheHits++;
     }
 
@@ -493,7 +491,7 @@ export async function fetchBeersFromProxy(storeId: string): Promise<BeersProxyRe
     metrics.unenrichedBeerCount += data.beers.length - enrichedCount;
 
     console.log(
-      `[EnrichmentService] Fetched ${data.beers.length} beers for store ${storeId}${data.cached ? ' (cached)' : ''}`
+      `[EnrichmentService] Fetched ${data.beers.length} beers for store ${storeId} (${data.source ?? 'unknown'})`
     );
 
     return data;
@@ -1180,7 +1178,7 @@ async function fetchEnrichmentBatchInternal(
  * const enrichedBeers = mergeEnrichmentData(beers, enrichmentData);
  * ```
  */
-export function mergeEnrichmentData<T extends BeerWithContainerType | BeerfinderWithContainerType>(
+export function mergeEnrichmentData<T extends Beer>(
   beers: T[],
   enrichmentData: Record<string, EnrichmentData>
 ): T[] {
