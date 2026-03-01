@@ -1,14 +1,11 @@
 import React, { useCallback, useMemo } from 'react';
-import { StyleSheet, FlatList, RefreshControl, View, ViewStyle } from 'react-native';
+import { StyleSheet, FlatList, RefreshControl, View, Text, ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ThemedView } from '../ThemedView';
-import { ThemedText } from '../ThemedText';
 import { BeerItem } from './BeerItem';
-import { useThemeColor } from '@/hooks/useThemeColor';
+import { useColorScheme } from '@/hooks/useColorScheme';
+import { Colors } from '@/constants/Colors';
 import { BeerWithContainerType, BeerfinderWithContainerType } from '@/src/types/beer';
 
-// Union type to accept both BeerWithContainerType and BeerfinderWithContainerType
-// These types have the container_type property (which can be null)
 type DisplayableBeer = BeerWithContainerType | BeerfinderWithContainerType;
 
 type BeerListProps = {
@@ -21,21 +18,10 @@ type BeerListProps = {
   onToggleExpand: (id: string) => void;
   dateLabel?: string;
   renderItemActions?: (beer: DisplayableBeer) => React.ReactNode;
-  /** Number of columns for grid layout (1 for phone, 2 for tablet portrait, 3 for tablet landscape) */
   numColumns?: number;
 };
 
-/**
- * MP-3 Bottleneck #1: Expected BeerItem height for getItemLayout optimization
- * Using collapsed height provides best performance. Minor scroll inaccuracy when
- * item is expanded is acceptable since only one item expands at a time.
- */
 const EXPECTED_ITEM_HEIGHT = 150;
-
-/**
- * Tab bar height constant (typical Expo Router tab bar)
- * Combined with safe area insets for accurate bottom padding
- */
 const TAB_BAR_HEIGHT = 49;
 
 export const BeerList: React.FC<BeerListProps> = ({
@@ -51,9 +37,9 @@ export const BeerList: React.FC<BeerListProps> = ({
   numColumns = 1,
 }) => {
   const insets = useSafeAreaInsets();
-  const tintColor = useThemeColor({}, 'tint');
+  const colorScheme = useColorScheme() ?? 'dark';
+  const colors = Colors[colorScheme];
 
-  // Calculate column wrapper style for multi-column layouts
   const columnWrapperStyle = useMemo<ViewStyle | undefined>(() => {
     if (numColumns <= 1) return undefined;
     return {
@@ -62,7 +48,6 @@ export const BeerList: React.FC<BeerListProps> = ({
     };
   }, [numColumns]);
 
-  // Memoize item wrapper style for multi-column layouts to avoid creating new objects per render
   const itemWrapperStyle = useMemo<ViewStyle | null>(() => {
     if (numColumns <= 1) return null;
     return {
@@ -71,8 +56,6 @@ export const BeerList: React.FC<BeerListProps> = ({
     };
   }, [numColumns]);
 
-  // Memoize renderItem to prevent unnecessary re-renders of FlatList items
-  // For multi-column layouts, wrap in a View with flex basis for equal width columns
   const renderItem = useCallback(
     ({ item }: { item: DisplayableBeer }) => {
       const content = (
@@ -85,7 +68,6 @@ export const BeerList: React.FC<BeerListProps> = ({
         />
       );
 
-      // For multi-column layouts, wrap in a View with proper flex sizing
       if (numColumns > 1 && itemWrapperStyle) {
         return <View style={itemWrapperStyle}>{content}</View>;
       }
@@ -97,11 +79,11 @@ export const BeerList: React.FC<BeerListProps> = ({
 
   if (!loading && beers.length === 0) {
     return (
-      <ThemedView style={styles.emptyContainer} testID="beer-list-empty">
-        <ThemedText style={styles.emptyText} testID="beer-list-empty-message">
+      <View style={styles.emptyContainer} testID="beer-list-empty">
+        <Text style={[styles.emptyText, { color: colors.textSecondary }]} testID="beer-list-empty-message">
           {emptyMessage}
-        </ThemedText>
-      </ThemedView>
+        </Text>
+      </View>
     );
   }
 
@@ -111,35 +93,26 @@ export const BeerList: React.FC<BeerListProps> = ({
       data={beers}
       keyExtractor={item => item.id}
       renderItem={renderItem}
-      // Key prop forces re-render when numColumns changes (required by FlatList)
       key={`beer-list-${numColumns}`}
       numColumns={numColumns}
-      // columnWrapperStyle is only applied when numColumns > 1
       columnWrapperStyle={columnWrapperStyle}
       contentContainerStyle={[
         styles.listContent,
         { paddingBottom: TAB_BAR_HEIGHT + insets.bottom + 16 },
       ]}
-      // Native RefreshControl for pull-to-refresh
       refreshControl={
         <RefreshControl
           refreshing={refreshing}
           onRefresh={onRefresh}
-          tintColor={tintColor}
-          colors={[tintColor]}
+          tintColor={colors.tint}
+          colors={[colors.tint]}
         />
       }
-      // Performance optimization: Reduce initial render and batch sizes for 60+ FPS
       initialNumToRender={10}
       maxToRenderPerBatch={10}
-      // MP-3 Final: windowSize=7 (3.5 above + 3.5 below viewport) for optimal scroll FPS
-      // This is a 67% reduction from React Native default (21) - safer than windowSize=5
-      // Fallback if blank areas appear: increase to 9 (57% reduction) or 11 (48% reduction)
       windowSize={7}
       removeClippedSubviews={true}
       updateCellsBatchingPeriod={50}
-      // Note: getItemLayout is disabled for multi-column layouts as row heights vary
-      // This is a minor performance tradeoff for correct layout calculation
       {...(numColumns === 1 && {
         getItemLayout: (_data: ArrayLike<DisplayableBeer> | null | undefined, index: number) => ({
           length: EXPECTED_ITEM_HEIGHT,
@@ -155,7 +128,6 @@ const styles = StyleSheet.create({
   listContent: {
     paddingHorizontal: 16,
     paddingTop: 4,
-    // paddingBottom is calculated dynamically: TAB_BAR_HEIGHT + insets.bottom + 16
   },
   emptyContainer: {
     flex: 1,
@@ -163,7 +135,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   emptyText: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontFamily: 'Space Mono',
+    fontSize: 11,
   },
 });

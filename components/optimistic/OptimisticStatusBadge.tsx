@@ -1,42 +1,13 @@
-/**
- * OptimisticStatusBadge - Visual indicator for optimistic update status
- *
- * Displays the current status of an optimistic update with appropriate
- * colors, icons, and animations.
- *
- * Statuses:
- * - PENDING: Yellow/orange badge with "Pending..." text
- * - SYNCING: Blue badge with "Syncing..." text and animated spinner
- * - SUCCESS: Green badge with checkmark (auto-hide after 1s)
- * - FAILED: Red badge with "Failed - Tap to Retry" text
- *
- * @example
- * ```tsx
- * <OptimisticStatusBadge
- *   status={OptimisticUpdateStatus.SYNCING}
- *   onRetry={() => retryCheckIn(beerId)}
- * />
- * ```
- */
-
 import React from 'react';
-import { StyleSheet, View, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { ThemedText } from '../ThemedText';
+import { StyleSheet, View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { OptimisticUpdateStatus } from '@/src/types/optimisticUpdate';
 import { Colors } from '@/constants/Colors';
 
 type OptimisticStatusBadgeProps = {
-  /** Current status of the optimistic update */
   status: OptimisticUpdateStatus;
-
-  /** Error message (for FAILED status) */
   error?: string;
-
-  /** Callback when user taps to retry */
   onRetry?: () => void;
-
-  /** Callback when user taps to rollback/cancel */
   onCancel?: () => void;
 };
 
@@ -46,54 +17,46 @@ export const OptimisticStatusBadge: React.FC<OptimisticStatusBadgeProps> = ({
   onRetry,
   onCancel,
 }) => {
-  const colorScheme = useColorScheme();
+  const colorScheme = useColorScheme() ?? 'dark';
+  const colors = Colors[colorScheme];
 
-  // Color schemes for different statuses
   const getStatusColors = () => {
-    const theme = colorScheme ?? 'light';
-    const themeColors = Colors[theme];
-
     switch (status) {
       case OptimisticUpdateStatus.PENDING:
         return {
-          bg: themeColors.warningBg,
-          border: themeColors.warningBorder,
-          text: themeColors.textOnStatus, // Always white on colored status backgrounds for visibility
+          bg: colors.warningBg,
+          border: colors.warningBorder,
+          text: colors.textOnStatus,
         };
-
       case OptimisticUpdateStatus.SYNCING:
         return {
-          bg: themeColors.infoBg,
-          border: themeColors.infoBorder,
-          text: themeColors.textOnStatus, // Always white on colored status backgrounds for visibility
+          bg: colors.infoBg,
+          border: colors.infoBorder,
+          text: colors.textOnStatus,
         };
-
       case OptimisticUpdateStatus.SUCCESS:
         return {
-          bg: themeColors.successBg,
-          border: themeColors.successBorder,
-          text: themeColors.textOnStatus, // Always white on colored status backgrounds for visibility
+          bg: colors.successBg,
+          border: colors.successBorder,
+          text: colors.textOnStatus,
         };
-
       case OptimisticUpdateStatus.FAILED:
         return {
-          bg: themeColors.errorBg,
-          border: themeColors.errorBorder,
-          text: themeColors.textOnStatus, // Always white on colored status backgrounds for visibility
+          bg: colors.errorBg,
+          border: colors.errorBorder,
+          text: colors.textOnStatus,
         };
-
       default:
         return {
-          bg: themeColors.backgroundSecondary,
-          border: themeColors.border,
-          text: themeColors.text,
+          bg: colors.backgroundSecondary,
+          border: colors.border,
+          text: colors.text,
         };
     }
   };
 
-  const colors = getStatusColors();
+  const statusColors = getStatusColors();
 
-  // Get status text
   const getStatusText = () => {
     switch (status) {
       case OptimisticUpdateStatus.PENDING:
@@ -109,7 +72,6 @@ export const OptimisticStatusBadge: React.FC<OptimisticStatusBadgeProps> = ({
     }
   };
 
-  // Don't render success badge (it auto-hides)
   if (status === OptimisticUpdateStatus.SUCCESS) {
     return null;
   }
@@ -121,16 +83,16 @@ export const OptimisticStatusBadge: React.FC<OptimisticStatusBadgeProps> = ({
   };
 
   const BadgeContent = (
-    <View style={[styles.badge, { backgroundColor: colors.bg, borderColor: colors.border }]}>
+    <View style={[styles.badge, { backgroundColor: statusColors.bg, borderColor: statusColors.border }]}>
       {status === OptimisticUpdateStatus.SYNCING && (
-        <ActivityIndicator size="small" color={colors.text} style={styles.spinner} />
+        <ActivityIndicator size="small" color={statusColors.text} style={styles.spinner} />
       )}
 
-      <ThemedText style={[styles.badgeText, { color: colors.text }]}>{getStatusText()}</ThemedText>
+      <Text style={[styles.badgeText, { color: statusColors.text }]}>{getStatusText()}</Text>
 
       {status === OptimisticUpdateStatus.PENDING && onCancel && (
         <TouchableOpacity onPress={onCancel} style={styles.cancelButton}>
-          <ThemedText style={[styles.cancelText, { color: colors.text }]}>✕</ThemedText>
+          <Text style={[styles.cancelText, { color: statusColors.text }]}>✕</Text>
         </TouchableOpacity>
       )}
     </View>
@@ -153,13 +115,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 6,
     paddingHorizontal: 12,
-    borderRadius: 12,
     borderWidth: 1,
     marginTop: 8,
   },
   badgeText: {
-    fontSize: 12,
+    fontFamily: 'Inter',
+    fontSize: 10,
     fontWeight: '600',
+    letterSpacing: 2,
   },
   spinner: {
     marginRight: 6,

@@ -1,46 +1,39 @@
 import React from 'react';
-import { View, ActivityIndicator, StyleSheet, useColorScheme } from 'react-native';
-import { ThemedText } from './ThemedText';
-import { ThemedView } from './ThemedView';
+import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
+import { useColorScheme } from '@/hooks/useColorScheme';
+import { Colors } from '@/constants/Colors';
 
 type MigrationProgressOverlayProps = {
-  progress: number; // 0-100
+  progress: number;
 };
 
 export function MigrationProgressOverlay({ progress }: MigrationProgressOverlayProps) {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
-
-  // Theme-aware colors
-  const spinnerColor = isDark ? '#0A84FF' : '#007AFF'; // iOS blue, brighter in dark mode
-  const progressBarColor = isDark ? '#0A84FF' : '#007AFF';
-  const progressBarBackgroundColor = isDark
-    ? 'rgba(10, 132, 255, 0.2)' // Brighter background in dark mode
-    : 'rgba(0, 122, 255, 0.2)';
+  const colorScheme = useColorScheme() ?? 'dark';
+  const colors = Colors[colorScheme];
 
   return (
-    <ThemedView style={styles.overlay}>
+    <View style={[styles.overlay, { backgroundColor: colors.background }]}>
       <View style={styles.content}>
-        <ActivityIndicator size="large" color={spinnerColor} />
-        <ThemedText style={styles.title}>Updating Database</ThemedText>
-        <ThemedText style={styles.subtitle}>
+        <ActivityIndicator size="large" color={colors.tint} />
+        <Text style={[styles.title, { color: colors.text }]}>Updating Database</Text>
+        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
           Processing beer data: {Math.round(progress)}%
-        </ThemedText>
+        </Text>
         <View
           style={[
             styles.progressBarContainer,
-            { backgroundColor: progressBarBackgroundColor },
+            { backgroundColor: colors.border },
           ]}
         >
           <View
             style={[
               styles.progressBar,
-              { width: `${progress}%`, backgroundColor: progressBarColor },
+              { width: `${progress}%`, backgroundColor: colors.tint },
             ]}
           />
         </View>
       </View>
-    </ThemedView>
+    </View>
   );
 }
 
@@ -53,31 +46,27 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 32,
-    borderRadius: 16,
     alignItems: 'center',
     minWidth: 280,
   },
   title: {
+    fontFamily: 'Inter',
     fontSize: 18,
     fontWeight: '600',
     marginTop: 16,
   },
   subtitle: {
-    fontSize: 14,
+    fontFamily: 'Space Mono',
+    fontSize: 11,
     marginTop: 8,
-    opacity: 0.7,
   },
   progressBarContainer: {
     width: '100%',
     height: 4,
-    borderRadius: 2,
     marginTop: 16,
     overflow: 'hidden',
-    // backgroundColor is set dynamically based on theme
   },
   progressBar: {
     height: '100%',
-    borderRadius: 2,
-    // backgroundColor is set dynamically based on theme
   },
 });

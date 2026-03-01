@@ -1,11 +1,11 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { Modal, View, TouchableOpacity, ActivityIndicator, StyleSheet, Alert } from 'react-native';
+import { Modal, View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
+import { Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView, WebViewNavigation, WebViewMessageEvent } from 'react-native-webview';
-
-import { ThemedText } from '@/components/ThemedText';
-import { IconSymbol } from '@/components/ui/IconSymbol';
-import { useThemeColor } from '@/hooks/useThemeColor';
+import { Ionicons } from '@expo/vector-icons';
+import { useColorScheme } from '@/hooks/useColorScheme';
+import { Colors } from '@/constants/Colors';
 import { setPreference } from '@/src/database/preferences';
 import { handleVisitorLogin } from '@/src/api/authService';
 import { saveSessionData, extractSessionDataFromResponse } from '@/src/api/sessionManager';
@@ -28,20 +28,14 @@ export default function LoginWebView({
   loading: _externalLoading,
 }: LoginWebViewProps) {
   const insets = useSafeAreaInsets();
-  const tintColor = useThemeColor({}, 'tint');
-  const cardBackgroundColor = useThemeColor({ light: '#F5F5F5', dark: '#1C1C1E' }, 'background');
-  const borderColor = useThemeColor({ light: '#CCCCCC', dark: '#333333' }, 'text');
-  const loadingOverlayColor = useThemeColor(
-    { light: 'rgba(255, 255, 255, 0.8)', dark: 'rgba(28, 28, 30, 0.8)' },
-    'background'
-  );
+  const colorScheme = useColorScheme() ?? 'dark';
+  const colors = Colors[colorScheme];
 
   const [_internalLoading, setInternalLoading] = useState(false);
   const webViewRef = useRef<WebView>(null);
   const processedUrlsRef = useRef<Set<string>>(new Set());
   const lastLoggedUrlRef = useRef<{ url: string; timestamp: number }>({ url: '', timestamp: 0 });
 
-  // Cleanup refs when modal closes to prevent stale state
   useEffect(() => {
     if (!visible) {
       processedUrlsRef.current.clear();
@@ -49,16 +43,13 @@ export default function LoginWebView({
     }
   }, [visible]);
 
-  // Handle close button
   const handleClose = useCallback(() => {
     processedUrlsRef.current.clear();
     Alert.alert('Login Cancelled', 'The login process was cancelled.');
     onLoginCancel();
   }, [onLoginCancel]);
 
-  // Handle WebView navigation state changes (simplified - no JS injection here)
   const handleWebViewNavigationStateChange = useCallback((navState: WebViewNavigation) => {
-    // Prevent duplicate logs for same URL within 500ms (React Strict Mode causes double calls)
     const now = Date.now();
     const isDuplicate =
       navState.url === lastLoggedUrlRef.current.url &&
@@ -70,7 +61,6 @@ export default function LoginWebView({
     }
   }, []);
 
-  // Handle WebView load end - inject JavaScript once per page load
   const handleWebViewLoadEnd = useCallback(() => {
     if (!webViewRef.current) {
       return;
@@ -78,7 +68,6 @@ export default function LoginWebView({
 
     setInternalLoading(false);
 
-    // Get the current URL with error handling
     webViewRef.current.injectJavaScript(`
       (function() {
         try {
@@ -99,22 +88,16 @@ export default function LoginWebView({
     `);
   }, []);
 
-  // Handle specific page JavaScript injection
   const injectPageSpecificJavaScript = useCallback((url: string) => {
-    // Create a unique key for this URL
     const urlKey = url;
 
-    // If we've already processed this URL, skip it
     if (processedUrlsRef.current.has(urlKey)) {
       return;
     }
 
-    // If we're on the member dashboard page
     if (url.includes('member-dash.php')) {
-      // Mark as processed
       processedUrlsRef.current.add(urlKey);
 
-      // Inject simplified JavaScript using regex on outerHTML
       if (webViewRef.current) {
         webViewRef.current.injectJavaScript(`
           (function() {
@@ -124,17 +107,14 @@ export default function LoginWebView({
                 return false;
               }
 
-              // Get the page HTML for regex matching
               const html = document.documentElement.outerHTML;
 
-              // Extract URLs using regex directly on HTML
               const memberJsonMatch = html.match(/https:\\/\\/[^"'\\s]+bk-member-json\\.php\\?uid=\\d+/i);
               const storeJsonMatch = html.match(/https:\\/\\/[^"'\\s]+bk-store-json\\.php\\?sid=\\d+/i);
 
               const userJsonUrl = memberJsonMatch ? memberJsonMatch[0] : null;
               const storeJsonUrl = storeJsonMatch ? storeJsonMatch[0] : null;
 
-              // Parse cookies from document.cookie
               const cookies = {};
               if (document.cookie) {
                 document.cookie.split(';').forEach(cookie => {
@@ -149,7 +129,6 @@ export default function LoginWebView({
                 });
               }
 
-              // Send the results back to React Native
               window.ReactNativeWebView.postMessage(JSON.stringify({
                 type: 'URLs',
                 userJsonUrl,
@@ -157,7 +136,6 @@ export default function LoginWebView({
                 cookies: cookies
               }));
             } catch (error) {
-              // Send error back to React Native for logging
               window.ReactNativeWebView.postMessage(JSON.stringify({
                 type: 'JS_INJECTION_ERROR',
                 error: error.toString(),
@@ -170,14 +148,11 @@ export default function LoginWebView({
         `);
       }
     }
-    // Check if user selected visitor mode
     else if (url.includes('visitor.php')) {
-      // Mark as processed
       processedUrlsRef.current.add(urlKey);
 
       console.log('Visitor mode detected in WebView at URL:', url);
 
-      // Extract cookies and store information for visitor mode
       if (webViewRef.current) {
         webViewRef.current.injectJavaScript(`
           (function() {
@@ -222,13 +197,11 @@ export default function LoginWebView({
     }
   }, []);
 
-  // Handle messages from WebView
   const handleWebViewMessage = useCallback(
     async (event: WebViewMessageEvent) => {
       try {
         const data = JSON.parse(event.nativeEvent.data);
 
-        // Handle JavaScript injection errors
         if (data.type === 'JS_INJECTION_ERROR') {
           console.error('JavaScript injection failed:', data.error, 'at', data.location);
           Alert.alert(
@@ -239,9 +212,7 @@ export default function LoginWebView({
           return;
         }
 
-        // Handle URL check from onLoadEnd
         if (data.type === 'URL_CHECK') {
-          // Verify the URL hasn't changed before injecting page-specific JS
           if (webViewRef.current) {
             webViewRef.current.injectJavaScript(`
             (function() {
@@ -276,18 +247,15 @@ export default function LoginWebView({
           console.log('Cookies received:', Object.keys(cookies || {}).join(', '));
 
           if (userJsonUrl && storeJsonUrl) {
-            // Explicitly clear visitor mode flag for regular login
             await setPreference(
               'is_visitor_mode',
               'false',
               'Flag indicating whether the user is in visitor mode'
             );
 
-            // Update preferences with new API endpoints
             setPreference('user_json_url', userJsonUrl, 'API endpoint for user data');
             setPreference('store_json_url', storeJsonUrl, 'API endpoint for store data');
 
-            // Also set the API URLs that are used by the rest of the app
             setPreference(
               'my_beers_api_url',
               userJsonUrl,
@@ -295,21 +263,17 @@ export default function LoginWebView({
             );
             setPreference('all_beers_api_url', storeJsonUrl, 'API endpoint for fetching all beers');
 
-            // Save login timestamp
             setPreference(
               'last_login_timestamp',
               new Date().toISOString(),
               'Last successful login timestamp'
             );
 
-            // Save cookies
             setPreference('auth_cookies', JSON.stringify(cookies), 'Authentication cookies');
 
-            // Extract and save session data to SecureStore for API requests
             const sessionData = extractSessionDataFromResponse(new Headers(), cookies);
             console.log('Extracted session data:', sessionData);
 
-            // Validate session data before saving
             if (isSessionData(sessionData)) {
               await saveSessionData(sessionData);
               console.log('Member session data saved to SecureStore successfully');
@@ -326,10 +290,8 @@ export default function LoginWebView({
               });
             }
 
-            // Clear processed URLs for next login session
             processedUrlsRef.current.clear();
 
-            // Call onLoginSuccess which will handle refresh and navigation
             onLoginSuccess();
           }
         } else if (data.type === 'VISITOR_LOGIN_ERROR') {
@@ -346,7 +308,6 @@ export default function LoginWebView({
           console.log('Raw cookies from WebView:', rawCookies);
           console.log('URL at login time:', url);
 
-          // Verify we have a store ID in the cookies
           const storeId = cookies.store__id || cookies.store;
           if (!storeId) {
             console.error(
@@ -362,20 +323,17 @@ export default function LoginWebView({
             return;
           }
 
-          // Handle visitor login using the API
           try {
             const loginResult = await handleVisitorLogin(cookies);
             console.log('Visitor login result:', loginResult);
 
             if (loginResult.success) {
-              // Ensure visitor mode preference is explicitly set to true
               await setPreference(
                 'is_visitor_mode',
                 'true',
                 'Flag indicating whether the user is in visitor mode'
               );
 
-              // Fetch only the store data URL for visitor mode
               const storeJsonUrl = `https://fsbs.beerknurd.com/bk-store-json.php?sid=${storeId}`;
               console.log('Setting all_beers_api_url to:', storeJsonUrl);
               await setPreference(
@@ -384,20 +342,16 @@ export default function LoginWebView({
                 'API endpoint for fetching all beers'
               );
 
-              // For visitor mode, use empty data placeholder instead of dummy URL to prevent network errors
               await setPreference(
                 'my_beers_api_url',
                 'none://visitor_mode',
                 'Placeholder URL for visitor mode (not a real endpoint)'
               );
 
-              // Clear processed URLs for next login session
               processedUrlsRef.current.clear();
 
-              // Call onLoginSuccess which will handle refresh and navigation
               onLoginSuccess();
             } else {
-              // Show error message
               Alert.alert(
                 'Visitor Login Failed',
                 loginResult.error || 'Could not log in as visitor. Please try again.',
@@ -429,25 +383,25 @@ export default function LoginWebView({
       accessibilityLabel="Flying Saucer login modal"
       accessibilityViewIsModal={true}
     >
-      <View style={{ flex: 1 }} testID="login-webview-modal">
+      <View style={{ flex: 1, backgroundColor: colors.background }} testID="login-webview-modal">
         <View
           style={[
             styles.webViewHeader,
             {
-              backgroundColor: cardBackgroundColor,
-              borderBottomColor: borderColor,
+              backgroundColor: colors.backgroundElevated,
+              borderBottomColor: colors.border,
               paddingTop: insets.top + 12,
             },
           ]}
         >
           <TouchableOpacity
             onPress={handleClose}
-            style={styles.closeButton}
+            style={[styles.closeButton, { backgroundColor: colors.backgroundActive }]}
             testID="close-webview-button"
           >
-            <IconSymbol name="xmark" size={22} color={tintColor} />
+            <Ionicons name="close" size={16} color={colors.text} />
           </TouchableOpacity>
-          <ThemedText style={styles.webViewTitle}>Flying Saucer Login</ThemedText>
+          <Text style={[styles.webViewTitle, { color: colors.text }]}>Flying Saucer Login</Text>
         </View>
 
         <WebView
@@ -487,10 +441,10 @@ export default function LoginWebView({
           startInLoadingState={true}
           renderLoading={() => (
             <View
-              style={[styles.webViewLoadingContainer, { backgroundColor: loadingOverlayColor }]}
+              style={[styles.webViewLoadingContainer, { backgroundColor: colors.background }]}
             >
-              <ActivityIndicator size="large" color={tintColor} />
-              <ThemedText style={styles.webViewLoadingText}>Loading Flying Saucer...</ThemedText>
+              <ActivityIndicator size="large" color={colors.tint} />
+              <Text style={[styles.webViewLoadingText, { color: colors.textSecondary }]}>Loading Flying Saucer...</Text>
             </View>
           )}
         />
@@ -505,19 +459,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 10,
     borderBottomWidth: 1,
-    // backgroundColor and borderBottomColor applied inline with theme colors
   },
   closeButton: {
-    padding: 8,
-    borderRadius: 20,
-    backgroundColor: 'rgba(200, 200, 200, 0.3)',
+    width: 30,
+    height: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   webViewTitle: {
     flex: 1,
+    fontFamily: 'Inter',
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '700',
     textAlign: 'center',
-    marginRight: 40, // To balance the close button
+    marginRight: 40,
   },
   webViewLoadingContainer: {
     position: 'absolute',
@@ -527,10 +482,10 @@ const styles = StyleSheet.create({
     bottom: 0,
     alignItems: 'center',
     justifyContent: 'center',
-    // backgroundColor applied inline with theme colors
   },
   webViewLoadingText: {
+    fontFamily: 'Space Mono',
+    fontSize: 11,
     marginTop: 10,
-    fontSize: 16,
   },
 });
