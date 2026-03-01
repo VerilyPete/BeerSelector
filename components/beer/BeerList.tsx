@@ -21,7 +21,6 @@ type BeerListProps = {
   numColumns?: number;
 };
 
-const EXPECTED_ITEM_HEIGHT = 150;
 const TAB_BAR_HEIGHT = 49;
 
 export const BeerList: React.FC<BeerListProps> = ({
@@ -108,18 +107,11 @@ export const BeerList: React.FC<BeerListProps> = ({
           colors={[colors.tint]}
         />
       }
-      initialNumToRender={10}
-      maxToRenderPerBatch={10}
-      windowSize={7}
-      removeClippedSubviews={true}
+      initialNumToRender={15}
+      maxToRenderPerBatch={15}
+      windowSize={11}
+      removeClippedSubviews={false}
       updateCellsBatchingPeriod={50}
-      {...(numColumns === 1 && {
-        getItemLayout: (_data: ArrayLike<DisplayableBeer> | null | undefined, index: number) => ({
-          length: EXPECTED_ITEM_HEIGHT,
-          offset: EXPECTED_ITEM_HEIGHT * index,
-          index,
-        }),
-      })}
     />
   );
 };

@@ -113,6 +113,14 @@ const BeerItemComponent: React.FC<BeerItemProps> = ({
                     ? ` · ${dateLabel} ${displayDate}`
                     : ''}
                 </Text>
+                <Text
+                  style={[styles.meta, { color: colors.textMuted }]}
+                  testID={`beer-style-${beer.id}`}
+                  numberOfLines={1}
+                >
+                  {beer.brew_style}
+                  {beer.brew_container ? ` · ${beer.brew_container}` : ''}
+                </Text>
               </View>
               {beer.abv != null && (
                 <View style={[styles.abvBadge, { borderColor: colors.accentMuted }]}>
@@ -127,10 +135,6 @@ const BeerItemComponent: React.FC<BeerItemProps> = ({
                 style={[styles.descriptionSection, { borderTopColor: colors.separator }, expandStyle]}
                 testID={`beer-description-container-${beer.id}`}
               >
-                <Text style={[styles.meta, { color: colors.textSecondary }]} testID={`beer-style-${beer.id}`}>
-                  {beer.brew_style}
-                  {beer.brew_container ? ` · ${beer.brew_container}` : ''}
-                </Text>
                 {!hasTastedDate && (
                   <Text style={[styles.meta, { color: colors.textMuted }]} testID={`beer-date-${beer.id}`}>
                     {dateLabel}: {displayDate}
@@ -203,11 +207,14 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     paddingHorizontal: 8,
     paddingVertical: 4,
+    minWidth: 52,
+    alignItems: 'center',
   },
   abvText: {
     fontFamily: 'SpaceMono',
     fontSize: 11,
     fontWeight: '700',
+    textAlign: 'center',
   },
   meta: {
     fontFamily: 'SpaceMono',

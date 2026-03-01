@@ -42,8 +42,9 @@ describe('BeerItem', () => {
     // Should show basic info in collapsed state
     expect(getByText('Test IPA')).toBeTruthy();
     expect(getByText(/Test Brewery/)).toBeTruthy();
+    expect(getByText(/IPA · 16oz Can/)).toBeTruthy();
 
-    // Style, container, date, and description only show when expanded
+    // Description only shows when expanded
     expect(queryByText('Description')).toBeNull();
     expect(queryByText(/delicious test beer/)).toBeNull();
   });
