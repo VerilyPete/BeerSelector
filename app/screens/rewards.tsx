@@ -15,11 +15,16 @@ export function RewardsScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <SafeAreaView style={{ flex: 1 }} edges={['top', 'right', 'left']}>
         <View style={styles.headerRow}>
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-            <Ionicons name="chevron-back" size={22} color={colors.text} />
-          </TouchableOpacity>
+          <View style={[styles.bezelOuter, { backgroundColor: colors.steelBezel, borderColor: colors.steelBezelBorder }]}>
+            <TouchableOpacity
+              style={[styles.bezelInner, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
+              onPress={() => router.back()}
+            >
+              <Ionicons name="chevron-back" size={22} color={colors.text} />
+            </TouchableOpacity>
+          </View>
           <Text style={[styles.title, { color: colors.text }]}>Rewards</Text>
-          <View style={styles.backButton} />
+          <View style={[styles.bezelOuter, { backgroundColor: colors.steelBezel, borderColor: colors.steelBezelBorder }]} />
         </View>
         <Rewards />
       </SafeAreaView>
@@ -35,17 +40,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 24,
+    paddingHorizontal: 18,
     marginTop: 8,
     marginBottom: 16,
   },
   title: {
-    fontFamily: 'Inter',
-    fontSize: 28,
-    fontWeight: '700',
+    fontFamily: 'SpaceGrotesk-Bold',
+    fontSize: 26,
     letterSpacing: -0.5,
   },
-  backButton: {
+  bezelOuter: {
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 2,
+  },
+  bezelInner: {
+    borderWidth: 1,
+    borderRadius: 8,
     width: 30,
     height: 30,
     alignItems: 'center',

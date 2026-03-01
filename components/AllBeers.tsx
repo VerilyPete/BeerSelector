@@ -206,17 +206,17 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: 'transparent',
+    paddingHorizontal: 18,
   },
   filtersContainer: {
     marginBottom: 16,
   },
   beerCountContainer: {
     marginBottom: 8,
-    paddingHorizontal: 24,
   },
   beerCount: {
-    fontFamily: 'Space Mono',
-    fontSize: 11,
+    fontFamily: 'SpaceMono',
+    fontSize: 10,
   },
   centered: {
     flex: 1,
@@ -225,34 +225,35 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   errorText: {
-    color: 'red',
     textAlign: 'center',
   },
   refreshButton: {
     marginTop: 16,
     paddingVertical: 12,
     paddingHorizontal: 24,
-    borderRadius: 24,
+    borderRadius: 8,
   },
   buttonText: {
-    fontWeight: '600',
+    fontFamily: 'SpaceGrotesk-SemiBold',
+    fontSize: 13,
   },
   buttonContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 16,
+    marginTop: 12,
   },
   checkInButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
     borderWidth: 1,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
     gap: 8,
   },
   checkInButtonText: {
-    fontFamily: 'Inter',
+    fontFamily: 'SpaceMono',
     fontSize: 10,
     fontWeight: '600',
     letterSpacing: 2,

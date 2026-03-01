@@ -37,14 +37,15 @@ const SearchBarComponent: React.FC<SearchBarProps> = ({
         {
           borderColor: isFocused ? colors.tint : colors.border,
           borderWidth: isFocused ? 1.5 : 1,
+          backgroundColor: colors.backgroundSecondary,
         },
       ]}
       testID="search-bar"
     >
       <IconSymbol
         name="magnifyingglass"
-        size={18}
-        color={colors.textSecondary}
+        size={16}
+        color={colors.textMuted}
         style={styles.icon}
       />
       <TextInput
@@ -53,7 +54,7 @@ const SearchBarComponent: React.FC<SearchBarProps> = ({
         value={searchText}
         onChangeText={onSearchChange}
         placeholder={placeholder}
-        placeholderTextColor={colors.textSecondary}
+        placeholderTextColor={colors.textMuted}
         autoCapitalize="none"
         autoCorrect={false}
         clearButtonMode="never"
@@ -70,7 +71,7 @@ const SearchBarComponent: React.FC<SearchBarProps> = ({
           accessibilityLabel="Clear search"
           accessibilityRole="button"
         >
-          <IconSymbol name="xmark.circle.fill" size={18} color={colors.textSecondary} />
+          <IconSymbol name="xmark.circle.fill" size={16} color={colors.textSecondary} />
         </TouchableOpacity>
       )}
     </View>
@@ -85,16 +86,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     height: 44,
     paddingHorizontal: 16,
-    marginHorizontal: 24,
+    marginHorizontal: 0,
     marginBottom: 8,
+    borderRadius: 12,
   },
   icon: {
-    marginRight: 12,
+    marginRight: 10,
   },
   input: {
     flex: 1,
-    fontFamily: 'Inter',
-    fontSize: 13,
+    fontFamily: 'SpaceMono',
+    fontSize: 11,
     height: '100%',
     padding: 0,
   },

@@ -61,12 +61,11 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   safeArea: { flex: 1 },
   title: {
-    fontFamily: 'Inter',
-    fontSize: 28,
-    fontWeight: '700',
+    fontFamily: 'SpaceGrotesk-Bold',
+    fontSize: 26,
     letterSpacing: -0.5,
     marginBottom: 16,
     marginTop: 8,
-    marginLeft: 24,
+    marginLeft: 18,
   },
 });

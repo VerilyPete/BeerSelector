@@ -79,65 +79,77 @@ const BeerItemComponent: React.FC<BeerItemProps> = ({
       accessibilityLabel={`${beer.brew_name} by ${beer.brewer}`}
     >
       <Animated.View style={pressStyle}>
-        <View style={[styles.card, { borderColor: colors.border }]}>
-          {/* Name row: name + container icon */}
-          <View style={styles.nameRow}>
-            <Text
-              style={[styles.beerName, { color: colors.text }]}
-              testID={`beer-name-${beer.id}`}
-              numberOfLines={isExpanded ? undefined : 1}
-            >
-              {beer.brew_name || 'Unnamed Beer'}
-            </Text>
-            <View style={styles.iconContainer}>
-              <ContainerIcon
-                type={containerType}
-                size={22}
-                color={hasTastedDate ? colors.tint : colors.textSecondary}
-              />
+        {/* Steel bezel outer frame */}
+        <View style={[styles.steelBezel, { backgroundColor: colors.steelBezel, borderColor: colors.steelBezelBorder }]}>
+          {/* Dark inner card */}
+          <View style={[styles.cardInner, {
+            backgroundColor: colors.backgroundSecondary,
+            borderColor: isExpanded ? colors.accentMuted : colors.border,
+          }]}>
+            {/* Name row: icon + name + ABV badge */}
+            <View style={styles.nameRow}>
+              <View style={[styles.beerIconWell, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
+                <ContainerIcon
+                  type={containerType}
+                  size={20}
+                  color={hasTastedDate ? colors.tint : colors.textSecondary}
+                />
+              </View>
+              <View style={styles.beerNameCol}>
+                <Text
+                  style={[styles.beerName, { color: colors.tint }]}
+                  testID={`beer-name-${beer.id}`}
+                  numberOfLines={isExpanded ? undefined : 1}
+                >
+                  {beer.brew_name || 'Unnamed Beer'}
+                </Text>
+                <Text
+                  style={[styles.brewery, { color: colors.textSecondary }]}
+                  testID={`beer-brewer-${beer.id}`}
+                  numberOfLines={isExpanded ? undefined : 1}
+                >
+                  {beer.brewer}
+                  {hasTastedDate && 'tasted_date' in beer && beer.tasted_date
+                    ? ` · ${dateLabel} ${displayDate}`
+                    : ''}
+                </Text>
+              </View>
+              {beer.abv != null && (
+                <View style={[styles.abvBadge, { borderColor: colors.accentMuted }]}>
+                  <Text style={[styles.abvText, { color: colors.tint }]}>{beer.abv}%</Text>
+                </View>
+              )}
             </View>
+
+            {/* Expanded description */}
+            {isExpanded && (
+              <Animated.View
+                style={[styles.descriptionSection, { borderTopColor: colors.separator }, expandStyle]}
+                testID={`beer-description-container-${beer.id}`}
+              >
+                <Text style={[styles.meta, { color: colors.textSecondary }]} testID={`beer-style-${beer.id}`}>
+                  {beer.brew_style}
+                  {beer.brew_container ? ` · ${beer.brew_container}` : ''}
+                </Text>
+                {!hasTastedDate && (
+                  <Text style={[styles.meta, { color: colors.textMuted }]} testID={`beer-date-${beer.id}`}>
+                    {dateLabel}: {displayDate}
+                  </Text>
+                )}
+                {beer.brew_description && (
+                  <>
+                    <Text style={[styles.descriptionLabel, { color: colors.text }]}>
+                      Description
+                    </Text>
+                    <Text style={[styles.descriptionText, { color: colors.textSecondary }]} testID={`beer-description-${beer.id}`}>
+                      {beer.brew_description.replace(/<\/?p>/g, '').replace(/<\/?br ?\/?>/, '\n')}
+                    </Text>
+                  </>
+                )}
+                {renderActions && <View style={styles.actionsContainer}>{renderActions()}</View>}
+              </Animated.View>
+            )}
           </View>
-
-          {/* Brewery */}
-          <Text
-            style={[styles.brewery, { color: colors.textSecondary }]}
-            testID={`beer-brewer-${beer.id}`}
-            numberOfLines={isExpanded ? undefined : 1}
-          >
-            {beer.brewer}
-            {beer.brewer_loc ? ` · ${beer.brewer_loc}` : ''}
-          </Text>
-
-          {/* Meta line: style · container · ABV */}
-          <Text style={[styles.meta, { color: colors.textSecondary }]} testID={`beer-style-${beer.id}`} numberOfLines={1}>
-            {beer.brew_style}
-            {beer.brew_container ? ` · ${beer.brew_container}` : ''}
-            {beer.abv != null ? ` · ${beer.abv}% ABV` : ''}
-          </Text>
-
-          {/* Date */}
-          <Text
-            style={[styles.meta, { color: hasTastedDate ? colors.tint : colors.textSecondary }]}
-            testID={`beer-date-${beer.id}`}
-          >
-            {dateLabel}: {displayDate}
-          </Text>
-
-          {/* Expanded description */}
-          {isExpanded && beer.brew_description && (
-            <Animated.View
-              style={[styles.descriptionSection, { borderTopColor: colors.separator }, expandStyle]}
-              testID={`beer-description-container-${beer.id}`}
-            >
-              <Text style={[styles.descriptionLabel, { color: colors.text }]}>
-                Description
-              </Text>
-              <Text style={[styles.descriptionText, { color: colors.textSecondary }]} testID={`beer-description-${beer.id}`}>
-                {beer.brew_description.replace(/<\/?p>/g, '').replace(/<\/?br ?\/?>/, '\n')}
-              </Text>
-              {renderActions && <View style={styles.actionsContainer}>{renderActions()}</View>}
-            </Animated.View>
-          )}
         </View>
       </Animated.View>
     </TouchableOpacity>
@@ -147,59 +159,78 @@ const BeerItemComponent: React.FC<BeerItemProps> = ({
 const styles = StyleSheet.create({
   touchable: {
     marginHorizontal: 0,
-    marginBottom: 12,
+    marginBottom: 8,
     minHeight: 44,
   },
-  card: {
+  steelBezel: {
+    borderRadius: 14,
+    padding: 3,
     borderWidth: 1,
-    padding: 16,
+  },
+  cardInner: {
+    borderWidth: 1,
+    borderRadius: 11,
+    padding: 10,
     gap: 4,
   },
   nameRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
   },
-  beerName: {
-    flex: 1,
-    fontFamily: 'Inter',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  iconContainer: {
-    width: 22,
-    height: 22,
+  beerIconWell: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+  },
+  beerNameCol: {
+    flex: 1,
+    gap: 2,
+  },
+  beerName: {
+    fontFamily: 'SpaceGrotesk-SemiBold',
+    fontSize: 14,
   },
   brewery: {
-    fontFamily: 'Inter',
-    fontSize: 13,
-    fontWeight: '400',
+    fontFamily: 'SpaceMono',
+    fontSize: 10,
+  },
+  abvBadge: {
+    borderWidth: 1,
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  abvText: {
+    fontFamily: 'SpaceMono',
+    fontSize: 11,
+    fontWeight: '700',
   },
   meta: {
-    fontFamily: 'Space Mono',
-    fontSize: 11,
+    fontFamily: 'SpaceMono',
+    fontSize: 10,
   },
   descriptionSection: {
-    marginTop: 12,
-    paddingTop: 12,
+    marginTop: 10,
+    paddingTop: 10,
     borderTopWidth: 1,
+    gap: 4,
   },
   descriptionLabel: {
-    fontFamily: 'Inter',
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 4,
+    fontFamily: 'SpaceGrotesk-SemiBold',
+    fontSize: 13,
+    marginTop: 4,
   },
   descriptionText: {
-    fontFamily: 'Inter',
-    fontSize: 13,
-    lineHeight: 20,
+    fontFamily: 'SpaceMono',
+    fontSize: 11,
+    lineHeight: 18,
   },
   actionsContainer: {
-    marginTop: 12,
+    marginTop: 10,
   },
 });
 

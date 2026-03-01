@@ -1,5 +1,8 @@
 import React from 'react';
-import { View, ViewStyle } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ViewStyle } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useColorScheme } from '@/hooks/useColorScheme';
+import { Colors } from '@/constants/Colors';
 import SettingsSection from './SettingsSection';
 import SettingsItem from './SettingsItem';
 
@@ -26,6 +29,9 @@ export default function DataManagementSection({
   style,
   testID = 'data-management-section',
 }: DataManagementSectionProps) {
+  const colorScheme = useColorScheme() ?? 'dark';
+  const colors = Colors[colorScheme];
+
   if (isFirstLogin && !apiUrlsConfigured) {
     return null;
   }
@@ -90,6 +96,60 @@ export default function DataManagementSection({
           />
         )}
       </SettingsSection>
+
+      {!isFirstLogin && (
+        <TouchableOpacity
+          style={[
+            styles.logoutOuter,
+            {
+              backgroundColor: colors.destructive,
+              borderColor: 'rgba(255, 153, 153, 0.37)',
+            },
+          ]}
+          onPress={onLogin}
+          activeOpacity={0.8}
+          testID="logout-button"
+        >
+          <View
+            style={[
+              styles.logoutInner,
+              { backgroundColor: '#1A0000', borderColor: 'rgba(51, 0, 0, 0.5)' },
+            ]}
+          >
+            <Ionicons name="log-out-outline" size={18} color={colors.destructive} />
+            <Text style={[styles.logoutText, { color: colors.destructive }]}>LOG OUT</Text>
+          </View>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  logoutOuter: {
+    borderRadius: 14,
+    padding: 2,
+    borderWidth: 1,
+    marginTop: 20,
+    shadowColor: '#FF3333',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 6,
+  },
+  logoutInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderRadius: 12,
+    paddingVertical: 12,
+    borderWidth: 1,
+  },
+  logoutText: {
+    fontFamily: 'SpaceMono',
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 2,
+  },
+});

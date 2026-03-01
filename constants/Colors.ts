@@ -1,41 +1,50 @@
 /**
- * BeerSelector Color System — Red Accent Dark Theme
+ * BeerSelector Color System — Robocop Industrial Theme
  *
- * Dark mode: Near-black backgrounds with red (#FF0000) accent
- * Light mode: Clean whites with muted red accent
+ * Dark mode: Near-black backgrounds with cyan glow (#00FFD0) accent
+ * Inspired by OCP's industrial aesthetic: steel panels, CRT displays, dystopian Detroit
  *
- * Design variable mapping:
- *   $bg-primary     → background
- *   $bg-elevated    → backgroundSecondary
- *   $bg-active      → backgroundElevated
- *   $border-primary → border
- *   $border-divider → separator
- *   $text-primary   → text
- *   $text-secondary → textSecondary
- *   $accent-red     → tint
+ * Design variable mapping (from Pencil):
+ *   $bg-black         → background (#0A0A0A)
+ *   $display-black    → backgroundSecondary (#0D1117)
+ *   $bezel-dark       → backgroundElevated (#1A1D22)
+ *   $bezel-edge       → border (#2A2E35)
+ *   $steel-dark       → separator (#3A3F47)
+ *   $steel-mid        → textSecondary (#8A919A)
+ *   $steel-bright     → text (#C8CDD3)
+ *   $display-glow     → tint (#00FFD0)
+ *   $display-amber    → amber (#FFB300) — action buttons
+ *   $accent-red       → destructive (#FF3333)
  */
 
 export const Colors = {
   light: {
     text: '#1A1A1A',
-    textSecondary: '#666666',
-    textMuted: '#999999',
-    background: '#FFFFFF',
-    backgroundSecondary: '#F5F5F5',
-    backgroundElevated: '#E5E5E5',
+    textSecondary: '#5A6069',
+    textMuted: '#8A919A',
+    background: '#E8ECF0',
+    backgroundSecondary: '#D4D8DD',
+    backgroundElevated: '#C8CDD3',
+    backgroundActive: '#A0A7B0',
 
-    tint: '#DC2626',
-    tintHover: '#B91C1C',
-    accent: '#FF0000',
-    accentMuted: '#FECACA',
+    tint: '#00B396',
+    tintHover: '#009980',
+    accent: '#00B396',
+    accentMuted: '#00B39620',
 
-    icon: '#999999',
-    iconActive: '#DC2626',
-    tabIconDefault: '#999999',
-    tabIconSelected: '#DC2626',
+    amber: '#CC8F00',
+    amberDim: '#CC8F0033',
+    amberWell: '#1A1200',
+    amberBorderOuter: '#CC8F0080',
+    amberBorderInner: '#33280080',
 
-    border: '#E5E5E5',
-    borderFocused: '#DC2626',
+    icon: '#5A6069',
+    iconActive: '#00B396',
+    tabIconDefault: '#5A6069',
+    tabIconSelected: '#00B396',
+
+    border: '#C8CDD3',
+    borderFocused: '#00B396',
 
     success: '#16A34A',
     error: '#DC2626',
@@ -52,76 +61,91 @@ export const Colors = {
     warningBorder: '#FCD34D',
     infoBorder: '#93C5FD',
 
-    textOnPrimary: '#FFFFFF',
+    textOnPrimary: '#0A0A0A',
     textOnStatus: '#FFFFFF',
     overlay: 'rgba(0, 0, 0, 0.4)',
     backgroundTertiary: 'rgba(150, 150, 150, 0.1)',
 
-    skeletonBase: '#F5F5F5',
-    skeletonHighlight: '#E0E0E0',
+    skeletonBase: '#D4D8DD',
+    skeletonHighlight: '#C8CDD3',
 
-    separator: '#E5E5E5',
+    steelBezel: '#8A919A',
+    steelBezelBorder: 'rgba(255, 255, 255, 0.25)',
+
+    separator: '#C8CDD3',
 
     untappd: '#FFCC00',
     untappdPink: '#E91E63',
-    link: '#DC2626',
+    link: '#00B396',
     destructive: '#DC2626',
     visitorBadge: '#FFB74D',
 
     glassTint: 'rgba(255, 255, 255, 0.7)',
   },
   dark: {
-    text: '#FFFFFF',
-    textSecondary: '#666666',
-    textMuted: '#888888',
-    background: '#0C0C0C',
-    backgroundSecondary: '#1A1A1A',
-    backgroundElevated: '#333333',
+    text: '#C8CDD3',
+    textSecondary: '#8A919A',
+    textMuted: '#5A6069',
+    background: '#0A0A0A',
+    backgroundSecondary: '#0D1117',
+    backgroundElevated: '#1A1D22',
+    backgroundActive: '#2A2E35',
 
-    tint: '#FF0000',
-    tintHover: '#CC0000',
-    accent: '#FF0000',
-    accentMuted: '#330000',
+    tint: '#00FFD0',
+    tintHover: '#00CCB0',
+    accent: '#00FFD0',
+    accentMuted: '#00FFD044',
 
-    icon: '#666666',
-    iconActive: '#FF0000',
-    tabIconDefault: '#666666',
-    tabIconSelected: '#FF0000',
+    amber: '#FFB300',
+    amberDim: '#FFB30033',
+    amberWell: '#1A1200',
+    amberBorderOuter: '#FFE08280',
+    amberBorderInner: '#33280080',
 
-    border: '#333333',
-    borderFocused: '#FF0000',
+    icon: '#5A6069',
+    iconActive: '#00FFD0',
+    tabIconDefault: '#3A3F47',
+    tabIconSelected: '#00FFD0',
 
-    success: '#4ADE80',
-    error: '#F87171',
-    warning: '#FBBF24',
+    border: '#2A2E35',
+    borderFocused: '#00FFD0',
+
+    success: '#00FFD0',
+    error: '#FF3333',
+    warning: '#FFB300',
     info: '#60A5FA',
 
-    successBg: '#052e16',
-    errorBg: '#450a0a',
-    warningBg: '#451a03',
+    successBg: '#00FFD015',
+    errorBg: '#FF333315',
+    warningBg: '#FFB30015',
     infoBg: '#172554',
 
-    successBorder: '#22c55e',
-    errorBorder: '#ef4444',
-    warningBorder: '#f59e0b',
+    successBorder: '#00FFD044',
+    errorBorder: '#FF333344',
+    warningBorder: '#FFB30044',
     infoBorder: '#3b82f6',
 
-    textOnPrimary: '#0C0C0C',
+    textOnPrimary: '#0A0A0A',
     textOnStatus: '#FFFFFF',
-    overlay: 'rgba(0, 0, 0, 0.7)',
-    backgroundTertiary: 'rgba(150, 150, 150, 0.1)',
+    overlay: 'rgba(0, 0, 0, 0.8)',
+    backgroundTertiary: 'rgba(150, 150, 150, 0.05)',
 
-    skeletonBase: '#1A1A1A',
-    skeletonHighlight: '#333333',
+    skeletonBase: '#0D1117',
+    skeletonHighlight: '#1A1D22',
 
-    separator: '#1A1A1A',
+    steelBezel: '#6B727B',
+    steelBezelBorder: 'rgba(255, 255, 255, 0.25)',
+    steelLabelPlate: '#5A6069',
+    steelLabelBorder: 'rgba(160, 167, 176, 0.25)',
+
+    separator: '#1A1D22',
 
     untappd: '#FFCC00',
     untappdPink: '#E91E63',
-    link: '#FF0000',
-    destructive: '#FF0000',
-    visitorBadge: '#FFB74D',
+    link: '#00FFD0',
+    destructive: '#FF3333',
+    visitorBadge: '#FFB300',
 
-    glassTint: 'rgba(0, 0, 0, 0.5)',
+    glassTint: 'rgba(0, 0, 0, 0.6)',
   },
 };

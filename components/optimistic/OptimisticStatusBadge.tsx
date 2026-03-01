@@ -119,7 +119,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   badgeText: {
-    fontFamily: 'Inter',
+    fontFamily: 'SpaceMono',
     fontSize: 10,
     fontWeight: '600',
     letterSpacing: 2,

@@ -110,7 +110,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   text: {
-    fontFamily: 'Inter',
+    fontFamily: 'SpaceMono',
     fontSize: 12,
     fontWeight: '600',
     textAlign: 'center',

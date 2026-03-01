@@ -23,23 +23,43 @@ export default function SettingsSection({
 
   return (
     <View style={[styles.container, style]} testID={testID}>
-      <Text
-        style={[styles.sectionHeader, { color: colors.textSecondary }]}
-        accessibilityRole="header"
-      >
-        {title.toUpperCase()}
-      </Text>
-
       <View
         style={[
-          styles.sectionCard,
+          styles.labelPlate,
           {
-            backgroundColor: colors.backgroundElevated,
-            borderColor: colors.border,
+            backgroundColor: colors.steelLabelPlate,
+            borderColor: colors.steelLabelBorder,
           },
         ]}
       >
-        {children}
+        <Text
+          style={[styles.sectionHeader, { color: colors.border }]}
+          accessibilityRole="header"
+        >
+          {title.toUpperCase()}
+        </Text>
+      </View>
+
+      <View
+        style={[
+          styles.steelBezelOuter,
+          {
+            backgroundColor: colors.steelBezel,
+            borderColor: colors.steelBezelBorder,
+          },
+        ]}
+      >
+        <View
+          style={[
+            styles.sectionCard,
+            {
+              backgroundColor: colors.backgroundSecondary,
+              borderColor: colors.border,
+            },
+          ]}
+        >
+          {children}
+        </View>
       </View>
 
       {footer && (
@@ -53,20 +73,36 @@ const styles = StyleSheet.create({
   container: {
     marginBottom: 24,
   },
-  sectionHeader: {
-    fontFamily: 'Inter',
-    fontSize: 10,
-    fontWeight: '600',
-    letterSpacing: 3,
+  labelPlate: {
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderRadius: 4,
+    paddingVertical: 3,
+    paddingHorizontal: 10,
     marginBottom: 8,
-    marginLeft: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.4,
+    shadowRadius: 2,
+  },
+  sectionHeader: {
+    fontFamily: 'SpaceMono',
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 2,
+  },
+  steelBezelOuter: {
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 3,
   },
   sectionCard: {
     borderWidth: 1,
+    borderRadius: 11,
     overflow: 'hidden',
   },
   sectionFooter: {
-    fontFamily: 'Space Mono',
+    fontFamily: 'SpaceMono',
     fontSize: 11,
     marginTop: 8,
     marginHorizontal: 4,

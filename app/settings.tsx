@@ -73,10 +73,20 @@ export default function SettingsScreen() {
           {!isFirstLogin && canGoBack && (
             <TouchableOpacity
               testID="back-button"
-              style={[styles.closeButton, { backgroundColor: colors.backgroundActive }]}
+              style={[
+                styles.closeButtonOuter,
+                { backgroundColor: colors.steelBezel, borderColor: colors.steelBezelBorder },
+              ]}
               onPress={() => router.back()}
             >
-              <Ionicons name="close" size={16} color={colors.text} />
+              <View
+                style={[
+                  styles.closeButtonInner,
+                  { backgroundColor: colors.backgroundSecondary, borderColor: colors.border },
+                ]}
+              >
+                <Ionicons name="close" size={16} color={colors.text} />
+              </View>
             </TouchableOpacity>
           )}
         </View>
@@ -117,7 +127,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 24,
+    paddingHorizontal: 18,
     paddingBottom: 48,
   },
   headerRow: {
@@ -128,14 +138,20 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   pageTitle: {
-    fontFamily: 'Inter',
-    fontSize: 28,
-    fontWeight: '700',
+    fontFamily: 'SpaceGrotesk-Bold',
+    fontSize: 26,
     letterSpacing: -0.5,
   },
-  closeButton: {
+  closeButtonOuter: {
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 2,
+  },
+  closeButtonInner: {
     width: 30,
     height: 30,
+    borderRadius: 8,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },

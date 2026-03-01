@@ -11,7 +11,6 @@ import {
   Platform,
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useUntappdColor } from '@/hooks/useUntappdColor';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { Colors } from '@/constants/Colors';
 import { useBreakpoint } from '@/hooks/useBreakpoint';
@@ -77,8 +76,6 @@ export const Beerfinder = () => {
 
   const colorScheme = useColorScheme() ?? 'dark';
   const colors = Colors[colorScheme];
-  const untappdColor = useUntappdColor();
-
   // Use the shared data refresh hook
   // Use AppContext's refreshBeerData to reload from database after refresh
   const { refreshing, handleRefresh: baseHandleRefresh } = useDataRefresh({
@@ -250,56 +247,32 @@ export const Beerfinder = () => {
   const renderBeerActions = (item: BeerWithContainerType) => (
     <View style={styles.buttonContainer}>
       <TouchableOpacity
-        style={[
-          styles.checkInButton,
-          {
-            backgroundColor: untappdColor,
-            width: '48%',
-          },
-        ]}
+        style={[styles.amberButtonOuter, { backgroundColor: colors.amber, borderColor: colors.amberBorderOuter }]}
         onPress={() => handleCheckIn(item)}
-        activeOpacity={0.7}
+        activeOpacity={0.8}
         disabled={checkinLoading}
       >
-        {checkinLoading ? (
-          <ActivityIndicator size="small" color={colors.textOnPrimary} />
-        ) : (
-          <Text
-            style={[
-              styles.checkInButtonText,
-              {
-                color: colors.textOnPrimary,
-              },
-            ]}
-            numberOfLines={1}
-          >
-            CHECK IN
-          </Text>
-        )}
+        <View style={[styles.amberButtonInner, { backgroundColor: colors.amberWell, borderColor: colors.amberBorderInner }]}>
+          {checkinLoading ? (
+            <ActivityIndicator size="small" color={colors.amber} />
+          ) : (
+            <Text style={[styles.amberButtonText, { color: colors.amber }]} numberOfLines={1}>
+              CHECK IN
+            </Text>
+          )}
+        </View>
       </TouchableOpacity>
 
       <TouchableOpacity
-        style={[
-          styles.checkInButton,
-          {
-            backgroundColor: untappdColor,
-            width: '48%',
-          },
-        ]}
+        style={[styles.amberButtonOuter, { backgroundColor: colors.amber, borderColor: colors.amberBorderOuter }]}
         onPress={() => handleUntappdSearch(item.brew_name)}
-        activeOpacity={0.7}
+        activeOpacity={0.8}
       >
-        <Text
-          style={[
-            styles.checkInButtonText,
-            {
-              color: colors.textOnPrimary,
-            },
-          ]}
-          numberOfLines={1}
-        >
-          Untappd
-        </Text>
+        <View style={[styles.amberButtonInner, { backgroundColor: colors.amberWell, borderColor: colors.amberBorderInner }]}>
+          <Text style={[styles.amberButtonText, { color: colors.amber }]} numberOfLines={1}>
+            UNTAPPD
+          </Text>
+        </View>
       </TouchableOpacity>
     </View>
   );
@@ -321,22 +294,18 @@ export const Beerfinder = () => {
                 {queueError}
               </Text>
               <TouchableOpacity
-                style={[
-                  styles.retryButton,
-                  {
-                    backgroundColor: untappdColor,
-                  },
-                ]}
+                style={[styles.amberButtonOuter, { backgroundColor: colors.amber, borderColor: colors.amberBorderOuter, flex: 0 }]}
                 onPress={viewQueues}
+                activeOpacity={0.8}
                 disabled={loadingQueues}
               >
-                {loadingQueues ? (
-                  <ActivityIndicator size="small" color={colors.textOnPrimary} />
-                ) : (
-                  <Text style={[styles.retryButtonText, { color: colors.textOnPrimary }]}>
-                    Try Again
-                  </Text>
-                )}
+                <View style={[styles.amberButtonInner, { backgroundColor: colors.amberWell, borderColor: colors.amberBorderInner }]}>
+                  {loadingQueues ? (
+                    <ActivityIndicator size="small" color={colors.amber} />
+                  ) : (
+                    <Text style={[styles.amberButtonText, { color: colors.amber }]}>TRY AGAIN</Text>
+                  )}
+                </View>
               </TouchableOpacity>
             </View>
           ) : queuedBeers.length === 0 ? (
@@ -390,17 +359,13 @@ export const Beerfinder = () => {
           )}
 
           <TouchableOpacity
-            style={[
-              styles.closeButton,
-              {
-                backgroundColor: untappdColor,
-              },
-            ]}
+            style={[styles.amberButtonOuter, { backgroundColor: colors.amber, borderColor: colors.amberBorderOuter, flex: 0, marginTop: 16 }]}
             onPress={() => setQueueModalVisible(false)}
+            activeOpacity={0.8}
           >
-            <Text style={[styles.closeButtonText, { color: colors.textOnPrimary }]}>
-              Close
-            </Text>
+            <View style={[styles.amberButtonInner, { backgroundColor: colors.amberWell, borderColor: colors.amberBorderInner }]}>
+              <Text style={[styles.amberButtonText, { color: colors.amber }]}>CLOSE</Text>
+            </View>
           </TouchableOpacity>
         </View>
       </View>
@@ -416,51 +381,28 @@ export const Beerfinder = () => {
           <View style={styles.filtersContainer}>
             <View style={styles.buttonsContainer}>
               <TouchableOpacity
-                style={[
-                  styles.actionButton,
-                  {
-                    backgroundColor: untappdColor,
-                    marginRight: 8,
-                  },
-                ]}
+                style={[styles.amberButtonOuter, { backgroundColor: colors.amber, borderColor: colors.amberBorderOuter }]}
                 onPress={viewQueues}
+                activeOpacity={0.8}
                 disabled={loadingQueues}
               >
-                {loadingQueues ? (
-                  <ActivityIndicator size="small" color={colors.textOnPrimary} />
-                ) : (
-                  <Text
-                    style={[
-                      styles.actionButtonText,
-                      {
-                        color: colors.textOnPrimary,
-                      },
-                    ]}
-                  >
-                    QUEUE
-                  </Text>
-                )}
+                <View style={[styles.amberButtonInner, { backgroundColor: colors.amberWell, borderColor: colors.amberBorderInner }]}>
+                  {loadingQueues ? (
+                    <ActivityIndicator size="small" color={colors.amber} />
+                  ) : (
+                    <Text style={[styles.amberButtonText, { color: colors.amber }]}>QUEUE</Text>
+                  )}
+                </View>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[
-                  styles.actionButton,
-                  {
-                    backgroundColor: untappdColor,
-                  },
-                ]}
+                style={[styles.amberButtonOuter, { backgroundColor: colors.amber, borderColor: colors.amberBorderOuter }]}
                 onPress={() => router.push('/screens/rewards' as Href)}
+                activeOpacity={0.8}
               >
-                <Text
-                  style={[
-                    styles.actionButtonText,
-                    {
-                      color: colors.textOnPrimary,
-                    },
-                  ]}
-                >
-                  Rewards
-                </Text>
+                <View style={[styles.amberButtonInner, { backgroundColor: colors.amberWell, borderColor: colors.amberBorderInner }]}>
+                  <Text style={[styles.amberButtonText, { color: colors.amber }]}>REWARDS</Text>
+                </View>
               </TouchableOpacity>
             </View>
           </View>
@@ -481,51 +423,28 @@ export const Beerfinder = () => {
           <View style={styles.filtersContainer}>
             <View style={styles.buttonsContainer}>
               <TouchableOpacity
-                style={[
-                  styles.actionButton,
-                  {
-                    backgroundColor: untappdColor,
-                    marginRight: 8,
-                  },
-                ]}
+                style={[styles.amberButtonOuter, { backgroundColor: colors.amber, borderColor: colors.amberBorderOuter }]}
                 onPress={viewQueues}
+                activeOpacity={0.8}
                 disabled={loadingQueues}
               >
-                {loadingQueues ? (
-                  <ActivityIndicator size="small" color={colors.textOnPrimary} />
-                ) : (
-                  <Text
-                    style={[
-                      styles.actionButtonText,
-                      {
-                        color: colors.textOnPrimary,
-                      },
-                    ]}
-                  >
-                    QUEUE
-                  </Text>
-                )}
+                <View style={[styles.amberButtonInner, { backgroundColor: colors.amberWell, borderColor: colors.amberBorderInner }]}>
+                  {loadingQueues ? (
+                    <ActivityIndicator size="small" color={colors.amber} />
+                  ) : (
+                    <Text style={[styles.amberButtonText, { color: colors.amber }]}>QUEUE</Text>
+                  )}
+                </View>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[
-                  styles.actionButton,
-                  {
-                    backgroundColor: untappdColor,
-                  },
-                ]}
+                style={[styles.amberButtonOuter, { backgroundColor: colors.amber, borderColor: colors.amberBorderOuter }]}
                 onPress={() => router.push('/screens/rewards' as Href)}
+                activeOpacity={0.8}
               >
-                <Text
-                  style={[
-                    styles.actionButtonText,
-                    {
-                      color: colors.textOnPrimary,
-                    },
-                  ]}
-                >
-                  Rewards
-                </Text>
+                <View style={[styles.amberButtonInner, { backgroundColor: colors.amberWell, borderColor: colors.amberBorderInner }]}>
+                  <Text style={[styles.amberButtonText, { color: colors.amber }]}>REWARDS</Text>
+                </View>
               </TouchableOpacity>
             </View>
 
@@ -579,20 +498,19 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: 'transparent',
+    paddingHorizontal: 18,
   },
   filtersContainer: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
+    paddingTop: 0,
     paddingBottom: 8,
     backgroundColor: 'transparent',
   },
   beerCountContainer: {
     marginBottom: 8,
-    paddingHorizontal: 24,
   },
   beerCount: {
-    fontFamily: 'Space Mono',
-    fontSize: 11,
+    fontFamily: 'SpaceMono',
+    fontSize: 10,
   },
   centered: {
     flex: 1,
@@ -603,49 +521,54 @@ const styles = StyleSheet.create({
   errorText: {
     marginBottom: 16,
     textAlign: 'center',
-    fontSize: 16,
+    fontSize: 13,
+    fontFamily: 'SpaceMono',
   },
   refreshButton: {
     paddingVertical: 12,
     paddingHorizontal: 24,
-    borderRadius: 24,
+    borderRadius: 8,
   },
   buttonText: {
-    fontWeight: '600',
+    fontFamily: 'SpaceGrotesk-SemiBold',
+    fontSize: 13,
   },
   buttonsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 12,
+    gap: 10,
+  },
+  amberButtonOuter: {
+    flex: 1,
+    borderRadius: 10,
+    padding: 5,
+    borderWidth: 1,
+    shadowColor: '#FFB300',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 10,
+    elevation: 6,
+  },
+  amberButtonInner: {
+    borderRadius: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    alignItems: 'center',
     justifyContent: 'center',
   },
-  actionButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 20,
-    flex: 0.5,
-    maxWidth: '45%',
-  },
-  actionButtonText: {
-    fontWeight: '600',
-    fontSize: 14,
+  amberButtonText: {
+    fontFamily: 'SpaceMono',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.5,
     textAlign: 'center',
   },
   buttonContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 16,
-  },
-  checkInButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  checkInButtonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
+    marginTop: 12,
+    gap: 8,
   },
   modalOverlay: {
     flex: 1,
@@ -655,19 +578,20 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     padding: 20,
-    borderRadius: 12,
+    borderRadius: 16,
     width: '90%',
     maxHeight: '80%',
     borderWidth: 1,
   },
   modalTitle: {
+    fontFamily: 'SpaceGrotesk-Bold',
     fontSize: 20,
-    fontWeight: 'bold',
     marginBottom: 16,
     textAlign: 'center',
   },
   noQueuesText: {
-    fontSize: 16,
+    fontFamily: 'SpaceMono',
+    fontSize: 13,
     textAlign: 'center',
     marginVertical: 24,
   },
@@ -677,19 +601,10 @@ const styles = StyleSheet.create({
     marginVertical: 24,
   },
   queueErrorText: {
-    fontSize: 16,
+    fontFamily: 'SpaceMono',
+    fontSize: 13,
     textAlign: 'center',
     marginBottom: 16,
-  },
-  retryButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    marginTop: 8,
-  },
-  retryButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
   },
   queuesList: {
     marginVertical: 10,
@@ -698,7 +613,7 @@ const styles = StyleSheet.create({
     padding: 12,
     borderBottomWidth: 1,
     marginBottom: 8,
-    borderRadius: 8,
+    borderRadius: 10,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -709,34 +624,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   queuedBeerName: {
-    fontSize: 16,
+    fontFamily: 'SpaceGrotesk-SemiBold',
+    fontSize: 14,
     marginBottom: 4,
   },
   queuedBeerDate: {
-    fontSize: 14,
+    fontFamily: 'SpaceMono',
+    fontSize: 11,
     opacity: 0.7,
   },
   deleteButton: {
     padding: 8,
-    borderRadius: 4,
+    borderRadius: 6,
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: 10,
     borderWidth: 1,
   },
   deleteButtonText: {
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  closeButton: {
-    marginTop: 16,
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  closeButtonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontFamily: 'SpaceGrotesk-SemiBold',
+    fontSize: 12,
   },
 });

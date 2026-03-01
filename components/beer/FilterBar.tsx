@@ -142,20 +142,21 @@ const FilterBarComponent: React.FC<FilterBarProps> = ({
 const styles = StyleSheet.create({
   container: {
     marginBottom: 8,
-    paddingHorizontal: 24,
+    paddingHorizontal: 0,
   },
   chipRow: {
     flexDirection: 'row',
     gap: 8,
   },
   chip: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
+    paddingVertical: 6,
+    paddingHorizontal: 14,
     alignItems: 'center',
     justifyContent: 'center',
+    borderRadius: 8,
   },
   chipText: {
-    fontFamily: 'Inter',
+    fontFamily: 'SpaceMono',
     fontSize: 10,
     fontWeight: '600',
     letterSpacing: 2,

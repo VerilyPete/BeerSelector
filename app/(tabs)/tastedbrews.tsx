@@ -77,19 +77,18 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   safeArea: { flex: 1 },
   headerContainer: {
-    paddingHorizontal: 24,
+    paddingHorizontal: 18,
     marginTop: 8,
     marginBottom: 16,
     gap: 4,
   },
   title: {
-    fontFamily: 'Inter',
-    fontSize: 28,
-    fontWeight: '700',
+    fontFamily: 'SpaceGrotesk-Bold',
+    fontSize: 26,
     letterSpacing: -0.5,
   },
   subtitle: {
-    fontFamily: 'Space Mono',
+    fontFamily: 'SpaceMono',
     fontSize: 11,
   },
 });

@@ -54,13 +54,18 @@ function NavigationCard({
       accessibilityState={{ disabled }}
     >
       <Animated.View style={pressStyle}>
-        <View style={[styles.navCard, { borderColor: colors.border }]}>
-          <Ionicons name={iconName as any} size={22} color={iconColor ?? colors.text} />
-          <View style={styles.navCardText}>
-            <Text style={[styles.navCardTitle, { color: colors.text }]}>{title}</Text>
-            <Text style={[styles.navCardDesc, { color: colors.textSecondary }]}>{description}</Text>
+        {/* Steel bezel outer frame */}
+        <View style={[styles.navCardBezel, { backgroundColor: colors.steelBezel, borderColor: colors.steelBezelBorder }]}>
+          <View style={[styles.navCard, { borderColor: colors.border, backgroundColor: colors.backgroundSecondary }]}>
+            <View style={[styles.navCardIcon, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
+              <Ionicons name={iconName as any} size={20} color={iconColor ?? colors.tint} />
+            </View>
+            <View style={styles.navCardText}>
+              <Text style={[styles.navCardTitle, { color: colors.text }]}>{title}</Text>
+              <Text style={[styles.navCardDesc, { color: colors.textSecondary }]}>{description}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
           </View>
-          <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
         </View>
       </Animated.View>
     </TouchableOpacity>
@@ -72,18 +77,24 @@ function MetricCard({ tastedCount, colors }: { tastedCount: number; colors: type
   const percentage = (progress * 100).toFixed(1);
 
   return (
-    <View style={[styles.metricCard, { borderColor: colors.border }]}>
-      <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>BEERS TASTED</Text>
-      <View style={styles.metricRow}>
-        <Text style={[styles.metricNumber, { color: colors.text }]}>{tastedCount}</Text>
-        <Text style={[styles.metricTotal, { color: colors.textSecondary }]}>/200</Text>
+    <View style={[styles.metricPanel, { backgroundColor: colors.steelBezel, borderColor: colors.steelBezelBorder }]}>
+      <View style={[styles.metricCard, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
+        <View style={[styles.labelPlate, { backgroundColor: colors.steelLabelPlate, borderColor: colors.steelLabelBorder }]}>
+          <Text style={[styles.labelPlateText, { color: colors.border }]}>BEERS TASTED</Text>
+        </View>
+        <View style={styles.metricRow}>
+          {/* Ghost segments */}
+          <Text style={[styles.metricGhost, { color: colors.tint, opacity: 0.05 }]}>888</Text>
+          <Text style={[styles.metricNumber, { color: colors.tint }]}>{tastedCount}</Text>
+          <Text style={[styles.metricTotal, { color: colors.textMuted }]}>/200</Text>
+        </View>
+        <View style={[styles.progressTrack, { backgroundColor: '#1A2A2A' }]}>
+          <View style={[styles.progressFill, { backgroundColor: colors.tint, width: `${progress * 100}%` }]} />
+        </View>
+        <Text style={[styles.progressLabel, { color: colors.textMuted }]}>
+          {percentage}% UFO CLUB PROGRESS
+        </Text>
       </View>
-      <View style={[styles.progressTrack, { backgroundColor: colors.border }]}>
-        <View style={[styles.progressFill, { backgroundColor: colors.tint, width: `${progress * 100}%` }]} />
-      </View>
-      <Text style={[styles.progressLabel, { color: colors.textSecondary }]}>
-        {percentage}% UFO Club Progress
-      </Text>
     </View>
   );
 }
@@ -119,8 +130,13 @@ function MainHomeView({
         contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Settings gear - top right */}
-        <View style={styles.settingsRow}>
+        {/* Header row with label plate + gear button */}
+        <View style={styles.headerRow}>
+          <View style={[styles.labelPlate, { backgroundColor: colors.steelLabelPlate, borderColor: colors.steelLabelBorder }]}>
+            <Text style={[styles.labelPlateText, { color: colors.border }]}>
+              {isVisitor ? 'GUEST MODE' : 'WELCOME BACK'}
+            </Text>
+          </View>
           <TouchableOpacity
             testID="settings-nav-button"
             onPress={() => {
@@ -131,16 +147,15 @@ function MainHomeView({
             accessibilityRole="button"
             accessibilityLabel="Open settings"
           >
-            <Ionicons name="settings-outline" size={22} color={colors.textSecondary} />
+            <View style={[styles.gearBezel, { backgroundColor: colors.steelBezel, borderColor: colors.steelBezelBorder }]}>
+              <View style={[styles.gearInner, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
+                <Ionicons name="settings-outline" size={18} color={colors.textSecondary} />
+              </View>
+            </View>
           </TouchableOpacity>
         </View>
-
-        {/* Hero section */}
-        <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>
-          {isVisitor ? 'GUEST MODE' : 'WELCOME BACK'}
-        </Text>
         <Text style={[styles.heroName, { color: colors.text }]}>
-          {isVisitor ? 'Visitor' : memberName || 'Beer Enthusiast'}
+          {isVisitor ? 'Visitor' : (memberName || 'Beer Enthusiast').toUpperCase()}
         </Text>
         {!isVisitor && storeName && (
           <View style={styles.storeRow}>
@@ -160,8 +175,10 @@ function MainHomeView({
 
         {/* Navigation section */}
         <View style={{ marginTop: 32 }}>
-          <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>EXPLORE</Text>
-          <View style={{ marginTop: 16, gap: 16 }}>
+          <View style={[styles.labelPlate, { backgroundColor: colors.steelLabelPlate, borderColor: colors.steelLabelBorder, alignSelf: 'flex-start' }]}>
+            <Text style={[styles.labelPlateText, { color: colors.border }]}>EXPLORE</Text>
+          </View>
+          <View style={{ marginTop: 12, gap: 10 }}>
             <NavigationCard
               testID="nav-all-beers"
               title="All Beers"
@@ -273,47 +290,93 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   scrollView: { flex: 1 },
-  scrollContent: { paddingHorizontal: 24, paddingBottom: 24 },
+  scrollContent: { paddingHorizontal: 18, paddingBottom: 24 },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24 },
 
-  settingsRow: { flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 8 },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+
+  labelPlate: {
+    borderRadius: 4,
+    paddingVertical: 3,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.4,
+    shadowRadius: 2,
+    elevation: 3,
+  },
+  labelPlateText: {
+    fontFamily: 'SpaceMono',
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 2,
+  },
+  gearBezel: {
+    borderRadius: 10,
+    padding: 2,
+    borderWidth: 1,
+  },
+  gearInner: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+  },
 
   sectionLabel: {
-    fontFamily: 'Inter',
+    fontFamily: 'SpaceMono',
     fontSize: 10,
     fontWeight: '600',
     letterSpacing: 3,
   },
   heroName: {
-    fontFamily: 'Inter',
-    fontSize: 28,
-    fontWeight: '700',
+    fontFamily: 'SpaceGrotesk-Bold',
+    fontSize: 26,
     letterSpacing: -0.5,
     marginTop: 8,
   },
   storeRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
-  storeName: { fontFamily: 'Space Mono', fontSize: 11 },
+  storeName: { fontFamily: 'SpaceMono', fontSize: 11 },
 
-  metricCard: { borderWidth: 1, padding: 24, gap: 12 },
-  metricRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 4 },
-  metricNumber: { fontFamily: 'Inter', fontSize: 72, fontWeight: '800', letterSpacing: -4, lineHeight: 64 },
-  metricTotal: { fontFamily: 'Space Mono', fontSize: 24, fontWeight: '700', marginBottom: 4 },
-  progressTrack: { height: 4, width: '100%' },
-  progressFill: { height: '100%' },
-  progressLabel: { fontFamily: 'Space Mono', fontSize: 11 },
+  metricPanel: { borderWidth: 1, borderRadius: 16, padding: 3, overflow: 'hidden' },
+  metricCard: { borderRadius: 13, padding: 20, gap: 10, borderWidth: 1 },
+  metricRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 4, position: 'relative' },
+  metricGhost: { fontFamily: 'SpaceGrotesk-Bold', fontSize: 64, letterSpacing: -4, lineHeight: 64, position: 'absolute', left: 0, bottom: 0 },
+  metricNumber: { fontFamily: 'SpaceGrotesk-Bold', fontSize: 64, letterSpacing: -4, lineHeight: 64 },
+  metricTotal: { fontFamily: 'SpaceMono', fontSize: 22, marginBottom: 4 },
+  progressTrack: { height: 6, width: '100%', borderRadius: 3 },
+  progressFill: { height: '100%', borderRadius: 3 },
+  progressLabel: { fontFamily: 'SpaceMono', fontSize: 9, letterSpacing: 1 },
 
+  navCardBezel: {
+    borderRadius: 14,
+    padding: 3,
+    borderWidth: 1,
+  },
   navCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    gap: 16,
+    padding: 10,
+    gap: 14,
+    borderWidth: 1,
+    borderRadius: 11,
+  },
+  navCardIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
   },
   navCardText: { flex: 1, gap: 2 },
-  navCardTitle: { fontFamily: 'Inter', fontSize: 15, fontWeight: '500' },
-  navCardDesc: { fontFamily: 'Space Mono', fontSize: 11 },
+  navCardTitle: { fontFamily: 'SpaceGrotesk-SemiBold', fontSize: 14 },
+  navCardDesc: { fontFamily: 'SpaceMono', fontSize: 11 },
 
-  setupCard: { borderWidth: 1, padding: 32, alignItems: 'center', maxWidth: 340, width: '100%' },
-  loginButton: { paddingVertical: 14, paddingHorizontal: 32, alignItems: 'center' },
-  loginButtonText: { fontFamily: 'Inter', fontSize: 15, fontWeight: '600', letterSpacing: 2 },
+  setupCard: { borderWidth: 1, borderRadius: 16, padding: 32, alignItems: 'center', maxWidth: 340, width: '100%' },
+  loginButton: { paddingVertical: 14, paddingHorizontal: 32, alignItems: 'center', borderRadius: 8 },
+  loginButtonText: { fontFamily: 'SpaceGrotesk-SemiBold', fontSize: 15, letterSpacing: 2 },
 });

@@ -69,14 +69,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   welcomeTitle: {
-    fontFamily: 'Inter',
+    fontFamily: 'SpaceGrotesk-SemiBold',
     fontSize: 24,
     fontWeight: '700',
     marginBottom: 8,
     textAlign: 'center',
   },
   welcomeText: {
-    fontFamily: 'Space Mono',
+    fontFamily: 'SpaceMono',
     fontSize: 11,
     lineHeight: 18,
     textAlign: 'center',

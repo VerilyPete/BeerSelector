@@ -39,42 +39,48 @@ function TerminalTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
 
   return (
     <View style={[styles.tabBarOuter, { paddingBottom: Math.max(insets.bottom, 12), backgroundColor: colors.background }]}>
-      <View style={[styles.tabBarPill, { borderColor: colors.border, backgroundColor: colors.background }]}>
-        {visibleRoutes.map((route) => {
-          const realIndex = state.routes.indexOf(route);
-          const isFocused = state.index === realIndex;
-          const cfg = TAB_CONFIGS[route.name];
-          if (!cfg) return null;
+      <View style={[styles.tabBarPillOuter, { borderColor: colorScheme === 'dark' ? '#FFFFFF30' : colors.border }]}>
+        <View style={[styles.tabBarPillInner, { borderColor: colors.border, backgroundColor: colors.backgroundSecondary }]}>
+          {visibleRoutes.map((route) => {
+            const realIndex = state.routes.indexOf(route);
+            const isFocused = state.index === realIndex;
+            const cfg = TAB_CONFIGS[route.name];
+            if (!cfg) return null;
 
-          const activeColor = isFocused ? colors.textOnPrimary : colors.textSecondary;
+            const activeColor = isFocused ? colors.tint : colors.tabIconDefault;
 
-          const onPress = () => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
-            if (!isFocused && !event.defaultPrevented) {
-              navigation.navigate(route.name);
-            }
-          };
+            const onPress = () => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+              if (!isFocused && !event.defaultPrevented) {
+                navigation.navigate(route.name);
+              }
+            };
 
-          return (
-            <TouchableOpacity
-              key={route.key}
-              accessibilityRole="button"
-              accessibilityState={isFocused ? { selected: true } : {}}
-              onPress={onPress}
-              style={[
-                styles.tabItem,
-                isFocused && { backgroundColor: colors.tint },
-              ]}
-              activeOpacity={0.7}
-            >
-              <IconSymbol name={cfg.icon} size={18} color={activeColor} />
-              <Text style={[styles.tabLabel, { color: activeColor }]}>
-                {cfg.label}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
+            return (
+              <TouchableOpacity
+                key={route.key}
+                accessibilityRole="button"
+                accessibilityState={isFocused ? { selected: true } : {}}
+                onPress={onPress}
+                style={[
+                  styles.tabItem,
+                  isFocused && {
+                    backgroundColor: colorScheme === 'dark' ? '#1A2A2A' : colors.backgroundSecondary,
+                    borderWidth: 1,
+                    borderColor: colors.accentMuted,
+                  },
+                ]}
+                activeOpacity={0.7}
+              >
+                <IconSymbol name={cfg.icon} size={18} color={activeColor} />
+                <Text style={[styles.tabLabel, { color: activeColor }]}>
+                  {cfg.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
       </View>
     </View>
   );
@@ -82,28 +88,36 @@ function TerminalTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
 
 const styles = StyleSheet.create({
   tabBarOuter: {
-    paddingHorizontal: 21,
-    paddingTop: 12,
+    paddingHorizontal: 16,
+    paddingTop: 0,
   },
-  tabBarPill: {
-    flexDirection: 'row',
+  tabBarPillOuter: {
     borderRadius: 36,
     height: 62,
     padding: 4,
+    borderWidth: 1,
+    backgroundColor: '#8A919A',
+  },
+  tabBarPillInner: {
+    flex: 1,
+    flexDirection: 'row',
+    borderRadius: 33,
+    padding: 3,
+    gap: 3,
     borderWidth: 1,
   },
   tabItem: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 26,
-    gap: 4,
+    borderRadius: 30,
+    gap: 3,
   },
   tabLabel: {
-    fontFamily: 'Inter',
-    fontSize: 10,
+    fontFamily: 'SpaceMono',
+    fontSize: 9,
     fontWeight: '600',
-    letterSpacing: 0.5,
+    letterSpacing: 1,
   },
 });
 

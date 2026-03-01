@@ -126,7 +126,7 @@ export const BeerList: React.FC<BeerListProps> = ({
 
 const styles = StyleSheet.create({
   listContent: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 0,
     paddingTop: 4,
   },
   emptyContainer: {
@@ -135,7 +135,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   emptyText: {
-    fontFamily: 'Space Mono',
+    fontFamily: 'SpaceMono',
     fontSize: 11,
   },
 });

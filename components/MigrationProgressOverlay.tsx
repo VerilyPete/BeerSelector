@@ -50,13 +50,13 @@ const styles = StyleSheet.create({
     minWidth: 280,
   },
   title: {
-    fontFamily: 'Inter',
+    fontFamily: 'SpaceGrotesk-SemiBold',
     fontSize: 18,
     fontWeight: '600',
     marginTop: 16,
   },
   subtitle: {
-    fontFamily: 'Space Mono',
+    fontFamily: 'SpaceMono',
     fontSize: 11,
     marginTop: 8,
   },

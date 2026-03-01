@@ -28,7 +28,7 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   title: {
-    fontFamily: 'Inter',
+    fontFamily: 'SpaceGrotesk-Bold',
     fontSize: 28,
     fontWeight: '700',
   },
@@ -37,7 +37,7 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
   },
   linkText: {
-    fontFamily: 'Inter',
+    fontFamily: 'SpaceMono',
     fontSize: 15,
     fontWeight: '500',
   },

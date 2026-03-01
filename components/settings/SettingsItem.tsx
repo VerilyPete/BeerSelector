@@ -205,12 +205,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   title: {
-    fontFamily: 'Inter',
+    fontFamily: 'SpaceGrotesk-Regular',
     fontSize: 15,
     fontWeight: '500',
   },
   subtitle: {
-    fontFamily: 'Space Mono',
+    fontFamily: 'SpaceMono',
     fontSize: 11,
     marginTop: 2,
   },
@@ -224,7 +224,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   valueText: {
-    fontFamily: 'Space Mono',
+    fontFamily: 'SpaceMono',
     fontSize: 11,
     marginRight: 4,
   },

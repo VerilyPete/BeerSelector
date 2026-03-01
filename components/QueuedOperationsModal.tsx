@@ -300,7 +300,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   title: {
-    fontFamily: 'Inter',
+    fontFamily: 'SpaceGrotesk-SemiBold',
     fontSize: 18,
     fontWeight: '700',
   },
@@ -317,7 +317,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   infoText: {
-    fontFamily: 'Space Mono',
+    fontFamily: 'SpaceMono',
     fontSize: 11,
     marginBottom: 4,
   },
@@ -330,7 +330,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   emptyText: {
-    fontFamily: 'Space Mono',
+    fontFamily: 'SpaceMono',
     fontSize: 11,
   },
   operationCard: {
@@ -347,7 +347,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   operationType: {
-    fontFamily: 'Inter',
+    fontFamily: 'SpaceGrotesk-SemiBold',
     fontSize: 15,
     fontWeight: '600',
     marginRight: 8,
@@ -357,27 +357,27 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   statusText: {
-    fontFamily: 'Inter',
+    fontFamily: 'SpaceMono',
     fontSize: 10,
     fontWeight: '600',
     letterSpacing: 1,
   },
   timestamp: {
-    fontFamily: 'Space Mono',
+    fontFamily: 'SpaceMono',
     fontSize: 11,
   },
   operationDetails: {
-    fontFamily: 'Inter',
+    fontFamily: 'SpaceGrotesk-Regular',
     fontSize: 13,
     marginBottom: 4,
   },
   retryInfo: {
-    fontFamily: 'Space Mono',
+    fontFamily: 'SpaceMono',
     fontSize: 11,
     marginBottom: 4,
   },
   errorMessage: {
-    fontFamily: 'Space Mono',
+    fontFamily: 'SpaceMono',
     fontSize: 11,
     marginBottom: 8,
   },
@@ -392,7 +392,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   actionButtonText: {
-    fontFamily: 'Inter',
+    fontFamily: 'SpaceMono',
     fontSize: 10,
     fontWeight: '600',
     letterSpacing: 2,
@@ -407,7 +407,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   clearButtonText: {
-    fontFamily: 'Inter',
+    fontFamily: 'SpaceMono',
     fontSize: 10,
     fontWeight: '600',
     letterSpacing: 2,

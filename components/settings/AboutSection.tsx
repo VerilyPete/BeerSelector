@@ -90,7 +90,7 @@ export default function AboutSection({
 
 const styles = StyleSheet.create({
   copyrightText: {
-    fontFamily: 'Space Mono',
+    fontFamily: 'SpaceMono',
     fontSize: 11,
     textAlign: 'center',
     marginTop: 32,

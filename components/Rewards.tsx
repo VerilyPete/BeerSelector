@@ -257,16 +257,22 @@ const ProgressHeader = ({ tastedCount }: { tastedCount: number }) => {
   const ringSize = Math.min(Math.max(screenWidth * 0.2, 80), 120);
 
   return (
-    <Animated.View
-      entering={FadeInDown.duration(600).delay(100)}
+    <View
       style={[
-        styles.progressHeader,
-        {
-          backgroundColor: colors.backgroundElevated,
-          borderColor: colors.border,
-        },
+        styles.progressHeaderBezelOuter,
+        { backgroundColor: colors.steelBezel, borderColor: colors.steelBezelBorder },
       ]}
     >
+      <Animated.View
+        entering={FadeInDown.duration(600).delay(100)}
+        style={[
+          styles.progressHeader,
+          {
+            backgroundColor: colors.backgroundSecondary,
+            borderColor: colors.border,
+          },
+        ]}
+      >
       <View style={styles.progressHeaderContent}>
         <View style={styles.progressTextContainer}>
           <Text style={[styles.progressSectionLabel, { color: colors.textSecondary }]}>
@@ -295,26 +301,35 @@ const ProgressHeader = ({ tastedCount }: { tastedCount: number }) => {
             <View
               key={milestone}
               style={[
-                styles.milestone,
-                {
-                  backgroundColor: reached ? colors.tint : 'transparent',
-                  borderColor: reached ? colors.tint : colors.border,
-                },
+                styles.milestoneBezelOuter,
+                reached
+                  ? { backgroundColor: colors.destructive, borderColor: 'rgba(255, 153, 153, 0.37)' }
+                  : { backgroundColor: colors.steelBezel, borderColor: colors.steelBezelBorder },
               ]}
             >
-              <Text
+              <View
                 style={[
-                  styles.milestoneText,
-                  { color: reached ? colors.textOnPrimary : colors.textSecondary },
+                  styles.milestone,
+                  reached
+                    ? { backgroundColor: '#1A0000', borderColor: 'rgba(51, 0, 0, 0.5)' }
+                    : { backgroundColor: colors.backgroundSecondary, borderColor: colors.border },
                 ]}
               >
-                {milestone}
-              </Text>
+                <Text
+                  style={[
+                    styles.milestoneText,
+                    { color: reached ? colors.textOnPrimary : colors.textSecondary },
+                  ]}
+                >
+                  {milestone}
+                </Text>
+              </View>
             </View>
           );
         })}
       </View>
-    </Animated.View>
+      </Animated.View>
+    </View>
   );
 };
 
@@ -483,8 +498,8 @@ export const Rewards = () => {
               styles.rewardCard,
               {
                 backgroundColor: colors.backgroundElevated,
-                borderColor: isRedeemed ? colors.border : colors.tint,
-                opacity: isRedeemed ? 0.7 : 1,
+                borderColor: isRedeemed ? colors.separator : colors.accentMuted,
+                opacity: isRedeemed ? 0.5 : 1,
               },
             ]}
             onPress={() => handleRewardPress(item)}
@@ -559,7 +574,12 @@ export const Rewards = () => {
         keyExtractor={item => item.reward_id}
         contentContainerStyle={styles.listContent}
         ListHeaderComponent={
-          !session.isVisitor ? <ProgressHeader tastedCount={tastedCount} /> : null
+          <>
+            {!session.isVisitor ? <ProgressHeader tastedCount={tastedCount} /> : null}
+            <View style={[styles.labelPlate, { backgroundColor: colors.steelLabelPlate, borderColor: colors.steelLabelBorder }]}>
+              <Text style={[styles.labelPlateText, { color: colors.border }]}>REWARD LOG</Text>
+            </View>
+          </>
         }
         ListEmptyComponent={<EmptyState isVisitor={session.isVisitor} />}
         refreshControl={
@@ -581,7 +601,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   listContent: {
-    padding: 24,
+    padding: 18,
     paddingBottom: 48,
   },
 
@@ -592,7 +612,7 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   loadingText: {
-    fontFamily: 'Space Mono',
+    fontFamily: 'SpaceMono',
     fontSize: 11,
     marginTop: 8,
   },
@@ -605,7 +625,7 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   errorText: {
-    fontFamily: 'Space Mono',
+    fontFamily: 'SpaceMono',
     fontSize: 11,
     textAlign: 'center',
     marginTop: 8,
@@ -614,19 +634,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderWidth: 1,
+    borderRadius: 8,
     marginTop: 16,
   },
   retryButtonText: {
-    fontFamily: 'Inter',
+    fontFamily: 'SpaceMono',
     fontWeight: '600',
     fontSize: 10,
     letterSpacing: 2,
   },
 
-  progressHeader: {
-    padding: 24,
-    marginBottom: 24,
+  progressHeaderBezelOuter: {
     borderWidth: 1,
+    borderRadius: 16,
+    padding: 3,
+    marginBottom: 24,
+  },
+  progressHeader: {
+    padding: 20,
+    borderWidth: 1,
+    borderRadius: 13,
   },
   progressHeaderContent: {
     flexDirection: 'row',
@@ -637,25 +664,23 @@ const styles = StyleSheet.create({
     marginRight: 16,
   },
   progressSectionLabel: {
-    fontFamily: 'Inter',
+    fontFamily: 'SpaceMono',
     fontSize: 10,
     fontWeight: '600',
     letterSpacing: 3,
     marginBottom: 8,
   },
   progressSubtitle: {
-    fontFamily: 'Inter',
+    fontFamily: 'SpaceGrotesk-SemiBold',
     fontSize: 15,
-    fontWeight: '500',
     marginBottom: 4,
   },
   progressRemaining: {
-    fontFamily: 'Space Mono',
+    fontFamily: 'SpaceMono',
     fontSize: 11,
   },
   progressComplete: {
-    fontFamily: 'Inter',
-    fontWeight: '700',
+    fontFamily: 'SpaceGrotesk-Bold',
     fontSize: 16,
   },
 
@@ -674,13 +699,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   progressPercentage: {
-    fontFamily: 'Inter',
+    fontFamily: 'SpaceGrotesk-Bold',
     fontSize: 24,
-    fontWeight: '700',
   },
   progressLabel: {
-    fontFamily: 'Space Mono',
-    fontSize: 12,
+    fontFamily: 'SpaceMono',
+    fontSize: 10,
   },
 
   milestoneContainer: {
@@ -690,25 +714,31 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     borderTopWidth: 1,
   },
+  milestoneBezelOuter: {
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 2,
+  },
   milestone: {
     width: 44,
     height: 44,
+    borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
   },
   milestoneText: {
-    fontFamily: 'Inter',
+    fontFamily: 'SpaceGrotesk-SemiBold',
     fontSize: 12,
-    fontWeight: '600',
   },
 
   rewardCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    marginBottom: 12,
+    padding: 14,
+    marginBottom: 10,
     borderWidth: 1,
+    borderRadius: 14,
     minHeight: 88,
   },
   rewardContent: {
@@ -716,14 +746,13 @@ const styles = StyleSheet.create({
     marginLeft: 12,
   },
   rewardType: {
-    fontFamily: 'Inter',
-    fontSize: 15,
-    fontWeight: '500',
+    fontFamily: 'SpaceGrotesk-SemiBold',
+    fontSize: 14,
     marginBottom: 4,
   },
   rewardDescription: {
-    fontFamily: 'Space Mono',
-    fontSize: 11,
+    fontFamily: 'SpaceMono',
+    fontSize: 10,
     marginBottom: 8,
   },
   rewardAction: {
@@ -733,6 +762,7 @@ const styles = StyleSheet.create({
   badgeContainer: {
     width: 48,
     height: 48,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -741,10 +771,11 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     paddingHorizontal: 8,
     paddingVertical: 4,
+    borderRadius: 6,
   },
   statusText: {
-    fontFamily: 'Inter',
-    fontSize: 10,
+    fontFamily: 'SpaceMono',
+    fontSize: 9,
     fontWeight: '600',
     letterSpacing: 2,
   },
@@ -755,18 +786,37 @@ const styles = StyleSheet.create({
     marginTop: 48,
   },
   emptyStateTitle: {
-    fontFamily: 'Inter',
+    fontFamily: 'SpaceGrotesk-Bold',
     fontSize: 20,
-    fontWeight: '700',
     marginTop: 24,
     marginBottom: 8,
     textAlign: 'center',
   },
   emptyStateMessage: {
-    fontFamily: 'Space Mono',
+    fontFamily: 'SpaceMono',
     fontSize: 11,
     textAlign: 'center',
     lineHeight: 18,
     paddingHorizontal: 16,
+  },
+
+  labelPlate: {
+    alignSelf: 'flex-start',
+    borderRadius: 4,
+    paddingVertical: 3,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    marginBottom: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.4,
+    shadowRadius: 2,
+    elevation: 3,
+  },
+  labelPlateText: {
+    fontFamily: 'SpaceMono',
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 2,
   },
 });

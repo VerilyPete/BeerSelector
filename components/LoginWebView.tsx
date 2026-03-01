@@ -468,7 +468,7 @@ const styles = StyleSheet.create({
   },
   webViewTitle: {
     flex: 1,
-    fontFamily: 'Inter',
+    fontFamily: 'SpaceGrotesk-SemiBold',
     fontSize: 18,
     fontWeight: '700',
     textAlign: 'center',
@@ -484,7 +484,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   webViewLoadingText: {
-    fontFamily: 'Space Mono',
+    fontFamily: 'SpaceMono',
     fontSize: 11,
     marginTop: 10,
   },

@@ -289,7 +289,7 @@ Tasted Beers: ${lastMyBeersRefresh ? new Date(parseInt(lastMyBeersRefresh)).toLo
 
 const styles = StyleSheet.create({
   devModeText: {
-    fontFamily: 'Space Mono',
+    fontFamily: 'SpaceMono',
     fontSize: 11,
     textAlign: 'center',
     fontStyle: 'italic',
