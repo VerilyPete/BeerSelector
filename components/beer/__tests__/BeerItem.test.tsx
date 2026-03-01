@@ -8,14 +8,6 @@ jest.mock('@/hooks/useColorScheme', () => ({
   useColorScheme: jest.fn(() => 'light'),
 }));
 
-jest.mock('@/hooks/useThemeColor', () => ({
-  useThemeColor: jest.fn(() => '#000000'),
-}));
-
-// Mock ThemedText and ThemedView to use plain React Native components
-jest.mock('@/components/ThemedText');
-jest.mock('@/components/ThemedView');
-
 // Use real timers for this test suite to avoid hanging
 beforeAll(() => {
   jest.useRealTimers();

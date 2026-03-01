@@ -25,16 +25,8 @@ import { BeerList } from '../BeerList';
 import { BeerWithContainerType } from '@/src/types/beer';
 
 // Mock dependencies
-jest.mock('@/hooks/useThemeColor', () => ({
-  useThemeColor: jest.fn(() => '#007AFF'),
-}));
-
-jest.mock('../../ThemedView', () => ({
-  ThemedView: ({ children }: { children?: React.ReactNode }) => <>{children}</>,
-}));
-
-jest.mock('../../ThemedText', () => ({
-  ThemedText: ({ children }: { children?: React.ReactNode }) => <>{children}</>,
+jest.mock('@/hooks/useColorScheme', () => ({
+  useColorScheme: jest.fn(() => 'light'),
 }));
 
 jest.mock('../BeerItem', () => ({

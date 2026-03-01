@@ -24,9 +24,6 @@ jest.mock('@/hooks/useDataRefresh');
 jest.mock('@/hooks/useDebounce', () => ({
   useDebounce: (value: any) => value,
 }));
-jest.mock('@/hooks/useThemeColor', () => ({
-  useThemeColor: jest.fn(() => '#007AFF'),
-}));
 jest.mock('@/hooks/useColorScheme', () => ({
   useColorScheme: jest.fn(() => 'light'),
 }));
