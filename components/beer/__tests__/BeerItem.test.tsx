@@ -236,8 +236,8 @@ describe('BeerItem', () => {
       <BeerItem beer={mockBeer} isExpanded={false} onToggle={mockOnToggle} />
     );
 
-    // Should use default "Date Added" label
-    expect(getByText(/Date Added:/)).toBeTruthy();
+    // Should use default "Added" label
+    expect(getByText(/Added/)).toBeTruthy();
   });
 
   // Test 12: Renders beer name fallback

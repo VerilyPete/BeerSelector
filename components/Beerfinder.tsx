@@ -39,7 +39,6 @@ export const Beerfinder = () => {
   // Responsive layout: 1 column on phone, 2 on tablet portrait, 3 on tablet landscape
   const { numColumns } = useBreakpoint();
 
-  const colorScheme = useColorScheme();
   const { queuedCheckIn, isLoading: checkinLoading } = useQueuedCheckIn();
   const [queueModalVisible, setQueueModalVisible] = useState(false);
   const [queuedBeers, setQueuedBeers] = useState<QueuedBeer[]>([]);
