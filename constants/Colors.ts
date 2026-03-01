@@ -1,144 +1,127 @@
 /**
- * Beer-Themed Color System for BeerSelector App
+ * BeerSelector Color System — Red Accent Dark Theme
  *
- * The palette draws inspiration from craft beer colors (amber, stout, IPA gold)
- * while maintaining excellent contrast ratios for accessibility (WCAG 2.1 AA).
+ * Dark mode: Near-black backgrounds with red (#FF0000) accent
+ * Light mode: Clean whites with muted red accent
  *
- * Light mode: Warm cream backgrounds with stout-dark text
- * Dark mode: Deep rich backgrounds with cream-light text
+ * Design variable mapping:
+ *   $bg-primary     → background
+ *   $bg-elevated    → backgroundSecondary
+ *   $bg-active      → backgroundElevated
+ *   $border-primary → border
+ *   $border-divider → separator
+ *   $text-primary   → text
+ *   $text-secondary → textSecondary
+ *   $accent-red     → tint
  */
 
 export const Colors = {
   light: {
-    // Core - Beer-themed palette
-    text: '#292524', // Stout Dark - Primary text
-    textSecondary: '#57534E', // Stout Medium - Secondary text
-    textMuted: '#78716C', // Stout Light - Tertiary text, icons
-    background: '#FAFAFA', // Background Primary - Main screen backgrounds
-    backgroundSecondary: '#F5F5F0', // Background Secondary - Card backgrounds, slight warmth
-    backgroundElevated: '#FFFFFF', // Background Elevated - Modal backgrounds, elevated cards
+    text: '#1A1A1A',
+    textSecondary: '#666666',
+    textMuted: '#999999',
+    background: '#FFFFFF',
+    backgroundSecondary: '#F5F5F5',
+    backgroundElevated: '#E5E5E5',
 
-    // Brand - Amber/IPA themed
-    tint: '#D97706', // Amber Primary - Primary buttons, active states
-    tintHover: '#B45309', // Amber Hover - Button pressed states
-    accent: '#FCD34D', // IPA Gold - Highlights, badges
-    accentMuted: '#FDE68A', // IPA Gold Muted - Soft highlights
+    tint: '#DC2626',
+    tintHover: '#B91C1C',
+    accent: '#FF0000',
+    accentMuted: '#FECACA',
 
-    // Icons and Tab Bar
-    icon: '#78716C', // Stout Light
-    iconActive: '#D97706', // Amber Primary
-    tabIconDefault: '#78716C', // Stout Light
-    tabIconSelected: '#D97706', // Amber Primary
+    icon: '#999999',
+    iconActive: '#DC2626',
+    tabIconDefault: '#999999',
+    tabIconSelected: '#DC2626',
 
-    // Borders
-    border: '#E7E5E4', // Border Light - Card borders
-    borderFocused: '#D97706', // Amber Primary
+    border: '#E5E5E5',
+    borderFocused: '#DC2626',
 
-    // Status colors - Beer-inspired
-    success: '#16A34A', // Hop Green - Success states, available
-    error: '#DC2626', // Porter Red - Error states, alerts
-    warning: '#F59E0B', // Amber warning
-    info: '#2196F3', // Info blue
+    success: '#16A34A',
+    error: '#DC2626',
+    warning: '#F59E0B',
+    info: '#2196F3',
 
-    // Status backgrounds (for badges, alerts)
-    successBg: '#95de64',
-    errorBg: '#ff7875',
-    warningBg: '#ffc53d',
-    infoBg: '#69c0ff',
+    successBg: '#DCFCE7',
+    errorBg: '#FEE2E2',
+    warningBg: '#FEF3C7',
+    infoBg: '#DBEAFE',
 
-    // Status borders
-    successBorder: '#73d13d',
-    errorBorder: '#ffa39e',
-    warningBorder: '#ffa940',
-    infoBorder: '#40a9ff',
+    successBorder: '#86EFAC',
+    errorBorder: '#FCA5A5',
+    warningBorder: '#FCD34D',
+    infoBorder: '#93C5FD',
 
-    // UI elements
-    textOnPrimary: '#FFFFFF', // Text on amber/colored buttons
-    textOnStatus: '#FFFFFF', // Always white for text on colored status badges
-    overlay: 'rgba(0, 0, 0, 0.4)', // Modal overlays
+    textOnPrimary: '#FFFFFF',
+    textOnStatus: '#FFFFFF',
+    overlay: 'rgba(0, 0, 0, 0.4)',
     backgroundTertiary: 'rgba(150, 150, 150, 0.1)',
 
-    // Skeleton loading
     skeletonBase: '#F5F5F5',
     skeletonHighlight: '#E0E0E0',
 
-    // Separators
-    separator: 'rgba(128, 128, 128, 0.2)',
+    separator: '#E5E5E5',
 
-    // Brand colors
-    untappd: '#FFCC00', // Untappd Yellow
-    untappdPink: '#E91E63', // Untappd brand pink
-    link: '#0a7ea4',
-    destructive: '#ff3b30',
-    visitorBadge: '#FFB74D', // Visitor mode badge
+    untappd: '#FFCC00',
+    untappdPink: '#E91E63',
+    link: '#DC2626',
+    destructive: '#DC2626',
+    visitorBadge: '#FFB74D',
 
-    // Glass effects
     glassTint: 'rgba(255, 255, 255, 0.7)',
   },
   dark: {
-    // Core - Beer-themed palette
-    text: '#FAFAF9', // Cream Light - Primary text
-    textSecondary: '#E7E5E4', // Cream Medium - Secondary text
-    textMuted: '#A8A29E', // Cream Muted - Tertiary text, icons
-    background: '#0C0A09', // Background Primary - Main screen backgrounds
-    backgroundSecondary: '#1C1917', // Background Secondary - Card backgrounds
-    backgroundElevated: '#292524', // Background Elevated - Modal backgrounds, elevated cards
+    text: '#FFFFFF',
+    textSecondary: '#666666',
+    textMuted: '#888888',
+    background: '#0C0C0C',
+    backgroundSecondary: '#1A1A1A',
+    backgroundElevated: '#333333',
 
-    // Brand - Amber/IPA themed (brighter for dark mode)
-    tint: '#F59E0B', // Amber Primary - Primary buttons, active states
-    tintHover: '#FBBF24', // Amber Hover - Button pressed states
-    accent: '#FCD34D', // IPA Gold - Highlights, badges
-    accentMuted: '#92400E', // IPA Gold Muted - Soft highlights (darker for dark mode)
+    tint: '#FF0000',
+    tintHover: '#CC0000',
+    accent: '#FF0000',
+    accentMuted: '#330000',
 
-    // Icons and Tab Bar
-    icon: '#A8A29E', // Cream Muted
-    iconActive: '#F59E0B', // Amber Primary
-    tabIconDefault: '#A8A29E', // Cream Muted
-    tabIconSelected: '#F59E0B', // Amber Primary
+    icon: '#666666',
+    iconActive: '#FF0000',
+    tabIconDefault: '#666666',
+    tabIconSelected: '#FF0000',
 
-    // Borders
-    border: '#44403C', // Border Dark - Card borders
-    borderFocused: '#F59E0B', // Amber Primary
+    border: '#333333',
+    borderFocused: '#FF0000',
 
-    // Status colors - Beer-inspired (brighter for dark mode)
-    success: '#4ADE80', // Hop Green - Success states, available
-    error: '#F87171', // Porter Red - Error states, alerts
-    warning: '#FBBF24', // Amber warning
-    info: '#60A5FA', // Info blue
+    success: '#4ADE80',
+    error: '#F87171',
+    warning: '#FBBF24',
+    info: '#60A5FA',
 
-    // Status backgrounds (for badges, alerts)
-    successBg: '#52c41a',
-    errorBg: '#ff4d4f',
-    warningBg: '#d48806',
-    infoBg: '#1890ff',
+    successBg: '#052e16',
+    errorBg: '#450a0a',
+    warningBg: '#451a03',
+    infoBg: '#172554',
 
-    // Status borders
-    successBorder: '#73d13d',
-    errorBorder: '#ff7875',
-    warningBorder: '#faad14',
-    infoBorder: '#40a9ff',
+    successBorder: '#22c55e',
+    errorBorder: '#ef4444',
+    warningBorder: '#f59e0b',
+    infoBorder: '#3b82f6',
 
-    // UI elements
-    textOnPrimary: '#000000', // Text on amber/colored buttons
-    textOnStatus: '#FFFFFF', // Always white for text on colored status badges
-    overlay: 'rgba(0, 0, 0, 0.7)', // Modal overlays
+    textOnPrimary: '#0C0C0C',
+    textOnStatus: '#FFFFFF',
+    overlay: 'rgba(0, 0, 0, 0.7)',
     backgroundTertiary: 'rgba(150, 150, 150, 0.1)',
 
-    // Skeleton loading
-    skeletonBase: '#1C1C1E',
-    skeletonHighlight: '#2C2C2E',
+    skeletonBase: '#1A1A1A',
+    skeletonHighlight: '#333333',
 
-    // Separators
-    separator: 'rgba(128, 128, 128, 0.2)',
+    separator: '#1A1A1A',
 
-    // Brand colors
-    untappd: '#FFCC00', // Untappd Yellow
-    untappdPink: '#E91E63', // Untappd brand pink
-    link: '#60A5FA',
-    destructive: '#ff453a',
-    visitorBadge: '#FFB74D', // Visitor mode badge
+    untappd: '#FFCC00',
+    untappdPink: '#E91E63',
+    link: '#FF0000',
+    destructive: '#FF0000',
+    visitorBadge: '#FFB74D',
 
-    // Glass effects
     glassTint: 'rgba(0, 0, 0, 0.5)',
   },
 };

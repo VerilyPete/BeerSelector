@@ -1,15 +1,11 @@
 import React, { useCallback } from 'react';
-import { StyleSheet, View, TouchableOpacity, ScrollView } from 'react-native';
+import { StyleSheet, View, TouchableOpacity, Text } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { ThemedText } from '../ThemedText';
 import { IconSymbol, IconSymbolName } from '../ui/IconSymbol';
 import BeerIcon from '../icons/BeerIcon';
-import { useThemeColor } from '@/hooks/useThemeColor';
-import { spacing } from '@/constants/spacing';
+import { Colors } from '@/constants/Colors';
+import { useColorScheme } from '@/hooks/useColorScheme';
 import { ContainerFilter, SortOption, SortDirection } from '@/hooks/useBeerFilters';
-
-/** Minimum touch target size per Apple HIG */
-const CHIP_MIN_HEIGHT = 44;
 
 type FilterBarProps = {
   containerFilter: ContainerFilter;
@@ -21,14 +17,14 @@ type FilterBarProps = {
 };
 
 const CONTAINER_LABELS: Record<ContainerFilter, string> = {
-  all: 'All',
-  draft: 'Draft',
-  cans: 'Cans',
+  all: 'ALL',
+  draft: 'DRAFT',
+  cans: 'CANS',
 };
 
 const SORT_LABELS: Record<SortOption, string> = {
-  date: 'Date',
-  name: 'Name',
+  date: 'DATE',
+  name: 'NAME',
   abv: 'ABV',
 };
 
@@ -39,13 +35,11 @@ const SORT_ICONS: Record<SortOption, IconSymbolName> = {
 };
 
 const DIRECTION_LABELS: Record<SortOption, Record<SortDirection, string>> = {
-  date: { asc: 'Oldest', desc: 'Newest' },
-  name: { asc: 'A–Z', desc: 'Z–A' },
-  abv: { asc: 'Low', desc: 'High' },
+  date: { asc: 'OLD ↓', desc: 'NEW ↓' },
+  name: { asc: 'A-Z ↓', desc: 'Z-A ↓' },
+  abv: { asc: 'LOW ↓', desc: 'HIGH ↓' },
 };
 
-// These maps duplicate the cycling logic from nextContainerFilter/nextSortOption
-// in useBeerFilters.ts. Keep them in sync when adding/removing filter or sort options.
 const NEXT_CONTAINER: Record<ContainerFilter, string> = {
   all: 'Draft',
   draft: 'Cans',
@@ -61,13 +55,8 @@ const FilterBarComponent: React.FC<FilterBarProps> = ({
   onCycleSort,
   onToggleSortDirection,
 }) => {
-  const tint = useThemeColor({}, 'tint');
-  const textOnPrimary = useThemeColor({}, 'textOnPrimary');
-  const backgroundSecondary = useThemeColor({}, 'backgroundSecondary');
-  const text = useThemeColor({}, 'text');
-  const border = useThemeColor({}, 'border');
-  const backgroundElevated = useThemeColor({}, 'backgroundElevated');
-
+  const colorScheme = useColorScheme() ?? 'dark';
+  const colors = Colors[colorScheme];
   const isContainerActive = containerFilter !== 'all';
 
   const handleContainerPress = useCallback(() => {
@@ -87,25 +76,15 @@ const FilterBarComponent: React.FC<FilterBarProps> = ({
 
   return (
     <View style={styles.container} testID="filter-bar">
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-        bounces={false}
-      >
-        {/* Container filter button */}
+      <View style={styles.chipRow}>
+        {/* Container filter chip */}
         <TouchableOpacity
-          style={{
-            minHeight: CHIP_MIN_HEIGHT,
-            paddingVertical: spacing.sm,
-            paddingHorizontal: spacing.m,
-            borderRadius: CHIP_MIN_HEIGHT / 2,
-            borderWidth: 1,
-            justifyContent: 'center',
-            alignItems: 'center',
-            backgroundColor: isContainerActive ? tint : backgroundSecondary,
-            borderColor: isContainerActive ? 'transparent' : border,
-          }}
+          style={[
+            styles.chip,
+            isContainerActive
+              ? { backgroundColor: colors.tint }
+              : { borderWidth: 1, borderColor: colors.border },
+          ]}
           onPress={handleContainerPress}
           activeOpacity={0.7}
           testID="filter-container-button"
@@ -113,26 +92,19 @@ const FilterBarComponent: React.FC<FilterBarProps> = ({
           accessibilityState={{ selected: isContainerActive }}
           accessibilityLabel={`Container filter: ${CONTAINER_LABELS[containerFilter]}. Double tap to show ${NEXT_CONTAINER[containerFilter]}.`}
         >
-          <ThemedText
-            style={[styles.chipText, { color: isContainerActive ? textOnPrimary : text }]}
+          <Text
+            style={[
+              styles.chipText,
+              { color: isContainerActive ? colors.textOnPrimary : colors.textSecondary },
+            ]}
           >
             {CONTAINER_LABELS[containerFilter]}
-          </ThemedText>
+          </Text>
         </TouchableOpacity>
 
-        {/* Sort button */}
+        {/* Sort chip */}
         <TouchableOpacity
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            minHeight: CHIP_MIN_HEIGHT,
-            paddingVertical: spacing.sm,
-            paddingHorizontal: spacing.m,
-            borderRadius: CHIP_MIN_HEIGHT / 2,
-            borderWidth: 1,
-            backgroundColor: backgroundElevated,
-            borderColor: border,
-          }}
+          style={[styles.chip, { borderWidth: 1, borderColor: colors.border, flexDirection: 'row', gap: 6 }]}
           onPress={handleSortPress}
           activeOpacity={0.7}
           testID="sort-toggle-button"
@@ -140,65 +112,53 @@ const FilterBarComponent: React.FC<FilterBarProps> = ({
           accessibilityLabel={`Sort by ${SORT_LABELS[sortBy]}. Double tap to sort by ${NEXT_SORT[sortBy]}.`}
         >
           {sortBy === 'abv' ? (
-            <BeerIcon name="bottle" size={16} color={text} style={styles.sortIcon} />
+            <BeerIcon name="bottle" size={14} color={colors.textSecondary} />
           ) : (
-            <IconSymbol name={SORT_ICONS[sortBy]} size={16} color={text} style={styles.sortIcon} />
+            <IconSymbol name={SORT_ICONS[sortBy]} size={14} color={colors.textSecondary} />
           )}
-          <ThemedText style={[styles.sortButtonText, { color: text }]} testID="sort-button-text">
+          <Text style={[styles.chipText, { color: colors.textSecondary }]} testID="sort-button-text">
             {SORT_LABELS[sortBy]}
-          </ThemedText>
+          </Text>
         </TouchableOpacity>
 
-        {/* Sort direction button */}
+        {/* Sort direction chip */}
         <TouchableOpacity
-          style={{
-            alignItems: 'center',
-            justifyContent: 'center',
-            minHeight: CHIP_MIN_HEIGHT,
-            minWidth: 62,
-            paddingVertical: spacing.sm,
-            paddingHorizontal: spacing.m,
-            borderRadius: CHIP_MIN_HEIGHT / 2,
-            borderWidth: 1,
-            backgroundColor: backgroundElevated,
-            borderColor: border,
-          }}
+          style={[styles.chip, { borderWidth: 1, borderColor: colors.border }]}
           onPress={handleDirectionPress}
           activeOpacity={0.7}
           testID="sort-direction-button"
           accessibilityRole="button"
-          accessibilityLabel={`Sort: ${DIRECTION_LABELS[sortBy][sortDirection]}. Double tap for ${DIRECTION_LABELS[sortBy][sortDirection === 'asc' ? 'desc' : 'asc']}.`}
+          accessibilityLabel={`Sort: ${DIRECTION_LABELS[sortBy][sortDirection].replace(' ↓', '')}. Double tap for ${DIRECTION_LABELS[sortBy][sortDirection === 'asc' ? 'desc' : 'asc'].replace(' ↓', '')}.`}
         >
-          <ThemedText style={[styles.chipText, { color: text }]}>
+          <Text style={[styles.chipText, { color: colors.textSecondary }]}>
             {DIRECTION_LABELS[sortBy][sortDirection]}
-          </ThemedText>
+          </Text>
         </TouchableOpacity>
-      </ScrollView>
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: spacing.s,
+    marginBottom: 8,
+    paddingHorizontal: 24,
   },
-  scrollContent: {
-    paddingHorizontal: spacing.m,
-    paddingVertical: spacing.xs,
+  chipRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  chip: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
     alignItems: 'center',
-    gap: spacing.s,
+    justifyContent: 'center',
   },
   chipText: {
-    fontSize: 14,
+    fontFamily: 'Inter',
+    fontSize: 10,
     fontWeight: '600',
-    letterSpacing: 0.2,
-  },
-  sortButtonText: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  sortIcon: {
-    marginRight: spacing.xs,
+    letterSpacing: 2,
   },
 });
 

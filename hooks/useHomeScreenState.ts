@@ -12,16 +12,13 @@ export type HomeScreenView = 'loading' | 'setup' | 'visitor' | 'member';
  * User data available from the session
  */
 export type HomeScreenUserData = {
-  /** Member name (first name if available, otherwise username) */
   memberName?: string;
-  /** User's email address */
   email?: string;
-  /** Store ID the user is logged into */
   storeId?: string;
-  /** Store name */
   storeName?: string;
-  /** Member ID from Flying Saucer */
   memberId?: string;
+  tastedBeerCount: number;
+  allBeerCount: number;
 };
 
 /**
@@ -115,7 +112,7 @@ export type UseHomeScreenStateReturn = {
  * @returns Object containing view state, user data, and navigation actions
  */
 export const useHomeScreenState = (): UseHomeScreenStateReturn => {
-  const { session } = useAppContext();
+  const { session, beers } = useAppContext();
   const [apiUrlsConfigured, setApiUrlsConfigured] = useState<boolean | null>(null);
 
   /**
@@ -192,6 +189,8 @@ export const useHomeScreenState = (): UseHomeScreenStateReturn => {
       storeId: session.storeId,
       storeName: session.storeName,
       memberId: session.memberId,
+      tastedBeerCount: beers.tastedBeers.length,
+      allBeerCount: beers.allBeers.length,
     };
   }, [
     session.isLoggedIn,
@@ -202,6 +201,8 @@ export const useHomeScreenState = (): UseHomeScreenStateReturn => {
     session.storeId,
     session.storeName,
     session.memberId,
+    beers.tastedBeers.length,
+    beers.allBeers.length,
   ]);
 
   // Navigation actions (memoized to prevent new object creation on every render)

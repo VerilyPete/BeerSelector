@@ -1,55 +1,33 @@
 import React, { useEffect } from 'react';
-import { StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { router, useLocalSearchParams } from 'expo-router';
-import { IconSymbol } from '@/components/ui/IconSymbol';
-
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
-import { useThemeColor } from '@/hooks/useThemeColor';
+import { Ionicons } from '@expo/vector-icons';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { Colors } from '@/constants/Colors';
-import { spacing, borderRadii } from '@/constants/spacing';
 
-// Import extracted components
 import LoginWebView from '@/components/LoginWebView';
 import AboutSection from '@/components/settings/AboutSection';
 import DataManagementSection from '@/components/settings/DataManagementSection';
 import WelcomeSection from '@/components/settings/WelcomeSection';
 import DeveloperSection from '@/components/settings/DeveloperSection';
 
-// Import custom hooks
 import { useLoginFlow } from '@/hooks/useLoginFlow';
 import { useSettingsState } from '@/hooks/useSettingsState';
 import { useSettingsRefresh } from '@/hooks/useSettingsRefresh';
 import { useAppContext } from '@/context/AppContext';
 
 export default function SettingsScreen() {
-  // Safe area insets for proper positioning
   const insets = useSafeAreaInsets();
+  const colorScheme = useColorScheme() ?? 'dark';
+  const colors = Colors[colorScheme];
 
-  // Theme colors
-  const tintColor = useThemeColor({}, 'tint');
-  const colorScheme = useColorScheme() ?? 'light';
-  const backgroundSecondaryColor = useThemeColor(
-    { light: Colors.light.backgroundSecondary, dark: Colors.dark.backgroundSecondary },
-    'background'
-  );
-  const closeButtonBgColor = useThemeColor(
-    { light: 'rgba(120, 120, 128, 0.12)', dark: 'rgba(120, 120, 128, 0.32)' },
-    'background'
-  );
-
-  // URL search params
   const { action } = useLocalSearchParams<{ action?: string }>();
 
-  // App context for refreshing beer data and session
   const { refreshBeerData, refreshSession } = useAppContext();
 
-  // Custom hooks for state management
   const { apiUrlsConfigured, isFirstLogin, canGoBack, loadPreferences } = useSettingsState();
-
   const { refreshing, handleRefresh } = useSettingsRefresh();
 
   const {
@@ -60,17 +38,13 @@ export default function SettingsScreen() {
     handleLoginCancel,
   } = useLoginFlow({
     onRefreshData: async () => {
-      // Silent mode: suppress success alerts during automatic login refresh
       await handleRefresh(true);
       await loadPreferences();
-      // Reload session to update visitor mode status
       await refreshSession();
-      // Reload beer data into AppContext after refresh
       await refreshBeerData();
     },
   });
 
-  // Auto-open login dialog if action=login is in URL params
   useEffect(() => {
     if (action === 'login') {
       startMemberLogin();
@@ -78,10 +52,9 @@ export default function SettingsScreen() {
   }, [action, startMemberLogin]);
 
   return (
-    <ThemedView style={[styles.container, { backgroundColor: backgroundSecondaryColor }]}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
 
-      {/* Login WebView Modal */}
       <LoginWebView
         visible={loginWebViewVisible}
         onLoginSuccess={handleLoginSuccess}
@@ -90,28 +63,24 @@ export default function SettingsScreen() {
         loading={isLoggingIn}
       />
 
-      {/* Back button - only show if not first login and we can go back */}
-      {!isFirstLogin && canGoBack && (
-        <TouchableOpacity
-          testID="back-button"
-          style={[styles.backButton, { backgroundColor: closeButtonBgColor, top: insets.top + 12 }]}
-          onPress={() => router.back()}
-        >
-          <IconSymbol name="xmark" size={16} color={tintColor} weight="semibold" />
-        </TouchableOpacity>
-      )}
-
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + spacing.m }]}
+        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 16 }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Title Section */}
-        <ThemedText type="title" style={styles.pageTitle}>
-          Settings
-        </ThemedText>
+        <View style={styles.headerRow}>
+          <Text style={[styles.pageTitle, { color: colors.text }]}>Settings</Text>
+          {!isFirstLogin && canGoBack && (
+            <TouchableOpacity
+              testID="back-button"
+              style={[styles.closeButton, { backgroundColor: colors.backgroundActive }]}
+              onPress={() => router.back()}
+            >
+              <Ionicons name="close" size={16} color={colors.text} />
+            </TouchableOpacity>
+          )}
+        </View>
 
-        {/* Welcome Section - First Login Only */}
         {isFirstLogin && (
           <WelcomeSection
             onLogin={startMemberLogin}
@@ -120,7 +89,6 @@ export default function SettingsScreen() {
           />
         )}
 
-        {/* Data Management Section */}
         {(!isFirstLogin || apiUrlsConfigured) && (
           <DataManagementSection
             apiUrlsConfigured={apiUrlsConfigured}
@@ -133,13 +101,11 @@ export default function SettingsScreen() {
           />
         )}
 
-        {/* About Section */}
         <AboutSection />
 
-        {/* Developer Tools Section - Only visible in development mode */}
         <DeveloperSection />
       </ScrollView>
-    </ThemedView>
+    </View>
   );
 }
 
@@ -151,23 +117,26 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: spacing.m,
-    paddingBottom: spacing.xxl,
+    paddingHorizontal: 24,
+    paddingBottom: 48,
   },
-  backButton: {
-    position: 'absolute',
-    right: spacing.m,
-    zIndex: 10,
-    width: 30,
-    height: 30,
-    borderRadius: borderRadii.full,
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    justifyContent: 'center',
+    marginBottom: 24,
+    marginTop: 8,
   },
   pageTitle: {
-    fontSize: 34,
+    fontFamily: 'Inter',
+    fontSize: 28,
     fontWeight: '700',
-    marginBottom: spacing.l,
-    marginTop: spacing.xs,
+    letterSpacing: -0.5,
+  },
+  closeButton: {
+    width: 30,
+    height: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

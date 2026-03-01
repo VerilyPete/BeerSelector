@@ -1,58 +1,37 @@
-import { StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
+import { StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, View, Text } from 'react-native';
 import React from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import * as Haptics from 'expo-haptics';
 import Animated from 'react-native-reanimated';
 
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
+import { IconSymbol } from '@/components/ui/IconSymbol';
 import { useColorScheme } from '@/hooks/useColorScheme';
-import { useThemeColor } from '@/hooks/useThemeColor';
 import { useHomeScreenState, HomeScreenView } from '@/hooks/useHomeScreenState';
 import { Colors } from '@/constants/Colors';
-import { spacing, borderRadii } from '@/constants/spacing';
-import { getShadow } from '@/constants/shadows';
 import { useAnimatedPress } from '@/animations';
 
-/**
- * Navigation card data structure
- */
-type NavigationCardProps = {
-  title: string;
-  description: string;
-  onPress: () => void;
-  disabled?: boolean;
-  testID?: string;
-} & (
-  | { iconFamily: 'ionicons'; iconName: React.ComponentProps<typeof Ionicons>['name'] }
-  | {
-      iconFamily: 'material-community';
-      iconName: React.ComponentProps<typeof MaterialCommunityIcons>['name'];
-    }
-);
+const PROGRESS_GOAL = 200;
 
-/**
- * Navigation Card Component
- * Renders an elevated card with icon, title, and description
- * Includes animated press feedback for a polished feel
- */
 function NavigationCard({
   title,
   description,
   iconName,
-  iconFamily,
+  iconColor,
   onPress,
   disabled = false,
   testID,
-}: NavigationCardProps) {
-  const colorScheme = useColorScheme() ?? 'light';
-  const isDark = colorScheme === 'dark';
+}: {
+  title: string;
+  description: string;
+  iconName: string;
+  iconColor?: string;
+  onPress: () => void;
+  disabled?: boolean;
+  testID?: string;
+}) {
+  const colorScheme = useColorScheme() ?? 'dark';
   const colors = Colors[colorScheme];
-  const borderColor = useThemeColor({}, 'border');
-
-  // Animation hooks
   const { animatedStyle: pressStyle, onPressIn, onPressOut } = useAnimatedPress({ disabled });
 
   const handlePress = () => {
@@ -68,234 +47,58 @@ function NavigationCard({
       onPressOut={onPressOut}
       disabled={disabled}
       activeOpacity={1}
-      style={styles.cardTouchable}
+      style={disabled ? { opacity: 0.5 } : undefined}
       accessibilityRole="button"
       accessibilityLabel={title}
       accessibilityHint={description}
       accessibilityState={{ disabled }}
     >
       <Animated.View style={pressStyle}>
-        <ThemedView
-          variant="elevated"
-          style={[
-            styles.navigationCard,
-            getShadow('md', isDark),
-            { borderColor },
-            disabled && styles.cardDisabled,
-          ]}
-        >
-          <ThemedView
-            variant="elevated"
-            style={[styles.iconContainer, { backgroundColor: colors.tint }]}
-          >
-            {iconFamily === 'ionicons' ? (
-              <Ionicons name={iconName} size={28} color={colors.textOnPrimary} />
-            ) : (
-              <MaterialCommunityIcons name={iconName} size={28} color={colors.textOnPrimary} />
-            )}
-          </ThemedView>
-          <ThemedView variant="elevated" style={styles.cardContent}>
-            <ThemedText type="defaultSemiBold" style={styles.cardTitle}>
-              {title}
-            </ThemedText>
-            <ThemedText type="muted" style={styles.cardDescription}>
-              {description}
-            </ThemedText>
-          </ThemedView>
-          <Ionicons
-            name="chevron-forward"
-            size={24}
-            color={colors.textMuted}
-            style={styles.chevron}
-          />
-        </ThemedView>
+        <View style={[styles.navCard, { borderColor: colors.border }]}>
+          <Ionicons name={iconName as any} size={22} color={iconColor ?? colors.text} />
+          <View style={styles.navCardText}>
+            <Text style={[styles.navCardTitle, { color: colors.text }]}>{title}</Text>
+            <Text style={[styles.navCardDesc, { color: colors.textSecondary }]}>{description}</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+        </View>
       </Animated.View>
     </TouchableOpacity>
   );
 }
 
-/**
- * Welcome Card Component
- * Shows personalized greeting for members or visitor welcome message
- */
-function WelcomeCard({
-  memberName,
-  storeName,
-  isVisitor,
-}: {
-  memberName?: string;
-  storeName?: string;
-  isVisitor: boolean;
-}) {
-  const colorScheme = useColorScheme() ?? 'light';
-  const isDark = colorScheme === 'dark';
-  const colors = Colors[colorScheme];
-  const borderColor = useThemeColor({}, 'border');
+function MetricCard({ tastedCount, colors }: { tastedCount: number; colors: typeof Colors.dark }) {
+  const progress = Math.min(tastedCount / PROGRESS_GOAL, 1);
+  const percentage = (progress * 100).toFixed(1);
 
   return (
-    <ThemedView
-      variant="elevated"
-      style={[styles.welcomeCard, getShadow('md', isDark), { borderColor }]}
-    >
-      <ThemedView variant="elevated" style={styles.welcomeHeader}>
-        <ThemedView
-          variant="elevated"
-          style={[
-            styles.welcomeIconContainer,
-            { backgroundColor: isVisitor ? colors.visitorBadge : colors.tint },
-          ]}
-        >
-          <Ionicons
-            name={isVisitor ? 'person-outline' : 'beer-outline'}
-            size={32}
-            color={isVisitor ? '#000000' : colors.textOnPrimary}
-          />
-        </ThemedView>
-        <ThemedView variant="elevated" style={styles.welcomeTextContainer}>
-          <ThemedText type="muted" style={styles.welcomeLabel}>
-            {isVisitor ? 'Guest Mode' : 'Welcome back'}
-          </ThemedText>
-          <ThemedText type="subtitle" style={styles.welcomeName}>
-            {isVisitor ? 'Visitor' : memberName || 'Beer Enthusiast'}
-          </ThemedText>
-          {!isVisitor && storeName && (
-            <ThemedText type="muted" style={styles.storeName}>
-              {storeName}
-            </ThemedText>
-          )}
-        </ThemedView>
-      </ThemedView>
-      {isVisitor && (
-        <ThemedView variant="elevated" style={styles.visitorNote}>
-          <ThemedText type="muted" style={styles.visitorNoteText}>
-            Log in with your UFO Club account to access all features including Beerfinder, Tasted
-            Brews, and Rewards.
-          </ThemedText>
-        </ThemedView>
-      )}
-    </ThemedView>
+    <View style={[styles.metricCard, { borderColor: colors.border }]}>
+      <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>BEERS TASTED</Text>
+      <View style={styles.metricRow}>
+        <Text style={[styles.metricNumber, { color: colors.text }]}>{tastedCount}</Text>
+        <Text style={[styles.metricTotal, { color: colors.textSecondary }]}>/200</Text>
+      </View>
+      <View style={[styles.progressTrack, { backgroundColor: colors.border }]}>
+        <View style={[styles.progressFill, { backgroundColor: colors.tint, width: `${progress * 100}%` }]} />
+      </View>
+      <Text style={[styles.progressLabel, { color: colors.textSecondary }]}>
+        {percentage}% UFO Club Progress
+      </Text>
+    </View>
   );
 }
 
-/**
- * Settings Button Component
- * Fixed position button in the top right corner
- * Includes animated press feedback
- * Uses safe area insets to position below status bar
- */
-function SettingsButton({ onPress, topInset }: { onPress: () => void; topInset: number }) {
-  const colorScheme = useColorScheme() ?? 'light';
-  const colors = Colors[colorScheme];
-
-  // Animation hooks
-  const { animatedStyle: pressStyle, onPressIn, onPressOut } = useAnimatedPress();
-
-  const handlePress = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    onPress();
-  };
-
-  return (
-    <TouchableOpacity
-      testID="settings-nav-button"
-      style={[styles.settingsButton, { top: topInset + spacing.sm }]}
-      onPress={handlePress}
-      onPressIn={onPressIn}
-      onPressOut={onPressOut}
-      activeOpacity={1}
-      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-      accessibilityRole="button"
-      accessibilityLabel="Open settings"
-    >
-      <Animated.View
-        style={[
-          styles.settingsButtonInner,
-          { backgroundColor: colors.backgroundTertiary },
-          pressStyle,
-        ]}
-      >
-        <Ionicons name="settings-outline" size={24} color={colors.icon} />
-      </Animated.View>
-    </TouchableOpacity>
-  );
-}
-
-/**
- * Loading View Component
- */
-function LoadingView() {
-  const tintColor = useThemeColor({}, 'tint');
-
-  return (
-    <ThemedView style={styles.centeredContainer}>
-      <ActivityIndicator size="large" color={tintColor} />
-    </ThemedView>
-  );
-}
-
-/**
- * Setup View Component
- * Shown when API URLs are not configured
- * Includes animated press feedback on the login button
- */
-function SetupView({ onLoginPress }: { onLoginPress: () => void }) {
-  const colorScheme = useColorScheme() ?? 'light';
-  const isDark = colorScheme === 'dark';
-  const colors = Colors[colorScheme];
-
-  // Animation hooks
-  const { animatedStyle: pressStyle, onPressIn, onPressOut } = useAnimatedPress();
-
-  const handlePress = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    onLoginPress();
-  };
-
-  return (
-    <ThemedView style={styles.centeredContainer}>
-      <ThemedView variant="elevated" style={[styles.setupCard, getShadow('lg', isDark)]}>
-        <ThemedView
-          variant="elevated"
-          style={[styles.setupIconContainer, { backgroundColor: colors.tint }]}
-        >
-          <Ionicons name="beer" size={48} color={colors.textOnPrimary} />
-        </ThemedView>
-        <ThemedText type="title" style={styles.setupTitle}>
-          Welcome to Beer Selector
-        </ThemedText>
-        <ThemedText type="secondary" style={styles.setupDescription}>
-          Log in to your UFO Club account or continue as a visitor to explore the taplist.
-        </ThemedText>
-        <TouchableOpacity
-          onPress={handlePress}
-          onPressIn={onPressIn}
-          onPressOut={onPressOut}
-          activeOpacity={1}
-        >
-          <Animated.View style={[styles.loginButton, { backgroundColor: colors.tint }, pressStyle]}>
-            <ThemedText style={[styles.loginButtonText, { color: colors.textOnPrimary }]}>
-              Get Started
-            </ThemedText>
-          </Animated.View>
-        </TouchableOpacity>
-      </ThemedView>
-    </ThemedView>
-  );
-}
-
-/**
- * Main Home Screen View
- * Renders navigation cards based on user mode (visitor/member)
- */
 function MainHomeView({
   view,
   memberName,
   storeName,
+  tastedBeerCount,
   actions,
 }: {
   view: HomeScreenView;
   memberName?: string;
   storeName?: string;
+  tastedBeerCount: number;
   actions: {
     navigateToSettings: () => void;
     navigateToAllBeers: () => void;
@@ -306,104 +109,151 @@ function MainHomeView({
 }) {
   const isVisitor = view === 'visitor';
   const insets = useSafeAreaInsets();
+  const colorScheme = useColorScheme() ?? 'dark';
+  const colors = Colors[colorScheme];
 
   return (
-    <ThemedView style={styles.container}>
-      <SettingsButton onPress={actions.navigateToSettings} topInset={insets.top} />
-
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={[
-          styles.scrollContent,
-          { paddingTop: insets.top + spacing.xxl + spacing.m },
-        ]}
+        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Welcome Card */}
-        <WelcomeCard memberName={memberName} storeName={storeName} isVisitor={isVisitor} />
+        {/* Settings gear - top right */}
+        <View style={styles.settingsRow}>
+          <TouchableOpacity
+            testID="settings-nav-button"
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              actions.navigateToSettings();
+            }}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            accessibilityRole="button"
+            accessibilityLabel="Open settings"
+          >
+            <Ionicons name="settings-outline" size={22} color={colors.textSecondary} />
+          </TouchableOpacity>
+        </View>
 
-        {/* Navigation Section Title */}
-        <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>
-          Explore
-        </ThemedText>
+        {/* Hero section */}
+        <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>
+          {isVisitor ? 'GUEST MODE' : 'WELCOME BACK'}
+        </Text>
+        <Text style={[styles.heroName, { color: colors.text }]}>
+          {isVisitor ? 'Visitor' : memberName || 'Beer Enthusiast'}
+        </Text>
+        {!isVisitor && storeName && (
+          <View style={styles.storeRow}>
+            <Ionicons name="location-sharp" size={14} color={colors.tint} />
+            <Text style={[styles.storeName, { color: colors.textSecondary }]}>
+              Flying Saucer — {storeName}
+            </Text>
+          </View>
+        )}
 
-        {/* All Beers Card - Always visible */}
-        <NavigationCard
-          testID="nav-all-beers"
-          title="All Beers"
-          description="Browse the complete taplist at your location"
-          iconName="beer-outline"
-          iconFamily="ionicons"
-          onPress={actions.navigateToAllBeers}
-        />
+        {/* Metric card - members only */}
+        {!isVisitor && (
+          <View style={{ marginTop: 32 }}>
+            <MetricCard tastedCount={tastedBeerCount} colors={colors} />
+          </View>
+        )}
 
-        {/* Beerfinder Card - Member only */}
-        <NavigationCard
-          testID="nav-beerfinder"
-          title="Beerfinder"
-          description={
-            isVisitor
-              ? "Log in to find beers you haven't tasted"
-              : "Find beers you haven't tasted yet"
-          }
-          iconName="glass-mug-variant"
-          iconFamily="material-community"
-          onPress={actions.navigateToBeerfinder}
-          disabled={isVisitor}
-        />
+        {/* Navigation section */}
+        <View style={{ marginTop: 32 }}>
+          <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>EXPLORE</Text>
+          <View style={{ marginTop: 16, gap: 16 }}>
+            <NavigationCard
+              testID="nav-all-beers"
+              title="All Beers"
+              description="Browse the complete taplist"
+              iconName="beer-outline"
+              onPress={actions.navigateToAllBeers}
+            />
+            <NavigationCard
+              testID="nav-beerfinder"
+              title="Beerfinder"
+              description={isVisitor ? "Log in to find untasted beers" : "Find beers you haven't tasted"}
+              iconName="search-outline"
+              onPress={actions.navigateToBeerfinder}
+              disabled={isVisitor}
+            />
+            <NavigationCard
+              testID="nav-tasted-brews"
+              title="Tasted Brews"
+              description={isVisitor ? 'Log in to track your history' : 'View your tasting history'}
+              iconName="checkmark-circle-outline"
+              iconColor={colors.tint}
+              onPress={actions.navigateToTastedBrews}
+              disabled={isVisitor}
+            />
+            <NavigationCard
+              testID="nav-rewards"
+              title="Rewards"
+              description={isVisitor ? 'Log in to view rewards' : 'View your UFO Club rewards'}
+              iconName="gift-outline"
+              onPress={actions.navigateToRewards}
+              disabled={isVisitor}
+            />
+          </View>
+        </View>
 
-        {/* Tasted Brews Card - Member only */}
-        <NavigationCard
-          testID="nav-tasted-brews"
-          title="Tasted Brews"
-          description={
-            isVisitor
-              ? 'Log in to track your tasting history'
-              : 'View your tasting history and progress'
-          }
-          iconName="checkmark-done-circle-outline"
-          iconFamily="ionicons"
-          onPress={actions.navigateToTastedBrews}
-          disabled={isVisitor}
-        />
-
-        {/* Rewards Card - Member only */}
-        <NavigationCard
-          testID="nav-rewards"
-          title="Rewards"
-          description={
-            isVisitor
-              ? 'Log in to view your UFO Club rewards'
-              : 'View and redeem your UFO Club rewards'
-          }
-          iconName="gift-outline"
-          iconFamily="ionicons"
-          onPress={actions.navigateToRewards}
-          disabled={isVisitor}
-        />
-
-        {/* Bottom spacing */}
-        <ThemedView style={styles.bottomSpacer} />
+        <View style={{ height: 40 }} />
       </ScrollView>
-    </ThemedView>
+    </View>
   );
 }
 
-/**
- * Home Screen Component
- * Main entry point that uses useHomeScreenState hook for state management
- */
+function LoadingView() {
+  const colorScheme = useColorScheme() ?? 'dark';
+  const colors = Colors[colorScheme];
+  return (
+    <View style={[styles.centered, { backgroundColor: colors.background }]}>
+      <ActivityIndicator size="large" color={colors.tint} />
+    </View>
+  );
+}
+
+function SetupView({ onLoginPress }: { onLoginPress: () => void }) {
+  const colorScheme = useColorScheme() ?? 'dark';
+  const colors = Colors[colorScheme];
+  const { animatedStyle: pressStyle, onPressIn, onPressOut } = useAnimatedPress();
+
+  return (
+    <View style={[styles.centered, { backgroundColor: colors.background }]}>
+      <View style={[styles.setupCard, { borderColor: colors.border }]}>
+        <Ionicons name="beer" size={48} color={colors.tint} style={{ marginBottom: 24 }} />
+        <Text style={[styles.heroName, { color: colors.text, textAlign: 'center', marginBottom: 12 }]}>
+          Beer Selector
+        </Text>
+        <Text style={[styles.storeName, { color: colors.textSecondary, textAlign: 'center', marginBottom: 24 }]}>
+          Log in to your UFO Club account or browse as a visitor.
+        </Text>
+        <TouchableOpacity
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            onLoginPress();
+          }}
+          onPressIn={onPressIn}
+          onPressOut={onPressOut}
+          activeOpacity={1}
+        >
+          <Animated.View style={[styles.loginButton, { backgroundColor: colors.tint }, pressStyle]}>
+            <Text style={[styles.loginButtonText, { color: colors.textOnPrimary }]}>Get Started</Text>
+          </Animated.View>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
 export default function HomeScreen() {
   const { view, userData, actions } = useHomeScreenState();
 
-  // Handle different view states
   switch (view) {
     case 'loading':
       return <LoadingView />;
-
     case 'setup':
       return <SetupView onLoginPress={actions.navigateToSettings} />;
-
     case 'visitor':
     case 'member':
       return (
@@ -411,180 +261,59 @@ export default function HomeScreen() {
           view={view}
           memberName={userData?.memberName}
           storeName={userData?.storeName}
+          tastedBeerCount={userData?.tastedBeerCount ?? 0}
           actions={actions}
         />
       );
-
     default:
       return <LoadingView />;
   }
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: spacing.m,
-    // paddingTop is set dynamically using safe area insets
-    paddingBottom: spacing.xl,
-  },
-  centeredContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: spacing.l,
-  },
+  container: { flex: 1 },
+  scrollView: { flex: 1 },
+  scrollContent: { paddingHorizontal: 24, paddingBottom: 24 },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24 },
 
-  // Settings Button
-  settingsButton: {
-    position: 'absolute',
-    // top is set dynamically using safe area insets
-    right: spacing.m,
-    zIndex: 10,
-  },
-  settingsButtonInner: {
-    width: 44,
-    height: 44,
-    borderRadius: borderRadii.full,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+  settingsRow: { flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 8 },
 
-  // Welcome Card
-  welcomeCard: {
-    borderRadius: borderRadii.l,
-    borderWidth: 1,
-    padding: spacing.m,
-    marginBottom: spacing.l,
-  },
-  welcomeHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  welcomeIconContainer: {
-    width: 64,
-    height: 64,
-    borderRadius: borderRadii.l,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  welcomeTextContainer: {
-    flex: 1,
-    marginLeft: spacing.m,
-  },
-  welcomeLabel: {
-    fontSize: 12,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  welcomeName: {
-    marginTop: spacing.xs,
-  },
-  storeName: {
-    marginTop: spacing.xs,
-    fontSize: 14,
-  },
-  visitorNote: {
-    marginTop: spacing.m,
-    paddingTop: spacing.m,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(128, 128, 128, 0.3)',
-  },
-  visitorNoteText: {
-    fontSize: 13,
-    lineHeight: 18,
-  },
-
-  // Section Title
-  sectionTitle: {
-    fontSize: 18,
-    marginBottom: spacing.sm,
-    marginTop: spacing.s,
-  },
-
-  // Navigation Cards
-  cardTouchable: {
-    marginBottom: spacing.sm,
-  },
-  navigationCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: borderRadii.l,
-    borderWidth: 1,
-    padding: spacing.m,
-    minHeight: 80, // Ensures adequate touch target
-  },
-  cardDisabled: {
-    opacity: 0.5,
-  },
-  iconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: borderRadii.m,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  cardContent: {
-    flex: 1,
-    marginLeft: spacing.m,
-    marginRight: spacing.s,
-  },
-  cardTitle: {
-    fontSize: 17,
-    marginBottom: spacing.xs,
-  },
-  cardDescription: {
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  chevron: {
-    marginLeft: 'auto',
-  },
-
-  // Setup View
-  setupCard: {
-    borderRadius: borderRadii.xl,
-    padding: spacing.xl,
-    alignItems: 'center',
-    maxWidth: 340,
-    width: '100%',
-  },
-  setupIconContainer: {
-    width: 88,
-    height: 88,
-    borderRadius: borderRadii.full,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: spacing.l,
-  },
-  setupTitle: {
-    fontSize: 28,
-    textAlign: 'center',
-    marginBottom: spacing.m,
-  },
-  setupDescription: {
-    textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: spacing.l,
-  },
-  loginButton: {
-    paddingVertical: spacing.m,
-    paddingHorizontal: spacing.xl,
-    borderRadius: borderRadii.xl,
-    minWidth: 180,
-    alignItems: 'center',
-  },
-  loginButtonText: {
-    fontSize: 17,
+  sectionLabel: {
+    fontFamily: 'Inter',
+    fontSize: 10,
     fontWeight: '600',
+    letterSpacing: 3,
   },
+  heroName: {
+    fontFamily: 'Inter',
+    fontSize: 28,
+    fontWeight: '700',
+    letterSpacing: -0.5,
+    marginTop: 8,
+  },
+  storeRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
+  storeName: { fontFamily: 'Space Mono', fontSize: 11 },
 
-  // Bottom Spacer
-  bottomSpacer: {
-    height: spacing.xl,
+  metricCard: { borderWidth: 1, padding: 24, gap: 12 },
+  metricRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 4 },
+  metricNumber: { fontFamily: 'Inter', fontSize: 72, fontWeight: '800', letterSpacing: -4, lineHeight: 64 },
+  metricTotal: { fontFamily: 'Space Mono', fontSize: 24, fontWeight: '700', marginBottom: 4 },
+  progressTrack: { height: 4, width: '100%' },
+  progressFill: { height: '100%' },
+  progressLabel: { fontFamily: 'Space Mono', fontSize: 11 },
+
+  navCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    gap: 16,
+    borderWidth: 1,
   },
+  navCardText: { flex: 1, gap: 2 },
+  navCardTitle: { fontFamily: 'Inter', fontSize: 15, fontWeight: '500' },
+  navCardDesc: { fontFamily: 'Space Mono', fontSize: 11 },
+
+  setupCard: { borderWidth: 1, padding: 32, alignItems: 'center', maxWidth: 340, width: '100%' },
+  loginButton: { paddingVertical: 14, paddingHorizontal: 32, alignItems: 'center' },
+  loginButtonText: { fontFamily: 'Inter', fontSize: 15, fontWeight: '600', letterSpacing: 2 },
 });

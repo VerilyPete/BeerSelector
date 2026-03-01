@@ -1,28 +1,29 @@
 import React from 'react';
-import { StyleSheet, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
 import { Rewards } from '@/components/Rewards';
-import { useThemeColor } from '@/hooks/useThemeColor';
+import { useColorScheme } from '@/hooks/useColorScheme';
+import { Colors } from '@/constants/Colors';
 import { router } from 'expo-router';
-import { IconSymbol } from '@/components/ui/IconSymbol';
+import { Ionicons } from '@expo/vector-icons';
 
 export function RewardsScreen() {
-  const tintColor = useThemeColor({}, 'tint');
+  const colorScheme = useColorScheme() ?? 'dark';
+  const colors = Colors[colorScheme];
 
   return (
-    <ThemedView style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <SafeAreaView style={{ flex: 1 }} edges={['top', 'right', 'left']}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <IconSymbol name="chevron.left" size={24} color={tintColor} />
-        </TouchableOpacity>
-        <ThemedText type="title" style={styles.title}>
-          Rewards
-        </ThemedText>
+        <View style={styles.headerRow}>
+          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+            <Ionicons name="chevron-back" size={22} color={colors.text} />
+          </TouchableOpacity>
+          <Text style={[styles.title, { color: colors.text }]}>Rewards</Text>
+          <View style={styles.backButton} />
+        </View>
         <Rewards />
       </SafeAreaView>
-    </ThemedView>
+    </View>
   );
 }
 
@@ -30,17 +31,25 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 16,
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 24,
     marginTop: 8,
-    marginLeft: 16,
+    marginBottom: 16,
+  },
+  title: {
+    fontFamily: 'Inter',
+    fontSize: 28,
+    fontWeight: '700',
+    letterSpacing: -0.5,
   },
   backButton: {
-    marginLeft: 16,
-    marginTop: 8,
-    padding: 4,
+    width: 30,
+    height: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
 

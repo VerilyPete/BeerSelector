@@ -1,53 +1,18 @@
 import React from 'react';
-import { View, StyleSheet, ViewStyle } from 'react-native';
-
-import { ThemedText } from '@/components/ThemedText';
-import { useThemeColor } from '@/hooks/useThemeColor';
+import { View, Text, StyleSheet, ViewStyle } from 'react-native';
+import { useColorScheme } from '@/hooks/useColorScheme';
 import { Colors } from '@/constants/Colors';
-import { spacing, borderRadii } from '@/constants/spacing';
 import SettingsSection from './SettingsSection';
 import SettingsItem from './SettingsItem';
 
-/**
- * Props for WelcomeSection component
- */
 type WelcomeSectionProps = {
-  /**
-   * Callback when user taps login button
-   */
   onLogin: () => void;
-
-  /**
-   * Whether login is in progress (disables button)
-   */
   loginLoading: boolean;
-
-  /**
-   * Whether any refresh is in progress (disables button)
-   */
   refreshing: boolean;
-
-  /**
-   * Custom style for the container
-   */
   style?: ViewStyle;
-
-  /**
-   * Test ID for testing
-   */
   testID?: string;
 };
 
-/**
- * WelcomeSection Component
- *
- * Displays first-login welcome message with:
- * - Welcome message card
- * - Login action using SettingsItem
- *
- * Shown only on first app launch before API URLs are configured.
- * Uses the new SettingsSection and SettingsItem components.
- */
 export default function WelcomeSection({
   onLogin,
   loginLoading,
@@ -55,47 +20,34 @@ export default function WelcomeSection({
   style,
   testID = 'welcome-section',
 }: WelcomeSectionProps) {
-  const backgroundElevatedColor = useThemeColor(
-    { light: Colors.light.backgroundElevated, dark: Colors.dark.backgroundElevated },
-    'background'
-  );
-  const borderColor = useThemeColor(
-    { light: Colors.light.border, dark: Colors.dark.border },
-    'background'
-  );
-  const textSecondaryColor = useThemeColor(
-    { light: Colors.light.textSecondary, dark: Colors.dark.textSecondary },
-    'text'
-  );
+  const colorScheme = useColorScheme() ?? 'dark';
+  const colors = Colors[colorScheme];
 
   const isDisabled = loginLoading || refreshing;
 
   return (
     <View style={style} testID={testID}>
-      {/* Welcome Message Card */}
       <View
         style={[
           styles.welcomeCard,
           {
-            backgroundColor: backgroundElevatedColor,
-            borderColor: borderColor,
+            backgroundColor: colors.backgroundElevated,
+            borderColor: colors.border,
           },
         ]}
       >
-        <ThemedText style={styles.welcomeTitle}>Welcome to Beer Selector</ThemedText>
-        <ThemedText style={[styles.welcomeText, { color: textSecondaryColor }]}>
+        <Text style={[styles.welcomeTitle, { color: colors.text }]}>Welcome to Beer Selector</Text>
+        <Text style={[styles.welcomeText, { color: colors.textSecondary }]}>
           Track your UFO Club progress, discover new beers, and never miss a tap takeover.
-        </ThemedText>
+        </Text>
       </View>
 
-      {/* Account Section with Login */}
       <SettingsSection
         title="Get Started"
         footer="Sign in with your UFO Club account to track your tasted beers, or continue as a visitor to browse taplists."
       >
         <SettingsItem
           icon="person.crop.circle.badge.plus"
-          iconBackgroundColor={Colors.light.tint}
           title={loginLoading ? 'Signing in...' : 'Sign In to Flying Saucer'}
           subtitle="Access your UFO Club account"
           accessoryType={loginLoading ? 'loading' : 'chevron'}
@@ -111,21 +63,22 @@ export default function WelcomeSection({
 
 const styles = StyleSheet.create({
   welcomeCard: {
-    borderRadius: borderRadii.l,
-    borderWidth: StyleSheet.hairlineWidth,
-    padding: spacing.l,
-    marginBottom: spacing.l,
+    borderWidth: 1,
+    padding: 24,
+    marginBottom: 24,
     alignItems: 'center',
   },
   welcomeTitle: {
+    fontFamily: 'Inter',
     fontSize: 24,
     fontWeight: '700',
-    marginBottom: spacing.s,
+    marginBottom: 8,
     textAlign: 'center',
   },
   welcomeText: {
-    fontSize: 16,
-    lineHeight: 22,
+    fontFamily: 'Space Mono',
+    fontSize: 11,
+    lineHeight: 18,
     textAlign: 'center',
   },
 });

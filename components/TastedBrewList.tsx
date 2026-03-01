@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { StyleSheet, View, TouchableOpacity } from 'react-native';
-import { ThemedText } from './ThemedText';
-import { useThemeColor } from '@/hooks/useThemeColor';
+import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
+import { useColorScheme } from '@/hooks/useColorScheme';
+import { Colors } from '@/constants/Colors';
 import { useBreakpoint } from '@/hooks/useBreakpoint';
 import { SearchBar } from './SearchBar';
 import { useBeerFilters } from '@/hooks/useBeerFilters';
@@ -48,8 +48,8 @@ export const TastedBrewList = () => {
     toggleExpand,
   } = useBeerFilters(beers.tastedBeers, 'tasted_date');
 
-  // Theme colors
-  const activeButtonColor = useThemeColor({}, 'tint');
+  const colorScheme = useColorScheme() ?? 'dark';
+  const colors = Colors[colorScheme];
 
   // Use the shared data refresh hook
   // Use AppContext's refreshBeerData to reload from database after refresh
@@ -120,12 +120,12 @@ export const TastedBrewList = () => {
         </>
       ) : errors.beerError ? (
         <View style={styles.centered}>
-          <ThemedText style={styles.errorText}>{errors.beerError}</ThemedText>
+          <Text style={[styles.errorText, { color: colors.error }]}>{errors.beerError}</Text>
           <TouchableOpacity
-            style={[styles.refreshButton, { backgroundColor: activeButtonColor }]}
+            style={[styles.refreshButton, { backgroundColor: colors.tint }]}
             onPress={handleRefresh}
           >
-            <ThemedText style={[styles.buttonText, { color: 'white' }]}>Try Again</ThemedText>
+            <Text style={[styles.buttonText, { color: colors.textOnPrimary }]}>Try Again</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -138,9 +138,9 @@ export const TastedBrewList = () => {
               placeholder="Search tasted beer..."
             />
             <View style={styles.beerCountContainer}>
-              <ThemedText style={styles.beerCount}>
-                {filteredBeers.length} {filteredBeers.length === 1 ? 'brew' : 'brews'} tasted
-              </ThemedText>
+              <Text style={[styles.beerCount, { color: colors.textSecondary }]}>
+                {filteredBeers.length} beers tasted
+              </Text>
             </View>
 
             <FilterBar
@@ -181,10 +181,11 @@ const styles = StyleSheet.create({
   },
   beerCountContainer: {
     marginBottom: 8,
-    paddingHorizontal: 16,
+    paddingHorizontal: 24,
   },
   beerCount: {
-    fontWeight: '600',
+    fontFamily: 'Space Mono',
+    fontSize: 11,
   },
   centered: {
     flex: 1,

@@ -1,10 +1,8 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { View, StyleSheet, Alert } from 'react-native';
+import { View, Text, StyleSheet, Alert } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { ThemedText } from '@/components/ThemedText';
-import { useThemeColor } from '@/hooks/useThemeColor';
+import { useColorScheme } from '@/hooks/useColorScheme';
 import { Colors } from '@/constants/Colors';
-import { spacing } from '@/constants/spacing';
 import { beerRepository } from '@/src/database/repositories/BeerRepository';
 import { myBeersRepository } from '@/src/database/repositories/MyBeersRepository';
 import { rewardsRepository } from '@/src/database/repositories/RewardsRepository';
@@ -14,9 +12,6 @@ import { clearSessionData } from '@/src/api/sessionManager';
 import SettingsSection from './SettingsSection';
 import SettingsItem from './SettingsItem';
 
-/**
- * Helper function to extract error message from unknown error type
- */
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) {
     return error.message;
@@ -29,12 +24,9 @@ export default function DeveloperSection() {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const isMountedRef = useRef(true);
 
-  const textMutedColor = useThemeColor(
-    { light: Colors.light.textMuted, dark: Colors.dark.textMuted },
-    'text'
-  );
+  const colorScheme = useColorScheme() ?? 'dark';
+  const colors = Colors[colorScheme];
 
-  // Track mounted state to prevent memory leaks
   useEffect(() => {
     return () => {
       isMountedRef.current = false;
@@ -226,7 +218,6 @@ Tasted Beers: ${lastMyBeersRefresh ? new Date(parseInt(lastMyBeersRefresh)).toLo
     );
   }, []);
 
-  // Only render in development mode - after all hooks are called
   if (!__DEV__) {
     return null;
   }
@@ -237,10 +228,8 @@ Tasted Beers: ${lastMyBeersRefresh ? new Date(parseInt(lastMyBeersRefresh)).toLo
         title="Developer Tools"
         footer={`Environment: ${process.env.NODE_ENV || 'development'} | __DEV__: ${__DEV__ ? 'true' : 'false'}`}
       >
-        {/* Database Statistics */}
         <SettingsItem
           icon="chart.bar.fill"
-          iconBackgroundColor="#5856D6"
           title="Database Statistics"
           subtitle={dbStats || 'View database counts and refresh times'}
           accessoryType={isLoading ? 'loading' : 'chevron'}
@@ -248,10 +237,8 @@ Tasted Beers: ${lastMyBeersRefresh ? new Date(parseInt(lastMyBeersRefresh)).toLo
           disabled={isLoading}
         />
 
-        {/* Clear Refresh Timestamps */}
         <SettingsItem
           icon="clock.arrow.circlepath"
-          iconBackgroundColor={Colors.light.warning}
           title="Clear Refresh Timestamps"
           subtitle="Force data refresh on next start"
           accessoryType="chevron"
@@ -259,10 +246,8 @@ Tasted Beers: ${lastMyBeersRefresh ? new Date(parseInt(lastMyBeersRefresh)).toLo
           disabled={isLoading}
         />
 
-        {/* View Preferences */}
         <SettingsItem
           icon="gearshape.fill"
-          iconBackgroundColor={Colors.light.textMuted}
           title="View Preferences"
           subtitle="Display all app preference values"
           accessoryType="chevron"
@@ -270,10 +255,8 @@ Tasted Beers: ${lastMyBeersRefresh ? new Date(parseInt(lastMyBeersRefresh)).toLo
           disabled={isLoading}
         />
 
-        {/* Create Mock Session */}
         <SettingsItem
           icon="flask.fill"
-          iconBackgroundColor={Colors.light.success}
           title="Create Mock Session"
           subtitle="Create a mock session for testing"
           accessoryType="chevron"
@@ -284,7 +267,6 @@ Tasted Beers: ${lastMyBeersRefresh ? new Date(parseInt(lastMyBeersRefresh)).toLo
         />
       </SettingsSection>
 
-      {/* Danger Zone */}
       <SettingsSection title="Danger Zone" footer="Warning: This action cannot be undone.">
         <SettingsItem
           icon="arrow.counterclockwise"
@@ -298,20 +280,20 @@ Tasted Beers: ${lastMyBeersRefresh ? new Date(parseInt(lastMyBeersRefresh)).toLo
         />
       </SettingsSection>
 
-      {/* Dev Mode Indicator */}
-      <ThemedText style={[styles.devModeText, { color: textMutedColor }]}>
+      <Text style={[styles.devModeText, { color: colors.textSecondary }]}>
         Development mode - hidden in production builds
-      </ThemedText>
+      </Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   devModeText: {
-    fontSize: 12,
+    fontFamily: 'Space Mono',
+    fontSize: 11,
     textAlign: 'center',
     fontStyle: 'italic',
-    marginTop: spacing.s,
-    marginBottom: spacing.m,
+    marginTop: 8,
+    marginBottom: 16,
   },
 });

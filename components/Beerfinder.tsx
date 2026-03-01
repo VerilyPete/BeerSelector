@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import {
   StyleSheet,
   View,
+  Text,
   TouchableOpacity,
   Alert,
   ActivityIndicator,
@@ -9,10 +10,10 @@ import {
   FlatList,
   Platform,
 } from 'react-native';
-import { ThemedText } from './ThemedText';
-import { useThemeColor } from '@/hooks/useThemeColor';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useUntappdColor } from '@/hooks/useUntappdColor';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { Colors } from '@/constants/Colors';
 import { useBreakpoint } from '@/hooks/useBreakpoint';
 import { SearchBar } from './SearchBar';
 import { router, Href } from 'expo-router';
@@ -75,16 +76,9 @@ export const Beerfinder = () => {
     toggleExpand,
   } = useBeerFilters(untastedBeers);
 
-  // Theme colors
-  const activeButtonColor = useThemeColor({}, 'tint');
+  const colorScheme = useColorScheme() ?? 'dark';
+  const colors = Colors[colorScheme];
   const untappdColor = useUntappdColor();
-  const cardColor = useThemeColor({}, 'background');
-  const borderColor = useThemeColor({}, 'border');
-  const textOnPrimary = useThemeColor({}, 'textOnPrimary');
-  const errorColor = useThemeColor({}, 'error');
-  const errorBgColor = useThemeColor({}, 'errorBg');
-  const errorBorderColor = useThemeColor({}, 'errorBorder');
-  const overlayColor = useThemeColor({}, 'overlay');
 
   // Use the shared data refresh hook
   // Use AppContext's refreshBeerData to reload from database after refresh
@@ -269,19 +263,19 @@ export const Beerfinder = () => {
         disabled={checkinLoading}
       >
         {checkinLoading ? (
-          <ActivityIndicator size="small" color={textOnPrimary} />
+          <ActivityIndicator size="small" color={colors.textOnPrimary} />
         ) : (
-          <ThemedText
+          <Text
             style={[
               styles.checkInButtonText,
               {
-                color: textOnPrimary,
+                color: colors.textOnPrimary,
               },
             ]}
             numberOfLines={1}
           >
-            Check Me In!
-          </ThemedText>
+            CHECK IN
+          </Text>
         )}
       </TouchableOpacity>
 
@@ -296,17 +290,17 @@ export const Beerfinder = () => {
         onPress={() => handleUntappdSearch(item.brew_name)}
         activeOpacity={0.7}
       >
-        <ThemedText
+        <Text
           style={[
             styles.checkInButtonText,
             {
-              color: textOnPrimary,
+              color: colors.textOnPrimary,
             },
           ]}
           numberOfLines={1}
         >
           Untappd
-        </ThemedText>
+        </Text>
       </TouchableOpacity>
     </View>
   );
@@ -318,15 +312,15 @@ export const Beerfinder = () => {
       visible={queueModalVisible}
       onRequestClose={() => setQueueModalVisible(false)}
     >
-      <View style={[styles.modalOverlay, { backgroundColor: overlayColor }]}>
-        <View style={[styles.modalContent, { backgroundColor: cardColor, borderColor }]}>
-          <ThemedText style={styles.modalTitle}>Queued Brews</ThemedText>
+      <View style={[styles.modalOverlay, { backgroundColor: colors.overlay }]}>
+        <View style={[styles.modalContent, { backgroundColor: colors.background, borderColor: colors.border }]}>
+          <Text style={styles.modalTitle}>Queued Brews</Text>
 
           {queueError ? (
             <View style={styles.queueErrorContainer}>
-              <ThemedText style={[styles.queueErrorText, { color: errorColor }]}>
+              <Text style={[styles.queueErrorText, { color: colors.error }]}>
                 {queueError}
-              </ThemedText>
+              </Text>
               <TouchableOpacity
                 style={[
                   styles.retryButton,
@@ -338,34 +332,34 @@ export const Beerfinder = () => {
                 disabled={loadingQueues}
               >
                 {loadingQueues ? (
-                  <ActivityIndicator size="small" color={textOnPrimary} />
+                  <ActivityIndicator size="small" color={colors.textOnPrimary} />
                 ) : (
-                  <ThemedText style={[styles.retryButtonText, { color: textOnPrimary }]}>
+                  <Text style={[styles.retryButtonText, { color: colors.textOnPrimary }]}>
                     Try Again
-                  </ThemedText>
+                  </Text>
                 )}
               </TouchableOpacity>
             </View>
           ) : queuedBeers.length === 0 ? (
-            <ThemedText style={styles.noQueuesText}>No beer currently in queue</ThemedText>
+            <Text style={styles.noQueuesText}>No beer currently in queue</Text>
           ) : (
             <FlatList
               data={queuedBeers}
               keyExtractor={item => item.id}
               renderItem={({ item }) => (
-                <View style={[styles.queuedBeerItem, { borderColor }]}>
+                <View style={[styles.queuedBeerItem, { borderColor: colors.border }]}>
                   <View style={styles.queuedBeerContent}>
-                    <ThemedText type="defaultSemiBold" style={styles.queuedBeerName}>
+                    <Text style={[styles.queuedBeerName, { color: colors.text }]}>
                       {item.name}
-                    </ThemedText>
-                    <ThemedText style={styles.queuedBeerDate}>{item.date}</ThemedText>
+                    </Text>
+                    <Text style={styles.queuedBeerDate}>{item.date}</Text>
                   </View>
                   <TouchableOpacity
                     style={[
                       styles.deleteButton,
                       {
-                        backgroundColor: errorBgColor,
-                        borderColor: errorBorderColor,
+                        backgroundColor: colors.errorBg,
+                        borderColor: colors.errorBorder,
                       },
                     ]}
                     onPress={() => deleteQueuedBeer(item.id, item.name)}
@@ -374,19 +368,19 @@ export const Beerfinder = () => {
                     {deletingBeerId === item.id ? (
                       <ActivityIndicator
                         size="small"
-                        color={colorScheme === 'dark' ? textOnPrimary : errorColor}
+                        color={colorScheme === 'dark' ? colors.textOnPrimary : colors.error}
                       />
                     ) : (
-                      <ThemedText
+                      <Text
                         style={[
                           styles.deleteButtonText,
                           {
-                            color: colorScheme === 'dark' ? textOnPrimary : errorColor,
+                            color: colorScheme === 'dark' ? colors.textOnPrimary : colors.error,
                           },
                         ]}
                       >
                         Delete
-                      </ThemedText>
+                      </Text>
                     )}
                   </TouchableOpacity>
                 </View>
@@ -405,9 +399,9 @@ export const Beerfinder = () => {
             ]}
             onPress={() => setQueueModalVisible(false)}
           >
-            <ThemedText style={[styles.closeButtonText, { color: textOnPrimary }]}>
+            <Text style={[styles.closeButtonText, { color: colors.textOnPrimary }]}>
               Close
-            </ThemedText>
+            </Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -434,18 +428,18 @@ export const Beerfinder = () => {
                 disabled={loadingQueues}
               >
                 {loadingQueues ? (
-                  <ActivityIndicator size="small" color={textOnPrimary} />
+                  <ActivityIndicator size="small" color={colors.textOnPrimary} />
                 ) : (
-                  <ThemedText
+                  <Text
                     style={[
                       styles.actionButtonText,
                       {
-                        color: textOnPrimary,
+                        color: colors.textOnPrimary,
                       },
                     ]}
                   >
-                    View Queues
-                  </ThemedText>
+                    QUEUE
+                  </Text>
                 )}
               </TouchableOpacity>
 
@@ -458,16 +452,16 @@ export const Beerfinder = () => {
                 ]}
                 onPress={() => router.push('/screens/rewards' as Href)}
               >
-                <ThemedText
+                <Text
                   style={[
                     styles.actionButtonText,
                     {
-                      color: textOnPrimary,
+                      color: colors.textOnPrimary,
                     },
                   ]}
                 >
                   Rewards
-                </ThemedText>
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -475,12 +469,12 @@ export const Beerfinder = () => {
         </>
       ) : errors.beerError ? (
         <View style={styles.centered}>
-          <ThemedText style={styles.errorText}>{errors.beerError}</ThemedText>
+          <Text style={styles.errorText}>{errors.beerError}</Text>
           <TouchableOpacity
-            style={[styles.refreshButton, { backgroundColor: activeButtonColor }]}
+            style={[styles.refreshButton, { backgroundColor: colors.tint }]}
             onPress={handleRefresh}
           >
-            <ThemedText style={[styles.buttonText, { color: textOnPrimary }]}>Try Again</ThemedText>
+            <Text style={[styles.buttonText, { color: colors.textOnPrimary }]}>Try Again</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -499,18 +493,18 @@ export const Beerfinder = () => {
                 disabled={loadingQueues}
               >
                 {loadingQueues ? (
-                  <ActivityIndicator size="small" color={textOnPrimary} />
+                  <ActivityIndicator size="small" color={colors.textOnPrimary} />
                 ) : (
-                  <ThemedText
+                  <Text
                     style={[
                       styles.actionButtonText,
                       {
-                        color: textOnPrimary,
+                        color: colors.textOnPrimary,
                       },
                     ]}
                   >
-                    View Queues
-                  </ThemedText>
+                    QUEUE
+                  </Text>
                 )}
               </TouchableOpacity>
 
@@ -523,16 +517,16 @@ export const Beerfinder = () => {
                 ]}
                 onPress={() => router.push('/screens/rewards' as Href)}
               >
-                <ThemedText
+                <Text
                   style={[
                     styles.actionButtonText,
                     {
-                      color: textOnPrimary,
+                      color: colors.textOnPrimary,
                     },
                   ]}
                 >
                   Rewards
-                </ThemedText>
+                </Text>
               </TouchableOpacity>
             </View>
 
@@ -543,9 +537,9 @@ export const Beerfinder = () => {
               placeholder="Search available beer..."
             />
             <View style={styles.beerCountContainer}>
-              <ThemedText style={styles.beerCount}>
-                {filteredBeers.length} {filteredBeers.length === 1 ? 'brew' : 'brews'} available
-              </ThemedText>
+              <Text style={[styles.beerCount, { color: colors.textSecondary }]}>
+                {filteredBeers.length} beers to discover
+              </Text>
             </View>
 
             <FilterBar
@@ -595,10 +589,11 @@ const styles = StyleSheet.create({
   },
   beerCountContainer: {
     marginBottom: 8,
-    paddingHorizontal: 16,
+    paddingHorizontal: 24,
   },
   beerCount: {
-    fontWeight: '600',
+    fontFamily: 'Space Mono',
+    fontSize: 11,
   },
   centered: {
     flex: 1,
