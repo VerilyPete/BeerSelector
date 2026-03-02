@@ -20,7 +20,7 @@ function BeerListScreen() {
 
   return (
     <View testID="all-beers-container" style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.chromeBar, { height: insets.top, backgroundColor: colors.chromeBar }]} />
+      <View style={[styles.chromeBar, { height: insets.top + 6, backgroundColor: colors.chromeBar }]} />
       <View style={styles.headerContainer}>
         <Text style={[styles.title, { color: colors.text }]}>All Beer</Text>
         <View style={[styles.bellBezel, { backgroundColor: colors.steelBezel, borderColor: colors.steelBezelBorder }]}>

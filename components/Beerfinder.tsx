@@ -10,6 +10,7 @@ import {
   FlatList,
   Platform,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { Colors } from '@/constants/Colors';
@@ -267,7 +268,14 @@ export const Beerfinder = () => {
       onRequestClose={() => setQueueModalVisible(false)}
     >
       <View style={[styles.modalOverlay, { backgroundColor: colors.overlay }]}>
-        <View style={[styles.modalContent, { backgroundColor: colors.background, borderColor: colors.border }]}>
+        <View style={styles.modalChromeShell}>
+          <LinearGradient
+            colors={['#8A919A', '#B8BFC7', '#8A919A'] as const}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+        <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
           <Text style={styles.modalTitle}>Queued Brews</Text>
 
           {queueError ? (
@@ -289,42 +297,20 @@ export const Beerfinder = () => {
               data={queuedBeers}
               keyExtractor={item => item.id}
               renderItem={({ item }) => (
-                <View style={[styles.queuedBeerItem, { borderColor: colors.border }]}>
+                <View style={[styles.queuedBeerItem, { borderColor: colors.accentMuted }]}>
                   <View style={styles.queuedBeerContent}>
-                    <Text style={[styles.queuedBeerName, { color: colors.text }]}>
+                    <Text style={[styles.queuedBeerName, { color: colors.tint }]}>
                       {item.name}
                     </Text>
                     <Text style={styles.queuedBeerDate}>{item.date}</Text>
                   </View>
-                  <TouchableOpacity
-                    style={[
-                      styles.deleteButton,
-                      {
-                        backgroundColor: colors.errorBg,
-                        borderColor: colors.errorBorder,
-                      },
-                    ]}
+                  <ActionButton
+                    label="DELETE"
                     onPress={() => deleteQueuedBeer(item.id, item.name)}
+                    loading={deletingBeerId === item.id}
                     disabled={deletingBeerId === item.id}
-                  >
-                    {deletingBeerId === item.id ? (
-                      <ActivityIndicator
-                        size="small"
-                        color={colorScheme === 'dark' ? colors.textOnPrimary : colors.error}
-                      />
-                    ) : (
-                      <Text
-                        style={[
-                          styles.deleteButtonText,
-                          {
-                            color: colorScheme === 'dark' ? colors.textOnPrimary : colors.error,
-                          },
-                        ]}
-                      >
-                        Delete
-                      </Text>
-                    )}
-                  </TouchableOpacity>
+                    style={{ flex: 0.15 }}
+                  />
                 </View>
               )}
               style={styles.queuesList}
@@ -335,8 +321,9 @@ export const Beerfinder = () => {
           <ActionButton
             label="CLOSE"
             onPress={() => setQueueModalVisible(false)}
-            style={{ flex: 0, marginTop: 16 }}
+            style={{ flex: 0, marginTop: 16, alignSelf: 'flex-end', width: '25%' }}
           />
+        </View>
         </View>
       </View>
     </Modal>
@@ -490,12 +477,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
   },
-  modalContent: {
-    padding: 20,
+  modalChromeShell: {
     borderRadius: 16,
+    overflow: 'hidden',
+    padding: 3,
     width: '90%',
     maxHeight: '80%',
-    borderWidth: 1,
+  },
+  modalContent: {
+    padding: 20,
+    borderRadius: 13,
   },
   modalTitle: {
     fontFamily: 'SpaceGrotesk-Bold',
@@ -546,17 +537,5 @@ const styles = StyleSheet.create({
     fontFamily: 'SpaceMono',
     fontSize: 11,
     opacity: 0.7,
-  },
-  deleteButton: {
-    padding: 8,
-    borderRadius: 6,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: 10,
-    borderWidth: 1,
-  },
-  deleteButtonText: {
-    fontFamily: 'SpaceGrotesk-SemiBold',
-    fontSize: 12,
   },
 });

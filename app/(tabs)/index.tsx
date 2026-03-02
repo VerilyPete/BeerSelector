@@ -61,7 +61,7 @@ function NavigationCard({
               <Ionicons name={iconName as any} size={20} color={iconColor ?? colors.tint} />
             </View>
             <View style={styles.navCardText}>
-              <Text style={[styles.navCardTitle, { color: colors.text }]}>{title}</Text>
+              <Text style={[styles.navCardTitle, { color: colors.tint }]}>{title}</Text>
               <Text style={[styles.navCardDesc, { color: colors.textSecondary }]}>{description}</Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
@@ -125,7 +125,7 @@ function MainHomeView({
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.chromeBar, { height: insets.top, backgroundColor: colors.chromeBar }]} />
+      <View style={[styles.chromeBar, { height: insets.top + 6, backgroundColor: colors.chromeBar }]} />
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
@@ -312,9 +312,8 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   labelPlateText: {
-    fontFamily: 'SpaceMono',
+    fontFamily: 'SpaceGrotesk-Bold',
     fontSize: 9,
-    fontWeight: '700',
     letterSpacing: 2,
   },
   gearBezel: {

@@ -52,7 +52,7 @@ export default function TastedBrewsScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]} testID="tasted-brews-screen">
-      <View style={[styles.chromeBar, { height: insets.top, backgroundColor: colors.chromeBar }]} />
+      <View style={[styles.chromeBar, { height: insets.top + 6, backgroundColor: colors.chromeBar }]} />
       <View style={styles.headerContainer}>
         <Text style={[styles.title, { color: colors.text }]}>Tasted Brews</Text>
 

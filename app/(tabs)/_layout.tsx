@@ -47,7 +47,7 @@ function TerminalTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
             const cfg = TAB_CONFIGS[route.name];
             if (!cfg) return null;
 
-            const activeColor = isFocused ? colors.tint : colors.tabIconDefault;
+            const activeColor = isFocused ? colors.tint : colors.tint;
 
             const onPress = () => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -73,8 +73,14 @@ function TerminalTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
                 ]}
                 activeOpacity={0.7}
               >
-                <IconSymbol name={cfg.icon} size={18} color={activeColor} />
-                <Text style={[styles.tabLabel, { color: activeColor }]}>
+                <View style={!isFocused ? styles.burntIn : undefined}>
+                  <IconSymbol name={cfg.icon} size={18} color={activeColor} />
+                </View>
+                <Text style={[
+                  styles.tabLabel,
+                  { color: activeColor },
+                  !isFocused && styles.burntInText,
+                ]}>
                   {cfg.label}
                 </Text>
               </TouchableOpacity>
@@ -118,6 +124,12 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: '600',
     letterSpacing: 1,
+  },
+  burntIn: {
+    opacity: 0.3,
+  },
+  burntInText: {
+    opacity: 0.3,
   },
 });
 

@@ -50,7 +50,7 @@ export default function MyBeersScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]} testID="beerfinder-screen">
-      <View style={[styles.chromeBar, { height: insets.top, backgroundColor: colors.chromeBar }]} />
+      <View style={[styles.chromeBar, { height: insets.top + 6, backgroundColor: colors.chromeBar }]} />
       <Text style={[styles.title, { color: colors.text }]}>Beerfinder</Text>
       <Beerfinder />
     </View>
