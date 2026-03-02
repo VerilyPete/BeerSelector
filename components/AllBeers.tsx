@@ -2,7 +2,6 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { StyleSheet, View, TouchableOpacity, Text } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { beerRepository } from '@/src/database/repositories/BeerRepository';
-import { useUntappdColor } from '@/hooks/useUntappdColor';
 import { useBreakpoint } from '@/hooks/useBreakpoint';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { Colors } from '@/constants/Colors';
@@ -55,7 +54,6 @@ export const AllBeers = () => {
 
   const colorScheme = useColorScheme() ?? 'dark';
   const colors = Colors[colorScheme];
-  const untappdColor = useUntappdColor();
 
   const loadBeers = useCallback(async () => {
     try {

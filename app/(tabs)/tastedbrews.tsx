@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, View, Text } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
+import { ChromeStatusBar } from '@/components/ui/ChromeStatusBar';
 
 import { TastedBrewList } from '@/components/TastedBrewList';
 import { areApiUrlsConfigured } from '@/src/database/preferences';
@@ -13,7 +13,6 @@ import { Colors } from '@/constants/Colors';
 
 export default function TastedBrewsScreen() {
   const [apiUrlsSet, setApiUrlsSet] = useState<boolean | null>(null);
-  const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme() ?? 'dark';
   const colors = Colors[colorScheme];
 

@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { StyleSheet, TextInput, View, TouchableOpacity } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { IconSymbol } from './ui/IconSymbol';
+import { ChromeShell } from '@/components/ui/ChromeShell';
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import * as Haptics from 'expo-haptics';
@@ -31,18 +31,12 @@ const SearchBarComponent: React.FC<SearchBarProps> = ({
     onClear();
   }, [onClear]);
 
-  const chromeGradient = isFocused
-    ? [colors.tint, colors.tint, colors.tint] as const
-    : ['#8A919A', '#B8BFC7', '#8A919A'] as const;
-
   return (
-    <View style={styles.chromeShell} testID="search-bar">
-      <LinearGradient
-        colors={[...chromeGradient]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={StyleSheet.absoluteFill}
-      />
+    <ChromeShell
+      colors={isFocused ? [colors.tint, colors.tint, colors.tint] : undefined}
+      style={styles.chromeShell}
+      testID="search-bar"
+    >
       <View
         style={[
           styles.container,
@@ -82,7 +76,7 @@ const SearchBarComponent: React.FC<SearchBarProps> = ({
           </TouchableOpacity>
         )}
       </View>
-    </View>
+    </ChromeShell>
   );
 };
 
@@ -90,9 +84,6 @@ export const SearchBar = React.memo(SearchBarComponent);
 
 const styles = StyleSheet.create({
   chromeShell: {
-    borderRadius: 14,
-    overflow: 'hidden',
-    padding: 3,
     marginBottom: 8,
   },
   container: {

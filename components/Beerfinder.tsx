@@ -10,7 +10,7 @@ import {
   FlatList,
   Platform,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { ChromeShell } from '@/components/ui/ChromeShell';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { Colors } from '@/constants/Colors';
@@ -268,63 +268,57 @@ export const Beerfinder = () => {
       onRequestClose={() => setQueueModalVisible(false)}
     >
       <View style={[styles.modalOverlay, { backgroundColor: colors.overlay }]}>
-        <View style={styles.modalChromeShell}>
-          <LinearGradient
-            colors={['#8A919A', '#B8BFC7', '#8A919A'] as const}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={StyleSheet.absoluteFill}
-          />
-        <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
-          <Text style={styles.modalTitle}>Queued Brews</Text>
+        <ChromeShell borderRadius={16} style={{ width: '90%', maxHeight: '80%' }}>
+          <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>Queued Brews</Text>
 
-          {queueError ? (
-            <View style={styles.queueErrorContainer}>
-              <Text style={[styles.queueErrorText, { color: colors.error }]}>
-                {queueError}
-              </Text>
-              <ActionButton
-                label="TRY AGAIN"
-                onPress={viewQueues}
-                loading={loadingQueues}
-                style={{ flex: 0 }}
-              />
-            </View>
-          ) : queuedBeers.length === 0 ? (
-            <Text style={styles.noQueuesText}>No beer currently in queue</Text>
-          ) : (
-            <FlatList
-              data={queuedBeers}
-              keyExtractor={item => item.id}
-              renderItem={({ item }) => (
-                <View style={[styles.queuedBeerItem, { borderColor: colors.accentMuted }]}>
-                  <View style={styles.queuedBeerContent}>
-                    <Text style={[styles.queuedBeerName, { color: colors.tint }]}>
-                      {item.name}
-                    </Text>
-                    <Text style={styles.queuedBeerDate}>{item.date}</Text>
+            {queueError ? (
+              <View style={styles.queueErrorContainer}>
+                <Text style={[styles.queueErrorText, { color: colors.error }]}>
+                  {queueError}
+                </Text>
+                <ActionButton
+                  label="TRY AGAIN"
+                  onPress={viewQueues}
+                  loading={loadingQueues}
+                  style={{ flex: 0 }}
+                />
+              </View>
+            ) : queuedBeers.length === 0 ? (
+              <Text style={[styles.noQueuesText, { color: colors.textSecondary }]}>No beer currently in queue</Text>
+            ) : (
+              <FlatList
+                data={queuedBeers}
+                keyExtractor={item => item.id}
+                renderItem={({ item }) => (
+                  <View style={[styles.queuedBeerItem, { borderColor: colors.accentMuted }]}>
+                    <View style={styles.queuedBeerContent}>
+                      <Text style={[styles.queuedBeerName, { color: colors.tint }]}>
+                        {item.name}
+                      </Text>
+                      <Text style={[styles.queuedBeerDate, { color: colors.textSecondary }]}>{item.date}</Text>
+                    </View>
+                    <ActionButton
+                      label="DELETE"
+                      onPress={() => deleteQueuedBeer(item.id, item.name)}
+                      loading={deletingBeerId === item.id}
+                      disabled={deletingBeerId === item.id}
+                      style={{ flex: 0.15 }}
+                    />
                   </View>
-                  <ActionButton
-                    label="DELETE"
-                    onPress={() => deleteQueuedBeer(item.id, item.name)}
-                    loading={deletingBeerId === item.id}
-                    disabled={deletingBeerId === item.id}
-                    style={{ flex: 0.15 }}
-                  />
-                </View>
-              )}
-              style={styles.queuesList}
-              contentContainerStyle={{ paddingBottom: 10 }}
-            />
-          )}
+                )}
+                style={styles.queuesList}
+                contentContainerStyle={{ paddingBottom: 10 }}
+              />
+            )}
 
-          <ActionButton
-            label="CLOSE"
-            onPress={() => setQueueModalVisible(false)}
-            style={{ flex: 0, marginTop: 16, alignSelf: 'flex-end', width: '25%' }}
-          />
-        </View>
-        </View>
+            <ActionButton
+              label="CLOSE"
+              onPress={() => setQueueModalVisible(false)}
+              style={{ flex: 0, marginTop: 16, alignSelf: 'flex-end', width: '25%' }}
+            />
+          </View>
+        </ChromeShell>
       </View>
     </Modal>
   );
@@ -352,7 +346,7 @@ export const Beerfinder = () => {
         </>
       ) : errors.beerError ? (
         <View style={styles.centered}>
-          <Text style={styles.errorText}>{errors.beerError}</Text>
+          <Text style={[styles.errorText, { color: colors.text }]}>{errors.beerError}</Text>
           <TouchableOpacity
             style={[styles.refreshButton, { backgroundColor: colors.tint }]}
             onPress={handleRefresh}
@@ -476,13 +470,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
-  },
-  modalChromeShell: {
-    borderRadius: 16,
-    overflow: 'hidden',
-    padding: 3,
-    width: '90%',
-    maxHeight: '80%',
   },
   modalContent: {
     padding: 20,

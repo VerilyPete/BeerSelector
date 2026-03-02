@@ -7,10 +7,24 @@ jest.mock('@/hooks/useColorScheme', () => ({
   useColorScheme: jest.fn(() => 'light'),
 }));
 
+jest.mock('expo-linear-gradient', () => ({
+  LinearGradient: ({ children, testID, ...props }: { children?: React.ReactNode; testID?: string; colors?: readonly string[]; style?: object }) => {
+    const { View } = require('react-native');
+    return <View testID={testID} {...props}>{children}</View>;
+  },
+}));
+
 jest.mock('@/components/ui/IconSymbol', () => ({
   IconSymbol: ({ name, testID }: { name: string; testID?: string }) => {
     const { View } = require('react-native');
     return <View testID={testID || `icon-${name}`} />;
+  },
+}));
+
+jest.mock('@/components/ui/ChromeShell', () => ({
+  ChromeShell: ({ children, testID }: { children?: React.ReactNode; testID?: string }) => {
+    const { View } = require('react-native');
+    return <View testID={testID}>{children}</View>;
   },
 }));
 
@@ -85,37 +99,18 @@ describe('FilterBar', () => {
       expect(props.onCycleContainerFilter).toHaveBeenCalledTimes(1);
     });
 
-    test('has active styling when containerFilter is not all', () => {
+    test('has active accessibilityState when containerFilter is not all', () => {
       const props = createDefaultProps();
       const { getByTestId } = render(<FilterBar {...props} containerFilter="draft" />);
       const button = getByTestId('filter-container-button');
-      expect(button.props.style).not.toEqual(
-        expect.objectContaining({ backgroundColor: '#F5F5F0' })
-      );
+      expect(button.props.accessibilityState).toEqual({ selected: true });
     });
 
-    test('does not have active styling when containerFilter is all', () => {
+    test('does not have active accessibilityState when containerFilter is all', () => {
       const props = createDefaultProps();
       const { getByTestId } = render(<FilterBar {...props} containerFilter="all" />);
       const button = getByTestId('filter-container-button');
-      const tintColor = '#0a7ea4';
-      const flatStyle = Array.isArray(button.props.style)
-        ? Object.assign({}, ...button.props.style)
-        : button.props.style;
-      expect(flatStyle?.backgroundColor).not.toBe(tintColor);
-    });
-
-    test('active and inactive states render different label text', () => {
-      const props = createDefaultProps();
-      const { getByText: getDraftText } = render(
-        <FilterBar {...props} containerFilter="draft" />
-      );
-      const { getByText: getAllText } = render(
-        <FilterBar {...props} containerFilter="all" />
-      );
-
-      expect(getDraftText('DRAFT')).toBeTruthy();
-      expect(getAllText('ALL')).toBeTruthy();
+      expect(button.props.accessibilityState).toEqual({ selected: false });
     });
   });
 

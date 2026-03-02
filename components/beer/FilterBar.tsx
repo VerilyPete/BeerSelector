@@ -1,7 +1,7 @@
 import React, { useCallback } from 'react';
 import { StyleSheet, View, TouchableOpacity, Text } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { LinearGradient } from 'expo-linear-gradient';
+import { ChromeShell } from '@/components/ui/ChromeShell';
 import { IconSymbol, IconSymbolName } from '../ui/IconSymbol';
 import BeerIcon from '../icons/BeerIcon';
 import { Colors } from '@/constants/Colors';
@@ -75,8 +75,6 @@ const FilterBarComponent: React.FC<FilterBarProps> = ({
     onToggleSortDirection();
   }, [onToggleSortDirection]);
 
-  const chromeGradient = ['#8A919A', '#B8BFC7', '#8A919A'] as const;
-
   return (
     <View style={styles.container} testID="filter-bar">
       <View style={styles.chipRow}>
@@ -89,26 +87,23 @@ const FilterBarComponent: React.FC<FilterBarProps> = ({
           accessibilityState={{ selected: isContainerActive }}
           accessibilityLabel={`Container filter: ${CONTAINER_LABELS[containerFilter]}. Double tap to show ${NEXT_CONTAINER[containerFilter]}.`}
         >
-          <View style={[styles.chromeShell, isContainerActive && { backgroundColor: colors.tint }]}>
-            {!isContainerActive && (
-              <LinearGradient
-                colors={[...chromeGradient]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={StyleSheet.absoluteFill}
-              />
-            )}
-            <View style={[styles.chipInner, { backgroundColor: isContainerActive ? colors.tint : colors.background }]}>
-              <Text
-                style={[
-                  styles.chipText,
-                  { color: isContainerActive ? colors.textOnPrimary : colors.tint },
-                ]}
-              >
-                {CONTAINER_LABELS[containerFilter]}
-              </Text>
+          {isContainerActive ? (
+            <View style={[styles.chromeShell, { backgroundColor: colors.tint }]}>
+              <View style={[styles.chipInner, { backgroundColor: colors.tint }]}>
+                <Text style={[styles.chipText, { color: colors.textOnPrimary }]}>
+                  {CONTAINER_LABELS[containerFilter]}
+                </Text>
+              </View>
             </View>
-          </View>
+          ) : (
+            <ChromeShell borderRadius={8} padding={1.5}>
+              <View style={[styles.chipInner, { backgroundColor: colors.background }]}>
+                <Text style={[styles.chipText, { color: colors.tint }]}>
+                  {CONTAINER_LABELS[containerFilter]}
+                </Text>
+              </View>
+            </ChromeShell>
+          )}
         </TouchableOpacity>
 
         {/* Sort chip */}
@@ -119,13 +114,7 @@ const FilterBarComponent: React.FC<FilterBarProps> = ({
           accessibilityRole="button"
           accessibilityLabel={`Sort by ${SORT_LABELS[sortBy]}. Double tap to sort by ${NEXT_SORT[sortBy]}.`}
         >
-          <View style={styles.chromeShell}>
-            <LinearGradient
-              colors={[...chromeGradient]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={StyleSheet.absoluteFill}
-            />
+          <ChromeShell borderRadius={8} padding={1.5}>
             <View style={[styles.chipInner, { backgroundColor: colors.background, flexDirection: 'row', gap: 6 }]}>
               {sortBy === 'abv' ? (
                 <BeerIcon name="bottle" size={14} color={colors.tint} />
@@ -136,7 +125,7 @@ const FilterBarComponent: React.FC<FilterBarProps> = ({
                 {SORT_LABELS[sortBy]}
               </Text>
             </View>
-          </View>
+          </ChromeShell>
         </TouchableOpacity>
 
         {/* Sort direction chip */}
@@ -147,19 +136,13 @@ const FilterBarComponent: React.FC<FilterBarProps> = ({
           accessibilityRole="button"
           accessibilityLabel={`Sort: ${DIRECTION_LABELS[sortBy][sortDirection].replace(' ↓', '')}. Double tap for ${DIRECTION_LABELS[sortBy][sortDirection === 'asc' ? 'desc' : 'asc'].replace(' ↓', '')}.`}
         >
-          <View style={styles.chromeShell}>
-            <LinearGradient
-              colors={[...chromeGradient]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={StyleSheet.absoluteFill}
-            />
+          <ChromeShell borderRadius={8} padding={1.5}>
             <View style={[styles.chipInner, { backgroundColor: colors.background }]}>
               <Text style={[styles.chipText, { color: colors.tint }]}>
                 {DIRECTION_LABELS[sortBy][sortDirection]}
               </Text>
             </View>
-          </View>
+          </ChromeShell>
         </TouchableOpacity>
       </View>
     </View>

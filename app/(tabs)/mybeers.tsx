@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, View, Text } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
+import { ChromeStatusBar } from '@/components/ui/ChromeStatusBar';
 
 import { Beerfinder } from '@/components/Beerfinder';
 import { areApiUrlsConfigured } from '@/src/database/preferences';
@@ -11,7 +11,6 @@ import { Colors } from '@/constants/Colors';
 
 export default function MyBeersScreen() {
   const [apiUrlsSet, setApiUrlsSet] = useState<boolean | null>(null);
-  const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme() ?? 'dark';
   const colors = Colors[colorScheme];
 
@@ -50,7 +49,7 @@ export default function MyBeersScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]} testID="beerfinder-screen">
-      <View style={[styles.chromeBar, { height: insets.top + 6, backgroundColor: colors.chromeBar }]} />
+      <ChromeStatusBar />
       <Text style={[styles.title, { color: colors.text }]}>Beerfinder</Text>
       <Beerfinder />
     </View>
@@ -59,10 +58,6 @@ export default function MyBeersScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  chromeBar: {
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.15)',
-  },
   title: {
     fontFamily: 'SpaceGrotesk-Bold',
     fontSize: 26,

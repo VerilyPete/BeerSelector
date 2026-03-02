@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import React, { useEffect } from 'react';
+import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -9,6 +9,7 @@ import { IconSymbol, IconSymbolName } from '@/components/ui/IconSymbol';
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useAppContext } from '@/context/AppContext';
+import { filterVisibleRoutes } from './tabBarFiltering';
 
 type TabConfig = {
   label: string;
@@ -29,13 +30,7 @@ function TerminalTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
   const { session } = useAppContext();
 
-  const visibleRoutes = state.routes.filter((route) => {
-    const cfg = TAB_CONFIGS[route.name];
-    if (!cfg) return false;
-    if (cfg.memberOnly && session.isVisitor) return false;
-    const options = descriptors[route.key].options;
-    return options.href !== null;
-  });
+  const visibleRoutes = filterVisibleRoutes(state.routes, descriptors, session.isVisitor, TAB_CONFIGS);
 
   return (
     <View style={[styles.tabBarOuter, { paddingBottom: Math.max(insets.bottom, 12), backgroundColor: colors.chromeBar }]}>
@@ -47,7 +42,7 @@ function TerminalTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
             const cfg = TAB_CONFIGS[route.name];
             if (!cfg) return null;
 
-            const activeColor = isFocused ? colors.tint : colors.tint;
+            const activeColor = colors.tint;
 
             const onPress = () => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -136,10 +131,6 @@ const styles = StyleSheet.create({
 export default function TabLayout() {
   const { session } = useAppContext();
   const isInVisitorMode = session.isVisitor;
-
-  useEffect(() => {
-    console.log('Tab layout rendering with visitor mode:', isInVisitorMode);
-  }, [isInVisitorMode]);
 
   return (
     <Tabs

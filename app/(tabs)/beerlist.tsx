@@ -1,8 +1,8 @@
 import { StyleSheet, View, Text } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { ChromeStatusBar } from '@/components/ui/ChromeStatusBar';
 import { areApiUrlsConfigured } from '@/src/database/preferences';
 import { checkAndRefreshOnAppOpen } from '@/src/services/dataUpdateService';
 import ErrorBoundary from '@/components/ErrorBoundary';
@@ -14,13 +14,12 @@ import { Colors } from '@/constants/Colors';
 
 function BeerListScreen() {
   const { session } = useAppContext();
-  const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme() ?? 'dark';
   const colors = Colors[colorScheme];
 
   return (
     <View testID="all-beers-container" style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.chromeBar, { height: insets.top + 6, backgroundColor: colors.chromeBar }]} />
+      <ChromeStatusBar />
       <View style={styles.headerContainer}>
         <Text style={[styles.title, { color: colors.text }]}>All Beer</Text>
         <View style={[styles.bellBezel, { backgroundColor: colors.steelBezel, borderColor: colors.steelBezelBorder }]}>
@@ -101,10 +100,6 @@ export default function TabOneScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  chromeBar: {
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.15)',
-  },
   headerContainer: {
     flexDirection: 'row',
     alignItems: 'center',

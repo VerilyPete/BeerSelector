@@ -73,6 +73,9 @@ export const Colors = {
     steelBezelBorder: 'rgba(255, 255, 255, 0.25)',
     chromeBar: '#B8BFC7',
     chromeBarBorder: 'rgba(255, 255, 255, 0.2)',
+    steelLabelPlate: '#8A919A',
+    steelLabelBorder: 'rgba(90, 96, 105, 0.25)',
+    progressTrack: '#C0C7CE',
 
     separator: '#C8CDD3',
 
@@ -141,6 +144,7 @@ export const Colors = {
     steelLabelBorder: 'rgba(160, 167, 176, 0.25)',
     chromeBar: '#8A919A',
     chromeBarBorder: 'rgba(255, 255, 255, 0.15)',
+    progressTrack: '#1A2A2A',
 
     separator: '#1A1D22',
 
@@ -153,3 +157,5 @@ export const Colors = {
     glassTint: 'rgba(0, 0, 0, 0.6)',
   },
 };
+
+export const CHROME_GRADIENT = ['#8A919A', '#B8BFC7', '#8A919A'] as const;

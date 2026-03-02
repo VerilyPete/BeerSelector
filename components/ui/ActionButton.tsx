@@ -96,7 +96,7 @@ export const ActionButton = ({
 
 const styles = StyleSheet.create({
   touchable: {
-    flex: 1,
+    alignSelf: 'flex-start',
   },
   shell: {
     borderRadius: 10,

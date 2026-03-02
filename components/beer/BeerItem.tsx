@@ -15,7 +15,6 @@ type BeerItemProps = {
   onToggle: (id: string) => void;
   dateLabel?: string;
   renderActions?: () => React.ReactNode;
-  isTasted?: boolean;
 };
 
 const formatDate = (timestamp: string): string => {
@@ -51,7 +50,6 @@ const BeerItemComponent: React.FC<BeerItemProps> = ({
   onToggle,
   dateLabel = 'Added',
   renderActions,
-  isTasted = false,
 }) => {
   const colorScheme = useColorScheme() ?? 'dark';
   const colors = Colors[colorScheme];

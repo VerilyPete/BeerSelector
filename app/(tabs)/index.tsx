@@ -1,17 +1,15 @@
 import { StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, View, Text } from 'react-native';
 import React from 'react';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { ChromeStatusBar } from '@/components/ui/ChromeStatusBar';
 import * as Haptics from 'expo-haptics';
 import Animated from 'react-native-reanimated';
 
-import { IconSymbol } from '@/components/ui/IconSymbol';
+import { MetricCard } from '@/components/ui/MetricCard';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useHomeScreenState, HomeScreenView } from '@/hooks/useHomeScreenState';
 import { Colors } from '@/constants/Colors';
 import { useAnimatedPress } from '@/animations';
-
-const PROGRESS_GOAL = 200;
 
 function NavigationCard({
   title,
@@ -24,7 +22,7 @@ function NavigationCard({
 }: {
   title: string;
   description: string;
-  iconName: string;
+  iconName: React.ComponentProps<typeof Ionicons>['name'];
   iconColor?: string;
   onPress: () => void;
   disabled?: boolean;
@@ -58,7 +56,7 @@ function NavigationCard({
         <View style={[styles.navCardBezel, { backgroundColor: colors.steelBezel, borderColor: colors.steelBezelBorder }]}>
           <View style={[styles.navCard, { borderColor: colors.border, backgroundColor: colors.backgroundSecondary }]}>
             <View style={[styles.navCardIcon, { backgroundColor: colors.backgroundSecondary, borderColor: colors.tint }]}>
-              <Ionicons name={iconName as any} size={20} color={iconColor ?? colors.tint} />
+              <Ionicons name={iconName} size={20} color={iconColor ?? colors.tint} />
             </View>
             <View style={styles.navCardText}>
               <Text style={[styles.navCardTitle, { color: colors.tint }]}>{title}</Text>
@@ -69,33 +67,6 @@ function NavigationCard({
         </View>
       </Animated.View>
     </TouchableOpacity>
-  );
-}
-
-function MetricCard({ tastedCount, colors }: { tastedCount: number; colors: typeof Colors.dark }) {
-  const progress = Math.min(tastedCount / PROGRESS_GOAL, 1);
-  const percentage = (progress * 100).toFixed(1);
-
-  return (
-    <View style={[styles.metricPanel, { backgroundColor: colors.steelBezel, borderColor: colors.steelBezelBorder }]}>
-      <View style={[styles.metricCard, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
-        <View style={[styles.labelPlate, { backgroundColor: colors.steelLabelPlate, borderColor: colors.steelLabelBorder }]}>
-          <Text style={[styles.labelPlateText, { color: colors.border }]}>BEERS TASTED</Text>
-        </View>
-        <View style={styles.metricRow}>
-          {/* Ghost segments */}
-          <Text style={[styles.metricGhost, { color: colors.tint, opacity: 0.05 }]}>888</Text>
-          <Text style={[styles.metricNumber, { color: colors.tint }]}>{tastedCount}</Text>
-          <Text style={[styles.metricTotal, { color: colors.textMuted }]}>/200</Text>
-        </View>
-        <View style={[styles.progressTrack, { backgroundColor: '#1A2A2A' }]}>
-          <View style={[styles.progressFill, { backgroundColor: colors.tint, width: `${progress * 100}%` }]} />
-        </View>
-        <Text style={[styles.progressLabel, { color: colors.textMuted }]}>
-          {percentage}% UFO CLUB PROGRESS
-        </Text>
-      </View>
-    </View>
   );
 }
 
@@ -119,13 +90,12 @@ function MainHomeView({
   };
 }) {
   const isVisitor = view === 'visitor';
-  const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme() ?? 'dark';
   const colors = Colors[colorScheme];
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.chromeBar, { height: insets.top + 6, backgroundColor: colors.chromeBar }]} />
+      <ChromeStatusBar />
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
@@ -290,10 +260,6 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  chromeBar: {
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.15)',
-  },
   scrollView: { flex: 1 },
   scrollContent: { paddingHorizontal: 18, paddingBottom: 24, paddingTop: 8 },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24 },
@@ -344,16 +310,6 @@ const styles = StyleSheet.create({
   },
   storeRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
   storeName: { fontFamily: 'SpaceMono', fontSize: 11 },
-
-  metricPanel: { borderWidth: 1, borderRadius: 16, padding: 3, overflow: 'hidden' },
-  metricCard: { borderRadius: 13, padding: 20, gap: 10, borderWidth: 1 },
-  metricRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 4, position: 'relative' },
-  metricGhost: { fontFamily: 'SpaceGrotesk-Bold', fontSize: 64, letterSpacing: -4, lineHeight: 64, position: 'absolute', left: 0, bottom: 0 },
-  metricNumber: { fontFamily: 'SpaceGrotesk-Bold', fontSize: 64, letterSpacing: -4, lineHeight: 64 },
-  metricTotal: { fontFamily: 'SpaceMono', fontSize: 22, marginBottom: 4 },
-  progressTrack: { height: 6, width: '100%', borderRadius: 3 },
-  progressFill: { height: '100%', borderRadius: 3 },
-  progressLabel: { fontFamily: 'SpaceMono', fontSize: 9, letterSpacing: 1 },
 
   navCardBezel: {
     borderRadius: 14,
