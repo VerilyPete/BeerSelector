@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, View, Text } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 
 import { TastedBrewList } from '@/components/TastedBrewList';
@@ -49,33 +49,37 @@ export default function TastedBrewsScreen() {
 
   if (apiUrlsSet === null || !apiUrlsSet) return null;
 
+  const insets = useSafeAreaInsets();
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]} testID="tasted-brews-screen">
-      <SafeAreaView style={styles.safeArea} edges={['top', 'right', 'left']}>
-        <View style={styles.headerContainer}>
-          <Text style={[styles.title, { color: colors.text }]}>Tasted Brews</Text>
-          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Your tasting history</Text>
-        </View>
-        <ErrorBoundary
-          fallbackMessage="Failed to load tasted brews. Please try again."
-          onError={(error, errorInfo) => {
-            logError(error, {
-              operation: 'TastedBrewList render',
-              component: 'TastedBrewsScreen',
-              additionalData: { componentStack: errorInfo.componentStack },
-            });
-          }}
-        >
-          <TastedBrewList />
-        </ErrorBoundary>
-      </SafeAreaView>
+      <View style={[styles.chromeBar, { height: insets.top, backgroundColor: colors.chromeBar }]} />
+      <View style={styles.headerContainer}>
+        <Text style={[styles.title, { color: colors.text }]}>Tasted Brews</Text>
+        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Your tasting history</Text>
+      </View>
+      <ErrorBoundary
+        fallbackMessage="Failed to load tasted brews. Please try again."
+        onError={(error, errorInfo) => {
+          logError(error, {
+            operation: 'TastedBrewList render',
+            component: 'TastedBrewsScreen',
+            additionalData: { componentStack: errorInfo.componentStack },
+          });
+        }}
+      >
+        <TastedBrewList />
+      </ErrorBoundary>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  safeArea: { flex: 1 },
+  chromeBar: {
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.15)',
+  },
   headerContainer: {
     paddingHorizontal: 18,
     marginTop: 8,

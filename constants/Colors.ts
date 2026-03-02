@@ -71,6 +71,8 @@ export const Colors = {
 
     steelBezel: '#8A919A',
     steelBezelBorder: 'rgba(255, 255, 255, 0.25)',
+    chromeBar: '#B8BFC7',
+    chromeBarBorder: 'rgba(255, 255, 255, 0.2)',
 
     separator: '#C8CDD3',
 
@@ -137,6 +139,8 @@ export const Colors = {
     steelBezelBorder: 'rgba(255, 255, 255, 0.25)',
     steelLabelPlate: '#5A6069',
     steelLabelBorder: 'rgba(160, 167, 176, 0.25)',
+    chromeBar: '#8A919A',
+    chromeBarBorder: 'rgba(255, 255, 255, 0.15)',
 
     separator: '#1A1D22',
 

@@ -1,7 +1,7 @@
 import { StyleSheet, View, Text } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { areApiUrlsConfigured } from '@/src/database/preferences';
 import { checkAndRefreshOnAppOpen } from '@/src/services/dataUpdateService';
@@ -14,31 +14,35 @@ import { Colors } from '@/constants/Colors';
 
 function BeerListScreen() {
   const { session } = useAppContext();
+  const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme() ?? 'dark';
   const colors = Colors[colorScheme];
 
   return (
     <View testID="all-beers-container" style={[styles.container, { backgroundColor: colors.background }]}>
-      <SafeAreaView style={styles.safeArea} edges={['top', 'right', 'left']}>
-        <View style={styles.headerContainer}>
-          <Text style={[styles.title, { color: colors.text }]}>All Beer</Text>
-          <Ionicons name="notifications-outline" size={22} color={colors.textSecondary} />
+      <View style={[styles.chromeBar, { height: insets.top, backgroundColor: colors.chromeBar }]} />
+      <View style={styles.headerContainer}>
+        <Text style={[styles.title, { color: colors.text }]}>All Beer</Text>
+        <View style={[styles.bellBezel, { backgroundColor: colors.steelBezel, borderColor: colors.steelBezelBorder }]}>
+          <View style={[styles.bellInner, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
+            <Ionicons name="notifications-outline" size={18} color={colors.textSecondary} />
+          </View>
         </View>
-        <View style={styles.contentContainer}>
-          <ErrorBoundary
-            fallbackMessage="Failed to load beer list. Please try again."
-            onError={(error, errorInfo) => {
-              logError(error, {
-                operation: 'AllBeers render',
-                component: 'BeerListScreen',
-                additionalData: { componentStack: errorInfo.componentStack },
-              });
-            }}
-          >
-            <AllBeers />
-          </ErrorBoundary>
-        </View>
-      </SafeAreaView>
+      </View>
+      <View style={styles.contentContainer}>
+        <ErrorBoundary
+          fallbackMessage="Failed to load beer list. Please try again."
+          onError={(error, errorInfo) => {
+            logError(error, {
+              operation: 'AllBeers render',
+              component: 'BeerListScreen',
+              additionalData: { componentStack: errorInfo.componentStack },
+            });
+          }}
+        >
+          <AllBeers />
+        </ErrorBoundary>
+      </View>
     </View>
   );
 }
@@ -97,7 +101,10 @@ export default function TabOneScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  safeArea: { flex: 1 },
+  chromeBar: {
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.15)',
+  },
   headerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -110,6 +117,19 @@ const styles = StyleSheet.create({
     fontFamily: 'SpaceGrotesk-Bold',
     fontSize: 26,
     letterSpacing: -0.5,
+  },
+  bellBezel: {
+    borderRadius: 10,
+    padding: 2,
+    borderWidth: 1,
+  },
+  bellInner: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
   },
   contentContainer: { flex: 1 },
 });

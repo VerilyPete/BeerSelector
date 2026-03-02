@@ -38,7 +38,7 @@ function TerminalTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   });
 
   return (
-    <View style={[styles.tabBarOuter, { paddingBottom: Math.max(insets.bottom, 12), backgroundColor: colors.background }]}>
+    <View style={[styles.tabBarOuter, { paddingBottom: Math.max(insets.bottom, 12), backgroundColor: colors.chromeBar }]}>
       <View style={[styles.tabBarPillOuter, { borderColor: colorScheme === 'dark' ? '#FFFFFF30' : colors.border }]}>
         <View style={[styles.tabBarPillInner, { borderColor: colors.border, backgroundColor: colors.backgroundSecondary }]}>
           {visibleRoutes.map((route) => {

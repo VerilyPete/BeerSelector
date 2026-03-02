@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, View, Text } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 
 import { Beerfinder } from '@/components/Beerfinder';
@@ -47,19 +47,23 @@ export default function MyBeersScreen() {
 
   if (apiUrlsSet === null || !apiUrlsSet) return null;
 
+  const insets = useSafeAreaInsets();
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]} testID="beerfinder-screen">
-      <SafeAreaView style={styles.safeArea} edges={['top', 'right', 'left']}>
-        <Text style={[styles.title, { color: colors.text }]}>Beerfinder</Text>
-        <Beerfinder />
-      </SafeAreaView>
+      <View style={[styles.chromeBar, { height: insets.top, backgroundColor: colors.chromeBar }]} />
+      <Text style={[styles.title, { color: colors.text }]}>Beerfinder</Text>
+      <Beerfinder />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  safeArea: { flex: 1 },
+  chromeBar: {
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.15)',
+  },
   title: {
     fontFamily: 'SpaceGrotesk-Bold',
     fontSize: 26,

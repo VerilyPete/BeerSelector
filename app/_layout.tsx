@@ -383,7 +383,7 @@ export default function RootLayout() {
                 </Stack>
                 <OfflineIndicator />
                 <QueuedOperationsManager />
-                <StatusBar style="auto" />
+                <StatusBar style="dark" />
                 {/* Show migration overlay when migrating */}
                 {migrationProgress !== null && (
                   <MigrationProgressOverlay progress={migrationProgress} />

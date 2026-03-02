@@ -125,9 +125,10 @@ function MainHomeView({
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.chromeBar, { height: insets.top, backgroundColor: colors.chromeBar }]} />
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top }]}
+        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
         {/* Header row with label plate + gear button */}
@@ -289,8 +290,12 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  chromeBar: {
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.15)',
+  },
   scrollView: { flex: 1 },
-  scrollContent: { paddingHorizontal: 18, paddingBottom: 24 },
+  scrollContent: { paddingHorizontal: 18, paddingBottom: 24, paddingTop: 8 },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24 },
 
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
