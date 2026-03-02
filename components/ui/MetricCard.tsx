@@ -21,7 +21,7 @@ export function MetricCard({ tastedCount, colors }: MetricCardProps) {
         </View>
         <View style={styles.metricRow}>
           {/* Ghost segments */}
-          <Text style={[styles.metricGhost, { color: colors.tint, opacity: 0.05 }]}>888</Text>
+          <Text style={[styles.metricGhost, { color: colors.tint, opacity: 0.12 }]}>888</Text>
           <Text style={[styles.metricNumber, { color: colors.tint }]}>{tastedCount}</Text>
           <Text style={[styles.metricTotal, { color: colors.textMuted }]}>/200</Text>
         </View>
@@ -59,9 +59,9 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
   },
   metricRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 4, position: 'relative' },
-  metricGhost: { fontFamily: 'SpaceGrotesk-Bold', fontSize: 64, letterSpacing: -4, lineHeight: 64, position: 'absolute', left: 0, bottom: 0 },
-  metricNumber: { fontFamily: 'SpaceGrotesk-Bold', fontSize: 64, letterSpacing: -4, lineHeight: 64 },
-  metricTotal: { fontFamily: 'SpaceMono', fontSize: 22, marginBottom: 4 },
+  metricGhost: { fontFamily: 'DSEG7Classic-Bold', fontSize: 64, lineHeight: 64, position: 'absolute', left: 0, bottom: 0 },
+  metricNumber: { fontFamily: 'DSEG7Classic-Bold', fontSize: 64, lineHeight: 64 },
+  metricTotal: { fontFamily: 'DSEG7Classic-Bold', fontSize: 22, marginBottom: 4 },
   progressTrack: { height: 6, width: '100%', borderRadius: 3 },
   progressFill: { height: '100%', borderRadius: 3 },
   progressLabel: { fontFamily: 'SpaceMono', fontSize: 9, letterSpacing: 1 },

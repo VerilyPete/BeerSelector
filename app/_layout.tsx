@@ -87,6 +87,7 @@ export default function RootLayout() {
     'SpaceGrotesk-SemiBold': require('../assets/fonts/SpaceGrotesk-SemiBold.ttf'),
     'SpaceGrotesk-Bold': require('../assets/fonts/SpaceGrotesk-Bold.ttf'),
     BeerIcons: require('../assets/fonts/BeerIcons.ttf'),
+    'DSEG7Classic-Bold': require('../assets/fonts/DSEG7Classic-Bold.ttf'),
   });
   const VALID_INITIAL_ROUTES = ['(tabs)', '/settings'] as const;
   type InitialRoute = typeof VALID_INITIAL_ROUTES[number];
