@@ -1,11 +1,20 @@
-import { StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, View, Text } from 'react-native';
+import {
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  ActivityIndicator,
+  View,
+  Text,
+} from 'react-native';
 import React from 'react';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { ChromeStatusBar } from '@/components/ui/ChromeStatusBar';
 import * as Haptics from 'expo-haptics';
 import Animated from 'react-native-reanimated';
 
 import { MetricCard } from '@/components/ui/MetricCard';
+import { ChromeIconWell } from '@/components/ui/ChromeIconWell';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useHomeScreenState, HomeScreenView } from '@/hooks/useHomeScreenState';
 import { Colors } from '@/constants/Colors';
@@ -53,18 +62,31 @@ function NavigationCard({
     >
       <Animated.View style={pressStyle}>
         {/* Steel bezel outer frame */}
-        <View style={[styles.navCardBezel, { backgroundColor: colors.steelBezel, borderColor: colors.steelBezelBorder }]}>
-          <View style={[styles.navCard, { borderColor: colors.border, backgroundColor: colors.backgroundSecondary }]}>
-            <View style={[styles.navCardIcon, { backgroundColor: colors.backgroundSecondary, borderColor: colors.tint }]}>
-              <Ionicons name={iconName} size={20} color={iconColor ?? colors.tint} />
-            </View>
+        <LinearGradient
+          colors={['#D4D8DD', '#8A919A', '#6B727B'] as const}
+          style={[styles.navCardBezel, { borderColor: '#FFFFFF30' }]}
+        >
+          <View
+            style={[
+              styles.navCard,
+              { borderColor: colors.border, backgroundColor: colors.backgroundSecondary },
+            ]}
+          >
+            <ChromeIconWell
+              borderColor={iconColor ?? colors.tint}
+              renderIcon={({ color, size }) => (
+                <Ionicons name={iconName} size={size} color={color} />
+              )}
+            />
             <View style={styles.navCardText}>
               <Text style={[styles.navCardTitle, { color: colors.tint }]}>{title}</Text>
-              <Text style={[styles.navCardDesc, { color: colors.textSecondary }]}>{description}</Text>
+              <Text style={[styles.navCardDesc, { color: colors.textSecondary }]}>
+                {description}
+              </Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
           </View>
-        </View>
+        </LinearGradient>
       </Animated.View>
     </TouchableOpacity>
   );
@@ -103,7 +125,12 @@ function MainHomeView({
       >
         {/* Header row with label plate + gear button */}
         <View style={styles.headerRow}>
-          <View style={[styles.labelPlate, { backgroundColor: colors.steelLabelPlate, borderColor: colors.steelLabelBorder }]}>
+          <View
+            style={[
+              styles.labelPlate,
+              { backgroundColor: colors.steelLabelPlate, borderColor: colors.steelLabelBorder },
+            ]}
+          >
             <Text style={[styles.labelPlateText, { color: colors.border }]}>
               {isVisitor ? 'GUEST MODE' : 'WELCOME BACK'}
             </Text>
@@ -118,11 +145,19 @@ function MainHomeView({
             accessibilityRole="button"
             accessibilityLabel="Open settings"
           >
-            <View style={[styles.gearBezel, { backgroundColor: colors.steelBezel, borderColor: colors.steelBezelBorder }]}>
-              <View style={[styles.gearInner, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
-                <Ionicons name="settings-outline" size={18} color={colors.textSecondary} />
+            <LinearGradient
+              colors={['#D4D8DD', '#8A919A', '#6B727B'] as const}
+              style={[styles.gearBezel, { borderColor: '#FFFFFF30' }]}
+            >
+              <View
+                style={[
+                  styles.gearInner,
+                  { backgroundColor: colors.backgroundSecondary, borderColor: colors.border },
+                ]}
+              >
+                <Ionicons name="settings-outline" size={18} color={colors.tint} />
               </View>
-            </View>
+            </LinearGradient>
           </TouchableOpacity>
         </View>
         <Text style={[styles.heroName, { color: colors.text }]}>
@@ -146,7 +181,16 @@ function MainHomeView({
 
         {/* Navigation section */}
         <View style={{ marginTop: 32 }}>
-          <View style={[styles.labelPlate, { backgroundColor: colors.steelLabelPlate, borderColor: colors.steelLabelBorder, alignSelf: 'flex-start' }]}>
+          <View
+            style={[
+              styles.labelPlate,
+              {
+                backgroundColor: colors.steelLabelPlate,
+                borderColor: colors.steelLabelBorder,
+                alignSelf: 'flex-start',
+              },
+            ]}
+          >
             <Text style={[styles.labelPlateText, { color: colors.border }]}>EXPLORE</Text>
           </View>
           <View style={{ marginTop: 12, gap: 10 }}>
@@ -160,7 +204,9 @@ function MainHomeView({
             <NavigationCard
               testID="nav-beerfinder"
               title="Beerfinder"
-              description={isVisitor ? "Log in to find untasted beers" : "Find beers you haven't tasted"}
+              description={
+                isVisitor ? 'Log in to find untasted beers' : "Find beers you haven't tasted"
+              }
               iconName="search-outline"
               onPress={actions.navigateToBeerfinder}
               disabled={isVisitor}
@@ -210,10 +256,17 @@ function SetupView({ onLoginPress }: { onLoginPress: () => void }) {
     <View style={[styles.centered, { backgroundColor: colors.background }]}>
       <View style={[styles.setupCard, { borderColor: colors.border }]}>
         <Ionicons name="beer" size={48} color={colors.tint} style={{ marginBottom: 24 }} />
-        <Text style={[styles.heroName, { color: colors.text, textAlign: 'center', marginBottom: 12 }]}>
+        <Text
+          style={[styles.heroName, { color: colors.text, textAlign: 'center', marginBottom: 12 }]}
+        >
           Beer Selector
         </Text>
-        <Text style={[styles.storeName, { color: colors.textSecondary, textAlign: 'center', marginBottom: 24 }]}>
+        <Text
+          style={[
+            styles.storeName,
+            { color: colors.textSecondary, textAlign: 'center', marginBottom: 24 },
+          ]}
+        >
           Log in to your UFO Club account or browse as a visitor.
         </Text>
         <TouchableOpacity
@@ -226,7 +279,9 @@ function SetupView({ onLoginPress }: { onLoginPress: () => void }) {
           activeOpacity={1}
         >
           <Animated.View style={[styles.loginButton, { backgroundColor: colors.tint }, pressStyle]}>
-            <Text style={[styles.loginButtonText, { color: colors.textOnPrimary }]}>Get Started</Text>
+            <Text style={[styles.loginButtonText, { color: colors.textOnPrimary }]}>
+              Get Started
+            </Text>
           </Animated.View>
         </TouchableOpacity>
       </View>
@@ -264,7 +319,12 @@ const styles = StyleSheet.create({
   scrollContent: { paddingHorizontal: 18, paddingBottom: 24, paddingTop: 8 },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24 },
 
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
 
   labelPlate: {
     borderRadius: 4,
@@ -324,19 +384,23 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 11,
   },
-  navCardIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-  },
   navCardText: { flex: 1, gap: 2 },
   navCardTitle: { fontFamily: 'SpaceGrotesk-SemiBold', fontSize: 14 },
   navCardDesc: { fontFamily: 'SpaceMono', fontSize: 11 },
 
-  setupCard: { borderWidth: 1, borderRadius: 16, padding: 32, alignItems: 'center', maxWidth: 340, width: '100%' },
-  loginButton: { paddingVertical: 14, paddingHorizontal: 32, alignItems: 'center', borderRadius: 8 },
+  setupCard: {
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 32,
+    alignItems: 'center',
+    maxWidth: 340,
+    width: '100%',
+  },
+  loginButton: {
+    paddingVertical: 14,
+    paddingHorizontal: 32,
+    alignItems: 'center',
+    borderRadius: 8,
+  },
   loginButtonText: { fontFamily: 'SpaceGrotesk-SemiBold', fontSize: 15, letterSpacing: 2 },
 });

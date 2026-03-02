@@ -1,7 +1,6 @@
 import { StyleSheet, View, Text } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { ChromeStatusBar } from '@/components/ui/ChromeStatusBar';
 import { areApiUrlsConfigured } from '@/src/database/preferences';
 import { checkAndRefreshOnAppOpen } from '@/src/services/dataUpdateService';
@@ -18,15 +17,13 @@ function BeerListScreen() {
   const colors = Colors[colorScheme];
 
   return (
-    <View testID="all-beers-container" style={[styles.container, { backgroundColor: colors.background }]}>
+    <View
+      testID="all-beers-container"
+      style={[styles.container, { backgroundColor: colors.background }]}
+    >
       <ChromeStatusBar />
       <View style={styles.headerContainer}>
         <Text style={[styles.title, { color: colors.text }]}>All Beer</Text>
-        <View style={[styles.bellBezel, { backgroundColor: colors.steelBezel, borderColor: colors.steelBezelBorder }]}>
-          <View style={[styles.bellInner, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
-            <Ionicons name="notifications-outline" size={18} color={colors.textSecondary} />
-          </View>
-        </View>
       </View>
       <View style={styles.contentContainer}>
         <ErrorBoundary
@@ -112,19 +109,6 @@ const styles = StyleSheet.create({
     fontFamily: 'SpaceGrotesk-Bold',
     fontSize: 26,
     letterSpacing: -0.5,
-  },
-  bellBezel: {
-    borderRadius: 10,
-    padding: 2,
-    borderWidth: 1,
-  },
-  bellInner: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
   },
   contentContainer: { flex: 1 },
 });

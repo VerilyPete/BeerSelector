@@ -5,6 +5,7 @@ import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { BeerWithContainerType, BeerfinderWithContainerType } from '@/src/types/beer';
 import { ContainerIcon } from '../icons/ContainerIcon';
+import { ChromeIconWell } from '@/components/ui/ChromeIconWell';
 import { useAnimatedPress, useAnimatedExpand } from '@/animations';
 
 type DisplayableBeer = BeerWithContainerType | BeerfinderWithContainerType;
@@ -78,21 +79,29 @@ const BeerItemComponent: React.FC<BeerItemProps> = ({
     >
       <Animated.View style={pressStyle}>
         {/* Steel bezel outer frame */}
-        <View style={[styles.steelBezel, { backgroundColor: colors.steelBezel, borderColor: colors.steelBezelBorder }]}>
+        <View
+          style={[
+            styles.steelBezel,
+            { backgroundColor: colors.steelBezel, borderColor: colors.steelBezelBorder },
+          ]}
+        >
           {/* Dark inner card */}
-          <View style={[styles.cardInner, {
-            backgroundColor: colors.backgroundSecondary,
-            borderColor: isExpanded ? colors.accentMuted : colors.border,
-          }]}>
+          <View
+            style={[
+              styles.cardInner,
+              {
+                backgroundColor: colors.backgroundSecondary,
+                borderColor: isExpanded ? colors.accentMuted : colors.border,
+              },
+            ]}
+          >
             {/* Name row: icon + name + ABV badge */}
             <View style={styles.nameRow}>
-              <View style={[styles.beerIconWell, { backgroundColor: colors.backgroundSecondary, borderColor: colors.tint }]}>
-                <ContainerIcon
-                  type={containerType}
-                  size={20}
-                  color={colors.tint}
-                />
-              </View>
+              <ChromeIconWell
+                renderIcon={({ color, size }) => (
+                  <ContainerIcon type={containerType} size={size} color={color} />
+                )}
+              />
               <View style={styles.beerNameCol}>
                 <Text
                   style={[styles.beerName, { color: colors.tint }]}
@@ -130,11 +139,18 @@ const BeerItemComponent: React.FC<BeerItemProps> = ({
             {/* Expanded description */}
             {isExpanded && (
               <Animated.View
-                style={[styles.descriptionSection, { borderTopColor: colors.separator }, expandStyle]}
+                style={[
+                  styles.descriptionSection,
+                  { borderTopColor: colors.separator },
+                  expandStyle,
+                ]}
                 testID={`beer-description-container-${beer.id}`}
               >
                 {!hasTastedDate && (
-                  <Text style={[styles.meta, { color: colors.textMuted }]} testID={`beer-date-${beer.id}`}>
+                  <Text
+                    style={[styles.meta, { color: colors.textMuted }]}
+                    testID={`beer-date-${beer.id}`}
+                  >
                     {dateLabel}: {displayDate}
                   </Text>
                 )}
@@ -143,7 +159,10 @@ const BeerItemComponent: React.FC<BeerItemProps> = ({
                     <Text style={[styles.descriptionLabel, { color: colors.text }]}>
                       Description
                     </Text>
-                    <Text style={[styles.descriptionText, { color: colors.textSecondary }]} testID={`beer-description-${beer.id}`}>
+                    <Text
+                      style={[styles.descriptionText, { color: colors.textSecondary }]}
+                      testID={`beer-description-${beer.id}`}
+                    >
                       {beer.brew_description.replace(/<\/?p>/g, '').replace(/<\/?br ?\/?>/, '\n')}
                     </Text>
                   </>
@@ -179,14 +198,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-  },
-  beerIconWell: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
   },
   beerNameCol: {
     flex: 1,

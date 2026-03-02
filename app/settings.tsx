@@ -85,7 +85,7 @@ export default function SettingsScreen() {
                   { backgroundColor: colors.backgroundSecondary, borderColor: colors.border },
                 ]}
               >
-                <Ionicons name="close" size={16} color={colors.text} />
+                <Ionicons name="close" size={16} color={colors.tint} />
               </View>
             </TouchableOpacity>
           )}

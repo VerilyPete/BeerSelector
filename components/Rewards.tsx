@@ -24,6 +24,7 @@ import Animated, {
   Layout,
   Easing,
 } from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { rewardsRepository } from '@/src/database/repositories/RewardsRepository';
@@ -198,9 +199,7 @@ const StatusBadge = ({ isRedeemed }: { isRedeemed: boolean }) => {
         },
       ]}
     >
-      <Text
-        style={[styles.statusText, { color: isRedeemed ? colors.textSecondary : colors.tint }]}
-      >
+      <Text style={[styles.statusText, { color: isRedeemed ? colors.textSecondary : colors.tint }]}>
         {isRedeemed ? 'REDEEMED' : 'AVAILABLE'}
       </Text>
     </View>
@@ -228,11 +227,7 @@ const EmptyState = ({ isVisitor }: { isVisitor: boolean }) => {
   return (
     <Animated.View entering={FadeIn.duration(500)} style={styles.emptyStateContainer}>
       <Animated.View style={bounceStyle}>
-        <Ionicons
-          name={isVisitor ? 'lock-closed' : 'beer-outline'}
-          size={64}
-          color={colors.tint}
-        />
+        <Ionicons name={isVisitor ? 'lock-closed' : 'beer-outline'} size={64} color={colors.tint} />
       </Animated.View>
       <Text style={[styles.emptyStateTitle, { color: colors.text }]}>
         {isVisitor ? 'Members Only' : 'No Rewards Yet'}
@@ -257,11 +252,9 @@ const ProgressHeader = ({ tastedCount }: { tastedCount: number }) => {
   const ringSize = Math.min(Math.max(screenWidth * 0.2, 80), 120);
 
   return (
-    <View
-      style={[
-        styles.progressHeaderBezelOuter,
-        { backgroundColor: colors.steelBezel, borderColor: colors.steelBezelBorder },
-      ]}
+    <LinearGradient
+      colors={['#D4D8DD', '#8A919A', '#6B727B'] as const}
+      style={[styles.progressHeaderBezelOuter, { borderColor: '#FFFFFF30' }]}
     >
       <Animated.View
         entering={FadeInDown.duration(600).delay(100)}
@@ -273,63 +266,73 @@ const ProgressHeader = ({ tastedCount }: { tastedCount: number }) => {
           },
         ]}
       >
-      <View style={styles.progressHeaderContent}>
-        <View style={styles.progressTextContainer}>
-          <Text style={[styles.progressSectionLabel, { color: colors.textSecondary }]}>
-            YOUR JOURNEY
-          </Text>
-          <Text style={[styles.progressSubtitle, { color: colors.text }]}>
-            {tastedCount} of {BEER_GOAL} beers tasted
-          </Text>
-          {remaining > 0 ? (
-            <Text style={[styles.progressRemaining, { color: colors.textSecondary }]}>
-              {remaining} more to go
+        <View style={styles.progressHeaderContent}>
+          <View style={styles.progressTextContainer}>
+            <Text style={[styles.progressSectionLabel, { color: colors.textSecondary }]}>
+              YOUR JOURNEY
             </Text>
-          ) : (
-            <Text style={[styles.progressComplete, { color: colors.tint }]}>
-              Plate Complete!
+            <Text style={[styles.progressSubtitle, { color: colors.text }]}>
+              {tastedCount} of {BEER_GOAL} beers tasted
             </Text>
-          )}
+            {remaining > 0 ? (
+              <Text style={[styles.progressRemaining, { color: colors.textSecondary }]}>
+                {remaining} more to go
+              </Text>
+            ) : (
+              <Text style={[styles.progressComplete, { color: colors.tint }]}>Plate Complete!</Text>
+            )}
+          </View>
+          <ProgressRing progress={progress} size={ringSize} />
         </View>
-        <ProgressRing progress={progress} size={ringSize} />
-      </View>
 
-      <View style={[styles.milestoneContainer, { borderTopColor: colors.separator }]}>
-        {[50, 100, 150, 200].map(milestone => {
-          const reached = tastedCount >= milestone;
-          return (
-            <View
-              key={milestone}
-              style={[
-                styles.milestoneBezelOuter,
-                reached
-                  ? { backgroundColor: colors.destructive, borderColor: 'rgba(255, 153, 153, 0.37)' }
-                  : { backgroundColor: colors.steelBezel, borderColor: colors.steelBezelBorder },
-              ]}
-            >
-              <View
-                style={[
-                  styles.milestone,
-                  reached
-                    ? { backgroundColor: '#1A0000', borderColor: 'rgba(51, 0, 0, 0.5)' }
-                    : { backgroundColor: colors.backgroundSecondary, borderColor: colors.border },
-                ]}
-              >
-                <Text
+        <View style={[styles.milestoneContainer, { borderTopColor: colors.separator }]}>
+          {[50, 100, 150, 200].map(milestone => {
+            const reached = tastedCount >= milestone;
+            return (
+              <View key={milestone} style={styles.milestoneBezelOuter}>
+                <LinearGradient
+                  colors={
+                    reached
+                      ? (['#FF6666', '#FF3333', '#CC2222'] as const)
+                      : (['#D4D8DD', '#8A919A', '#6B727B'] as const)
+                  }
                   style={[
-                    styles.milestoneText,
-                    { color: reached ? colors.textOnPrimary : colors.textSecondary },
+                    styles.milestoneGradient,
+                    {
+                      borderColor: reached ? '#FF999960' : '#FFFFFF30',
+                    },
                   ]}
                 >
-                  {milestone}
-                </Text>
+                  <View
+                    style={[
+                      styles.milestone,
+                      reached
+                        ? { backgroundColor: '#1A0000', borderColor: '#33000080' }
+                        : {
+                            backgroundColor: colors.backgroundSecondary,
+                            borderColor: colors.border,
+                          },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.milestoneText,
+                        {
+                          color: reached ? colors.destructive : colors.textSecondary,
+                          opacity: reached ? 1 : 0.4,
+                        },
+                      ]}
+                    >
+                      {milestone}
+                    </Text>
+                  </View>
+                </LinearGradient>
               </View>
-            </View>
-          );
-        })}
-      </View>
+            );
+          })}
+        </View>
       </Animated.View>
-    </View>
+    </LinearGradient>
   );
 };
 
@@ -509,9 +512,7 @@ export const Rewards = () => {
             <RewardBadge isRedeemed={isRedeemed} isAnimating={!isRedeemed} />
 
             <View style={styles.rewardContent}>
-              <Text style={[styles.rewardType, { color: colors.text }]}>
-                {item.reward_type}
-              </Text>
+              <Text style={[styles.rewardType, { color: colors.text }]}>{item.reward_type}</Text>
               <Text style={[styles.rewardDescription, { color: colors.textSecondary }]}>
                 {isRedeemed ? 'You have claimed this reward' : 'Tap to add to your queue'}
               </Text>
@@ -558,9 +559,7 @@ export const Rewards = () => {
           style={[styles.retryButton, { borderColor: colors.tint }]}
           onPress={handleRefresh}
         >
-          <Text style={[styles.retryButtonText, { color: colors.tint }]}>
-            TRY AGAIN
-          </Text>
+          <Text style={[styles.retryButtonText, { color: colors.tint }]}>TRY AGAIN</Text>
         </TouchableOpacity>
       </View>
     );
@@ -576,7 +575,12 @@ export const Rewards = () => {
         ListHeaderComponent={
           <>
             {!session.isVisitor ? <ProgressHeader tastedCount={tastedCount} /> : null}
-            <View style={[styles.labelPlate, { backgroundColor: colors.steelLabelPlate, borderColor: colors.steelLabelBorder }]}>
+            <View
+              style={[
+                styles.labelPlate,
+                { backgroundColor: colors.steelLabelPlate, borderColor: colors.steelLabelBorder },
+              ]}
+            >
               <Text style={[styles.labelPlateText, { color: colors.border }]}>REWARD LOG</Text>
             </View>
           </>
@@ -715,13 +719,19 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
   },
   milestoneBezelOuter: {
-    borderWidth: 1,
+    borderRadius: 10,
+    overflow: 'hidden',
+  },
+  milestoneGradient: {
     borderRadius: 10,
     padding: 2,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   milestone: {
-    width: 44,
-    height: 44,
+    width: 66,
+    height: 28,
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
