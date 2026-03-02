@@ -51,7 +51,7 @@ export default function TastedBrewsScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]} testID="tasted-brews-screen">
-      <View style={[styles.chromeBar, { height: insets.top + 6, backgroundColor: colors.chromeBar }]} />
+      <ChromeStatusBar />
       <View style={styles.headerContainer}>
         <Text style={[styles.title, { color: colors.text }]}>Tasted Brews</Text>
 
@@ -74,10 +74,6 @@ export default function TastedBrewsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  chromeBar: {
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.15)',
-  },
   headerContainer: {
     paddingHorizontal: 18,
     marginTop: 8,
