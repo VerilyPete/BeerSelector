@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { StyleSheet, TextInput, View, TouchableOpacity } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { IconSymbol } from './ui/IconSymbol';
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
@@ -30,50 +31,57 @@ const SearchBarComponent: React.FC<SearchBarProps> = ({
     onClear();
   }, [onClear]);
 
+  const chromeGradient = isFocused
+    ? [colors.tint, colors.tint, colors.tint] as const
+    : ['#8A919A', '#B8BFC7', '#8A919A'] as const;
+
   return (
-    <View
-      style={[
-        styles.container,
-        {
-          borderColor: isFocused ? colors.tint : colors.border,
-          borderWidth: isFocused ? 1.5 : 1,
-          backgroundColor: colors.backgroundSecondary,
-        },
-      ]}
-      testID="search-bar"
-    >
-      <IconSymbol
-        name="magnifyingglass"
-        size={16}
-        color={colors.textMuted}
-        style={styles.icon}
+    <View style={styles.chromeShell} testID="search-bar">
+      <LinearGradient
+        colors={[...chromeGradient]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={StyleSheet.absoluteFill}
       />
-      <TextInput
-        testID="search-input"
-        style={[styles.input, { color: colors.text }]}
-        value={searchText}
-        onChangeText={onSearchChange}
-        placeholder={placeholder}
-        placeholderTextColor={colors.textMuted}
-        autoCapitalize="none"
-        autoCorrect={false}
-        clearButtonMode="never"
-        onFocus={handleFocus}
-        onBlur={handleBlur}
-        selectionColor={colors.tint}
-      />
-      {searchText.length > 0 && (
-        <TouchableOpacity
-          onPress={handleClear}
-          style={styles.clearButton}
-          testID="clear-search-button"
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          accessibilityLabel="Clear search"
-          accessibilityRole="button"
-        >
-          <IconSymbol name="xmark.circle.fill" size={16} color={colors.textSecondary} />
-        </TouchableOpacity>
-      )}
+      <View
+        style={[
+          styles.container,
+          { backgroundColor: colors.backgroundSecondary },
+        ]}
+      >
+        <IconSymbol
+          name="magnifyingglass"
+          size={16}
+          color={colors.textMuted}
+          style={styles.icon}
+        />
+        <TextInput
+          testID="search-input"
+          style={[styles.input, { color: colors.text }]}
+          value={searchText}
+          onChangeText={onSearchChange}
+          placeholder={placeholder}
+          placeholderTextColor={colors.textMuted}
+          autoCapitalize="none"
+          autoCorrect={false}
+          clearButtonMode="never"
+          onFocus={handleFocus}
+          onBlur={handleBlur}
+          selectionColor={colors.tint}
+        />
+        {searchText.length > 0 && (
+          <TouchableOpacity
+            onPress={handleClear}
+            style={styles.clearButton}
+            testID="clear-search-button"
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            accessibilityLabel="Clear search"
+            accessibilityRole="button"
+          >
+            <IconSymbol name="xmark.circle.fill" size={16} color={colors.textSecondary} />
+          </TouchableOpacity>
+        )}
+      </View>
     </View>
   );
 };
@@ -81,14 +89,18 @@ const SearchBarComponent: React.FC<SearchBarProps> = ({
 export const SearchBar = React.memo(SearchBarComponent);
 
 const styles = StyleSheet.create({
+  chromeShell: {
+    borderRadius: 14,
+    overflow: 'hidden',
+    padding: 3,
+    marginBottom: 8,
+  },
   container: {
     flexDirection: 'row',
     alignItems: 'center',
     height: 44,
     paddingHorizontal: 16,
-    marginHorizontal: 0,
-    marginBottom: 8,
-    borderRadius: 12,
+    borderRadius: 11,
   },
   icon: {
     marginRight: 10,

@@ -1,6 +1,7 @@
 import React, { useCallback } from 'react';
 import { StyleSheet, View, TouchableOpacity, Text } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import { LinearGradient } from 'expo-linear-gradient';
 import { IconSymbol, IconSymbolName } from '../ui/IconSymbol';
 import BeerIcon from '../icons/BeerIcon';
 import { Colors } from '@/constants/Colors';
@@ -74,17 +75,13 @@ const FilterBarComponent: React.FC<FilterBarProps> = ({
     onToggleSortDirection();
   }, [onToggleSortDirection]);
 
+  const chromeGradient = ['#8A919A', '#B8BFC7', '#8A919A'] as const;
+
   return (
     <View style={styles.container} testID="filter-bar">
       <View style={styles.chipRow}>
         {/* Container filter chip */}
         <TouchableOpacity
-          style={[
-            styles.chip,
-            isContainerActive
-              ? { backgroundColor: colors.tint }
-              : { borderWidth: 1, borderColor: colors.border },
-          ]}
           onPress={handleContainerPress}
           activeOpacity={0.7}
           testID="filter-container-button"
@@ -92,47 +89,77 @@ const FilterBarComponent: React.FC<FilterBarProps> = ({
           accessibilityState={{ selected: isContainerActive }}
           accessibilityLabel={`Container filter: ${CONTAINER_LABELS[containerFilter]}. Double tap to show ${NEXT_CONTAINER[containerFilter]}.`}
         >
-          <Text
-            style={[
-              styles.chipText,
-              { color: isContainerActive ? colors.textOnPrimary : colors.textSecondary },
-            ]}
-          >
-            {CONTAINER_LABELS[containerFilter]}
-          </Text>
+          <View style={[styles.chromeShell, isContainerActive && { backgroundColor: colors.tint }]}>
+            {!isContainerActive && (
+              <LinearGradient
+                colors={[...chromeGradient]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={StyleSheet.absoluteFill}
+              />
+            )}
+            <View style={[styles.chipInner, { backgroundColor: isContainerActive ? colors.tint : colors.background }]}>
+              <Text
+                style={[
+                  styles.chipText,
+                  { color: isContainerActive ? colors.textOnPrimary : colors.tint },
+                ]}
+              >
+                {CONTAINER_LABELS[containerFilter]}
+              </Text>
+            </View>
+          </View>
         </TouchableOpacity>
 
         {/* Sort chip */}
         <TouchableOpacity
-          style={[styles.chip, { borderWidth: 1, borderColor: colors.border, flexDirection: 'row', gap: 6 }]}
           onPress={handleSortPress}
           activeOpacity={0.7}
           testID="sort-toggle-button"
           accessibilityRole="button"
           accessibilityLabel={`Sort by ${SORT_LABELS[sortBy]}. Double tap to sort by ${NEXT_SORT[sortBy]}.`}
         >
-          {sortBy === 'abv' ? (
-            <BeerIcon name="bottle" size={14} color={colors.textSecondary} />
-          ) : (
-            <IconSymbol name={SORT_ICONS[sortBy]} size={14} color={colors.textSecondary} />
-          )}
-          <Text style={[styles.chipText, { color: colors.textSecondary }]} testID="sort-button-text">
-            {SORT_LABELS[sortBy]}
-          </Text>
+          <View style={styles.chromeShell}>
+            <LinearGradient
+              colors={[...chromeGradient]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFill}
+            />
+            <View style={[styles.chipInner, { backgroundColor: colors.background, flexDirection: 'row', gap: 6 }]}>
+              {sortBy === 'abv' ? (
+                <BeerIcon name="bottle" size={14} color={colors.tint} />
+              ) : (
+                <IconSymbol name={SORT_ICONS[sortBy]} size={14} color={colors.tint} />
+              )}
+              <Text style={[styles.chipText, { color: colors.tint }]} testID="sort-button-text">
+                {SORT_LABELS[sortBy]}
+              </Text>
+            </View>
+          </View>
         </TouchableOpacity>
 
         {/* Sort direction chip */}
         <TouchableOpacity
-          style={[styles.chip, { borderWidth: 1, borderColor: colors.border }]}
           onPress={handleDirectionPress}
           activeOpacity={0.7}
           testID="sort-direction-button"
           accessibilityRole="button"
           accessibilityLabel={`Sort: ${DIRECTION_LABELS[sortBy][sortDirection].replace(' ↓', '')}. Double tap for ${DIRECTION_LABELS[sortBy][sortDirection === 'asc' ? 'desc' : 'asc'].replace(' ↓', '')}.`}
         >
-          <Text style={[styles.chipText, { color: colors.textSecondary }]}>
-            {DIRECTION_LABELS[sortBy][sortDirection]}
-          </Text>
+          <View style={styles.chromeShell}>
+            <LinearGradient
+              colors={[...chromeGradient]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFill}
+            />
+            <View style={[styles.chipInner, { backgroundColor: colors.background }]}>
+              <Text style={[styles.chipText, { color: colors.tint }]}>
+                {DIRECTION_LABELS[sortBy][sortDirection]}
+              </Text>
+            </View>
+          </View>
         </TouchableOpacity>
       </View>
     </View>
@@ -148,12 +175,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
   },
-  chip: {
+  chromeShell: {
+    borderRadius: 8,
+    overflow: 'hidden',
+    padding: 1.5,
+  },
+  chipInner: {
     paddingVertical: 6,
     paddingHorizontal: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 8,
+    borderRadius: 7,
   },
   chipText: {
     fontFamily: 'SpaceMono',

@@ -11,6 +11,7 @@ import { Colors } from '@/constants/Colors';
 
 export default function MyBeersScreen() {
   const [apiUrlsSet, setApiUrlsSet] = useState<boolean | null>(null);
+  const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme() ?? 'dark';
   const colors = Colors[colorScheme];
 
@@ -46,8 +47,6 @@ export default function MyBeersScreen() {
   );
 
   if (apiUrlsSet === null || !apiUrlsSet) return null;
-
-  const insets = useSafeAreaInsets();
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]} testID="beerfinder-screen">

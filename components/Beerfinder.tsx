@@ -30,6 +30,7 @@ import { useAppContext } from '@/context/AppContext';
 import { useQueuedCheckIn } from '@/hooks/useQueuedCheckIn';
 import { getSessionData } from '@/src/api/sessionManager';
 import { updateLiveActivityWithQueue } from '@/src/services/liveActivityService';
+import { ActionButton } from './ui/ActionButton';
 
 export const Beerfinder = () => {
   // MP-4 Step 2: Use context for beer data instead of local state
@@ -246,34 +247,15 @@ export const Beerfinder = () => {
 
   const renderBeerActions = (item: BeerWithContainerType) => (
     <View style={styles.buttonContainer}>
-      <TouchableOpacity
-        style={[styles.amberButtonOuter, { backgroundColor: colors.amber, borderColor: colors.amberBorderOuter }]}
+      <ActionButton
+        label="CHECK IN"
         onPress={() => handleCheckIn(item)}
-        activeOpacity={0.8}
-        disabled={checkinLoading}
-      >
-        <View style={[styles.amberButtonInner, { backgroundColor: colors.amberWell, borderColor: colors.amberBorderInner }]}>
-          {checkinLoading ? (
-            <ActivityIndicator size="small" color={colors.amber} />
-          ) : (
-            <Text style={[styles.amberButtonText, { color: colors.amber }]} numberOfLines={1}>
-              CHECK IN
-            </Text>
-          )}
-        </View>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={[styles.amberButtonOuter, { backgroundColor: colors.amber, borderColor: colors.amberBorderOuter }]}
+        loading={checkinLoading}
+      />
+      <ActionButton
+        label="UNTAPPD"
         onPress={() => handleUntappdSearch(item.brew_name)}
-        activeOpacity={0.8}
-      >
-        <View style={[styles.amberButtonInner, { backgroundColor: colors.amberWell, borderColor: colors.amberBorderInner }]}>
-          <Text style={[styles.amberButtonText, { color: colors.amber }]} numberOfLines={1}>
-            UNTAPPD
-          </Text>
-        </View>
-      </TouchableOpacity>
+      />
     </View>
   );
 
@@ -293,20 +275,12 @@ export const Beerfinder = () => {
               <Text style={[styles.queueErrorText, { color: colors.error }]}>
                 {queueError}
               </Text>
-              <TouchableOpacity
-                style={[styles.amberButtonOuter, { backgroundColor: colors.amber, borderColor: colors.amberBorderOuter, flex: 0 }]}
+              <ActionButton
+                label="TRY AGAIN"
                 onPress={viewQueues}
-                activeOpacity={0.8}
-                disabled={loadingQueues}
-              >
-                <View style={[styles.amberButtonInner, { backgroundColor: colors.amberWell, borderColor: colors.amberBorderInner }]}>
-                  {loadingQueues ? (
-                    <ActivityIndicator size="small" color={colors.amber} />
-                  ) : (
-                    <Text style={[styles.amberButtonText, { color: colors.amber }]}>TRY AGAIN</Text>
-                  )}
-                </View>
-              </TouchableOpacity>
+                loading={loadingQueues}
+                style={{ flex: 0 }}
+              />
             </View>
           ) : queuedBeers.length === 0 ? (
             <Text style={styles.noQueuesText}>No beer currently in queue</Text>
@@ -358,15 +332,11 @@ export const Beerfinder = () => {
             />
           )}
 
-          <TouchableOpacity
-            style={[styles.amberButtonOuter, { backgroundColor: colors.amber, borderColor: colors.amberBorderOuter, flex: 0, marginTop: 16 }]}
+          <ActionButton
+            label="CLOSE"
             onPress={() => setQueueModalVisible(false)}
-            activeOpacity={0.8}
-          >
-            <View style={[styles.amberButtonInner, { backgroundColor: colors.amberWell, borderColor: colors.amberBorderInner }]}>
-              <Text style={[styles.amberButtonText, { color: colors.amber }]}>CLOSE</Text>
-            </View>
-          </TouchableOpacity>
+            style={{ flex: 0, marginTop: 16 }}
+          />
         </View>
       </View>
     </Modal>
@@ -380,30 +350,15 @@ export const Beerfinder = () => {
           {/* MP-3 Step 3b: Show action buttons even during loading */}
           <View style={styles.filtersContainer}>
             <View style={styles.buttonsContainer}>
-              <TouchableOpacity
-                style={[styles.amberButtonOuter, { backgroundColor: colors.amber, borderColor: colors.amberBorderOuter }]}
+              <ActionButton
+                label="QUEUE"
                 onPress={viewQueues}
-                activeOpacity={0.8}
-                disabled={loadingQueues}
-              >
-                <View style={[styles.amberButtonInner, { backgroundColor: colors.amberWell, borderColor: colors.amberBorderInner }]}>
-                  {loadingQueues ? (
-                    <ActivityIndicator size="small" color={colors.amber} />
-                  ) : (
-                    <Text style={[styles.amberButtonText, { color: colors.amber }]}>QUEUE</Text>
-                  )}
-                </View>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.amberButtonOuter, { backgroundColor: colors.amber, borderColor: colors.amberBorderOuter }]}
+                loading={loadingQueues}
+              />
+              <ActionButton
+                label="REWARDS"
                 onPress={() => router.push('/screens/rewards' as Href)}
-                activeOpacity={0.8}
-              >
-                <View style={[styles.amberButtonInner, { backgroundColor: colors.amberWell, borderColor: colors.amberBorderInner }]}>
-                  <Text style={[styles.amberButtonText, { color: colors.amber }]}>REWARDS</Text>
-                </View>
-              </TouchableOpacity>
+              />
             </View>
           </View>
           <SkeletonLoader count={20} />
@@ -422,30 +377,15 @@ export const Beerfinder = () => {
         <>
           <View style={styles.filtersContainer}>
             <View style={styles.buttonsContainer}>
-              <TouchableOpacity
-                style={[styles.amberButtonOuter, { backgroundColor: colors.amber, borderColor: colors.amberBorderOuter }]}
+              <ActionButton
+                label="QUEUE"
                 onPress={viewQueues}
-                activeOpacity={0.8}
-                disabled={loadingQueues}
-              >
-                <View style={[styles.amberButtonInner, { backgroundColor: colors.amberWell, borderColor: colors.amberBorderInner }]}>
-                  {loadingQueues ? (
-                    <ActivityIndicator size="small" color={colors.amber} />
-                  ) : (
-                    <Text style={[styles.amberButtonText, { color: colors.amber }]}>QUEUE</Text>
-                  )}
-                </View>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.amberButtonOuter, { backgroundColor: colors.amber, borderColor: colors.amberBorderOuter }]}
+                loading={loadingQueues}
+              />
+              <ActionButton
+                label="REWARDS"
                 onPress={() => router.push('/screens/rewards' as Href)}
-                activeOpacity={0.8}
-              >
-                <View style={[styles.amberButtonInner, { backgroundColor: colors.amberWell, borderColor: colors.amberBorderInner }]}>
-                  <Text style={[styles.amberButtonText, { color: colors.amber }]}>REWARDS</Text>
-                </View>
-              </TouchableOpacity>
+              />
             </View>
 
             <SearchBar
@@ -538,32 +478,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 12,
     gap: 10,
-  },
-  amberButtonOuter: {
-    flex: 1,
-    borderRadius: 10,
-    padding: 5,
-    borderWidth: 1,
-    shadowColor: '#FFB300',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 10,
-    elevation: 6,
-  },
-  amberButtonInner: {
-    borderRadius: 6,
-    paddingVertical: 6,
-    paddingHorizontal: 14,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  amberButtonText: {
-    fontFamily: 'SpaceMono',
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-    textAlign: 'center',
   },
   buttonContainer: {
     flexDirection: 'row',

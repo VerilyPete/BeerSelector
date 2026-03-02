@@ -13,6 +13,7 @@ import { Colors } from '@/constants/Colors';
 
 export default function TastedBrewsScreen() {
   const [apiUrlsSet, setApiUrlsSet] = useState<boolean | null>(null);
+  const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme() ?? 'dark';
   const colors = Colors[colorScheme];
 
@@ -49,14 +50,12 @@ export default function TastedBrewsScreen() {
 
   if (apiUrlsSet === null || !apiUrlsSet) return null;
 
-  const insets = useSafeAreaInsets();
-
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]} testID="tasted-brews-screen">
       <View style={[styles.chromeBar, { height: insets.top, backgroundColor: colors.chromeBar }]} />
       <View style={styles.headerContainer}>
         <Text style={[styles.title, { color: colors.text }]}>Tasted Brews</Text>
-        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Your tasting history</Text>
+
       </View>
       <ErrorBoundary
         fallbackMessage="Failed to load tasted brews. Please try again."

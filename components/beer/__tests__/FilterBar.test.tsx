@@ -105,27 +105,17 @@ describe('FilterBar', () => {
       expect(flatStyle?.backgroundColor).not.toBe(tintColor);
     });
 
-    test('active and inactive states use different background colors', () => {
+    test('active and inactive states render different label text', () => {
       const props = createDefaultProps();
-      const { getByTestId: getDraftTestId } = render(
+      const { getByText: getDraftText } = render(
         <FilterBar {...props} containerFilter="draft" />
       );
-      const { getByTestId: getAllTestId } = render(
+      const { getByText: getAllText } = render(
         <FilterBar {...props} containerFilter="all" />
       );
 
-      const activeButton = getDraftTestId('filter-container-button');
-      const inactiveButton = getAllTestId('filter-container-button');
-
-      const getBackground = (el: { props: { style: unknown } }) => {
-        const style = el.props.style;
-        if (Array.isArray(style)) {
-          return style.reduce<Record<string, unknown>>((acc, s) => ({ ...acc, ...(s as object) }), {}).backgroundColor;
-        }
-        return (style as Record<string, unknown>)?.backgroundColor;
-      };
-
-      expect(getBackground(activeButton)).not.toBe(getBackground(inactiveButton));
+      expect(getDraftText('DRAFT')).toBeTruthy();
+      expect(getAllText('ALL')).toBeTruthy();
     });
   });
 

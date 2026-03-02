@@ -57,7 +57,7 @@ function NavigationCard({
         {/* Steel bezel outer frame */}
         <View style={[styles.navCardBezel, { backgroundColor: colors.steelBezel, borderColor: colors.steelBezelBorder }]}>
           <View style={[styles.navCard, { borderColor: colors.border, backgroundColor: colors.backgroundSecondary }]}>
-            <View style={[styles.navCardIcon, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
+            <View style={[styles.navCardIcon, { backgroundColor: colors.backgroundSecondary, borderColor: colors.tint }]}>
               <Ionicons name={iconName as any} size={20} color={iconColor ?? colors.tint} />
             </View>
             <View style={styles.navCardText}>

@@ -88,11 +88,11 @@ const BeerItemComponent: React.FC<BeerItemProps> = ({
           }]}>
             {/* Name row: icon + name + ABV badge */}
             <View style={styles.nameRow}>
-              <View style={[styles.beerIconWell, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
+              <View style={[styles.beerIconWell, { backgroundColor: colors.backgroundSecondary, borderColor: colors.tint }]}>
                 <ContainerIcon
                   type={containerType}
                   size={20}
-                  color={hasTastedDate ? colors.tint : colors.textSecondary}
+                  color={colors.tint}
                 />
               </View>
               <View style={styles.beerNameCol}>
