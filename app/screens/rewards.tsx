@@ -1,8 +1,9 @@
 import React from 'react';
-import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, TouchableOpacity } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Rewards } from '@/components/Rewards';
+import { ScanlineTitle } from '@/components/ui/ScanlineTitle';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { Colors } from '@/constants/Colors';
 import { router } from 'expo-router';
@@ -30,7 +31,7 @@ export function RewardsScreen() {
               <Ionicons name="chevron-back" size={22} color={colors.tint} />
             </TouchableOpacity>
           </LinearGradient>
-          <Text style={[styles.title, { color: colors.text }]}>Rewards</Text>
+          <ScanlineTitle title="Rewards" />
           <View style={styles.bezelSpacer} />
         </View>
         <Rewards />
@@ -50,11 +51,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     marginTop: 8,
     marginBottom: 16,
-  },
-  title: {
-    fontFamily: 'SpaceGrotesk-Bold',
-    fontSize: 26,
-    letterSpacing: -0.5,
   },
   bezelOuter: {
     borderWidth: 1,

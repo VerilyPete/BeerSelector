@@ -1,7 +1,8 @@
-import { StyleSheet, View, Text } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ChromeStatusBar } from '@/components/ui/ChromeStatusBar';
+import { ScanlineTitle } from '@/components/ui/ScanlineTitle';
 import { areApiUrlsConfigured } from '@/src/database/preferences';
 import { checkAndRefreshOnAppOpen } from '@/src/services/dataUpdateService';
 import ErrorBoundary from '@/components/ErrorBoundary';
@@ -23,7 +24,7 @@ function BeerListScreen() {
     >
       <ChromeStatusBar />
       <View style={styles.headerContainer}>
-        <Text style={[styles.title, { color: colors.text }]}>All Beer</Text>
+        <ScanlineTitle title="All Beer" />
       </View>
       <View style={styles.contentContainer}>
         <ErrorBoundary
@@ -104,11 +105,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     marginTop: 8,
     marginBottom: 16,
-  },
-  title: {
-    fontFamily: 'SpaceGrotesk-Bold',
-    fontSize: 26,
-    letterSpacing: -0.5,
   },
   contentContainer: { flex: 1 },
 });

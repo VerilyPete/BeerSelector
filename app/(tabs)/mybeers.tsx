@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { StyleSheet, View, Text } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { ChromeStatusBar } from '@/components/ui/ChromeStatusBar';
+import { ScanlineTitle } from '@/components/ui/ScanlineTitle';
 
 import { Beerfinder } from '@/components/Beerfinder';
 import { areApiUrlsConfigured } from '@/src/database/preferences';
@@ -48,9 +49,14 @@ export default function MyBeersScreen() {
   if (apiUrlsSet === null || !apiUrlsSet) return null;
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]} testID="beerfinder-screen">
+    <View
+      style={[styles.container, { backgroundColor: colors.background }]}
+      testID="beerfinder-screen"
+    >
       <ChromeStatusBar />
-      <Text style={[styles.title, { color: colors.text }]}>Beerfinder</Text>
+      <View style={styles.headerContainer}>
+        <ScanlineTitle title="Beerfinder" />
+      </View>
       <Beerfinder />
     </View>
   );
@@ -58,12 +64,9 @@ export default function MyBeersScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  title: {
-    fontFamily: 'SpaceGrotesk-Bold',
-    fontSize: 26,
-    letterSpacing: -0.5,
-    marginBottom: 16,
+  headerContainer: {
+    paddingHorizontal: 18,
     marginTop: 8,
-    marginLeft: 18,
+    marginBottom: 16,
   },
 });

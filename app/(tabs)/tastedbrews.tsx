@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { StyleSheet, View, Text } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { ChromeStatusBar } from '@/components/ui/ChromeStatusBar';
+import { ScanlineTitle } from '@/components/ui/ScanlineTitle';
 
 import { TastedBrewList } from '@/components/TastedBrewList';
 import { areApiUrlsConfigured } from '@/src/database/preferences';
@@ -50,11 +51,13 @@ export default function TastedBrewsScreen() {
   if (apiUrlsSet === null || !apiUrlsSet) return null;
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]} testID="tasted-brews-screen">
+    <View
+      style={[styles.container, { backgroundColor: colors.background }]}
+      testID="tasted-brews-screen"
+    >
       <ChromeStatusBar />
       <View style={styles.headerContainer}>
-        <Text style={[styles.title, { color: colors.text }]}>Tasted Brews</Text>
-
+        <ScanlineTitle title="Tasted Brews" />
       </View>
       <ErrorBoundary
         fallbackMessage="Failed to load tasted brews. Please try again."
@@ -78,15 +81,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     marginTop: 8,
     marginBottom: 16,
-    gap: 4,
-  },
-  title: {
-    fontFamily: 'SpaceGrotesk-Bold',
-    fontSize: 26,
-    letterSpacing: -0.5,
-  },
-  subtitle: {
-    fontFamily: 'SpaceMono',
-    fontSize: 11,
   },
 });

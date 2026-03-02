@@ -84,9 +84,7 @@ export const ActionButton = ({
           {loading ? (
             <ActivityIndicator size="small" color={colors.amber} />
           ) : (
-            <Text style={[styles.label, { color: colors.amber }]}>
-              {label}
-            </Text>
+            <Text style={[styles.label, { color: colors.amber }]}>{label}</Text>
           )}
         </View>
       </View>
@@ -99,21 +97,20 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   shell: {
-    borderRadius: 10,
+    borderRadius: 8,
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 3,
-    paddingHorizontal: 10,
+    padding: 1.5,
   },
   gradientFill: {
     ...StyleSheet.absoluteFillObject,
   },
   darkWell: {
-    borderRadius: 10,
+    borderRadius: 7,
     borderWidth: 1,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },

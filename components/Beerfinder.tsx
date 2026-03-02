@@ -248,15 +248,8 @@ export const Beerfinder = () => {
 
   const renderBeerActions = (item: BeerWithContainerType) => (
     <View style={styles.buttonContainer}>
-      <ActionButton
-        label="CHECK IN"
-        onPress={() => handleCheckIn(item)}
-        loading={checkinLoading}
-      />
-      <ActionButton
-        label="UNTAPPD"
-        onPress={() => handleUntappdSearch(item.brew_name)}
-      />
+      <ActionButton label="CHECK IN" onPress={() => handleCheckIn(item)} loading={checkinLoading} />
+      <ActionButton label="UNTAPPD" onPress={() => handleUntappdSearch(item.brew_name)} />
     </View>
   );
 
@@ -274,9 +267,7 @@ export const Beerfinder = () => {
 
             {queueError ? (
               <View style={styles.queueErrorContainer}>
-                <Text style={[styles.queueErrorText, { color: colors.error }]}>
-                  {queueError}
-                </Text>
+                <Text style={[styles.queueErrorText, { color: colors.error }]}>{queueError}</Text>
                 <ActionButton
                   label="TRY AGAIN"
                   onPress={viewQueues}
@@ -285,7 +276,9 @@ export const Beerfinder = () => {
                 />
               </View>
             ) : queuedBeers.length === 0 ? (
-              <Text style={[styles.noQueuesText, { color: colors.textSecondary }]}>No beer currently in queue</Text>
+              <Text style={[styles.noQueuesText, { color: colors.textSecondary }]}>
+                No beer currently in queue
+              </Text>
             ) : (
               <FlatList
                 data={queuedBeers}
@@ -296,7 +289,9 @@ export const Beerfinder = () => {
                       <Text style={[styles.queuedBeerName, { color: colors.tint }]}>
                         {item.name}
                       </Text>
-                      <Text style={[styles.queuedBeerDate, { color: colors.textSecondary }]}>{item.date}</Text>
+                      <Text style={[styles.queuedBeerDate, { color: colors.textSecondary }]}>
+                        {item.date}
+                      </Text>
                     </View>
                     <ActionButton
                       label="DELETE"
@@ -330,15 +325,18 @@ export const Beerfinder = () => {
         <>
           {/* MP-3 Step 3b: Show action buttons even during loading */}
           <View style={styles.filtersContainer}>
-            <View style={styles.buttonsContainer}>
+            <View style={styles.filterRow}>
+              <View style={{ flex: 1 }} />
               <ActionButton
                 label="QUEUE"
                 onPress={viewQueues}
                 loading={loadingQueues}
+                style={{ flex: 0 }}
               />
               <ActionButton
                 label="REWARDS"
                 onPress={() => router.push('/screens/rewards' as Href)}
+                style={{ flex: 0 }}
               />
             </View>
           </View>
@@ -357,38 +355,36 @@ export const Beerfinder = () => {
       ) : (
         <>
           <View style={styles.filtersContainer}>
-            <View style={styles.buttonsContainer}>
-              <ActionButton
-                label="QUEUE"
-                onPress={viewQueues}
-                loading={loadingQueues}
-              />
-              <ActionButton
-                label="REWARDS"
-                onPress={() => router.push('/screens/rewards' as Href)}
-              />
-            </View>
-
             <SearchBar
               searchText={localSearchText}
               onSearchChange={handleSearchChange}
               onClear={clearSearch}
               placeholder="Search available beer..."
             />
-            <View style={styles.beerCountContainer}>
-              <Text style={[styles.beerCount, { color: colors.textSecondary }]}>
-                {filteredBeers.length} beers to discover
-              </Text>
+            <Text style={[styles.beerCount, { color: colors.textSecondary }]}>
+              {filteredBeers.length} to discover
+            </Text>
+            <View style={styles.filterRow}>
+              <ActionButton
+                label="QUEUE"
+                onPress={viewQueues}
+                loading={loadingQueues}
+                style={{ flex: 0 }}
+              />
+              <ActionButton
+                label="REWARDS"
+                onPress={() => router.push('/screens/rewards' as Href)}
+                style={{ flex: 0 }}
+              />
+              <FilterBar
+                containerFilter={containerFilter}
+                sortBy={sortBy}
+                sortDirection={sortDirection}
+                onCycleContainerFilter={cycleContainerFilter}
+                onCycleSort={cycleSort}
+                onToggleSortDirection={toggleSortDirection}
+              />
             </View>
-
-            <FilterBar
-              containerFilter={containerFilter}
-              sortBy={sortBy}
-              sortDirection={sortDirection}
-              onCycleContainerFilter={cycleContainerFilter}
-              onCycleSort={cycleSort}
-              onToggleSortDirection={toggleSortDirection}
-            />
           </View>
 
           <BeerList
@@ -426,12 +422,15 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
     backgroundColor: 'transparent',
   },
-  beerCountContainer: {
-    marginBottom: 8,
+  filterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   beerCount: {
     fontFamily: 'SpaceMono',
     fontSize: 10,
+    marginBottom: 6,
   },
   centered: {
     flex: 1,
@@ -453,12 +452,6 @@ const styles = StyleSheet.create({
   buttonText: {
     fontFamily: 'SpaceGrotesk-SemiBold',
     fontSize: 13,
-  },
-  buttonsContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-    gap: 10,
   },
   buttonContainer: {
     flexDirection: 'row',
