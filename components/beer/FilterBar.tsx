@@ -76,7 +76,7 @@ const FilterBarComponent: React.FC<FilterBarProps> = ({
   }, [onToggleSortDirection]);
 
   return (
-    <>
+    <View style={styles.chipRow} testID="filter-bar">
       {/* Container filter chip */}
       <TouchableOpacity
         onPress={handleContainerPress}
@@ -148,11 +148,15 @@ const FilterBarComponent: React.FC<FilterBarProps> = ({
           </View>
         </ChromeShell>
       </TouchableOpacity>
-    </>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
+  chipRow: {
+    flexDirection: 'row',
+    gap: 6,
+  },
   chromeShell: {
     borderRadius: 8,
     overflow: 'hidden',
