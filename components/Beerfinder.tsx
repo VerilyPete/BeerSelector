@@ -365,17 +365,6 @@ export const Beerfinder = () => {
               {filteredBeers.length} to discover
             </Text>
             <View style={styles.filterRow}>
-              <ActionButton
-                label="QUEUE"
-                onPress={viewQueues}
-                loading={loadingQueues}
-                style={{ flex: 0 }}
-              />
-              <ActionButton
-                label="REWARDS"
-                onPress={() => router.push('/screens/rewards' as Href)}
-                style={{ flex: 0 }}
-              />
               <FilterBar
                 containerFilter={containerFilter}
                 sortBy={sortBy}
@@ -383,6 +372,11 @@ export const Beerfinder = () => {
                 onCycleContainerFilter={cycleContainerFilter}
                 onCycleSort={cycleSort}
                 onToggleSortDirection={toggleSortDirection}
+              />
+              <ActionButton label="QUEUE" onPress={viewQueues} loading={loadingQueues} />
+              <ActionButton
+                label="REWARDS"
+                onPress={() => router.push('/screens/rewards' as Href)}
               />
             </View>
           </View>
@@ -421,11 +415,12 @@ const styles = StyleSheet.create({
     paddingTop: 0,
     paddingBottom: 8,
     backgroundColor: 'transparent',
+    gap: 8,
   },
   filterRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   beerCount: {
     fontFamily: 'SpaceMono',
