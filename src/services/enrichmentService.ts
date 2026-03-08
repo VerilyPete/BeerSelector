@@ -108,8 +108,13 @@ export type EnrichedBeerResponse = z.infer<typeof enrichedBeerResponseSchema>;
 
 /**
  * Response from GET /beers?sid={storeId}
+ * Includes etag extracted from HTTP response headers (not part of JSON body).
  */
-export type BeersProxyResponse = z.infer<typeof beersProxyResponseSchema>;
+export type BeersProxyResponse = Omit<z.infer<typeof beersProxyResponseSchema>, 'source'> & {
+  etag: string | null;
+  notModified: boolean;
+  source?: 'live' | 'cache' | 'stale' | 'not_modified';
+};
 
 /**
  * Response from POST /beers/batch
@@ -399,7 +404,10 @@ export async function getClientId(): Promise<string> {
  * console.log(`Got ${response.beers.length} beers, ${response.cached ? 'from cache' : 'fresh'}`);
  * ```
  */
-export async function fetchBeersFromProxy(storeId: string): Promise<BeersProxyResponse> {
+export async function fetchBeersFromProxy(
+  storeId: string,
+  etag?: string
+): Promise<BeersProxyResponse> {
   const { enrichment } = config;
 
   assertEnrichmentConfigured(enrichment);
@@ -420,14 +428,20 @@ export async function fetchBeersFromProxy(storeId: string): Promise<BeersProxyRe
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), enrichment.timeout);
 
+  const headers: Record<string, string> = {
+    'X-API-Key': enrichment.apiKey,
+    'X-Client-ID': clientId,
+    Accept: 'application/json',
+  };
+
+  if (etag) {
+    headers['If-None-Match'] = etag;
+  }
+
   try {
     const response = await fetch(url, {
       method: 'GET',
-      headers: {
-        'X-API-Key': enrichment.apiKey,
-        'X-Client-ID': clientId,
-        Accept: 'application/json',
-      },
+      headers,
       signal: controller.signal,
     });
 
@@ -437,6 +451,20 @@ export async function fetchBeersFromProxy(storeId: string): Promise<BeersProxyRe
     const requestId = response.headers.get('X-Request-ID');
     if (requestId) {
       console.debug(`[EnrichmentService] Request ID: ${requestId}`);
+    }
+
+    // Handle 304 Not Modified — data hasn't changed since last ETag
+    if (response.status === 304) {
+      metrics.proxySuccesses++;
+      metrics.cacheHits++;
+      return {
+        beers: [],
+        storeId,
+        source: 'not_modified',
+        requestId: response.headers.get('X-Request-ID') ?? '',
+        etag: response.headers.get('ETag') ?? etag ?? null,
+        notModified: true,
+      };
     }
 
     // Handle server-side rate limiting
@@ -477,7 +505,12 @@ export async function fetchBeersFromProxy(storeId: string): Promise<BeersProxyRe
         `Enrichment service returned invalid response shape for store ${storeId}: ${parseResult.error.message}`
       );
     }
-    const data = parseResult.data;
+    const responseEtag = response.headers.get('ETag');
+    const data: BeersProxyResponse = {
+      ...parseResult.data,
+      etag: responseEtag ?? null,
+      notModified: false,
+    };
 
     // Track metrics
     metrics.proxySuccesses++;
@@ -616,7 +649,10 @@ export async function fetchEnrichmentBatch(
         logWarning(`Batch enrichment chunk returned invalid response shape`, {
           operation: 'fetchEnrichmentBatch',
           component: 'enrichmentService',
-          additionalData: { chunkIndex: successCount + failureCount, error: parseResult.error.message },
+          additionalData: {
+            chunkIndex: successCount + failureCount,
+            error: parseResult.error.message,
+          },
         });
         continue; // Try next chunk
       }
@@ -781,7 +817,10 @@ export async function fetchEnrichmentBatchWithMissing(
         logWarning(`Batch enrichment chunk returned invalid response shape`, {
           operation: 'fetchEnrichmentBatchWithMissing',
           component: 'enrichmentService',
-          additionalData: { chunkIndex: successCount + failureCount, error: parseResult.error.message },
+          additionalData: {
+            chunkIndex: successCount + failureCount,
+            error: parseResult.error.message,
+          },
         });
         continue;
       }
