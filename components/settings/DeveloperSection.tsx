@@ -172,6 +172,7 @@ Tasted Beers: ${lastMyBeersRefresh ? new Date(parseInt(lastMyBeersRefresh)).toLo
               console.log('Cleared session data');
 
               await setPreference('all_beers_api_url', '', 'API endpoint for fetching all beers');
+              await setPreference('all_beers_etag', '', 'Cached ETag for all beers taplist');
               await setPreference(
                 'my_beers_api_url',
                 '',

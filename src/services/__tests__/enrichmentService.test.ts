@@ -26,7 +26,12 @@ import {
   EnrichmentData,
   EnrichmentBatchResult,
 } from '../enrichmentService';
-import { Beer, Beerfinder, BeerWithContainerType, BeerfinderWithContainerType } from '@/src/types/beer';
+import {
+  Beer,
+  Beerfinder,
+  BeerWithContainerType,
+  BeerfinderWithContainerType,
+} from '@/src/types/beer';
 
 // Mock the config module
 jest.mock('@/src/config', () => ({
@@ -710,6 +715,130 @@ describe('enrichmentService', () => {
         await expect(fetchBeersFromProxy('13879')).rejects.toThrow(
           'Enrichment service request timed out'
         );
+      });
+
+      it('should return ETag from response header when present', async () => {
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            storeId: '13879',
+            beers: [],
+            requestId: 'req-etag',
+            source: 'cache',
+          }),
+          headers: new Headers({ ETag: '"abc123"', 'X-Request-ID': 'req-etag' }),
+        });
+
+        const result = await fetchBeersFromProxy('13879');
+
+        expect(result.etag).toBe('"abc123"');
+      });
+
+      it('should return null etag when ETag header is not present', async () => {
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            storeId: '13879',
+            beers: [],
+            requestId: 'req-no-etag',
+            source: 'live',
+          }),
+          headers: new Headers({ 'X-Request-ID': 'req-no-etag' }),
+        });
+
+        const result = await fetchBeersFromProxy('13879');
+
+        expect(result.etag).toBeNull();
+      });
+
+      it('should send If-None-Match header when etag parameter is provided', async () => {
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            storeId: '13879',
+            beers: [],
+            requestId: 'req-etag-send',
+            source: 'cache',
+          }),
+          headers: new Headers({ 'X-Request-ID': 'req-etag-send' }),
+        });
+
+        await fetchBeersFromProxy('13879', '"abc123"');
+
+        expect(mockFetch).toHaveBeenCalledWith(
+          expect.any(String),
+          expect.objectContaining({
+            headers: expect.objectContaining({
+              'If-None-Match': '"abc123"',
+            }),
+          })
+        );
+      });
+
+      it('should return notModified true on 304 response', async () => {
+        mockFetch.mockResolvedValueOnce({
+          ok: false,
+          status: 304,
+          headers: new Headers({ ETag: '"abc123"', 'X-Request-ID': 'req-304' }),
+        });
+
+        const result = await fetchBeersFromProxy('13879', '"abc123"');
+
+        expect(result.notModified).toBe(true);
+        expect(result.beers).toEqual([]);
+        expect(result.source).toBe('not_modified');
+        expect(result.etag).toBe('"abc123"');
+      });
+
+      it('should NOT call response.json() on 304 response', async () => {
+        const jsonMock = jest.fn();
+        mockFetch.mockResolvedValueOnce({
+          ok: false,
+          status: 304,
+          json: jsonMock,
+          headers: new Headers({ ETag: '"abc123"', 'X-Request-ID': 'req-304-no-json' }),
+        });
+
+        await fetchBeersFromProxy('13879', '"abc123"');
+
+        expect(jsonMock).not.toHaveBeenCalled();
+      });
+
+      it('should not treat 304 as a !response.ok error', async () => {
+        mockFetch.mockResolvedValueOnce({
+          ok: false,
+          status: 304,
+          statusText: 'Not Modified',
+          headers: new Headers({ 'X-Request-ID': 'req-304-not-error' }),
+        });
+
+        const result = await fetchBeersFromProxy('13879', '"old-etag"');
+
+        expect(result.notModified).toBe(true);
+        expect(result.beers).toEqual([]);
+      });
+
+      it('should NOT send If-None-Match header when no etag parameter is provided', async () => {
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            storeId: '13879',
+            beers: [],
+            requestId: 'req-no-etag-send',
+            source: 'live',
+          }),
+          headers: new Headers({ 'X-Request-ID': 'req-no-etag-send' }),
+        });
+
+        await fetchBeersFromProxy('13879');
+
+        const callArgs = mockFetch.mock.calls[0];
+        const headers = callArgs[1].headers;
+        expect(headers).not.toHaveProperty('If-None-Match');
       });
     });
 

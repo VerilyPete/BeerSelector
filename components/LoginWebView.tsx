@@ -147,8 +147,7 @@ export default function LoginWebView({
           })();
         `);
       }
-    }
-    else if (url.includes('visitor.php')) {
+    } else if (url.includes('visitor.php')) {
       processedUrlsRef.current.add(urlKey);
 
       console.log('Visitor mode detected in WebView at URL:', url);
@@ -262,6 +261,7 @@ export default function LoginWebView({
               'API endpoint for fetching Beerfinder beers'
             );
             setPreference('all_beers_api_url', storeJsonUrl, 'API endpoint for fetching all beers');
+            setPreference('all_beers_etag', '', 'Cached ETag for all beers taplist');
 
             setPreference(
               'last_login_timestamp',
@@ -341,6 +341,7 @@ export default function LoginWebView({
                 storeJsonUrl,
                 'API endpoint for fetching all beers'
               );
+              await setPreference('all_beers_etag', '', 'Cached ETag for all beers taplist');
 
               await setPreference(
                 'my_beers_api_url',
@@ -440,11 +441,11 @@ export default function LoginWebView({
           cacheMode="LOAD_CACHE_ELSE_NETWORK"
           startInLoadingState={true}
           renderLoading={() => (
-            <View
-              style={[styles.webViewLoadingContainer, { backgroundColor: colors.background }]}
-            >
+            <View style={[styles.webViewLoadingContainer, { backgroundColor: colors.background }]}>
               <ActivityIndicator size="large" color={colors.tint} />
-              <Text style={[styles.webViewLoadingText, { color: colors.textSecondary }]}>Loading Flying Saucer...</Text>
+              <Text style={[styles.webViewLoadingText, { color: colors.textSecondary }]}>
+                Loading Flying Saucer...
+              </Text>
             </View>
           )}
         />

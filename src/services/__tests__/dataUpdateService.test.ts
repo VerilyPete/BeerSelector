@@ -12,6 +12,7 @@ import {
   fetchAndUpdateRewards,
   sequentialRefreshAllData,
   refreshAllDataFromAPI,
+  fetchTaplistFromProxyOrDirect,
 } from '../dataUpdateService';
 import { Beer, Beerfinder } from '../../types/beer';
 import { config } from '@/src/config';
@@ -159,16 +160,9 @@ describe('dataUpdateService', () => {
       expect(getPreference).toHaveBeenCalledWith('all_beers_api_url');
     });
 
-    it('should return failure result if fetch fails', async () => {
-      // Mock getPreference to return a test API URL
+    it('should return failure result if fetchBeersFromAPI throws', async () => {
       (getPreference as jest.Mock).mockResolvedValueOnce(testAllBeersUrl);
-
-      // Mock fetch to fail
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: false,
-        status: 500,
-        statusText: 'Internal Server Error',
-      });
+      (fetchBeersFromAPI as jest.Mock).mockRejectedValueOnce(new Error('Network error'));
 
       const result = await fetchAndUpdateAllBeers();
 
@@ -176,21 +170,11 @@ describe('dataUpdateService', () => {
       expect(result.dataUpdated).toBe(false);
       expect(result.error).toBeDefined();
       expect(getPreference).toHaveBeenCalledWith('all_beers_api_url');
-      expect(global.fetch).toHaveBeenCalledWith(
-        testAllBeersUrl,
-        expect.objectContaining({ signal: expect.any(Object) })
-      );
     });
 
-    it('should return failure result if response is not an array', async () => {
-      // Mock getPreference to return a test API URL
+    it('should return failure result when fetchBeersFromAPI returns empty array', async () => {
       (getPreference as jest.Mock).mockResolvedValueOnce(testAllBeersUrl);
-
-      // Mock fetch to return a non-array response
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: true,
-        json: jest.fn().mockResolvedValueOnce({ error: 'Invalid data' }),
-      });
+      (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce([]);
 
       const result = await fetchAndUpdateAllBeers();
 
@@ -199,15 +183,11 @@ describe('dataUpdateService', () => {
       expect(result.error).toBeDefined();
     });
 
-    it('should return failure result if response does not contain brewInStock', async () => {
-      // Mock getPreference to return a test API URL
+    it('should return failure result when all beers are invalid', async () => {
       (getPreference as jest.Mock).mockResolvedValueOnce(testAllBeersUrl);
-
-      // Mock fetch to return an array without brewInStock
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: true,
-        json: jest.fn().mockResolvedValueOnce([{ something: 'else' }, { notBrewInStock: [] }]),
-      });
+      (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce([
+        { brew_name: 'No ID Beer', brewer: 'Brewery 1' },
+      ]);
 
       const result = await fetchAndUpdateAllBeers();
 
@@ -217,25 +197,15 @@ describe('dataUpdateService', () => {
     });
 
     it('should successfully update all beers', async () => {
-      // Mock getPreference to return a test API URL
       (getPreference as jest.Mock).mockResolvedValueOnce(testAllBeersUrl);
 
-      // Mock beers data (without container_type - it's added by calculateContainerTypes in the service)
       const mockBeers: Beer[] = [
         { id: 'beer-1', brew_name: 'Test Beer 1', brewer: 'Brewery 1' },
         { id: 'beer-2', brew_name: 'Test Beer 2', brewer: 'Brewery 2' },
       ];
 
-      // Mock fetch to return valid data
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: true,
-        json: jest.fn().mockResolvedValueOnce([{ something: 'else' }, { brewInStock: mockBeers }]),
-      });
-
-      // Mock beerRepository.insertMany to succeed
+      (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce(mockBeers);
       (beerRepository.insertMany as jest.Mock).mockResolvedValueOnce(undefined);
-
-      // Mock setPreference to succeed
       (setPreference as jest.Mock).mockResolvedValue(undefined);
 
       const result = await fetchAndUpdateAllBeers();
@@ -243,7 +213,6 @@ describe('dataUpdateService', () => {
       expect(result.success).toBe(true);
       expect(result.dataUpdated).toBe(true);
       expect(result.itemCount).toBe(mockBeers.length);
-      // The service adds container_type, abv, and enrichment fields (all null) to beers before insertion via calculateContainerTypes()
       expect(beerRepository.insertMany).toHaveBeenCalledWith([
         {
           id: 'beer-1',
@@ -269,11 +238,8 @@ describe('dataUpdateService', () => {
     });
 
     it('should handle errors during update', async () => {
-      // Mock getPreference to return a test API URL
       (getPreference as jest.Mock).mockResolvedValueOnce(testAllBeersUrl);
-
-      // Mock fetch to throw an error
-      (global.fetch as jest.Mock).mockRejectedValueOnce(new Error('Network error'));
+      (fetchBeersFromAPI as jest.Mock).mockRejectedValueOnce(new Error('Network error'));
 
       const result = await fetchAndUpdateAllBeers();
 
@@ -282,71 +248,47 @@ describe('dataUpdateService', () => {
       expect(result.error).toBeDefined();
     });
 
-    it('should handle fetch timeout with AbortError', async () => {
-      // Mock getPreference to return a test API URL
+    it('should handle fetch errors via createErrorResponse', async () => {
       (getPreference as jest.Mock).mockResolvedValueOnce(testAllBeersUrl);
-
-      // Create AbortError
-      const abortError = new Error('The operation was aborted');
-      abortError.name = 'AbortError';
-
-      // Mock fetch to throw AbortError
-      (global.fetch as jest.Mock).mockRejectedValueOnce(abortError);
+      (fetchBeersFromAPI as jest.Mock).mockRejectedValueOnce(
+        new Error('The operation was aborted')
+      );
 
       const result = await fetchAndUpdateAllBeers();
 
       expect(result.success).toBe(false);
       expect(result.dataUpdated).toBe(false);
       expect(result.error).toBeDefined();
-      expect(result.error?.type).toBe('NETWORK_ERROR');
-      expect(result.error?.message).toContain('request timed out');
     });
 
-    it('should use configured URL from preferences', async () => {
-      const customUrl = 'https://custom.api.com/beers';
-      (getPreference as jest.Mock).mockResolvedValueOnce(customUrl);
-
-      // Mock valid response
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: true,
-        json: jest
-          .fn()
-          .mockResolvedValueOnce([{}, { brewInStock: [{ id: '1', brew_name: 'Test' }] }]),
-      });
-
+    it('should delegate to fetchBeersFromAPI for fetching', async () => {
+      (getPreference as jest.Mock).mockResolvedValueOnce(testAllBeersUrl);
+      (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce([{ id: '1', brew_name: 'Test' }]);
       (beerRepository.insertMany as jest.Mock).mockResolvedValueOnce(undefined);
       (setPreference as jest.Mock).mockResolvedValue(undefined);
 
       await fetchAndUpdateAllBeers();
 
-      expect(global.fetch).toHaveBeenCalledWith(
-        customUrl,
-        expect.objectContaining({ signal: expect.any(Object) })
-      );
+      expect(fetchBeersFromAPI).toHaveBeenCalled();
     });
 
     it('should filter out invalid beers without IDs', async () => {
       (getPreference as jest.Mock).mockResolvedValueOnce(testAllBeersUrl);
 
-      // Mock beers data with some invalid entries (no ID)
       const mockBeers = [
         { id: 'beer-1', brew_name: 'Valid Beer 1', brewer: 'Brewery 1' },
-        { brew_name: 'Invalid Beer - No ID', brewer: 'Brewery 2' }, // Missing id
+        { brew_name: 'Invalid Beer - No ID', brewer: 'Brewery 2' },
         { id: 'beer-3', brew_name: 'Valid Beer 2', brewer: 'Brewery 3' },
       ];
 
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: true,
-        json: jest.fn().mockResolvedValueOnce([{}, { brewInStock: mockBeers }]),
-      });
-
+      (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce(mockBeers);
       (beerRepository.insertMany as jest.Mock).mockResolvedValueOnce(undefined);
       (setPreference as jest.Mock).mockResolvedValue(undefined);
 
       const result = await fetchAndUpdateAllBeers();
 
       expect(result.success).toBe(true);
-      expect(result.itemCount).toBe(2); // Only 2 valid beers
+      expect(result.itemCount).toBe(2);
     });
   });
 
@@ -690,21 +632,14 @@ describe('dataUpdateService', () => {
       it('should work with production config base URL', async () => {
         const productionUrl = `${config.api.baseUrl}/visitor`;
         (getPreference as jest.Mock).mockResolvedValueOnce(productionUrl);
-
-        (global.fetch as jest.Mock).mockResolvedValueOnce({
-          ok: true,
-          json: jest
-            .fn()
-            .mockResolvedValueOnce([{}, { brewInStock: [{ id: '1', brew_name: 'Test' }] }]),
-        });
-
+        (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce([{ id: '1', brew_name: 'Test' }]);
         (beerRepository.insertMany as jest.Mock).mockResolvedValueOnce(undefined);
         (setPreference as jest.Mock).mockResolvedValue(undefined);
 
         const result = await fetchAndUpdateAllBeers();
 
         expect(result.success).toBe(true);
-        expect(global.fetch).toHaveBeenCalledWith(productionUrl, expect.any(Object));
+        expect(fetchBeersFromAPI).toHaveBeenCalled();
       });
 
       it('should work with custom API URL', async () => {
@@ -712,62 +647,37 @@ describe('dataUpdateService', () => {
         const customUrl = `${customBaseUrl}/api/beers`;
 
         (getPreference as jest.Mock).mockResolvedValueOnce(customUrl);
-
-        (global.fetch as jest.Mock).mockResolvedValueOnce({
-          ok: true,
-          json: jest
-            .fn()
-            .mockResolvedValueOnce([{}, { brewInStock: [{ id: '1', brew_name: 'Test' }] }]),
-        });
-
+        (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce([{ id: '1', brew_name: 'Test' }]);
         (beerRepository.insertMany as jest.Mock).mockResolvedValueOnce(undefined);
         (setPreference as jest.Mock).mockResolvedValue(undefined);
 
         const result = await fetchAndUpdateAllBeers();
 
         expect(result.success).toBe(true);
-        expect(global.fetch).toHaveBeenCalledWith(customUrl, expect.any(Object));
+        expect(fetchBeersFromAPI).toHaveBeenCalled();
       });
     });
 
     describe('Network Timeout Configuration', () => {
-      it('should use 15 second timeout for fetch requests', async () => {
+      it('should delegate fetch to fetchBeersFromAPI which handles timeouts', async () => {
         (getPreference as jest.Mock).mockResolvedValueOnce(testAllBeersUrl);
-
-        let capturedSignal: AbortSignal | null = null;
-        (global.fetch as jest.Mock).mockImplementationOnce((url, options) => {
-          capturedSignal = options.signal;
-          // Return a resolved promise to avoid hanging
-          return Promise.resolve({
-            ok: true,
-            json: jest
-              .fn()
-              .mockResolvedValue([{}, { brewInStock: [{ id: '1', brew_name: 'Test' }] }]),
-          });
-        });
-
+        (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce([{ id: '1', brew_name: 'Test' }]);
         (beerRepository.insertMany as jest.Mock).mockResolvedValueOnce(undefined);
         (setPreference as jest.Mock).mockResolvedValue(undefined);
 
         await fetchAndUpdateAllBeers();
 
-        // Verify fetch was called with an AbortSignal
-        expect(capturedSignal).toBeDefined();
-        expect(capturedSignal).toHaveProperty('aborted');
+        expect(fetchBeersFromAPI).toHaveBeenCalled();
       });
 
       it('should handle timeout gracefully', async () => {
         (getPreference as jest.Mock).mockResolvedValueOnce(testAllBeersUrl);
-
-        const abortError = new Error('Timeout');
-        abortError.name = 'AbortError';
-        (global.fetch as jest.Mock).mockRejectedValueOnce(abortError);
+        (fetchBeersFromAPI as jest.Mock).mockRejectedValueOnce(new Error('Timeout'));
 
         const result = await fetchAndUpdateAllBeers();
 
         expect(result.success).toBe(false);
-        expect(result.error?.type).toBe('NETWORK_ERROR');
-        expect(result.error?.message).toContain('timed out');
+        expect(result.error).toBeDefined();
       });
     });
 
@@ -775,8 +685,7 @@ describe('dataUpdateService', () => {
       it('should handle malformed URLs gracefully', async () => {
         const malformedUrl = 'not-a-valid-url';
         (getPreference as jest.Mock).mockResolvedValueOnce(malformedUrl);
-
-        (global.fetch as jest.Mock).mockRejectedValueOnce(new TypeError('Failed to fetch'));
+        (fetchBeersFromAPI as jest.Mock).mockRejectedValueOnce(new TypeError('Failed to fetch'));
 
         const result = await fetchAndUpdateAllBeers();
 
@@ -787,113 +696,78 @@ describe('dataUpdateService', () => {
       it('should accept HTTPS URLs', async () => {
         const httpsUrl = 'https://secure.api.com/beers';
         (getPreference as jest.Mock).mockResolvedValueOnce(httpsUrl);
-
-        (global.fetch as jest.Mock).mockResolvedValueOnce({
-          ok: true,
-          json: jest
-            .fn()
-            .mockResolvedValueOnce([{}, { brewInStock: [{ id: '1', brew_name: 'Test' }] }]),
-        });
-
+        (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce([{ id: '1', brew_name: 'Test' }]);
         (beerRepository.insertMany as jest.Mock).mockResolvedValueOnce(undefined);
         (setPreference as jest.Mock).mockResolvedValue(undefined);
 
         const result = await fetchAndUpdateAllBeers();
 
         expect(result.success).toBe(true);
-        expect(global.fetch).toHaveBeenCalledWith(httpsUrl, expect.any(Object));
+        expect(fetchBeersFromAPI).toHaveBeenCalled();
       });
 
       it('should accept HTTP URLs', async () => {
         const httpUrl = 'http://localhost:3000/api/beers';
         (getPreference as jest.Mock).mockResolvedValueOnce(httpUrl);
-
-        (global.fetch as jest.Mock).mockResolvedValueOnce({
-          ok: true,
-          json: jest
-            .fn()
-            .mockResolvedValueOnce([{}, { brewInStock: [{ id: '1', brew_name: 'Test' }] }]),
-        });
-
+        (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce([{ id: '1', brew_name: 'Test' }]);
         (beerRepository.insertMany as jest.Mock).mockResolvedValueOnce(undefined);
         (setPreference as jest.Mock).mockResolvedValue(undefined);
 
         const result = await fetchAndUpdateAllBeers();
 
         expect(result.success).toBe(true);
-        expect(global.fetch).toHaveBeenCalledWith(httpUrl, expect.any(Object));
+        expect(fetchBeersFromAPI).toHaveBeenCalled();
       });
     });
 
     describe('Config Module Compatibility', () => {
       it('should work with config.api.baseUrl value', async () => {
-        // Verify config module is properly initialized
         expect(config.api.baseUrl).toBeDefined();
         expect(typeof config.api.baseUrl).toBe('string');
 
         const configBasedUrl = `${config.api.baseUrl}/custom/endpoint`;
         (getPreference as jest.Mock).mockResolvedValueOnce(configBasedUrl);
-
-        (global.fetch as jest.Mock).mockResolvedValueOnce({
-          ok: true,
-          json: jest
-            .fn()
-            .mockResolvedValueOnce([{}, { brewInStock: [{ id: '1', brew_name: 'Test' }] }]),
-        });
-
+        (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce([{ id: '1', brew_name: 'Test' }]);
         (beerRepository.insertMany as jest.Mock).mockResolvedValueOnce(undefined);
         (setPreference as jest.Mock).mockResolvedValue(undefined);
 
         const result = await fetchAndUpdateAllBeers();
 
         expect(result.success).toBe(true);
-        expect(global.fetch).toHaveBeenCalledWith(
-          expect.stringContaining(config.api.baseUrl),
-          expect.any(Object)
-        );
+        expect(fetchBeersFromAPI).toHaveBeenCalled();
       });
 
       it('should respect config network settings for timeout handling', async () => {
-        // Verify network config is available
         expect(config.network.timeout).toBeDefined();
         expect(config.network.retries).toBeDefined();
         expect(config.network.retryDelay).toBeDefined();
 
-        // The service uses a hardcoded 15s timeout, but config is available
-        // for future refactoring
         expect(config.network.timeout).toBeGreaterThan(0);
         expect(config.network.retries).toBeGreaterThanOrEqual(0);
       });
     });
 
     describe('Error Handling with Config', () => {
-      it('should properly categorize network errors', async () => {
+      it('should properly categorize fetch errors', async () => {
         (getPreference as jest.Mock).mockResolvedValueOnce(testAllBeersUrl);
-
-        (global.fetch as jest.Mock).mockRejectedValueOnce(new TypeError('Network request failed'));
+        (fetchBeersFromAPI as jest.Mock).mockRejectedValueOnce(
+          new TypeError('Network request failed')
+        );
 
         const result = await fetchAndUpdateAllBeers();
 
         expect(result.success).toBe(false);
         expect(result.error).toBeDefined();
-        expect(result.error?.type).toBe('NETWORK_ERROR');
       });
 
-      it('should properly categorize server errors', async () => {
+      it('should properly categorize API errors', async () => {
         (getPreference as jest.Mock).mockResolvedValueOnce(testAllBeersUrl);
-
-        (global.fetch as jest.Mock).mockResolvedValueOnce({
-          ok: false,
-          status: 503,
-          statusText: 'Service Unavailable',
-        });
+        (fetchBeersFromAPI as jest.Mock).mockRejectedValueOnce(new Error('Server error'));
 
         const result = await fetchAndUpdateAllBeers();
 
         expect(result.success).toBe(false);
         expect(result.error).toBeDefined();
-        expect(result.error?.type).toBe('SERVER_ERROR');
-        expect(result.error?.statusCode).toBe(503);
       });
 
       it('should properly categorize validation errors', async () => {
@@ -906,19 +780,14 @@ describe('dataUpdateService', () => {
         expect(result.error?.type).toBe('VALIDATION_ERROR');
       });
 
-      it('should properly categorize parse errors', async () => {
+      it('should properly categorize empty response', async () => {
         (getPreference as jest.Mock).mockResolvedValueOnce(testAllBeersUrl);
-
-        (global.fetch as jest.Mock).mockResolvedValueOnce({
-          ok: true,
-          json: jest.fn().mockRejectedValueOnce(new Error('Invalid JSON')),
-        });
+        (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce([]);
 
         const result = await fetchAndUpdateAllBeers();
 
         expect(result.success).toBe(false);
         expect(result.error).toBeDefined();
-        expect(result.error?.type).toBe('PARSE_ERROR');
       });
     });
   });
@@ -1140,7 +1009,7 @@ describe('dataUpdateService', () => {
 
       const result = await sequentialRefreshAllData();
 
-      expect(fetchBeersFromProxy).toHaveBeenCalledWith('13885');
+      expect(fetchBeersFromProxy).toHaveBeenCalledWith('13885', expect.anything());
       expect(result.allBeersResult.success).toBe(true);
     });
 
@@ -1270,7 +1139,7 @@ describe('dataUpdateService', () => {
 
       await refreshAllDataFromAPI();
 
-      expect(fetchBeersFromProxy).toHaveBeenCalledWith('13885');
+      expect(fetchBeersFromProxy).toHaveBeenCalledWith('13885', expect.anything());
       expect(fetchBeersFromAPI).not.toHaveBeenCalled();
     });
 
@@ -1408,5 +1277,233 @@ describe('dataUpdateService', () => {
       // Restore fake timers for remaining tests
       jest.useFakeTimers();
     }, 10000);
+  });
+
+  describe('ETag / 304 handling', () => {
+    describe('fetchTaplistFromProxyOrDirect', () => {
+      it('should return notModified true when proxy returns 304', async () => {
+        const { config: mockConfig } = require('@/src/config');
+        mockConfig.enrichment.isConfigured.mockReturnValue(true);
+
+        (fetchBeersFromProxy as jest.Mock).mockResolvedValueOnce({
+          beers: [],
+          storeId: '13879',
+          source: 'not_modified',
+          requestId: '',
+          etag: '"abc123"',
+          notModified: true,
+        });
+
+        const result = await fetchTaplistFromProxyOrDirect('13879');
+
+        expect(result.notModified).toBe(true);
+        expect(result.beers).toEqual([]);
+        expect(result.etag).toBe('"abc123"');
+      });
+
+      it('should pass stored ETag to fetchBeersFromProxy when preference exists', async () => {
+        const { config: mockConfig } = require('@/src/config');
+        mockConfig.enrichment.isConfigured.mockReturnValue(true);
+
+        (getPreference as jest.Mock).mockImplementation((key: string) => {
+          if (key === 'all_beers_etag') return Promise.resolve('"stored-etag"');
+          return Promise.resolve(null);
+        });
+
+        (fetchBeersFromProxy as jest.Mock).mockResolvedValueOnce({
+          beers: [],
+          storeId: '13879',
+          source: 'cache',
+          etag: '"stored-etag"',
+          notModified: false,
+        });
+
+        await fetchTaplistFromProxyOrDirect('13879');
+
+        expect(fetchBeersFromProxy).toHaveBeenCalledWith('13879', '"stored-etag"');
+      });
+
+      it('should NOT pass ETag to fetchBeersFromProxy when no preference exists', async () => {
+        const { config: mockConfig } = require('@/src/config');
+        mockConfig.enrichment.isConfigured.mockReturnValue(true);
+
+        (getPreference as jest.Mock).mockResolvedValue(null);
+
+        (fetchBeersFromProxy as jest.Mock).mockResolvedValueOnce({
+          beers: [],
+          storeId: '13879',
+          source: 'live',
+          etag: null,
+          notModified: false,
+        });
+
+        await fetchTaplistFromProxyOrDirect('13879');
+
+        expect(fetchBeersFromProxy).toHaveBeenCalledWith('13879', undefined);
+      });
+
+      it('should default notModified to false on normal 200 proxy response', async () => {
+        const { config: mockConfig } = require('@/src/config');
+        mockConfig.enrichment.isConfigured.mockReturnValue(true);
+
+        (getPreference as jest.Mock).mockResolvedValue(null);
+
+        (fetchBeersFromProxy as jest.Mock).mockResolvedValueOnce({
+          beers: [{ id: '1', brew_name: 'Test', brewer: 'Brewer' }],
+          storeId: '13879',
+          source: 'live',
+          etag: '"new-etag"',
+          notModified: false,
+        });
+
+        const result = await fetchTaplistFromProxyOrDirect('13879');
+
+        expect(result.notModified).toBe(false);
+        expect(result.beers.length).toBe(1);
+      });
+
+      it('should default notModified to false on direct Flying Saucer fallback', async () => {
+        const { config: mockConfig } = require('@/src/config');
+        mockConfig.enrichment.isConfigured.mockReturnValue(false);
+
+        (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce([
+          { id: '1', brew_name: 'Test', brewer: 'Brewer' },
+        ]);
+
+        const result = await fetchTaplistFromProxyOrDirect('13879');
+
+        expect(result.notModified).toBe(false);
+        expect(result.etag).toBeNull();
+      });
+    });
+
+    describe('fetchAndUpdateAllBeers with 304', () => {
+      it('should skip DB writes on 304 and return dataUpdated false', async () => {
+        const { config: mockConfig } = require('@/src/config');
+        mockConfig.enrichment.isConfigured.mockReturnValue(true);
+
+        (getPreference as jest.Mock).mockImplementation((key: string) => {
+          if (key === 'all_beers_api_url')
+            return Promise.resolve('https://fsbs.beerknurd.com/bk-store-json.php?sid=13879');
+          if (key === 'all_beers_etag') return Promise.resolve('"cached-etag"');
+          return Promise.resolve(null);
+        });
+
+        (fetchBeersFromProxy as jest.Mock).mockResolvedValueOnce({
+          beers: [],
+          storeId: '13879',
+          source: 'not_modified',
+          requestId: '',
+          etag: '"cached-etag"',
+          notModified: true,
+        });
+
+        const result = await fetchAndUpdateAllBeers();
+
+        expect(result.success).toBe(true);
+        expect(result.dataUpdated).toBe(false);
+        expect(beerRepository.insertMany).not.toHaveBeenCalled();
+      });
+
+      it('should update all_beers_last_check on 304', async () => {
+        const { config: mockConfig } = require('@/src/config');
+        mockConfig.enrichment.isConfigured.mockReturnValue(true);
+
+        (getPreference as jest.Mock).mockImplementation((key: string) => {
+          if (key === 'all_beers_api_url')
+            return Promise.resolve('https://fsbs.beerknurd.com/bk-store-json.php?sid=13879');
+          if (key === 'all_beers_etag') return Promise.resolve('"cached-etag"');
+          return Promise.resolve(null);
+        });
+
+        (fetchBeersFromProxy as jest.Mock).mockResolvedValueOnce({
+          beers: [],
+          storeId: '13879',
+          source: 'not_modified',
+          etag: '"cached-etag"',
+          notModified: true,
+        });
+
+        await fetchAndUpdateAllBeers();
+
+        expect(setPreference).toHaveBeenCalledWith('all_beers_last_check', expect.any(String));
+      });
+
+      it('should store ETag after successful 200 from proxy with ETag header', async () => {
+        const { config: mockConfig } = require('@/src/config');
+        mockConfig.enrichment.isConfigured.mockReturnValue(true);
+
+        (getPreference as jest.Mock).mockImplementation((key: string) => {
+          if (key === 'all_beers_api_url')
+            return Promise.resolve('https://fsbs.beerknurd.com/bk-store-json.php?sid=13879');
+          if (key === 'all_beers_etag') return Promise.resolve(null);
+          return Promise.resolve(null);
+        });
+
+        (fetchBeersFromProxy as jest.Mock).mockResolvedValueOnce({
+          beers: [{ id: '1', brew_name: 'Test IPA', brewer: 'Test Brewery' }],
+          storeId: '13879',
+          source: 'live',
+          etag: '"new-etag"',
+          notModified: false,
+        });
+
+        (beerRepository.insertMany as jest.Mock).mockResolvedValueOnce(undefined);
+        (setPreference as jest.Mock).mockResolvedValue(undefined);
+
+        await fetchAndUpdateAllBeers();
+
+        expect(setPreference).toHaveBeenCalledWith('all_beers_etag', '"new-etag"');
+      });
+
+      it('should NOT store ETag after 200 from proxy with no ETag header', async () => {
+        const { config: mockConfig } = require('@/src/config');
+        mockConfig.enrichment.isConfigured.mockReturnValue(true);
+
+        (getPreference as jest.Mock).mockImplementation((key: string) => {
+          if (key === 'all_beers_api_url')
+            return Promise.resolve('https://fsbs.beerknurd.com/bk-store-json.php?sid=13879');
+          if (key === 'all_beers_etag') return Promise.resolve(null);
+          return Promise.resolve(null);
+        });
+
+        (fetchBeersFromProxy as jest.Mock).mockResolvedValueOnce({
+          beers: [{ id: '1', brew_name: 'Test IPA', brewer: 'Test Brewery' }],
+          storeId: '13879',
+          source: 'live',
+          etag: null,
+          notModified: false,
+        });
+
+        (beerRepository.insertMany as jest.Mock).mockResolvedValueOnce(undefined);
+        (setPreference as jest.Mock).mockResolvedValue(undefined);
+
+        await fetchAndUpdateAllBeers();
+
+        expect(setPreference).not.toHaveBeenCalledWith('all_beers_etag', expect.anything());
+      });
+
+      it('should NOT store ETag after 200 from direct Flying Saucer fetch', async () => {
+        const { config: mockConfig } = require('@/src/config');
+        mockConfig.enrichment.isConfigured.mockReturnValue(false);
+
+        (getPreference as jest.Mock).mockImplementation((key: string) => {
+          if (key === 'all_beers_api_url')
+            return Promise.resolve('https://fsbs.beerknurd.com/bk-store-json.php?sid=13879');
+          return Promise.resolve(null);
+        });
+
+        (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce([
+          { id: '1', brew_name: 'Test IPA', brewer: 'Test Brewery' },
+        ]);
+
+        (beerRepository.insertMany as jest.Mock).mockResolvedValueOnce(undefined);
+        (setPreference as jest.Mock).mockResolvedValue(undefined);
+
+        await fetchAndUpdateAllBeers();
+
+        expect(setPreference).not.toHaveBeenCalledWith('all_beers_etag', expect.anything());
+      });
+    });
   });
 });
