@@ -62,14 +62,6 @@ jest.mock('@/hooks/useColorScheme', () => ({
   useColorScheme: jest.fn(() => 'light'),
 }));
 
-jest.mock('@/hooks/useThemeColor', () => ({
-  useThemeColor: jest.fn(() => '#007AFF'),
-}));
-
-// Mock ThemedText and ThemedView
-jest.mock('@/components/ThemedText');
-jest.mock('@/components/ThemedView');
-
 // Mock IconSymbol
 jest.mock('@/components/ui/IconSymbol', () => ({
   IconSymbol: ({ name, testID }: any) => {

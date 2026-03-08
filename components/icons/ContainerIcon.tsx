@@ -1,8 +1,7 @@
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import BeerIcon from './BeerIcon';
 import { ContainerType } from '@/src/utils/beerGlassType';
-import { ThemedText } from '../ThemedText';
 
 type ContainerIconProps = {
   type: ContainerType;
@@ -10,19 +9,8 @@ type ContainerIconProps = {
   color?: string;
 };
 
-/**
- * Renders the appropriate container icon based on type
- * - Pint glass for draft beers < 8% ABV (16oz)
- * - Tulip glass for draft beers >= 8% ABV (13oz)
- * - Can for canned beers
- * - Bottle for bottled beers
- * - Flight for beer flights (4 tasting glasses)
- * - Question mark for unknown container types (null)
- */
 export function ContainerIcon({ type, size = 24, color = '#000000' }: ContainerIconProps) {
   if (!type) {
-    // Show a question mark for unknown container types
-    // Uses muted text style for subtle appearance consistent with iconography
     return (
       <View
         style={[
@@ -35,8 +23,7 @@ export function ContainerIcon({ type, size = 24, color = '#000000' }: ContainerI
         accessible={true}
         accessibilityLabel="Unknown container type"
       >
-        <ThemedText
-          type="muted"
+        <Text
           style={[
             styles.unknownText,
             {
@@ -47,12 +34,11 @@ export function ContainerIcon({ type, size = 24, color = '#000000' }: ContainerI
           ]}
         >
           ?
-        </ThemedText>
+        </Text>
       </View>
     );
   }
 
-  // All valid types map directly to BeerIcon names
   return <BeerIcon name={type} size={size} color={color} />;
 }
 
