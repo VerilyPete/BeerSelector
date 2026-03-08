@@ -27,6 +27,13 @@ import {
 } from './enrichmentService';
 import { EnrichmentUpdate } from '../types/enrichment';
 
+const RAPID_REFRESH_WINDOW_MS = 30_000;
+let lastManualRefreshTime = 0;
+
+export function resetLastManualRefreshTime(): void {
+  lastManualRefreshTime = 0;
+}
+
 /**
  * Result of a data update operation
  */
@@ -963,6 +970,12 @@ export async function manualRefreshAllData(): Promise<ManualRefreshResult> {
 
     // Force fresh data by clearing relevant timestamps
     console.log('Clearing timestamp checks for manual refresh (all data)');
+    const now = Date.now();
+    if (now - lastManualRefreshTime < RAPID_REFRESH_WINDOW_MS) {
+      console.log('Rapid double-refresh detected, clearing ETag to force full fetch');
+      await setPreference('all_beers_etag', '');
+    }
+    lastManualRefreshTime = now;
     await setPreference('all_beers_last_update', '');
     await setPreference('all_beers_last_check', '');
     await setPreference('my_beers_last_update', '');

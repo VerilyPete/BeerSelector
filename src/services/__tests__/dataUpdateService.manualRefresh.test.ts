@@ -2,6 +2,7 @@ import * as svc from '../../services/dataUpdateService';
 
 // Import mocked functions
 import { fetchBeersFromAPI, fetchMyBeersFromAPI, fetchRewardsFromAPI } from '../../api/beerApi';
+import { setPreference } from '../../database/preferences';
 
 // Mock dependencies
 jest.mock('../../database/preferences', () => ({
@@ -97,5 +98,48 @@ describe('manualRefreshAllData', () => {
     expect(result.allBeersResult.success).toBe(false);
     expect(result.myBeersResult.success).toBe(true);
     expect(result.rewardsResult.success).toBe(true);
+  });
+
+  it('does not clear ETag on first manual refresh', async () => {
+    svc.resetLastManualRefreshTime();
+    (fetchBeersFromAPI as jest.Mock).mockResolvedValue([
+      { id: 'beer-1', brew_name: 'Test Beer', brewer: 'Brewery' },
+    ]);
+    (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue([]);
+    (fetchRewardsFromAPI as jest.Mock).mockResolvedValue([]);
+
+    await svc.manualRefreshAllData();
+
+    const etagClears = (setPreference as jest.Mock).mock.calls.filter(
+      (c: unknown[]) => c[0] === 'all_beers_etag'
+    );
+    expect(etagClears).toHaveLength(0);
+  });
+
+  it('clears ETag on rapid second manual refresh within 30s', async () => {
+    svc.resetLastManualRefreshTime();
+    (fetchBeersFromAPI as jest.Mock).mockResolvedValue([
+      { id: 'beer-1', brew_name: 'Test Beer', brewer: 'Brewery' },
+    ]);
+    (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue([]);
+    (fetchRewardsFromAPI as jest.Mock).mockResolvedValue([]);
+
+    await svc.manualRefreshAllData();
+    jest.clearAllMocks();
+
+    // Re-setup mocks after clear
+    (fetchBeersFromAPI as jest.Mock).mockResolvedValue([
+      { id: 'beer-1', brew_name: 'Test Beer', brewer: 'Brewery' },
+    ]);
+    (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue([]);
+    (fetchRewardsFromAPI as jest.Mock).mockResolvedValue([]);
+
+    await svc.manualRefreshAllData();
+
+    const etagClears = (setPreference as jest.Mock).mock.calls.filter(
+      (c: unknown[]) => c[0] === 'all_beers_etag'
+    );
+    expect(etagClears).toHaveLength(1);
+    expect(etagClears[0][1]).toBe('');
   });
 });

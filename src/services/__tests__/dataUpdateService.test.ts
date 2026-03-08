@@ -248,17 +248,18 @@ describe('dataUpdateService', () => {
       expect(result.error).toBeDefined();
     });
 
-    it('should handle fetch errors via createErrorResponse', async () => {
+    it('should categorize AbortError as NETWORK_ERROR via createErrorResponse', async () => {
       (getPreference as jest.Mock).mockResolvedValueOnce(testAllBeersUrl);
-      (fetchBeersFromAPI as jest.Mock).mockRejectedValueOnce(
-        new Error('The operation was aborted')
-      );
+      const abortError = new Error('The operation was aborted');
+      abortError.name = 'AbortError';
+      (fetchBeersFromAPI as jest.Mock).mockRejectedValueOnce(abortError);
 
       const result = await fetchAndUpdateAllBeers();
 
       expect(result.success).toBe(false);
       expect(result.dataUpdated).toBe(false);
       expect(result.error).toBeDefined();
+      expect(result.error?.type).toBe('NETWORK_ERROR');
     });
 
     it('should delegate to fetchBeersFromAPI for fetching', async () => {
@@ -748,7 +749,7 @@ describe('dataUpdateService', () => {
     });
 
     describe('Error Handling with Config', () => {
-      it('should properly categorize fetch errors', async () => {
+      it('should properly categorize network errors', async () => {
         (getPreference as jest.Mock).mockResolvedValueOnce(testAllBeersUrl);
         (fetchBeersFromAPI as jest.Mock).mockRejectedValueOnce(
           new TypeError('Network request failed')
@@ -758,9 +759,10 @@ describe('dataUpdateService', () => {
 
         expect(result.success).toBe(false);
         expect(result.error).toBeDefined();
+        expect(result.error?.type).toBe('NETWORK_ERROR');
       });
 
-      it('should properly categorize API errors', async () => {
+      it('should properly categorize unknown errors', async () => {
         (getPreference as jest.Mock).mockResolvedValueOnce(testAllBeersUrl);
         (fetchBeersFromAPI as jest.Mock).mockRejectedValueOnce(new Error('Server error'));
 
@@ -768,6 +770,7 @@ describe('dataUpdateService', () => {
 
         expect(result.success).toBe(false);
         expect(result.error).toBeDefined();
+        expect(result.error?.type).toBe('UNKNOWN_ERROR');
       });
 
       it('should properly categorize validation errors', async () => {
@@ -780,7 +783,7 @@ describe('dataUpdateService', () => {
         expect(result.error?.type).toBe('VALIDATION_ERROR');
       });
 
-      it('should properly categorize empty response', async () => {
+      it('should properly categorize empty response as validation error', async () => {
         (getPreference as jest.Mock).mockResolvedValueOnce(testAllBeersUrl);
         (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce([]);
 
@@ -788,6 +791,7 @@ describe('dataUpdateService', () => {
 
         expect(result.success).toBe(false);
         expect(result.error).toBeDefined();
+        expect(result.error?.type).toBe('VALIDATION_ERROR');
       });
     });
   });
