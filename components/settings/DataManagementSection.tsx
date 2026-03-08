@@ -1,50 +1,23 @@
 import React from 'react';
-import { View, ViewStyle } from 'react-native';
-
+import { View, Text, TouchableOpacity, StyleSheet, ViewStyle } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useColorScheme } from '@/hooks/useColorScheme';
 import { Colors } from '@/constants/Colors';
 import SettingsSection from './SettingsSection';
 import SettingsItem from './SettingsItem';
 
-/**
- * Props for DataManagementSection component
- */
 type DataManagementSectionProps = {
-  /** Whether API URLs are configured */
   apiUrlsConfigured: boolean;
-  /** Whether data refresh is in progress */
   refreshing: boolean;
-  /** Callback to refresh all data */
   onRefresh: () => Promise<void>;
-
-  /** Whether this is the first login (affects UI rendering) */
   isFirstLogin: boolean;
-  /** Callback to initiate Flying Saucer login */
   onLogin: () => void;
-
-  /** Whether the app can navigate back (affects home button visibility) */
   canGoBack: boolean;
-  /** Callback to navigate to home screen */
   onGoHome: () => void;
-
-  /** Custom style for the container */
   style?: ViewStyle;
-  /** Test ID for testing */
   testID?: string;
 };
 
-/**
- * DataManagementSection Component
- *
- * Manages data-related operations including:
- * - Refreshing beer data from API
- * - Flying Saucer authentication
- * - Navigation to home screen
- *
- * Uses the new SettingsSection and SettingsItem components
- * for consistent styling and dark mode support.
- *
- * All items show loading state during refresh operations.
- */
 export default function DataManagementSection({
   apiUrlsConfigured,
   refreshing,
@@ -56,14 +29,13 @@ export default function DataManagementSection({
   style,
   testID = 'data-management-section',
 }: DataManagementSectionProps) {
-  // Don't render section at all if first login and URLs not configured
+  const colorScheme = useColorScheme() ?? 'dark';
+  const colors = Colors[colorScheme];
+
   if (isFirstLogin && !apiUrlsConfigured) {
     return null;
   }
 
-  /**
-   * Handles refresh button press
-   */
   const handleRefresh = async () => {
     try {
       await onRefresh();
@@ -72,7 +44,6 @@ export default function DataManagementSection({
     }
   };
 
-  // Count how many items will be shown to manage separators
   const showRefresh = apiUrlsConfigured;
   const showLogin = !isFirstLogin;
   const showHome = apiUrlsConfigured && !canGoBack;
@@ -87,11 +58,9 @@ export default function DataManagementSection({
             : undefined
         }
       >
-        {/* Refresh Button */}
         {showRefresh && (
           <SettingsItem
             icon="arrow.clockwise"
-            iconBackgroundColor={Colors.light.success}
             title={refreshing ? 'Refreshing...' : 'Refresh All Data'}
             subtitle="Download latest beers and rewards"
             accessoryType={refreshing ? 'loading' : 'none'}
@@ -102,11 +71,9 @@ export default function DataManagementSection({
           />
         )}
 
-        {/* Login Button */}
         {showLogin && (
           <SettingsItem
             icon="person.crop.circle"
-            iconBackgroundColor={Colors.light.tint}
             title="Login to Flying Saucer"
             subtitle="Sign in with your UFO Club account"
             accessoryType="chevron"
@@ -117,11 +84,9 @@ export default function DataManagementSection({
           />
         )}
 
-        {/* Home Navigation Button */}
         {showHome && (
           <SettingsItem
             icon="house.fill"
-            iconBackgroundColor="#5856D6"
             title="Go to Home Screen"
             subtitle="Return to the main beer list"
             accessoryType="chevron"
@@ -131,6 +96,60 @@ export default function DataManagementSection({
           />
         )}
       </SettingsSection>
+
+      {!isFirstLogin && (
+        <TouchableOpacity
+          style={[
+            styles.logoutOuter,
+            {
+              backgroundColor: colors.destructive,
+              borderColor: 'rgba(255, 153, 153, 0.37)',
+            },
+          ]}
+          onPress={onLogin}
+          activeOpacity={0.8}
+          testID="logout-button"
+        >
+          <View
+            style={[
+              styles.logoutInner,
+              { backgroundColor: '#1A0000', borderColor: 'rgba(51, 0, 0, 0.5)' },
+            ]}
+          >
+            <Ionicons name="log-out-outline" size={18} color={colors.destructive} />
+            <Text style={[styles.logoutText, { color: colors.destructive }]}>LOG OUT</Text>
+          </View>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  logoutOuter: {
+    borderRadius: 14,
+    padding: 2,
+    borderWidth: 1,
+    marginTop: 20,
+    shadowColor: '#FF3333',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 6,
+  },
+  logoutInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderRadius: 12,
+    paddingVertical: 12,
+    borderWidth: 1,
+  },
+  logoutText: {
+    fontFamily: 'SpaceMono',
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 2,
+  },
+});

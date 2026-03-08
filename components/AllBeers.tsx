@@ -1,11 +1,10 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { StyleSheet, View, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, TouchableOpacity, Text } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { beerRepository } from '@/src/database/repositories/BeerRepository';
-import { ThemedText } from './ThemedText';
-import { useThemeColor } from '@/hooks/useThemeColor';
-import { useUntappdColor } from '@/hooks/useUntappdColor';
 import { useBreakpoint } from '@/hooks/useBreakpoint';
+import { useColorScheme } from '@/hooks/useColorScheme';
+import { Colors } from '@/constants/Colors';
 import { SearchBar } from './SearchBar';
 import { useBeerFilters } from '@/hooks/useBeerFilters';
 import { useDataRefresh } from '@/hooks/useDataRefresh';
@@ -53,9 +52,8 @@ export const AllBeers = () => {
     setSearchText(debouncedSearchText);
   }, [debouncedSearchText, setSearchText]);
 
-  // Theme colors
-  const activeButtonColor = useThemeColor({}, 'tint');
-  const untappdColor = useUntappdColor();
+  const colorScheme = useColorScheme() ?? 'dark';
+  const colors = Colors[colorScheme];
 
   const loadBeers = useCallback(async () => {
     try {
@@ -111,22 +109,16 @@ export const AllBeers = () => {
   const renderBeerActions = (item: BeerWithContainerType) => (
     <View style={styles.buttonContainer}>
       <TouchableOpacity
-        style={[
-          styles.checkInButton,
-          {
-            backgroundColor: untappdColor,
-            width: '48%',
-          },
-        ]}
+        style={[styles.checkInButton, { borderColor: colors.tint }]}
         onPress={() => handleUntappdSearch(item.brew_name)}
         activeOpacity={0.7}
         accessible={true}
         accessibilityLabel={`Check ${item.brew_name} on Untappd`}
         accessibilityRole="button"
       >
-        <ThemedText style={styles.checkInButtonText} numberOfLines={1}>
-          Untappd
-        </ThemedText>
+        <Text style={[styles.checkInButtonText, { color: colors.tint }]} numberOfLines={1}>
+          UNTAPPD
+        </Text>
       </TouchableOpacity>
     </View>
   );
@@ -149,15 +141,15 @@ export const AllBeers = () => {
         </>
       ) : errors.beerError ? (
         <View style={styles.centered} testID="error-container">
-          <ThemedText style={styles.errorText} testID="error-message">
+          <Text style={[styles.errorText, { color: colors.error }]} testID="error-message">
             {errors.beerError}
-          </ThemedText>
+          </Text>
           <TouchableOpacity
-            style={[styles.refreshButton, { backgroundColor: activeButtonColor }]}
+            style={[styles.refreshButton, { backgroundColor: colors.tint }]}
             onPress={loadBeers}
             testID="try-again-button"
           >
-            <ThemedText style={[styles.buttonText, { color: 'white' }]}>Try Again</ThemedText>
+            <Text style={[styles.buttonText, { color: colors.textOnPrimary }]}>Try Again</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -170,9 +162,9 @@ export const AllBeers = () => {
               placeholder="Search beer..."
             />
             <View style={styles.beerCountContainer}>
-              <ThemedText style={styles.beerCount} testID="beer-count">
-                {filteredBeers.length} {filteredBeers.length === 1 ? 'brew' : 'brews'} available
-              </ThemedText>
+              <Text style={[styles.beerCount, { color: colors.textSecondary }]} testID="beer-count">
+                {filteredBeers.length} beers on tap
+              </Text>
             </View>
 
             <FilterBar
@@ -212,16 +204,17 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: 'transparent',
+    paddingHorizontal: 18,
   },
   filtersContainer: {
     marginBottom: 16,
   },
   beerCountContainer: {
     marginBottom: 8,
-    paddingHorizontal: 16,
   },
   beerCount: {
-    fontWeight: '600',
+    fontFamily: 'SpaceMono',
+    fontSize: 10,
   },
   centered: {
     flex: 1,
@@ -230,33 +223,37 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   errorText: {
-    color: 'red',
     textAlign: 'center',
   },
   refreshButton: {
     marginTop: 16,
     paddingVertical: 12,
     paddingHorizontal: 24,
-    borderRadius: 24,
+    borderRadius: 8,
   },
   buttonText: {
-    fontWeight: '600',
+    fontFamily: 'SpaceGrotesk-SemiBold',
+    fontSize: 13,
   },
   buttonContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 16,
+    marginTop: 12,
   },
   checkInButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderWidth: 1,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
   },
   checkInButtonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: 'white',
+    fontFamily: 'SpaceMono',
+    fontSize: 10,
+    fontWeight: '600',
+    letterSpacing: 2,
   },
 });

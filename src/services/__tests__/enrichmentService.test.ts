@@ -26,7 +26,7 @@ import {
   EnrichmentData,
   EnrichmentBatchResult,
 } from '../enrichmentService';
-import { BeerWithContainerType, BeerfinderWithContainerType } from '@/src/types/beer';
+import { Beer, Beerfinder, BeerWithContainerType, BeerfinderWithContainerType } from '@/src/types/beer';
 
 // Mock the config module
 jest.mock('@/src/config', () => ({
@@ -343,6 +343,51 @@ describe('enrichmentService', () => {
       // Should fall back to beer's original description
       expect(result[0].brew_description).toBe('Original from Flying Saucer');
     });
+
+    it('should accept Beerfinder[] (pre-container-type) for enrichment-before-container-type flow', () => {
+      const beers: Beerfinder[] = [
+        {
+          id: '1',
+          brew_name: 'Draft Beer No ABV',
+          brewer: 'Test Brewery',
+          brew_container: 'Draft',
+          brew_description: 'A hoppy draft beer',
+          roh_lap: '1',
+          tasted_date: '2024-06-15',
+        },
+        {
+          id: '2',
+          brew_name: 'Another Draft',
+          brewer: 'Test Brewery',
+          brew_container: 'Draft',
+          roh_lap: '1',
+          tasted_date: '2024-06-20',
+        },
+      ];
+
+      const enrichmentData: Record<string, EnrichmentData> = {
+        '1': {
+          enriched_abv: 6.5,
+          enrichment_confidence: 0.9,
+          enrichment_source: 'perplexity',
+          brew_description: 'A hoppy draft beer. 6.5% ABV.',
+          has_cleaned_description: true,
+        },
+      };
+
+      const result = mergeEnrichmentData(beers, enrichmentData);
+
+      // Beer 1 should have enrichment ABV
+      expect(result[0].abv).toBe(6.5);
+      expect(result[0].enrichment_source).toBe('perplexity');
+      // Beerfinder fields should be preserved
+      expect(result[0].roh_lap).toBe('1');
+      expect(result[0].tasted_date).toBe('2024-06-15');
+
+      // Beer 2 should be unchanged
+      expect(result[1].abv).toBeUndefined();
+      expect(result[1].roh_lap).toBe('1');
+    });
   });
 
   describe('Rate Limiting - Extended Tests', () => {
@@ -542,11 +587,9 @@ describe('enrichmentService', () => {
         const mockSuccessResponse = {
           ok: true,
           json: async () => ({
-            success: true,
             storeId: '13879',
             beers: [],
-            total: 0,
-            cached: false,
+            source: 'live',
           }),
           headers: new Headers(),
         };
@@ -577,18 +620,16 @@ describe('enrichmentService', () => {
           ok: true,
           status: 200,
           json: async () => ({
-            success: true,
             storeId: '13879',
             beers: mockBeers,
-            total: 1,
-            cached: false,
+            requestId: 'req-123',
+            source: 'live',
           }),
           headers: new Headers({ 'X-Request-ID': 'req-123' }),
         });
 
         const result = await fetchBeersFromProxy('13879');
 
-        expect(result.success).toBe(true);
         expect(result.beers).toHaveLength(1);
         expect(result.beers[0].brew_name).toBe('Test IPA');
 
@@ -603,12 +644,11 @@ describe('enrichmentService', () => {
           ok: true,
           status: 200,
           json: async () => ({
-            success: true,
             storeId: '13879',
             beers: [],
-            total: 0,
-            cached: true, // This is a cached response
-            cacheAge: 300,
+            requestId: 'req-456',
+            source: 'cache',
+            cached_at: '2026-02-28T12:00:00Z',
           }),
           headers: new Headers(),
         });
@@ -895,7 +935,7 @@ describe('enrichmentService', () => {
         for (let i = 0; i < 10; i++) {
           mockFetch.mockResolvedValueOnce({
             ok: true,
-            json: async () => ({ success: true, storeId: '13879', beers: [], total: 0 }),
+            json: async () => ({ storeId: '13879', beers: [], source: 'live' }),
             headers: new Headers(),
           });
           await fetchBeersFromProxy('13879').catch(() => {});
@@ -1087,7 +1127,7 @@ describe('enrichmentService', () => {
       for (let i = 0; i < 10; i++) {
         mockFetch.mockResolvedValueOnce({
           ok: true,
-          json: async () => ({ success: true, storeId: '13879', beers: [], total: 0 }),
+          json: async () => ({ storeId: '13879', beers: [], source: 'live' }),
           headers: new Headers(),
         });
         await fetchBeersFromProxy('13879').catch(() => {});
@@ -1472,24 +1512,101 @@ describe('enrichmentService', () => {
       );
     });
 
-    it('accepts response with missing optional fields (cached, requestId)', async () => {
+    it('accepts response with missing optional fields (source, requestId)', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         status: 200,
         json: async () => ({
-          success: true,
           storeId: '13879',
           beers: [],
-          total: 0,
-          // No cached, requestId, cacheAge
         }),
         headers: new Headers(),
       });
 
       const result = await fetchBeersFromProxy('13879');
 
-      expect(result.success).toBe(true);
       expect(result.beers).toEqual([]);
+    });
+
+    it('accepts actual Worker response shape (no success field, source instead of cached)', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          storeId: '13879',
+          beers: [
+            {
+              id: '123',
+              brew_name: 'Test IPA',
+              brewer: 'Test Brewery',
+              enriched_abv: 6.5,
+              enrichment_confidence: 0.9,
+              enrichment_source: 'perplexity',
+            },
+          ],
+          requestId: 'req-abc',
+          source: 'live',
+        }),
+        headers: new Headers(),
+      });
+
+      const result = await fetchBeersFromProxy('13879');
+
+      expect(result.beers).toHaveLength(1);
+      expect(result.beers[0].brew_name).toBe('Test IPA');
+    });
+
+    it('accepts beers with null review_count and review_rating from Worker', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          storeId: '13879',
+          beers: [
+            {
+              id: '456',
+              brew_name: 'Null Review Beer',
+              brewer: 'Test Brewery',
+              review_count: null,
+              review_rating: null,
+              enriched_abv: 5.0,
+              enrichment_confidence: 0.8,
+              enrichment_source: 'description',
+            },
+          ],
+          requestId: 'req-def',
+          source: 'cache',
+          cached_at: '2026-02-28T12:00:00Z',
+        }),
+        headers: new Headers(),
+      });
+
+      const result = await fetchBeersFromProxy('13879');
+
+      expect(result.beers).toHaveLength(1);
+      expect(result.beers[0].review_count).toBeNull();
+      expect(result.beers[0].review_rating).toBeNull();
+    });
+
+    it('tracks cache hit when source is cache', async () => {
+      resetEnrichmentMetrics();
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          storeId: '13879',
+          beers: [],
+          requestId: 'req-ghi',
+          source: 'cache',
+          cached_at: '2026-02-28T12:00:00Z',
+        }),
+        headers: new Headers(),
+      });
+
+      await fetchBeersFromProxy('13879');
+
+      const metrics = getEnrichmentMetrics();
+      expect(metrics.cacheHits).toBe(1);
     });
   });
 

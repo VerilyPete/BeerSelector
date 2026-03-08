@@ -8,14 +8,6 @@ jest.mock('@/hooks/useColorScheme', () => ({
   useColorScheme: jest.fn(() => 'light'),
 }));
 
-jest.mock('@/hooks/useThemeColor', () => ({
-  useThemeColor: jest.fn(() => '#000000'),
-}));
-
-// Mock ThemedText and ThemedView to use plain React Native components
-jest.mock('@/components/ThemedText');
-jest.mock('@/components/ThemedView');
-
 // Mock BeerItem component to simplify testing
 jest.mock('../BeerItem', () => ({
   BeerItem: ({ beer }: { beer: { id: string; brew_name: string } }) => {

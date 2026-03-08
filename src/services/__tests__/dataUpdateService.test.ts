@@ -27,6 +27,7 @@ import {
   fetchBeersFromProxy,
   fetchEnrichmentBatchWithMissing,
   syncBeersToWorker,
+  mergeEnrichmentData,
   pollForEnrichmentUpdates,
 } from '../enrichmentService';
 
@@ -614,6 +615,73 @@ describe('dataUpdateService', () => {
         customUrl,
         expect.objectContaining({ signal: expect.any(Object) })
       );
+    });
+
+    it('should calculate container types AFTER enrichment so ABV is available for glass selection', async () => {
+      (getPreference as jest.Mock)
+        .mockResolvedValueOnce('false') // is_visitor_mode
+        .mockResolvedValueOnce(testMyBeersUrl); // my_beers_api_url
+      (config.enrichment.isConfigured as jest.Mock).mockReturnValue(true);
+
+      // Draft beer with no ABV in description — container type would be null without enrichment
+      const mockBeers: Beerfinder[] = [
+        {
+          id: 'beer-1',
+          brew_name: 'Parish West Coast Ghost',
+          brewer: 'Parish Brewing',
+          brew_container: 'Draft',
+          brew_style: 'IPA',
+          brew_description: 'A west coast IPA',
+          tasted_date: '2024-06-15',
+        },
+      ];
+
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValueOnce([{}, { tasted_brew_current_round: mockBeers }]),
+      });
+
+      // Enrichment provides ABV = 6.5% (< 8% → pint glass)
+      (fetchEnrichmentBatchWithMissing as jest.Mock).mockResolvedValueOnce({
+        enrichments: {
+          'beer-1': {
+            enriched_abv: 6.5,
+            enrichment_confidence: 0.9,
+            enrichment_source: 'perplexity',
+            brew_description: 'A west coast IPA. 6.5% ABV.',
+            has_cleaned_description: true,
+          },
+        },
+        missing: [],
+      });
+
+      // Make mergeEnrichmentData actually merge ABV (not just pass through)
+      (mergeEnrichmentData as jest.Mock).mockImplementationOnce((beers, enrichmentData) => {
+        return beers.map((beer: Record<string, unknown>) => {
+          const enrichment = enrichmentData[beer.id as string];
+          if (enrichment) {
+            return {
+              ...beer,
+              abv: enrichment.enriched_abv ?? beer.abv,
+              enrichment_confidence: enrichment.enrichment_confidence,
+              enrichment_source: enrichment.enrichment_source,
+              brew_description: enrichment.brew_description ?? beer.brew_description,
+            };
+          }
+          return beer;
+        });
+      });
+
+      (myBeersRepository.insertMany as jest.Mock).mockResolvedValueOnce(undefined);
+      (setPreference as jest.Mock).mockResolvedValue(undefined);
+
+      await fetchAndUpdateMyBeers();
+
+      // The beer should have container_type = 'pint' (6.5% ABV draft → pint glass)
+      // NOT null (which would show a question mark)
+      const insertCall = (myBeersRepository.insertMany as jest.Mock).mock.calls[0][0];
+      expect(insertCall[0].container_type).toBe('pint');
+      expect(insertCall[0].abv).toBe(6.5);
     });
   });
 

@@ -2,13 +2,13 @@ import React, { useState, useCallback, useEffect } from 'react';
 import {
   StyleSheet,
   View,
+  Text,
   FlatList,
   RefreshControl,
   ActivityIndicator,
   TouchableOpacity,
   Alert,
   Platform,
-  useColorScheme,
   useWindowDimensions,
 } from 'react-native';
 import Animated, {
@@ -24,20 +24,17 @@ import Animated, {
   Layout,
   Easing,
 } from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { rewardsRepository } from '@/src/database/repositories/RewardsRepository';
 import { fetchRewardsFromAPI } from '@/src/api/beerApi';
-import { ThemedText } from './ThemedText';
-import { ThemedView } from './ThemedView';
-import { useThemeColor } from '@/hooks/useThemeColor';
+import { useColorScheme } from '@/hooks/useColorScheme';
 import { getSessionData } from '@/src/api/sessionManager';
 import Constants from 'expo-constants';
 import { useAppContext } from '@/context/AppContext';
 import { config } from '@/src/config';
 import { Colors } from '@/constants/Colors';
-import { spacing, borderRadii } from '@/constants/spacing';
-import { getShadow } from '@/constants/shadows';
 
 type Reward = {
   reward_id: string;
@@ -47,10 +44,8 @@ type Reward = {
 
 const BEER_GOAL = 200;
 
-// Animated TouchableOpacity for rewards
 const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
 
-// Progress Ring Component
 const ProgressRing = ({
   progress,
   size = 120,
@@ -60,9 +55,8 @@ const ProgressRing = ({
   size?: number;
   strokeWidth?: number;
 }) => {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
-  const colors = isDark ? Colors.dark : Colors.light;
+  const colorScheme = useColorScheme() ?? 'dark';
+  const colors = Colors[colorScheme];
 
   const animatedProgress = useSharedValue(0);
   const celebrationScale = useSharedValue(1);
@@ -73,7 +67,6 @@ const ProgressRing = ({
       easing: Easing.out(Easing.cubic),
     });
 
-    // Celebration pulse when progress is high
     if (progress >= 0.9) {
       celebrationScale.value = withRepeat(
         withSequence(withTiming(1.05, { duration: 800 }), withTiming(1, { duration: 800 })),
@@ -105,7 +98,6 @@ const ProgressRing = ({
     >
       <Animated.View style={[animatedStyle, { width: size, height: size }]}>
         <View style={StyleSheet.absoluteFill}>
-          {/* Background circle */}
           <View
             style={[
               styles.progressCircle,
@@ -118,7 +110,6 @@ const ProgressRing = ({
               },
             ]}
           />
-          {/* Progress indicator using View-based approach */}
           <View
             style={[
               styles.progressCircle,
@@ -127,7 +118,7 @@ const ProgressRing = ({
                 height: size,
                 borderRadius: size / 2,
                 borderWidth: strokeWidth,
-                borderColor: colors.accent,
+                borderColor: colors.tint,
                 borderTopColor: 'transparent',
                 borderRightColor: 'transparent',
                 transform: [{ rotate: `${progress * 360 - 90}deg` }],
@@ -137,18 +128,17 @@ const ProgressRing = ({
         </View>
       </Animated.View>
       <View style={styles.progressRingInner}>
-        <ThemedText style={[styles.progressPercentage, { fontSize: size * 0.2 }]}>
+        <Text style={[styles.progressPercentage, { fontSize: size * 0.2, color: colors.text }]}>
           {Math.round(progress * 100)}%
-        </ThemedText>
-        <ThemedText type="muted" style={[styles.progressLabel, { fontSize: size * 0.1 }]}>
+        </Text>
+        <Text style={[styles.progressLabel, { fontSize: size * 0.1, color: colors.textSecondary }]}>
           Complete
-        </ThemedText>
+        </Text>
       </View>
     </View>
   );
 };
 
-// Badge Icon Component
 const RewardBadge = ({
   isRedeemed,
   isAnimating,
@@ -156,9 +146,8 @@ const RewardBadge = ({
   isRedeemed: boolean;
   isAnimating: boolean;
 }) => {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
-  const colors = isDark ? Colors.dark : Colors.light;
+  const colorScheme = useColorScheme() ?? 'dark';
+  const colors = Colors[colorScheme];
 
   const shimmerValue = useSharedValue(0);
 
@@ -179,47 +168,47 @@ const RewardBadge = ({
   });
 
   const iconName = isRedeemed ? 'checkmark-circle' : 'gift';
-  const iconColor = isRedeemed ? colors.textMuted : colors.accent;
-  const backgroundColor = isRedeemed ? colors.backgroundSecondary : colors.accentMuted;
+  const iconColor = isRedeemed ? colors.textSecondary : colors.tint;
+  const backgroundColor = isRedeemed ? colors.backgroundActive : colors.backgroundElevated;
 
   return (
     <Animated.View
-      style={[styles.badgeContainer, { backgroundColor }, !isRedeemed && shimmerStyle]}
+      style={[
+        styles.badgeContainer,
+        { backgroundColor, borderWidth: 1, borderColor: colors.border },
+        !isRedeemed && shimmerStyle,
+      ]}
     >
       <Ionicons name={iconName} size={24} color={iconColor} />
     </Animated.View>
   );
 };
 
-// Status Badge Component
 const StatusBadge = ({ isRedeemed }: { isRedeemed: boolean }) => {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
-  const colors = isDark ? Colors.dark : Colors.light;
+  const colorScheme = useColorScheme() ?? 'dark';
+  const colors = Colors[colorScheme];
 
   return (
     <View
       style={[
         styles.statusBadge,
         {
-          backgroundColor: isRedeemed ? colors.backgroundSecondary : colors.successBg,
+          backgroundColor: isRedeemed ? colors.backgroundActive : 'transparent',
+          borderWidth: isRedeemed ? 0 : 1,
+          borderColor: isRedeemed ? 'transparent' : colors.tint,
         },
       ]}
     >
-      <ThemedText
-        style={[styles.statusText, { color: isRedeemed ? colors.textMuted : colors.textOnStatus }]}
-      >
-        {isRedeemed ? 'Redeemed' : 'Available'}
-      </ThemedText>
+      <Text style={[styles.statusText, { color: isRedeemed ? colors.textSecondary : colors.tint }]}>
+        {isRedeemed ? 'REDEEMED' : 'AVAILABLE'}
+      </Text>
     </View>
   );
 };
 
-// Empty State Component
 const EmptyState = ({ isVisitor }: { isVisitor: boolean }) => {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
-  const colors = isDark ? Colors.dark : Colors.light;
+  const colorScheme = useColorScheme() ?? 'dark';
+  const colors = Colors[colorScheme];
 
   const bounceValue = useSharedValue(0);
 
@@ -238,98 +227,112 @@ const EmptyState = ({ isVisitor }: { isVisitor: boolean }) => {
   return (
     <Animated.View entering={FadeIn.duration(500)} style={styles.emptyStateContainer}>
       <Animated.View style={bounceStyle}>
-        <Ionicons
-          name={isVisitor ? 'lock-closed' : 'beer-outline'}
-          size={64}
-          color={colors.accent}
-        />
+        <Ionicons name={isVisitor ? 'lock-closed' : 'beer-outline'} size={64} color={colors.tint} />
       </Animated.View>
-      <ThemedText type="subtitle" style={styles.emptyStateTitle}>
+      <Text style={[styles.emptyStateTitle, { color: colors.text }]}>
         {isVisitor ? 'Members Only' : 'No Rewards Yet'}
-      </ThemedText>
-      <ThemedText type="secondary" style={styles.emptyStateMessage}>
+      </Text>
+      <Text style={[styles.emptyStateMessage, { color: colors.textSecondary }]}>
         {isVisitor
           ? 'Rewards are exclusive to UFO Club members. Log in to view and claim your rewards!'
           : 'Keep tasting new beers to earn rewards! Your first reward awaits after just a few check-ins.'}
-      </ThemedText>
+      </Text>
     </Animated.View>
   );
 };
 
-// Progress Header Component
 const ProgressHeader = ({ tastedCount }: { tastedCount: number }) => {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
-  const colors = isDark ? Colors.dark : Colors.light;
+  const colorScheme = useColorScheme() ?? 'dark';
+  const colors = Colors[colorScheme];
   const { width: screenWidth } = useWindowDimensions();
 
   const progress = Math.min(tastedCount / BEER_GOAL, 1);
   const remaining = Math.max(BEER_GOAL - tastedCount, 0);
 
-  // Responsive ring size: smaller on narrow screens, larger on wide screens but capped
   const ringSize = Math.min(Math.max(screenWidth * 0.2, 80), 120);
 
   return (
-    <Animated.View
-      entering={FadeInDown.duration(600).delay(100)}
-      style={[
-        styles.progressHeader,
-        {
-          backgroundColor: colors.backgroundElevated,
-          borderColor: colors.border,
-        },
-        getShadow('md', isDark),
-      ]}
+    <LinearGradient
+      colors={['#D4D8DD', '#8A919A', '#6B727B'] as const}
+      style={[styles.progressHeaderBezelOuter, { borderColor: '#FFFFFF30' }]}
     >
-      <View style={styles.progressHeaderContent}>
-        <View style={styles.progressTextContainer}>
-          <ThemedText type="subtitle" style={styles.progressTitle}>
-            Your Journey
-          </ThemedText>
-          <ThemedText type="secondary" style={styles.progressSubtitle}>
-            {tastedCount} of {BEER_GOAL} beers tasted
-          </ThemedText>
-          {remaining > 0 ? (
-            <ThemedText type="muted" style={styles.progressRemaining}>
-              {remaining} more to go!
-            </ThemedText>
-          ) : (
-            <ThemedText style={[styles.progressComplete, { color: colors.success }]}>
-              Plate Complete!
-            </ThemedText>
-          )}
+      <Animated.View
+        entering={FadeInDown.duration(600).delay(100)}
+        style={[
+          styles.progressHeader,
+          {
+            backgroundColor: colors.backgroundSecondary,
+            borderColor: colors.border,
+          },
+        ]}
+      >
+        <View style={styles.progressHeaderContent}>
+          <View style={styles.progressTextContainer}>
+            <Text style={[styles.progressSectionLabel, { color: colors.textSecondary }]}>
+              YOUR JOURNEY
+            </Text>
+            <Text style={[styles.progressSubtitle, { color: colors.text }]}>
+              {tastedCount} of {BEER_GOAL} beers tasted
+            </Text>
+            {remaining > 0 ? (
+              <Text style={[styles.progressRemaining, { color: colors.textSecondary }]}>
+                {remaining} more to go
+              </Text>
+            ) : (
+              <Text style={[styles.progressComplete, { color: colors.tint }]}>Plate Complete!</Text>
+            )}
+          </View>
+          <ProgressRing progress={progress} size={ringSize} />
         </View>
-        <ProgressRing progress={progress} size={ringSize} />
-      </View>
 
-      {/* Milestone markers */}
-      <View style={styles.milestoneContainer}>
-        {[50, 100, 150, 200].map(milestone => {
-          const reached = tastedCount >= milestone;
-          return (
-            <View
-              key={milestone}
-              style={[
-                styles.milestone,
-                {
-                  backgroundColor: reached ? colors.accent : colors.backgroundSecondary,
-                  borderColor: reached ? colors.accent : colors.border,
-                },
-              ]}
-            >
-              <ThemedText
-                style={[
-                  styles.milestoneText,
-                  { color: reached ? colors.textOnPrimary : colors.textMuted },
-                ]}
-              >
-                {milestone}
-              </ThemedText>
-            </View>
-          );
-        })}
-      </View>
-    </Animated.View>
+        <View style={[styles.milestoneContainer, { borderTopColor: colors.separator }]}>
+          {[50, 100, 150, 200].map(milestone => {
+            const reached = tastedCount >= milestone;
+            return (
+              <View key={milestone} style={styles.milestoneBezelOuter}>
+                <LinearGradient
+                  colors={
+                    reached
+                      ? (['#FF6666', '#FF3333', '#CC2222'] as const)
+                      : (['#D4D8DD', '#8A919A', '#6B727B'] as const)
+                  }
+                  style={[
+                    styles.milestoneGradient,
+                    {
+                      borderColor: reached ? '#FF999960' : '#FFFFFF30',
+                    },
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.milestone,
+                      reached
+                        ? { backgroundColor: '#1A0000', borderColor: '#33000080' }
+                        : {
+                            backgroundColor: colors.backgroundSecondary,
+                            borderColor: colors.border,
+                          },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.milestoneText,
+                        {
+                          color: reached ? colors.destructive : colors.textSecondary,
+                          opacity: reached ? 1 : 0.4,
+                        },
+                      ]}
+                    >
+                      {milestone}
+                    </Text>
+                  </View>
+                </LinearGradient>
+              </View>
+            );
+          })}
+        </View>
+      </Animated.View>
+    </LinearGradient>
   );
 };
 
@@ -339,11 +342,8 @@ export const Rewards = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [queueingRewards, setQueueingRewards] = useState<Record<string, boolean>>({});
 
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
-  const colors = isDark ? Colors.dark : Colors.light;
-
-  const textColor = useThemeColor({}, 'text');
+  const colorScheme = useColorScheme() ?? 'dark';
+  const colors = Colors[colorScheme];
 
   const handleRefresh = useCallback(async () => {
     try {
@@ -501,10 +501,9 @@ export const Rewards = () => {
               styles.rewardCard,
               {
                 backgroundColor: colors.backgroundElevated,
-                borderColor: isRedeemed ? colors.border : colors.accent,
-                opacity: isRedeemed ? 0.7 : 1,
+                borderColor: isRedeemed ? colors.separator : colors.accentMuted,
+                opacity: isRedeemed ? 0.5 : 1,
               },
-              getShadow(isRedeemed ? 'sm' : 'md', isDark),
             ]}
             onPress={() => handleRewardPress(item)}
             activeOpacity={0.8}
@@ -513,12 +512,10 @@ export const Rewards = () => {
             <RewardBadge isRedeemed={isRedeemed} isAnimating={!isRedeemed} />
 
             <View style={styles.rewardContent}>
-              <ThemedText type="defaultSemiBold" style={styles.rewardType}>
-                {item.reward_type}
-              </ThemedText>
-              <ThemedText type="muted" style={styles.rewardDescription}>
+              <Text style={[styles.rewardType, { color: colors.text }]}>{item.reward_type}</Text>
+              <Text style={[styles.rewardDescription, { color: colors.textSecondary }]}>
                 {isRedeemed ? 'You have claimed this reward' : 'Tap to add to your queue'}
-              </ThemedText>
+              </Text>
               <StatusBadge isRedeemed={isRedeemed} />
             </View>
 
@@ -528,58 +525,65 @@ export const Rewards = () => {
               ) : !isRedeemed ? (
                 <Ionicons name="chevron-forward" size={20} color={colors.tint} />
               ) : (
-                <Ionicons name="checkmark" size={20} color={colors.textMuted} />
+                <Ionicons name="checkmark" size={20} color={colors.textSecondary} />
               )}
             </View>
           </AnimatedTouchableOpacity>
         </Animated.View>
       );
     },
-    [colors, isDark, queueingRewards, handleRewardPress]
+    [colors, queueingRewards, handleRewardPress]
   );
 
-  // Calculate tasted beer count from tastedBeers
   const tastedCount = beers.tastedBeers?.length || 0;
 
   if (loading.isLoadingRewards && !refreshing) {
     return (
-      <ThemedView style={styles.loadingContainer}>
+      <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" color={colors.tint} />
-        <ThemedText type="secondary" style={styles.loadingText}>
+        <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
           Loading your rewards...
-        </ThemedText>
-      </ThemedView>
+        </Text>
+      </View>
     );
   }
 
   if (errors.rewardError) {
     return (
-      <ThemedView style={styles.errorContainer}>
+      <View style={[styles.errorContainer, { backgroundColor: colors.background }]}>
         <Ionicons name="alert-circle" size={48} color={colors.error} />
-        <ThemedText type="secondary" style={styles.errorText}>
+        <Text style={[styles.errorText, { color: colors.textSecondary }]}>
           {errors.rewardError}
-        </ThemedText>
+        </Text>
         <TouchableOpacity
-          style={[styles.retryButton, { backgroundColor: colors.tint }]}
+          style={[styles.retryButton, { borderColor: colors.tint }]}
           onPress={handleRefresh}
         >
-          <ThemedText style={[styles.retryButtonText, { color: colors.textOnPrimary }]}>
-            Try Again
-          </ThemedText>
+          <Text style={[styles.retryButtonText, { color: colors.tint }]}>TRY AGAIN</Text>
         </TouchableOpacity>
-      </ThemedView>
+      </View>
     );
   }
 
   return (
-    <ThemedView style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <FlatList
         data={beers.rewards}
         renderItem={renderRewardItem}
         keyExtractor={item => item.reward_id}
         contentContainerStyle={styles.listContent}
         ListHeaderComponent={
-          !session.isVisitor ? <ProgressHeader tastedCount={tastedCount} /> : null
+          <>
+            {!session.isVisitor ? <ProgressHeader tastedCount={tastedCount} /> : null}
+            <View
+              style={[
+                styles.labelPlate,
+                { backgroundColor: colors.steelLabelPlate, borderColor: colors.steelLabelBorder },
+              ]}
+            >
+              <Text style={[styles.labelPlateText, { color: colors.border }]}>REWARD LOG</Text>
+            </View>
+          </>
         }
         ListEmptyComponent={<EmptyState isVisitor={session.isVisitor} />}
         refreshControl={
@@ -587,12 +591,12 @@ export const Rewards = () => {
             refreshing={refreshing}
             onRefresh={handleRefresh}
             colors={[colors.tint]}
-            tintColor={textColor}
+            tintColor={colors.text}
           />
         }
         showsVerticalScrollIndicator={false}
       />
-    </ThemedView>
+    </View>
   );
 };
 
@@ -601,50 +605,59 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   listContent: {
-    padding: spacing.m,
-    paddingBottom: spacing.xxl,
+    padding: 18,
+    paddingBottom: 48,
   },
 
-  // Loading State
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    gap: spacing.m,
+    gap: 16,
   },
   loadingText: {
-    marginTop: spacing.s,
+    fontFamily: 'SpaceMono',
+    fontSize: 11,
+    marginTop: 8,
   },
 
-  // Error State
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: spacing.xl,
-    gap: spacing.m,
+    padding: 32,
+    gap: 16,
   },
   errorText: {
+    fontFamily: 'SpaceMono',
+    fontSize: 11,
     textAlign: 'center',
-    marginTop: spacing.s,
+    marginTop: 8,
   },
   retryButton: {
-    paddingHorizontal: spacing.l,
-    paddingVertical: spacing.sm,
-    borderRadius: borderRadii.m,
-    marginTop: spacing.m,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderRadius: 8,
+    marginTop: 16,
   },
   retryButtonText: {
+    fontFamily: 'SpaceMono',
     fontWeight: '600',
-    fontSize: 16,
+    fontSize: 10,
+    letterSpacing: 2,
   },
 
-  // Progress Header
-  progressHeader: {
-    borderRadius: borderRadii.l,
-    padding: spacing.m,
-    marginBottom: spacing.l,
+  progressHeaderBezelOuter: {
     borderWidth: 1,
+    borderRadius: 16,
+    padding: 3,
+    marginBottom: 24,
+  },
+  progressHeader: {
+    padding: 20,
+    borderWidth: 1,
+    borderRadius: 13,
   },
   progressHeaderContent: {
     flexDirection: 'row',
@@ -652,23 +665,29 @@ const styles = StyleSheet.create({
   },
   progressTextContainer: {
     flex: 1,
-    marginRight: spacing.m,
+    marginRight: 16,
   },
-  progressTitle: {
-    marginBottom: spacing.xs,
+  progressSectionLabel: {
+    fontFamily: 'SpaceMono',
+    fontSize: 10,
+    fontWeight: '600',
+    letterSpacing: 3,
+    marginBottom: 8,
   },
   progressSubtitle: {
-    marginBottom: spacing.xs,
+    fontFamily: 'SpaceGrotesk-SemiBold',
+    fontSize: 15,
+    marginBottom: 4,
   },
   progressRemaining: {
-    fontSize: 14,
+    fontFamily: 'SpaceMono',
+    fontSize: 11,
   },
   progressComplete: {
-    fontWeight: '700',
+    fontFamily: 'SpaceGrotesk-Bold',
     fontSize: 16,
   },
 
-  // Progress Ring - overflow hidden clips any transforms, padding gives breathing room
   progressRingContainer: {
     justifyContent: 'center',
     alignItems: 'center',
@@ -684,98 +703,130 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   progressPercentage: {
+    fontFamily: 'SpaceGrotesk-Bold',
     fontSize: 24,
-    fontWeight: '700',
   },
   progressLabel: {
-    fontSize: 12,
+    fontFamily: 'SpaceMono',
+    fontSize: 10,
   },
 
-  // Milestones
   milestoneContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    marginTop: spacing.m,
-    paddingTop: spacing.m,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(128, 128, 128, 0.2)',
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+  },
+  milestoneBezelOuter: {
+    borderRadius: 10,
+    overflow: 'hidden',
+  },
+  milestoneGradient: {
+    borderRadius: 10,
+    padding: 2,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   milestone: {
-    width: 44,
-    height: 44,
-    borderRadius: borderRadii.full,
+    width: 66,
+    height: 28,
+    borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
+    borderWidth: 1,
   },
   milestoneText: {
+    fontFamily: 'SpaceGrotesk-SemiBold',
     fontSize: 12,
-    fontWeight: '600',
   },
 
-  // Reward Card
   rewardCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: borderRadii.l,
-    padding: spacing.m,
-    marginBottom: spacing.sm,
-    borderWidth: 1.5,
+    padding: 14,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderRadius: 14,
     minHeight: 88,
   },
   rewardContent: {
     flex: 1,
-    marginLeft: spacing.sm,
+    marginLeft: 12,
   },
   rewardType: {
-    fontSize: 17,
-    marginBottom: spacing.xs,
+    fontFamily: 'SpaceGrotesk-SemiBold',
+    fontSize: 14,
+    marginBottom: 4,
   },
   rewardDescription: {
-    fontSize: 13,
-    marginBottom: spacing.s,
+    fontFamily: 'SpaceMono',
+    fontSize: 10,
+    marginBottom: 8,
   },
   rewardAction: {
-    padding: spacing.s,
+    padding: 8,
   },
 
-  // Badge
   badgeContainer: {
     width: 48,
     height: 48,
-    borderRadius: borderRadii.full,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
   },
 
-  // Status Badge
   statusBadge: {
     alignSelf: 'flex-start',
-    paddingHorizontal: spacing.s,
-    paddingVertical: spacing.xs,
-    borderRadius: borderRadii.s,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
   },
   statusText: {
-    fontSize: 11,
+    fontFamily: 'SpaceMono',
+    fontSize: 9,
     fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 2,
   },
 
-  // Empty State
   emptyStateContainer: {
     alignItems: 'center',
-    padding: spacing.xl,
-    marginTop: spacing.xxl,
+    padding: 32,
+    marginTop: 48,
   },
   emptyStateTitle: {
-    marginTop: spacing.l,
-    marginBottom: spacing.s,
+    fontFamily: 'SpaceGrotesk-Bold',
+    fontSize: 20,
+    marginTop: 24,
+    marginBottom: 8,
     textAlign: 'center',
   },
   emptyStateMessage: {
+    fontFamily: 'SpaceMono',
+    fontSize: 11,
     textAlign: 'center',
-    lineHeight: 22,
-    paddingHorizontal: spacing.m,
+    lineHeight: 18,
+    paddingHorizontal: 16,
+  },
+
+  labelPlate: {
+    alignSelf: 'flex-start',
+    borderRadius: 4,
+    paddingVertical: 3,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    marginBottom: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.4,
+    shadowRadius: 2,
+    elevation: 3,
+  },
+  labelPlateText: {
+    fontFamily: 'SpaceMono',
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 2,
   },
 });

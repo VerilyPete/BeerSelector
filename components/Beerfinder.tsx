@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import {
   StyleSheet,
   View,
+  Text,
   TouchableOpacity,
   Alert,
   ActivityIndicator,
@@ -9,10 +10,10 @@ import {
   FlatList,
   Platform,
 } from 'react-native';
-import { ThemedText } from './ThemedText';
-import { useThemeColor } from '@/hooks/useThemeColor';
-import { useUntappdColor } from '@/hooks/useUntappdColor';
+import { ChromeShell } from '@/components/ui/ChromeShell';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { Colors } from '@/constants/Colors';
 import { useBreakpoint } from '@/hooks/useBreakpoint';
 import { SearchBar } from './SearchBar';
 import { router, Href } from 'expo-router';
@@ -30,6 +31,7 @@ import { useAppContext } from '@/context/AppContext';
 import { useQueuedCheckIn } from '@/hooks/useQueuedCheckIn';
 import { getSessionData } from '@/src/api/sessionManager';
 import { updateLiveActivityWithQueue } from '@/src/services/liveActivityService';
+import { ActionButton } from './ui/ActionButton';
 
 export const Beerfinder = () => {
   // MP-4 Step 2: Use context for beer data instead of local state
@@ -38,7 +40,6 @@ export const Beerfinder = () => {
   // Responsive layout: 1 column on phone, 2 on tablet portrait, 3 on tablet landscape
   const { numColumns } = useBreakpoint();
 
-  const colorScheme = useColorScheme();
   const { queuedCheckIn, isLoading: checkinLoading } = useQueuedCheckIn();
   const [queueModalVisible, setQueueModalVisible] = useState(false);
   const [queuedBeers, setQueuedBeers] = useState<QueuedBeer[]>([]);
@@ -75,17 +76,8 @@ export const Beerfinder = () => {
     toggleExpand,
   } = useBeerFilters(untastedBeers);
 
-  // Theme colors
-  const activeButtonColor = useThemeColor({}, 'tint');
-  const untappdColor = useUntappdColor();
-  const cardColor = useThemeColor({}, 'background');
-  const borderColor = useThemeColor({}, 'border');
-  const textOnPrimary = useThemeColor({}, 'textOnPrimary');
-  const errorColor = useThemeColor({}, 'error');
-  const errorBgColor = useThemeColor({}, 'errorBg');
-  const errorBorderColor = useThemeColor({}, 'errorBorder');
-  const overlayColor = useThemeColor({}, 'overlay');
-
+  const colorScheme = useColorScheme() ?? 'dark';
+  const colors = Colors[colorScheme];
   // Use the shared data refresh hook
   // Use AppContext's refreshBeerData to reload from database after refresh
   const { refreshing, handleRefresh: baseHandleRefresh } = useDataRefresh({
@@ -256,58 +248,8 @@ export const Beerfinder = () => {
 
   const renderBeerActions = (item: BeerWithContainerType) => (
     <View style={styles.buttonContainer}>
-      <TouchableOpacity
-        style={[
-          styles.checkInButton,
-          {
-            backgroundColor: untappdColor,
-            width: '48%',
-          },
-        ]}
-        onPress={() => handleCheckIn(item)}
-        activeOpacity={0.7}
-        disabled={checkinLoading}
-      >
-        {checkinLoading ? (
-          <ActivityIndicator size="small" color={textOnPrimary} />
-        ) : (
-          <ThemedText
-            style={[
-              styles.checkInButtonText,
-              {
-                color: textOnPrimary,
-              },
-            ]}
-            numberOfLines={1}
-          >
-            Check Me In!
-          </ThemedText>
-        )}
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={[
-          styles.checkInButton,
-          {
-            backgroundColor: untappdColor,
-            width: '48%',
-          },
-        ]}
-        onPress={() => handleUntappdSearch(item.brew_name)}
-        activeOpacity={0.7}
-      >
-        <ThemedText
-          style={[
-            styles.checkInButtonText,
-            {
-              color: textOnPrimary,
-            },
-          ]}
-          numberOfLines={1}
-        >
-          Untappd
-        </ThemedText>
-      </TouchableOpacity>
+      <ActionButton label="CHECK IN" onPress={() => handleCheckIn(item)} loading={checkinLoading} />
+      <ActionButton label="UNTAPPD" onPress={() => handleUntappdSearch(item.brew_name)} />
     </View>
   );
 
@@ -318,98 +260,60 @@ export const Beerfinder = () => {
       visible={queueModalVisible}
       onRequestClose={() => setQueueModalVisible(false)}
     >
-      <View style={[styles.modalOverlay, { backgroundColor: overlayColor }]}>
-        <View style={[styles.modalContent, { backgroundColor: cardColor, borderColor }]}>
-          <ThemedText style={styles.modalTitle}>Queued Brews</ThemedText>
+      <View style={[styles.modalOverlay, { backgroundColor: colors.overlay }]}>
+        <ChromeShell borderRadius={16} style={{ width: '90%', maxHeight: '80%' }}>
+          <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>Queued Brews</Text>
 
-          {queueError ? (
-            <View style={styles.queueErrorContainer}>
-              <ThemedText style={[styles.queueErrorText, { color: errorColor }]}>
-                {queueError}
-              </ThemedText>
-              <TouchableOpacity
-                style={[
-                  styles.retryButton,
-                  {
-                    backgroundColor: untappdColor,
-                  },
-                ]}
-                onPress={viewQueues}
-                disabled={loadingQueues}
-              >
-                {loadingQueues ? (
-                  <ActivityIndicator size="small" color={textOnPrimary} />
-                ) : (
-                  <ThemedText style={[styles.retryButtonText, { color: textOnPrimary }]}>
-                    Try Again
-                  </ThemedText>
-                )}
-              </TouchableOpacity>
-            </View>
-          ) : queuedBeers.length === 0 ? (
-            <ThemedText style={styles.noQueuesText}>No beer currently in queue</ThemedText>
-          ) : (
-            <FlatList
-              data={queuedBeers}
-              keyExtractor={item => item.id}
-              renderItem={({ item }) => (
-                <View style={[styles.queuedBeerItem, { borderColor }]}>
-                  <View style={styles.queuedBeerContent}>
-                    <ThemedText type="defaultSemiBold" style={styles.queuedBeerName}>
-                      {item.name}
-                    </ThemedText>
-                    <ThemedText style={styles.queuedBeerDate}>{item.date}</ThemedText>
+            {queueError ? (
+              <View style={styles.queueErrorContainer}>
+                <Text style={[styles.queueErrorText, { color: colors.error }]}>{queueError}</Text>
+                <ActionButton
+                  label="TRY AGAIN"
+                  onPress={viewQueues}
+                  loading={loadingQueues}
+                  style={{ flex: 0 }}
+                />
+              </View>
+            ) : queuedBeers.length === 0 ? (
+              <Text style={[styles.noQueuesText, { color: colors.textSecondary }]}>
+                No beer currently in queue
+              </Text>
+            ) : (
+              <FlatList
+                data={queuedBeers}
+                keyExtractor={item => item.id}
+                renderItem={({ item }) => (
+                  <View style={[styles.queuedBeerItem, { borderColor: colors.accentMuted }]}>
+                    <View style={styles.queuedBeerContent}>
+                      <Text style={[styles.queuedBeerName, { color: colors.tint }]}>
+                        {item.name}
+                      </Text>
+                      <Text style={[styles.queuedBeerDate, { color: colors.textSecondary }]}>
+                        {item.date}
+                      </Text>
+                    </View>
+                    <ActionButton
+                      label="DELETE"
+                      onPress={() => deleteQueuedBeer(item.id, item.name)}
+                      loading={deletingBeerId === item.id}
+                      disabled={deletingBeerId === item.id}
+                      style={{ flex: 0.15 }}
+                    />
                   </View>
-                  <TouchableOpacity
-                    style={[
-                      styles.deleteButton,
-                      {
-                        backgroundColor: errorBgColor,
-                        borderColor: errorBorderColor,
-                      },
-                    ]}
-                    onPress={() => deleteQueuedBeer(item.id, item.name)}
-                    disabled={deletingBeerId === item.id}
-                  >
-                    {deletingBeerId === item.id ? (
-                      <ActivityIndicator
-                        size="small"
-                        color={colorScheme === 'dark' ? textOnPrimary : errorColor}
-                      />
-                    ) : (
-                      <ThemedText
-                        style={[
-                          styles.deleteButtonText,
-                          {
-                            color: colorScheme === 'dark' ? textOnPrimary : errorColor,
-                          },
-                        ]}
-                      >
-                        Delete
-                      </ThemedText>
-                    )}
-                  </TouchableOpacity>
-                </View>
-              )}
-              style={styles.queuesList}
-              contentContainerStyle={{ paddingBottom: 10 }}
-            />
-          )}
+                )}
+                style={styles.queuesList}
+                contentContainerStyle={{ paddingBottom: 10 }}
+              />
+            )}
 
-          <TouchableOpacity
-            style={[
-              styles.closeButton,
-              {
-                backgroundColor: untappdColor,
-              },
-            ]}
-            onPress={() => setQueueModalVisible(false)}
-          >
-            <ThemedText style={[styles.closeButtonText, { color: textOnPrimary }]}>
-              Close
-            </ThemedText>
-          </TouchableOpacity>
-        </View>
+            <ActionButton
+              label="CLOSE"
+              onPress={() => setQueueModalVisible(false)}
+              style={{ flex: 0, marginTop: 16, alignSelf: 'flex-end', width: '25%' }}
+            />
+          </View>
+        </ChromeShell>
       </View>
     </Modal>
   );
@@ -421,141 +325,60 @@ export const Beerfinder = () => {
         <>
           {/* MP-3 Step 3b: Show action buttons even during loading */}
           <View style={styles.filtersContainer}>
-            <View style={styles.buttonsContainer}>
-              <TouchableOpacity
-                style={[
-                  styles.actionButton,
-                  {
-                    backgroundColor: untappdColor,
-                    marginRight: 8,
-                  },
-                ]}
+            <View style={styles.filterRow}>
+              <View style={{ flex: 1 }} />
+              <ActionButton
+                label="QUEUE"
                 onPress={viewQueues}
-                disabled={loadingQueues}
-              >
-                {loadingQueues ? (
-                  <ActivityIndicator size="small" color={textOnPrimary} />
-                ) : (
-                  <ThemedText
-                    style={[
-                      styles.actionButtonText,
-                      {
-                        color: textOnPrimary,
-                      },
-                    ]}
-                  >
-                    View Queues
-                  </ThemedText>
-                )}
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.actionButton,
-                  {
-                    backgroundColor: untappdColor,
-                  },
-                ]}
+                loading={loadingQueues}
+                style={{ flex: 0 }}
+              />
+              <ActionButton
+                label="REWARDS"
                 onPress={() => router.push('/screens/rewards' as Href)}
-              >
-                <ThemedText
-                  style={[
-                    styles.actionButtonText,
-                    {
-                      color: textOnPrimary,
-                    },
-                  ]}
-                >
-                  Rewards
-                </ThemedText>
-              </TouchableOpacity>
+                style={{ flex: 0 }}
+              />
             </View>
           </View>
           <SkeletonLoader count={20} />
         </>
       ) : errors.beerError ? (
         <View style={styles.centered}>
-          <ThemedText style={styles.errorText}>{errors.beerError}</ThemedText>
+          <Text style={[styles.errorText, { color: colors.text }]}>{errors.beerError}</Text>
           <TouchableOpacity
-            style={[styles.refreshButton, { backgroundColor: activeButtonColor }]}
+            style={[styles.refreshButton, { backgroundColor: colors.tint }]}
             onPress={handleRefresh}
           >
-            <ThemedText style={[styles.buttonText, { color: textOnPrimary }]}>Try Again</ThemedText>
+            <Text style={[styles.buttonText, { color: colors.textOnPrimary }]}>Try Again</Text>
           </TouchableOpacity>
         </View>
       ) : (
         <>
           <View style={styles.filtersContainer}>
-            <View style={styles.buttonsContainer}>
-              <TouchableOpacity
-                style={[
-                  styles.actionButton,
-                  {
-                    backgroundColor: untappdColor,
-                    marginRight: 8,
-                  },
-                ]}
-                onPress={viewQueues}
-                disabled={loadingQueues}
-              >
-                {loadingQueues ? (
-                  <ActivityIndicator size="small" color={textOnPrimary} />
-                ) : (
-                  <ThemedText
-                    style={[
-                      styles.actionButtonText,
-                      {
-                        color: textOnPrimary,
-                      },
-                    ]}
-                  >
-                    View Queues
-                  </ThemedText>
-                )}
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.actionButton,
-                  {
-                    backgroundColor: untappdColor,
-                  },
-                ]}
-                onPress={() => router.push('/screens/rewards' as Href)}
-              >
-                <ThemedText
-                  style={[
-                    styles.actionButtonText,
-                    {
-                      color: textOnPrimary,
-                    },
-                  ]}
-                >
-                  Rewards
-                </ThemedText>
-              </TouchableOpacity>
-            </View>
-
             <SearchBar
               searchText={localSearchText}
               onSearchChange={handleSearchChange}
               onClear={clearSearch}
               placeholder="Search available beer..."
             />
-            <View style={styles.beerCountContainer}>
-              <ThemedText style={styles.beerCount}>
-                {filteredBeers.length} {filteredBeers.length === 1 ? 'brew' : 'brews'} available
-              </ThemedText>
+            <Text style={[styles.beerCount, { color: colors.textSecondary }]}>
+              {filteredBeers.length} to discover
+            </Text>
+            <View style={styles.filterRow}>
+              <FilterBar
+                containerFilter={containerFilter}
+                sortBy={sortBy}
+                sortDirection={sortDirection}
+                onCycleContainerFilter={cycleContainerFilter}
+                onCycleSort={cycleSort}
+                onToggleSortDirection={toggleSortDirection}
+              />
+              <ActionButton label="QUEUE" onPress={viewQueues} loading={loadingQueues} />
+              <ActionButton
+                label="REWARDS"
+                onPress={() => router.push('/screens/rewards' as Href)}
+              />
             </View>
-
-            <FilterBar
-              containerFilter={containerFilter}
-              sortBy={sortBy}
-              sortDirection={sortDirection}
-              onCycleContainerFilter={cycleContainerFilter}
-              onCycleSort={cycleSort}
-              onToggleSortDirection={toggleSortDirection}
-            />
           </View>
 
           <BeerList
@@ -586,19 +409,23 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: 'transparent',
+    paddingHorizontal: 18,
   },
   filtersContainer: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
+    paddingTop: 0,
     paddingBottom: 8,
     backgroundColor: 'transparent',
+    gap: 8,
   },
-  beerCountContainer: {
-    marginBottom: 8,
-    paddingHorizontal: 16,
+  filterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   beerCount: {
-    fontWeight: '600',
+    fontFamily: 'SpaceMono',
+    fontSize: 10,
+    marginBottom: 6,
   },
   centered: {
     flex: 1,
@@ -609,49 +436,22 @@ const styles = StyleSheet.create({
   errorText: {
     marginBottom: 16,
     textAlign: 'center',
-    fontSize: 16,
+    fontSize: 13,
+    fontFamily: 'SpaceMono',
   },
   refreshButton: {
     paddingVertical: 12,
     paddingHorizontal: 24,
-    borderRadius: 24,
+    borderRadius: 8,
   },
   buttonText: {
-    fontWeight: '600',
-  },
-  buttonsContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
-    justifyContent: 'center',
-  },
-  actionButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 20,
-    flex: 0.5,
-    maxWidth: '45%',
-  },
-  actionButtonText: {
-    fontWeight: '600',
-    fontSize: 14,
-    textAlign: 'center',
+    fontFamily: 'SpaceGrotesk-SemiBold',
+    fontSize: 13,
   },
   buttonContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 16,
-  },
-  checkInButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  checkInButtonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
+    marginTop: 12,
+    gap: 8,
   },
   modalOverlay: {
     flex: 1,
@@ -661,19 +461,17 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     padding: 20,
-    borderRadius: 12,
-    width: '90%',
-    maxHeight: '80%',
-    borderWidth: 1,
+    borderRadius: 13,
   },
   modalTitle: {
+    fontFamily: 'SpaceGrotesk-Bold',
     fontSize: 20,
-    fontWeight: 'bold',
     marginBottom: 16,
     textAlign: 'center',
   },
   noQueuesText: {
-    fontSize: 16,
+    fontFamily: 'SpaceMono',
+    fontSize: 13,
     textAlign: 'center',
     marginVertical: 24,
   },
@@ -683,19 +481,10 @@ const styles = StyleSheet.create({
     marginVertical: 24,
   },
   queueErrorText: {
-    fontSize: 16,
+    fontFamily: 'SpaceMono',
+    fontSize: 13,
     textAlign: 'center',
     marginBottom: 16,
-  },
-  retryButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    marginTop: 8,
-  },
-  retryButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
   },
   queuesList: {
     marginVertical: 10,
@@ -704,7 +493,7 @@ const styles = StyleSheet.create({
     padding: 12,
     borderBottomWidth: 1,
     marginBottom: 8,
-    borderRadius: 8,
+    borderRadius: 10,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -715,34 +504,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   queuedBeerName: {
-    fontSize: 16,
+    fontFamily: 'SpaceGrotesk-SemiBold',
+    fontSize: 14,
     marginBottom: 4,
   },
   queuedBeerDate: {
-    fontSize: 14,
+    fontFamily: 'SpaceMono',
+    fontSize: 11,
     opacity: 0.7,
-  },
-  deleteButton: {
-    padding: 8,
-    borderRadius: 4,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: 10,
-    borderWidth: 1,
-  },
-  deleteButtonText: {
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  closeButton: {
-    marginTop: 16,
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  closeButtonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
   },
 });

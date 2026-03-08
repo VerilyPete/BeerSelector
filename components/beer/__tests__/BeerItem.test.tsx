@@ -8,14 +8,6 @@ jest.mock('@/hooks/useColorScheme', () => ({
   useColorScheme: jest.fn(() => 'light'),
 }));
 
-jest.mock('@/hooks/useThemeColor', () => ({
-  useThemeColor: jest.fn(() => '#000000'),
-}));
-
-// Mock ThemedText and ThemedView to use plain React Native components
-jest.mock('@/components/ThemedText');
-jest.mock('@/components/ThemedView');
-
 // Use real timers for this test suite to avoid hanging
 beforeAll(() => {
   jest.useRealTimers();
@@ -47,13 +39,12 @@ describe('BeerItem', () => {
       <BeerItem beer={mockBeer} isExpanded={false} onToggle={mockOnToggle} />
     );
 
-    // Should show basic info
+    // Should show basic info in collapsed state
     expect(getByText('Test IPA')).toBeTruthy();
     expect(getByText(/Test Brewery/)).toBeTruthy();
-    expect(getByText(/Austin, TX/)).toBeTruthy();
-    expect(getByText(/16oz Can/)).toBeTruthy();
+    expect(getByText(/IPA · 16oz Can/)).toBeTruthy();
 
-    // Should NOT show description in collapsed state
+    // Description only shows when expanded
     expect(queryByText('Description')).toBeNull();
     expect(queryByText(/delicious test beer/)).toBeNull();
   });
@@ -89,7 +80,7 @@ describe('BeerItem', () => {
   test('formats unix timestamp date correctly', () => {
     const mockOnToggle = jest.fn();
     const { getByText } = render(
-      <BeerItem beer={mockBeer} isExpanded={false} onToggle={mockOnToggle} dateLabel="Date Added" />
+      <BeerItem beer={mockBeer} isExpanded={true} onToggle={mockOnToggle} dateLabel="Date Added" />
     );
 
     // Should display formatted date
@@ -111,8 +102,8 @@ describe('BeerItem', () => {
       <BeerItem beer={tastedBeer} isExpanded={false} onToggle={mockOnToggle} dateLabel="Tasted" />
     );
 
-    // Should display formatted tasted date
-    expect(getByText(/Tasted:/)).toBeTruthy();
+    // Tasted date appears in brewery line (no colon in collapsed view)
+    expect(getByText(/Tasted/)).toBeTruthy();
     expect(getByText(/Nov 10, 2023/)).toBeTruthy();
   });
 
@@ -125,10 +116,10 @@ describe('BeerItem', () => {
     };
 
     const { getByText } = render(
-      <BeerItem beer={beerWithInvalidDate} isExpanded={false} onToggle={mockOnToggle} />
+      <BeerItem beer={beerWithInvalidDate} isExpanded={true} onToggle={mockOnToggle} />
     );
 
-    // Should show "Invalid Date" for malformed dates (note capitalization)
+    // Should show "Invalid Date" for malformed dates in expanded view
     expect(getByText(/Invalid Date/i)).toBeTruthy();
   });
 
@@ -156,11 +147,6 @@ describe('BeerItem', () => {
     // Should render without crashing
     expect(getByText('Minimal Beer')).toBeTruthy();
     expect(getByText(/Test Brewery/)).toBeTruthy();
-    expect(getByText(/Lager/)).toBeTruthy();
-
-    // Should not show empty container or location
-    const breweryText = getByText(/Test Brewery/).props.children.join('');
-    expect(breweryText).not.toContain('• ');
   });
 
   // Test 8: Renders custom actions when provided
@@ -206,10 +192,10 @@ describe('BeerItem', () => {
     };
 
     const { getByText } = render(
-      <BeerItem beer={beerWithEmptyDate} isExpanded={false} onToggle={mockOnToggle} />
+      <BeerItem beer={beerWithEmptyDate} isExpanded={true} onToggle={mockOnToggle} />
     );
 
-    // Should show "Unknown date" for empty dates
+    // Should show "Unknown date" for empty dates in expanded view
     expect(getByText(/Unknown date/)).toBeTruthy();
   });
 
@@ -233,11 +219,11 @@ describe('BeerItem', () => {
   test('uses default date label when not provided', () => {
     const mockOnToggle = jest.fn();
     const { getByText } = render(
-      <BeerItem beer={mockBeer} isExpanded={false} onToggle={mockOnToggle} />
+      <BeerItem beer={mockBeer} isExpanded={true} onToggle={mockOnToggle} />
     );
 
-    // Should use default "Date Added" label
-    expect(getByText(/Date Added:/)).toBeTruthy();
+    // Should use default "Added" label in expanded view
+    expect(getByText(/Added/)).toBeTruthy();
   });
 
   // Test 12: Renders beer name fallback

@@ -1,28 +1,42 @@
 import React from 'react';
-import { StyleSheet, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, TouchableOpacity } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
 import { Rewards } from '@/components/Rewards';
-import { useThemeColor } from '@/hooks/useThemeColor';
+import { ScanlineTitle } from '@/components/ui/ScanlineTitle';
+import { useColorScheme } from '@/hooks/useColorScheme';
+import { Colors } from '@/constants/Colors';
 import { router } from 'expo-router';
-import { IconSymbol } from '@/components/ui/IconSymbol';
+import { Ionicons } from '@expo/vector-icons';
 
 export function RewardsScreen() {
-  const tintColor = useThemeColor({}, 'tint');
+  const colorScheme = useColorScheme() ?? 'dark';
+  const colors = Colors[colorScheme];
 
   return (
-    <ThemedView style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <SafeAreaView style={{ flex: 1 }} edges={['top', 'right', 'left']}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <IconSymbol name="chevron.left" size={24} color={tintColor} />
-        </TouchableOpacity>
-        <ThemedText type="title" style={styles.title}>
-          Rewards
-        </ThemedText>
+        <View style={styles.headerRow}>
+          <LinearGradient
+            colors={['#D4D8DD', '#8A919A', '#6B727B'] as const}
+            style={[styles.bezelOuter, { borderColor: '#FFFFFF30' }]}
+          >
+            <TouchableOpacity
+              style={[
+                styles.bezelInner,
+                { backgroundColor: colors.backgroundSecondary, borderColor: colors.border },
+              ]}
+              onPress={() => router.back()}
+            >
+              <Ionicons name="chevron-back" size={22} color={colors.tint} />
+            </TouchableOpacity>
+          </LinearGradient>
+          <ScanlineTitle title="Rewards" />
+          <View style={styles.bezelSpacer} />
+        </View>
         <Rewards />
       </SafeAreaView>
-    </ThemedView>
+    </View>
   );
 }
 
@@ -30,17 +44,34 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 18,
+    marginTop: 8,
     marginBottom: 16,
-    marginTop: 8,
-    marginLeft: 16,
   },
-  backButton: {
-    marginLeft: 16,
-    marginTop: 8,
-    padding: 4,
+  bezelOuter: {
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 2,
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bezelSpacer: {
+    width: 36,
+    height: 36,
+  },
+  bezelInner: {
+    borderWidth: 1,
+    borderRadius: 8,
+    width: 30,
+    height: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
 
