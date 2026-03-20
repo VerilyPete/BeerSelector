@@ -34,6 +34,7 @@
  * ```
  */
 
+import { Platform } from 'react-native';
 import { requireNativeModule } from 'expo-modules-core';
 
 // ============================================================================
@@ -218,7 +219,26 @@ export interface LiveActivityModuleInterface {
  *
  * This uses Expo Modules API's requireNativeModule to load the Swift module.
  * The module name "LiveActivity" must match the Name() definition in the Swift code.
+ * On non-iOS platforms, a no-op stub is provided since Live Activities are iOS-only.
  */
-const LiveActivityModule = requireNativeModule<LiveActivityModuleInterface>('LiveActivity');
+const noopModule: LiveActivityModuleInterface = {
+  areActivitiesEnabled: async () => false,
+  startActivity: async () => '',
+  updateActivity: async () => false,
+  endActivity: async () => false,
+  endAllActivities: async () => false,
+  restartActivity: async () => null,
+  getAllActivityIds: async () => [],
+  endActivitiesOlderThan: async () => 0,
+  endAllActivitiesSync: () => false,
+  scheduleCleanupTask: async () => false,
+  cancelCleanupTask: () => false,
+  getActivityStaleDate: async () => null,
+};
+
+const LiveActivityModule: LiveActivityModuleInterface =
+  Platform.OS === 'ios'
+    ? requireNativeModule<LiveActivityModuleInterface>('LiveActivity')
+    : noopModule;
 
 export default LiveActivityModule;

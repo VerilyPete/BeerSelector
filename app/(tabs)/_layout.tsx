@@ -9,7 +9,7 @@ import { IconSymbol, IconSymbolName } from '@/components/ui/IconSymbol';
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useAppContext } from '@/context/AppContext';
-import { filterVisibleRoutes } from './tabBarFiltering';
+import { filterVisibleRoutes } from '@/src/utils/tabBarFiltering';
 
 type TabConfig = {
   label: string;
@@ -30,13 +30,33 @@ function TerminalTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
   const { session } = useAppContext();
 
-  const visibleRoutes = filterVisibleRoutes(state.routes, descriptors, session.isVisitor, TAB_CONFIGS);
+  const visibleRoutes = filterVisibleRoutes(
+    state.routes,
+    descriptors,
+    session.isVisitor,
+    TAB_CONFIGS
+  );
 
   return (
-    <View style={[styles.tabBarOuter, { paddingBottom: Math.max(insets.bottom, 12), backgroundColor: colors.chromeBar }]}>
-      <View style={[styles.tabBarPillOuter, { borderColor: colorScheme === 'dark' ? '#FFFFFF30' : colors.border }]}>
-        <View style={[styles.tabBarPillInner, { borderColor: colors.border, backgroundColor: colors.backgroundSecondary }]}>
-          {visibleRoutes.map((route) => {
+    <View
+      style={[
+        styles.tabBarOuter,
+        { paddingBottom: Math.max(insets.bottom, 12), backgroundColor: colors.chromeBar },
+      ]}
+    >
+      <View
+        style={[
+          styles.tabBarPillOuter,
+          { borderColor: colorScheme === 'dark' ? '#FFFFFF30' : colors.border },
+        ]}
+      >
+        <View
+          style={[
+            styles.tabBarPillInner,
+            { borderColor: colors.border, backgroundColor: colors.backgroundSecondary },
+          ]}
+        >
+          {visibleRoutes.map(route => {
             const realIndex = state.routes.indexOf(route);
             const isFocused = state.index === realIndex;
             const cfg = TAB_CONFIGS[route.name];
@@ -46,7 +66,11 @@ function TerminalTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
 
             const onPress = () => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+              const event = navigation.emit({
+                type: 'tabPress',
+                target: route.key,
+                canPreventDefault: true,
+              });
               if (!isFocused && !event.defaultPrevented) {
                 navigation.navigate(route.name);
               }
@@ -61,7 +85,8 @@ function TerminalTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
                 style={[
                   styles.tabItem,
                   isFocused && {
-                    backgroundColor: colorScheme === 'dark' ? '#1A2A2A' : colors.backgroundSecondary,
+                    backgroundColor:
+                      colorScheme === 'dark' ? '#1A2A2A' : colors.backgroundSecondary,
                     borderWidth: 1,
                     borderColor: colors.accentMuted,
                   },
@@ -71,11 +96,13 @@ function TerminalTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
                 <View style={!isFocused ? styles.burntIn : undefined}>
                   <IconSymbol name={cfg.icon} size={18} color={activeColor} />
                 </View>
-                <Text style={[
-                  styles.tabLabel,
-                  { color: activeColor },
-                  !isFocused && styles.burntInText,
-                ]}>
+                <Text
+                  style={[
+                    styles.tabLabel,
+                    { color: activeColor },
+                    !isFocused && styles.burntInText,
+                  ]}
+                >
                   {cfg.label}
                 </Text>
               </TouchableOpacity>
@@ -121,10 +148,10 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   burntIn: {
-    opacity: 0.3,
+    opacity: 0.7,
   },
   burntInText: {
-    opacity: 0.3,
+    opacity: 0.7,
   },
 });
 
@@ -133,10 +160,7 @@ export default function TabLayout() {
   const isInVisitorMode = session.isVisitor;
 
   return (
-    <Tabs
-      tabBar={(props) => <TerminalTabBar {...props} />}
-      screenOptions={{ headerShown: false }}
-    >
+    <Tabs tabBar={props => <TerminalTabBar {...props} />} screenOptions={{ headerShown: false }}>
       <Tabs.Screen name="index" options={{ title: 'Home' }} />
       <Tabs.Screen name="beerlist" options={{ title: 'All Beer' }} />
       <Tabs.Screen
