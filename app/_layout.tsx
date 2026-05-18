@@ -90,7 +90,7 @@ export default function RootLayout() {
     'DSEG7Classic-Bold': require('../assets/fonts/DSEG7Classic-Bold.ttf'),
   });
   const VALID_INITIAL_ROUTES = ['(tabs)', '/settings'] as const;
-  type InitialRoute = typeof VALID_INITIAL_ROUTES[number];
+  type InitialRoute = (typeof VALID_INITIAL_ROUTES)[number];
 
   const [initialRoute, setInitialRoute] = useState<InitialRoute | null>(null);
   const [migrationProgress, setMigrationProgress] = useState<number | null>(null);
@@ -345,8 +345,25 @@ export default function RootLayout() {
   // Navigate to initial route once determined and hide splash screen
   useEffect(() => {
     if (loaded && initialRoute) {
-      console.log(`Navigating to initial route: ${initialRoute}`);
-      router.replace(initialRoute as Href);
+      const navigateToInitialRoute = async () => {
+        // On cold launch via a deep link (e.g., Live Activity tap), Expo Router
+        // is already navigating to the deep link's path (e.g., /beerfinder which
+        // redirects to /(tabs)/mybeers). Calling router.replace here races with
+        // that navigation and can leave an invisible /beerfinder screen on top
+        // of the stack absorbing all touches — the app appears unresponsive.
+        const pendingDeepLink = initialRoute === '(tabs)' ? await Linking.getInitialURL() : null;
+
+        if (pendingDeepLink) {
+          console.log(
+            `Initial deep link present, letting Expo Router navigate: ${pendingDeepLink}`
+          );
+        } else {
+          console.log(`Navigating to initial route: ${initialRoute}`);
+          router.replace(initialRoute as Href);
+        }
+      };
+
+      navigateToInitialRoute();
 
       // Hide splash screen after navigation starts
       // Small delay ensures the new screen has begun rendering
