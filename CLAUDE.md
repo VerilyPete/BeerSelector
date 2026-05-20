@@ -300,10 +300,10 @@ if (lastCheck && Date.now() - parseInt(lastCheck) < 12 * 60 * 60 * 1000) {
 File-based routing with tabs:
 
 - `app/(tabs)/` - Tab navigation screens
-  - `index.tsx` - All Beers list
-  - `beerlist.tsx` - Beerfinder (filtered search)
+  - `index.tsx` - Home / All Beers list
+  - `beerlist.tsx` - All Beer list (BEERS tab)
   - `tastedbrews.tsx` - Tasted beers history
-  - `mybeers.tsx` - (deprecated/unused)
+  - `mybeers.tsx` - Beerfinder / untasted beers (FINDER tab, member-only). Live screen — renders `<Beerfinder />`; this is the Live Activity deep-link target.
 - `app/settings.tsx` - Settings screen
 - `app/screens/rewards.tsx` - Rewards detail screen
 - `app/_layout.tsx` - Root layout with initialization logic

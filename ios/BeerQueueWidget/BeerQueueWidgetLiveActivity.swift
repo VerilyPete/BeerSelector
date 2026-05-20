@@ -19,7 +19,10 @@ struct BeerQueueWidgetLiveActivity: Widget {
             BeerQueueCompactView(beers: context.state.beers)
                 .activityBackgroundTint(Color.clear)
                 .activitySystemActionForegroundColor(Color.primary)
-                .widgetURL(URL(string: "beerselector://beerfinder"))
+                // Link straight at the Beerfinder tab. Routing through an
+                // intermediate /beerfinder redirect route duplicated the (tabs)
+                // navigator on cold launch, leaving an inert tab bar on top.
+                .widgetURL(URL(string: "beerselector://mybeers"))
 
         } dynamicIsland: { context in
             DynamicIsland {
@@ -46,7 +49,7 @@ struct BeerQueueWidgetLiveActivity: Widget {
                     .font(.system(size: 16, weight: .medium))
                     .foregroundStyle(Color.dynamicIslandAccent)
             }
-            .widgetURL(URL(string: "beerselector://beerfinder"))
+            .widgetURL(URL(string: "beerselector://mybeers"))
             .keylineTint(Color.dynamicIslandAccent)
         }
     }

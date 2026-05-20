@@ -1,6 +1,6 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
-import { Stack, router, Href } from 'expo-router';
+import { Stack, router } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState, useRef } from 'react';
@@ -9,6 +9,7 @@ import { LogBox, Alert, AppState, AppStateStatus, Platform, Linking } from 'reac
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { resolveColdStartRoute } from '@/src/utils/coldStartNavigation';
 import {
   syncLiveActivityOnLaunch,
   syncActivityIdFromNative,
@@ -75,6 +76,15 @@ if (__DEV__) {
     'timestamp_locked_on_nw_queue',
   ]);
 }
+
+// Anchor the root stack on the tabs group. Without this, a deep-link cold launch
+// (e.g. tapping the Live Activity → beerselector://beerfinder) builds an orphan
+// stack with no (tabs) underneath, leaving the redirecting /beerfinder screen
+// mounted on top as an invisible touch-absorbing layer — the app opens but is
+// unresponsive. The anchor guarantees a well-formed [(tabs), …] back stack.
+export const unstable_settings = {
+  initialRouteName: '(tabs)',
+};
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -346,21 +356,18 @@ export default function RootLayout() {
   useEffect(() => {
     if (loaded && initialRoute) {
       const navigateToInitialRoute = async () => {
-        // On cold launch via a deep link (e.g., Live Activity tap), Expo Router
-        // is already navigating to the deep link's path (e.g., /beerfinder which
-        // redirects to /(tabs)/mybeers). Calling router.replace here races with
-        // that navigation and can leave an invisible /beerfinder screen on top
-        // of the stack absorbing all touches — the app appears unresponsive.
+        // On cold launch the root navigator mounts late (after async DB + network
+        // prepare), so Expo Router's automatic deep-link resolution and the
+        // app/beerfinder.tsx redirect race with the mount and can leave an
+        // invisible /beerfinder screen on top absorbing all touches. Drive the
+        // navigation explicitly instead: compute the one destination and replace.
         const pendingDeepLink = initialRoute === '(tabs)' ? await Linking.getInitialURL() : null;
+        const target = resolveColdStartRoute(initialRoute, pendingDeepLink);
 
-        if (pendingDeepLink) {
-          console.log(
-            `Initial deep link present, letting Expo Router navigate: ${pendingDeepLink}`
-          );
-        } else {
-          console.log(`Navigating to initial route: ${initialRoute}`);
-          router.replace(initialRoute as Href);
-        }
+        console.log(
+          `Navigating to ${target}${pendingDeepLink ? ` (deep link: ${pendingDeepLink})` : ''}`
+        );
+        router.replace(target);
       };
 
       navigateToInitialRoute();
