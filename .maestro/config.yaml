@@ -30,6 +30,8 @@ flows:
   - live-activity-restart.yaml
   - live-activity-empty-queue.yaml
   - live-activity-logout.yaml
+  # Deep-link cold launch (runs on simulator too — uses openLink, not a real Live Activity)
+  - live-activity-deep-link-cold-launch.yaml
 
 # Performance thresholds
 performance:
