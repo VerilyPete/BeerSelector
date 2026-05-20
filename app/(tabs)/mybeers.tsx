@@ -7,6 +7,7 @@ import { ScanlineTitle } from '@/components/ui/ScanlineTitle';
 import { Beerfinder } from '@/components/Beerfinder';
 import { areApiUrlsConfigured } from '@/src/database/preferences';
 import { checkAndRefreshOnAppOpen } from '@/src/services/dataUpdateService';
+import { shouldRunFocusRefresh } from '@/src/utils/focusRefreshThrottle';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { Colors } from '@/constants/Colors';
 
@@ -31,6 +32,7 @@ export default function MyBeersScreen() {
     useCallback(() => {
       const refreshDataOnFocus = async () => {
         if (!apiUrlsSet) return;
+        if (!shouldRunFocusRefresh()) return;
         console.log('Beerfinder tab focused, checking for data updates');
         try {
           const result = await checkAndRefreshOnAppOpen(2);

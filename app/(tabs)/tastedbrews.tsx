@@ -7,6 +7,7 @@ import { ScanlineTitle } from '@/components/ui/ScanlineTitle';
 import { TastedBrewList } from '@/components/TastedBrewList';
 import { areApiUrlsConfigured } from '@/src/database/preferences';
 import { checkAndRefreshOnAppOpen } from '@/src/services/dataUpdateService';
+import { shouldRunFocusRefresh } from '@/src/utils/focusRefreshThrottle';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { logError } from '@/src/utils/errorLogger';
 import { useColorScheme } from '@/hooks/useColorScheme';
@@ -33,6 +34,7 @@ export default function TastedBrewsScreen() {
     useCallback(() => {
       const refreshDataOnFocus = async () => {
         if (!apiUrlsSet) return;
+        if (!shouldRunFocusRefresh()) return;
         console.log('Tasted Brews tab focused, checking for data updates');
         try {
           const result = await checkAndRefreshOnAppOpen(2);

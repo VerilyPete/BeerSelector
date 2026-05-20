@@ -104,23 +104,27 @@ export const AllBeers = () => {
     setUntappdModalVisible(true);
   }, []);
 
-  // No useCallback wrapper - matches Beerfinder pattern
-  // Function is called during render for each visible item, memoization doesn't help
-  const renderBeerActions = (item: BeerWithContainerType) => (
-    <View style={styles.buttonContainer}>
-      <TouchableOpacity
-        style={[styles.checkInButton, { borderColor: colors.tint }]}
-        onPress={() => handleUntappdSearch(item.brew_name)}
-        activeOpacity={0.7}
-        accessible={true}
-        accessibilityLabel={`Check ${item.brew_name} on Untappd`}
-        accessibilityRole="button"
-      >
-        <Text style={[styles.checkInButtonText, { color: colors.tint }]} numberOfLines={1}>
-          UNTAPPD
-        </Text>
-      </TouchableOpacity>
-    </View>
+  // Memoized so its identity is stable: an unstable renderItemActions invalidates
+  // BeerList's renderItem (useCallback) and busts each BeerItem's React.memo,
+  // re-rendering every visible row on each parent render.
+  const renderBeerActions = useCallback(
+    (item: BeerWithContainerType) => (
+      <View style={styles.buttonContainer}>
+        <TouchableOpacity
+          style={[styles.checkInButton, { borderColor: colors.tint }]}
+          onPress={() => handleUntappdSearch(item.brew_name)}
+          activeOpacity={0.7}
+          accessible={true}
+          accessibilityLabel={`Check ${item.brew_name} on Untappd`}
+          accessibilityRole="button"
+        >
+          <Text style={[styles.checkInButtonText, { color: colors.tint }]} numberOfLines={1}>
+            UNTAPPD
+          </Text>
+        </TouchableOpacity>
+      </View>
+    ),
+    [colors, handleUntappdSearch]
   );
 
   return (

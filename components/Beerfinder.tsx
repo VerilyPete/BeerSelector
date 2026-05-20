@@ -249,11 +249,18 @@ export const Beerfinder = () => {
     setLocalSearchText('');
   }, []);
 
-  const renderBeerActions = (item: BeerWithContainerType) => (
-    <View style={styles.buttonContainer}>
-      <ActionButton label="CHECK IN" onPress={() => handleCheckIn(item)} loading={checkinLoading} />
-      <ActionButton label="UNTAPPD" onPress={() => handleUntappdSearch(item.brew_name)} />
-    </View>
+  const renderBeerActions = useCallback(
+    (item: BeerWithContainerType) => (
+      <View style={styles.buttonContainer}>
+        <ActionButton
+          label="CHECK IN"
+          onPress={() => handleCheckIn(item)}
+          loading={checkinLoading}
+        />
+        <ActionButton label="UNTAPPD" onPress={() => handleUntappdSearch(item.brew_name)} />
+      </View>
+    ),
+    [handleCheckIn, checkinLoading, handleUntappdSearch]
   );
 
   const renderQueueModal = () => (
