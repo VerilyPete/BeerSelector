@@ -145,8 +145,12 @@ export interface BeerState {
   /** User's rewards from UFO Club */
   rewards: Reward[];
 
-  /** IDs of beers currently in the check-in queue (to prevent double check-ins) */
-  queuedBeerIds: Set<string>;
+  /**
+   * IDs of beers currently in the check-in queue (to prevent double check-ins).
+   * Exposed as ReadonlySet so consumers can't bypass addQueuedBeer/removeQueuedBeer
+   * with a direct .add()/.delete(); internal updates copy-then-mutate via new Set().
+   */
+  queuedBeerIds: ReadonlySet<string>;
 }
 
 /**
