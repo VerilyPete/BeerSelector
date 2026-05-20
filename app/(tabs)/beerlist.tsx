@@ -9,12 +9,10 @@ import { shouldRunFocusRefresh } from '@/src/utils/focusRefreshThrottle';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { logError } from '@/src/utils/errorLogger';
 import { AllBeers } from '@/components/AllBeers';
-import { useAppContext } from '@/context/AppContext';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { Colors } from '@/constants/Colors';
 
 function BeerListScreen() {
-  const { session } = useAppContext();
   const colorScheme = useColorScheme() ?? 'dark';
   const colors = Colors[colorScheme];
 
