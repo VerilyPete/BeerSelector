@@ -5,6 +5,7 @@ import { ChromeStatusBar } from '@/components/ui/ChromeStatusBar';
 import { ScanlineTitle } from '@/components/ui/ScanlineTitle';
 import { areApiUrlsConfigured } from '@/src/database/preferences';
 import { checkAndRefreshOnAppOpen } from '@/src/services/dataUpdateService';
+import { shouldRunFocusRefresh } from '@/src/utils/focusRefreshThrottle';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { logError } from '@/src/utils/errorLogger';
 import { AllBeers } from '@/components/AllBeers';
@@ -63,6 +64,7 @@ export default function TabOneScreen() {
     useCallback(() => {
       const refreshDataOnFocus = async () => {
         if (!apiUrlsSet) return;
+        if (!shouldRunFocusRefresh()) return;
         console.log('Beer list tab focused, checking for data updates');
         try {
           const result = await checkAndRefreshOnAppOpen(2);

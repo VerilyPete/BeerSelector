@@ -160,7 +160,10 @@ export default function TabLayout() {
   const isInVisitorMode = session.isVisitor;
 
   return (
-    <Tabs tabBar={props => <TerminalTabBar {...props} />} screenOptions={{ headerShown: false }}>
+    <Tabs
+      tabBar={props => <TerminalTabBar {...props} />}
+      screenOptions={{ headerShown: false, freezeOnBlur: true }}
+    >
       <Tabs.Screen name="index" options={{ title: 'Home' }} />
       <Tabs.Screen name="beerlist" options={{ title: 'All Beer' }} />
       <Tabs.Screen
