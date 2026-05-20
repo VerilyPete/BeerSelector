@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   StyleSheet,
   View,
@@ -28,6 +28,7 @@ import { getQueuedBeers, deleteQueuedBeer as deleteQueuedBeerApi } from '@/src/a
 import { BeerWithContainerType } from '@/src/types/beer';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useAppContext } from '@/context/AppContext';
+import { selectUntastedBeers } from '@/src/utils/untastedBeers';
 import { useQueuedCheckIn } from '@/hooks/useQueuedCheckIn';
 import { getSessionData } from '@/src/api/sessionManager';
 import { updateLiveActivityWithQueue } from '@/src/services/liveActivityService';
@@ -56,12 +57,14 @@ export const Beerfinder = () => {
   const [localSearchText, setLocalSearchText] = useState('');
   const debouncedSearchText = useDebounce(localSearchText, 300);
 
-  // Use the shared filtering hook with untasted beers from context
-  // Filter out both tasted beers AND queued beers (to prevent double check-ins)
-  const untastedBeers = beers.allBeers.filter(beer => {
-    const tastedIds = new Set(beers.tastedBeers.map(b => b.id));
-    return !tastedIds.has(beer.id) && !beers.queuedBeerIds.has(beer.id);
-  });
+  // Use the shared filtering hook with untasted beers from context.
+  // Memoized on the (stable) context references so the set difference only
+  // recomputes when beer data changes — not on every render (search keystrokes,
+  // modal toggles, etc.), which previously re-scanned the whole catalog.
+  const untastedBeers = useMemo(
+    () => selectUntastedBeers(beers.allBeers, beers.tastedBeers, beers.queuedBeerIds),
+    [beers.allBeers, beers.tastedBeers, beers.queuedBeerIds]
+  );
 
   const {
     filteredBeers,
