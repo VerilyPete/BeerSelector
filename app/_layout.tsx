@@ -9,7 +9,8 @@ import { LogBox, Alert, AppState, AppStateStatus, Platform, Linking } from 'reac
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { useColorScheme } from '@/hooks/useColorScheme';
-import { resolveColdStartRoute } from '@/src/utils/coldStartNavigation';
+import { resolveColdStartRoute, type InitialRoute } from '@/src/utils/coldStartNavigation';
+import { logInfo } from '@/src/utils/errorLogger';
 import {
   syncLiveActivityOnLaunch,
   syncActivityIdFromNative,
@@ -36,20 +37,6 @@ import { OptimisticUpdateProvider } from '@/context/OptimisticUpdateContext';
 import { OfflineIndicator } from '@/components/OfflineIndicator';
 import { QueuedOperationsManager } from '@/components/QueuedOperationsManager';
 import { MigrationProgressOverlay } from '@/components/MigrationProgressOverlay';
-
-/**
- * Handle deep links from Live Activity.
- * Deep link format: beerselector://beerfinder
- *
- * Note: The /beerfinder route (app/beerfinder.tsx) handles this automatically
- * via Expo Router's deep link matching. This handler is kept for logging
- * and potential future deep link patterns.
- */
-const handleDeepLink = (url: string | null) => {
-  if (!url) return;
-  console.log('[DeepLink] Received URL:', url);
-  // Expo Router handles beerselector://beerfinder via app/beerfinder.tsx redirect
-};
 
 // Disable react-devtools connection to port 8097
 if (__DEV__) {
@@ -99,9 +86,6 @@ export default function RootLayout() {
     BeerIcons: require('../assets/fonts/BeerIcons.ttf'),
     'DSEG7Classic-Bold': require('../assets/fonts/DSEG7Classic-Bold.ttf'),
   });
-  const VALID_INITIAL_ROUTES = ['(tabs)', '/settings'] as const;
-  type InitialRoute = (typeof VALID_INITIAL_ROUTES)[number];
-
   const [initialRoute, setInitialRoute] = useState<InitialRoute | null>(null);
   const [migrationProgress, setMigrationProgress] = useState<number | null>(null);
   const initializationStarted = useRef(false);
@@ -329,29 +313,6 @@ export default function RootLayout() {
     };
   }, []);
 
-  // Deep link handling for Live Activity taps
-  useEffect(() => {
-    // Handle initial URL (app opened from deep link while closed)
-    const getInitialURL = async () => {
-      try {
-        const url = await Linking.getInitialURL();
-        handleDeepLink(url);
-      } catch (error) {
-        console.error('[DeepLink] Error getting initial URL:', error);
-      }
-    };
-    getInitialURL();
-
-    // Handle URLs when app is already open (app foregrounded from deep link)
-    const linkingSubscription = Linking.addEventListener('url', event => {
-      handleDeepLink(event.url);
-    });
-
-    return () => {
-      linkingSubscription.remove();
-    };
-  }, []);
-
   // Navigate to initial route once determined and hide splash screen
   useEffect(() => {
     if (loaded && initialRoute) {
@@ -360,14 +321,25 @@ export default function RootLayout() {
         // prepare), so Expo Router's automatic deep-link resolution and the
         // app/beerfinder.tsx redirect race with the mount and can leave an
         // invisible /beerfinder screen on top absorbing all touches. Drive the
-        // navigation explicitly instead: compute the one destination and replace.
+        // routes we own explicitly; defer any other pending deep link to Expo
+        // Router (target === null) rather than clobbering it to the tabs root.
         const pendingDeepLink = initialRoute === '(tabs)' ? await Linking.getInitialURL() : null;
         const target = resolveColdStartRoute(initialRoute, pendingDeepLink);
 
-        console.log(
-          `Navigating to ${target}${pendingDeepLink ? ` (deep link: ${pendingDeepLink})` : ''}`
-        );
-        router.replace(target);
+        if (target) {
+          console.log(
+            `Navigating to ${target}${pendingDeepLink ? ` (deep link: ${pendingDeepLink})` : ''}`
+          );
+          router.replace(target);
+        } else {
+          // A deep link we don't own is pending — leave it for Expo Router to
+          // resolve. Breadcrumb so this (late-mount) defer path stays observable.
+          logInfo('Cold-start deferred deep link to Expo Router', {
+            operation: 'coldStartNavigation',
+            component: '_layout',
+            additionalData: { url: pendingDeepLink },
+          });
+        }
       };
 
       navigateToInitialRoute();

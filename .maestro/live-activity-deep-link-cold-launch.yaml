@@ -1,0 +1,73 @@
+appId: org.verily.FSbeerselector
+name: "Live Activity - Deep Link Cold Launch & Tab Bar Responsiveness"
+---
+# Verifies the fix for the Dynamic Island / Live Activity cold-launch bug:
+# tapping the Live Activity cold-launched the app with a DUPLICATED (tabs)
+# navigator, leaving an inert tab bar painted on top (tab taps did nothing while
+# screen content stayed responsive).
+#
+# Also guards the deep-link regression fix: a cold-launch deep link the app does
+# NOT own must be resolved by Expo Router (e.g. land on Settings), NOT clobbered
+# to the tabs root.
+#
+# Runs on simulator AND device (uses openLink, not a real Live Activity).
+# Prerequisites: logged in as UFO Club member, API URLs configured.
+
+# ============================================================
+# PART 1: Cold launch via the Live Activity deep link -> Beerfinder,
+#         and the tab bar must be responsive.
+# ============================================================
+
+# Ensure a true cold launch (no warm process)
+- stopApp
+
+# Cold-launch via the Live Activity deep link
+- openLink: beerselector://mybeers
+- waitForAnimationToEnd
+
+# Dismiss Expo dev menu if present
+- runFlow:
+    when:
+      visible: "Reload"
+    commands:
+      - pressKey: Escape
+      - waitForAnimationToEnd
+
+# We should land directly on the Beerfinder tab
+- assertVisible:
+    id: "beerfinder-screen"
+
+# REGRESSION GUARD: the bug was an inert tab bar. Tapping another tab must
+# actually navigate (no haptic / no nav was the failure signature).
+- tapOn: "All Beer"
+- waitForAnimationToEnd
+- assertVisible:
+    id: "all-beers-container"
+
+# And back to Beerfinder via the tab bar
+- tapOn: "Beerfinder"
+- waitForAnimationToEnd
+- assertVisible:
+    id: "beerfinder-screen"
+
+# ============================================================
+# PART 2: A cold-launch deep link we DON'T own must be resolved by
+#         Expo Router (land on Settings), not clobbered to the tabs root.
+# ============================================================
+
+- stopApp
+- openLink: beerselector://settings
+- waitForAnimationToEnd
+
+- runFlow:
+    when:
+      visible: "Reload"
+    commands:
+      - pressKey: Escape
+      - waitForAnimationToEnd
+
+# The deferred link resolved to the Settings screen (NOT the tabs home)
+- assertVisible:
+    text: "Settings"
+- assertVisible:
+    id: "about-section"
