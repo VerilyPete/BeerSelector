@@ -70,6 +70,17 @@ name: "Migration Lock - Schema Migrations Release the Master Lock"
 - assertVisible:
     id: "beer-list"
 
+# ⚠️ `assertVisible: id: beer-count` after the swipe would be USELESS here.
+# beer-count is rendered from the existing database contents and is already on
+# screen before the refresh, so it is satisfied by pre-refresh state whether or
+# not the refresh completed. Under a leaked lock the refresh queues, rejects at
+# 30s, and the list keeps rendering — the assertion passes anyway.
+#
+# Capture it first, then require it to be a real value afterwards, using the
+# same idiom as 09-refresh-functionality.yaml:44.
+- evalScript: |
+      output.beforeCount = await maestro.getText({id: 'beer-count'})
+
 # Pull to refresh -> sequentialRefreshAllData -> withDatabaseLock
 - swipe:
     direction: DOWN
@@ -79,14 +90,21 @@ name: "Migration Lock - Schema Migrations Release the Master Lock"
 
 - waitForAnimationToEnd
 
-# The refresh must actually complete. Under a leaked lock this assertion is
-# what fails, because the count is not repainted from a completed write.
-# Deliberately shorter than the 30s acquisition timeout: if we waited longer
-# than that, a wedged refresh would eventually reject and the UI could settle,
-# and this would pass for the wrong reason.
-- assertVisible:
-    id: "beer-count"
-    timeout: 20000
+# Read it back. Deliberately checked BEFORE the 30s acquisition timeout could
+# fire: waiting longer would let a wedged refresh reject and the UI settle, and
+# this would pass for the wrong reason.
+- evalScript: |
+      output.afterCount = await maestro.getText({id: 'beer-count'})
+
+# A completed refresh leaves a non-empty count. A refresh that never got the
+# lock leaves the screen in a loading/stale state instead.
+- assertTrue: ${output.afterCount != null && output.afterCount != ''}
+
+# The refresh must have finished, not still be in flight. The count is a set
+# difference over the taplist, so a completed refresh against an unchanged
+# upstream leaves it equal to what we captured — and a half-applied write
+# would not.
+- assertTrue: ${output.afterCount == output.beforeCount}
 
 # ========================================
 # Test 3: The write actually persisted across a relaunch
@@ -110,12 +128,17 @@ name: "Migration Lock - Schema Migrations Release the Master Lock"
 - tapOn: "All Beer"
 - waitForAnimationToEnd
 
-# Data written by Test 2's refresh must still be here. An empty list after a
-# successful refresh is the symptom this whole plan exists to fix.
 - assertVisible:
     id: "beer-list"
-- assertVisible:
-    id: "beer-count"
+
+# Data written by Test 2's refresh must still be here. Same reasoning as above:
+# read the value rather than asserting the element exists, and require it to
+# match what Test 2 observed. An empty list after a successful refresh is the
+# symptom this whole plan exists to fix, and only a value comparison catches it.
+- evalScript: |
+      output.relaunchCount = await maestro.getText({id: 'beer-count'})
+
+- assertTrue: ${output.relaunchCount == output.afterCount}
 
 # And the lock must still be grantable on the already-migrated path, which
 # takes a different branch through setupDatabase than Test 1 did.
@@ -127,6 +150,7 @@ name: "Migration Lock - Schema Migrations Release the Master Lock"
 
 - waitForAnimationToEnd
 
-- assertVisible:
-    id: "beer-count"
-    timeout: 20000
+- evalScript: |
+      output.secondRefreshCount = await maestro.getText({id: 'beer-count'})
+
+- assertTrue: ${output.secondRefreshCount == output.relaunchCount}

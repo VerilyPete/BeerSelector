@@ -218,7 +218,11 @@ export class DatabaseLockManager {
    * @param token - The token returned when the lock was granted
    */
   release(token: LockToken): void {
-    if (this.abandonedGrantSerial !== null && token.serial === this.abandonedGrantSerial) {
+    if (
+      this.abandonedGrantSerial !== null &&
+      token.serial === this.abandonedGrantSerial &&
+      token.operationName === this.abandonedOperation
+    ) {
       this.logger.warn(
         `[LockManager] Abandoned hold for ${token.operationName} returned; lock is grantable again`
       );
@@ -228,7 +232,12 @@ export class DatabaseLockManager {
       return;
     }
 
-    if (token.serial !== this.grantSerial) {
+    // `!this.lockHeld` is not redundant with the serial check. _forceRelease
+    // bumps grantSerial without minting a token, so while a hold is abandoned
+    // the live serial belongs to no holder at all — matching it should still
+    // not free anything. Checking both keeps the invariant an assertion rather
+    // than a consequence of the arithmetic skipping a value.
+    if (!this.lockHeld || token.serial !== this.grantSerial) {
       this.logger.warn(
         `[LockManager] Ignoring stale release for ${token.operationName} (grant already abandoned)`
       );
