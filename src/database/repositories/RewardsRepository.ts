@@ -8,12 +8,8 @@
 import { getDatabase } from '../connection';
 import { Reward } from '../../types/database';
 import { databaseLockManager } from '../locks';
-import {
-  isRewardRow,
-  rewardRowToReward,
-  RewardRow,
-  isCountResult
-} from '../schemaTypes';
+import { toContentionError, withContentionMapping } from '../errors';
+import { isRewardRow, rewardRowToReward, RewardRow, isCountResult } from '../schemaTypes';
 
 /**
  * Repository class for Reward entity operations
@@ -39,12 +35,12 @@ export class RewardsRepository {
     }
 
     // Acquire database lock to prevent concurrent operations
-    if (!await databaseLockManager.acquireLock('RewardsRepository.insertMany')) {
+    if (!(await databaseLockManager.acquireLock('RewardsRepository.insertMany'))) {
       throw new Error('Could not acquire database lock for rewards insertion');
     }
 
     try {
-      await this._insertManyInternal(rewards);
+      await withContentionMapping('rewards import', () => this._insertManyInternal(rewards));
     } finally {
       // Always release the lock
       databaseLockManager.releaseLock('RewardsRepository.insertMany');
@@ -65,7 +61,7 @@ export class RewardsRepository {
       return;
     }
 
-    await this._insertManyInternal(rewards);
+    await withContentionMapping('rewards import', () => this._insertManyInternal(rewards));
   }
 
   /**
@@ -91,11 +87,7 @@ export class RewardsRepository {
         const values: (string | number)[] = [];
 
         batch.forEach(reward => {
-          values.push(
-            reward.reward_id || '',
-            reward.redeemed || '0',
-            reward.reward_type || ''
-          );
+          values.push(reward.reward_id || '', reward.redeemed || '0', reward.reward_type || '');
         });
 
         await database.runAsync(
@@ -129,9 +121,7 @@ export class RewardsRepository {
       );
 
       // Validate and convert each row
-      return rows
-        .filter(row => isRewardRow(row))
-        .map(row => rewardRowToReward(row));
+      return rows.filter(row => isRewardRow(row)).map(row => rewardRowToReward(row));
     } catch (error) {
       console.error('Error getting rewards:', error);
       return [];
@@ -185,9 +175,7 @@ export class RewardsRepository {
       );
 
       // Validate and convert each row
-      return rows
-        .filter(row => isRewardRow(row))
-        .map(row => rewardRowToReward(row));
+      return rows.filter(row => isRewardRow(row)).map(row => rewardRowToReward(row));
     } catch (error) {
       console.error('Error getting rewards by type:', error);
       throw error;
@@ -211,9 +199,7 @@ export class RewardsRepository {
       );
 
       // Validate and convert each row
-      return rows
-        .filter(row => isRewardRow(row))
-        .map(row => rewardRowToReward(row));
+      return rows.filter(row => isRewardRow(row)).map(row => rewardRowToReward(row));
     } catch (error) {
       console.error('Error getting redeemed rewards:', error);
       throw error;
@@ -238,9 +224,7 @@ export class RewardsRepository {
       );
 
       // Validate and convert each row
-      return rows
-        .filter(row => isRewardRow(row))
-        .map(row => rewardRowToReward(row));
+      return rows.filter(row => isRewardRow(row)).map(row => rewardRowToReward(row));
     } catch (error) {
       console.error('Error getting unredeemed rewards:', error);
       throw error;
@@ -260,7 +244,7 @@ export class RewardsRepository {
       });
     } catch (error) {
       console.error('Error clearing rewards:', error);
-      throw error;
+      throw toContentionError('rewards clear', error);
     }
   }
 

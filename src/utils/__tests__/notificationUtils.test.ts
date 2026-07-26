@@ -16,6 +16,7 @@ import {
   ApiErrorType,
 } from '../notificationUtils';
 import type { ErrorResponse } from '../notificationUtils';
+import { DatabaseContentionError } from '../../database/errors';
 
 jest.mock('react-native', () => ({
   Alert: {
@@ -258,6 +259,36 @@ describe('notificationUtils', () => {
       expect(result.type).toBe(ApiErrorType.UNKNOWN_ERROR);
       expect(result.message).toBe('An unknown error occurred');
     });
+
+    // ----------------------------------------------------------
+    // Database contention (plan 02 Phase 0)
+    //
+    // Exclusive transactions abort a competing writer with
+    // `database is locked`. That condition is transient and
+    // self-resolving, so it must not be presented as a hard
+    // failure. Classification is by type, never by message.
+    // ----------------------------------------------------------
+
+    it('createErrorResponse classifies a DatabaseContentionError as CONTENTION_ERROR', () => {
+      const result = createErrorResponse(
+        new DatabaseContentionError('allbeers write aborted: database is locked')
+      );
+
+      expect(result.type).toBe(ApiErrorType.CONTENTION_ERROR);
+    });
+
+    it('createErrorResponse marks a contention error as retryable', () => {
+      const result = createErrorResponse(new DatabaseContentionError('write aborted'));
+
+      expect(result.retryable).toBe(true);
+    });
+
+    it('createErrorResponse does not classify an arbitrary error mentioning "locked" as contention', () => {
+      const result = createErrorResponse(new Error('The account is locked'));
+
+      expect(result.type).toBe(ApiErrorType.UNKNOWN_ERROR);
+      expect(result.retryable).toBeUndefined();
+    });
   });
 
   // ============================================================
@@ -290,12 +321,21 @@ describe('notificationUtils', () => {
       expect(result).toBe('The server encountered an error. Please try again later.');
     });
 
+    it('describes CONTENTION_ERROR as transient without leaking the SQLite message', () => {
+      const result = getUserFriendlyErrorMessage(
+        makeError(
+          ApiErrorType.CONTENTION_ERROR,
+          'allbeers write aborted: database is locked by another writer'
+        )
+      );
+
+      expect(result).toBe('The app was busy updating. Please try again in a moment.');
+    });
+
     it('should return parse error message for PARSE_ERROR', () => {
       const result = getUserFriendlyErrorMessage(makeError(ApiErrorType.PARSE_ERROR));
 
-      expect(result).toBe(
-        'There was a problem processing the server response. Please try again.'
-      );
+      expect(result).toBe('There was a problem processing the server response. Please try again.');
     });
 
     it('should return the custom message for VALIDATION_ERROR when set', () => {

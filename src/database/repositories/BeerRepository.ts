@@ -8,6 +8,7 @@
 import { getDatabase } from '../connection';
 import { BeerWithContainerType } from '../../types/beer';
 import { databaseLockManager } from '../locks';
+import { toContentionError, withContentionMapping } from '../errors';
 import { isAllBeersRow, allBeersRowToBeerWithContainerType, AllBeersRow } from '../schemaTypes';
 import { EnrichmentUpdate } from '../../types/enrichment';
 
@@ -37,7 +38,7 @@ export class BeerRepository {
     }
 
     try {
-      await this._insertManyInternal(beers);
+      await withContentionMapping('allbeers import', () => this._insertManyInternal(beers));
     } finally {
       // Always release the lock
       databaseLockManager.releaseLock('BeerRepository');
@@ -53,7 +54,7 @@ export class BeerRepository {
    * @param beers - Array of BeerWithContainerType objects to insert
    */
   async insertManyUnsafe(beers: BeerWithContainerType[]): Promise<void> {
-    await this._insertManyInternal(beers);
+    await withContentionMapping('allbeers import', () => this._insertManyInternal(beers));
   }
 
   /**
@@ -365,6 +366,8 @@ export class BeerRepository {
 
       console.log(`[BeerRepository] Updated enrichment for ${updatedCount} beers`);
       return updatedCount;
+    } catch (error) {
+      throw toContentionError('allbeers enrichment update', error);
     } finally {
       databaseLockManager.releaseLock('BeerRepository');
     }
@@ -393,7 +396,7 @@ export class BeerRepository {
       });
     } catch (error) {
       console.error('Error clearing all beers:', error);
-      throw error;
+      throw toContentionError('allbeers clear', error);
     }
   }
 }

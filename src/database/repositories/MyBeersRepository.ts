@@ -8,6 +8,7 @@
 import { getDatabase } from '../connection';
 import { BeerfinderWithContainerType } from '../../types/beer';
 import { databaseLockManager } from '../locks';
+import { toContentionError } from '../errors';
 import {
   TastedBrewRow,
   TableInfo,
@@ -167,7 +168,7 @@ export class MyBeersRepository {
       }
     } catch (error) {
       console.error('Error populating My Beers database:', error);
-      throw error;
+      throw toContentionError('My Beers import', error);
     } finally {
       // Always release the lock
       databaseLockManager.releaseLock('MyBeersRepository');
@@ -302,7 +303,7 @@ export class MyBeersRepository {
       }
     } catch (error) {
       console.error('Error populating My Beers database:', error);
-      throw error;
+      throw toContentionError('My Beers import', error);
     }
   }
 
@@ -411,7 +412,7 @@ export class MyBeersRepository {
       });
     } catch (error) {
       console.error('Error clearing tasted beers:', error);
-      throw error;
+      throw toContentionError('tasted beers clear', error);
     }
   }
 
@@ -494,6 +495,8 @@ export class MyBeersRepository {
 
       console.log(`[MyBeersRepository] Updated enrichment for ${updatedCount} beers`);
       return updatedCount;
+    } catch (error) {
+      throw toContentionError('tasted beers enrichment update', error);
     } finally {
       databaseLockManager.releaseLock('MyBeersRepository');
     }
