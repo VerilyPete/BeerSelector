@@ -79,15 +79,89 @@ describe('DatabaseLockManager grant ownership', () => {
     await expectPending(pendingB);
   });
 
-  it('ignores a release from a holder whose grant was already abandoned', async () => {
+  it('does not grant a brand-new acquirer while a hold is abandoned', async () => {
+    const lockManager = createLockManager({ holdTimeoutMs: 50 });
+    await lockManager.acquire('slow-op');
+
+    jest.advanceTimersByTime(50);
+
+    // Skipping _processQueue only protects callers already in the queue. A
+    // caller arriving AFTER the force release hits the `!lockHeld` fast path,
+    // so it would be granted the lock while the abandoned holder is still
+    // mid-write — the exact interleaving this phase exists to prevent.
+    const newcomer = lockManager.acquire('newcomer-c');
+
+    await expectPending(newcomer);
+    expect(lockManager.getCurrentOperation()).toBeNull();
+  });
+
+  it('grants a waiter once the abandoned holder finally releases', async () => {
+    const lockManager = createLockManager({ holdTimeoutMs: 50 });
+    const tokenA = await lockManager.acquire('slow-op');
+
+    jest.advanceTimersByTime(50);
+    const newcomer = lockManager.acquire('newcomer-c');
+    await expectPending(newcomer);
+
+    // The abandoned writer returns at last. That is the signal that no writer
+    // is in flight any more, so the lock becomes grantable again without
+    // waiting for anyone's acquisition timeout.
+    lockManager.release(tokenA);
+
+    await expect(newcomer).resolves.toEqual(
+      expect.objectContaining({ operationName: 'newcomer-c' })
+    );
+    expect(lockManager.getCurrentOperation()).toBe('newcomer-c');
+  });
+
+  it('reports an abandoned hold distinctly from an idle lock', async () => {
+    const lockManager = createLockManager({ holdTimeoutMs: 50 });
+    expect(lockManager.hasAbandonedHolder()).toBe(false);
+
+    await lockManager.acquire('slow-op');
+    jest.advanceTimersByTime(50);
+
+    // isLocked() is false either way, so without this an abandoned hold is
+    // indistinguishable from an idle one to anyone reading logs or metrics.
+    expect(lockManager.isLocked()).toBe(false);
+    expect(lockManager.hasAbandonedHolder()).toBe(true);
+    expect(lockManager.getLockMetrics().abandonedHolder).toBe('slow-op');
+  });
+
+  it('clears an abandoned hold on resetForTesting so suites do not wedge each other', async () => {
+    const lockManager = createLockManager({ holdTimeoutMs: 50 });
+    await lockManager.acquire('slow-op');
+    jest.advanceTimersByTime(50);
+    expect(lockManager.hasAbandonedHolder()).toBe(true);
+
+    lockManager.resetForTesting();
+
+    expect(lockManager.hasAbandonedHolder()).toBe(false);
+    await expect(lockManager.acquire('next-test')).resolves.toEqual(
+      expect.objectContaining({ operationName: 'next-test' })
+    );
+  });
+
+  it('never lets a late release free a different holder grant', async () => {
     const lockManager = createLockManager({ holdTimeoutMs: 50 });
     const tokenA = await lockManager.acquire('slow-op');
     const pendingB = lockManager.acquire('waiter-b');
 
     jest.advanceTimersByTime(50);
+
+    // A's first release is the recovery signal and hands the lock to B.
+    lockManager.release(tokenA);
+    await pendingB;
+    expect(lockManager.getCurrentOperation()).toBe('waiter-b');
+
+    // A releasing a second time — a double release, or a stale `finally` on a
+    // retry path — must not free B. This exercises the real release path; the
+    // name-keyed shim used by the older suites short-circuits before reaching
+    // it, so this is the only place the double release is genuinely covered.
     lockManager.release(tokenA);
 
-    await expectPending(pendingB);
+    expect(lockManager.isLocked()).toBe(true);
+    expect(lockManager.getCurrentOperation()).toBe('waiter-b');
   });
 
   it('increments the grant serial on every grant, not only on forced release', async () => {

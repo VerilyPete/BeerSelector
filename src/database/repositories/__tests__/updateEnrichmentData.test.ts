@@ -19,11 +19,26 @@ import { EnrichmentUpdate } from '../../../types/enrichment';
 
 // Mock dependencies
 jest.mock('../../connection');
-jest.mock('../../locks', () => ({
-  databaseLockManager: {
-    withDatabaseLock: jest.fn(),
-  },
-}));
+// Delegates to a REAL DatabaseLockManager. A `jest.fn((_name, task) => task())`
+// stand-in has no release to observe, so "released the lock" assertions against
+// it pass even with withDatabaseLock's finally deleted.
+jest.mock('../../locks', () => {
+  const actual = jest.requireActual('../../DatabaseLockManager');
+  const real = new actual.DatabaseLockManager();
+  const delegate = (name: string, task: () => Promise<unknown>) =>
+    real.withDatabaseLock(name, task);
+  return {
+    databaseLockManager: {
+      withDatabaseLock: jest.fn(delegate),
+      // Exposed so setupLocks can restore delegation after a test overrides
+      // the implementation (e.g. to simulate an acquisition failure).
+      __delegate: delegate,
+      isLocked: () => real.isLocked(),
+      getQueueLength: () => real.getQueueLength(),
+      resetForTesting: () => real.resetForTesting(),
+    },
+  };
+});
 
 type MockStatement = {
   executeAsync: jest.Mock;
@@ -56,9 +71,13 @@ function createMockDatabase(mockStatement: MockStatement): MockDatabase {
 }
 
 function setupLocks(): void {
-  (databaseLockManager.withDatabaseLock as jest.Mock).mockImplementation(
-    async (_name: string, task: () => Promise<unknown>) => task()
-  );
+  const mocked = databaseLockManager as unknown as {
+    __delegate: (name: string, task: () => Promise<unknown>) => Promise<unknown>;
+  };
+  // Restores delegation to the real lock manager, undoing any per-test
+  // override. Not a plain task-runner: isLocked() has to mean something.
+  (databaseLockManager.withDatabaseLock as jest.Mock).mockImplementation(mocked.__delegate);
+  databaseLockManager.resetForTesting();
 }
 
 describe('BeerRepository.updateEnrichmentData', () => {
@@ -114,6 +133,7 @@ describe('BeerRepository.updateEnrichmentData', () => {
         'BeerRepository.updateEnrichmentData',
         expect.any(Function)
       );
+      expect(databaseLockManager.isLocked()).toBe(false);
     });
 
     test('should release BeerRepository lock after successful operation', async () => {
@@ -139,6 +159,7 @@ describe('BeerRepository.updateEnrichmentData', () => {
         'BeerRepository.updateEnrichmentData',
         expect.any(Function)
       );
+      expect(databaseLockManager.isLocked()).toBe(false);
     });
 
     test('should release lock even when database operation fails', async () => {
@@ -165,6 +186,7 @@ describe('BeerRepository.updateEnrichmentData', () => {
         'BeerRepository.updateEnrichmentData',
         expect.any(Function)
       );
+      expect(databaseLockManager.isLocked()).toBe(false);
     });
 
     test('should propagate an acquisition failure without touching the database', async () => {
@@ -516,6 +538,7 @@ describe('MyBeersRepository.updateEnrichmentData', () => {
         'MyBeersRepository.updateEnrichmentData',
         expect.any(Function)
       );
+      expect(databaseLockManager.isLocked()).toBe(false);
     });
 
     test('should release MyBeersRepository lock after operation', async () => {
@@ -541,6 +564,7 @@ describe('MyBeersRepository.updateEnrichmentData', () => {
         'MyBeersRepository.updateEnrichmentData',
         expect.any(Function)
       );
+      expect(databaseLockManager.isLocked()).toBe(false);
     });
 
     test('should propagate an acquisition failure', async () => {
@@ -679,6 +703,7 @@ describe('MyBeersRepository.updateEnrichmentData', () => {
         'MyBeersRepository.updateEnrichmentData',
         expect.any(Function)
       );
+      expect(databaseLockManager.isLocked()).toBe(false);
     });
   });
 });

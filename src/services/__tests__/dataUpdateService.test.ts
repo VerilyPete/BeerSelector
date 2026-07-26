@@ -70,11 +70,26 @@ jest.mock('../../database/repositories/RewardsRepository', () => ({
   },
 }));
 
-jest.mock('../../database/DatabaseLockManager', () => ({
-  databaseLockManager: {
-    withDatabaseLock: jest.fn(async (_name: string, task: () => Promise<unknown>) => task()),
-  },
-}));
+// Delegates to a REAL DatabaseLockManager rather than faking the lock away.
+// A mock of the shape `jest.fn((_name, task) => task())` has no release to
+// observe, so a test asserting "the lock was released" against it passes even
+// when withDatabaseLock's finally is deleted. Keeping a spy on top preserves
+// the call-name assertions while isLocked() reports genuine state.
+jest.mock('../../database/DatabaseLockManager', () => {
+  const actual = jest.requireActual('../../database/DatabaseLockManager');
+  const real = new actual.DatabaseLockManager();
+  return {
+    databaseLockManager: {
+      withDatabaseLock: jest.fn((name: string, task: () => Promise<unknown>) =>
+        real.withDatabaseLock(name, task)
+      ),
+      isLocked: () => real.isLocked(),
+      getQueueLength: () => real.getQueueLength(),
+      hasAbandonedHolder: () => real.hasAbandonedHolder(),
+      resetForTesting: () => real.resetForTesting(),
+    },
+  };
+});
 
 jest.mock('../../api/beerApi', () => ({
   fetchBeersFromAPI: jest.fn(),
@@ -934,12 +949,15 @@ describe('dataUpdateService', () => {
 
       await sequentialRefreshAllData();
 
-      // Release is structural: withDatabaseLock releases in a finally, and
-      // DatabaseLockManager.ownership.test.ts proves it does so on a throw.
+      // Asserts the lock is actually free, not merely that the wrapper was
+      // called. The manager behind this mock is real, so deleting the finally
+      // from withDatabaseLock fails this.
       expect(databaseLockManager.withDatabaseLock).toHaveBeenCalledWith(
         'refresh-all-data-sequential',
         expect.any(Function)
       );
+      expect(databaseLockManager.isLocked()).toBe(false);
+      expect(databaseLockManager.getQueueLength()).toBe(0);
     });
 
     it('returns hasErrors=false when all operations succeed', async () => {
@@ -1097,12 +1115,15 @@ describe('dataUpdateService', () => {
 
       await expect(refreshAllDataFromAPI()).rejects.toThrow();
 
-      // Release is structural: withDatabaseLock releases in a finally, and
-      // DatabaseLockManager.ownership.test.ts proves it does so on a throw.
+      // Asserts the lock is actually free, not merely that the wrapper was
+      // called. The manager behind this mock is real, so deleting the finally
+      // from withDatabaseLock fails this.
       expect(databaseLockManager.withDatabaseLock).toHaveBeenCalledWith(
         'refresh-all-from-api',
         expect.any(Function)
       );
+      expect(databaseLockManager.isLocked()).toBe(false);
+      expect(databaseLockManager.getQueueLength()).toBe(0);
     });
 
     it('returns all beers, my beers, and rewards on success', async () => {

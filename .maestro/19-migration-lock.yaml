@@ -9,21 +9,33 @@ name: "Migration Lock - Schema Migrations Release the Master Lock"
 # only prove it against a mocked database.
 #
 # On a real device a leaked migration lock does not surface as an error. It
-# surfaces as a permanent hang at splash: setupDatabase() runs the migrations
-# in app/_layout.tsx before the app renders, and every later database write
-# then queues behind a lock nobody holds until the 30s acquisition timeout
-# rejects it. That is what this flow catches and Jest cannot.
+# surfaces as a hang: setupDatabase() runs the migrations in app/_layout.tsx
+# before the app renders, and every later database WRITE then queues behind a
+# lock nobody holds until the 30s acquisition timeout rejects it.
+#
+# ⚠️ The probe has to be a WRITE that takes the master lock. Reads do not
+# qualify — repository getAll()/getFirst() are lock-free by design, so the beer
+# list renders happily from a leaked-lock state. Preference writes do not
+# qualify either: src/database/preferences.ts never touches the lock manager.
+# Pull-to-refresh does, via sequentialRefreshAllData ->
+# withDatabaseLock('refresh-all-data-sequential'), which is why every test
+# below drives a refresh rather than just asserting a screen is visible.
+#
+# ⚠️ NOT YET RUN ON A DEVICE. The selectors are copied from
+# 09-refresh-functionality.yaml (beer-list, beer-count) and 15/16, but this
+# flow has not been executed. Validate it on device before trusting a pass.
 #
 # Prerequisites:
 # - Run against a build whose schema version is BELOW the current one to
 #   exercise a real migration. On an already-migrated install this still
-#   passes, but proves only that startup is not wedged.
+#   passes, but proves only that startup and refresh are not wedged.
+# - Logged in, so a refresh has something to fetch.
 
 # ========================================
 # Test 1: Cold start completes past migrations
 # ========================================
 
-# Step 1: Launch with cleared state so setupDatabase runs migrations
+# Launch with cleared state so setupDatabase runs the migrations
 - launchApp:
     clearState: true
 
@@ -37,36 +49,52 @@ name: "Migration Lock - Schema Migrations Release the Master Lock"
       - pressKey: Escape
       - waitForAnimationToEnd
 
-# Step 2: The app must get past the splash/initialisation screen.
-# A leaked migration lock hangs here rather than erroring.
+# The app must get past splash/initialisation. A migration that never returns
+# hangs here rather than erroring.
 - assertVisible:
     text: "Settings"
     timeout: 30000
 
 # ========================================
-# Test 2: A database write still succeeds after migrations
+# Test 2: A lock-taking WRITE succeeds after migrations
 # ========================================
 #
 # Reaching the UI only proves the migration finished. It does not prove the
-# lock was released — the first write after startup is what does that, since
-# it has to acquire the same master lock.
+# lock was released — the first write to take the master lock is what does
+# that. If the lock leaked, this refresh queues until the 30s acquisition
+# timeout and the count never updates.
 
-- tapOn:
-    text: "Settings"
+- tapOn: "All Beer"
 - waitForAnimationToEnd
 
-# Writing a preference goes through the database. If the migration lock leaked,
-# this queues until the acquisition timeout instead of completing.
 - assertVisible:
-    text: "Settings"
-    timeout: 10000
+    id: "beer-list"
+
+# Pull to refresh -> sequentialRefreshAllData -> withDatabaseLock
+- swipe:
+    direction: DOWN
+    from:
+      id: "beer-list"
+    duration: 800
+
+- waitForAnimationToEnd
+
+# The refresh must actually complete. Under a leaked lock this assertion is
+# what fails, because the count is not repainted from a completed write.
+# Deliberately shorter than the 30s acquisition timeout: if we waited longer
+# than that, a wedged refresh would eventually reject and the UI could settle,
+# and this would pass for the wrong reason.
+- assertVisible:
+    id: "beer-count"
+    timeout: 20000
 
 # ========================================
-# Test 3: Restart is clean
+# Test 3: The write actually persisted across a relaunch
 # ========================================
 #
-# Second launch takes the already-migrated path. If the first run left the
-# lock held, state written during it would be missing or startup would stall.
+# A refresh that appears to complete but rolled back would still leave the
+# count rendered. Relaunching and re-reading is what distinguishes a committed
+# write from a discarded one.
 
 - launchApp:
     clearState: false
@@ -79,6 +107,26 @@ name: "Migration Lock - Schema Migrations Release the Master Lock"
       - pressKey: Escape
       - waitForAnimationToEnd
 
+- tapOn: "All Beer"
+- waitForAnimationToEnd
+
+# Data written by Test 2's refresh must still be here. An empty list after a
+# successful refresh is the symptom this whole plan exists to fix.
 - assertVisible:
-    text: "Settings"
-    timeout: 30000
+    id: "beer-list"
+- assertVisible:
+    id: "beer-count"
+
+# And the lock must still be grantable on the already-migrated path, which
+# takes a different branch through setupDatabase than Test 1 did.
+- swipe:
+    direction: DOWN
+    from:
+      id: "beer-list"
+    duration: 800
+
+- waitForAnimationToEnd
+
+- assertVisible:
+    id: "beer-count"
+    timeout: 20000
