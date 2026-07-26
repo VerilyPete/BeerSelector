@@ -95,6 +95,9 @@ describe('DatabaseLockManager grant ownership', () => {
     expect(lockManager.getCurrentOperation()).toBeNull();
   });
 
+  // Regresses by TIMEOUT rather than assertion — the awaited promise simply
+  // never resolves — so this caps well under the 30s default to keep a
+  // regression legible in seconds instead of looking like a hung suite.
   it('grants a waiter once the abandoned holder finally releases', async () => {
     const lockManager = createLockManager({ holdTimeoutMs: 50 });
     const tokenA = await lockManager.acquire('slow-op');
@@ -112,7 +115,7 @@ describe('DatabaseLockManager grant ownership', () => {
       expect.objectContaining({ operationName: 'newcomer-c' })
     );
     expect(lockManager.getCurrentOperation()).toBe('newcomer-c');
-  });
+  }, 3000);
 
   it('reports an abandoned hold distinctly from an idle lock', async () => {
     const lockManager = createLockManager({ holdTimeoutMs: 50 });
@@ -126,6 +129,42 @@ describe('DatabaseLockManager grant ownership', () => {
     expect(lockManager.isLocked()).toBe(false);
     expect(lockManager.hasAbandonedHolder()).toBe(true);
     expect(lockManager.getLockMetrics().abandonedHolder).toBe('slow-op');
+  });
+
+  it('ignores a release when no grant is live, even if the serial matches', async () => {
+    const lockManager = createLockManager({ holdTimeoutMs: 50 });
+    const tokenA = await lockManager.acquire('slow-op');
+
+    jest.advanceTimersByTime(50);
+    const pendingB = lockManager.acquire('waiter-b');
+    await expectPending(pendingB);
+
+    // _forceRelease bumps the grant serial WITHOUT minting a token, so this
+    // value belongs to no holder that ever existed. release() inferred "this
+    // is the live holder" from the serial alone, so a token carrying it would
+    // free a lock nobody held and hand it to a waiter mid-write. Unreachable
+    // while tokens only come from _grantLock — but the invariant should rest
+    // on a check, not on the arithmetic happening to skip a value.
+    lockManager.release({ operationName: 'forged', serial: tokenA.serial + 1 });
+
+    await expectPending(pendingB);
+    expect(lockManager.isLocked()).toBe(false);
+    expect(lockManager.hasAbandonedHolder()).toBe(true);
+  });
+
+  it('does not accept a recovery release for a different operation', async () => {
+    const lockManager = createLockManager({ holdTimeoutMs: 50 });
+    const tokenA = await lockManager.acquire('slow-op');
+
+    jest.advanceTimersByTime(50);
+    const pendingB = lockManager.acquire('waiter-b');
+
+    // Same serial, wrong operation. Only the actual abandoned holder returning
+    // is evidence that the writer stopped.
+    lockManager.release({ operationName: 'not-the-abandoned-op', serial: tokenA.serial });
+
+    await expectPending(pendingB);
+    expect(lockManager.hasAbandonedHolder()).toBe(true);
   });
 
   it('does not report shutdown-safe while a hold is abandoned', async () => {
@@ -175,7 +214,7 @@ describe('DatabaseLockManager grant ownership', () => {
 
     expect(lockManager.isLocked()).toBe(true);
     expect(lockManager.getCurrentOperation()).toBe('waiter-b');
-  });
+  }, 3000);
 
   it('increments the grant serial on every grant, not only on forced release', async () => {
     const lockManager = createLockManager();
