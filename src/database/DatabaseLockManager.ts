@@ -12,11 +12,55 @@
  */
 
 /**
+ * Proof that the bearer currently holds the lock.
+ *
+ * Stamped at GRANT time. `release` compares the serial against the live grant,
+ * so a release arriving from a holder whose grant was abandoned is ignored
+ * rather than freeing whoever holds the lock now.
+ */
+export type LockToken = {
+  readonly operationName: string;
+  readonly serial: number;
+};
+
+/**
+ * Identity of a request while it is waiting in the queue.
+ *
+ * Stamped at ENQUEUE time, and deliberately distinct from LockToken: a queued
+ * request has no grant, so `_timeoutAcquisition` cannot match on a grant serial.
+ * Operation names are not unique — several call sites share one — so matching on
+ * the name rejects whichever waiter happens to be found first.
+ */
+type RequestId = {
+  readonly operationName: string;
+  readonly requestSerial: number;
+};
+
+/**
+ * Minimal logging surface, injectable so tests can assert without console spies.
+ */
+export type LockLogger = {
+  log: (message: string) => void;
+  warn: (message: string) => void;
+};
+
+/**
+ * Construction options. Timeouts are options rather than constants so tests can
+ * drive small budgets deterministically with fake timers.
+ */
+export type DatabaseLockManagerOptions = {
+  readonly holdTimeoutMs?: number;
+  readonly acquisitionTimeoutMs?: number;
+  readonly logger?: LockLogger;
+};
+
+/**
  * Lock request in the queue
  */
 type LockRequest = {
   operationName: string;
-  resolve: (acquired: boolean) => void;
+  requestSerial: number;
+  resolve: (token: LockToken) => void;
   reject: (error: Error) => void;
   timestamp: number;
   acquisitionTimeoutId?: ReturnType<typeof setTimeout>;
@@ -49,14 +93,96 @@ export class DatabaseLockManager {
   private lockHeld: boolean = false;
   private queue: LockRequest[] = [];
   private timeoutId: ReturnType<typeof setTimeout> | null = null;
-  private readonly LOCK_TIMEOUT_MS = 15000; // 15 seconds for mobile UX (hold timeout)
-  private readonly ACQUISITION_TIMEOUT_MS = 30000; // 30 seconds for acquisition timeout
+  private readonly LOCK_TIMEOUT_MS: number; // hold timeout
+  private readonly ACQUISITION_TIMEOUT_MS: number; // acquisition timeout
+  private readonly logger: LockLogger;
+  /** Monotonic, stamped into every LockToken at grant time. */
+  private grantSerial: number = 0;
+  /** Monotonic, stamped into every queued request at enqueue time. */
+  private requestSerial: number = 0;
   private currentOperation: string | null = null;
   private debugLogging: boolean = false;
   private recentWaitTimes: number[] = []; // Track recent queue wait times
   private readonly MAX_WAIT_TIME_HISTORY = 10; // Keep last 10 wait times
   private readonly QUEUE_WARNING_THRESHOLD = 5; // Warn if queue exceeds this length
   private isShuttingDown: boolean = false; // Flag to indicate shutdown state
+
+  constructor(options: DatabaseLockManagerOptions = {}) {
+    this.LOCK_TIMEOUT_MS = options.holdTimeoutMs ?? 15000; // 15s for mobile UX
+    this.ACQUISITION_TIMEOUT_MS = options.acquisitionTimeoutMs ?? 30000;
+    this.logger = options.logger ?? console;
+  }
+
+  /**
+   * Acquire the database lock, resolving with proof of ownership.
+   *
+   * Prefer this over `acquireLock`: the returned token is what lets `release`
+   * tell a live owner from one whose grant was already abandoned.
+   *
+   * @param operationName - Name of the operation requesting the lock
+   * @param timeoutMs - Optional acquisition timeout (default: 30000)
+   * @returns Promise<LockToken> - rejects on acquisition timeout
+   */
+  async acquire(operationName: string, timeoutMs?: number): Promise<LockToken> {
+    return new Promise((resolve, reject) => {
+      if (this.isShuttingDown) {
+        reject(new Error('Cannot acquire lock: database is shutting down'));
+        return;
+      }
+
+      if (!this.lockHeld) {
+        this._grantLock(operationName, resolve);
+        return;
+      }
+
+      this.logger.log(
+        `Database operation already in progress, waiting for lock (${operationName})...`
+      );
+
+      const timeout = timeoutMs !== undefined ? timeoutMs : this.ACQUISITION_TIMEOUT_MS;
+      this.requestSerial += 1;
+      const requestId: RequestId = { operationName, requestSerial: this.requestSerial };
+
+      const acquisitionTimeoutId = setTimeout(() => {
+        this._timeoutAcquisition(requestId, timeout);
+      }, timeout);
+
+      this.queue.push({
+        operationName,
+        requestSerial: requestId.requestSerial,
+        resolve,
+        reject,
+        timestamp: Date.now(),
+        acquisitionTimeoutId,
+      });
+
+      if (this.queue.length >= this.QUEUE_WARNING_THRESHOLD) {
+        this.logger.warn(
+          `[LockManager] Queue length is ${this.queue.length}, exceeding threshold of ${this.QUEUE_WARNING_THRESHOLD}`
+        );
+      }
+    });
+  }
+
+  /**
+   * Release a lock using the token returned by `acquire`.
+   *
+   * A token whose serial no longer matches the live grant is stale — its grant
+   * was forcibly released, or already handed on — and is ignored. Releasing
+   * unconditionally would free a lock the caller no longer owns.
+   *
+   * @param token - The token returned when the lock was granted
+   */
+  release(token: LockToken): void {
+    if (token.serial !== this.grantSerial) {
+      this.logger.warn(
+        `[LockManager] Ignoring stale release for ${token.operationName} (grant already abandoned)`
+      );
+      return;
+    }
+
+    this._releaseInternal(token.operationName);
+  }
 
   /**
    * Attempt to acquire the database lock
@@ -75,44 +201,8 @@ export class DatabaseLockManager {
    * @returns Promise<boolean> - true if lock acquired, rejects on acquisition timeout
    */
   async acquireLock(operationName: string, timeoutMs?: number): Promise<boolean> {
-    return new Promise((resolve, reject) => {
-      // Check if shutting down
-      if (this.isShuttingDown) {
-        reject(new Error('Cannot acquire lock: database is shutting down'));
-        return;
-      }
-
-      // If lock is not held, acquire immediately
-      if (!this.lockHeld) {
-        this._grantLock(operationName, resolve);
-        return;
-      }
-
-      // Lock is held, add to queue with acquisition timeout
-      console.log(`Database operation already in progress, waiting for lock (${operationName})...`);
-
-      const timeout = timeoutMs !== undefined ? timeoutMs : this.ACQUISITION_TIMEOUT_MS;
-
-      // Set acquisition timeout
-      const acquisitionTimeoutId = setTimeout(() => {
-        this._timeoutAcquisition(operationName, timeout);
-      }, timeout);
-
-      this.queue.push({
-        operationName,
-        resolve,
-        reject,
-        timestamp: Date.now(),
-        acquisitionTimeoutId,
-      });
-
-      // Warn if queue is getting long (after adding to queue)
-      if (this.queue.length >= this.QUEUE_WARNING_THRESHOLD) {
-        console.warn(
-          `[LockManager] Queue length is ${this.queue.length}, exceeding threshold of ${this.QUEUE_WARNING_THRESHOLD}`
-        );
-      }
-    });
+    await this.acquire(operationName, timeoutMs);
+    return true;
   }
 
   /**
@@ -125,7 +215,7 @@ export class DatabaseLockManager {
    */
   private _grantLock(
     operationName: string,
-    resolve: (acquired: boolean) => void,
+    resolve: (token: LockToken) => void,
     acquisitionTimeoutId?: ReturnType<typeof setTimeout>,
     requestTimestamp?: number
   ): void {
@@ -135,17 +225,22 @@ export class DatabaseLockManager {
       this._recordWaitTime(waitTime);
 
       if (this.debugLogging) {
-        console.log(`[LockManager] Lock acquired for: ${operationName} (waited ${waitTime}ms)`);
+        this.logger.log(`[LockManager] Lock acquired for: ${operationName} (waited ${waitTime}ms)`);
       }
     } else if (this.debugLogging) {
-      console.log(`[LockManager] Lock acquired immediately for: ${operationName}`);
+      this.logger.log(`[LockManager] Lock acquired immediately for: ${operationName}`);
     }
 
     // Always log lock acquisition (not just in debug mode)
-    console.log(`Lock acquired for: ${operationName}`);
+    this.logger.log(`Lock acquired for: ${operationName}`);
 
     this.lockHeld = true;
     this.currentOperation = operationName;
+    // Bumped on EVERY grant, not only on forced release. If it only moved in
+    // _forceRelease, the normal release -> _processQueue -> _grantLock path
+    // would re-stamp the same serial and a double release would free the next
+    // holder's grant.
+    this.grantSerial += 1;
 
     // Clear acquisition timeout if it exists
     if (acquisitionTimeoutId) {
@@ -157,13 +252,13 @@ export class DatabaseLockManager {
       clearTimeout(this.timeoutId);
     }
 
-    // Set safety timeout to auto-release lock after 15 seconds (hold timeout)
+    // Set safety timeout to auto-release lock after the hold timeout
     this.timeoutId = setTimeout(() => {
-      console.warn(`Database lock forcibly released after timeout (${this.currentOperation})`);
+      this.logger.warn(`Database lock forcibly released after timeout (${this.currentOperation})`);
       this._forceRelease();
     }, this.LOCK_TIMEOUT_MS);
 
-    resolve(true);
+    resolve({ operationName, serial: this.grantSerial });
   }
 
   /**
@@ -174,9 +269,13 @@ export class DatabaseLockManager {
    * @param operationName - Name of the operation that timed out
    * @param timeoutMs - Timeout duration that expired
    */
-  private _timeoutAcquisition(operationName: string, timeoutMs: number): void {
-    // Find the request in the queue
-    const index = this.queue.findIndex(req => req.operationName === operationName);
+  private _timeoutAcquisition(requestId: RequestId, timeoutMs: number): void {
+    const { operationName } = requestId;
+    // Matched on the enqueue-time serial, not the operation name: names are not
+    // unique (BeerRepository and MyBeersRepository each use one name at two call
+    // sites), so a name match rejects whichever waiter is found first rather
+    // than the one whose timer actually fired.
+    const index = this.queue.findIndex(req => req.requestSerial === requestId.requestSerial);
 
     if (index !== -1) {
       const request = this.queue[index];
@@ -185,7 +284,7 @@ export class DatabaseLockManager {
       this.queue.splice(index, 1);
 
       // Log warning
-      console.warn(`Lock acquisition timeout for ${operationName} after ${timeoutMs}ms`);
+      this.logger.warn(`Lock acquisition timeout for ${operationName} after ${timeoutMs}ms`);
 
       // Reject the promise
       request.reject(
@@ -200,13 +299,24 @@ export class DatabaseLockManager {
   private _forceRelease(): void {
     this.lockHeld = false;
     this.currentOperation = null;
+    // Abandons the grant, so a late release from the timed-out holder is
+    // recognised as stale rather than freeing whoever holds the lock next.
+    this.grantSerial += 1;
     if (this.timeoutId) {
       clearTimeout(this.timeoutId);
       this.timeoutId = null;
     }
 
-    // Process next in queue
-    this._processQueue();
+    // Deliberately does NOT call _processQueue(). The timed-out holder has not
+    // returned and may still be mid-write; handing the lock to a queued writer
+    // now is silent data loss, whereas leaving it unheld is diagnosable. Under
+    // an exclusive transaction the second writer would hit `database is locked`
+    // anyway. Liveness is covered by the acquisition timeout, which rejects
+    // waiters with a real message rather than hanging them forever.
+    //
+    // Removing this hold timeout altogether is the right end state — see
+    // plan 01 Phase 6 — but it cannot land until Phase 4 splits the network
+    // fetch out of the write burst.
   }
 
   /**
@@ -220,12 +330,21 @@ export class DatabaseLockManager {
    * @param operationName - Name of the operation releasing the lock (for logging)
    */
   releaseLock(operationName: string): void {
+    this._releaseInternal(operationName);
+  }
+
+  /**
+   * Shared release path for both the token API and the legacy name-based one.
+   *
+   * @param operationName - Name of the operation releasing the lock (for logging)
+   */
+  private _releaseInternal(operationName: string): void {
     if (this.timeoutId) {
       clearTimeout(this.timeoutId);
       this.timeoutId = null;
     }
 
-    console.log(`Lock released for: ${operationName}`);
+    this.logger.log(`Lock released for: ${operationName}`);
     this.lockHeld = false;
     this.currentOperation = null;
 
