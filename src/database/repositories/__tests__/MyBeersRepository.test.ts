@@ -6,6 +6,7 @@
 import { MyBeersRepository } from '../MyBeersRepository';
 import { BeerfinderWithContainerType } from '../../../types/beer';
 import * as connection from '../../connection';
+import { databaseLockManager } from '../../locks';
 import { DatabaseContentionError } from '../../errors';
 
 // Mock the database connection module
@@ -827,6 +828,61 @@ describe('MyBeersRepository', () => {
       mockDatabase.withTransactionAsync.mockRejectedValueOnce(new Error('Transaction failed'));
 
       await expect(repository.insertManyUnsafe(beers)).rejects.toThrow('Transaction failed');
+    });
+  });
+  // ==========================================================================
+  // Lock lifetime (plan 01 Phase 3)
+  //
+  // These suites use the REAL databaseLockManager, so isLocked() asserts
+  // genuine lock state. This is the guard for the likeliest defect in the
+  // migration to withDatabaseLock: a dropped release, which on a device shows
+  // up as a permanent hang at splash rather than a test failure.
+  // ==========================================================================
+
+  describe('lock lifetime', () => {
+    it('does not leave the lock held when the write throws', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      const repository = createRepository();
+      const beers: BeerfinderWithContainerType[] = [
+        {
+          id: '1',
+          brew_name: 'Test Beer',
+          brewer: 'Test Brewery',
+          container_type: 'pint',
+          abv: null,
+          enrichment_confidence: null,
+          enrichment_source: null,
+        },
+      ];
+
+      mockDatabase.runAsync.mockRejectedValue(new Error('Database error'));
+
+      await expect(repository.insertMany(beers)).rejects.toThrow();
+
+      expect(databaseLockManager.isLocked()).toBe(false);
+      expect(databaseLockManager.getQueueLength()).toBe(0);
+    });
+
+    it('does not leave the lock held on a successful write', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      const repository = createRepository();
+      const beers: BeerfinderWithContainerType[] = [
+        {
+          id: '1',
+          brew_name: 'Test Beer',
+          brewer: 'Test Brewery',
+          container_type: 'pint',
+          abv: null,
+          enrichment_confidence: null,
+          enrichment_source: null,
+        },
+      ];
+
+      await repository.insertMany(beers);
+
+      expect(databaseLockManager.isLocked()).toBe(false);
     });
   });
 });

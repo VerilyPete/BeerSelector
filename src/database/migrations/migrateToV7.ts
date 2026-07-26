@@ -25,11 +25,8 @@ export async function migrateToVersion7(
 ): Promise<void> {
   console.log('[Migration v7] Starting migration to schema version 7...');
 
-  // Acquire master lock to prevent concurrent data operations
-  const lockId = 'schema-migration-v7';
-  await databaseLockManager.acquireLock(lockId);
-
-  try {
+  // Hold the master lock for the whole migration
+  await databaseLockManager.withDatabaseLock('schema-migration-v7', async () => {
     // =========================================================================
     // IMPORTANT: All PRAGMA queries MUST be outside the transaction
     // PRAGMA statements don't work correctly inside transactions in SQLite
@@ -106,7 +103,5 @@ export async function migrateToVersion7(
     if (onProgress) {
       onProgress(1, 1);
     }
-  } finally {
-    databaseLockManager.releaseLock(lockId);
-  }
+  });
 }

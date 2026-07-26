@@ -34,17 +34,9 @@ export class RewardsRepository {
       return;
     }
 
-    // Acquire database lock to prevent concurrent operations
-    if (!(await databaseLockManager.acquireLock('RewardsRepository.insertMany'))) {
-      throw new Error('Could not acquire database lock for rewards insertion');
-    }
-
-    try {
-      await withContentionMapping('rewards import', () => this._insertManyInternal(rewards));
-    } finally {
-      // Always release the lock
-      databaseLockManager.releaseLock('RewardsRepository.insertMany');
-    }
+    await databaseLockManager.withDatabaseLock('RewardsRepository.insertMany', () =>
+      withContentionMapping('rewards import', () => this._insertManyInternal(rewards))
+    );
   }
 
   /**

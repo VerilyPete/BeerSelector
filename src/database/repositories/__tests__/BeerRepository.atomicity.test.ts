@@ -35,8 +35,9 @@ import { withAtomicWrite } from '../../transactions';
 jest.mock('../../connection');
 jest.mock('../../locks', () => ({
   databaseLockManager: {
-    acquireLock: jest.fn().mockResolvedValue(true),
-    releaseLock: jest.fn(),
+    // Must run the task. A mock missing this method makes the locked-entry-point
+    // test pass on a TypeError rather than on atomicity.
+    withDatabaseLock: jest.fn(async (_name: string, task: () => Promise<unknown>) => task()),
   },
 }));
 

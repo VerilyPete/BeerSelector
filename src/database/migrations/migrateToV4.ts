@@ -25,11 +25,8 @@ export async function migrateToVersion4(
 ): Promise<void> {
   console.log('Starting migration to schema version 4...');
 
-  // Acquire master lock to prevent concurrent data operations
-  const lockId = 'schema-migration-v4';
-  await databaseLockManager.acquireLock(lockId);
-
-  try {
+  // Hold the master lock for the whole migration
+  await databaseLockManager.withDatabaseLock('schema-migration-v4', async () => {
     await database.withTransactionAsync(async () => {
       // Rename glass_type column to container_type in allbeers table
       console.log('Renaming glass_type to container_type in allbeers...');
@@ -55,9 +52,7 @@ export async function migrateToVersion4(
 
       console.log('Migration to version 4 complete');
     });
-  } finally {
-    databaseLockManager.releaseLock(lockId);
-  }
+  });
 }
 
 /**

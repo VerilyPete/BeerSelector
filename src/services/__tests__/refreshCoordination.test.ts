@@ -148,19 +148,19 @@ describe('Sequential Refresh Coordination', () => {
      * Test 2: Master lock coordinates all operations
      *
      * REQUIREMENT: Single lock acquired once for entire sequence
-     * IMPLEMENTATION: Line 546 - acquireLock('refresh-all-data-sequential')
+     * IMPLEMENTATION: withDatabaseLock('refresh-all-data-sequential')
      * STATUS: ✅ This test verifies Step 5c implementation (sequential refresh coordination)
      */
     it('should use a master lock to coordinate all operations', async () => {
       const lockAcquisitionLog: string[] = [];
 
       // Spy on lock acquisitions
-      const originalAcquire = databaseLockManager.acquireLock.bind(databaseLockManager);
+      const originalWithLock = databaseLockManager.withDatabaseLock.bind(databaseLockManager);
       const acquireSpy = jest
-        .spyOn(databaseLockManager, 'acquireLock')
-        .mockImplementation(async (operation: string) => {
+        .spyOn(databaseLockManager, 'withDatabaseLock')
+        .mockImplementation(async (operation: string, task: () => Promise<unknown>) => {
           lockAcquisitionLog.push(`acquire-${operation}`);
-          return originalAcquire(operation);
+          return originalWithLock(operation, task);
         });
 
       await sequentialRefreshAllData();
@@ -220,9 +220,9 @@ describe('Sequential Refresh Coordination', () => {
       expect(result.myBeersResult.success).toBe(false);
 
       // Lock should be released - verify we can acquire it again
-      const lockAcquired = await databaseLockManager.acquireLock('test-operation');
-      expect(lockAcquired).toBe(true);
-      await databaseLockManager.releaseLock();
+      const token = await databaseLockManager.acquire('test-operation');
+      expect(databaseLockManager.isLocked()).toBe(true);
+      databaseLockManager.release(token);
     });
 
     /**
@@ -254,15 +254,12 @@ describe('Sequential Refresh Coordination', () => {
       // Track lock acquisitions
       const lockOperations: string[] = [];
       const acquireSpy = jest
-        .spyOn(databaseLockManager, 'acquireLock')
-        .mockImplementation(async (operation: string) => {
+        .spyOn(databaseLockManager, 'withDatabaseLock')
+        .mockImplementation(async (operation: string, task: () => Promise<unknown>) => {
           lockOperations.push(operation);
-          return true; // Just return success, don't call through
+          // Runs the task without real locking; release is the helper's job.
+          return task();
         });
-
-      const releaseSpy = jest.spyOn(databaseLockManager, 'releaseLock').mockImplementation(() => {
-        // Just track, don't call through
-      });
 
       await sequentialRefreshAllData();
 
@@ -273,7 +270,6 @@ describe('Sequential Refresh Coordination', () => {
 
       // Cleanup spies
       acquireSpy.mockRestore();
-      releaseSpy.mockRestore();
     });
   });
 
@@ -289,33 +285,30 @@ describe('Sequential Refresh Coordination', () => {
 
       // Track when operations acquire locks
       const acquireSpy = jest
-        .spyOn(databaseLockManager, 'acquireLock')
-        .mockImplementation(async (operation: string) => {
+        .spyOn(databaseLockManager, 'withDatabaseLock')
+        .mockImplementation(async (operation: string, task: () => Promise<unknown>) => {
           lockQueue.push(`${operation}-waiting`);
           lockQueue.push(`${operation}-acquired`);
-          return true; // Just return success without actual locking
+          // Runs the task without actual locking.
+          return task();
         });
 
-      const releaseSpy = jest.spyOn(databaseLockManager, 'releaseLock').mockImplementation(() => {
-        // Just track, don't call through
-      });
-
       const mockOp1 = async () => {
-        await databaseLockManager.acquireLock('allBeers');
-        await Promise.resolve();
-        databaseLockManager.releaseLock();
+        await databaseLockManager.withDatabaseLock('allBeers', async () => {
+          await Promise.resolve();
+        });
       };
 
       const mockOp2 = async () => {
-        await databaseLockManager.acquireLock('myBeers');
-        await Promise.resolve();
-        databaseLockManager.releaseLock();
+        await databaseLockManager.withDatabaseLock('myBeers', async () => {
+          await Promise.resolve();
+        });
       };
 
       const mockOp3 = async () => {
-        await databaseLockManager.acquireLock('rewards');
-        await Promise.resolve();
-        databaseLockManager.releaseLock();
+        await databaseLockManager.withDatabaseLock('rewards', async () => {
+          await Promise.resolve();
+        });
       };
 
       // Simulate current parallel execution
@@ -328,7 +321,6 @@ describe('Sequential Refresh Coordination', () => {
 
       // Cleanup spies
       acquireSpy.mockRestore();
-      releaseSpy.mockRestore();
     });
   });
 
@@ -387,12 +379,12 @@ describe('Sequential Refresh Coordination', () => {
     it('manualRefreshAllData should use only one master lock', async () => {
       const lockAcquisitionLog: string[] = [];
 
-      const originalAcquire = databaseLockManager.acquireLock.bind(databaseLockManager);
+      const originalWithLock = databaseLockManager.withDatabaseLock.bind(databaseLockManager);
       const acquireSpy = jest
-        .spyOn(databaseLockManager, 'acquireLock')
-        .mockImplementation(async (operation: string) => {
+        .spyOn(databaseLockManager, 'withDatabaseLock')
+        .mockImplementation(async (operation: string, task: () => Promise<unknown>) => {
           lockAcquisitionLog.push(`acquire-${operation}`);
-          return originalAcquire(operation);
+          return originalWithLock(operation, task);
         });
 
       await manualRefreshAllData();
@@ -479,18 +471,18 @@ describe('Sequential Refresh Coordination', () => {
      * Test 12: refreshAllDataFromAPI() should use master lock
      *
      * REQUIREMENT: Only ONE lock acquisition for entire refresh
-     * IMPLEMENTATION: Line 840 - acquireLock('refresh-all-from-api')
+     * IMPLEMENTATION: withDatabaseLock('refresh-all-from-api')
      * STATUS: ✅ This test verifies CI-5 fix (refreshAllDataFromAPI uses sequential pattern)
      */
     it('refreshAllDataFromAPI should use only one master lock', async () => {
       const lockAcquisitionLog: string[] = [];
 
-      const originalAcquire = databaseLockManager.acquireLock.bind(databaseLockManager);
+      const originalWithLock = databaseLockManager.withDatabaseLock.bind(databaseLockManager);
       const acquireSpy = jest
-        .spyOn(databaseLockManager, 'acquireLock')
-        .mockImplementation(async (operation: string) => {
+        .spyOn(databaseLockManager, 'withDatabaseLock')
+        .mockImplementation(async (operation: string, task: () => Promise<unknown>) => {
           lockAcquisitionLog.push(`acquire-${operation}`);
-          return originalAcquire(operation);
+          return originalWithLock(operation, task);
         });
 
       await refreshAllDataFromAPI();

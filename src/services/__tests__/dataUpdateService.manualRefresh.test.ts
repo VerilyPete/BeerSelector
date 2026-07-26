@@ -40,8 +40,7 @@ jest.mock('../../database/repositories/RewardsRepository', () => ({
 
 jest.mock('../../database/DatabaseLockManager', () => ({
   databaseLockManager: {
-    acquireLock: jest.fn(async () => {}),
-    releaseLock: jest.fn(),
+    withDatabaseLock: jest.fn(async (_name: string, task: () => Promise<unknown>) => task()),
   },
 }));
 

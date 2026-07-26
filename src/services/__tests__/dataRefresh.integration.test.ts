@@ -35,8 +35,9 @@ describe('Data Refresh Integration Tests', () => {
     // Default mock for areApiUrlsConfigured - tests can override if needed
     (preferences.areApiUrlsConfigured as jest.Mock).mockResolvedValue(true);
     // Mock lock manager methods
-    jest.spyOn(databaseLockManager, 'acquireLock').mockResolvedValue(undefined);
-    jest.spyOn(databaseLockManager, 'releaseLock').mockResolvedValue(undefined);
+    jest
+      .spyOn(databaseLockManager, 'withDatabaseLock')
+      .mockImplementation(async (_name, task) => task());
   });
 
   describe('Full refresh flow', () => {
@@ -56,27 +57,29 @@ describe('Data Refresh Integration Tests', () => {
       });
 
       // Mock API responses with real fixtures
-      (beerApi.fetchBeersFromAPI as jest.Mock).mockResolvedValue(
-        allBeersFixture[1].brewInStock
-      );
+      (beerApi.fetchBeersFromAPI as jest.Mock).mockResolvedValue(allBeersFixture[1].brewInStock);
       (beerApi.fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(
         myBeersFixture[1].tasted_brew_current_round
       );
       (beerApi.fetchRewardsFromAPI as jest.Mock).mockResolvedValue([
-        { reward_id: '1', redeemed: 'false', reward_type: 'plate' }
+        { reward_id: '1', redeemed: 'false', reward_type: 'plate' },
       ]);
 
       // Mock repository insertMany methods
       (beerRepository.beerRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
-      (myBeersRepository.myBeersRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
-      (rewardsRepository.rewardsRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
+      (myBeersRepository.myBeersRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(
+        undefined
+      );
+      (rewardsRepository.rewardsRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(
+        undefined
+      );
 
       // Execute refresh
       const result = await refreshAllDataFromAPI();
 
       // Verify results
       expect(result.allBeers).toHaveLength(194); // From allbeers.json - 1 beer has empty brew_name and is filtered out by validation
-      expect(result.myBeers).toHaveLength(98);   // From mybeers.json
+      expect(result.myBeers).toHaveLength(98); // From mybeers.json
       expect(result.rewards).toHaveLength(1);
 
       // Verify API calls
@@ -87,12 +90,14 @@ describe('Data Refresh Integration Tests', () => {
       // Verify repositories were called with validated data (not raw fixture data)
       expect(beerRepository.beerRepository.insertManyUnsafe).toHaveBeenCalledTimes(1);
       expect(myBeersRepository.myBeersRepository.insertManyUnsafe).toHaveBeenCalledTimes(1);
-      
+
       // Verify the validated arrays have correct lengths (accounting for validation filtering)
-      const allBeersCall = (beerRepository.beerRepository.insertManyUnsafe as jest.Mock).mock.calls[0][0];
+      const allBeersCall = (beerRepository.beerRepository.insertManyUnsafe as jest.Mock).mock
+        .calls[0][0];
       expect(allBeersCall).toHaveLength(194); // 195 - 1 beer with empty brew_name
-      
-      const myBeersCall = (myBeersRepository.myBeersRepository.insertManyUnsafe as jest.Mock).mock.calls[0][0];
+
+      const myBeersCall = (myBeersRepository.myBeersRepository.insertManyUnsafe as jest.Mock).mock
+        .calls[0][0];
       expect(myBeersCall).toHaveLength(98);
     });
 
@@ -111,15 +116,17 @@ describe('Data Refresh Integration Tests', () => {
         }
       });
 
-      (beerApi.fetchBeersFromAPI as jest.Mock).mockResolvedValue(
-        allBeersFixture[1].brewInStock
-      );
+      (beerApi.fetchBeersFromAPI as jest.Mock).mockResolvedValue(allBeersFixture[1].brewInStock);
       (beerApi.fetchMyBeersFromAPI as jest.Mock).mockResolvedValue([]);
       (beerApi.fetchRewardsFromAPI as jest.Mock).mockResolvedValue([]);
 
       (beerRepository.beerRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
-      (myBeersRepository.myBeersRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
-      (rewardsRepository.rewardsRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
+      (myBeersRepository.myBeersRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(
+        undefined
+      );
+      (rewardsRepository.rewardsRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(
+        undefined
+      );
 
       const result = await refreshAllDataFromAPI();
 
@@ -156,11 +163,17 @@ describe('Data Refresh Integration Tests', () => {
       (beerApi.fetchRewardsFromAPI as jest.Mock).mockResolvedValue([]);
 
       (beerRepository.beerRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
-      (myBeersRepository.myBeersRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
-      (rewardsRepository.rewardsRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
+      (myBeersRepository.myBeersRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(
+        undefined
+      );
+      (rewardsRepository.rewardsRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(
+        undefined
+      );
 
       // Empty all beers should throw an error - this is a critical failure
-      await expect(refreshAllDataFromAPI()).rejects.toThrow('No valid all beers found in API response');
+      await expect(refreshAllDataFromAPI()).rejects.toThrow(
+        'No valid all beers found in API response'
+      );
     });
 
     it('should handle empty my beers response (new user)', async () => {
@@ -177,15 +190,17 @@ describe('Data Refresh Integration Tests', () => {
         }
       });
 
-      (beerApi.fetchBeersFromAPI as jest.Mock).mockResolvedValue(
-        allBeersFixture[1].brewInStock
-      );
+      (beerApi.fetchBeersFromAPI as jest.Mock).mockResolvedValue(allBeersFixture[1].brewInStock);
       (beerApi.fetchMyBeersFromAPI as jest.Mock).mockResolvedValue([]);
       (beerApi.fetchRewardsFromAPI as jest.Mock).mockResolvedValue([]);
 
       (beerRepository.beerRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
-      (myBeersRepository.myBeersRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
-      (rewardsRepository.rewardsRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
+      (myBeersRepository.myBeersRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(
+        undefined
+      );
+      (rewardsRepository.rewardsRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(
+        undefined
+      );
 
       const result = await refreshAllDataFromAPI();
 
@@ -210,16 +225,18 @@ describe('Data Refresh Integration Tests', () => {
         }
       });
 
-      (beerApi.fetchBeersFromAPI as jest.Mock).mockResolvedValue(
-        allBeersFixture[1].brewInStock
-      );
+      (beerApi.fetchBeersFromAPI as jest.Mock).mockResolvedValue(allBeersFixture[1].brewInStock);
       // API returns empty array when round rolls over
       (beerApi.fetchMyBeersFromAPI as jest.Mock).mockResolvedValue([]);
       (beerApi.fetchRewardsFromAPI as jest.Mock).mockResolvedValue([]);
 
       (beerRepository.beerRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
-      (myBeersRepository.myBeersRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
-      (rewardsRepository.rewardsRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
+      (myBeersRepository.myBeersRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(
+        undefined
+      );
+      (rewardsRepository.rewardsRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(
+        undefined
+      );
 
       const result = await refreshAllDataFromAPI();
 
@@ -253,9 +270,7 @@ describe('Data Refresh Integration Tests', () => {
         }
       });
 
-      (beerApi.fetchBeersFromAPI as jest.Mock).mockRejectedValue(
-        new Error('Network error')
-      );
+      (beerApi.fetchBeersFromAPI as jest.Mock).mockRejectedValue(new Error('Network error'));
 
       await expect(refreshAllDataFromAPI()).rejects.toThrow('Network error');
     });
@@ -274,12 +289,8 @@ describe('Data Refresh Integration Tests', () => {
         }
       });
 
-      (beerApi.fetchBeersFromAPI as jest.Mock).mockResolvedValue(
-        allBeersFixture[1].brewInStock
-      );
-      (beerApi.fetchMyBeersFromAPI as jest.Mock).mockRejectedValue(
-        new Error('API timeout')
-      );
+      (beerApi.fetchBeersFromAPI as jest.Mock).mockResolvedValue(allBeersFixture[1].brewInStock);
+      (beerApi.fetchMyBeersFromAPI as jest.Mock).mockRejectedValue(new Error('API timeout'));
 
       await expect(refreshAllDataFromAPI()).rejects.toThrow('API timeout');
     });
@@ -298,9 +309,7 @@ describe('Data Refresh Integration Tests', () => {
         }
       });
 
-      (beerApi.fetchBeersFromAPI as jest.Mock).mockResolvedValue(
-        allBeersFixture[1].brewInStock
-      );
+      (beerApi.fetchBeersFromAPI as jest.Mock).mockResolvedValue(allBeersFixture[1].brewInStock);
       (beerApi.fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(
         myBeersFixture[1].tasted_brew_current_round
       );
@@ -308,9 +317,7 @@ describe('Data Refresh Integration Tests', () => {
         new Error('Rewards service unavailable')
       );
 
-      await expect(refreshAllDataFromAPI()).rejects.toThrow(
-        'Rewards service unavailable'
-      );
+      await expect(refreshAllDataFromAPI()).rejects.toThrow('Rewards service unavailable');
     });
 
     it('should handle database insertion failure', async () => {
@@ -327,9 +334,7 @@ describe('Data Refresh Integration Tests', () => {
         }
       });
 
-      (beerApi.fetchBeersFromAPI as jest.Mock).mockResolvedValue(
-        allBeersFixture[1].brewInStock
-      );
+      (beerApi.fetchBeersFromAPI as jest.Mock).mockResolvedValue(allBeersFixture[1].brewInStock);
       (beerApi.fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(
         myBeersFixture[1].tasted_brew_current_round
       );
@@ -363,7 +368,7 @@ describe('Data Refresh Integration Tests', () => {
       const beersWithInvalid = [
         { id: '1', brew_name: 'Valid Beer 1', brewer: 'Brewery A' },
         { brew_name: 'Invalid Beer - No ID', brewer: 'Brewery B' }, // Missing ID
-        { id: '2', brew_name: 'Valid Beer 2', brewer: 'Brewery C' }
+        { id: '2', brew_name: 'Valid Beer 2', brewer: 'Brewery C' },
       ];
 
       (beerApi.fetchBeersFromAPI as jest.Mock).mockResolvedValue(beersWithInvalid);
@@ -371,8 +376,12 @@ describe('Data Refresh Integration Tests', () => {
       (beerApi.fetchRewardsFromAPI as jest.Mock).mockResolvedValue([]);
 
       (beerRepository.beerRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
-      (myBeersRepository.myBeersRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
-      (rewardsRepository.rewardsRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
+      (myBeersRepository.myBeersRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(
+        undefined
+      );
+      (rewardsRepository.rewardsRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(
+        undefined
+      );
 
       const result = await refreshAllDataFromAPI();
 
@@ -407,8 +416,8 @@ describe('Data Refresh Integration Tests', () => {
           // At least one Beerfinder field should exist
           expect(
             beer.roh_lap !== undefined ||
-            beer.tasted_date !== undefined ||
-            beer.chit_code !== undefined
+              beer.tasted_date !== undefined ||
+              beer.chit_code !== undefined
           ).toBe(true);
         }
       });

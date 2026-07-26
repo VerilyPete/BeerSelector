@@ -72,8 +72,7 @@ jest.mock('../../database/repositories/RewardsRepository', () => ({
 
 jest.mock('../../database/DatabaseLockManager', () => ({
   databaseLockManager: {
-    acquireLock: jest.fn().mockResolvedValue(undefined),
-    releaseLock: jest.fn(),
+    withDatabaseLock: jest.fn(async (_name: string, task: () => Promise<unknown>) => task()),
   },
 }));
 
@@ -918,8 +917,10 @@ describe('dataUpdateService', () => {
 
       await sequentialRefreshAllData();
 
-      expect(databaseLockManager.acquireLock).toHaveBeenCalledWith('refresh-all-data-sequential');
-      expect(databaseLockManager.releaseLock).toHaveBeenCalledWith('refresh-all-data-sequential');
+      expect(databaseLockManager.withDatabaseLock).toHaveBeenCalledWith(
+        'refresh-all-data-sequential',
+        expect.any(Function)
+      );
     });
 
     it('releases lock even when an operation fails', async () => {
@@ -933,7 +934,12 @@ describe('dataUpdateService', () => {
 
       await sequentialRefreshAllData();
 
-      expect(databaseLockManager.releaseLock).toHaveBeenCalledWith('refresh-all-data-sequential');
+      // Release is structural: withDatabaseLock releases in a finally, and
+      // DatabaseLockManager.ownership.test.ts proves it does so on a throw.
+      expect(databaseLockManager.withDatabaseLock).toHaveBeenCalledWith(
+        'refresh-all-data-sequential',
+        expect.any(Function)
+      );
     });
 
     it('returns hasErrors=false when all operations succeed', async () => {
@@ -1078,8 +1084,10 @@ describe('dataUpdateService', () => {
 
       await refreshAllDataFromAPI();
 
-      expect(databaseLockManager.acquireLock).toHaveBeenCalledWith('refresh-all-from-api');
-      expect(databaseLockManager.releaseLock).toHaveBeenCalledWith('refresh-all-from-api');
+      expect(databaseLockManager.withDatabaseLock).toHaveBeenCalledWith(
+        'refresh-all-from-api',
+        expect.any(Function)
+      );
     });
 
     it('releases lock when fetch throws', async () => {
@@ -1089,7 +1097,12 @@ describe('dataUpdateService', () => {
 
       await expect(refreshAllDataFromAPI()).rejects.toThrow();
 
-      expect(databaseLockManager.releaseLock).toHaveBeenCalledWith('refresh-all-from-api');
+      // Release is structural: withDatabaseLock releases in a finally, and
+      // DatabaseLockManager.ownership.test.ts proves it does so on a throw.
+      expect(databaseLockManager.withDatabaseLock).toHaveBeenCalledWith(
+        'refresh-all-from-api',
+        expect.any(Function)
+      );
     });
 
     it('returns all beers, my beers, and rewards on success', async () => {

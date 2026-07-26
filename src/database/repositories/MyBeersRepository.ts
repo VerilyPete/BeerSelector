@@ -42,137 +42,133 @@ export class MyBeersRepository {
   async insertMany(beers: BeerfinderWithContainerType[]): Promise<void> {
     console.log(`DB: Populating My Beers table with ${beers.length} beers`);
 
-    // Acquire database lock to prevent concurrent operations
-    if (!(await databaseLockManager.acquireLock('MyBeersRepository'))) {
-      throw new Error('Could not acquire database lock for my beers insertion');
-    }
-
-    try {
-      const database = await getDatabase();
-
-      // Handle empty array as valid (clear the table for new user or round rollover)
-      if (!beers || beers.length === 0) {
-        console.log(
-          'DB: Empty beers array - clearing tasted_brew_current_round table (new user or round rollover at 200 beers)'
-        );
-        await database.withTransactionAsync(async () => {
-          const before = await database.getFirstAsync<{ count: number }>(
-            'SELECT COUNT(*) as count FROM tasted_brew_current_round'
-          );
-          await database.runAsync('DELETE FROM tasted_brew_current_round');
-          console.log(
-            `Cleared tasted_brew_current_round table (removed ${before?.count ?? 0} rows)`
-          );
-        });
-        return;
-      }
-
-      // Count beers with valid IDs
-      const validBeers = beers.filter(beer => beer && beer.id);
-      console.log(
-        `DB: Found ${validBeers.length} valid beers with IDs out of ${beers.length} total beers`
-      );
-
-      if (validBeers.length === 0) {
-        console.log('DB: No valid beers with IDs found, clearing table instead of throwing error');
-        await database.withTransactionAsync(async () => {
-          const before = await database.getFirstAsync<{ count: number }>(
-            'SELECT COUNT(*) as count FROM tasted_brew_current_round'
-          );
-          await database.runAsync('DELETE FROM tasted_brew_current_round');
-          console.log(
-            `Cleared tasted_brew_current_round table (removed ${before?.count ?? 0} rows)`
-          );
-        });
-        return;
-      }
-
-      console.log('DB: Database initialized for populating My Beers table');
-
+    return databaseLockManager.withDatabaseLock('MyBeersRepository.insertMany', async () => {
       try {
-        // Use a transaction for clearing and inserting data
-        console.log('DB: Starting transaction for populating My Beers table');
-        await database.withTransactionAsync(async () => {
-          // Only clear the table if we have valid beers to insert
-          console.log('DB: Clearing existing data from tasted_brew_current_round table');
-          await database.runAsync('DELETE FROM tasted_brew_current_round');
+        const database = await getDatabase();
 
-          console.log(`DB: Starting import of ${validBeers.length} valid My Beers...`);
-
-          // Process in larger batches using transactions
-          const batchSize = 20;
-          console.log(`DB: Processing My Beers in batches of ${batchSize}`);
-
-          for (let i = 0; i < validBeers.length; i += batchSize) {
-            const batch = validBeers.slice(i, i + batchSize);
-            console.log(
-              `DB: Processing batch ${Math.floor(i / batchSize) + 1} of ${Math.ceil(validBeers.length / batchSize)} (${batch.length} beers)`
+        // Handle empty array as valid (clear the table for new user or round rollover)
+        if (!beers || beers.length === 0) {
+          console.log(
+            'DB: Empty beers array - clearing tasted_brew_current_round table (new user or round rollover at 200 beers)'
+          );
+          await database.withTransactionAsync(async () => {
+            const before = await database.getFirstAsync<{ count: number }>(
+              'SELECT COUNT(*) as count FROM tasted_brew_current_round'
             );
+            await database.runAsync('DELETE FROM tasted_brew_current_round');
+            console.log(
+              `Cleared tasted_brew_current_round table (removed ${before?.count ?? 0} rows)`
+            );
+          });
+          return;
+        }
 
-            // Insert each beer within the transaction
-            for (const beer of batch) {
-              // Double-check that the beer has an ID (should always be true due to our filtering)
-              if (!beer.id) {
-                console.log('DB: Skipping beer without ID');
-                continue; // Skip entries without an ID
-              }
+        // Count beers with valid IDs
+        const validBeers = beers.filter(beer => beer && beer.id);
+        console.log(
+          `DB: Found ${validBeers.length} valid beers with IDs out of ${beers.length} total beers`
+        );
 
-              try {
-                await database.runAsync(
-                  `INSERT OR REPLACE INTO tasted_brew_current_round (
+        if (validBeers.length === 0) {
+          console.log(
+            'DB: No valid beers with IDs found, clearing table instead of throwing error'
+          );
+          await database.withTransactionAsync(async () => {
+            const before = await database.getFirstAsync<{ count: number }>(
+              'SELECT COUNT(*) as count FROM tasted_brew_current_round'
+            );
+            await database.runAsync('DELETE FROM tasted_brew_current_round');
+            console.log(
+              `Cleared tasted_brew_current_round table (removed ${before?.count ?? 0} rows)`
+            );
+          });
+          return;
+        }
+
+        console.log('DB: Database initialized for populating My Beers table');
+
+        try {
+          // Use a transaction for clearing and inserting data
+          console.log('DB: Starting transaction for populating My Beers table');
+          await database.withTransactionAsync(async () => {
+            // Only clear the table if we have valid beers to insert
+            console.log('DB: Clearing existing data from tasted_brew_current_round table');
+            await database.runAsync('DELETE FROM tasted_brew_current_round');
+
+            console.log(`DB: Starting import of ${validBeers.length} valid My Beers...`);
+
+            // Process in larger batches using transactions
+            const batchSize = 20;
+            console.log(`DB: Processing My Beers in batches of ${batchSize}`);
+
+            for (let i = 0; i < validBeers.length; i += batchSize) {
+              const batch = validBeers.slice(i, i + batchSize);
+              console.log(
+                `DB: Processing batch ${Math.floor(i / batchSize) + 1} of ${Math.ceil(validBeers.length / batchSize)} (${batch.length} beers)`
+              );
+
+              // Insert each beer within the transaction
+              for (const beer of batch) {
+                // Double-check that the beer has an ID (should always be true due to our filtering)
+                if (!beer.id) {
+                  console.log('DB: Skipping beer without ID');
+                  continue; // Skip entries without an ID
+                }
+
+                try {
+                  await database.runAsync(
+                    `INSERT OR REPLACE INTO tasted_brew_current_round (
                     id, roh_lap, tasted_date, brew_name, brewer, brewer_loc,
                     brew_style, brew_container, review_count, review_ratings,
                     brew_description, chit_code, container_type, abv,
                     enrichment_confidence, enrichment_source
                   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                  [
-                    beer.id,
-                    beer.roh_lap || '',
-                    beer.tasted_date || '',
-                    beer.brew_name || '',
-                    beer.brewer || '',
-                    beer.brewer_loc || '',
-                    beer.brew_style || '',
-                    beer.brew_container || '',
-                    beer.review_count || '',
-                    beer.review_ratings || '',
-                    beer.brew_description || '',
-                    beer.chit_code || '',
-                    beer.container_type ?? null,
-                    beer.abv ?? null,
-                    beer.enrichment_confidence ?? null,
-                    beer.enrichment_source ?? null,
-                  ]
-                );
-              } catch (err) {
-                console.error('DB: Error inserting beer into tasted_brew_current_round:', err);
+                    [
+                      beer.id,
+                      beer.roh_lap || '',
+                      beer.tasted_date || '',
+                      beer.brew_name || '',
+                      beer.brewer || '',
+                      beer.brewer_loc || '',
+                      beer.brew_style || '',
+                      beer.brew_container || '',
+                      beer.review_count || '',
+                      beer.review_ratings || '',
+                      beer.brew_description || '',
+                      beer.chit_code || '',
+                      beer.container_type ?? null,
+                      beer.abv ?? null,
+                      beer.enrichment_confidence ?? null,
+                      beer.enrichment_source ?? null,
+                    ]
+                  );
+                } catch (err) {
+                  console.error('DB: Error inserting beer into tasted_brew_current_round:', err);
+                }
               }
             }
-          }
-        });
+          });
 
-        // Verify final row count
-        try {
-          const after = await database.getFirstAsync<{ count: number }>(
-            'SELECT COUNT(*) as count FROM tasted_brew_current_round'
-          );
-          console.log(
-            `DB: My Beers import complete! tasted_brew_current_round now has ${after?.count ?? 0} rows`
-          );
-        } catch (e) {
-          console.log('DB: My Beers import complete! (row count query failed)');
+          // Verify final row count
+          try {
+            const after = await database.getFirstAsync<{ count: number }>(
+              'SELECT COUNT(*) as count FROM tasted_brew_current_round'
+            );
+            console.log(
+              `DB: My Beers import complete! tasted_brew_current_round now has ${after?.count ?? 0} rows`
+            );
+          } catch (e) {
+            console.log('DB: My Beers import complete! (row count query failed)');
+          }
+        } catch (error) {
+          console.error('Error populating My Beers database:', error);
+          throw error;
         }
       } catch (error) {
         console.error('Error populating My Beers database:', error);
-        throw error;
+        throw toContentionError('My Beers import', error);
       }
-    } catch (error) {
-      console.error('Error populating My Beers database:', error);
-      throw toContentionError('My Beers import', error);
-    } finally {
-      // Always release the lock
-      databaseLockManager.releaseLock('MyBeersRepository');
-    }
+    });
   }
 
   /**
@@ -459,47 +455,46 @@ export class MyBeersRepository {
     const ids = Object.keys(enrichments);
     if (ids.length === 0) return 0;
 
-    if (!(await databaseLockManager.acquireLock('MyBeersRepository'))) {
-      throw new Error('Could not acquire database lock for enrichment update');
-    }
+    return databaseLockManager.withDatabaseLock(
+      'MyBeersRepository.updateEnrichmentData',
+      async () => {
+        try {
+          const database = await getDatabase();
+          let updatedCount = 0;
 
-    try {
-      const database = await getDatabase();
-      let updatedCount = 0;
-
-      await database.withTransactionAsync(async () => {
-        const stmt = await database.prepareAsync(
-          `UPDATE tasted_brew_current_round SET
+          await database.withTransactionAsync(async () => {
+            const stmt = await database.prepareAsync(
+              `UPDATE tasted_brew_current_round SET
             abv = COALESCE(?, abv),
             enrichment_confidence = ?,
             enrichment_source = ?,
             brew_description = COALESCE(?, brew_description)
            WHERE id = ?`
-        );
+            );
 
-        try {
-          for (const [id, data] of Object.entries(enrichments)) {
-            const result = await stmt.executeAsync([
-              data.enriched_abv,
-              data.enrichment_confidence ?? null,
-              data.enrichment_source ?? null,
-              data.brew_description ?? null,
-              id,
-            ]);
-            if (result.changes > 0) updatedCount++;
-          }
-        } finally {
-          await stmt.finalizeAsync();
+            try {
+              for (const [id, data] of Object.entries(enrichments)) {
+                const result = await stmt.executeAsync([
+                  data.enriched_abv,
+                  data.enrichment_confidence ?? null,
+                  data.enrichment_source ?? null,
+                  data.brew_description ?? null,
+                  id,
+                ]);
+                if (result.changes > 0) updatedCount++;
+              }
+            } finally {
+              await stmt.finalizeAsync();
+            }
+          });
+
+          console.log(`[MyBeersRepository] Updated enrichment for ${updatedCount} beers`);
+          return updatedCount;
+        } catch (error) {
+          throw toContentionError('tasted beers enrichment update', error);
         }
-      });
-
-      console.log(`[MyBeersRepository] Updated enrichment for ${updatedCount} beers`);
-      return updatedCount;
-    } catch (error) {
-      throw toContentionError('tasted beers enrichment update', error);
-    } finally {
-      databaseLockManager.releaseLock('MyBeersRepository');
-    }
+      }
+    );
   }
 }
 

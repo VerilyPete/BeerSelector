@@ -124,3 +124,87 @@ describe('DatabaseLockManager grant ownership', () => {
     await expectPending(patient);
   });
 });
+
+describe('withDatabaseLock', () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('releases the lock when the task throws', async () => {
+    const lockManager = createLockManager();
+
+    await expect(
+      lockManager.withDatabaseLock('failing-write', async () => {
+        throw new Error('write failed');
+      })
+    ).rejects.toThrow('write failed');
+
+    expect(lockManager.isLocked()).toBe(false);
+  });
+
+  it('releases the lock when the task succeeds, and returns its value', async () => {
+    const lockManager = createLockManager();
+
+    const result = await lockManager.withDatabaseLock('good-write', async () => 42);
+
+    expect(result).toBe(42);
+    expect(lockManager.isLocked()).toBe(false);
+  });
+
+  it('holds the lock for the duration of the task', async () => {
+    const lockManager = createLockManager();
+    let heldDuringTask = false;
+
+    await lockManager.withDatabaseLock('slow-write', async () => {
+      heldDuringTask = lockManager.isLocked();
+    });
+
+    expect(heldDuringTask).toBe(true);
+  });
+
+  it('grants a queued waiter once the first task finishes', async () => {
+    const lockManager = createLockManager();
+    const order: string[] = [];
+
+    const first = lockManager.withDatabaseLock('first', async () => {
+      order.push('first');
+    });
+    const second = lockManager.withDatabaseLock('second', async () => {
+      order.push('second');
+    });
+
+    await Promise.all([first, second]);
+
+    expect(order).toEqual(['first', 'second']);
+    expect(lockManager.isLocked()).toBe(false);
+  });
+
+  it('releases the lock even when the task throws a non-Error value', async () => {
+    const lockManager = createLockManager();
+
+    await expect(
+      lockManager.withDatabaseLock('odd-write', async () => {
+        throw 'a string, not an Error';
+      })
+    ).rejects.toBe('a string, not an Error');
+
+    expect(lockManager.isLocked()).toBe(false);
+  });
+});
+
+describe('retired name-based lock API', () => {
+  it('is no longer reachable', () => {
+    const lockManager = createLockManager();
+
+    // Compile-time is the real guard here; these assertions exist so the
+    // removal is visible in the suite rather than only in tsc output.
+    // @ts-expect-error acquireLock was removed in plan 01 Phase 3
+    expect(lockManager.acquireLock).toBeUndefined();
+    // @ts-expect-error releaseLock was removed in plan 01 Phase 3
+    expect(lockManager.releaseLock).toBeUndefined();
+  });
+});

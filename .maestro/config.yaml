@@ -25,6 +25,12 @@ flows:
   - 12-offline-scenarios.yaml
   - 13-network-timeout-recovery.yaml
   - 14-api-error-handling.yaml
+  # Adopted: these two existed on disk but were never registered here, so they
+  # had never run. Unregistered flows are invisible — add new ones to this list.
+  - 15-config-validation.yaml
+  - 16-offline-mode.yaml
+  # Schema migrations must release the master lock; a leak hangs at splash.
+  - 19-migration-lock.yaml
   # Live Activity tests (require physical iOS device - iOS 16.1+)
   # These tests will fail on simulators - run only on physical devices
   - live-activity-restart.yaml
