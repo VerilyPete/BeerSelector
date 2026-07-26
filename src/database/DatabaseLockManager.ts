@@ -77,15 +77,9 @@ type LockRequest = {
  * const lockManager = new DatabaseLockManager();
  *
  * async function databaseOperation() {
- *   if (!await lockManager.acquireLock('myOperation')) {
- *     throw new Error('Could not acquire lock');
- *   }
- *
- *   try {
+ *   return lockManager.withDatabaseLock('myOperation', async () => {
  *     // ... database operations here
- *   } finally {
- *     lockManager.releaseLock('myOperation');
- *   }
+ *   });
  * }
  * ```
  */
@@ -116,8 +110,9 @@ export class DatabaseLockManager {
   /**
    * Acquire the database lock, resolving with proof of ownership.
    *
-   * Prefer this over `acquireLock`: the returned token is what lets `release`
-   * tell a live owner from one whose grant was already abandoned.
+   * Prefer `withDatabaseLock` unless you genuinely need to hold the lock across
+   * a boundary a callback cannot span. The returned token is what lets
+   * `release` tell a live owner from one whose grant was already abandoned.
    *
    * @param operationName - Name of the operation requesting the lock
    * @param timeoutMs - Optional acquisition timeout (default: 30000)
@@ -165,6 +160,32 @@ export class DatabaseLockManager {
   }
 
   /**
+   * Run a task while holding the database lock, releasing it however it exits.
+   *
+   * The only supported way to take the lock. Hand-written acquire/try/finally
+   * pairs are what let a `finally` go missing, and a dropped release wedges the
+   * app at splash until the hold timeout fires.
+   *
+   * @param operationName - Name of the operation, used in lock logs
+   * @param task - The work to run while holding the lock
+   * @param timeoutMs - Optional acquisition timeout (default: 30000)
+   * @returns Whatever `task` returns
+   */
+  async withDatabaseLock<T>(
+    operationName: string,
+    task: () => Promise<T>,
+    timeoutMs?: number
+  ): Promise<T> {
+    const token = await this.acquire(operationName, timeoutMs);
+
+    try {
+      return await task();
+    } finally {
+      this.release(token);
+    }
+  }
+
+  /**
    * Release a lock using the token returned by `acquire`.
    *
    * A token whose serial no longer matches the live grant is stale — its grant
@@ -182,27 +203,6 @@ export class DatabaseLockManager {
     }
 
     this._releaseInternal(token.operationName);
-  }
-
-  /**
-   * Attempt to acquire the database lock
-   *
-   * If the lock is already held, the request is queued and will be granted
-   * when the current lock holder releases the lock (FIFO order).
-   *
-   * When the lock is successfully acquired, a 15-second timeout is set
-   * to automatically release the lock in case of errors or hung operations.
-   *
-   * Acquisition timeout: If lock cannot be acquired within timeoutMs (default 30s),
-   * the promise will be rejected with a timeout error.
-   *
-   * @param operationName - Name of the operation requesting the lock (for logging)
-   * @param timeoutMs - Optional acquisition timeout in milliseconds (default: 30000)
-   * @returns Promise<boolean> - true if lock acquired, rejects on acquisition timeout
-   */
-  async acquireLock(operationName: string, timeoutMs?: number): Promise<boolean> {
-    await this.acquire(operationName, timeoutMs);
-    return true;
   }
 
   /**
@@ -320,21 +320,8 @@ export class DatabaseLockManager {
   }
 
   /**
-   * Release the database lock
-   *
-   * This method should be called in a finally block to ensure the lock
-   * is released even if an error occurs during the operation.
-   *
-   * After releasing, the next operation in the queue (if any) is granted the lock.
-   *
-   * @param operationName - Name of the operation releasing the lock (for logging)
-   */
-  releaseLock(operationName: string): void {
-    this._releaseInternal(operationName);
-  }
-
-  /**
-   * Shared release path for both the token API and the legacy name-based one.
+   * Shared release path, reached only via `release(token)` or the
+   * `withDatabaseLock` helper — both of which check ownership first.
    *
    * @param operationName - Name of the operation releasing the lock (for logging)
    */
@@ -552,9 +539,9 @@ export class DatabaseLockManager {
  * ```typescript
  * import { databaseLockManager } from './DatabaseLockManager';
  *
- * if (!await databaseLockManager.acquireLock('operation')) {
- *   throw new Error('Could not acquire lock');
- * }
+ * await databaseLockManager.withDatabaseLock('operation', async () => {
+ *   // ... database operations here
+ * });
  * ```
  */
 export const databaseLockManager = new DatabaseLockManager();

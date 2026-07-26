@@ -34,17 +34,9 @@ export class BeerRepository {
    * @param beers - Array of BeerWithContainerType objects to insert
    */
   async insertMany(beers: BeerWithContainerType[]): Promise<void> {
-    // Acquire database lock to prevent concurrent operations
-    if (!(await databaseLockManager.acquireLock('BeerRepository'))) {
-      throw new Error('Could not acquire database lock for beer insertion');
-    }
-
-    try {
-      await withContentionMapping('allbeers import', () => this._insertManyInternal(beers));
-    } finally {
-      // Always release the lock
-      databaseLockManager.releaseLock('BeerRepository');
-    }
+    await databaseLockManager.withDatabaseLock('BeerRepository.insertMany', () =>
+      withContentionMapping('allbeers import', () => this._insertManyInternal(beers))
+    );
   }
 
   /**
@@ -331,47 +323,43 @@ export class BeerRepository {
     const ids = Object.keys(enrichments);
     if (ids.length === 0) return 0;
 
-    if (!(await databaseLockManager.acquireLock('BeerRepository'))) {
-      throw new Error('Could not acquire database lock for enrichment update');
-    }
+    return databaseLockManager.withDatabaseLock('BeerRepository.updateEnrichmentData', async () => {
+      try {
+        const database = await getDatabase();
+        let updatedCount = 0;
 
-    try {
-      const database = await getDatabase();
-      let updatedCount = 0;
+        await database.withTransactionAsync(async () => {
+          const stmt = await database.prepareAsync(
+            `UPDATE allbeers SET
+                abv = COALESCE(?, abv),
+                enrichment_confidence = ?,
+                enrichment_source = ?,
+                brew_description = COALESCE(?, brew_description)
+               WHERE id = ?`
+          );
 
-      await database.withTransactionAsync(async () => {
-        const stmt = await database.prepareAsync(
-          `UPDATE allbeers SET
-            abv = COALESCE(?, abv),
-            enrichment_confidence = ?,
-            enrichment_source = ?,
-            brew_description = COALESCE(?, brew_description)
-           WHERE id = ?`
-        );
-
-        try {
-          for (const [id, data] of Object.entries(enrichments)) {
-            const result = await stmt.executeAsync([
-              data.enriched_abv,
-              data.enrichment_confidence ?? null,
-              data.enrichment_source ?? null,
-              data.brew_description ?? null,
-              id,
-            ]);
-            if (result.changes > 0) updatedCount++;
+          try {
+            for (const [id, data] of Object.entries(enrichments)) {
+              const result = await stmt.executeAsync([
+                data.enriched_abv,
+                data.enrichment_confidence ?? null,
+                data.enrichment_source ?? null,
+                data.brew_description ?? null,
+                id,
+              ]);
+              if (result.changes > 0) updatedCount++;
+            }
+          } finally {
+            await stmt.finalizeAsync();
           }
-        } finally {
-          await stmt.finalizeAsync();
-        }
-      });
+        });
 
-      console.log(`[BeerRepository] Updated enrichment for ${updatedCount} beers`);
-      return updatedCount;
-    } catch (error) {
-      throw toContentionError('allbeers enrichment update', error);
-    } finally {
-      databaseLockManager.releaseLock('BeerRepository');
-    }
+        console.log(`[BeerRepository] Updated enrichment for ${updatedCount} beers`);
+        return updatedCount;
+      } catch (error) {
+        throw toContentionError('allbeers enrichment update', error);
+      }
+    });
   }
 
   /**

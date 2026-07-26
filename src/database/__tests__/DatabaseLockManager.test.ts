@@ -6,9 +6,14 @@
  */
 
 import { DatabaseLockManager } from '../DatabaseLockManager';
+import { nameKeyedLock, NameKeyedLock } from './helpers/nameKeyedLock';
 
-function createLockManager(): DatabaseLockManager {
-  return new DatabaseLockManager();
+// These suites identify operations by name, which is what they assert about.
+// The shim maps names to tokens; ownership is covered in
+// DatabaseLockManager.ownership.test.ts against the real API.
+function createLockManager(): DatabaseLockManager & NameKeyedLock {
+  const manager = new DatabaseLockManager();
+  return Object.assign(manager, nameKeyedLock(manager));
 }
 
 describe('DatabaseLockManager', () => {
@@ -183,9 +188,7 @@ describe('DatabaseLockManager', () => {
       // Trigger timeout
       jest.advanceTimersByTime(15000);
 
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('forcibly released')
-      );
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('forcibly released'));
 
       consoleSpy.mockRestore();
     });
@@ -348,9 +351,7 @@ describe('DatabaseLockManager', () => {
       // Second operation should log waiting message (immediately on queue entry)
       const secondPromise = lockManager.acquireLock('waiting-operation');
 
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('waiting for lock')
-      );
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('waiting for lock'));
 
       lockManager.releaseLock('blocking-operation');
       await secondPromise;
@@ -569,7 +570,7 @@ describe('DatabaseLockManager', () => {
       await lockManager.acquireLock('operation-1');
 
       // Queue 3 operations with different timeouts
-      const promise2 = lockManager.acquireLock('operation-2', 5000);  // 5s
+      const promise2 = lockManager.acquireLock('operation-2', 5000); // 5s
       const promise3 = lockManager.acquireLock('operation-3', 10000); // 10s
       const promise4 = lockManager.acquireLock('operation-4', 15000); // 15s
 
@@ -770,9 +771,7 @@ describe('DatabaseLockManager', () => {
 
       await lockManager.prepareForShutdown(5000);
 
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        expect.stringMatching(/preparing.*shutdown/i)
-      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringMatching(/preparing.*shutdown/i));
 
       consoleLogSpy.mockRestore();
     });

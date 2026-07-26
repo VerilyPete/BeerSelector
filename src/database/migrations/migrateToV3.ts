@@ -36,11 +36,8 @@ export async function migrateToVersion3(
 ): Promise<void> {
   console.log('Starting migration to schema version 3...');
 
-  // Acquire master lock to prevent concurrent data operations
-  const lockId = 'schema-migration-v3';
-  await databaseLockManager.acquireLock(lockId);
-
-  try {
+  // Hold the master lock for the whole migration
+  await databaseLockManager.withDatabaseLock('schema-migration-v3', async () => {
     await database.withTransactionAsync(async () => {
       // Add glass_type column to allbeers table
       console.log('Adding glass_type column to allbeers...');
@@ -64,9 +61,7 @@ export async function migrateToVersion3(
 
       console.log('✅ Migration to version 3 complete');
     });
-  } finally {
-    databaseLockManager.releaseLock(lockId);
-  }
+  });
 }
 
 /**

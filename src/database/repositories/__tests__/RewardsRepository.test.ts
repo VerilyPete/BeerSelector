@@ -6,6 +6,7 @@
 import { RewardsRepository } from '../RewardsRepository';
 import { Reward } from '../../../types/database';
 import * as connection from '../../connection';
+import { databaseLockManager } from '../../locks';
 
 // Mock the database connection module
 jest.mock('../../connection');
@@ -40,13 +41,13 @@ describe('RewardsRepository', () => {
         {
           reward_id: '1',
           redeemed: 'false',
-          reward_type: 'plate'
+          reward_type: 'plate',
         },
         {
           reward_id: '2',
           redeemed: 'true',
-          reward_type: 'shirt'
-        }
+          reward_type: 'shirt',
+        },
       ];
 
       await repository.insertMany(rewards);
@@ -96,7 +97,7 @@ describe('RewardsRepository', () => {
       const rewards: Reward[] = Array.from({ length: 250 }, (_, i) => ({
         reward_id: `reward-${i}`,
         redeemed: i % 2 === 0 ? 'true' : 'false',
-        reward_type: 'plate'
+        reward_type: 'plate',
       }));
 
       await repository.insertMany(rewards);
@@ -119,8 +120,8 @@ describe('RewardsRepository', () => {
         {
           reward_id: '1',
           redeemed: '',
-          reward_type: ''
-        }
+          reward_type: '',
+        },
       ];
 
       await repository.insertMany(rewards);
@@ -139,7 +140,7 @@ describe('RewardsRepository', () => {
       const rewards: Reward[] = [
         { reward_id: '1', redeemed: 'false', reward_type: 'plate' },
         { reward_id: '2', redeemed: 'true', reward_type: 'shirt' },
-        { reward_id: '3', redeemed: 'false', reward_type: 'glass' }
+        { reward_id: '3', redeemed: 'false', reward_type: 'glass' },
       ];
 
       await repository.insertMany(rewards);
@@ -155,15 +156,12 @@ describe('RewardsRepository', () => {
       const mockDatabase = createMockDatabase();
       (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
-      const rewards: Reward[] = [
-        { reward_id: '1', redeemed: 'false', reward_type: 'plate' }
-      ];
+      const rewards: Reward[] = [{ reward_id: '1', redeemed: 'false', reward_type: 'plate' }];
 
       mockDatabase.runAsync.mockRejectedValueOnce(new Error('Database error'));
 
       await expect(repository.insertMany(rewards)).rejects.toThrow('Database error');
     });
-
 
     it('should handle missing reward_id by using empty string', async () => {
       const mockDatabase = createMockDatabase();
@@ -173,8 +171,8 @@ describe('RewardsRepository', () => {
         {
           reward_id: '',
           redeemed: 'false',
-          reward_type: 'plate'
-        } as any
+          reward_type: 'plate',
+        } as any,
       ];
 
       await repository.insertMany(rewards);
@@ -189,15 +187,17 @@ describe('RewardsRepository', () => {
       const mockDatabase = createMockDatabase();
       (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
-      const rewards: Reward[] = [
-        { reward_id: '1', redeemed: 'false', reward_type: 'plate' }
-      ];
+      const rewards: Reward[] = [{ reward_id: '1', redeemed: 'false', reward_type: 'plate' }];
 
       await repository.insertMany(rewards);
 
       const calls = mockDatabase.runAsync.mock.calls;
-      const deleteCall = calls.find((call: unknown[]) => (call[0] as string).includes('DELETE FROM rewards'));
-      const insertCall = calls.find((call: unknown[]) => (call[0] as string).includes('INSERT OR REPLACE'));
+      const deleteCall = calls.find((call: unknown[]) =>
+        (call[0] as string).includes('DELETE FROM rewards')
+      );
+      const insertCall = calls.find((call: unknown[]) =>
+        (call[0] as string).includes('INSERT OR REPLACE')
+      );
 
       // Delete should come before insert
       expect(calls.indexOf(deleteCall)).toBeLessThan(calls.indexOf(insertCall));
@@ -213,13 +213,13 @@ describe('RewardsRepository', () => {
         {
           reward_id: '1',
           redeemed: 'false',
-          reward_type: 'plate'
+          reward_type: 'plate',
         },
         {
           reward_id: '2',
           redeemed: 'true',
-          reward_type: 'shirt'
-        }
+          reward_type: 'shirt',
+        },
       ];
 
       mockDatabase.getAllAsync.mockResolvedValue(mockRewards);
@@ -278,7 +278,7 @@ describe('RewardsRepository', () => {
       const mockReward: Reward = {
         reward_id: '123',
         redeemed: 'false',
-        reward_type: 'plate'
+        reward_type: 'plate',
       };
 
       mockDatabase.getFirstAsync.mockResolvedValue(mockReward);
@@ -340,13 +340,13 @@ describe('RewardsRepository', () => {
         {
           reward_id: '1',
           redeemed: 'false',
-          reward_type: 'plate'
+          reward_type: 'plate',
         },
         {
           reward_id: '2',
           redeemed: 'true',
-          reward_type: 'plate'
-        }
+          reward_type: 'plate',
+        },
       ];
 
       mockDatabase.getAllAsync.mockResolvedValue(mockRewards);
@@ -382,10 +382,7 @@ describe('RewardsRepository', () => {
       const result = await repository.getByType('');
 
       expect(result).toEqual([]);
-      expect(mockDatabase.getAllAsync).toHaveBeenCalledWith(
-        expect.any(String),
-        ['']
-      );
+      expect(mockDatabase.getAllAsync).toHaveBeenCalledWith(expect.any(String), ['']);
     });
 
     it('should throw error on database failure', async () => {
@@ -408,13 +405,13 @@ describe('RewardsRepository', () => {
         {
           reward_id: '1',
           redeemed: 'true',
-          reward_type: 'plate'
+          reward_type: 'plate',
         },
         {
           reward_id: '2',
           redeemed: 'true',
-          reward_type: 'shirt'
-        }
+          reward_type: 'shirt',
+        },
       ];
 
       mockDatabase.getAllAsync.mockResolvedValue(mockRewards);
@@ -459,13 +456,13 @@ describe('RewardsRepository', () => {
         {
           reward_id: '1',
           redeemed: 'false',
-          reward_type: 'plate'
+          reward_type: 'plate',
         },
         {
           reward_id: '2',
           redeemed: 'false',
-          reward_type: 'shirt'
-        }
+          reward_type: 'shirt',
+        },
       ];
 
       mockDatabase.getAllAsync.mockResolvedValue(mockRewards);
@@ -610,13 +607,9 @@ describe('RewardsRepository', () => {
       const mockDatabase = createMockDatabase();
       (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
-      const rewards: Reward[] = [
-        { reward_id: '1', redeemed: 'false', reward_type: 'plate' }
-      ];
+      const rewards: Reward[] = [{ reward_id: '1', redeemed: 'false', reward_type: 'plate' }];
 
-      mockDatabase.withTransactionAsync.mockRejectedValueOnce(
-        new Error('Transaction failed')
-      );
+      mockDatabase.withTransactionAsync.mockRejectedValueOnce(new Error('Transaction failed'));
 
       // insertMany does NOT log errors - it propagates them
       await expect(repository.insertMany(rewards)).rejects.toThrow('Transaction failed');
@@ -626,14 +619,47 @@ describe('RewardsRepository', () => {
       const mockDatabase = createMockDatabase();
       (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
-      const rewards: Reward[] = [
-        { reward_id: '1', redeemed: 'false', reward_type: 'plate' }
-      ];
+      const rewards: Reward[] = [{ reward_id: '1', redeemed: 'false', reward_type: 'plate' }];
 
       await repository.insertMany(rewards);
 
       // Should wrap DELETE and INSERT in transaction
       expect(mockDatabase.withTransactionAsync).toHaveBeenCalled();
+    });
+  });
+  // ==========================================================================
+  // Lock lifetime (plan 01 Phase 3)
+  //
+  // These suites use the REAL databaseLockManager, so isLocked() asserts
+  // genuine lock state. This is the guard for the likeliest defect in the
+  // migration to withDatabaseLock: a dropped release, which on a device shows
+  // up as a permanent hang at splash rather than a test failure.
+  // ==========================================================================
+
+  describe('lock lifetime', () => {
+    it('does not leave the lock held when the write throws', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      const repository = createRepository();
+      const rewards: Reward[] = [{ reward_id: '1', redeemed: 'false', reward_type: 'plate' }];
+
+      mockDatabase.runAsync.mockRejectedValue(new Error('Database error'));
+
+      await expect(repository.insertMany(rewards)).rejects.toThrow();
+
+      expect(databaseLockManager.isLocked()).toBe(false);
+      expect(databaseLockManager.getQueueLength()).toBe(0);
+    });
+
+    it('does not leave the lock held on a successful write', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      const repository = createRepository();
+      const rewards: Reward[] = [{ reward_id: '1', redeemed: 'false', reward_type: 'plate' }];
+
+      await repository.insertMany(rewards);
+
+      expect(databaseLockManager.isLocked()).toBe(false);
     });
   });
 });

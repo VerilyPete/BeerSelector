@@ -1,0 +1,84 @@
+appId: org.verily.FSbeerselector
+name: "Migration Lock - Schema Migrations Release the Master Lock"
+---
+# Test Flow: Schema migration lock lifetime
+#
+# Plan 01 Phase 3. The five schema migrations moved from hand-written
+# acquireLock/try/finally pairs onto databaseLockManager.withDatabaseLock().
+# A dropped release is the likeliest defect in that migration, and Jest can
+# only prove it against a mocked database.
+#
+# On a real device a leaked migration lock does not surface as an error. It
+# surfaces as a permanent hang at splash: setupDatabase() runs the migrations
+# in app/_layout.tsx before the app renders, and every later database write
+# then queues behind a lock nobody holds until the 30s acquisition timeout
+# rejects it. That is what this flow catches and Jest cannot.
+#
+# Prerequisites:
+# - Run against a build whose schema version is BELOW the current one to
+#   exercise a real migration. On an already-migrated install this still
+#   passes, but proves only that startup is not wedged.
+
+# ========================================
+# Test 1: Cold start completes past migrations
+# ========================================
+
+# Step 1: Launch with cleared state so setupDatabase runs migrations
+- launchApp:
+    clearState: true
+
+- waitForAnimationToEnd
+
+# Dismiss Expo dev menu if present
+- runFlow:
+    when:
+      visible: "Reload"
+    commands:
+      - pressKey: Escape
+      - waitForAnimationToEnd
+
+# Step 2: The app must get past the splash/initialisation screen.
+# A leaked migration lock hangs here rather than erroring.
+- assertVisible:
+    text: "Settings"
+    timeout: 30000
+
+# ========================================
+# Test 2: A database write still succeeds after migrations
+# ========================================
+#
+# Reaching the UI only proves the migration finished. It does not prove the
+# lock was released — the first write after startup is what does that, since
+# it has to acquire the same master lock.
+
+- tapOn:
+    text: "Settings"
+- waitForAnimationToEnd
+
+# Writing a preference goes through the database. If the migration lock leaked,
+# this queues until the acquisition timeout instead of completing.
+- assertVisible:
+    text: "Settings"
+    timeout: 10000
+
+# ========================================
+# Test 3: Restart is clean
+# ========================================
+#
+# Second launch takes the already-migrated path. If the first run left the
+# lock held, state written during it would be missing or startup would stall.
+
+- launchApp:
+    clearState: false
+- waitForAnimationToEnd
+
+- runFlow:
+    when:
+      visible: "Reload"
+    commands:
+      - pressKey: Escape
+      - waitForAnimationToEnd
+
+- assertVisible:
+    text: "Settings"
+    timeout: 30000

@@ -30,8 +30,7 @@ jest.mock('../../connection', () => ({
 // Mock the lock manager
 jest.mock('../../locks', () => ({
   databaseLockManager: {
-    acquireLock: jest.fn().mockResolvedValue(true),
-    releaseLock: jest.fn(),
+    withDatabaseLock: jest.fn(async (_name: string, task: () => Promise<unknown>) => task()),
   },
 }));
 

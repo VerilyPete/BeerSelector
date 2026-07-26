@@ -2,12 +2,9 @@ import { migrateToVersion4 } from '../migrateToV4';
 import { databaseLockManager } from '../../DatabaseLockManager';
 import { recordMigration } from '../../schemaVersion';
 
-jest.mock('../../DatabaseLockManager', () => ({
-  databaseLockManager: {
-    acquireLock: jest.fn().mockResolvedValue(true),
-    releaseLock: jest.fn(),
-  },
-}));
+// The lock manager is deliberately NOT mocked. With the database mocked but
+// the real manager, isLocked() asserts genuine lock state, which is what
+// catches a dropped release — a mock asserting a mock cannot.
 
 jest.mock('../../schemaVersion', () => ({
   recordMigration: jest.fn().mockResolvedValue(undefined),
@@ -25,8 +22,8 @@ type MockDb = {
 };
 
 function createMockMigrationDb(): MockDb {
-  (databaseLockManager.acquireLock as jest.Mock).mockClear();
-  (databaseLockManager.releaseLock as jest.Mock).mockClear();
+  databaseLockManager.resetForTesting();
+  jest.restoreAllMocks();
   (recordMigration as jest.Mock).mockClear();
   return {
     getAllAsync: jest.fn().mockResolvedValue([]),
@@ -50,11 +47,12 @@ describe('migrateToVersion4', () => {
   describe('happy path: glass_type column exists, no rows already have container_type', () => {
     it('acquires and releases the migration lock', async () => {
       const db = createMockMigrationDb();
+      const lockSpy = jest.spyOn(databaseLockManager, 'withDatabaseLock');
 
       await migrateToVersion4(db as never);
 
-      expect(databaseLockManager.acquireLock).toHaveBeenCalledWith('schema-migration-v4');
-      expect(databaseLockManager.releaseLock).toHaveBeenCalledWith('schema-migration-v4');
+      expect(lockSpy).toHaveBeenCalledWith('schema-migration-v4', expect.any(Function));
+      expect(databaseLockManager.isLocked()).toBe(false);
     });
 
     it('renames glass_type to container_type in allbeers', async () => {
@@ -63,10 +61,13 @@ describe('migrateToVersion4', () => {
       await migrateToVersion4(db as never);
 
       const execCalls = (db.execAsync as jest.Mock).mock.calls.map((c: string[]) => c[0]);
-      expect(execCalls.some((sql: string) =>
-        sql.includes('ALTER TABLE allbeers') &&
-        sql.includes('RENAME COLUMN glass_type TO container_type')
-      )).toBe(true);
+      expect(
+        execCalls.some(
+          (sql: string) =>
+            sql.includes('ALTER TABLE allbeers') &&
+            sql.includes('RENAME COLUMN glass_type TO container_type')
+        )
+      ).toBe(true);
     });
 
     it('renames glass_type to container_type in tasted_brew_current_round', async () => {
@@ -75,10 +76,13 @@ describe('migrateToVersion4', () => {
       await migrateToVersion4(db as never);
 
       const execCalls = (db.execAsync as jest.Mock).mock.calls.map((c: string[]) => c[0]);
-      expect(execCalls.some((sql: string) =>
-        sql.includes('ALTER TABLE tasted_brew_current_round') &&
-        sql.includes('RENAME COLUMN glass_type TO container_type')
-      )).toBe(true);
+      expect(
+        execCalls.some(
+          (sql: string) =>
+            sql.includes('ALTER TABLE tasted_brew_current_round') &&
+            sql.includes('RENAME COLUMN glass_type TO container_type')
+        )
+      ).toBe(true);
     });
 
     it('records migration version 4', async () => {
@@ -103,12 +107,17 @@ describe('migrateToVersion4', () => {
       await migrateToVersion4(db as never);
 
       const getAllCalls = (db.getAllAsync as jest.Mock).mock.calls.map((c: string[]) => c[0]);
-      expect(getAllCalls.some((sql: string) =>
-        sql.includes('allbeers') && sql.includes('container_type IS NULL')
-      )).toBe(true);
-      expect(getAllCalls.some((sql: string) =>
-        sql.includes('tasted_brew_current_round') && sql.includes('container_type IS NULL')
-      )).toBe(true);
+      expect(
+        getAllCalls.some(
+          (sql: string) => sql.includes('allbeers') && sql.includes('container_type IS NULL')
+        )
+      ).toBe(true);
+      expect(
+        getAllCalls.some(
+          (sql: string) =>
+            sql.includes('tasted_brew_current_round') && sql.includes('container_type IS NULL')
+        )
+      ).toBe(true);
     });
 
     it('skips bulk update when no rows need recalculation', async () => {
@@ -158,9 +167,7 @@ describe('migrateToVersion4', () => {
     it('calls onProgress for each batch processed', async () => {
       const db = createMockMigrationDb();
       const beerRows = createCanBeerRows(5);
-      db.getAllAsync
-        .mockResolvedValueOnce(beerRows)
-        .mockResolvedValueOnce(beerRows);
+      db.getAllAsync.mockResolvedValueOnce(beerRows).mockResolvedValueOnce(beerRows);
       const onProgress = jest.fn();
 
       await migrateToVersion4(db as never, onProgress);
@@ -171,9 +178,7 @@ describe('migrateToVersion4', () => {
     it('processes large batches in chunks of 100', async () => {
       const db = createMockMigrationDb();
       const beerRows = createCanBeerRows(150);
-      db.getAllAsync
-        .mockResolvedValueOnce(beerRows)
-        .mockResolvedValueOnce(beerRows);
+      db.getAllAsync.mockResolvedValueOnce(beerRows).mockResolvedValueOnce(beerRows);
 
       await migrateToVersion4(db as never);
 
@@ -189,7 +194,7 @@ describe('migrateToVersion4', () => {
 
       await expect(migrateToVersion4(db as never)).rejects.toThrow('Transaction failed');
 
-      expect(databaseLockManager.releaseLock).toHaveBeenCalledWith('schema-migration-v4');
+      expect(databaseLockManager.isLocked()).toBe(false);
     });
 
     it('releases the lock when execAsync throws inside the transaction', async () => {
@@ -201,14 +206,14 @@ describe('migrateToVersion4', () => {
 
       await expect(migrateToVersion4(db as never)).rejects.toThrow('RENAME COLUMN failed');
 
-      expect(databaseLockManager.releaseLock).toHaveBeenCalledWith('schema-migration-v4');
+      expect(databaseLockManager.isLocked()).toBe(false);
     });
 
     it('propagates error when lock acquisition fails', async () => {
       const db = createMockMigrationDb();
-      (databaseLockManager.acquireLock as jest.Mock).mockRejectedValue(
-        new Error('Cannot acquire lock: database is shutting down')
-      );
+      jest
+        .spyOn(databaseLockManager, 'withDatabaseLock')
+        .mockRejectedValue(new Error('Cannot acquire lock: database is shutting down'));
 
       await expect(migrateToVersion4(db as never)).rejects.toThrow('Cannot acquire lock');
     });

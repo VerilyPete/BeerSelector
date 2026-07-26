@@ -2,12 +2,9 @@ import { migrateToVersion5 } from '../migrateToV5';
 import { databaseLockManager } from '../../DatabaseLockManager';
 import { recordMigration } from '../../schemaVersion';
 
-jest.mock('../../DatabaseLockManager', () => ({
-  databaseLockManager: {
-    acquireLock: jest.fn().mockResolvedValue(true),
-    releaseLock: jest.fn(),
-  },
-}));
+// The lock manager is deliberately NOT mocked. With the database mocked but
+// the real manager, isLocked() asserts genuine lock state, which is what
+// catches a dropped release — a mock asserting a mock cannot.
 
 jest.mock('../../schemaVersion', () => ({
   recordMigration: jest.fn().mockResolvedValue(undefined),
@@ -25,8 +22,8 @@ type MockDb = {
 };
 
 function createMockMigrationDb(): MockDb {
-  (databaseLockManager.acquireLock as jest.Mock).mockClear();
-  (databaseLockManager.releaseLock as jest.Mock).mockClear();
+  databaseLockManager.resetForTesting();
+  jest.restoreAllMocks();
   (recordMigration as jest.Mock).mockClear();
   return {
     getAllAsync: jest.fn().mockResolvedValue([]),
@@ -51,11 +48,12 @@ describe('migrateToVersion5', () => {
   describe('happy path: flight beers with null container_type exist', () => {
     it('acquires and releases the migration lock', async () => {
       const db = createMockMigrationDb();
+      const lockSpy = jest.spyOn(databaseLockManager, 'withDatabaseLock');
 
       await migrateToVersion5(db as never);
 
-      expect(databaseLockManager.acquireLock).toHaveBeenCalledWith('schema-migration-v5');
-      expect(databaseLockManager.releaseLock).toHaveBeenCalledWith('schema-migration-v5');
+      expect(lockSpy).toHaveBeenCalledWith('schema-migration-v5', expect.any(Function));
+      expect(databaseLockManager.isLocked()).toBe(false);
     });
 
     it('records migration version 5', async () => {
@@ -80,11 +78,14 @@ describe('migrateToVersion5', () => {
       await migrateToVersion5(db as never);
 
       const getAllCalls = (db.getAllAsync as jest.Mock).mock.calls.map((c: string[]) => c[0]);
-      expect(getAllCalls.some((sql: string) =>
-        sql.includes('allbeers') &&
-        sql.includes('container_type IS NULL') &&
-        sql.includes('flight')
-      )).toBe(true);
+      expect(
+        getAllCalls.some(
+          (sql: string) =>
+            sql.includes('allbeers') &&
+            sql.includes('container_type IS NULL') &&
+            sql.includes('flight')
+        )
+      ).toBe(true);
     });
 
     it('queries tasted_brew_current_round for rows that may be flights with null container_type', async () => {
@@ -93,11 +94,14 @@ describe('migrateToVersion5', () => {
       await migrateToVersion5(db as never);
 
       const getAllCalls = (db.getAllAsync as jest.Mock).mock.calls.map((c: string[]) => c[0]);
-      expect(getAllCalls.some((sql: string) =>
-        sql.includes('tasted_brew_current_round') &&
-        sql.includes('container_type IS NULL') &&
-        sql.includes('flight')
-      )).toBe(true);
+      expect(
+        getAllCalls.some(
+          (sql: string) =>
+            sql.includes('tasted_brew_current_round') &&
+            sql.includes('container_type IS NULL') &&
+            sql.includes('flight')
+        )
+      ).toBe(true);
     });
 
     it('runs bulk update for flight beers', async () => {
@@ -115,9 +119,7 @@ describe('migrateToVersion5', () => {
     it('calls onProgress for each batch processed', async () => {
       const db = createMockMigrationDb();
       const beerRows = createFlightBeerRows(5);
-      db.getAllAsync
-        .mockResolvedValueOnce(beerRows)
-        .mockResolvedValueOnce(beerRows);
+      db.getAllAsync.mockResolvedValueOnce(beerRows).mockResolvedValueOnce(beerRows);
       const onProgress = jest.fn();
 
       await migrateToVersion5(db as never, onProgress);
@@ -128,9 +130,7 @@ describe('migrateToVersion5', () => {
     it('processes large batches in chunks of 100', async () => {
       const db = createMockMigrationDb();
       const beerRows = createFlightBeerRows(150);
-      db.getAllAsync
-        .mockResolvedValueOnce(beerRows)
-        .mockResolvedValueOnce(beerRows);
+      db.getAllAsync.mockResolvedValueOnce(beerRows).mockResolvedValueOnce(beerRows);
 
       await migrateToVersion5(db as never);
 
@@ -175,7 +175,7 @@ describe('migrateToVersion5', () => {
 
       await expect(migrateToVersion5(db as never)).rejects.toThrow('Transaction failed');
 
-      expect(databaseLockManager.releaseLock).toHaveBeenCalledWith('schema-migration-v5');
+      expect(databaseLockManager.isLocked()).toBe(false);
     });
 
     it('releases the lock when getAllAsync throws inside the transaction', async () => {
@@ -187,14 +187,14 @@ describe('migrateToVersion5', () => {
 
       await expect(migrateToVersion5(db as never)).rejects.toThrow('Query failed');
 
-      expect(databaseLockManager.releaseLock).toHaveBeenCalledWith('schema-migration-v5');
+      expect(databaseLockManager.isLocked()).toBe(false);
     });
 
     it('propagates error when lock acquisition fails', async () => {
       const db = createMockMigrationDb();
-      (databaseLockManager.acquireLock as jest.Mock).mockRejectedValue(
-        new Error('Cannot acquire lock: database is shutting down')
-      );
+      jest
+        .spyOn(databaseLockManager, 'withDatabaseLock')
+        .mockRejectedValue(new Error('Cannot acquire lock: database is shutting down'));
 
       await expect(migrateToVersion5(db as never)).rejects.toThrow('Cannot acquire lock');
     });

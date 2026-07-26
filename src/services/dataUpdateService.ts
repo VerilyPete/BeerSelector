@@ -721,10 +721,8 @@ export async function fetchAndUpdateRewards(): Promise<DataUpdateResult> {
 export async function sequentialRefreshAllData(): Promise<ManualRefreshResult> {
   console.log('Starting sequential refresh with master lock coordination...');
 
-  // Acquire master lock ONCE for entire sequence
-  await databaseLockManager.acquireLock('refresh-all-data-sequential');
-
-  try {
+  // Hold the master lock ONCE for the entire sequence
+  return databaseLockManager.withDatabaseLock('refresh-all-data-sequential', async () => {
     // Execute operations sequentially using unsafe repository methods
     // Since we hold the master lock, nested lock acquisition is unnecessary
     console.log('Sequential refresh: starting all beers fetch');
@@ -923,10 +921,7 @@ export async function sequentialRefreshAllData(): Promise<ManualRefreshResult> {
       hasErrors,
       allNetworkErrors,
     };
-  } finally {
-    // Always release the master lock
-    databaseLockManager.releaseLock('refresh-all-data-sequential');
-  }
+  });
 }
 
 /**
@@ -1116,10 +1111,8 @@ export const refreshAllDataFromAPI = async (): Promise<{
     throw new Error('API URLs not configured. Please log in to set up API URLs.');
   }
 
-  // Acquire master lock for entire sequence to avoid lock contention (CI-5 fix)
-  await databaseLockManager.acquireLock('refresh-all-from-api');
-
-  try {
+  // Hold the master lock for the entire sequence to avoid lock contention (CI-5 fix)
+  return databaseLockManager.withDatabaseLock('refresh-all-from-api', async () => {
     // Execute sequentially to avoid lock contention
     // Use unsafe repository methods since we already hold master lock
 
@@ -1240,8 +1233,5 @@ export const refreshAllDataFromAPI = async (): Promise<{
       myBeers: myBeersWithContainerTypes as BeerfinderWithContainerType[],
       rewards,
     };
-  } finally {
-    // Always release the master lock
-    databaseLockManager.releaseLock('refresh-all-from-api');
-  }
+  });
 };
