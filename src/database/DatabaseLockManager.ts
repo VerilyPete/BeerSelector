@@ -100,6 +100,18 @@ export class DatabaseLockManager {
   private readonly MAX_WAIT_TIME_HISTORY = 10; // Keep last 10 wait times
   private readonly QUEUE_WARNING_THRESHOLD = 5; // Warn if queue exceeds this length
   private isShuttingDown: boolean = false; // Flag to indicate shutdown state
+  /**
+   * Serial of a grant that was forcibly released while its holder may still be
+   * writing, or null when no hold is abandoned.
+   *
+   * `lockHeld` alone cannot express this state: the abandoned holder does not
+   * hold a valid grant any more, but it is not safe to give the lock to anyone
+   * else until it comes back. Cleared when the abandoned holder's own release
+   * finally arrives, which is the only reliable evidence it has stopped
+   * writing.
+   */
+  private abandonedGrantSerial: number | null = null;
+  private abandonedOperation: string | null = null;
 
   constructor(options: DatabaseLockManagerOptions = {}) {
     this.LOCK_TIMEOUT_MS = options.holdTimeoutMs ?? 15000; // 15s for mobile UX
@@ -125,13 +137,19 @@ export class DatabaseLockManager {
         return;
       }
 
-      if (!this.lockHeld) {
+      // An abandoned hold blocks the fast path as firmly as a live one. Without
+      // this check, skipping _processQueue() in _forceRelease would protect
+      // only the callers already queued: a caller arriving afterwards would be
+      // granted the lock straight away, alongside a writer still in flight.
+      if (!this.lockHeld && this.abandonedGrantSerial === null) {
         this._grantLock(operationName, resolve);
         return;
       }
 
       this.logger.log(
-        `Database operation already in progress, waiting for lock (${operationName})...`
+        this.abandonedGrantSerial !== null
+          ? `Waiting for an abandoned hold (${this.abandonedOperation}) to return before granting ${operationName}...`
+          : `Database operation already in progress, waiting for lock (${operationName})...`
       );
 
       const timeout = timeoutMs !== undefined ? timeoutMs : this.ACQUISITION_TIMEOUT_MS;
@@ -189,12 +207,27 @@ export class DatabaseLockManager {
    * Release a lock using the token returned by `acquire`.
    *
    * A token whose serial no longer matches the live grant is stale — its grant
-   * was forcibly released, or already handed on — and is ignored. Releasing
-   * unconditionally would free a lock the caller no longer owns.
+   * was forcibly released, or already handed on — and never frees whoever holds
+   * the lock now. Releasing unconditionally would free a lock the caller no
+   * longer owns.
+   *
+   * One stale token is special: the one belonging to a hold this manager
+   * abandoned. Its arrival is the only reliable evidence that the writer has
+   * actually stopped, so it lifts the block rather than being discarded.
    *
    * @param token - The token returned when the lock was granted
    */
   release(token: LockToken): void {
+    if (this.abandonedGrantSerial !== null && token.serial === this.abandonedGrantSerial) {
+      this.logger.warn(
+        `[LockManager] Abandoned hold for ${token.operationName} returned; lock is grantable again`
+      );
+      this.abandonedGrantSerial = null;
+      this.abandonedOperation = null;
+      this._processQueue();
+      return;
+    }
+
     if (token.serial !== this.grantSerial) {
       this.logger.warn(
         `[LockManager] Ignoring stale release for ${token.operationName} (grant already abandoned)`
@@ -203,6 +236,17 @@ export class DatabaseLockManager {
     }
 
     this._releaseInternal(token.operationName);
+  }
+
+  /**
+   * Whether a forcibly-released hold has yet to return.
+   *
+   * `isLocked()` is false in that state — nobody holds a valid grant — so this
+   * is what distinguishes an abandoned hold from an idle lock in logs and
+   * metrics. Without it the two are indistinguishable to a human.
+   */
+  hasAbandonedHolder(): boolean {
+    return this.abandonedGrantSerial !== null;
   }
 
   /**
@@ -297,6 +341,11 @@ export class DatabaseLockManager {
    * Force release the lock (called by timeout)
    */
   private _forceRelease(): void {
+    // Records WHICH grant is being abandoned, so the holder's eventual release
+    // can be recognised and lift the block. Until then no one is granted the
+    // lock — not the queue, and not a new arrival either.
+    this.abandonedGrantSerial = this.grantSerial;
+    this.abandonedOperation = this.currentOperation;
     this.lockHeld = false;
     this.currentOperation = null;
     // Abandons the grant, so a late release from the timed-out holder is
@@ -308,11 +357,15 @@ export class DatabaseLockManager {
     }
 
     // Deliberately does NOT call _processQueue(). The timed-out holder has not
-    // returned and may still be mid-write; handing the lock to a queued writer
-    // now is silent data loss, whereas leaving it unheld is diagnosable. Under
-    // an exclusive transaction the second writer would hit `database is locked`
-    // anyway. Liveness is covered by the acquisition timeout, which rejects
-    // waiters with a real message rather than hanging them forever.
+    // returned and may still be mid-write; handing the lock to another writer
+    // now is silent data loss. Blocking the fast path in `acquire` is the other
+    // half of that — skipping the queue alone would only protect callers who
+    // were already waiting. Under an exclusive transaction the second writer
+    // would hit `database is locked` anyway.
+    //
+    // Liveness has two exits: the abandoned holder's own release lifts the
+    // block immediately, and failing that every waiter is rejected by its
+    // acquisition timeout with a real message rather than hanging forever.
     //
     // Removing this hold timeout altogether is the right end state — see
     // plan 01 Phase 6 — but it cannot land until Phase 4 splits the network
@@ -425,11 +478,16 @@ export class DatabaseLockManager {
     currentOperation: string | null;
     queueLength: number;
     queueWaitTimes: number[];
+    abandonedHolder: string | null;
   } {
     return {
       currentOperation: this.currentOperation,
       queueLength: this.queue.length,
       queueWaitTimes: [...this.recentWaitTimes], // Return a copy
+      // Non-null means a hold timed out and has not returned. The lock reads as
+      // idle in every other field, so this is the only way to tell the two
+      // apart.
+      abandonedHolder: this.abandonedOperation,
     };
   }
 
@@ -520,13 +578,21 @@ export class DatabaseLockManager {
       clearTimeout(this.timeoutId);
       this.timeoutId = null;
     }
-    this.queue.forEach(req => {
+    // Settles queued waiters rather than dropping them. Clearing the array
+    // without rejecting leaves their promises pending forever, so a leaked
+    // waiter in one test surfaces as a silent hang in the next rather than a
+    // failure — and eight suites now reset the shared singleton in setup.
+    const stranded = this.queue;
+    this.queue = [];
+    stranded.forEach(req => {
       if (req.acquisitionTimeoutId) {
         clearTimeout(req.acquisitionTimeoutId);
       }
+      req.reject(new Error(`Lock manager reset while ${req.operationName} was queued`));
     });
-    this.queue = [];
     this.currentOperation = null;
+    this.abandonedGrantSerial = null;
+    this.abandonedOperation = null;
     this.isShuttingDown = false;
     this.recentWaitTimes = [];
   }
