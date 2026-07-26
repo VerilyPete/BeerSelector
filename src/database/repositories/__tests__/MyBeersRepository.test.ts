@@ -6,6 +6,7 @@
 import { MyBeersRepository } from '../MyBeersRepository';
 import { BeerfinderWithContainerType } from '../../../types/beer';
 import * as connection from '../../connection';
+import { DatabaseContentionError } from '../../errors';
 
 // Mock the database connection module
 jest.mock('../../connection');
@@ -267,7 +268,6 @@ describe('MyBeersRepository', () => {
       await expect(repository.insertMany(beers)).rejects.toThrow('Database error');
     });
 
-
     it('should include all Beerfinder-specific fields in insert', async () => {
       const mockDatabase = createMockDatabase();
       (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
@@ -365,7 +365,6 @@ describe('MyBeersRepository', () => {
 
       await expect(repository.getAll()).rejects.toThrow('Database error');
     });
-
   });
 
   describe('getById', () => {
@@ -450,7 +449,6 @@ describe('MyBeersRepository', () => {
       expect(mockDatabase.runAsync).toHaveBeenCalledWith('DELETE FROM tasted_brew_current_round');
       expect(mockDatabase.withTransactionAsync).toHaveBeenCalled();
     });
-
 
     it('should handle clearing empty table', async () => {
       const mockDatabase = createMockDatabase();
@@ -585,6 +583,58 @@ describe('MyBeersRepository', () => {
       mockDatabase.withTransactionAsync.mockRejectedValueOnce(new Error('Transaction failed'));
 
       await expect(repository.insertMany(beers)).rejects.toThrow('Transaction failed');
+    });
+
+    // ----------------------------------------------------------
+    // Database contention (plan 02 Phase 0)
+    //
+    // `database is locked` is what expo-sqlite raises when a write
+    // collides with an exclusive transaction on another connection.
+    // The repository is the one boundary where the raw string is
+    // tested; everything above it classifies by type.
+    // ----------------------------------------------------------
+
+    it('insertMany rethrows a database-is-locked failure as DatabaseContentionError', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      const repository = createRepository();
+      const beers: BeerfinderWithContainerType[] = [
+        {
+          id: '1',
+          brew_name: 'Test Beer',
+          brewer: 'Test Brewery',
+          container_type: 'pint',
+          abv: null,
+          enrichment_confidence: null,
+          enrichment_source: null,
+        },
+      ];
+
+      mockDatabase.withTransactionAsync.mockRejectedValueOnce(new Error('database is locked'));
+
+      await expect(repository.insertMany(beers)).rejects.toBeInstanceOf(DatabaseContentionError);
+    });
+
+    it('insertMany leaves an unrelated database failure unwrapped', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      const repository = createRepository();
+      const beers: BeerfinderWithContainerType[] = [
+        {
+          id: '1',
+          brew_name: 'Test Beer',
+          brewer: 'Test Brewery',
+          container_type: 'pint',
+          abv: null,
+          enrichment_confidence: null,
+          enrichment_source: null,
+        },
+      ];
+      const original = new Error('no such table: tasted_brew_current_round');
+
+      mockDatabase.withTransactionAsync.mockRejectedValueOnce(original);
+
+      await expect(repository.insertMany(beers)).rejects.toBe(original);
     });
   });
 
@@ -757,7 +807,6 @@ describe('MyBeersRepository', () => {
 
       await expect(repository.insertManyUnsafe(beers)).resolves.not.toThrow();
     });
-
 
     it('should throw error on transaction failure', async () => {
       const mockDatabase = createMockDatabase();

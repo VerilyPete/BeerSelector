@@ -1,4 +1,5 @@
 import { Alert } from 'react-native';
+import { DatabaseContentionError } from '../database/errors';
 
 /**
  * Error types for API requests
@@ -9,6 +10,7 @@ export enum ApiErrorType {
   SERVER_ERROR = 'SERVER_ERROR',
   PARSE_ERROR = 'PARSE_ERROR',
   VALIDATION_ERROR = 'VALIDATION_ERROR',
+  CONTENTION_ERROR = 'CONTENTION_ERROR',
   UNKNOWN_ERROR = 'UNKNOWN_ERROR',
   INFO = 'INFO',
 }
@@ -21,6 +23,11 @@ export type ErrorResponse = {
   message: string;
   statusCode?: number;
   originalError?: unknown;
+  /**
+   * True when the same operation is expected to succeed if retried.
+   * Currently set only for CONTENTION_ERROR.
+   */
+  readonly retryable?: boolean;
 };
 
 /**
@@ -99,6 +106,18 @@ export function formatApiErrorForUser(error: unknown): string {
  * @returns A standardized error response
  */
 export function createErrorResponse(error: unknown): ErrorResponse {
+  // Classified by type, deliberately not by message. A write aborted by
+  // database contention is transient, so it must not be reported as the hard
+  // failure the UNKNOWN_ERROR default would make of it.
+  if (error instanceof DatabaseContentionError) {
+    return {
+      type: ApiErrorType.CONTENTION_ERROR,
+      message: error.message,
+      originalError: error,
+      retryable: true,
+    };
+  }
+
   // Default error response
   const errorResponse: ErrorResponse = {
     type: ApiErrorType.UNKNOWN_ERROR,
@@ -172,6 +191,10 @@ export function getUserFriendlyErrorMessage(error: ErrorResponse): string {
 
     case ApiErrorType.PARSE_ERROR:
       return 'There was a problem processing the server response. Please try again.';
+
+    case ApiErrorType.CONTENTION_ERROR:
+      // Deliberately ignores error.message, which carries the raw SQLite text.
+      return 'The app was busy updating. Please try again in a moment.';
 
     case ApiErrorType.VALIDATION_ERROR:
       return error.message || 'There was a problem with your request. Please try again.';
