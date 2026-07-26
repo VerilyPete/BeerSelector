@@ -5,10 +5,12 @@
  * Manages all database operations related to the allbeers table.
  */
 
+import { Platform } from 'react-native';
 import { getDatabase } from '../connection';
 import { BeerWithContainerType } from '../../types/beer';
 import { databaseLockManager } from '../locks';
 import { toContentionError, withContentionMapping } from '../errors';
+import { withAtomicWrite } from '../transactions';
 import { isAllBeersRow, allBeersRowToBeerWithContainerType, AllBeersRow } from '../schemaTypes';
 import { EnrichmentUpdate } from '../../types/enrichment';
 
@@ -65,30 +67,28 @@ export class BeerRepository {
   private async _insertManyInternal(beers: BeerWithContainerType[]): Promise<void> {
     const database = await getDatabase();
 
-    // Always refresh the allbeers table with the latest data
-    // Clear existing data first, then insert fresh records in batches
-    await database.withTransactionAsync(async () => {
-      const before = await database.getFirstAsync<{ count: number }>(
-        'SELECT COUNT(*) as count FROM allbeers'
-      );
-      await database.runAsync('DELETE FROM allbeers');
-      console.log(`Cleared allbeers table (removed ${before?.count ?? 0} rows)`);
-    });
-
     console.log(`Starting import of ${beers.length} beers...`);
 
-    // Process in larger batches using transactions
+    // Paces progress logging ONLY. This is deliberately not a durability
+    // boundary any more: the delete and every insert publish at a single
+    // commit below, so no reader can observe a cleared or half-built table.
     const batchSize = 50;
 
-    for (let i = 0; i < beers.length; i += batchSize) {
-      const batch = beers.slice(i, i + batchSize);
+    // Every query in this body must go through `txn`. Reads that escape onto
+    // the `database` handle do not throw — they silently return the
+    // pre-transaction snapshot — so the body is kept write-only, which makes a
+    // misrouted call fail loudly instead of quietly.
+    await withAtomicWrite(database, Platform.OS === 'web' ? 'web' : 'native', async txn => {
+      const cleared = await txn.runAsync('DELETE FROM allbeers');
+      console.log(`Cleared allbeers table (removed ${cleared.changes} rows)`);
 
-      // Use withTransactionAsync for each batch
-      await database.withTransactionAsync(async () => {
+      for (let i = 0; i < beers.length; i += batchSize) {
+        const batch = beers.slice(i, i + batchSize);
+
         for (const beer of batch) {
           if (!beer.id) continue; // Skip entries without an ID
 
-          await database.runAsync(
+          await txn.runAsync(
             `INSERT OR REPLACE INTO allbeers (
               id, added_date, brew_name, brewer, brewer_loc,
               brew_style, brew_container, review_count, review_rating,
@@ -113,17 +113,18 @@ export class BeerRepository {
             ]
           );
         }
-      });
 
-      // Log progress for larger batches
-      if ((i + batchSize) % 200 === 0 || i + batchSize >= beers.length) {
-        console.log(
-          `Imported ${Math.min(i + batchSize, beers.length)} of ${beers.length} beers...`
-        );
+        // Log progress for larger batches
+        if ((i + batchSize) % 200 === 0 || i + batchSize >= beers.length) {
+          console.log(
+            `Imported ${Math.min(i + batchSize, beers.length)} of ${beers.length} beers...`
+          );
+        }
       }
-    }
+    });
 
-    // Verify final row count
+    // Verify final row count — deliberately outside the transaction, on the
+    // database handle, so it reports what was actually committed.
     try {
       const after = await database.getFirstAsync<{ count: number }>(
         'SELECT COUNT(*) as count FROM allbeers'

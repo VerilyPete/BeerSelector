@@ -127,8 +127,11 @@ describe('Repository Type Safety', () => {
         withTransactionAsync: jest.fn(async (callback: () => Promise<void>) => {
           await callback();
         }),
+        withExclusiveTransactionAsync: jest.fn(async (task: (txn: unknown) => Promise<void>) => {
+          await task(mockDb);
+        }),
         getFirstAsync: jest.fn().mockResolvedValue({ count: 0 }),
-        runAsync: jest.fn(),
+        runAsync: jest.fn().mockResolvedValue({ changes: 0, lastInsertRowId: 0 }),
       };
 
       const { getDatabase } = require('../../connection');

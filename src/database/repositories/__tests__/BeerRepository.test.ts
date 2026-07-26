@@ -12,18 +12,32 @@ jest.mock('../../connection');
 
 type MockDatabase = {
   withTransactionAsync: jest.Mock;
+  withExclusiveTransactionAsync: jest.Mock;
   runAsync: jest.Mock;
   getAllAsync: jest.Mock;
   getFirstAsync: jest.Mock;
 };
 
 function createMockDatabase(): MockDatabase {
-  return {
+  const mockDatabase: MockDatabase = {
     withTransactionAsync: jest.fn(async (callback: () => Promise<void>) => await callback()),
-    runAsync: jest.fn(),
+    withExclusiveTransactionAsync: jest.fn(),
+    // The real runAsync always resolves an SQLiteRunResult; the allbeers import
+    // reads `changes` from the DELETE to log the cleared row count.
+    runAsync: jest.fn().mockResolvedValue({ changes: 0, lastInsertRowId: 0 }),
     getAllAsync: jest.fn(),
     getFirstAsync: jest.fn(),
   };
+
+  // Hands the body a `txn` that forwards to the same mock, so assertions on
+  // runAsync still see the transaction's queries. This mock does NOT model
+  // rollback or contention — see BeerRepository.atomicity.test.ts for a fake
+  // that does.
+  mockDatabase.withExclusiveTransactionAsync.mockImplementation(
+    async (task: (txn: MockDatabase) => Promise<void>) => await task(mockDatabase)
+  );
+
+  return mockDatabase;
 }
 
 function createRepository(): BeerRepository {
@@ -138,8 +152,10 @@ describe('BeerRepository', () => {
 
       await repository.insertMany(beers);
 
-      // Should use transactions for batching (120 beers = 3 batches of 50, 50, 20)
-      expect(mockDatabase.withTransactionAsync).toHaveBeenCalled();
+      // The batch loop now paces progress logging only — the whole import runs
+      // in ONE exclusive transaction, so there is no per-batch commit seam.
+      expect(mockDatabase.withExclusiveTransactionAsync).toHaveBeenCalledTimes(1);
+      expect(mockDatabase.withTransactionAsync).not.toHaveBeenCalled();
 
       // Should insert all 120 beers
       const insertCalls = mockDatabase.runAsync.mock.calls.filter((call: unknown[]) =>
@@ -212,7 +228,6 @@ describe('BeerRepository', () => {
 
       await expect(repository.insertMany(beers)).rejects.toThrow('Database error');
     });
-
   });
 
   describe('getAll', () => {
