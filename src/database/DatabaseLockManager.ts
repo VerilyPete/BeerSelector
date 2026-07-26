@@ -507,7 +507,7 @@ export class DatabaseLockManager {
     console.log('Preparing database lock manager for shutdown...');
 
     // Already shutting down, return success immediately
-    if (this.isShuttingDown && !this.lockHeld) {
+    if (this.isShuttingDown && !this.lockHeld && this.abandonedGrantSerial === null) {
       return true;
     }
 
@@ -517,14 +517,18 @@ export class DatabaseLockManager {
     const startTime = Date.now();
     const pollInterval = 100; // Poll every 100ms
 
-    // Wait for lock to be released
-    while (this.lockHeld) {
+    // Waits on an abandoned hold as well as a live one. A forcibly-released
+    // hold clears lockHeld while its writer may still be running, so checking
+    // lockHeld alone would report "safe to close" and let connection.ts close
+    // the database underneath it.
+    while (this.lockHeld || this.abandonedGrantSerial !== null) {
       const elapsed = Date.now() - startTime;
 
       if (elapsed >= timeoutMs) {
-        console.warn(
-          `Shutdown timeout: lock is still held by '${this.currentOperation}' after ${timeoutMs}ms`
-        );
+        const holder = this.lockHeld
+          ? `'${this.currentOperation}'`
+          : `'${this.abandonedOperation}' (abandoned, never returned)`;
+        console.warn(`Shutdown timeout: lock is still held by ${holder} after ${timeoutMs}ms`);
 
         // Warn if queue is not empty
         if (this.queue.length > 0) {

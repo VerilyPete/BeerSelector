@@ -128,6 +128,19 @@ describe('DatabaseLockManager grant ownership', () => {
     expect(lockManager.getLockMetrics().abandonedHolder).toBe('slow-op');
   });
 
+  it('does not report shutdown-safe while a hold is abandoned', async () => {
+    const lockManager = createLockManager({ holdTimeoutMs: 50 });
+    await lockManager.acquire('slow-op');
+
+    jest.advanceTimersByTime(50);
+
+    // connection.ts calls prepareForShutdown before closing the database. It
+    // waits on lockHeld, which a force release clears — so an abandoned hold
+    // reads as safe and the connection closes under a writer that may still
+    // be running. Same blind spot as the acquire fast path.
+    await expect(lockManager.prepareForShutdown(0)).resolves.toBe(false);
+  });
+
   it('clears an abandoned hold on resetForTesting so suites do not wedge each other', async () => {
     const lockManager = createLockManager({ holdTimeoutMs: 50 });
     await lockManager.acquire('slow-op');
