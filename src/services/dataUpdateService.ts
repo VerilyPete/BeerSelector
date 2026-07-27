@@ -47,6 +47,73 @@ export function resetLastManualRefreshTime(): void {
 }
 
 /**
+ * The refresh currently running, if any, so a second caller joins it instead of
+ * starting a competing one.
+ *
+ * Plan 01 Phase 4. Until that phase the master lock was the *only* thing
+ * serialising concurrent refreshes — nothing else de-duplicates them:
+ * `useDataRefresh`'s `refreshing` flag is per-component
+ * (`hooks/useDataRefresh.ts`), and `shouldRunFocusRefresh` is a five-minute
+ * throttle rather than a mutex (`src/utils/focusRefreshThrottle.ts`). Moving the
+ * fetches out from under that lock therefore removes the serialisation as a
+ * side effect, and without this replacement the result is two concurrent full
+ * taplist downloads on precisely the weak link this work targets.
+ *
+ * Deliberately not a queue. A caller arriving mid-refresh wants fresh data, and
+ * the refresh already in flight is fresh data; making it wait for a second round
+ * trip to learn the same thing is the cost this exists to avoid.
+ *
+ * Write ordering, stated rather than left implicit: overlapping refreshes of the
+ * same source are now impossible, and a refresh overlapping some *other* writer
+ * is last-writer-wins. That is acceptable and self-healing — both writers
+ * replace the whole table from the same upstream, so the loser's rows are not
+ * partial, only seconds older, and the next refresh reconciles.
+ */
+let inFlightSequentialRefresh: Promise<ManualRefreshResult> | null = null;
+
+/**
+ * What a source's unlocked phase concluded.
+ *
+ * Either the source is already done — it failed, or it had nothing to store —
+ * or it has a write waiting for the lock. Splitting it this way is what lets the
+ * caller answer "does anything need the lock at all?" with one predicate over
+ * the three plans, instead of a hand-maintained condition per source that drifts
+ * away from what the write functions actually do.
+ */
+type SourcePlan<TWrite> =
+  | { readonly kind: 'settled'; readonly result: DataUpdateResult }
+  | { readonly kind: 'write'; readonly write: TWrite };
+
+/**
+ * A taplist write.
+ *
+ * `not-modified` is a write: a 304 stamps `all_beers_last_check` so the 12-hour
+ * window advances even though no rows changed.
+ */
+type AllBeersWrite =
+  | { readonly kind: 'not-modified' }
+  | {
+      readonly kind: 'replace';
+      readonly beers: NonEmptyArray<BeerWithContainerType>;
+      readonly etag: string | null;
+      readonly itemCount: number;
+    };
+
+/** A tasted-list write. `clear` is reachable only from `confirmed-empty`. */
+type MyBeersWrite =
+  | { readonly kind: 'clear' }
+  | {
+      readonly kind: 'replace';
+      readonly beers: NonEmptyArray<BeerfinderWithContainerType>;
+      readonly itemCount: number;
+    };
+
+/** A rewards write, mirroring the two writing arms of `RewardsDecision`. */
+type RewardsWrite =
+  | { readonly kind: 'clear' }
+  | { readonly kind: 'replace'; readonly rows: NonEmptyArray<Reward> };
+
+/**
  * Result of a data update operation
  */
 export type DataUpdateResult = {
@@ -870,284 +937,384 @@ export async function fetchAndUpdateRewards(): Promise<DataUpdateResult> {
  * - Sequential with master lock: ~1.5s (no queueing overhead)
  */
 export async function sequentialRefreshAllData(): Promise<ManualRefreshResult> {
-  console.log('Starting sequential refresh with master lock coordination...');
+  if (inFlightSequentialRefresh !== null) {
+    console.log('Sequential refresh already in flight; joining it rather than starting another');
+    return inFlightSequentialRefresh;
+  }
 
-  // Hold the master lock ONCE for the entire sequence
-  return databaseLockManager.withDatabaseLock('refresh-all-data-sequential', async () => {
-    // Execute operations sequentially using unsafe repository methods
-    // Since we hold the master lock, nested lock acquisition is unnecessary
-    console.log('Sequential refresh: starting all beers fetch');
-    let allBeersResult: DataUpdateResult;
-    try {
-      // Get API URL to extract store ID for proxy
-      const apiUrl = await getPreference('all_beers_api_url');
-      const storeId = apiUrl ? extractStoreIdFromUrl(apiUrl) : null;
+  const run = runSequentialRefresh().finally(() => {
+    // Guarded rather than a bare `null` assignment so a late `finally` can only
+    // ever clear its OWN entry. Cheap insurance against a future edit that
+    // reorders the assignment below.
+    if (inFlightSequentialRefresh === run) {
+      inFlightSequentialRefresh = null;
+    }
+  });
+  inFlightSequentialRefresh = run;
+  return run;
+}
 
-      const taplistResult = await fetchTaplistFromProxyOrDirect(storeId);
+/**
+ * The refresh itself: fetch everything with no lock held, then write everything
+ * under one.
+ */
+async function runSequentialRefresh(): Promise<ManualRefreshResult> {
+  console.log('Sequential refresh: fetching all sources with no lock held');
+  const allBeers = await prepareAllBeers();
+  const myBeers = await prepareMyBeers();
+  const rewards = await prepareRewards();
 
-      // Handle 304 Not Modified
-      if (taplistResult.notModified) {
-        console.log('Sequential refresh: all beers not modified (304), skipping DB update');
-        await setPreference('all_beers_last_check', new Date().toISOString());
-        allBeersResult = { success: true, dataUpdated: false };
-      } else {
-        const { beers: allBeers, etag } = taplistResult;
+  /**
+   * Applying all three, in order.
+   *
+   * A single expression rather than a long callback body, which retires the
+   * trap the old code carried a comment about: a `return` placed mid-callback
+   * exited the entire refresh and silently skipped the sources after it. There
+   * is no longer a mid-callback position to put one in.
+   */
+  const applyAll = async (): Promise<
+    readonly [DataUpdateResult, DataUpdateResult, DataUpdateResult]
+  > => [
+    await applyPlan(allBeers, writeAllBeers, 'sequentialRefreshAllData - all beers'),
+    await applyPlan(myBeers, writeMyBeers, 'sequentialRefreshAllData - my beers'),
+    await applyPlan(rewards, writeRewards, 'sequentialRefreshAllData - rewards'),
+  ];
 
-        // Validate beers before insertion
-        const validationResult = validateBeerArray(allBeers);
+  // No write, no lock. Every plan being `settled` means all three sources
+  // either failed or had nothing to store — taking the lock then would be a
+  // pointless acquisition on a connection that just proved itself dead, at the
+  // moment other retries are most likely to be contending for it.
+  const needsLock = [allBeers, myBeers, rewards].some(plan => plan.kind === 'write');
 
-        if (validationResult.invalidBeers.length > 0) {
-          logWarning(
-            `Sequential refresh: Skipping ${validationResult.invalidBeers.length} invalid beers`,
-            {
-              operation: 'sequentialRefreshAllData',
-              component: 'dataUpdateService',
-              additionalData: { summary: validationResult.summary },
-            }
-          );
-        }
+  const [allBeersResult, myBeersResult, rewardsResult] = needsLock
+    ? await databaseLockManager.withDatabaseLock('refresh-all-data-write', applyAll)
+    : await applyAll();
 
-        if (validationResult.validBeers.length === 0) {
-          throw new Error('No valid beers found in API response');
-        }
+  // Check for errors
+  const hasErrors = !allBeersResult.success || !myBeersResult.success || !rewardsResult.success;
 
-        // Calculate container types BEFORE insertion
-        console.log('Sequential refresh: calculating container types for beers...');
-        const beersWithContainerTypes = calculateContainerTypes(validationResult.validBeers);
+  // Check if all errors are network-related
+  const allNetworkErrors =
+    hasErrors &&
+    [allBeersResult, myBeersResult, rewardsResult]
+      .filter(result => !result.success && result.error)
+      .every(
+        result => result.error?.type === 'NETWORK_ERROR' || result.error?.type === 'TIMEOUT_ERROR'
+      );
 
-        const sequentialBeers = toNonEmpty(beersWithContainerTypes);
-        if (sequentialBeers === null) {
-          throw new Error('No valid beers to insert after container-type calculation');
-        }
-        await beerRepository.insertManyUnsafe(sequentialBeers);
+  console.log('Sequential refresh completed:', {
+    allBeers: allBeersResult.success,
+    myBeers: myBeersResult.success,
+    rewards: rewardsResult.success,
+    hasErrors,
+    allNetworkErrors,
+    tookLock: needsLock,
+  });
 
-        // Store ETag for future conditional requests
-        if (etag) {
-          await setPreference('all_beers_etag', etag);
-        }
+  return {
+    allBeersResult,
+    myBeersResult,
+    rewardsResult,
+    hasErrors,
+    allNetworkErrors,
+  };
+}
 
-        await setPreference('all_beers_last_update', new Date().toISOString());
-        await setPreference('all_beers_last_check', new Date().toISOString());
-        allBeersResult = {
-          success: true,
-          dataUpdated: true,
-          itemCount: validationResult.validBeers.length,
-        };
-      }
-    } catch (error) {
-      logError(error, {
-        operation: 'sequentialRefreshAllData - all beers',
-        component: 'dataUpdateService',
-      });
-      allBeersResult = {
-        success: false,
-        dataUpdated: false,
-        error: createErrorResponse(error),
-      };
+/**
+ * Carry out one source's planned write, or pass through a conclusion already
+ * reached without one.
+ *
+ * The write gets its own `try`/`catch` so per-source isolation survives the
+ * split: a repository throwing for one source must not suppress the other two,
+ * exactly as a failing fetch does not. Written once rather than three times
+ * because hand-repeating this isolation is how `refreshAllDataFromAPI` came to
+ * be missing it entirely until 02 Phase 2.5.
+ */
+async function applyPlan<TWrite>(
+  plan: SourcePlan<TWrite>,
+  write: (target: TWrite) => Promise<DataUpdateResult>,
+  operation: string
+): Promise<DataUpdateResult> {
+  if (plan.kind === 'settled') {
+    return plan.result;
+  }
+
+  try {
+    return await write(plan.write);
+  } catch (error) {
+    logError(error, { operation, component: 'dataUpdateService' });
+    return { success: false, dataUpdated: false, error: createErrorResponse(error) };
+  }
+}
+
+/**
+ * Fetch, validate and shape the taplist. No database access.
+ */
+async function prepareAllBeers(): Promise<SourcePlan<AllBeersWrite>> {
+  console.log('Sequential refresh: starting all beers fetch');
+  try {
+    // Get API URL to extract store ID for proxy
+    const apiUrl = await getPreference('all_beers_api_url');
+    const storeId = apiUrl ? extractStoreIdFromUrl(apiUrl) : null;
+
+    const taplistResult = await fetchTaplistFromProxyOrDirect(storeId);
+
+    // Handle 304 Not Modified
+    if (taplistResult.notModified) {
+      console.log('Sequential refresh: all beers not modified (304), skipping DB update');
+      return { kind: 'write', write: { kind: 'not-modified' } };
     }
 
-    console.log('Sequential refresh: starting my beers fetch');
-    let myBeersResult: DataUpdateResult;
-    try {
-      const myBeersSource = await fetchMyBeersFromAPI();
+    const { beers: allBeers, etag } = taplistResult;
 
-      // The three outcomes diverge here, and this is the divergence the whole
-      // plan exists for. `unavailable` must NOT touch the table and must NOT
-      // stamp a timestamp — stamping is what suppressed a retry for 12 hours.
-      // `confirmed-empty` is the ONLY case in which clearing is correct.
-      //
-      // `not-applicable` is separated from the other unavailable codes for the
-      // same reason rewards separates them: it means "this source does not apply
-      // to you", which is what visitor mode and a none:// placeholder ARE. This
-      // block used to throw on every `unavailable`, so every visitor refresh
-      // failed with UNKNOWN_ERROR — and UNKNOWN_ERROR returns error.message
-      // verbatim, putting "My beers unavailable (not-applicable): …" in an
-      // Alert. Not an update either: no table write, no timestamp.
-      if (
-        myBeersSource.status === 'unavailable' &&
-        myBeersSource.reason.code === 'not-applicable'
-      ) {
-        console.log(`Sequential refresh: my beers not applicable — ${myBeersSource.reason.detail}`);
-        myBeersResult = { success: true, dataUpdated: false };
-      } else {
-        if (myBeersSource.status === 'failed') {
-          // Was `My beers could not be fetched (failed)` — which discarded the
-          // ErrorResponse whole, not even interpolating its message.
-          throw new SourceFailureError(myBeersSource.error, 'My beers');
+    // Validate beers before insertion
+    const validationResult = validateBeerArray(allBeers);
+
+    if (validationResult.invalidBeers.length > 0) {
+      logWarning(
+        `Sequential refresh: Skipping ${validationResult.invalidBeers.length} invalid beers`,
+        {
+          operation: 'sequentialRefreshAllData',
+          component: 'dataUpdateService',
+          additionalData: { summary: validationResult.summary },
         }
-        if (myBeersSource.status !== 'fetched') {
-          throw new Error(
-            `My beers unavailable (${myBeersSource.reason.code}): ${myBeersSource.reason.detail}`
-          );
-        }
-        if (myBeersSource.data.kind === 'malformed') {
-          throw new Error(`My beers malformed: ${myBeersSource.data.detail}`);
-        }
-        const emptyRound = myBeersSource.data.kind === 'confirmed-empty';
-        if (emptyRound) {
-          // NOT an early return: this block lives inside the withDatabaseLock
-          // callback, so returning here would exit the whole refresh and skip the
-          // rewards source entirely.
-          await myBeersRepository.replaceAllWithEmptyUnsafe();
-          await setPreference('my_beers_last_update', new Date().toISOString());
-          await setPreference('my_beers_last_check', new Date().toISOString());
-        }
-
-        const myBeers = emptyRound ? [] : [...myBeersSource.data.items];
-
-        // Validate myBeers before insertion
-        const validationResult = validateBeerArray(myBeers);
-
-        if (validationResult.invalidBeers.length > 0) {
-          logWarning(
-            `Sequential refresh: Skipping ${validationResult.invalidBeers.length} invalid my beers`,
-            {
-              operation: 'sequentialRefreshAllData',
-              component: 'dataUpdateService',
-              additionalData: { summary: validationResult.summary },
-            }
-          );
-        }
-
-        // Enrich BEFORE container type calculation so ABV is available for glass selection
-        let beersForContainerCalc = validationResult.validBeers;
-        if (config.enrichment.isConfigured() && validationResult.validBeers.length > 0) {
-          try {
-            const beerIds = validationResult.validBeers.map(beer => beer.id);
-            console.log(
-              `[sequentialRefresh] Fetching enrichment for ${beerIds.length} tasted beers...`
-            );
-
-            const { enrichments: enrichmentData, missing: missingIds } =
-              await fetchEnrichmentBatchWithMissing(beerIds);
-            const enrichedCount = Object.keys(enrichmentData).length;
-
-            if (enrichedCount > 0) {
-              console.log(`[sequentialRefresh] Got enrichment for ${enrichedCount} tasted beers`);
-              beersForContainerCalc = mergeEnrichmentData(
-                validationResult.validBeers,
-                enrichmentData
-              );
-            }
-
-            // Sync missing beers to Worker for enrichment (in background)
-            syncMissingBeersInBackground(
-              missingIds,
-              validationResult.validBeers,
-              'sequentialRefresh'
-            );
-          } catch (enrichmentError) {
-            logWarning('Batch enrichment failed in sequential refresh, continuing without', {
-              operation: 'sequentialRefreshAllData',
-              component: 'dataUpdateService',
-            });
-          }
-        }
-
-        // Calculate container types AFTER enrichment so ABV is available for glass selection
-        console.log('Sequential refresh: calculating container types for my beers...');
-        const myBeersWithContainerTypes = calculateContainerTypes(beersForContainerCalc);
-
-        // Two DIFFERENT conditions, which a bare [] cannot tell apart.
-        // fetchMyBeersFromAPI still returns a bare [] for FOUR conditions —
-        // visitor mode, no URL, a none:// URL, and a genuine empty round. The
-        // fifth, rows that all lack an id, now throws upstream instead, which is
-        // what makes the split below meaningful. Of the four remaining, only the
-        // empty round should clear; 02 Phase 3's `unavailable` retires the other
-        // three, which still reach the clear arm today.
-        const sequentialMyBeers = toNonEmpty(
-          myBeersWithContainerTypes as BeerfinderWithContainerType[]
-        );
-        if (!emptyRound) {
-          if (sequentialMyBeers === null) {
-            // Rows arrived and none survived local validation. confirmed-empty is
-            // handled above, so this can only be malformed — leave the table
-            // alone rather than wiping a populated list.
-            throw new Error(
-              `All ${myBeers.length} tasted beers from the API failed validation; refusing to write`
-            );
-          }
-          await myBeersRepository.insertManyUnsafe(sequentialMyBeers);
-          await setPreference('my_beers_last_update', new Date().toISOString());
-          await setPreference('my_beers_last_check', new Date().toISOString());
-        }
-        myBeersResult = {
-          success: true,
-          dataUpdated: true,
-          itemCount: validationResult.validBeers.length,
-        };
-      }
-    } catch (error) {
-      logError(error, {
-        operation: 'sequentialRefreshAllData - my beers',
-        component: 'dataUpdateService',
-      });
-      myBeersResult = {
-        success: false,
-        dataUpdated: false,
-        error: createErrorResponse(error),
-      };
+      );
     }
 
-    console.log('Sequential refresh: starting rewards fetch');
-    let rewardsResult: DataUpdateResult;
-    try {
-      const decision = decideRewards(await fetchRewardsFromAPI());
-
-      if (decision.action === 'fail') {
-        rewardsResult = { success: false, dataUpdated: false, error: decision.error };
-      } else if (decision.action === 'skip') {
-        console.log(`Sequential refresh: rewards not applicable — ${decision.reason.detail}`);
-        rewardsResult = { success: true, dataUpdated: false };
-      } else {
-        const rows = decision.action === 'clear' ? [] : [...decision.rows];
-        await rewardsRepository.insertManyUnsafe(rows);
-        rewardsResult = {
-          success: true,
-          dataUpdated: true,
-          itemCount: rows.length,
-        };
-      }
-    } catch (error) {
-      logError(error, {
-        operation: 'sequentialRefreshAllData - rewards',
-        component: 'dataUpdateService',
-      });
-      rewardsResult = {
-        success: false,
-        dataUpdated: false,
-        error: createErrorResponse(error),
-      };
+    if (validationResult.validBeers.length === 0) {
+      throw new Error('No valid beers found in API response');
     }
 
-    // Check for errors
-    const hasErrors = !allBeersResult.success || !myBeersResult.success || !rewardsResult.success;
+    // Calculate container types BEFORE insertion
+    console.log('Sequential refresh: calculating container types for beers...');
+    const beersWithContainerTypes = calculateContainerTypes(validationResult.validBeers);
 
-    // Check if all errors are network-related
-    const allNetworkErrors =
-      hasErrors &&
-      [allBeersResult, myBeersResult, rewardsResult]
-        .filter(result => !result.success && result.error)
-        .every(
-          result => result.error?.type === 'NETWORK_ERROR' || result.error?.type === 'TIMEOUT_ERROR'
-        );
-
-    console.log('Sequential refresh completed:', {
-      allBeers: allBeersResult.success,
-      myBeers: myBeersResult.success,
-      rewards: rewardsResult.success,
-      hasErrors,
-      allNetworkErrors,
-    });
+    const sequentialBeers = toNonEmpty(beersWithContainerTypes);
+    if (sequentialBeers === null) {
+      throw new Error('No valid beers to insert after container-type calculation');
+    }
 
     return {
-      allBeersResult,
-      myBeersResult,
-      rewardsResult,
-      hasErrors,
-      allNetworkErrors,
+      kind: 'write',
+      write: {
+        kind: 'replace',
+        beers: sequentialBeers,
+        etag,
+        itemCount: validationResult.validBeers.length,
+      },
     };
-  });
+  } catch (error) {
+    logError(error, {
+      operation: 'sequentialRefreshAllData - all beers',
+      component: 'dataUpdateService',
+    });
+    return {
+      kind: 'settled',
+      result: { success: false, dataUpdated: false, error: createErrorResponse(error) },
+    };
+  }
+}
+
+/** Store the taplist. Runs under the write lock; makes no network request. */
+async function writeAllBeers(write: AllBeersWrite): Promise<DataUpdateResult> {
+  if (write.kind === 'not-modified') {
+    await setPreference('all_beers_last_check', new Date().toISOString());
+    return { success: true, dataUpdated: false };
+  }
+
+  await beerRepository.insertManyUnsafe(write.beers);
+
+  // Store ETag for future conditional requests
+  if (write.etag) {
+    await setPreference('all_beers_etag', write.etag);
+  }
+
+  await setPreference('all_beers_last_update', new Date().toISOString());
+  await setPreference('all_beers_last_check', new Date().toISOString());
+  return { success: true, dataUpdated: true, itemCount: write.itemCount };
+}
+
+/**
+ * Fetch, validate, enrich and shape the tasted list. No database access.
+ *
+ * The enrichment batch is a network round trip and belongs here for the same
+ * reason the three `beerApi` calls do — leaving it behind would keep an HTTP
+ * request inside the lock and forfeit most of this phase's benefit, since it is
+ * the request over the largest id list.
+ */
+async function prepareMyBeers(): Promise<SourcePlan<MyBeersWrite>> {
+  console.log('Sequential refresh: starting my beers fetch');
+  try {
+    const myBeersSource = await fetchMyBeersFromAPI();
+
+    // The three outcomes diverge here, and this is the divergence the whole
+    // plan exists for. `unavailable` must NOT touch the table and must NOT
+    // stamp a timestamp — stamping is what suppressed a retry for 12 hours.
+    // `confirmed-empty` is the ONLY case in which clearing is correct.
+    //
+    // `not-applicable` is separated from the other unavailable codes for the
+    // same reason rewards separates them: it means "this source does not apply
+    // to you", which is what visitor mode and a none:// placeholder ARE. This
+    // block used to throw on every `unavailable`, so every visitor refresh
+    // failed with UNKNOWN_ERROR — and UNKNOWN_ERROR returns error.message
+    // verbatim, putting "My beers unavailable (not-applicable): …" in an
+    // Alert. Not an update either: no table write, no timestamp.
+    if (myBeersSource.status === 'unavailable' && myBeersSource.reason.code === 'not-applicable') {
+      console.log(`Sequential refresh: my beers not applicable — ${myBeersSource.reason.detail}`);
+      return { kind: 'settled', result: { success: true, dataUpdated: false } };
+    }
+    if (myBeersSource.status === 'failed') {
+      // Carries the ErrorResponse rather than its message. Stringifying here
+      // discarded a typed NETWORK_ERROR and flipped `allNetworkErrors` off.
+      throw new SourceFailureError(myBeersSource.error, 'My beers');
+    }
+    if (myBeersSource.status !== 'fetched') {
+      throw new Error(
+        `My beers unavailable (${myBeersSource.reason.code}): ${myBeersSource.reason.detail}`
+      );
+    }
+    if (myBeersSource.data.kind === 'malformed') {
+      throw new Error(`My beers malformed: ${myBeersSource.data.detail}`);
+    }
+    if (myBeersSource.data.kind === 'confirmed-empty') {
+      // The one case in which emptying the table is correct: the server was
+      // asked and answered zero. Every other route to an empty list — visitor
+      // mode, no URL, a none:// placeholder, an unusable body — is handled
+      // above and leaves the table alone.
+      return { kind: 'write', write: { kind: 'clear' } };
+    }
+
+    const myBeers = [...myBeersSource.data.items];
+
+    // Validate myBeers before insertion
+    const validationResult = validateBeerArray(myBeers);
+
+    if (validationResult.invalidBeers.length > 0) {
+      logWarning(
+        `Sequential refresh: Skipping ${validationResult.invalidBeers.length} invalid my beers`,
+        {
+          operation: 'sequentialRefreshAllData',
+          component: 'dataUpdateService',
+          additionalData: { summary: validationResult.summary },
+        }
+      );
+    }
+
+    // Enrich BEFORE container type calculation so ABV is available for glass selection
+    let beersForContainerCalc = validationResult.validBeers;
+    if (config.enrichment.isConfigured() && validationResult.validBeers.length > 0) {
+      try {
+        const beerIds = validationResult.validBeers.map(beer => beer.id);
+        console.log(
+          `[sequentialRefresh] Fetching enrichment for ${beerIds.length} tasted beers...`
+        );
+
+        const { enrichments: enrichmentData, missing: missingIds } =
+          await fetchEnrichmentBatchWithMissing(beerIds);
+        const enrichedCount = Object.keys(enrichmentData).length;
+
+        if (enrichedCount > 0) {
+          console.log(`[sequentialRefresh] Got enrichment for ${enrichedCount} tasted beers`);
+          beersForContainerCalc = mergeEnrichmentData(validationResult.validBeers, enrichmentData);
+        }
+
+        // Sync missing beers to Worker for enrichment (in background)
+        syncMissingBeersInBackground(missingIds, validationResult.validBeers, 'sequentialRefresh');
+      } catch (enrichmentError) {
+        logWarning('Batch enrichment failed in sequential refresh, continuing without', {
+          operation: 'sequentialRefreshAllData',
+          component: 'dataUpdateService',
+        });
+      }
+    }
+
+    // Calculate container types AFTER enrichment so ABV is available for glass selection
+    console.log('Sequential refresh: calculating container types for my beers...');
+    const myBeersWithContainerTypes = calculateContainerTypes(beersForContainerCalc);
+
+    const sequentialMyBeers = toNonEmpty(
+      myBeersWithContainerTypes as BeerfinderWithContainerType[]
+    );
+    if (sequentialMyBeers === null) {
+      // Rows arrived and none survived local validation. confirmed-empty is
+      // handled above, so this can only be malformed — leave the table alone
+      // rather than wiping a populated list.
+      throw new Error(
+        `All ${myBeers.length} tasted beers from the API failed validation; refusing to write`
+      );
+    }
+
+    return {
+      kind: 'write',
+      write: {
+        kind: 'replace',
+        beers: sequentialMyBeers,
+        itemCount: validationResult.validBeers.length,
+      },
+    };
+  } catch (error) {
+    logError(error, {
+      operation: 'sequentialRefreshAllData - my beers',
+      component: 'dataUpdateService',
+    });
+    return {
+      kind: 'settled',
+      result: { success: false, dataUpdated: false, error: createErrorResponse(error) },
+    };
+  }
+}
+
+/** Store the tasted list. Runs under the write lock; makes no network request. */
+async function writeMyBeers(write: MyBeersWrite): Promise<DataUpdateResult> {
+  if (write.kind === 'clear') {
+    await myBeersRepository.replaceAllWithEmptyUnsafe();
+    await setPreference('my_beers_last_update', new Date().toISOString());
+    await setPreference('my_beers_last_check', new Date().toISOString());
+    return { success: true, dataUpdated: true, itemCount: 0 };
+  }
+
+  await myBeersRepository.insertManyUnsafe(write.beers);
+  await setPreference('my_beers_last_update', new Date().toISOString());
+  await setPreference('my_beers_last_check', new Date().toISOString());
+  return { success: true, dataUpdated: true, itemCount: write.itemCount };
+}
+
+/** Fetch and classify rewards. No database access. */
+async function prepareRewards(): Promise<SourcePlan<RewardsWrite>> {
+  console.log('Sequential refresh: starting rewards fetch');
+  try {
+    const decision = decideRewards(await fetchRewardsFromAPI());
+
+    if (decision.action === 'fail') {
+      return {
+        kind: 'settled',
+        result: { success: false, dataUpdated: false, error: decision.error },
+      };
+    }
+    if (decision.action === 'skip') {
+      console.log(`Sequential refresh: rewards not applicable — ${decision.reason.detail}`);
+      return { kind: 'settled', result: { success: true, dataUpdated: false } };
+    }
+    return decision.action === 'clear'
+      ? { kind: 'write', write: { kind: 'clear' } }
+      : { kind: 'write', write: { kind: 'replace', rows: decision.rows } };
+  } catch (error) {
+    logError(error, {
+      operation: 'sequentialRefreshAllData - rewards',
+      component: 'dataUpdateService',
+    });
+    return {
+      kind: 'settled',
+      result: { success: false, dataUpdated: false, error: createErrorResponse(error) },
+    };
+  }
+}
+
+/** Store rewards. Runs under the write lock; makes no network request. */
+async function writeRewards(write: RewardsWrite): Promise<DataUpdateResult> {
+  const rows = write.kind === 'clear' ? [] : [...write.rows];
+  await rewardsRepository.insertManyUnsafe(rows);
+  return { success: true, dataUpdated: true, itemCount: rows.length };
 }
 
 /**

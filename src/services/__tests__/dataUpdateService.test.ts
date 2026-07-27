@@ -1355,8 +1355,12 @@ describe('dataUpdateService', () => {
 
       await sequentialRefreshAllData();
 
+      // Renamed from 'refresh-all-data-sequential' by plan 05 Phase 5.4. The
+      // lock no longer spans the sequence — the fetches run outside it — so a
+      // name claiming it does would misdescribe every log line and every
+      // contention report it appears in.
       expect(databaseLockManager.withDatabaseLock).toHaveBeenCalledWith(
-        'refresh-all-data-sequential',
+        'refresh-all-data-write',
         expect.any(Function)
       );
     });
@@ -1376,7 +1380,7 @@ describe('dataUpdateService', () => {
       // called. The manager behind this mock is real, so deleting the finally
       // from withDatabaseLock fails this.
       expect(databaseLockManager.withDatabaseLock).toHaveBeenCalledWith(
-        'refresh-all-data-sequential',
+        'refresh-all-data-write',
         expect.any(Function)
       );
       expect(databaseLockManager.isLocked()).toBe(false);
