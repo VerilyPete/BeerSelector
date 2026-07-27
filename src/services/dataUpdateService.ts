@@ -47,6 +47,19 @@ export function resetLastManualRefreshTime(): void {
 }
 
 /**
+ * Drop any in-flight refresh. **Tests only**, matching
+ * `resetLastManualRefreshTime`.
+ *
+ * A test that starts a refresh without awaiting it parks the promise in the
+ * module slot, and every later call in that file silently joins a run it never
+ * started — which presents as an unrelated test hanging or asserting against
+ * someone else's fetches.
+ */
+export function resetInFlightSequentialRefresh(): void {
+  inFlightSequentialRefresh = null;
+}
+
+/**
  * The refresh currently running, if any, so a second caller joins it instead of
  * starting a competing one.
  *
@@ -81,8 +94,29 @@ let inFlightSequentialRefresh: Promise<ManualRefreshResult> | null = null;
  * away from what the write functions actually do.
  */
 type SourcePlan<TWrite> =
-  | { readonly kind: 'settled'; readonly result: DataUpdateResult }
+  | { readonly kind: 'settled'; readonly result: SettledResult }
   | { readonly kind: 'write'; readonly write: TWrite };
+
+/**
+ * What a source that reached its conclusion without a write may report.
+ *
+ * Narrower than `DataUpdateResult`, which is a plain record and would let a
+ * `settled` plan claim `dataUpdated: true` with an `itemCount` — a completed
+ * write in a run that may not even take the lock. It would equally admit a
+ * failure with no `error`, which `allNetworkErrors` filters out before its
+ * `.every`, making the offline alert fire vacuously for a non-network fault.
+ *
+ * Neither is reachable today; both are the defect class `FetchedSource` and
+ * `RewardsDecision` were shaped to make unrepresentable, so this says it in the
+ * type rather than relying on all six construction sites staying disciplined.
+ */
+type SettledResult =
+  | { readonly success: true; readonly dataUpdated: false }
+  | {
+      readonly success: false;
+      readonly dataUpdated: false;
+      readonly error: ErrorResponse;
+    };
 
 /**
  * A taplist write.
@@ -96,7 +130,6 @@ type AllBeersWrite =
       readonly kind: 'replace';
       readonly beers: NonEmptyArray<BeerWithContainerType>;
       readonly etag: string | null;
-      readonly itemCount: number;
     };
 
 /** A tasted-list write. `clear` is reachable only from `confirmed-empty`. */
@@ -105,13 +138,47 @@ type MyBeersWrite =
   | {
       readonly kind: 'replace';
       readonly beers: NonEmptyArray<BeerfinderWithContainerType>;
-      readonly itemCount: number;
     };
 
 /** A rewards write, mirroring the two writing arms of `RewardsDecision`. */
 type RewardsWrite =
   | { readonly kind: 'clear' }
   | { readonly kind: 'replace'; readonly rows: NonEmptyArray<Reward> };
+
+/**
+ * Beers the Worker has never seen, to be handed to it once the writes are done.
+ */
+type PendingWorkerSync = {
+  readonly missingIds: string[];
+  readonly beers: BeerWithContainerType[];
+};
+
+/**
+ * The my-beers plan, plus a Worker sync that must not start yet.
+ *
+ * The sync is the one part of `prepareMyBeers` that is not pure with respect to
+ * the database: it polls the Worker and then writes enrichment straight into
+ * `allbeers` and `tasted_brew_current_round`, taking the master lock itself to
+ * do it (`BeerRepository.updateEnrichmentData`,
+ * `MyBeersRepository.updateEnrichmentData`).
+ *
+ * While the refresh held one lock end to end, that write could only ever queue
+ * BEHIND the refresh's own writes. Hoisting the fetches freed the lock during
+ * the fetch phase, so a poll returning while the rewards fetch is still running
+ * could acquire it first, persist enrichment, log success — and then have the
+ * clear-and-reinsert throw it away. The poll's first sleep is 5s
+ * (`enrichmentService.ts`), so the window opens on exactly the slow links this
+ * work targets, and the data lost is exactly the enrichment the sync was
+ * started to obtain.
+ *
+ * Carried as data rather than a closure so a test can see it, and so the
+ * decision about *when* to fire lives with the code that knows when the writes
+ * finished.
+ */
+type MyBeersPreparation = {
+  readonly plan: SourcePlan<MyBeersWrite>;
+  readonly pendingWorkerSync: PendingWorkerSync | null;
+};
 
 /**
  * Result of a data update operation
@@ -961,7 +1028,7 @@ export async function sequentialRefreshAllData(): Promise<ManualRefreshResult> {
 async function runSequentialRefresh(): Promise<ManualRefreshResult> {
   console.log('Sequential refresh: fetching all sources with no lock held');
   const allBeers = await prepareAllBeers();
-  const myBeers = await prepareMyBeers();
+  const { plan: myBeers, pendingWorkerSync } = await prepareMyBeers();
   const rewards = await prepareRewards();
 
   /**
@@ -989,6 +1056,19 @@ async function runSequentialRefresh(): Promise<ManualRefreshResult> {
   const [allBeersResult, myBeersResult, rewardsResult] = needsLock
     ? await databaseLockManager.withDatabaseLock('refresh-all-data-write', applyAll)
     : await applyAll();
+
+  // Fire-and-forget, and deliberately here rather than where it was discovered:
+  // this sync polls the Worker and then writes enrichment into both tables
+  // under its own lock, so starting it during the fetch phase lets it land
+  // BEFORE the burst above and be wiped by the clear-and-reinsert. See
+  // `MyBeersPreparation`.
+  if (pendingWorkerSync !== null) {
+    syncMissingBeersInBackground(
+      pendingWorkerSync.missingIds,
+      pendingWorkerSync.beers,
+      'sequentialRefresh'
+    );
+  }
 
   // Check for errors
   const hasErrors = !allBeersResult.success || !myBeersResult.success || !rewardsResult.success;
@@ -1096,12 +1176,7 @@ async function prepareAllBeers(): Promise<SourcePlan<AllBeersWrite>> {
 
     return {
       kind: 'write',
-      write: {
-        kind: 'replace',
-        beers: sequentialBeers,
-        etag,
-        itemCount: validationResult.validBeers.length,
-      },
+      write: { kind: 'replace', beers: sequentialBeers, etag },
     };
   } catch (error) {
     logError(error, {
@@ -1131,7 +1206,9 @@ async function writeAllBeers(write: AllBeersWrite): Promise<DataUpdateResult> {
 
   await setPreference('all_beers_last_update', new Date().toISOString());
   await setPreference('all_beers_last_check', new Date().toISOString());
-  return { success: true, dataUpdated: true, itemCount: write.itemCount };
+  // Derived, not carried. Container-type calculation and enrichment merge are
+  // both 1:1 maps, so a separate count could only ever agree — or drift.
+  return { success: true, dataUpdated: true, itemCount: write.beers.length };
 }
 
 /**
@@ -1142,8 +1219,9 @@ async function writeAllBeers(write: AllBeersWrite): Promise<DataUpdateResult> {
  * request inside the lock and forfeit most of this phase's benefit, since it is
  * the request over the largest id list.
  */
-async function prepareMyBeers(): Promise<SourcePlan<MyBeersWrite>> {
+async function prepareMyBeers(): Promise<MyBeersPreparation> {
   console.log('Sequential refresh: starting my beers fetch');
+  let workerSync: PendingWorkerSync | null = null;
   try {
     const myBeersSource = await fetchMyBeersFromAPI();
 
@@ -1161,7 +1239,10 @@ async function prepareMyBeers(): Promise<SourcePlan<MyBeersWrite>> {
     // Alert. Not an update either: no table write, no timestamp.
     if (myBeersSource.status === 'unavailable' && myBeersSource.reason.code === 'not-applicable') {
       console.log(`Sequential refresh: my beers not applicable — ${myBeersSource.reason.detail}`);
-      return { kind: 'settled', result: { success: true, dataUpdated: false } };
+      return {
+        plan: { kind: 'settled', result: { success: true, dataUpdated: false } },
+        pendingWorkerSync: null,
+      };
     }
     if (myBeersSource.status === 'failed') {
       // Carries the ErrorResponse rather than its message. Stringifying here
@@ -1181,7 +1262,7 @@ async function prepareMyBeers(): Promise<SourcePlan<MyBeersWrite>> {
       // asked and answered zero. Every other route to an empty list — visitor
       // mode, no URL, a none:// placeholder, an unusable body — is handled
       // above and leaves the table alone.
-      return { kind: 'write', write: { kind: 'clear' } };
+      return { plan: { kind: 'write', write: { kind: 'clear' } }, pendingWorkerSync: null };
     }
 
     const myBeers = [...myBeersSource.data.items];
@@ -1218,12 +1299,17 @@ async function prepareMyBeers(): Promise<SourcePlan<MyBeersWrite>> {
           beersForContainerCalc = mergeEnrichmentData(validationResult.validBeers, enrichmentData);
         }
 
-        // Sync missing beers to Worker for enrichment (in background)
-        syncMissingBeersInBackground(missingIds, validationResult.validBeers, 'sequentialRefresh');
+        // Deferred until after the write burst — see `pendingWorkerSync`.
+        workerSync = { missingIds, beers: validationResult.validBeers };
       } catch (enrichmentError) {
+        // The cause is carried, matching the sibling handler in this file. Without
+        // it a 500, a DNS failure and a parse error are indistinguishable in the
+        // logs, and this is an optional enrichment that fails silently by design
+        // — so the log line is the only evidence there will ever be.
         logWarning('Batch enrichment failed in sequential refresh, continuing without', {
           operation: 'sequentialRefreshAllData',
           component: 'dataUpdateService',
+          additionalData: { error: String(enrichmentError) },
         });
       }
     }
@@ -1245,12 +1331,11 @@ async function prepareMyBeers(): Promise<SourcePlan<MyBeersWrite>> {
     }
 
     return {
-      kind: 'write',
-      write: {
-        kind: 'replace',
-        beers: sequentialMyBeers,
-        itemCount: validationResult.validBeers.length,
+      plan: {
+        kind: 'write',
+        write: { kind: 'replace', beers: sequentialMyBeers },
       },
+      pendingWorkerSync: workerSync,
     };
   } catch (error) {
     logError(error, {
@@ -1258,8 +1343,11 @@ async function prepareMyBeers(): Promise<SourcePlan<MyBeersWrite>> {
       component: 'dataUpdateService',
     });
     return {
-      kind: 'settled',
-      result: { success: false, dataUpdated: false, error: createErrorResponse(error) },
+      plan: {
+        kind: 'settled',
+        result: { success: false, dataUpdated: false, error: createErrorResponse(error) },
+      },
+      pendingWorkerSync: null,
     };
   }
 }
@@ -1276,7 +1364,7 @@ async function writeMyBeers(write: MyBeersWrite): Promise<DataUpdateResult> {
   await myBeersRepository.insertManyUnsafe(write.beers);
   await setPreference('my_beers_last_update', new Date().toISOString());
   await setPreference('my_beers_last_check', new Date().toISOString());
-  return { success: true, dataUpdated: true, itemCount: write.itemCount };
+  return { success: true, dataUpdated: true, itemCount: write.beers.length };
 }
 
 /** Fetch and classify rewards. No database access. */
