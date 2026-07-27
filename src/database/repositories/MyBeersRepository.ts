@@ -94,8 +94,10 @@ export class MyBeersRepository {
    * Insert multiple tasted beers into the database
    *
    * Special handling:
-   * - Empty array clears the table (new user or round rollover at 200 beers)
-   * - Filters out beers without valid IDs
+   * - Requires a NonEmptyArray. Emptying the table is replaceAllWithEmpty(),
+   *   asked for explicitly rather than inferred from an empty payload.
+   * - Throws if NO supplied row carries an id — that is malformed input, and
+   *   must not be allowed to replace a populated list.
    * - Processes in batches of 20
    * - Uses database lock to prevent concurrent operations
    *
@@ -458,25 +460,11 @@ export class MyBeersRepository {
    * Used for new users or round rollover scenarios.
    */
   async clear(): Promise<void> {
-    const database = await getDatabase();
-
-    try {
-      await database.withTransactionAsync(async () => {
-        const before = await database.getFirstAsync<{ count: number }>(
-          'SELECT COUNT(*) as count FROM tasted_brew_current_round'
-        );
-        await database.runAsync('DELETE FROM tasted_brew_current_round');
-        const after = await database.getFirstAsync<{ count: number }>(
-          'SELECT COUNT(*) as count FROM tasted_brew_current_round'
-        );
-        console.log(
-          `DB: Successfully cleared tasted_brew_current_round table (removed ${before?.count ?? 0} rows, now ${after?.count ?? 0})`
-        );
-      });
-    } catch (error) {
-      console.error('Error clearing tasted beers:', error);
-      throw toContentionError('tasted beers clear', error);
-    }
+    // Delegates rather than duplicating: the old body carried a
+    // count-before-delete read INSIDE the transaction — the `txn` trap, which
+    // fails silently by returning the pre-transaction snapshot — plus a second
+    // post-delete read. _deleteAllInternal has neither.
+    return withContentionMapping('tasted beers clear', () => this._deleteAllInternal());
   }
 
   /**

@@ -3,6 +3,7 @@ import * as svc from '../../services/dataUpdateService';
 // Import mocked functions
 import { fetchBeersFromAPI, fetchMyBeersFromAPI, fetchRewardsFromAPI } from '../../api/beerApi';
 import { setPreference } from '../../database/preferences';
+import { myBeersRepository } from '../../database/repositories/MyBeersRepository';
 
 // Mock dependencies
 jest.mock('../../database/preferences', () => ({
@@ -29,6 +30,7 @@ jest.mock('../../database/repositories/BeerRepository', () => ({
 jest.mock('../../database/repositories/MyBeersRepository', () => ({
   myBeersRepository: {
     insertManyUnsafe: jest.fn(async () => {}),
+    replaceAllWithEmptyUnsafe: jest.fn(async () => {}),
   },
 }));
 
@@ -140,5 +142,46 @@ describe('manualRefreshAllData', () => {
     );
     expect(etagClears).toHaveLength(1);
     expect(etagClears[0][1]).toBe('');
+  });
+});
+
+describe('sequentialRefreshAllData: empty vs malformed tasted beers', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (fetchBeersFromAPI as jest.Mock).mockResolvedValue([
+      { id: 'beer-1', brew_name: 'Test Beer 1', brewer: 'Test Brewery' },
+    ]);
+    (fetchRewardsFromAPI as jest.Mock).mockResolvedValue([]);
+  });
+
+  it('clears the tasted table when the server reports a genuinely empty round', async () => {
+    // The rollover at 200, or a new user. This arm previously had NO coverage
+    // at all on this path — deleting the clear call left the whole suite green.
+    (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue([]);
+
+    const result = await svc.sequentialRefreshAllData();
+
+    expect(myBeersRepository.replaceAllWithEmptyUnsafe).toHaveBeenCalledTimes(1);
+    expect(myBeersRepository.insertManyUnsafe).not.toHaveBeenCalled();
+    expect(result.myBeersResult.success).toBe(true);
+  });
+
+  it('does not clear the tasted table when every row from the API lacks an id', async () => {
+    // fetchMyBeersFromAPI collapses FIVE conditions to a bare [] — visitor
+    // mode, no URL, a none:// URL, a genuine empty round, and malformed rows.
+    // Validation then drops id-less rows, so malformed arrives here looking
+    // exactly like an empty round and took the clear arm.
+    (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue([
+      { brew_name: 'no id', brewer: 'x' },
+      { brew_name: 'also no id', brewer: 'y' },
+    ]);
+
+    const result = await svc.sequentialRefreshAllData();
+
+    expect(myBeersRepository.replaceAllWithEmptyUnsafe).not.toHaveBeenCalled();
+    expect(myBeersRepository.insertManyUnsafe).not.toHaveBeenCalled();
+    expect(result.myBeersResult.success).toBe(false);
+    // And no timestamp, which is what made the wipe persist for 12 hours.
+    expect(setPreference).not.toHaveBeenCalledWith('my_beers_last_update', expect.any(String));
   });
 });
