@@ -50,7 +50,8 @@ const attemptFetch = async (
   url: string,
   retries: number,
   delay: number,
-  deadline: number
+  deadline: number,
+  earlierFailure?: unknown
 ): Promise<unknown> => {
   // An unbounded request here can be an unbounded database lock hold: the full
   // refresh paths call this while holding the master lock, and past the lock's
@@ -88,7 +89,21 @@ const attemptFetch = async (
     // which is the same argument notificationUtils makes for classifying by type
     // rather than by message.
     if (controller.signal.aborted) {
-      throw error;
+      // The deadline is how we stopped waiting; it is not what went wrong. If
+      // an earlier attempt produced a real answer — a 500, a refused
+      // connection — that is the fault worth reporting, and the abort is an
+      // implementation detail of giving up on it.
+      //
+      // Without this the chain reports an AbortError, which
+      // `createErrorResponse` maps to NETWORK_ERROR, which sets
+      // `allNetworkErrors`, which picks the "check your internet connection"
+      // alert. A server that answered 500 twice and then stalled would tell
+      // the user to check a connection that demonstrably worked. That is the
+      // same defect 30f9d90's review found at the fetcher layer, and the
+      // per-chain deadline reintroduced it one layer down: shortening the
+      // budget makes a late attempt likelier to abort, so the more often the
+      // deadline does its job, the more often the real error was discarded.
+      throw earlierFailure ?? error;
     }
 
     // A 4xx is the server reading the request and rejecting it on its merits.
@@ -119,7 +134,10 @@ const attemptFetch = async (
 
     console.log(`Fetch failed, retrying in ${delay}ms... (${retries - 1} retries left)`);
     await new Promise(resolve => setTimeout(resolve, delay));
-    return attemptFetch(url, retries - 1, delay * 1.5, deadline);
+    // This attempt's error is carried forward as the one to report if the
+    // chain later runs out of budget. Most recent rather than first: it is the
+    // freshest evidence of what the server is doing.
+    return attemptFetch(url, retries - 1, delay * 1.5, deadline, error);
   } finally {
     // Runs on the retry path too: `return attemptFetch(...)` in the catch
     // evaluates the call, then this clears THIS invocation's timer before the

@@ -25,7 +25,7 @@ import { fetchBeersFromAPI, fetchMyBeersFromAPI, fetchRewardsFromAPI } from '../
 import { beerRepository } from '../../database/repositories/BeerRepository';
 import { myBeersRepository } from '../../database/repositories/MyBeersRepository';
 import { rewardsRepository } from '../../database/repositories/RewardsRepository';
-import { fetchEnrichmentBatchWithMissing } from '../enrichmentService';
+import { fetchEnrichmentBatchWithMissing, syncBeersToWorker } from '../enrichmentService';
 import { config } from '@/src/config';
 import { fetchedRows, failed, unavailable } from '../../api/__tests__/helpers/fetchOutcomeFixtures';
 import { sequentialRefreshAllData } from '../dataUpdateService';
@@ -198,6 +198,36 @@ describe('sequentialRefreshAllData locking', () => {
     expect(mockEvents.indexOf('lock:acquire')).toBeGreaterThan(
       mockEvents.lastIndexOf('fetch:enrichment')
     );
+
+    enrichmentSpy.mockRestore();
+  });
+
+  it('starts the background worker sync only after the write burst', async () => {
+    // The sync polls the Worker and then writes enrichment straight into
+    // `allbeers` and `tasted_brew_current_round`, taking the master lock itself
+    // to do it. While the refresh held one lock end to end, that write could
+    // only ever queue BEHIND the refresh's own writes. Now the lock is free
+    // during the fetch phase, so a poll returning mid-refresh can land first
+    // and then be wiped by the clear-and-reinsert — enrichment written, logged
+    // as persisted, and gone, on exactly the slow link that makes the window
+    // wide enough to hit.
+    const enrichmentSpy = jest
+      .spyOn(config, 'enrichment', 'get')
+      .mockReturnValue({ ...config.enrichment, isConfigured: () => true });
+    allSourcesSucceed();
+    (fetchEnrichmentBatchWithMissing as jest.Mock).mockResolvedValue({
+      enrichments: {},
+      missing: ['b1'],
+    });
+    (syncBeersToWorker as jest.Mock).mockImplementation(async () => {
+      mockEvents.push('sync:worker');
+      return { synced: 1, queued_for_cleanup: 0 };
+    });
+
+    await sequentialRefreshAllData();
+
+    expect(mockEvents).toContain('sync:worker');
+    expect(mockEvents.indexOf('sync:worker')).toBeGreaterThan(mockEvents.indexOf('lock:release'));
 
     enrichmentSpy.mockRestore();
   });

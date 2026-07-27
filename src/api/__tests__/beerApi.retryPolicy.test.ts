@@ -145,7 +145,11 @@ describe('fetchWithRetry retry policy', () => {
 
       const backoff = 1000;
       const result = fetchWithRetry(config.api.baseUrl, 3, backoff);
-      const rejection = expect(result).rejects.toMatchObject({ name: 'AbortError' });
+      // The rejection is the earlier transport failure, not the abort — see
+      // 'reports what actually failed…' below, which owns that property. Kept
+      // handled here only so an unhandled rejection does not mask the
+      // assertion this test exists for.
+      const rejection = expect(result).rejects.toThrow('Network request failed');
 
       // Attempt 1 fails at once; the backoff carries us to T=backoff, where
       // attempt 2 starts.
@@ -158,6 +162,56 @@ describe('fetchWithRetry retry policy', () => {
       // Per-chain: attempt 2 inherited `timeout - backoff` and is done.
       // Per-attempt: attempt 2 got a fresh `timeout` and has `backoff` still to
       // run. This single assertion is the entire difference between them.
+      expect(signals[0].aborted).toBe(true);
+      await rejection;
+    });
+
+    it('reports what actually failed when the budget runs out mid-chain', async () => {
+      // The chain's deadline is how we STOP waiting; it is not what went wrong.
+      // A server that answered 500 twice and then stalled is a server fault,
+      // and saying so is the difference between "the service is having
+      // trouble" and "check your internet connection" — which is the advice
+      // the user gets for an AbortError, since notificationUtils maps it to
+      // NETWORK_ERROR, and NETWORK_ERROR is what selects the offline alert.
+      //
+      // This is the exact defect class 30f9d90's review round caught at the
+      // fetcher layer. It came back one layer down, via the deadline.
+      const serverError = { ok: false, status: 500, statusText: 'Internal Server Error' };
+      let attempts = 0;
+      (global.fetch as jest.Mock).mockImplementation(
+        (_url: string, options: { signal: AbortSignal }) =>
+          new Promise((resolve, reject) => {
+            attempts += 1;
+            const answersSlowly = attempts <= 2;
+            options.signal.addEventListener('abort', () => reject(abortError()));
+            if (answersSlowly) {
+              setTimeout(() => resolve(serverError), 6000);
+            }
+          })
+      );
+
+      const result = fetchWithRetry(config.api.baseUrl);
+      const rejection = expect(result).rejects.toThrow('HTTP 500 Internal Server Error');
+
+      await jest.advanceTimersByTimeAsync(config.network.timeout + 1);
+
+      // Three attempts: two real 500s, then one armed with the sliver of
+      // budget left, which aborts. The abort must not become the answer.
+      expect(attempts).toBe(3);
+      await rejection;
+    });
+
+    it('still reports the abort when nothing else has gone wrong', async () => {
+      // GUARD, and the reason the fix is "prefer the earlier real error"
+      // rather than "never report an abort". A single request that stalls has
+      // produced no other error, and a timeout is the honest description.
+      const signals = capturedSignals();
+
+      const result = fetchWithRetry(config.api.baseUrl, 1);
+      const rejection = expect(result).rejects.toMatchObject({ name: 'AbortError' });
+
+      await jest.advanceTimersByTimeAsync(config.network.timeout + 1);
+
       expect(signals[0].aborted).toBe(true);
       await rejection;
     });
