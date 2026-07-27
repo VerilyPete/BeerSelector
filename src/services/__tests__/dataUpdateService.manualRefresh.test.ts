@@ -166,15 +166,16 @@ describe('sequentialRefreshAllData: empty vs malformed tasted beers', () => {
     expect(result.myBeersResult.success).toBe(true);
   });
 
-  it('does not clear the tasted table when every row from the API lacks an id', async () => {
-    // fetchMyBeersFromAPI collapses FIVE conditions to a bare [] — visitor
-    // mode, no URL, a none:// URL, a genuine empty round, and malformed rows.
-    // Validation then drops id-less rows, so malformed arrives here looking
-    // exactly like an empty round and took the clear arm.
-    (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue([
-      { brew_name: 'no id', brewer: 'x' },
-      { brew_name: 'also no id', brewer: 'y' },
-    ]);
+  it('does not clear the tasted table when the fetch reports malformed rows', async () => {
+    // The FIRST version of this test mocked fetchMyBeersFromAPI resolving
+    // [{brew_name:'no id'}] — a value the real function CANNOT return, because
+    // it filtered for id itself and returned [] when nothing survived. The test
+    // was green while production still wiped the table. beerApi now throws,
+    // which is what makes this case reachable at all; this drives that real
+    // contract instead of an invented one.
+    (fetchMyBeersFromAPI as jest.Mock).mockRejectedValue(
+      new Error('My Beers response contained 2 rows and all lack an id')
+    );
 
     const result = await svc.sequentialRefreshAllData();
 

@@ -430,3 +430,43 @@ describe('Data Refresh Integration Tests', () => {
     });
   });
 });
+
+describe('refreshAllDataFromAPI: empty vs malformed tasted beers', () => {
+  // This arm had NO coverage: collapsing it back to an unconditional
+  // replaceAllWithEmptyUnsafe left the whole suite green. It is the
+  // autoLogin -> CHECK IN path, which is where a wipe hurts most.
+  it('does not clear the tasted table when every row fails validation', async () => {
+    jest.clearAllMocks();
+    (beerApi.fetchBeersFromAPI as jest.Mock).mockResolvedValue([
+      { id: 'b1', brew_name: 'Beer', brewer: 'X' },
+    ]);
+    // Rows that HAVE ids — so beerApi's own filter passes them through — but
+    // fail validateBeer on brew_name. This is the only input that now reaches
+    // the null arm with a non-empty raw array, and mocking a rejection instead
+    // would never get here at all.
+    (beerApi.fetchMyBeersFromAPI as jest.Mock).mockResolvedValue([
+      { id: 'm1', brew_name: '', brewer: 'X' },
+      { id: 'm2', brew_name: '', brewer: 'Y' },
+    ]);
+    (beerApi.fetchRewardsFromAPI as jest.Mock).mockResolvedValue([]);
+
+    await refreshAllDataFromAPI();
+
+    // Skipped, not cleared. This is the autoLogin -> CHECK IN path.
+    expect(myBeersRepository.myBeersRepository.replaceAllWithEmptyUnsafe).not.toHaveBeenCalled();
+    expect(myBeersRepository.myBeersRepository.insertManyUnsafe).not.toHaveBeenCalled();
+  });
+
+  it('does clear the tasted table when the server reports a genuinely empty round', async () => {
+    jest.clearAllMocks();
+    (beerApi.fetchBeersFromAPI as jest.Mock).mockResolvedValue([
+      { id: 'b1', brew_name: 'Beer', brewer: 'X' },
+    ]);
+    (beerApi.fetchMyBeersFromAPI as jest.Mock).mockResolvedValue([]);
+    (beerApi.fetchRewardsFromAPI as jest.Mock).mockResolvedValue([]);
+
+    await refreshAllDataFromAPI();
+
+    expect(myBeersRepository.myBeersRepository.replaceAllWithEmptyUnsafe).toHaveBeenCalled();
+  });
+});
