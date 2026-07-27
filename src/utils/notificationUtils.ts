@@ -1,6 +1,6 @@
 import { Alert } from 'react-native';
 import { DatabaseContentionError } from '../database/errors';
-import { MalformedResponseError } from '../api/fetchOutcome';
+import { HttpError, MalformedResponseError } from '../api/fetchOutcome';
 
 /**
  * Error types for API requests
@@ -117,6 +117,21 @@ export function createErrorResponse(error: unknown): ErrorResponse {
       message: error.message,
       originalError: error,
       retryable: true,
+    };
+  }
+
+  // The server answered with a non-2xx status. Classified by type for the same
+  // reason as the two cases around it: the old thrown message began
+  // "Failed to fetch", which the substring rules below read as a network error,
+  // so a 500 told the user to check their internet connection and set
+  // `allNetworkErrors`. 5xx is retryable, 4xx is not — repeating a request the
+  // server rejected on its merits will be rejected again.
+  if (error instanceof HttpError) {
+    return {
+      type: ApiErrorType.SERVER_ERROR,
+      message: error.message,
+      originalError: error,
+      retryable: error.status >= 500,
     };
   }
 

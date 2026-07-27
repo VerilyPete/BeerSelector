@@ -181,7 +181,11 @@ describe('API Integration with Mock Server', () => {
 
       mockServer.setResponse('/visitor.php', FlyingSaucerResponses.serverError());
 
-      await expect(fetchBeersFromAPI()).rejects.toThrow();
+      // INVERTED by plan 05 Phase 5.3: transport failures arrive as `failed`
+      // rather than being thrown, and a 5xx is now typed SERVER_ERROR rather
+      // than being read as a network error out of its message.
+      const outcome = await fetchBeersFromAPI();
+      expect(outcome.status).toBe('failed');
     });
 
     it('should handle 404 not found error', async () => {
@@ -189,7 +193,8 @@ describe('API Integration with Mock Server', () => {
 
       mockServer.setResponse('/notfound.php', FlyingSaucerResponses.notFound());
 
-      await expect(fetchBeersFromAPI()).rejects.toThrow();
+      // INVERTED by plan 05 Phase 5.3.
+      expect((await fetchBeersFromAPI()).status).toBe('failed');
     });
 
     it('should timeout on slow response', async () => {
@@ -468,8 +473,13 @@ describe('API Integration with Mock Server', () => {
         body: { unexpected: 'format' },
       });
 
-      // Should throw error on invalid format
-      await expect(fetchBeersFromAPI()).rejects.toThrow('Invalid response format from API');
+      // INVERTED by plan 05 Phase 5.3: a body that arrived and could not be used
+      // is `fetched` + `malformed`, not a throw and not `failed`.
+      const outcome = await fetchBeersFromAPI();
+      expect(outcome.status).toBe('fetched');
+      if (outcome.status === 'fetched') {
+        expect(outcome.data.kind).toBe('malformed');
+      }
     });
 
     it('should handle partial data corruption', async () => {

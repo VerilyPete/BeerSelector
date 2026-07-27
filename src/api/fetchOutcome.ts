@@ -103,6 +103,28 @@ export type FetchedSource<T> =
   | { readonly status: 'failed'; readonly error: ErrorResponse };
 
 /**
+ * A source that cannot report `unchanged`, because it makes no conditional
+ * requests.
+ *
+ * The comment above accepts the inert `unchanged` arm as the price of cutting
+ * the unions by axis — and that argument is about the shape of the SHARED union,
+ * not about what each individual producer declares it can return. None of the
+ * three `beerApi` fetchers sends `If-None-Match`; only the enrichment proxy does,
+ * and `dataUpdateService` handles its 304 separately without ever building a
+ * `FetchedSource`.
+ *
+ * Every consumer was therefore carrying a branch for a state its input could not
+ * be in. Those branches cannot be tested through the public API, and an untested
+ * branch in the code that exists to stop non-answers becoming answers is exactly
+ * where the next one hides — one of them was a `fail` carrying developer prose
+ * into a user-facing channel. Narrowing here makes writing such a branch a
+ * compile error, which is a better guarantee than a test.
+ *
+ * Assignable to `FetchedSource<T>`, so wide consumers keep working unchanged.
+ */
+export type UnconditionalSource<T> = Exclude<FetchedSource<T>, { readonly status: 'unchanged' }>;
+
+/**
  * A response arrived and could not be used.
  *
  * Typed so that callers — and the user-facing error formatter — can tell it
@@ -116,6 +138,31 @@ export type FetchedSource<T> =
  * 02 Phase 3 folds this into `FetchOutcome`'s `malformed` case; until the
  * callers are migrated, the throw needs a type.
  */
+/**
+ * The server answered with a non-2xx status.
+ *
+ * A type rather than a message, for the reason `createErrorResponse` states at
+ * the top of its body: it classifies `DatabaseContentionError` and
+ * `MalformedResponseError` by type precisely so the answer does not depend on
+ * prose. Before this existed, the thrown message was
+ * `Failed to fetch: 500 Internal Server Error`, which matched that function's
+ * `'Failed to fetch'` substring test — so **every HTTP error was reported to the
+ * user as "check your internet connection"**, and counted toward
+ * `allNetworkErrors`, which picks the offline alert. The one thing the user could
+ * do nothing about was the one thing they were told to check.
+ */
+export class HttpError extends Error {
+  constructor(
+    readonly status: number,
+    statusText: string
+  ) {
+    super(`HTTP ${status}${statusText ? ` ${statusText}` : ''}`);
+    this.name = 'HttpError';
+    // Required for `instanceof` to survive transpilation of Error subclasses.
+    Object.setPrototypeOf(this, HttpError.prototype);
+  }
+}
+
 export class MalformedResponseError extends Error {
   constructor(message: string) {
     super(message);

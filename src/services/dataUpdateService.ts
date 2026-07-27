@@ -15,9 +15,9 @@ import { databaseLockManager } from '../database/DatabaseLockManager';
 import { toNonEmpty } from '../api/fetchOutcome';
 import type {
   FetchOutcome,
-  FetchedSource,
   NonEmptyArray,
   UnavailableReason,
+  UnconditionalSource,
 } from '../api/fetchOutcome';
 import { validateBrewInStockResponse, validateBeerArray } from '../api/validators';
 import { logError, logWarning } from '../utils/errorLogger';
@@ -241,15 +241,12 @@ export async function fetchTaplistFromProxyOrDirect(
  * store with zero beers is not a real state. Every non-data case names itself,
  * which is what the old bare `[]` could not do.
  */
-function requireRows<T>(source: FetchedSource<FetchOutcome<T>>, label: string): readonly T[] {
+function requireRows<T>(source: UnconditionalSource<FetchOutcome<T>>, label: string): readonly T[] {
   if (source.status === 'unavailable') {
     throw new Error(`${label} unavailable (${source.reason.code}): ${source.reason.detail}`);
   }
   if (source.status === 'failed') {
     throw new Error(`${label} failed: ${source.error.message}`);
-  }
-  if (source.status === 'unchanged') {
-    throw new Error(`${label} reported unchanged, which this path cannot use`);
   }
   if (source.data.kind === 'malformed') {
     throw new Error(`${label} malformed: ${source.data.detail}`);
@@ -305,7 +302,7 @@ type RewardsDecision =
  *
  * @param source - The completed fetch
  */
-function decideRewards(source: FetchedSource<FetchOutcome<Reward>>): RewardsDecision {
+function decideRewards(source: UnconditionalSource<FetchOutcome<Reward>>): RewardsDecision {
   if (source.status === 'unavailable') {
     return source.reason.code === 'not-applicable'
       ? { action: 'skip', reason: source.reason }
@@ -320,20 +317,6 @@ function decideRewards(source: FetchedSource<FetchOutcome<Reward>>): RewardsDeci
 
   if (source.status === 'failed') {
     return { action: 'fail', error: source.error };
-  }
-
-  if (source.status === 'unchanged') {
-    // Rewards support no conditional requests, so this arm is unreachable — it
-    // exists only because `FetchedSource` is shared with all-beers. Reported
-    // rather than defaulted, so that if it ever does occur it is visible instead
-    // of silently becoming an empty successful update.
-    return {
-      action: 'fail',
-      error: {
-        type: ApiErrorType.UNKNOWN_ERROR,
-        message: 'Rewards reported unchanged, which this source cannot produce',
-      },
-    };
   }
 
   if (source.data.kind === 'malformed') {
