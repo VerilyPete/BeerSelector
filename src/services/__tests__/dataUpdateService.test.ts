@@ -76,6 +76,8 @@ jest.mock('../../database/repositories/MyBeersRepository', () => ({
 
 jest.mock('../../database/repositories/RewardsRepository', () => ({
   rewardsRepository: {
+    replaceAllWithEmpty: jest.fn(async () => {}),
+    replaceAllWithEmptyUnsafe: jest.fn(async () => {}),
     insertMany: jest.fn(),
     insertManyUnsafe: jest.fn(),
   },
@@ -1131,7 +1133,7 @@ describe('dataUpdateService', () => {
         expect(rewardsRepository.insertMany).not.toHaveBeenCalled();
       });
 
-      it('reports a successful update when the server confirms zero rewards', async () => {
+      it('clears the table and reports an update when the server confirms zero rewards', async () => {
         (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(confirmedEmpty());
 
         const result = await fetchAndUpdateRewards();
@@ -1140,6 +1142,15 @@ describe('dataUpdateService', () => {
         expect(result.success).toBe(true);
         expect(result.dataUpdated).toBe(true);
         expect(result.itemCount).toBe(0);
+
+        // The clear is the half this test used to miss. It asserted the three
+        // values above and nothing about the table, so `insertMany([])` — which
+        // early-returns without clearing — satisfied it completely: the server
+        // said "you have no rewards", the stale rewards stayed, and the refresh
+        // reported a successful update. Pinning the reporting without pinning
+        // the write is what kept that invisible.
+        expect(rewardsRepository.replaceAllWithEmpty).toHaveBeenCalled();
+        expect(rewardsRepository.insertMany).not.toHaveBeenCalled();
       });
 
       // GUARD — passes before and after. Over-correction protection: the fix

@@ -20,6 +20,7 @@
  */
 
 import { fetchWithRetry } from '../beerApi';
+import { MalformedResponseError } from '../fetchOutcome';
 import { config } from '@/src/config';
 
 jest.mock('../../database/preferences');
@@ -116,6 +117,33 @@ describe('fetchWithRetry retry policy', () => {
         expect(await settled).toBe(attempts === 1 ? 'rejected' : 'resolved');
       }
     );
+
+    it('does not retry a body that will not parse', async () => {
+      // The same argument the 4xx exit makes, applied to the body: re-fetching
+      // a response that is not JSON asks the identical question and gets the
+      // identical unusable answer. A captive-portal login page returned with
+      // 200 OK costs three requests and 2.5s of backoff to learn that twice.
+      //
+      // It also fixes the classification. A raw SyntaxError has no type the
+      // classifier recognises, so it fell through to UNKNOWN_ERROR — which
+      // returns `error.message` verbatim, putting "Unexpected token < in JSON
+      // at position 0" in a user-facing alert. MalformedResponseError has
+      // dedicated copy that exists to suppress exactly that.
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => {
+          throw new SyntaxError('Unexpected token < in JSON at position 0');
+        },
+      });
+
+      const result = fetchWithRetry(config.api.baseUrl, 3, 10);
+      const rejection = expect(result).rejects.toThrow(MalformedResponseError);
+
+      await jest.advanceTimersByTimeAsync(1000);
+
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+      await rejection;
+    });
 
     it('still retries a transport failure, which carries no status at all', async () => {
       // GUARD. The 4xx exit must key on the status, not on "it threw" — routing

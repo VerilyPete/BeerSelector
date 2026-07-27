@@ -57,6 +57,43 @@ export class RewardsRepository {
   }
 
   /**
+   * Empty the rewards table, deliberately.
+   *
+   * There was no way to do this. `insertMany([])` early-returns on an empty
+   * array, so `decideRewards`'s `clear` arm — which exists precisely because the
+   * server *confirmed* zero rewards — reached the repository, did nothing, and
+   * still reported `dataUpdated: true`. Stale rewards, marked fresh: the exact
+   * shape plan 02 was written to remove, surviving at the one call that looked
+   * like it was already handled.
+   *
+   * Named after `MyBeersRepository.replaceAllWithEmpty`, which learned this
+   * first: emptying a table is asked for, never inferred from an empty payload.
+   */
+  async replaceAllWithEmpty(): Promise<void> {
+    return databaseLockManager.withDatabaseLock('RewardsRepository.replaceAllWithEmpty', () =>
+      withContentionMapping('rewards clear', () => this._deleteAllInternal())
+    );
+  }
+
+  /**
+   * Unlocked twin of `replaceAllWithEmpty`, for callers already holding the
+   * master lock.
+   */
+  async replaceAllWithEmptyUnsafe(): Promise<void> {
+    return withContentionMapping('rewards clear', () => this._deleteAllInternal());
+  }
+
+  /** Shared body for both empty variants. */
+  private async _deleteAllInternal(): Promise<void> {
+    const database = await getDatabase();
+
+    await database.withTransactionAsync(async () => {
+      const cleared = await database.runAsync('DELETE FROM rewards');
+      console.log(`Cleared rewards table (removed ${cleared.changes} rows)`);
+    });
+  }
+
+  /**
    * Internal implementation of rewards insertion (shared by locked and unlocked variants)
    *
    * @param rewards - Array of Reward objects to insert

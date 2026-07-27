@@ -3,7 +3,7 @@ import { isBeer } from '../types/beer';
 import { Reward } from '../types/database';
 import { getPreference } from '../database/preferences';
 import { config } from '../config';
-import { HttpError, toNonEmpty } from './fetchOutcome';
+import { HttpError, MalformedResponseError, toNonEmpty } from './fetchOutcome';
 import { createErrorResponse } from '../utils/notificationUtils';
 import type { FetchOutcome, UnavailableReason, UnconditionalSource } from './fetchOutcome';
 
@@ -72,7 +72,20 @@ const attemptFetch = async (
       throw new HttpError(response.status, response.statusText);
     }
 
-    return await response.json();
+    try {
+      return await response.json();
+    } catch (parseError) {
+      // Typed, for the same reason `HttpError` is: a raw SyntaxError has
+      // nothing `createErrorResponse` recognises, so it fell through to
+      // UNKNOWN_ERROR — which returns `error.message` verbatim and puts
+      // "Unexpected token < in JSON at position 0" in a user-facing alert.
+      // `MalformedResponseError` has copy written to suppress precisely that.
+      throw new MalformedResponseError(
+        `Response body could not be parsed as JSON: ${
+          parseError instanceof Error ? parseError.message : String(parseError)
+        }`
+      );
+    }
   } catch (error) {
     // A timeout is NOT retried. The request already spent the full deadline, and
     // three more rounds of backoff on top of that is the opposite of what a weak
@@ -118,6 +131,14 @@ const attemptFetch = async (
     // carries no status and must keep retrying — that is the case this whole
     // plan exists for.
     if (error instanceof HttpError && error.status < 500) {
+      throw error;
+    }
+
+    // A body that will not parse will not parse the second time either. Same
+    // argument as the 4xx above, applied to the response instead of the
+    // request: a captive-portal login page served with 200 OK costs three
+    // requests and 2.5s of backoff to learn the same thing three times.
+    if (error instanceof MalformedResponseError) {
       throw error;
     }
 
