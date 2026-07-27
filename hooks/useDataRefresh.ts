@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { Alert } from 'react-native';
 import { areApiUrlsConfigured } from '@/src/database/preferences';
 import { manualRefreshAllData } from '@/src/services/dataUpdateService';
-import { getUserFriendlyErrorMessage } from '@/src/utils/notificationUtils';
+import { buildRefreshErrorMessages } from '@/src/utils/refreshErrorMessages';
 
 /**
  * Parameters for the useDataRefresh hook
@@ -132,18 +132,10 @@ export const useDataRefresh = ({
             [{ text: 'OK' }]
           );
         } else {
-          // Partial errors - collect specific error messages
-          const errorMessages: string[] = [];
-
-          if (!result.allBeersResult.success && result.allBeersResult.error) {
-            const allBeersError = getUserFriendlyErrorMessage(result.allBeersResult.error);
-            errorMessages.push(`All Beer data: ${allBeersError}`);
-          }
-
-          if (!result.myBeersResult.success && result.myBeersResult.error) {
-            const myBeersError = getUserFriendlyErrorMessage(result.myBeersResult.error);
-            errorMessages.push(`Beerfinder data: ${myBeersError}`);
-          }
+          // Partial errors - one line per failed source. Covers rewards too;
+          // omitting it here while `hasErrors` counted it produced an error
+          // dialog with an empty body. See refreshErrorMessages.ts.
+          const errorMessages = buildRefreshErrorMessages(result);
 
           Alert.alert(
             'Data Refresh Error',

@@ -24,8 +24,20 @@ export const fetchWithRetry = async (
   // round. Callers now reject none:// URLs before calling, and return
   // `unavailable/not-applicable` instead.
 
+  // An unbounded request here can be an unbounded database lock hold: the full
+  // refresh paths call this while holding the master lock, and past the lock's
+  // hold timeout the grant is abandoned and every later writer blocks until this
+  // returns. It was the one network await in the codebase with no bound — the
+  // apiClient and enrichment paths all have their own AbortController.
+  //
+  // (Plan 05 Phase 5.4/5.5 hoists the fetches out of the lock, which weakens the
+  // lock-hold argument but not the bound itself — a request that never settles
+  // is worth failing either way.)
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), config.network.timeout);
+
   try {
-    const response = await fetch(url);
+    const response = await fetch(url, { signal: controller.signal });
 
     if (!response.ok) {
       throw new Error(`Failed to fetch: ${response.status} ${response.statusText}`);
@@ -33,6 +45,24 @@ export const fetchWithRetry = async (
 
     return await response.json();
   } catch (error) {
+    // A timeout is NOT retried. The request already spent the full deadline, and
+    // three more rounds of backoff on top of that is the opposite of what a weak
+    // link needs — it is what turns one stalled request into a multi-minute
+    // hold. Transient failures below still retry; this exit is only for the
+    // deadline.
+    //
+    // Asks the controller rather than inspecting the error. `error.name ===
+    // 'AbortError'` was wrong in both directions: any error so named from any
+    // source would exit here, and an abort that is not an `Error` instance would
+    // not — React Native's whatwg-fetch polyfill raises its own DOMException,
+    // which would have fallen through and been retried three times, defeating
+    // the whole point. The controller knows the answer without inferring it,
+    // which is the same argument notificationUtils makes for classifying by type
+    // rather than by message.
+    if (controller.signal.aborted) {
+      throw error;
+    }
+
     if (retries <= 1) {
       throw error;
     }
@@ -40,6 +70,11 @@ export const fetchWithRetry = async (
     console.log(`Fetch failed, retrying in ${delay}ms... (${retries - 1} retries left)`);
     await new Promise(resolve => setTimeout(resolve, delay));
     return fetchWithRetry(url, retries - 1, delay * 1.5);
+  } finally {
+    // Runs on the retry path too: `return fetchWithRetry(...)` in the catch
+    // evaluates the call, then this clears THIS invocation's timer before the
+    // promise is handed back. Each recursion arms and disarms its own.
+    clearTimeout(timeoutId);
   }
 };
 
@@ -53,6 +88,61 @@ const unavailable = <T>(
   code: UnavailableReason['code'],
   detail: string
 ): FetchedSource<FetchOutcome<T>> => ({ status: 'unavailable', reason: { code, detail } });
+
+/**
+ * A usable member API URL, or the reason there is not one.
+ */
+type MemberApiUrl =
+  | { readonly ok: true; readonly url: string }
+  | { readonly ok: false; readonly reason: UnavailableReason };
+
+/**
+ * Resolve `my_beers_api_url` for a member-only source, or say why there is none.
+ *
+ * My-beers and rewards read the **same** preference and must reject the same
+ * three conditions before making a request. They did not: 02 Phase 3 added the
+ * `none://` rejection to my-beers only, and rewards kept sending the placeholder
+ * to `fetch()` — three retries at 1s / 1.5s / 2.25s for a URL that was never
+ * valid, on exactly the weak links this work targets.
+ *
+ * The omission was invisible because the duplication made it read as a
+ * difference between the two functions rather than a gap in one. Sharing the
+ * preamble is what makes the next such omission impossible rather than merely
+ * fixed.
+ *
+ * @param subject - Names the source in log lines and detail strings
+ */
+const resolveMemberApiUrl = async (subject: string): Promise<MemberApiUrl> => {
+  if ((await getPreference('is_visitor_mode')) === 'true') {
+    console.log(`DB: In visitor mode - ${subject} is not applicable`);
+    return {
+      ok: false,
+      reason: { code: 'not-applicable', detail: `visitor mode has no ${subject}` },
+    };
+  }
+
+  const url = await getPreference('my_beers_api_url');
+  if (!url) {
+    console.log(`DB: My beers API URL not found in preferences (${subject})`);
+    return {
+      ok: false,
+      reason: { code: 'not-configured', detail: 'my_beers_api_url is not set' },
+    };
+  }
+
+  if (url.startsWith('none://')) {
+    // Rejected HERE, before any request. fetchWithRetry no longer synthesises a
+    // fake empty response for none://, so without this the URL falls through to
+    // fetch() and burns three retries with backoff.
+    console.log(`DB: none:// placeholder in my_beers_api_url - ${subject} not applicable`);
+    return {
+      ok: false,
+      reason: { code: 'not-applicable', detail: 'my_beers_api_url is a none:// placeholder' },
+    };
+  }
+
+  return { ok: true, url };
+};
 
 /**
  * Classify a parsed array into `data` or `confirmed-empty`.
@@ -192,33 +282,13 @@ export const fetchBeersFromAPI = async (): Promise<FetchedSource<FetchOutcome<Be
  */
 export const fetchMyBeersFromAPI = async (): Promise<FetchedSource<FetchOutcome<Beerfinder>>> => {
   try {
-    // First check if in visitor mode to immediately return empty array
-    const isVisitorMode = (await getPreference('is_visitor_mode')) === 'true';
-    if (isVisitorMode) {
-      console.log('DB: In visitor mode - my beers is not applicable');
-      return unavailable('not-applicable', 'visitor mode has no tasted beers');
-    }
-
-    // Get the API endpoint from preferences
-    const apiUrl = await getPreference('my_beers_api_url');
-    console.log('DB: Fetching My Beers from API URL:', apiUrl);
-
-    if (!apiUrl) {
-      console.log('DB: My beers API URL not found in preferences');
-      return unavailable('not-configured', 'my_beers_api_url is not set');
-    }
-
-    // Special handling for none:// protocol to avoid network errors
-    if (apiUrl.startsWith('none://')) {
-      // Rejected HERE, before any request. fetchWithRetry no longer synthesises
-      // a fake empty response for none://, so without this guard the URL would
-      // fall through to fetch() and burn three retries with backoff.
-      console.log('DB: none:// placeholder in my_beers_api_url - not applicable');
-      return unavailable('not-applicable', 'my_beers_api_url is a none:// placeholder');
+    const resolved = await resolveMemberApiUrl('tasted beers');
+    if (!resolved.ok) {
+      return { status: 'unavailable', reason: resolved.reason };
     }
 
     console.log('DB: Making API request to fetch My Beers data...');
-    const data = await fetchWithRetry(apiUrl);
+    const data = await fetchWithRetry(resolved.url);
     console.log('DB: Received response from My Beers API');
 
     // Log the structure of the response
@@ -318,22 +388,12 @@ export const fetchMyBeersFromAPI = async (): Promise<FetchedSource<FetchOutcome<
  */
 export const fetchRewardsFromAPI = async (): Promise<FetchedSource<FetchOutcome<Reward>>> => {
   try {
-    // Check if in visitor mode first
-    const isVisitorMode = (await getPreference('is_visitor_mode')) === 'true';
-    if (isVisitorMode) {
-      console.log('In visitor mode - rewards not applicable');
-      return unavailable('not-applicable', 'visitor mode has no rewards');
+    const resolved = await resolveMemberApiUrl('rewards');
+    if (!resolved.ok) {
+      return { status: 'unavailable', reason: resolved.reason };
     }
 
-    // Get the API endpoint from preferences
-    const apiUrl = await getPreference('my_beers_api_url');
-
-    if (!apiUrl) {
-      console.log('My beers API URL not found in preferences');
-      return unavailable('not-configured', 'my_beers_api_url is not set');
-    }
-
-    const data = await fetchWithRetry(apiUrl);
+    const data = await fetchWithRetry(resolved.url);
 
     // Extract the reward array from the response
     if (data && Array.isArray(data) && data.length >= 3 && data[2] && data[2].reward) {

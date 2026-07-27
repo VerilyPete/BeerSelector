@@ -13,7 +13,12 @@ import { myBeersRepository } from '../database/repositories/MyBeersRepository';
 import { rewardsRepository } from '../database/repositories/RewardsRepository';
 import { databaseLockManager } from '../database/DatabaseLockManager';
 import { toNonEmpty } from '../api/fetchOutcome';
-import type { FetchOutcome, FetchedSource } from '../api/fetchOutcome';
+import type {
+  FetchOutcome,
+  FetchedSource,
+  NonEmptyArray,
+  UnavailableReason,
+} from '../api/fetchOutcome';
 import { validateBrewInStockResponse, validateBeerArray } from '../api/validators';
 import { logError, logWarning } from '../utils/errorLogger';
 import { calculateContainerTypes } from '../database/utils/glassTypeCalculator';
@@ -261,16 +266,97 @@ function requireRows<T>(source: FetchedSource<FetchOutcome<T>>, label: string): 
 }
 
 /**
- * Flatten a completed fetch to rows, treating every "nothing to write" case as
- * an empty list.
+ * What a completed rewards fetch means for the caller.
  *
- * Only safe where writing nothing is harmless — rewards, which are additive and
- * never cleared from an empty response. NOT safe for tasted beers, where the
- * caller must distinguish confirmed-empty (clear) from unavailable (leave
- * alone), which is why those sites switch explicitly instead.
+ * Replaced `rowsOrNone`, which flattened every non-data case to `[]`. The two
+ * callers that report a result then said `success: true, dataUpdated: true,
+ * itemCount: 0`, making "no rewards URL configured" and "the rewards fetch
+ * failed" indistinguishable from "you have no rewards"; the third silently
+ * returned `[]`. That is the defect plan 02 exists to remove, reintroduced one
+ * layer above the layer 02 fixed.
+ *
+ * A decision type rather than a list, because there is now no value a caller can
+ * pass through without first saying what it means. `rowsOrNone` was safe to
+ * misuse precisely because its return type had nowhere to put "why".
  */
-function rowsOrNone<T>(source: FetchedSource<FetchOutcome<T>>): readonly T[] {
-  return source.status === 'fetched' && source.data.kind === 'data' ? source.data.items : [];
+type RewardsDecision =
+  | { readonly action: 'write'; readonly rows: NonEmptyArray<Reward> }
+  | { readonly action: 'clear' }
+  | { readonly action: 'skip'; readonly reason: UnavailableReason }
+  | { readonly action: 'fail'; readonly error: ErrorResponse };
+
+/**
+ * Classify a completed rewards fetch.
+ *
+ * The two `unavailable` codes are treated differently on purpose.
+ *
+ * `not-applicable` is NOT a failure: visitor mode and a `none://` placeholder are
+ * normal states, and reporting them as errors is what drives a user-facing alert
+ * via `hasErrors`. It is still not an update — `dataUpdated: false` is the half
+ * that was broken, and the half that stops stale rewards being marked fresh.
+ *
+ * `not-configured` IS a failure, because `fetchAndUpdateAllBeers` already returns
+ * a VALIDATION_ERROR for a missing `all_beers_api_url`; the sibling path set that
+ * precedent and diverging from it would be the surprise. Note this is a
+ * deliberate departure from `fetchOutcome.ts`'s framing, which groups both codes
+ * as non-errors — that grouping is about the transport layer, where neither is a
+ * fault. What counts as a failure *for this consumer* is a different question,
+ * and this is the right place to answer it.
+ *
+ * @param source - The completed fetch
+ */
+function decideRewards(source: FetchedSource<FetchOutcome<Reward>>): RewardsDecision {
+  if (source.status === 'unavailable') {
+    return source.reason.code === 'not-applicable'
+      ? { action: 'skip', reason: source.reason }
+      : {
+          action: 'fail',
+          error: {
+            type: ApiErrorType.VALIDATION_ERROR,
+            message: `Rewards unavailable: ${source.reason.detail}`,
+          },
+        };
+  }
+
+  if (source.status === 'failed') {
+    return { action: 'fail', error: source.error };
+  }
+
+  if (source.status === 'unchanged') {
+    // Rewards support no conditional requests, so this arm is unreachable — it
+    // exists only because `FetchedSource` is shared with all-beers. Reported
+    // rather than defaulted, so that if it ever does occur it is visible instead
+    // of silently becoming an empty successful update.
+    return {
+      action: 'fail',
+      error: {
+        type: ApiErrorType.UNKNOWN_ERROR,
+        message: 'Rewards reported unchanged, which this source cannot produce',
+      },
+    };
+  }
+
+  if (source.data.kind === 'malformed') {
+    return {
+      action: 'fail',
+      error: {
+        type: ApiErrorType.MALFORMED_RESPONSE_ERROR,
+        message: `Rewards response was unusable: ${source.data.detail}`,
+      },
+    };
+  }
+
+  // `clear` is separate from `write` deliberately. Collapsing them into one arm
+  // keyed on `rows.length` would make the type depend on a fact about a
+  // DIFFERENT module — that `RewardsRepository.insertMany` early-returns on an
+  // empty array — which the type cannot state and which is exactly the kind of
+  // cross-module assumption that goes stale. If the repository is ever changed
+  // to genuinely clear on an empty write (the semantics my-beers already has via
+  // `replaceAllWithEmptyUnsafe`), `{action:'write', rows: []}` becomes a table
+  // wipe with nothing distinguishing it from a construction mistake.
+  return source.data.kind === 'confirmed-empty'
+    ? { action: 'clear' }
+    : { action: 'write', rows: source.data.items };
 }
 
 /**
@@ -741,17 +827,29 @@ export async function fetchAndUpdateRewards(): Promise<DataUpdateResult> {
 
     // Fetch and populate rewards if not in visitor mode
     console.log('Refreshing rewards data');
-    // Rewards are additive and never cleared from an empty response, so every
-    // "nothing to write" case flattens to no write. That is NOT true of tasted
-    // beers, which is why those sites switch on the outcome explicitly.
-    const rewards = rowsOrNone(await fetchRewardsFromAPI());
-    await rewardsRepository.insertMany([...rewards]);
+    const decision = decideRewards(await fetchRewardsFromAPI());
 
-    console.log(`Updated rewards data successfully: ${rewards.length} rewards`);
+    if (decision.action === 'fail') {
+      logWarning(`Rewards refresh did not produce data: ${decision.error.message}`, {
+        operation: 'fetchAndUpdateRewards',
+        component: 'dataUpdateService',
+      });
+      return { success: false, dataUpdated: false, error: decision.error };
+    }
+
+    if (decision.action === 'skip') {
+      console.log(`Rewards not applicable: ${decision.reason.detail}`);
+      return { success: true, dataUpdated: false };
+    }
+
+    const rows = decision.action === 'clear' ? [] : [...decision.rows];
+    await rewardsRepository.insertMany(rows);
+
+    console.log(`Updated rewards data successfully: ${rows.length} rewards`);
     return {
       success: true,
       dataUpdated: true,
-      itemCount: rewards.length,
+      itemCount: rows.length,
     };
   } catch (error) {
     logError(error, {
@@ -866,109 +964,125 @@ export async function sequentialRefreshAllData(): Promise<ManualRefreshResult> {
       // plan exists for. `unavailable` must NOT touch the table and must NOT
       // stamp a timestamp — stamping is what suppressed a retry for 12 hours.
       // `confirmed-empty` is the ONLY case in which clearing is correct.
-      if (myBeersSource.status !== 'fetched') {
-        throw new Error(
-          myBeersSource.status === 'unavailable'
-            ? `My beers unavailable (${myBeersSource.reason.code}): ${myBeersSource.reason.detail}`
-            : `My beers could not be fetched (${myBeersSource.status})`
-        );
-      }
-      if (myBeersSource.data.kind === 'malformed') {
-        throw new Error(`My beers malformed: ${myBeersSource.data.detail}`);
-      }
-      const emptyRound = myBeersSource.data.kind === 'confirmed-empty';
-      if (emptyRound) {
-        // NOT an early return: this block lives inside the withDatabaseLock
-        // callback, so returning here would exit the whole refresh and skip the
-        // rewards source entirely.
-        await myBeersRepository.replaceAllWithEmptyUnsafe();
-        await setPreference('my_beers_last_update', new Date().toISOString());
-        await setPreference('my_beers_last_check', new Date().toISOString());
-      }
-
-      const myBeers = emptyRound ? [] : [...myBeersSource.data.items];
-
-      // Validate myBeers before insertion
-      const validationResult = validateBeerArray(myBeers);
-
-      if (validationResult.invalidBeers.length > 0) {
-        logWarning(
-          `Sequential refresh: Skipping ${validationResult.invalidBeers.length} invalid my beers`,
-          {
-            operation: 'sequentialRefreshAllData',
-            component: 'dataUpdateService',
-            additionalData: { summary: validationResult.summary },
-          }
-        );
-      }
-
-      // Enrich BEFORE container type calculation so ABV is available for glass selection
-      let beersForContainerCalc = validationResult.validBeers;
-      if (config.enrichment.isConfigured() && validationResult.validBeers.length > 0) {
-        try {
-          const beerIds = validationResult.validBeers.map(beer => beer.id);
-          console.log(
-            `[sequentialRefresh] Fetching enrichment for ${beerIds.length} tasted beers...`
+      //
+      // `not-applicable` is separated from the other unavailable codes for the
+      // same reason rewards separates them: it means "this source does not apply
+      // to you", which is what visitor mode and a none:// placeholder ARE. This
+      // block used to throw on every `unavailable`, so every visitor refresh
+      // failed with UNKNOWN_ERROR — and UNKNOWN_ERROR returns error.message
+      // verbatim, putting "My beers unavailable (not-applicable): …" in an
+      // Alert. Not an update either: no table write, no timestamp.
+      if (
+        myBeersSource.status === 'unavailable' &&
+        myBeersSource.reason.code === 'not-applicable'
+      ) {
+        console.log(`Sequential refresh: my beers not applicable — ${myBeersSource.reason.detail}`);
+        myBeersResult = { success: true, dataUpdated: false };
+      } else {
+        if (myBeersSource.status !== 'fetched') {
+          throw new Error(
+            myBeersSource.status === 'unavailable'
+              ? `My beers unavailable (${myBeersSource.reason.code}): ${myBeersSource.reason.detail}`
+              : `My beers could not be fetched (${myBeersSource.status})`
           );
+        }
+        if (myBeersSource.data.kind === 'malformed') {
+          throw new Error(`My beers malformed: ${myBeersSource.data.detail}`);
+        }
+        const emptyRound = myBeersSource.data.kind === 'confirmed-empty';
+        if (emptyRound) {
+          // NOT an early return: this block lives inside the withDatabaseLock
+          // callback, so returning here would exit the whole refresh and skip the
+          // rewards source entirely.
+          await myBeersRepository.replaceAllWithEmptyUnsafe();
+          await setPreference('my_beers_last_update', new Date().toISOString());
+          await setPreference('my_beers_last_check', new Date().toISOString());
+        }
 
-          const { enrichments: enrichmentData, missing: missingIds } =
-            await fetchEnrichmentBatchWithMissing(beerIds);
-          const enrichedCount = Object.keys(enrichmentData).length;
+        const myBeers = emptyRound ? [] : [...myBeersSource.data.items];
 
-          if (enrichedCount > 0) {
-            console.log(`[sequentialRefresh] Got enrichment for ${enrichedCount} tasted beers`);
-            beersForContainerCalc = mergeEnrichmentData(
+        // Validate myBeers before insertion
+        const validationResult = validateBeerArray(myBeers);
+
+        if (validationResult.invalidBeers.length > 0) {
+          logWarning(
+            `Sequential refresh: Skipping ${validationResult.invalidBeers.length} invalid my beers`,
+            {
+              operation: 'sequentialRefreshAllData',
+              component: 'dataUpdateService',
+              additionalData: { summary: validationResult.summary },
+            }
+          );
+        }
+
+        // Enrich BEFORE container type calculation so ABV is available for glass selection
+        let beersForContainerCalc = validationResult.validBeers;
+        if (config.enrichment.isConfigured() && validationResult.validBeers.length > 0) {
+          try {
+            const beerIds = validationResult.validBeers.map(beer => beer.id);
+            console.log(
+              `[sequentialRefresh] Fetching enrichment for ${beerIds.length} tasted beers...`
+            );
+
+            const { enrichments: enrichmentData, missing: missingIds } =
+              await fetchEnrichmentBatchWithMissing(beerIds);
+            const enrichedCount = Object.keys(enrichmentData).length;
+
+            if (enrichedCount > 0) {
+              console.log(`[sequentialRefresh] Got enrichment for ${enrichedCount} tasted beers`);
+              beersForContainerCalc = mergeEnrichmentData(
+                validationResult.validBeers,
+                enrichmentData
+              );
+            }
+
+            // Sync missing beers to Worker for enrichment (in background)
+            syncMissingBeersInBackground(
+              missingIds,
               validationResult.validBeers,
-              enrichmentData
+              'sequentialRefresh'
+            );
+          } catch (enrichmentError) {
+            logWarning('Batch enrichment failed in sequential refresh, continuing without', {
+              operation: 'sequentialRefreshAllData',
+              component: 'dataUpdateService',
+            });
+          }
+        }
+
+        // Calculate container types AFTER enrichment so ABV is available for glass selection
+        console.log('Sequential refresh: calculating container types for my beers...');
+        const myBeersWithContainerTypes = calculateContainerTypes(beersForContainerCalc);
+
+        // Two DIFFERENT conditions, which a bare [] cannot tell apart.
+        // fetchMyBeersFromAPI still returns a bare [] for FOUR conditions —
+        // visitor mode, no URL, a none:// URL, and a genuine empty round. The
+        // fifth, rows that all lack an id, now throws upstream instead, which is
+        // what makes the split below meaningful. Of the four remaining, only the
+        // empty round should clear; 02 Phase 3's `unavailable` retires the other
+        // three, which still reach the clear arm today.
+        const sequentialMyBeers = toNonEmpty(
+          myBeersWithContainerTypes as BeerfinderWithContainerType[]
+        );
+        if (!emptyRound) {
+          if (sequentialMyBeers === null) {
+            // Rows arrived and none survived local validation. confirmed-empty is
+            // handled above, so this can only be malformed — leave the table
+            // alone rather than wiping a populated list.
+            throw new Error(
+              `All ${myBeers.length} tasted beers from the API failed validation; refusing to write`
             );
           }
-
-          // Sync missing beers to Worker for enrichment (in background)
-          syncMissingBeersInBackground(
-            missingIds,
-            validationResult.validBeers,
-            'sequentialRefresh'
-          );
-        } catch (enrichmentError) {
-          logWarning('Batch enrichment failed in sequential refresh, continuing without', {
-            operation: 'sequentialRefreshAllData',
-            component: 'dataUpdateService',
-          });
+          await myBeersRepository.insertManyUnsafe(sequentialMyBeers);
+          await setPreference('my_beers_last_update', new Date().toISOString());
+          await setPreference('my_beers_last_check', new Date().toISOString());
         }
+        myBeersResult = {
+          success: true,
+          dataUpdated: true,
+          itemCount: validationResult.validBeers.length,
+        };
       }
-
-      // Calculate container types AFTER enrichment so ABV is available for glass selection
-      console.log('Sequential refresh: calculating container types for my beers...');
-      const myBeersWithContainerTypes = calculateContainerTypes(beersForContainerCalc);
-
-      // Two DIFFERENT conditions, which a bare [] cannot tell apart.
-      // fetchMyBeersFromAPI still returns a bare [] for FOUR conditions —
-      // visitor mode, no URL, a none:// URL, and a genuine empty round. The
-      // fifth, rows that all lack an id, now throws upstream instead, which is
-      // what makes the split below meaningful. Of the four remaining, only the
-      // empty round should clear; 02 Phase 3's `unavailable` retires the other
-      // three, which still reach the clear arm today.
-      const sequentialMyBeers = toNonEmpty(
-        myBeersWithContainerTypes as BeerfinderWithContainerType[]
-      );
-      if (!emptyRound) {
-        if (sequentialMyBeers === null) {
-          // Rows arrived and none survived local validation. confirmed-empty is
-          // handled above, so this can only be malformed — leave the table
-          // alone rather than wiping a populated list.
-          throw new Error(
-            `All ${myBeers.length} tasted beers from the API failed validation; refusing to write`
-          );
-        }
-        await myBeersRepository.insertManyUnsafe(sequentialMyBeers);
-        await setPreference('my_beers_last_update', new Date().toISOString());
-        await setPreference('my_beers_last_check', new Date().toISOString());
-      }
-      myBeersResult = {
-        success: true,
-        dataUpdated: true,
-        itemCount: validationResult.validBeers.length,
-      };
     } catch (error) {
       logError(error, {
         operation: 'sequentialRefreshAllData - my beers',
@@ -984,13 +1098,22 @@ export async function sequentialRefreshAllData(): Promise<ManualRefreshResult> {
     console.log('Sequential refresh: starting rewards fetch');
     let rewardsResult: DataUpdateResult;
     try {
-      const rewardsRows = rowsOrNone(await fetchRewardsFromAPI());
-      await rewardsRepository.insertManyUnsafe([...rewardsRows]);
-      rewardsResult = {
-        success: true,
-        dataUpdated: true,
-        itemCount: rewardsRows.length,
-      };
+      const decision = decideRewards(await fetchRewardsFromAPI());
+
+      if (decision.action === 'fail') {
+        rewardsResult = { success: false, dataUpdated: false, error: decision.error };
+      } else if (decision.action === 'skip') {
+        console.log(`Sequential refresh: rewards not applicable — ${decision.reason.detail}`);
+        rewardsResult = { success: true, dataUpdated: false };
+      } else {
+        const rows = decision.action === 'clear' ? [] : [...decision.rows];
+        await rewardsRepository.insertManyUnsafe(rows);
+        rewardsResult = {
+          success: true,
+          dataUpdated: true,
+          itemCount: rows.length,
+        };
+      }
     } catch (error) {
       logError(error, {
         operation: 'sequentialRefreshAllData - rewards',
@@ -1311,84 +1434,99 @@ export const refreshAllDataFromAPI = async (): Promise<{
       // Same three-way split as sequentialRefreshAllData. Handled up front so
       // the confirmed-empty case is unmistakable and every other case leaves
       // the tasted table alone.
-      if (myBeersSource.status !== 'fetched') {
-        throw new Error(
-          myBeersSource.status === 'unavailable'
-            ? `My beers unavailable (${myBeersSource.reason.code}): ${myBeersSource.reason.detail}`
-            : `My beers could not be fetched (${myBeersSource.status})`
-        );
-      }
-      if (myBeersSource.data.kind === 'malformed') {
-        throw new Error(`My beers malformed: ${myBeersSource.data.detail}`);
-      }
-      const myBeersRaw =
-        myBeersSource.data.kind === 'confirmed-empty' ? [] : [...myBeersSource.data.items];
-      const confirmedEmptyRound = myBeersSource.data.kind === 'confirmed-empty';
-      const myBeersValidation = validateBeerArray(myBeersRaw);
-
-      if (myBeersValidation.invalidBeers.length > 0) {
-        logWarning(`Skipping ${myBeersValidation.invalidBeers.length} invalid my beers`, {
-          operation: 'refreshAllDataFromAPI',
-          component: 'dataUpdateService',
-          additionalData: { summary: myBeersValidation.summary },
-        });
-      }
-
-      // Enrich BEFORE container type calculation so ABV is available for glass selection
-      let myBeersForContainerCalc = myBeersValidation.validBeers;
-      if (config.enrichment.isConfigured() && myBeersValidation.validBeers.length > 0) {
-        try {
-          const beerIds = myBeersValidation.validBeers.map(beer => beer.id);
-          console.log(
-            `[refreshAllDataFromAPI] Fetching enrichment for ${beerIds.length} tasted beers...`
+      // `not-applicable` is not a failure: it means this source does not
+      // apply to this user, which is what visitor mode and a none://
+      // placeholder ARE. Throwing here logged an error on every visitor
+      // login, since this is the autoLogin -> checkInBeer path. Leaves
+      // `myBeersWithContainerTypes` at its hoisted [] and writes nothing,
+      // which is the same outcome minus the false error.
+      if (
+        myBeersSource.status === 'unavailable' &&
+        myBeersSource.reason.code === 'not-applicable'
+      ) {
+        console.log(`My beers not applicable: ${myBeersSource.reason.detail}`);
+      } else {
+        if (myBeersSource.status !== 'fetched') {
+          throw new Error(
+            myBeersSource.status === 'unavailable'
+              ? `My beers unavailable (${myBeersSource.reason.code}): ${myBeersSource.reason.detail}`
+              : `My beers could not be fetched (${myBeersSource.status})`
           );
+        }
+        if (myBeersSource.data.kind === 'malformed') {
+          throw new Error(`My beers malformed: ${myBeersSource.data.detail}`);
+        }
+        const myBeersRaw =
+          myBeersSource.data.kind === 'confirmed-empty' ? [] : [...myBeersSource.data.items];
+        const confirmedEmptyRound = myBeersSource.data.kind === 'confirmed-empty';
+        const myBeersValidation = validateBeerArray(myBeersRaw);
 
-          const { enrichments: enrichmentData, missing: missingIds } =
-            await fetchEnrichmentBatchWithMissing(beerIds);
-          const enrichedCount = Object.keys(enrichmentData).length;
-
-          if (enrichedCount > 0) {
-            console.log(`[refreshAllDataFromAPI] Got enrichment for ${enrichedCount} tasted beers`);
-            myBeersForContainerCalc = mergeEnrichmentData(
-              myBeersValidation.validBeers,
-              enrichmentData
-            );
-          }
-
-          // Sync missing beers to Worker for enrichment (in background)
-          syncMissingBeersInBackground(
-            missingIds,
-            myBeersValidation.validBeers,
-            'refreshAllDataFromAPI'
-          );
-        } catch (enrichmentError) {
-          logWarning('Batch enrichment failed in refreshAllDataFromAPI, continuing without', {
+        if (myBeersValidation.invalidBeers.length > 0) {
+          logWarning(`Skipping ${myBeersValidation.invalidBeers.length} invalid my beers`, {
             operation: 'refreshAllDataFromAPI',
             component: 'dataUpdateService',
+            additionalData: { summary: myBeersValidation.summary },
           });
         }
-      }
 
-      // Calculate container types AFTER enrichment so ABV is available for glass selection
-      console.log('Calculating container types for my beers...');
-      myBeersWithContainerTypes = calculateContainerTypes(myBeersForContainerCalc);
+        // Enrich BEFORE container type calculation so ABV is available for glass selection
+        let myBeersForContainerCalc = myBeersValidation.validBeers;
+        if (config.enrichment.isConfigured() && myBeersValidation.validBeers.length > 0) {
+          try {
+            const beerIds = myBeersValidation.validBeers.map(beer => beer.id);
+            console.log(
+              `[refreshAllDataFromAPI] Fetching enrichment for ${beerIds.length} tasted beers...`
+            );
 
-      // Same split as sequentialRefreshAllData: only the RAW length can tell a
-      // genuine empty round from a response whose every row lacked an id.
-      const apiMyBeers = toNonEmpty(myBeersWithContainerTypes as BeerfinderWithContainerType[]);
-      if (apiMyBeers !== null) {
-        await myBeersRepository.insertManyUnsafe(apiMyBeers);
-      } else if (confirmedEmptyRound) {
-        // The server said zero, so clearing is correct. Keyed off the outcome
-        // rather than a length, which is what could not tell these apart.
-        await myBeersRepository.replaceAllWithEmptyUnsafe();
-      } else {
-        // This is the autoLogin -> CHECK IN path, so aborting here would fail a
-        // check-in. Skipping the write is the lesser harm: a stale tasted list
-        // beats a wiped one. Per-source reporting is 02 Phase 2.5's job.
-        console.error(
-          `Refusing to write my beers: all ${myBeersRaw.length} rows failed validation`
-        );
+            const { enrichments: enrichmentData, missing: missingIds } =
+              await fetchEnrichmentBatchWithMissing(beerIds);
+            const enrichedCount = Object.keys(enrichmentData).length;
+
+            if (enrichedCount > 0) {
+              console.log(
+                `[refreshAllDataFromAPI] Got enrichment for ${enrichedCount} tasted beers`
+              );
+              myBeersForContainerCalc = mergeEnrichmentData(
+                myBeersValidation.validBeers,
+                enrichmentData
+              );
+            }
+
+            // Sync missing beers to Worker for enrichment (in background)
+            syncMissingBeersInBackground(
+              missingIds,
+              myBeersValidation.validBeers,
+              'refreshAllDataFromAPI'
+            );
+          } catch (enrichmentError) {
+            logWarning('Batch enrichment failed in refreshAllDataFromAPI, continuing without', {
+              operation: 'refreshAllDataFromAPI',
+              component: 'dataUpdateService',
+            });
+          }
+        }
+
+        // Calculate container types AFTER enrichment so ABV is available for glass selection
+        console.log('Calculating container types for my beers...');
+        myBeersWithContainerTypes = calculateContainerTypes(myBeersForContainerCalc);
+
+        // Same split as sequentialRefreshAllData: only the RAW length can tell a
+        // genuine empty round from a response whose every row lacked an id.
+        const apiMyBeers = toNonEmpty(myBeersWithContainerTypes as BeerfinderWithContainerType[]);
+        if (apiMyBeers !== null) {
+          await myBeersRepository.insertManyUnsafe(apiMyBeers);
+        } else if (confirmedEmptyRound) {
+          // The server said zero, so clearing is correct. Keyed off the outcome
+          // rather than a length, which is what could not tell these apart.
+          await myBeersRepository.replaceAllWithEmptyUnsafe();
+        } else {
+          // This is the autoLogin -> CHECK IN path, so aborting here would fail a
+          // check-in. Skipping the write is the lesser harm: a stale tasted list
+          // beats a wiped one. Per-source reporting is 02 Phase 2.5's job.
+          console.error(
+            `Refusing to write my beers: all ${myBeersRaw.length} rows failed validation`
+          );
+        }
       }
     } catch (error) {
       logError(error, {
@@ -1399,8 +1537,30 @@ export const refreshAllDataFromAPI = async (): Promise<{
 
     try {
       console.log('Fetching rewards from API...');
-      rewards = [...rowsOrNone(await fetchRewardsFromAPI())];
-      await rewardsRepository.insertManyUnsafe(rewards);
+      const decision = decideRewards(await fetchRewardsFromAPI());
+
+      // This entry point returns rows and has no per-source success channel, so
+      // a rewards failure is not reportable to the caller here — it can only be
+      // logged, and `rewards` stays at its hoisted `[]`. Callers that need the
+      // outcome use fetchAndUpdateRewards or sequentialRefreshAllData.
+      //
+      // Logged rather than thrown. The earlier `throw new Error(error.message)`
+      // reached the catch nine lines below purely for its logging, and paid for
+      // it by discarding `type` and `originalError` from an ErrorResponse one
+      // line after decideRewards built it — control flow by exception, and the
+      // re-parseable-message failure mode the outcome types exist to remove.
+      if (decision.action === 'fail') {
+        logWarning(`Rewards refresh failed: ${decision.error.message}`, {
+          operation: 'refreshAllDataFromAPI - rewards',
+          component: 'dataUpdateService',
+          additionalData: { errorType: decision.error.type },
+        });
+      } else if (decision.action === 'skip') {
+        console.log(`Rewards not applicable: ${decision.reason.detail}`);
+      } else {
+        rewards = decision.action === 'clear' ? [] : [...decision.rows];
+        await rewardsRepository.insertManyUnsafe(rewards);
+      }
     } catch (error) {
       logError(error, {
         operation: 'refreshAllDataFromAPI - rewards',

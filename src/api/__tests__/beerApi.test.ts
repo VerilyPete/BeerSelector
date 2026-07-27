@@ -65,7 +65,12 @@ describe('Beer API', () => {
       const resultPromise = fetchWithRetry(config.api.baseUrl);
       const result = await resultPromise;
 
-      expect(global.fetch).toHaveBeenCalledWith(config.api.baseUrl);
+      // The signal arrived with plan 05 Phase 5.0; the timeout behaviour it
+      // carries is pinned in beerApi.timeout.test.ts. Asserted here only so this
+      // test keeps describing the real call.
+      expect(global.fetch).toHaveBeenCalledWith(config.api.baseUrl, {
+        signal: expect.any(AbortSignal),
+      });
       expect(result).toEqual(mockData);
     });
 
@@ -518,7 +523,9 @@ describe('Beer API', () => {
         await fetchBeersFromAPI();
 
         // Verify fetch was called with config URL
-        expect(global.fetch).toHaveBeenCalledWith(config.api.baseUrl);
+        expect(global.fetch).toHaveBeenCalledWith(config.api.baseUrl, {
+          signal: expect.any(AbortSignal),
+        });
       });
 
       it('should use config endpoint URLs for different API calls', async () => {
@@ -539,7 +546,9 @@ describe('Beer API', () => {
         await fetchMyBeersFromAPI();
 
         // Verify fetch was called with config-constructed URL
-        expect(global.fetch).toHaveBeenCalledWith(config.api.getFullUrl('memberDashboard'));
+        expect(global.fetch).toHaveBeenCalledWith(config.api.getFullUrl('memberDashboard'), {
+          signal: expect.any(AbortSignal),
+        });
       });
     });
 
@@ -708,6 +717,16 @@ describe('Beer API', () => {
 });
 
 describe('FetchOutcome semantics (plan 02 Phase 3)', () => {
+  // This block is a sibling of `describe('Beer API')`, so it does NOT inherit
+  // that block's cleanup — without this, `global.fetch` accumulates calls across
+  // every test here. The `not.toHaveBeenCalled()` assertions are the ones that
+  // care: the my-beers none:// test in this block passed only because it happened to
+  // run before any test that fetches. A test that cannot fail is worth less than
+  // no test, so pin the isolation rather than the ordering.
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
   // Every assertion here is on `kind`, never on array length. Length is what
   // made six distinct conditions indistinguishable in the first place.
   const memberPrefs = (urlKey: string, url: string | null) => (key: string) => {
@@ -843,5 +862,25 @@ describe('FetchOutcome semantics (plan 02 Phase 3)', () => {
     if (outcome.status === 'unavailable') {
       expect(outcome.reason.code).toBe('not-applicable');
     }
+  });
+
+  it('fetchRewardsFromAPI reports not-applicable for a none:// URL without calling fetch', async () => {
+    // Plan 05 Phase 5.2. Rewards reads the SAME preference as my-beers
+    // (`my_beers_api_url`), so it inherited the same placeholder exposure and
+    // none of the guard: 02 Phase 3 added the rejection at one of the two call
+    // sites. Without it the placeholder reaches fetch() and burns three retries
+    // at 1s / 1.5s / 2.25s — 4.75s of a refresh budget, on the weak links this
+    // plan exists to fix, for a URL that was never valid.
+    (preferences.getPreference as jest.Mock).mockImplementation(
+      memberPrefs('my_beers_api_url', 'none://placeholder')
+    );
+
+    const outcome = await fetchRewardsFromAPI();
+
+    expect(outcome.status).toBe('unavailable');
+    if (outcome.status === 'unavailable') {
+      expect(outcome.reason.code).toBe('not-applicable');
+    }
+    expect(global.fetch).not.toHaveBeenCalled();
   });
 });
