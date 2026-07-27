@@ -44,40 +44,60 @@ export const toNonEmpty = <T>(items: readonly T[]): NonEmptyArray<T> | null =>
   items.length > 0 ? [items[0], ...items.slice(1)] : null;
 
 /**
- * Why no usable data came back.
+ * Why no request was made at all.
  *
- * Deliberately a code plus a human-readable detail, not a message to be
- * re-parsed. Classifying by substring is the pattern this plan exists to
- * remove — see `createErrorResponse` in `src/utils/notificationUtils.ts`.
+ * Deliberately narrow: these are the states where asking would be meaningless,
+ * not failures. Visitor mode and "no URL configured" are normal conditions, so
+ * they must not be modelled as errors — that is what pushes callers back to
+ * classifying by message string.
+ *
+ * A code plus a human-readable detail, never a message to be re-parsed.
  */
 export type UnavailableReason =
   | { readonly code: 'not-configured'; readonly detail: string }
-  | { readonly code: 'not-applicable'; readonly detail: string }
-  | { readonly code: 'malformed'; readonly detail: string }
-  | { readonly code: 'network'; readonly detail: string };
+  | { readonly code: 'not-applicable'; readonly detail: string };
 
 /**
- * What the response BODY contained.
+ * What the response BODY contained. Only meaningful once a body has arrived.
  *
  * `confirmed-empty` is a success: the server really did report zero rows, which
  * happens legitimately for a new user or at the 200-beer round rollover. It is
  * the only case in which clearing the local table is correct, and separating it
- * from `unavailable` is the whole point of this type.
+ * from every "we have nothing to show you" condition is the whole point.
+ *
+ * `malformed` lives here rather than alongside the transport conditions because
+ * it is genuinely a statement about a body: it arrived, and it was unusable.
  */
 export type FetchOutcome<T> =
   | { readonly kind: 'data'; readonly items: NonEmptyArray<T> }
   | { readonly kind: 'confirmed-empty' }
-  | { readonly kind: 'unavailable'; readonly reason: UnavailableReason };
+  | { readonly kind: 'malformed'; readonly detail: string };
 
 /**
  * What happened to the REQUEST. Consumed by plan 01 Phase 4.
  *
- * Composes with the above: all-beers is honestly
- * `FetchedSource<FetchOutcome<Beer>>`, while my-beers and rewards are plain
- * `FetchOutcome<T>` that a caller lifts with
- * `{ status: 'fetched', data: outcome, etag: null }`.
+ * **Every source composes as `FetchedSource<FetchOutcome<T>>`** — all-beers,
+ * my-beers and rewards alike. The earlier split, where only all-beers composed
+ * and the others used a bare `FetchOutcome<T>`, let three contradictory pairings
+ * typecheck: `{ status: 'fetched', data: { kind: 'unavailable', … } }` reads as
+ * "the request succeeded, and the body it returned was a network failure". The
+ * merged five-case union was rejected for admitting nonsense; the composed pair
+ * admitted different nonsense.
+ *
+ * The cut is by axis. `not-configured` / `not-applicable` / a network failure
+ * are facts about the request, so they live here; only `malformed` is a fact
+ * about a body. With the codes on the right side, no combination is
+ * contradictory.
+ *
+ * The cost, stated honestly: my-beers and rewards inherit `unchanged`, which
+ * they can never produce because neither supports conditional requests. One
+ * inert case is cheaper than three constructible nonsense combinations that
+ * every reader has to reason about — and the previous design's own prescribed
+ * lift (`{ status: 'fetched', data: outcome, etag: null }`) handed them that
+ * same inert case anyway, one layer up, plus a permanently-null etag.
  */
 export type FetchedSource<T> =
   | { readonly status: 'fetched'; readonly data: T; readonly etag: string | null }
   | { readonly status: 'unchanged' }
+  | { readonly status: 'unavailable'; readonly reason: UnavailableReason }
   | { readonly status: 'failed'; readonly error: ErrorResponse };
