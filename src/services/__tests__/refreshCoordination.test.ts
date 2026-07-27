@@ -202,10 +202,21 @@ describe('Sequential Refresh Coordination', () => {
       databaseLockManager.release(token);
     });
 
-    it('leaves the lock free when every source fails', async () => {
-      // The offline case takes no lock at all now, so "released" has to be
-      // asserted as "acquirable" rather than as a release event that never
-      // happens.
+    it('never acquires the lock when every source fails', async () => {
+      // Asserted through the ACQUISITION LOG, not through `isLocked()`. The
+      // earlier version checked only that the lock was free afterwards, which
+      // is equally true of "took it and released it" — so forcing `needsLock`
+      // to true left it green, and it could not fail at the thing its name
+      // claimed.
+      const lockAcquisitions: string[] = [];
+      const originalWithLock = databaseLockManager.withDatabaseLock.bind(databaseLockManager);
+      jest
+        .spyOn(databaseLockManager, 'withDatabaseLock')
+        .mockImplementation(async (operation: string, task: () => Promise<unknown>) => {
+          lockAcquisitions.push(operation);
+          return originalWithLock(operation, task);
+        });
+
       (fetchBeersFromAPI as jest.Mock).mockRejectedValue(new Error('Network error'));
       (fetchMyBeersFromAPI as jest.Mock).mockRejectedValue(new Error('Network error'));
       (fetchRewardsFromAPI as jest.Mock).mockRejectedValue(new Error('Network error'));
@@ -213,8 +224,8 @@ describe('Sequential Refresh Coordination', () => {
       const result = await sequentialRefreshAllData();
 
       expect(result.hasErrors).toBe(true);
+      expect(lockAcquisitions).toEqual([]);
       expect(databaseLockManager.isLocked()).toBe(false);
-      expect(databaseLockManager.getQueueLength()).toBe(0);
     });
   });
 
