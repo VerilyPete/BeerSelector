@@ -258,10 +258,23 @@ export const fetchMyBeersFromAPI = async (): Promise<Beerfinder[]> => {
       // length check could tell them apart and all three wiped the tasted
       // table while reporting success.
       //
-      // Throwing is the minimal bridge: the callers' existing per-source
-      // catches already turn it into a reported failure with no write and no
-      // timestamp. 02 Phase 3 replaces it with FetchOutcome's `malformed`,
-      // which lets the caller decide rather than forcing a throw.
+      // Throwing is the minimal bridge, and it lands differently per caller —
+      // worth knowing before Phase 3 changes it again:
+      //   fetchAndUpdateMyBeers   catches, reports failure, writes nothing,
+      //                           stamps no timestamp. Clean.
+      //   sequentialRefreshAllData  same, via its per-source catch; all-beers
+      //                           and rewards still run.
+      //   refreshAllDataFromAPI   has NO per-source catch, so this aborts the
+      //                           whole function and the rewards write after it
+      //                           is skipped. autoLogin catches and logs, so a
+      //                           check-in still proceeds. A missed rewards
+      //                           refresh is the price of not wiping the tasted
+      //                           table, and rewards refresh on their own
+      //                           schedule anyway. Per-source isolation there
+      //                           is 02 Phase 2.5's job.
+      //
+      // 02 Phase 3 replaces this with FetchOutcome's `malformed`, which lets
+      // each caller decide instead of forcing a throw on all three.
       throw new Error(`My Beers response contained ${invalidBeers.length} rows and all lack an id`);
     }
 
