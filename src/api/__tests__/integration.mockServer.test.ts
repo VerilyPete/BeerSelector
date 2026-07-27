@@ -19,6 +19,7 @@ import {
   fetchWithRetry,
 } from '../beerApi';
 import * as preferences from '@/src/database/preferences';
+import type { FetchOutcome, FetchedSource } from '../fetchOutcome';
 
 process.env.EXPO_PUBLIC_API_RETRY_DELAY = '100';
 
@@ -28,6 +29,18 @@ jest.mock('@/src/database/preferences');
 // IMPORTANT: Do NOT mock fetch - we need real HTTP calls to the mock server
 // Save the real fetch before jest.setup.js mocks it
 const realFetch = global.fetch;
+
+/**
+ * Unwrap a fetch result to its rows for this suite's assertions.
+ *
+ * This suite exercises the mock-server plumbing — retries, timeouts, malformed
+ * transports — not the FetchOutcome semantics, which beerApi.test.ts covers
+ * directly. Flattening every non-data case to [] keeps these tests asserting
+ * what they were written to assert.
+ */
+function rowsOf<T>(source: FetchedSource<FetchOutcome<T>>): T[] {
+  return source.status === 'fetched' && source.data.kind === 'data' ? [...source.data.items] : [];
+}
 
 describe('API Integration with Mock Server', () => {
   let mockServer: any;
@@ -92,7 +105,7 @@ describe('API Integration with Mock Server', () => {
 
       mockServer.setResponse('/visitor.php', FlyingSaucerResponses.beers(mockBeers));
 
-      const beers = await fetchBeersFromAPI();
+      const beers = rowsOf(await fetchBeersFromAPI());
 
       expect(beers).toEqual(mockBeers);
       expect(mockServer.getRequestsForPath('/visitor.php')).toHaveLength(1);
@@ -122,7 +135,7 @@ describe('API Integration with Mock Server', () => {
 
       mockServer.setResponse('/mybeers.php', FlyingSaucerResponses.myBeers(mockTastedBeers));
 
-      const tastedBeers = await fetchMyBeersFromAPI();
+      const tastedBeers = rowsOf(await fetchMyBeersFromAPI());
 
       expect(tastedBeers).toEqual(mockTastedBeers);
       expect(mockServer.getRequestsForPath('/mybeers.php')).toHaveLength(1);
@@ -157,7 +170,7 @@ describe('API Integration with Mock Server', () => {
         body: [null, null, { reward: mockRewards }],
       });
 
-      const rewards = await fetchRewardsFromAPI();
+      const rewards = rowsOf(await fetchRewardsFromAPI());
 
       expect(rewards).toEqual(mockRewards);
       expect(mockServer.getRequestsForPath('/rewards.php')).toHaveLength(1);
@@ -211,7 +224,7 @@ describe('API Integration with Mock Server', () => {
         body: [null, { brewInStock: [] }],
       });
 
-      const beers = await fetchBeersFromAPI();
+      const beers = rowsOf(await fetchBeersFromAPI());
 
       expect(beers).toEqual([]);
     });
@@ -243,7 +256,7 @@ describe('API Integration with Mock Server', () => {
         };
       });
 
-      const beers = await fetchBeersFromAPI();
+      const beers = rowsOf(await fetchBeersFromAPI());
 
       expect(beers).toHaveLength(1);
       expect(beers[0].brew_name).toBe('Success After Retry');
@@ -323,7 +336,7 @@ describe('API Integration with Mock Server', () => {
       });
 
       // Should work without authentication
-      const beers = await fetchBeersFromAPI();
+      const beers = rowsOf(await fetchBeersFromAPI());
 
       expect(beers).toHaveLength(1);
       expect(beers[0].brew_name).toBe('Public Beer');
@@ -474,7 +487,7 @@ describe('API Integration with Mock Server', () => {
         body: [null, { brewInStock: mixedBeers }],
       });
 
-      const beers = await fetchBeersFromAPI();
+      const beers = rowsOf(await fetchBeersFromAPI());
 
       // Should return all beers (filtering happens in repository layer)
       expect(beers).toHaveLength(3);
@@ -498,7 +511,7 @@ describe('API Integration with Mock Server', () => {
         ],
       });
 
-      const beers = await fetchBeersFromAPI();
+      const beers = rowsOf(await fetchBeersFromAPI());
 
       expect(beers).toHaveLength(1);
       expect(mockServer.getRequestsForPath('/custom-endpoint.php')).toHaveLength(1);
@@ -523,12 +536,12 @@ describe('API Integration with Mock Server', () => {
 
       // Test dev environment
       mockGetPreference.mockResolvedValue(devUrl);
-      const devBeers = await fetchBeersFromAPI();
+      const devBeers = rowsOf(await fetchBeersFromAPI());
       expect(devBeers[0].brew_name).toBe('Dev Beer');
 
       // Switch to prod environment
       mockGetPreference.mockResolvedValue(prodUrl);
-      const prodBeers = await fetchBeersFromAPI();
+      const prodBeers = rowsOf(await fetchBeersFromAPI());
       expect(prodBeers[0].brew_name).toBe('Prod Beer');
     });
 
@@ -650,7 +663,7 @@ describe('API Integration with Mock Server', () => {
         body: [null, { brewInStock: mockBeers }],
       });
 
-      const beers = await fetchBeersFromAPI();
+      const beers = rowsOf(await fetchBeersFromAPI());
 
       expect(beers).toEqual(mockBeers);
       expect(beers).toHaveLength(2);
@@ -674,7 +687,7 @@ describe('API Integration with Mock Server', () => {
         body: [null, { tasted_brew_current_round: mockTastedBeers }],
       });
 
-      const beers = await fetchMyBeersFromAPI();
+      const beers = rowsOf(await fetchMyBeersFromAPI());
 
       expect(beers).toEqual(mockTastedBeers);
     });
@@ -706,7 +719,7 @@ describe('API Integration with Mock Server', () => {
         body: [null, null, { reward: mockRewards }],
       });
 
-      const rewards = await fetchRewardsFromAPI();
+      const rewards = rowsOf(await fetchRewardsFromAPI());
 
       expect(rewards).toEqual(mockRewards);
     });
@@ -720,7 +733,7 @@ describe('API Integration with Mock Server', () => {
         body: [null, { brewInStock: [{ id: '1', brew_name: 'Test' }] }],
       });
 
-      const beers = await fetchBeersFromAPI();
+      const beers = rowsOf(await fetchBeersFromAPI());
 
       expect(beers).toHaveLength(1);
       expect(beers[0].id).toBe('1');

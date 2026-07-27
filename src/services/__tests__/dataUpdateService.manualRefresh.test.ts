@@ -4,6 +4,11 @@ import * as svc from '../../services/dataUpdateService';
 import { fetchBeersFromAPI, fetchMyBeersFromAPI, fetchRewardsFromAPI } from '../../api/beerApi';
 import { setPreference } from '../../database/preferences';
 import { myBeersRepository } from '../../database/repositories/MyBeersRepository';
+import {
+  fetchedRows,
+  confirmedEmpty,
+  unavailable,
+} from '../../api/__tests__/helpers/fetchOutcomeFixtures';
 
 // Mock dependencies
 jest.mock('../../database/preferences', () => ({
@@ -53,22 +58,38 @@ describe('manualRefreshAllData', () => {
 
   it('refreshes core endpoints and returns no errors when all succeed', async () => {
     // Mock successful API responses
-    (fetchBeersFromAPI as jest.Mock).mockResolvedValue([
-      { id: 'beer-1', brew_name: 'Test Beer 1', brewer: 'Test Brewery' },
-      { id: 'beer-2', brew_name: 'Test Beer 2', brewer: 'Test Brewery' },
-      { id: 'beer-3', brew_name: 'Test Beer 3', brewer: 'Test Brewery' },
-    ]);
-    (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue([
-      { id: 'beer-1', brew_name: 'Test Beer 1', brewer: 'Test Brewery', tasted_date: '2023-01-01' },
-      { id: 'beer-2', brew_name: 'Test Beer 2', brewer: 'Test Brewery', tasted_date: '2023-01-02' },
-    ]);
-    (fetchRewardsFromAPI as jest.Mock).mockResolvedValue([
-      { reward_id: 'reward-1', reward_type: 'badge' },
-      { reward_id: 'reward-2', reward_type: 'badge' },
-      { reward_id: 'reward-3', reward_type: 'badge' },
-      { reward_id: 'reward-4', reward_type: 'badge' },
-      { reward_id: 'reward-5', reward_type: 'badge' },
-    ]);
+    (fetchBeersFromAPI as jest.Mock).mockResolvedValue(
+      fetchedRows([
+        { id: 'beer-1', brew_name: 'Test Beer 1', brewer: 'Test Brewery' },
+        { id: 'beer-2', brew_name: 'Test Beer 2', brewer: 'Test Brewery' },
+        { id: 'beer-3', brew_name: 'Test Beer 3', brewer: 'Test Brewery' },
+      ])
+    );
+    (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(
+      fetchedRows([
+        {
+          id: 'beer-1',
+          brew_name: 'Test Beer 1',
+          brewer: 'Test Brewery',
+          tasted_date: '2023-01-01',
+        },
+        {
+          id: 'beer-2',
+          brew_name: 'Test Beer 2',
+          brewer: 'Test Brewery',
+          tasted_date: '2023-01-02',
+        },
+      ])
+    );
+    (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(
+      fetchedRows([
+        { reward_id: 'reward-1', reward_type: 'badge' },
+        { reward_id: 'reward-2', reward_type: 'badge' },
+        { reward_id: 'reward-3', reward_type: 'badge' },
+        { reward_id: 'reward-4', reward_type: 'badge' },
+        { reward_id: 'reward-5', reward_type: 'badge' },
+      ])
+    );
 
     const result = await svc.manualRefreshAllData();
 
@@ -81,17 +102,31 @@ describe('manualRefreshAllData', () => {
   it('handles partial failure and sets hasErrors', async () => {
     // Mock: all beers fails, others succeed
     (fetchBeersFromAPI as jest.Mock).mockRejectedValue(new Error('Server error'));
-    (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue([
-      { id: 'beer-1', brew_name: 'Test Beer 1', brewer: 'Test Brewery', tasted_date: '2023-01-01' },
-      { id: 'beer-2', brew_name: 'Test Beer 2', brewer: 'Test Brewery', tasted_date: '2023-01-02' },
-    ]);
-    (fetchRewardsFromAPI as jest.Mock).mockResolvedValue([
-      { reward_id: 'reward-1', reward_type: 'badge' },
-      { reward_id: 'reward-2', reward_type: 'badge' },
-      { reward_id: 'reward-3', reward_type: 'badge' },
-      { reward_id: 'reward-4', reward_type: 'badge' },
-      { reward_id: 'reward-5', reward_type: 'badge' },
-    ]);
+    (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(
+      fetchedRows([
+        {
+          id: 'beer-1',
+          brew_name: 'Test Beer 1',
+          brewer: 'Test Brewery',
+          tasted_date: '2023-01-01',
+        },
+        {
+          id: 'beer-2',
+          brew_name: 'Test Beer 2',
+          brewer: 'Test Brewery',
+          tasted_date: '2023-01-02',
+        },
+      ])
+    );
+    (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(
+      fetchedRows([
+        { reward_id: 'reward-1', reward_type: 'badge' },
+        { reward_id: 'reward-2', reward_type: 'badge' },
+        { reward_id: 'reward-3', reward_type: 'badge' },
+        { reward_id: 'reward-4', reward_type: 'badge' },
+        { reward_id: 'reward-5', reward_type: 'badge' },
+      ])
+    );
 
     const result = await svc.manualRefreshAllData();
 
@@ -103,11 +138,11 @@ describe('manualRefreshAllData', () => {
 
   it('does not clear ETag on first manual refresh', async () => {
     svc.resetLastManualRefreshTime();
-    (fetchBeersFromAPI as jest.Mock).mockResolvedValue([
-      { id: 'beer-1', brew_name: 'Test Beer', brewer: 'Brewery' },
-    ]);
-    (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue([]);
-    (fetchRewardsFromAPI as jest.Mock).mockResolvedValue([]);
+    (fetchBeersFromAPI as jest.Mock).mockResolvedValue(
+      fetchedRows([{ id: 'beer-1', brew_name: 'Test Beer', brewer: 'Brewery' }])
+    );
+    (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows([]));
+    (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(fetchedRows([]));
 
     await svc.manualRefreshAllData();
 
@@ -119,21 +154,21 @@ describe('manualRefreshAllData', () => {
 
   it('clears ETag on rapid second manual refresh within 30s', async () => {
     svc.resetLastManualRefreshTime();
-    (fetchBeersFromAPI as jest.Mock).mockResolvedValue([
-      { id: 'beer-1', brew_name: 'Test Beer', brewer: 'Brewery' },
-    ]);
-    (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue([]);
-    (fetchRewardsFromAPI as jest.Mock).mockResolvedValue([]);
+    (fetchBeersFromAPI as jest.Mock).mockResolvedValue(
+      fetchedRows([{ id: 'beer-1', brew_name: 'Test Beer', brewer: 'Brewery' }])
+    );
+    (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows([]));
+    (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(fetchedRows([]));
 
     await svc.manualRefreshAllData();
     jest.clearAllMocks();
 
     // Re-setup mocks after clear
-    (fetchBeersFromAPI as jest.Mock).mockResolvedValue([
-      { id: 'beer-1', brew_name: 'Test Beer', brewer: 'Brewery' },
-    ]);
-    (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue([]);
-    (fetchRewardsFromAPI as jest.Mock).mockResolvedValue([]);
+    (fetchBeersFromAPI as jest.Mock).mockResolvedValue(
+      fetchedRows([{ id: 'beer-1', brew_name: 'Test Beer', brewer: 'Brewery' }])
+    );
+    (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows([]));
+    (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(fetchedRows([]));
 
     await svc.manualRefreshAllData();
 
@@ -148,16 +183,16 @@ describe('manualRefreshAllData', () => {
 describe('sequentialRefreshAllData: empty vs malformed tasted beers', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (fetchBeersFromAPI as jest.Mock).mockResolvedValue([
-      { id: 'beer-1', brew_name: 'Test Beer 1', brewer: 'Test Brewery' },
-    ]);
-    (fetchRewardsFromAPI as jest.Mock).mockResolvedValue([]);
+    (fetchBeersFromAPI as jest.Mock).mockResolvedValue(
+      fetchedRows([{ id: 'beer-1', brew_name: 'Test Beer 1', brewer: 'Test Brewery' }])
+    );
+    (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(fetchedRows([]));
   });
 
   it('clears the tasted table when the server reports a genuinely empty round', async () => {
     // The rollover at 200, or a new user. This arm previously had NO coverage
     // at all on this path — deleting the clear call left the whole suite green.
-    (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue([]);
+    (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows([]));
 
     const result = await svc.sequentialRefreshAllData();
 
@@ -176,10 +211,12 @@ describe('sequentialRefreshAllData: empty vs malformed tasted beers', () => {
     // Rewriting the original test to use a rejection fixed its motivation and
     // silently moved it off the branch it was covering, leaving the malformed
     // arm with no test at all.
-    (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue([
-      { id: 'm1', brew_name: '', brewer: 'X' },
-      { id: 'm2', brew_name: '', brewer: 'Y' },
-    ]);
+    (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(
+      fetchedRows([
+        { id: 'm1', brew_name: '', brewer: 'X' },
+        { id: 'm2', brew_name: '', brewer: 'Y' },
+      ])
+    );
 
     const result = await svc.sequentialRefreshAllData();
 
@@ -207,5 +244,52 @@ describe('sequentialRefreshAllData: empty vs malformed tasted beers', () => {
     expect(result.myBeersResult.success).toBe(false);
     // And no timestamp, which is what made the wipe persist for 12 hours.
     expect(setPreference).not.toHaveBeenCalledWith('my_beers_last_update', expect.any(String));
+  });
+});
+
+describe('sequentialRefreshAllData: FetchOutcome semantics (plan 02 Phase 3)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (fetchBeersFromAPI as jest.Mock).mockResolvedValue(
+      fetchedRows([{ id: 'b1', brew_name: 'Beer', brewer: 'X' }])
+    );
+    (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(fetchedRows([]));
+  });
+
+  it('does not clear the tasted table when my beers are unavailable', async () => {
+    // Visitor mode, an unconfigured URL, a none:// placeholder — none of these
+    // are "the server said you have none". Before FetchOutcome they all arrived
+    // as the same empty array and cleared a populated tasted list.
+    (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(unavailable('not-applicable', 'visitor'));
+
+    await svc.sequentialRefreshAllData();
+
+    expect(myBeersRepository.replaceAllWithEmptyUnsafe).not.toHaveBeenCalled();
+    expect(myBeersRepository.insertManyUnsafe).not.toHaveBeenCalled();
+  });
+
+  it('does not stamp my_beers_last_check when my beers are unavailable', async () => {
+    // THE 12-HOUR SUPPRESSION REGRESSION TEST. Stamping the timestamp after a
+    // non-answer told the 12-hour refresh window that the data was current, so
+    // the app would not try again until the window elapsed — turning a
+    // transient condition into half a day of wrong data.
+    (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(unavailable('not-configured', 'no url'));
+
+    await svc.sequentialRefreshAllData();
+
+    expect(setPreference).not.toHaveBeenCalledWith('my_beers_last_check', expect.any(String));
+    expect(setPreference).not.toHaveBeenCalledWith('my_beers_last_update', expect.any(String));
+  });
+
+  it('clears the tasted table when the server confirms an empty round', async () => {
+    // The one case where clearing IS correct: a new user, or the rollover at
+    // 200. Distinguishing this from the case above is the entire point.
+    (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(confirmedEmpty());
+
+    const result = await svc.sequentialRefreshAllData();
+
+    expect(myBeersRepository.replaceAllWithEmptyUnsafe).toHaveBeenCalled();
+    expect(setPreference).toHaveBeenCalledWith('my_beers_last_check', expect.any(String));
+    expect(result.myBeersResult.success).toBe(true);
   });
 });

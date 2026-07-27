@@ -12,7 +12,8 @@ import { beerRepository } from '../database/repositories/BeerRepository';
 import { myBeersRepository } from '../database/repositories/MyBeersRepository';
 import { rewardsRepository } from '../database/repositories/RewardsRepository';
 import { databaseLockManager } from '../database/DatabaseLockManager';
-import { toNonEmpty, MalformedResponseError } from '../api/fetchOutcome';
+import { toNonEmpty } from '../api/fetchOutcome';
+import type { FetchOutcome, FetchedSource } from '../api/fetchOutcome';
 import { validateBrewInStockResponse, validateBeerArray } from '../api/validators';
 import { logError, logWarning } from '../utils/errorLogger';
 import { calculateContainerTypes } from '../database/utils/glassTypeCalculator';
@@ -224,8 +225,52 @@ export async function fetchTaplistFromProxyOrDirect(
 
   console.log('[dataUpdateService] Using direct Flying Saucer fetch...');
   recordFallback();
-  const beers = await fetchBeersFromAPI();
-  return { beers, usedProxy: false, etag: null, notModified: false };
+  const beers = requireRows(await fetchBeersFromAPI(), 'All beers');
+  return { beers: [...beers], usedProxy: false, etag: null, notModified: false };
+}
+
+/**
+ * Unwrap a completed fetch into its rows, or throw with the reason.
+ *
+ * For sources where nothing but rows is a usable answer — the taplist, where a
+ * store with zero beers is not a real state. Every non-data case names itself,
+ * which is what the old bare `[]` could not do.
+ */
+function requireRows<T>(source: FetchedSource<FetchOutcome<T>>, label: string): readonly T[] {
+  if (source.status === 'unavailable') {
+    throw new Error(`${label} unavailable (${source.reason.code}): ${source.reason.detail}`);
+  }
+  if (source.status === 'failed') {
+    throw new Error(`${label} failed: ${source.error.message}`);
+  }
+  if (source.status === 'unchanged') {
+    throw new Error(`${label} reported unchanged, which this path cannot use`);
+  }
+  if (source.data.kind === 'malformed') {
+    throw new Error(`${label} malformed: ${source.data.detail}`);
+  }
+  if (source.data.kind === 'confirmed-empty') {
+    // Returns empty rather than throwing: the taplist path already has
+    // validation downstream that rejects an empty store and reports it as a
+    // VALIDATION_ERROR, which is a better categorisation than anything this
+    // helper could produce. The distinction that matters here — data versus
+    // "we never asked" — is still enforced above.
+    return [];
+  }
+  return source.data.items;
+}
+
+/**
+ * Flatten a completed fetch to rows, treating every "nothing to write" case as
+ * an empty list.
+ *
+ * Only safe where writing nothing is harmless — rewards, which are additive and
+ * never cleared from an empty response. NOT safe for tasted beers, where the
+ * caller must distinguish confirmed-empty (clear) from unavailable (leave
+ * alone), which is why those sites switch explicitly instead.
+ */
+function rowsOrNone<T>(source: FetchedSource<FetchOutcome<T>>): readonly T[] {
+  return source.status === 'fetched' && source.data.kind === 'data' ? source.data.items : [];
 }
 
 /**
@@ -696,8 +741,11 @@ export async function fetchAndUpdateRewards(): Promise<DataUpdateResult> {
 
     // Fetch and populate rewards if not in visitor mode
     console.log('Refreshing rewards data');
-    const rewards = await fetchRewardsFromAPI();
-    await rewardsRepository.insertMany(rewards);
+    // Rewards are additive and never cleared from an empty response, so every
+    // "nothing to write" case flattens to no write. That is NOT true of tasted
+    // beers, which is why those sites switch on the outcome explicitly.
+    const rewards = rowsOrNone(await fetchRewardsFromAPI());
+    await rewardsRepository.insertMany([...rewards]);
 
     console.log(`Updated rewards data successfully: ${rewards.length} rewards`);
     return {
@@ -812,7 +860,33 @@ export async function sequentialRefreshAllData(): Promise<ManualRefreshResult> {
     console.log('Sequential refresh: starting my beers fetch');
     let myBeersResult: DataUpdateResult;
     try {
-      const myBeers = await fetchMyBeersFromAPI();
+      const myBeersSource = await fetchMyBeersFromAPI();
+
+      // The three outcomes diverge here, and this is the divergence the whole
+      // plan exists for. `unavailable` must NOT touch the table and must NOT
+      // stamp a timestamp — stamping is what suppressed a retry for 12 hours.
+      // `confirmed-empty` is the ONLY case in which clearing is correct.
+      if (myBeersSource.status !== 'fetched') {
+        throw new Error(
+          myBeersSource.status === 'unavailable'
+            ? `My beers unavailable (${myBeersSource.reason.code}): ${myBeersSource.reason.detail}`
+            : `My beers could not be fetched (${myBeersSource.status})`
+        );
+      }
+      if (myBeersSource.data.kind === 'malformed') {
+        throw new Error(`My beers malformed: ${myBeersSource.data.detail}`);
+      }
+      const emptyRound = myBeersSource.data.kind === 'confirmed-empty';
+      if (emptyRound) {
+        // NOT an early return: this block lives inside the withDatabaseLock
+        // callback, so returning here would exit the whole refresh and skip the
+        // rewards source entirely.
+        await myBeersRepository.replaceAllWithEmptyUnsafe();
+        await setPreference('my_beers_last_update', new Date().toISOString());
+        await setPreference('my_beers_last_check', new Date().toISOString());
+      }
+
+      const myBeers = emptyRound ? [] : [...myBeersSource.data.items];
 
       // Validate myBeers before insertion
       const validationResult = validateBeerArray(myBeers);
@@ -877,25 +951,19 @@ export async function sequentialRefreshAllData(): Promise<ManualRefreshResult> {
       const sequentialMyBeers = toNonEmpty(
         myBeersWithContainerTypes as BeerfinderWithContainerType[]
       );
-      if (sequentialMyBeers !== null) {
+      if (!emptyRound) {
+        if (sequentialMyBeers === null) {
+          // Rows arrived and none survived local validation. confirmed-empty is
+          // handled above, so this can only be malformed — leave the table
+          // alone rather than wiping a populated list.
+          throw new Error(
+            `All ${myBeers.length} tasted beers from the API failed validation; refusing to write`
+          );
+        }
         await myBeersRepository.insertManyUnsafe(sequentialMyBeers);
-      } else if (myBeers.length === 0) {
-        // The server really did report zero tasted beers.
-        await myBeersRepository.replaceAllWithEmptyUnsafe();
-      } else {
-        // Rows arrived and none survived validation: malformed, not empty.
-        // Leave the table alone and report failure rather than wiping a
-        // populated tasted list and stamping over it for 12 hours.
-        // Reachable only for rows that HAVE ids but fail validateBeer's other
-        // requirements (missing or empty brew_name) — beerApi already rejects
-        // the all-ids-missing case upstream. The message says so rather than
-        // repeating the id claim, which would be false here.
-        throw new MalformedResponseError(
-          `All ${myBeers.length} tasted beers from the API failed validation; refusing to write`
-        );
+        await setPreference('my_beers_last_update', new Date().toISOString());
+        await setPreference('my_beers_last_check', new Date().toISOString());
       }
-      await setPreference('my_beers_last_update', new Date().toISOString());
-      await setPreference('my_beers_last_check', new Date().toISOString());
       myBeersResult = {
         success: true,
         dataUpdated: true,
@@ -916,12 +984,12 @@ export async function sequentialRefreshAllData(): Promise<ManualRefreshResult> {
     console.log('Sequential refresh: starting rewards fetch');
     let rewardsResult: DataUpdateResult;
     try {
-      const rewards = await fetchRewardsFromAPI();
-      await rewardsRepository.insertManyUnsafe(rewards);
+      const rewardsRows = rowsOrNone(await fetchRewardsFromAPI());
+      await rewardsRepository.insertManyUnsafe([...rewardsRows]);
       rewardsResult = {
         success: true,
         dataUpdated: true,
-        itemCount: rewards.length,
+        itemCount: rewardsRows.length,
       };
     } catch (error) {
       logError(error, {
@@ -1166,7 +1234,7 @@ export const refreshAllDataFromAPI = async (): Promise<{
     // which is what the caller then sees for that source.
     let allBeersWithContainerTypes: BeerWithContainerType[] = [];
     let myBeersWithContainerTypes: BeerfinderWithContainerType[] = [];
-    let rewards: Awaited<ReturnType<typeof fetchRewardsFromAPI>> = [];
+    let rewards: Reward[] = [];
 
     // Each source is isolated, mirroring sequentialRefreshAllData. This is the
     // only one of the three refresh entry points that had no per-source catch,
@@ -1238,7 +1306,24 @@ export const refreshAllDataFromAPI = async (): Promise<{
       // MY BEERS: Fetch from FS, then batch enrichment
       // =========================================================================
       console.log('Fetching my beers from API...');
-      const myBeersRaw = await fetchMyBeersFromAPI();
+      const myBeersSource = await fetchMyBeersFromAPI();
+
+      // Same three-way split as sequentialRefreshAllData. Handled up front so
+      // the confirmed-empty case is unmistakable and every other case leaves
+      // the tasted table alone.
+      if (myBeersSource.status !== 'fetched') {
+        throw new Error(
+          myBeersSource.status === 'unavailable'
+            ? `My beers unavailable (${myBeersSource.reason.code}): ${myBeersSource.reason.detail}`
+            : `My beers could not be fetched (${myBeersSource.status})`
+        );
+      }
+      if (myBeersSource.data.kind === 'malformed') {
+        throw new Error(`My beers malformed: ${myBeersSource.data.detail}`);
+      }
+      const myBeersRaw =
+        myBeersSource.data.kind === 'confirmed-empty' ? [] : [...myBeersSource.data.items];
+      const confirmedEmptyRound = myBeersSource.data.kind === 'confirmed-empty';
       const myBeersValidation = validateBeerArray(myBeersRaw);
 
       if (myBeersValidation.invalidBeers.length > 0) {
@@ -1293,7 +1378,9 @@ export const refreshAllDataFromAPI = async (): Promise<{
       const apiMyBeers = toNonEmpty(myBeersWithContainerTypes as BeerfinderWithContainerType[]);
       if (apiMyBeers !== null) {
         await myBeersRepository.insertManyUnsafe(apiMyBeers);
-      } else if (myBeersRaw.length === 0) {
+      } else if (confirmedEmptyRound) {
+        // The server said zero, so clearing is correct. Keyed off the outcome
+        // rather than a length, which is what could not tell these apart.
         await myBeersRepository.replaceAllWithEmptyUnsafe();
       } else {
         // This is the autoLogin -> CHECK IN path, so aborting here would fail a
@@ -1312,7 +1399,7 @@ export const refreshAllDataFromAPI = async (): Promise<{
 
     try {
       console.log('Fetching rewards from API...');
-      rewards = await fetchRewardsFromAPI();
+      rewards = [...rowsOrNone(await fetchRewardsFromAPI())];
       await rewardsRepository.insertManyUnsafe(rewards);
     } catch (error) {
       logError(error, {

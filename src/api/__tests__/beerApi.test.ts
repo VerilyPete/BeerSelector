@@ -14,7 +14,7 @@ import {
 } from '../beerApi';
 import * as preferences from '../../database/preferences';
 import { config } from '@/src/config';
-import { MalformedResponseError } from '../fetchOutcome';
+import type { FetchOutcome, FetchedSource } from '../fetchOutcome';
 
 process.env.EXPO_PUBLIC_API_RETRY_DELAY = '10';
 
@@ -23,6 +23,19 @@ jest.mock('../../database/preferences');
 
 // Mock global fetch
 global.fetch = jest.fn();
+
+/**
+ * Assert a request completed and return its payload outcome.
+ *
+ * The three fetchers return `FetchedSource<FetchOutcome<T>>`: the outer union
+ * says what happened to the REQUEST, the inner what the BODY contained.
+ */
+function payload<T>(source: FetchedSource<FetchOutcome<T>>): FetchOutcome<T> {
+  if (source.status !== 'fetched') {
+    throw new Error(`expected a fetched source, got "${source.status}"`);
+  }
+  return source.data;
+}
 
 describe('Beer API', () => {
   beforeEach(() => {
@@ -56,7 +69,12 @@ describe('Beer API', () => {
       expect(result).toEqual(mockData);
     });
 
-    it('should handle none:// protocol URLs by returning empty data', async () => {
+    // INVERTED by plan 02 Phase 3. fetchWithRetry no longer fabricates
+    // `[null, { tasted_brew_current_round: [] }]` for none:// — a server
+    // response that never existed, which every downstream parser read as a
+    // legitimate empty round. Callers reject none:// before calling now, which
+    // the 'reports not-applicable for a none:// URL' test below pins.
+    it.skip('should handle none:// protocol URLs by returning empty data', async () => {
       const resultPromise = fetchWithRetry('none://placeholder');
       const result = await resultPromise;
 
@@ -140,7 +158,8 @@ describe('Beer API', () => {
 
       const result = await fetchBeersFromAPI();
 
-      expect(result).toEqual([]);
+      // Was []. Now says WHY there is nothing, which is the whole point.
+      expect(result.status).toBe('unavailable');
       expect(global.fetch).not.toHaveBeenCalled();
     });
 
@@ -159,7 +178,9 @@ describe('Beer API', () => {
 
       const result = await fetchBeersFromAPI();
 
-      expect(result).toEqual(mockBeers);
+      const body = payload(result);
+      expect(body.kind).toBe('data');
+      if (body.kind === 'data') expect(body.items).toEqual(mockBeers);
       expect(preferences.getPreference).toHaveBeenCalledWith('all_beers_api_url');
     });
 
@@ -179,7 +200,9 @@ describe('Beer API', () => {
 
       const result = await fetchBeersFromAPI();
 
-      expect(result).toEqual(mockBeers);
+      const body = payload(result);
+      expect(body.kind).toBe('data');
+      if (body.kind === 'data') expect(body.items).toEqual(mockBeers);
     });
 
     it('should throw error when no beer data found in response', async () => {
@@ -214,7 +237,8 @@ describe('Beer API', () => {
 
       const result = await fetchMyBeersFromAPI();
 
-      expect(result).toEqual([]);
+      // Was []. Each of these conditions now names itself.
+      expect(result.status).toBe('unavailable');
       expect(global.fetch).not.toHaveBeenCalled();
     });
 
@@ -227,7 +251,8 @@ describe('Beer API', () => {
 
       const result = await fetchMyBeersFromAPI();
 
-      expect(result).toEqual([]);
+      // Was []. Each of these conditions now names itself.
+      expect(result.status).toBe('unavailable');
       expect(global.fetch).not.toHaveBeenCalled();
     });
 
@@ -240,11 +265,16 @@ describe('Beer API', () => {
 
       const result = await fetchMyBeersFromAPI();
 
-      expect(result).toEqual([]);
+      // Was []. Each of these conditions now names itself.
+      expect(result.status).toBe('unavailable');
       expect(global.fetch).not.toHaveBeenCalled();
     });
 
-    it('throws rather than returning [] when every row lacks an id', async () => {
+    // SUPERSEDED by plan 02 Phase 3. Phase 2 bridged this with a throw because
+    // the return type had no way to say "a body arrived and was unusable".
+    // `malformed` is that way, so the caller decides instead of being forced to
+    // catch. The MalformedResponseError type is retired with it.
+    it('reports malformed rather than [] when every row lacks an id', async () => {
       (preferences.getPreference as jest.Mock).mockImplementation((key: string) => {
         if (key === 'is_visitor_mode') return Promise.resolve('false');
         if (key === 'my_beers_api_url') return Promise.resolve('https://example.com/my.json');
@@ -266,8 +296,11 @@ describe('Beer API', () => {
       // Asserts the TYPE, not just the message: an untyped Error carries the
       // same text but falls through createErrorResponse to UNKNOWN_ERROR, and
       // the developer prose then reaches the user's refresh alert verbatim.
-      await expect(fetchMyBeersFromAPI()).rejects.toBeInstanceOf(MalformedResponseError);
-      await expect(fetchMyBeersFromAPI()).rejects.toThrow(/lack an id/i);
+      const outcome = await fetchMyBeersFromAPI();
+
+      const body = payload(outcome);
+      expect(body.kind).toBe('malformed');
+      if (body.kind === 'malformed') expect(body.detail).toMatch(/none carried an id/i);
     });
 
     it('should fetch and return tasted beers', async () => {
@@ -290,7 +323,9 @@ describe('Beer API', () => {
 
       const result = await fetchMyBeersFromAPI();
 
-      expect(result).toEqual(mockBeers);
+      const body = payload(result);
+      expect(body.kind).toBe('data');
+      if (body.kind === 'data') expect(body.items).toEqual(mockBeers);
       expect(preferences.getPreference).toHaveBeenCalledWith('my_beers_api_url');
     });
 
@@ -310,7 +345,11 @@ describe('Beer API', () => {
 
       const result = await fetchMyBeersFromAPI();
 
-      expect(result).toEqual([]);
+      // Was []. Each of these conditions now names itself.
+      // A genuinely empty round is confirmed-empty, not unavailable: the
+      // server answered, and the answer was zero. That distinction is the
+      // one that decides whether clearing the local table is correct.
+      expect(payload(result).kind).toBe('confirmed-empty');
     });
 
     it('should filter out beers without IDs', async () => {
@@ -334,9 +373,12 @@ describe('Beer API', () => {
 
       const result = await fetchMyBeersFromAPI();
 
-      expect(result).toHaveLength(2);
-      expect(result[0].id).toBe('1');
-      expect(result[1].id).toBe('2');
+      const filtered = payload(result);
+      expect(filtered.kind).toBe('data');
+      if (filtered.kind !== 'data') throw new Error('expected data');
+      expect(filtered.items).toHaveLength(2);
+      expect(filtered.items[0].id).toBe('1');
+      expect(filtered.items[1].id).toBe('2');
     });
 
     it('should throw error on invalid response format', async () => {
@@ -383,7 +425,7 @@ describe('Beer API', () => {
 
       const result = await fetchRewardsFromAPI();
 
-      expect(result).toEqual([]);
+      expect(result.status).toBe('unavailable');
       expect(global.fetch).not.toHaveBeenCalled();
     });
 
@@ -396,7 +438,7 @@ describe('Beer API', () => {
 
       const result = await fetchRewardsFromAPI();
 
-      expect(result).toEqual([]);
+      expect(result.status).toBe('unavailable');
       expect(global.fetch).not.toHaveBeenCalled();
     });
 
@@ -420,7 +462,9 @@ describe('Beer API', () => {
 
       const result = await fetchRewardsFromAPI();
 
-      expect(result).toEqual(mockRewards);
+      const rewardsBody = payload(result);
+      expect(rewardsBody.kind).toBe('data');
+      if (rewardsBody.kind === 'data') expect(rewardsBody.items).toEqual(mockRewards);
       expect(preferences.getPreference).toHaveBeenCalledWith('my_beers_api_url');
     });
 
@@ -660,5 +704,144 @@ describe('Beer API', () => {
         expect(config.network.retryDelay).toBeLessThanOrEqual(5000); // Max 5s initial delay
       });
     });
+  });
+});
+
+describe('FetchOutcome semantics (plan 02 Phase 3)', () => {
+  // Every assertion here is on `kind`, never on array length. Length is what
+  // made six distinct conditions indistinguishable in the first place.
+  const memberPrefs = (urlKey: string, url: string | null) => (key: string) => {
+    if (key === 'is_visitor_mode') return Promise.resolve('false');
+    if (key === urlKey) return Promise.resolve(url);
+    return Promise.resolve(null);
+  };
+
+  describe('fetchMyBeersFromAPI', () => {
+    it('reports unavailable/not-configured when my_beers_api_url is absent', async () => {
+      (preferences.getPreference as jest.Mock).mockImplementation(
+        memberPrefs('my_beers_api_url', null)
+      );
+
+      const outcome = await fetchMyBeersFromAPI();
+
+      expect(outcome.status).toBe('unavailable');
+      if (outcome.status === 'unavailable') {
+        expect(outcome.reason.code).toBe('not-configured');
+      }
+    });
+
+    it('reports unavailable/not-applicable in visitor mode', async () => {
+      (preferences.getPreference as jest.Mock).mockImplementation((key: string) =>
+        Promise.resolve(key === 'is_visitor_mode' ? 'true' : null)
+      );
+
+      const outcome = await fetchMyBeersFromAPI();
+
+      expect(outcome.status).toBe('unavailable');
+      if (outcome.status === 'unavailable') {
+        expect(outcome.reason.code).toBe('not-applicable');
+      }
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it('reports not-applicable for a none:// URL without calling fetch', async () => {
+      (preferences.getPreference as jest.Mock).mockImplementation(
+        memberPrefs('my_beers_api_url', 'none://placeholder')
+      );
+
+      const outcome = await fetchMyBeersFromAPI();
+
+      expect(outcome.status).toBe('unavailable');
+      if (outcome.status === 'unavailable') {
+        expect(outcome.reason.code).toBe('not-applicable');
+      }
+      // Pins the REPLACEMENT behaviour, not just the removal: once
+      // fetchWithRetry stops synthesising a fake response for none://, the URL
+      // must be rejected BEFORE the request or it falls through to fetch() and
+      // burns three retries with backoff.
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it('reports confirmed-empty when the server returns an empty round', async () => {
+      (preferences.getPreference as jest.Mock).mockImplementation(
+        memberPrefs('my_beers_api_url', 'https://example.com/my.json')
+      );
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => [{}, { tasted_brew_current_round: [] }],
+      });
+
+      const outcome = await fetchMyBeersFromAPI();
+
+      // A real state — new user, or the rollover at 200 — and the ONLY case in
+      // which clearing the local table is correct.
+      expect(payload(outcome).kind).toBe('confirmed-empty');
+    });
+
+    it('reports malformed when every entry lacks an id', async () => {
+      (preferences.getPreference as jest.Mock).mockImplementation(
+        memberPrefs('my_beers_api_url', 'https://example.com/my.json')
+      );
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => [
+          {},
+          { tasted_brew_current_round: [{ brew_name: 'no id' }, { brew_name: 'nor here' }] },
+        ],
+      });
+
+      const outcome = await fetchMyBeersFromAPI();
+
+      // Replaces the MalformedResponseError bridge added in Phase 2 — the
+      // caller decides now, instead of being forced to catch.
+      expect(payload(outcome).kind).toBe('malformed');
+    });
+
+    it('reports data when the server returns beers', async () => {
+      (preferences.getPreference as jest.Mock).mockImplementation(
+        memberPrefs('my_beers_api_url', 'https://example.com/my.json')
+      );
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => [
+          {},
+          { tasted_brew_current_round: [{ id: '1', brew_name: 'Tasted', brewer: 'X' }] },
+        ],
+      });
+
+      const outcome = await fetchMyBeersFromAPI();
+
+      const body = payload(outcome);
+      expect(body.kind).toBe('data');
+      if (body.kind === 'data') {
+        expect(body.items).toHaveLength(1);
+      }
+    });
+  });
+
+  it('fetchBeersFromAPI reports unavailable/not-configured when all_beers_api_url is absent', async () => {
+    (preferences.getPreference as jest.Mock).mockImplementation(
+      memberPrefs('all_beers_api_url', null)
+    );
+
+    const outcome = await fetchBeersFromAPI();
+
+    expect(outcome.status).toBe('unavailable');
+    if (outcome.status === 'unavailable') {
+      expect(outcome.reason.code).toBe('not-configured');
+    }
+  });
+
+  it('fetchRewardsFromAPI reports unavailable rather than an empty list in visitor mode', async () => {
+    (preferences.getPreference as jest.Mock).mockImplementation((key: string) =>
+      Promise.resolve(key === 'is_visitor_mode' ? 'true' : null)
+    );
+
+    const outcome = await fetchRewardsFromAPI();
+
+    expect(outcome.status).toBe('unavailable');
+    if (outcome.status === 'unavailable') {
+      expect(outcome.reason.code).toBe('not-applicable');
+    }
   });
 });

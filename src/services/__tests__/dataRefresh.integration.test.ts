@@ -12,6 +12,7 @@ import * as preferences from '../../database/preferences';
 import { databaseLockManager } from '../../database/locks';
 import fs from 'fs';
 import path from 'path';
+import { fetchedRows } from '../../api/__tests__/helpers/fetchOutcomeFixtures';
 
 // Load real JSON fixtures
 const allBeersFixture = JSON.parse(
@@ -57,13 +58,15 @@ describe('Data Refresh Integration Tests', () => {
       });
 
       // Mock API responses with real fixtures
-      (beerApi.fetchBeersFromAPI as jest.Mock).mockResolvedValue(allBeersFixture[1].brewInStock);
-      (beerApi.fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(
-        myBeersFixture[1].tasted_brew_current_round
+      (beerApi.fetchBeersFromAPI as jest.Mock).mockResolvedValue(
+        fetchedRows(allBeersFixture[1].brewInStock)
       );
-      (beerApi.fetchRewardsFromAPI as jest.Mock).mockResolvedValue([
-        { reward_id: '1', redeemed: 'false', reward_type: 'plate' },
-      ]);
+      (beerApi.fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(
+        fetchedRows(myBeersFixture[1].tasted_brew_current_round)
+      );
+      (beerApi.fetchRewardsFromAPI as jest.Mock).mockResolvedValue(
+        fetchedRows([{ reward_id: '1', redeemed: 'false', reward_type: 'plate' }])
+      );
 
       // Mock repository insertMany methods
       (beerRepository.beerRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
@@ -116,9 +119,11 @@ describe('Data Refresh Integration Tests', () => {
         }
       });
 
-      (beerApi.fetchBeersFromAPI as jest.Mock).mockResolvedValue(allBeersFixture[1].brewInStock);
-      (beerApi.fetchMyBeersFromAPI as jest.Mock).mockResolvedValue([]);
-      (beerApi.fetchRewardsFromAPI as jest.Mock).mockResolvedValue([]);
+      (beerApi.fetchBeersFromAPI as jest.Mock).mockResolvedValue(
+        fetchedRows(allBeersFixture[1].brewInStock)
+      );
+      (beerApi.fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows([]));
+      (beerApi.fetchRewardsFromAPI as jest.Mock).mockResolvedValue(fetchedRows([]));
 
       (beerRepository.beerRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
       (myBeersRepository.myBeersRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(
@@ -157,11 +162,11 @@ describe('Data Refresh Integration Tests', () => {
         }
       });
 
-      (beerApi.fetchBeersFromAPI as jest.Mock).mockResolvedValue([]);
+      (beerApi.fetchBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows([]));
       (beerApi.fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(
-        myBeersFixture[1].tasted_brew_current_round
+        fetchedRows(myBeersFixture[1].tasted_brew_current_round)
       );
-      (beerApi.fetchRewardsFromAPI as jest.Mock).mockResolvedValue([]);
+      (beerApi.fetchRewardsFromAPI as jest.Mock).mockResolvedValue(fetchedRows([]));
 
       (beerRepository.beerRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
       (myBeersRepository.myBeersRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(
@@ -193,9 +198,11 @@ describe('Data Refresh Integration Tests', () => {
         }
       });
 
-      (beerApi.fetchBeersFromAPI as jest.Mock).mockResolvedValue(allBeersFixture[1].brewInStock);
-      (beerApi.fetchMyBeersFromAPI as jest.Mock).mockResolvedValue([]);
-      (beerApi.fetchRewardsFromAPI as jest.Mock).mockResolvedValue([]);
+      (beerApi.fetchBeersFromAPI as jest.Mock).mockResolvedValue(
+        fetchedRows(allBeersFixture[1].brewInStock)
+      );
+      (beerApi.fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows([]));
+      (beerApi.fetchRewardsFromAPI as jest.Mock).mockResolvedValue(fetchedRows([]));
 
       (beerRepository.beerRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
       (myBeersRepository.myBeersRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(
@@ -230,10 +237,12 @@ describe('Data Refresh Integration Tests', () => {
         }
       });
 
-      (beerApi.fetchBeersFromAPI as jest.Mock).mockResolvedValue(allBeersFixture[1].brewInStock);
+      (beerApi.fetchBeersFromAPI as jest.Mock).mockResolvedValue(
+        fetchedRows(allBeersFixture[1].brewInStock)
+      );
       // API returns empty array when round rolls over
-      (beerApi.fetchMyBeersFromAPI as jest.Mock).mockResolvedValue([]);
-      (beerApi.fetchRewardsFromAPI as jest.Mock).mockResolvedValue([]);
+      (beerApi.fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows([]));
+      (beerApi.fetchRewardsFromAPI as jest.Mock).mockResolvedValue(fetchedRows([]));
 
       (beerRepository.beerRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
       (myBeersRepository.myBeersRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(
@@ -287,9 +296,9 @@ describe('Data Refresh Integration Tests', () => {
       // need mocking. Before isolation they were unreachable in this test —
       // which is a fair illustration of what the change buys.
       (beerApi.fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(
-        myBeersFixture[1].tasted_brew_current_round
+        fetchedRows(myBeersFixture[1].tasted_brew_current_round)
       );
-      (beerApi.fetchRewardsFromAPI as jest.Mock).mockResolvedValue([]);
+      (beerApi.fetchRewardsFromAPI as jest.Mock).mockResolvedValue(fetchedRows([]));
 
       await expect(refreshAllDataFromAPI()).resolves.toBeDefined();
 
@@ -315,7 +324,9 @@ describe('Data Refresh Integration Tests', () => {
         }
       });
 
-      (beerApi.fetchBeersFromAPI as jest.Mock).mockResolvedValue(allBeersFixture[1].brewInStock);
+      (beerApi.fetchBeersFromAPI as jest.Mock).mockResolvedValue(
+        fetchedRows(allBeersFixture[1].brewInStock)
+      );
       (beerApi.fetchMyBeersFromAPI as jest.Mock).mockRejectedValue(new Error('API timeout'));
 
       await expect(refreshAllDataFromAPI()).resolves.toBeDefined();
@@ -340,9 +351,11 @@ describe('Data Refresh Integration Tests', () => {
         }
       });
 
-      (beerApi.fetchBeersFromAPI as jest.Mock).mockResolvedValue(allBeersFixture[1].brewInStock);
+      (beerApi.fetchBeersFromAPI as jest.Mock).mockResolvedValue(
+        fetchedRows(allBeersFixture[1].brewInStock)
+      );
       (beerApi.fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(
-        myBeersFixture[1].tasted_brew_current_round
+        fetchedRows(myBeersFixture[1].tasted_brew_current_round)
       );
       (beerApi.fetchRewardsFromAPI as jest.Mock).mockRejectedValue(
         new Error('Rewards service unavailable')
@@ -369,11 +382,13 @@ describe('Data Refresh Integration Tests', () => {
         }
       });
 
-      (beerApi.fetchBeersFromAPI as jest.Mock).mockResolvedValue(allBeersFixture[1].brewInStock);
-      (beerApi.fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(
-        myBeersFixture[1].tasted_brew_current_round
+      (beerApi.fetchBeersFromAPI as jest.Mock).mockResolvedValue(
+        fetchedRows(allBeersFixture[1].brewInStock)
       );
-      (beerApi.fetchRewardsFromAPI as jest.Mock).mockResolvedValue([]);
+      (beerApi.fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(
+        fetchedRows(myBeersFixture[1].tasted_brew_current_round)
+      );
+      (beerApi.fetchRewardsFromAPI as jest.Mock).mockResolvedValue(fetchedRows([]));
 
       // Simulate database failure
       (beerRepository.beerRepository.insertManyUnsafe as jest.Mock).mockRejectedValue(
@@ -410,9 +425,9 @@ describe('Data Refresh Integration Tests', () => {
         { id: '2', brew_name: 'Valid Beer 2', brewer: 'Brewery C' },
       ];
 
-      (beerApi.fetchBeersFromAPI as jest.Mock).mockResolvedValue(beersWithInvalid);
-      (beerApi.fetchMyBeersFromAPI as jest.Mock).mockResolvedValue([]);
-      (beerApi.fetchRewardsFromAPI as jest.Mock).mockResolvedValue([]);
+      (beerApi.fetchBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(beersWithInvalid));
+      (beerApi.fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows([]));
+      (beerApi.fetchRewardsFromAPI as jest.Mock).mockResolvedValue(fetchedRows([]));
 
       (beerRepository.beerRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
       (myBeersRepository.myBeersRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(
@@ -472,18 +487,20 @@ describe('refreshAllDataFromAPI: empty vs malformed tasted beers', () => {
   // autoLogin -> CHECK IN path, which is where a wipe hurts most.
   it('does not clear the tasted table when every row fails validation', async () => {
     jest.clearAllMocks();
-    (beerApi.fetchBeersFromAPI as jest.Mock).mockResolvedValue([
-      { id: 'b1', brew_name: 'Beer', brewer: 'X' },
-    ]);
+    (beerApi.fetchBeersFromAPI as jest.Mock).mockResolvedValue(
+      fetchedRows([{ id: 'b1', brew_name: 'Beer', brewer: 'X' }])
+    );
     // Rows that HAVE ids — so beerApi's own filter passes them through — but
     // fail validateBeer on brew_name. This is the only input that now reaches
     // the null arm with a non-empty raw array, and mocking a rejection instead
     // would never get here at all.
-    (beerApi.fetchMyBeersFromAPI as jest.Mock).mockResolvedValue([
-      { id: 'm1', brew_name: '', brewer: 'X' },
-      { id: 'm2', brew_name: '', brewer: 'Y' },
-    ]);
-    (beerApi.fetchRewardsFromAPI as jest.Mock).mockResolvedValue([]);
+    (beerApi.fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(
+      fetchedRows([
+        { id: 'm1', brew_name: '', brewer: 'X' },
+        { id: 'm2', brew_name: '', brewer: 'Y' },
+      ])
+    );
+    (beerApi.fetchRewardsFromAPI as jest.Mock).mockResolvedValue(fetchedRows([]));
 
     await refreshAllDataFromAPI();
 
@@ -494,11 +511,11 @@ describe('refreshAllDataFromAPI: empty vs malformed tasted beers', () => {
 
   it('does clear the tasted table when the server reports a genuinely empty round', async () => {
     jest.clearAllMocks();
-    (beerApi.fetchBeersFromAPI as jest.Mock).mockResolvedValue([
-      { id: 'b1', brew_name: 'Beer', brewer: 'X' },
-    ]);
-    (beerApi.fetchMyBeersFromAPI as jest.Mock).mockResolvedValue([]);
-    (beerApi.fetchRewardsFromAPI as jest.Mock).mockResolvedValue([]);
+    (beerApi.fetchBeersFromAPI as jest.Mock).mockResolvedValue(
+      fetchedRows([{ id: 'b1', brew_name: 'Beer', brewer: 'X' }])
+    );
+    (beerApi.fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows([]));
+    (beerApi.fetchRewardsFromAPI as jest.Mock).mockResolvedValue(fetchedRows([]));
 
     await refreshAllDataFromAPI();
 
