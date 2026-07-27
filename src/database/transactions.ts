@@ -44,7 +44,7 @@ export type DatabaseOperation<T = DatabaseOperationResult> = (db: SQLiteDatabase
  * Narrow on purpose: it lets the web branch of `withAtomicWrite` pass the
  * database itself without a type assertion.
  */
-export type TransactionLike = Pick<SQLiteDatabase, 'runAsync' | 'getFirstAsync'>;
+export type TransactionLike = Pick<SQLiteDatabase, 'runAsync' | 'getFirstAsync' | 'prepareAsync'>;
 
 /**
  * Run a write inside an exclusive transaction where the platform supports one.

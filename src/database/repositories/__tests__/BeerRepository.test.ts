@@ -11,23 +11,40 @@ import { databaseLockManager } from '../../locks';
 // Mock the database connection module
 jest.mock('../../connection');
 
+type MockStatement = {
+  executeAsync: jest.Mock;
+  finalizeAsync: jest.Mock;
+};
+
 type MockDatabase = {
   withTransactionAsync: jest.Mock;
   withExclusiveTransactionAsync: jest.Mock;
   runAsync: jest.Mock;
+  prepareAsync: jest.Mock;
   getAllAsync: jest.Mock;
   getFirstAsync: jest.Mock;
+  /** The statement prepareAsync hands back — the import's inserts land here. */
+  statement: MockStatement;
 };
 
 function createMockDatabase(): MockDatabase {
+  const statement: MockStatement = {
+    executeAsync: jest.fn().mockResolvedValue({ changes: 1, lastInsertRowId: 1 }),
+    finalizeAsync: jest.fn().mockResolvedValue(undefined),
+  };
+
   const mockDatabase: MockDatabase = {
     withTransactionAsync: jest.fn(async (callback: () => Promise<void>) => await callback()),
     withExclusiveTransactionAsync: jest.fn(),
     // The real runAsync always resolves an SQLiteRunResult; the allbeers import
     // reads `changes` from the DELETE to log the cleared row count.
     runAsync: jest.fn().mockResolvedValue({ changes: 0, lastInsertRowId: 0 }),
+    // The import compiles its INSERT once and reuses it, so the per-row
+    // assertions below look at statement.executeAsync rather than runAsync.
+    prepareAsync: jest.fn().mockResolvedValue(statement),
     getAllAsync: jest.fn(),
     getFirstAsync: jest.fn(),
+    statement,
   };
 
   // Hands the body a `txn` that forwards to the same mock, so assertions on
@@ -84,9 +101,11 @@ describe('BeerRepository', () => {
       // Should clear existing beers first
       expect(mockDatabase.runAsync).toHaveBeenCalledWith('DELETE FROM allbeers');
 
-      // Should insert all beers
-      expect(mockDatabase.runAsync).toHaveBeenCalledWith(
-        expect.stringContaining('INSERT OR REPLACE INTO allbeers'),
+      // Should compile the insert once and execute it per row
+      expect(mockDatabase.prepareAsync).toHaveBeenCalledWith(
+        expect.stringContaining('INSERT OR REPLACE INTO allbeers')
+      );
+      expect(mockDatabase.statement.executeAsync).toHaveBeenCalledWith(
         expect.arrayContaining(['1', '2024-01-01', 'Test IPA', 'Test Brewery'])
       );
     });
@@ -127,13 +146,11 @@ describe('BeerRepository', () => {
       await repository.insertMany(beers);
 
       // Should only insert the valid beers (2 beers)
-      const insertCalls = mockDatabase.runAsync.mock.calls.filter((call: unknown[]) =>
-        (call[0] as string).includes('INSERT OR REPLACE')
-      );
+      const insertCalls = mockDatabase.statement.executeAsync.mock.calls;
 
       expect(insertCalls).toHaveLength(2);
-      expect(insertCalls[0][1]).toContain('1');
-      expect(insertCalls[1][1]).toContain('2');
+      expect(insertCalls[0][0]).toContain('1');
+      expect(insertCalls[1][0]).toContain('2');
     });
 
     it('should process beers in batches of 50', async () => {
@@ -158,11 +175,9 @@ describe('BeerRepository', () => {
       expect(mockDatabase.withExclusiveTransactionAsync).toHaveBeenCalledTimes(1);
       expect(mockDatabase.withTransactionAsync).not.toHaveBeenCalled();
 
-      // Should insert all 120 beers
-      const insertCalls = mockDatabase.runAsync.mock.calls.filter((call: unknown[]) =>
-        (call[0] as string).includes('INSERT OR REPLACE')
-      );
-      expect(insertCalls).toHaveLength(120);
+      // Should insert all 120 beers, from a single compiled statement
+      expect(mockDatabase.prepareAsync).toHaveBeenCalledTimes(1);
+      expect(mockDatabase.statement.executeAsync).toHaveBeenCalledTimes(120);
     });
 
     it('should handle empty beer array', async () => {
@@ -178,10 +193,7 @@ describe('BeerRepository', () => {
       expect(mockDatabase.runAsync).toHaveBeenCalledWith('DELETE FROM allbeers');
 
       // Should not insert any beers
-      const insertCalls = mockDatabase.runAsync.mock.calls.filter((call: unknown[]) =>
-        (call[0] as string).includes('INSERT OR REPLACE')
-      );
-      expect(insertCalls).toHaveLength(0);
+      expect(mockDatabase.statement.executeAsync).not.toHaveBeenCalled();
     });
 
     it('should handle beers with optional fields missing', async () => {
@@ -204,8 +216,7 @@ describe('BeerRepository', () => {
       await repository.insertMany(beers);
 
       // Should insert beer with empty strings for missing fields and container_type
-      expect(mockDatabase.runAsync).toHaveBeenCalledWith(
-        expect.stringContaining('INSERT OR REPLACE INTO allbeers'),
+      expect(mockDatabase.statement.executeAsync).toHaveBeenCalledWith(
         expect.arrayContaining(['1', '', 'Minimal Beer', '', '', '', '', '', '', '', 'pint'])
       );
     });

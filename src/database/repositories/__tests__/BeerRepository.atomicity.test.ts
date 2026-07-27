@@ -54,6 +54,8 @@ type TransactionalFake = {
   readonly commitCount: () => number;
   readonly escapedQueries: () => number;
   readonly escapedWrites: () => number;
+  readonly prepareCount: () => number;
+  readonly finalizeCount: () => number;
   readonly failOnInsertNumber: (n: number) => void;
 };
 
@@ -78,6 +80,8 @@ function createTransactionalFake(
   let escapedWriteCount = 0;
   let insertsSeen = 0;
   let failAtInsert: number | null = null;
+  let prepares = 0;
+  let finalizes = 0;
 
   const isWrite = (sql: string): boolean => /^\s*(DELETE|INSERT|UPDATE)/i.test(sql);
 
@@ -148,6 +152,25 @@ function createTransactionalFake(
       if (staged === null) throw new Error('fake: txn used outside a transaction');
       return read(staged, sql) as T | null;
     },
+    // Counts compiles separately from executions, so a regression to
+    // compile-per-row is visible rather than merely slower.
+    prepareAsync: async (sql: string) => {
+      if (staged === null) throw new Error('fake: txn used outside a transaction');
+      prepares += 1;
+      let finalized = false;
+      return {
+        executeAsync: async (params: readonly unknown[] = []): Promise<RunResult> => {
+          if (finalized) throw new Error('fake: statement used after finalize');
+          if (staged === null) throw new Error('fake: statement used outside a transaction');
+          if (isWrite(sql)) sawFirstWrite = true;
+          return apply(staged, sql, params);
+        },
+        finalizeAsync: async (): Promise<void> => {
+          finalized = true;
+          finalizes += 1;
+        },
+      };
+    },
   };
 
   const runTransaction = async (
@@ -188,6 +211,8 @@ function createTransactionalFake(
     commitCount: () => commits,
     escapedQueries: () => escaped,
     escapedWrites: () => escapedWriteCount,
+    prepareCount: () => prepares,
+    finalizeCount: () => finalizes,
     failOnInsertNumber: (n: number) => {
       failAtInsert = n;
     },
@@ -238,6 +263,31 @@ describe('BeerRepository insert atomicity', () => {
     await expect(new BeerRepository().insertMany(makeBeers(5))).rejects.toThrow();
 
     expect(fake.committedIds()).toEqual(['old-1', 'old-2', 'old-3']);
+  });
+
+  it('compiles the insert once and reuses it for every row', async () => {
+    const fake = createTransactionalFake(['old-1']);
+    (connection.getDatabase as jest.Mock).mockResolvedValue(fake.db);
+
+    await new BeerRepository().insertManyUnsafe(makeBeers(120));
+
+    // One compile, not one per row. A ~1200-beer import runs entirely inside a
+    // single exclusive transaction whose whole span is covered by the 15s lock
+    // hold timeout — and blowing that timeout abandons the grant and blocks
+    // every other writer until this import finishes. Recompiling the same
+    // INSERT 1200 times is the avoidable part of that budget.
+    expect(fake.prepareCount()).toBe(1);
+    expect(fake.finalizeCount()).toBe(1);
+  });
+
+  it('finalizes the prepared statement even when an insert fails partway through', async () => {
+    const fake = createTransactionalFake(['old-1']);
+    (connection.getDatabase as jest.Mock).mockResolvedValue(fake.db);
+    fake.failOnInsertNumber(2);
+
+    await expect(new BeerRepository().insertManyUnsafe(makeBeers(5))).rejects.toThrow();
+
+    expect(fake.finalizeCount()).toBe(1);
   });
 
   it('routes every query through the transaction object, not the database handle', async () => {
