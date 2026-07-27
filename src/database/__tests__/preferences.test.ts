@@ -337,6 +337,17 @@ describe('Preference Functions', () => {
 });
 
 describe('preferences under database contention', () => {
+  // jest.setup.js:141 turns on fake timers for EVERY suite, so the retry's
+  // backoff sleep would never fire and the await would hang to the 30s test
+  // timeout. Real timers here; the whole budget is well under a second.
+  beforeEach(() => {
+    jest.useRealTimers();
+  });
+
+  afterEach(() => {
+    jest.useFakeTimers();
+  });
+
   it('maps a lock abort on setPreference to DatabaseContentionError', async () => {
     const { mockDatabase, mockRunAsync } = createMockPreferencesDb();
     (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
@@ -347,6 +358,8 @@ describe('preferences under database contention', () => {
     // write lock aborts every other writer for the duration of that import.
     // Unmapped, this reached the user as raw SQLite text via UNKNOWN_ERROR.
     await expect(setPreference('some_key', 'v')).rejects.toBeInstanceOf(DatabaseContentionError);
+    // Retried before giving up, rather than failing on the first collision.
+    expect(mockRunAsync.mock.calls.length).toBeGreaterThan(1);
   });
 
   it('leaves an unrelated failure unwrapped', async () => {

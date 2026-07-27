@@ -4,7 +4,7 @@
  */
 
 import { Preference } from './types';
-import { toContentionError } from './errors';
+import { toContentionError, retryOnContention } from './errors';
 import { getDatabase } from './connection';
 import { isPreferenceRow, preferenceRowToPreference, PreferenceRow } from './schemaTypes';
 
@@ -37,6 +37,20 @@ export const getPreference = async (key: string): Promise<string | null> => {
  * @throws Error if the database operation fails
  */
 export const setPreference = async (
+  key: string,
+  value: string,
+  description?: string
+): Promise<void> => {
+  // Retried because this module holds no lock, and the exclusive taplist import
+  // takes SQLite's write lock at the FILE level — so a background refresh aborts
+  // every preference write for its duration. See retryOnContention for why the
+  // master lock cannot simply be extended to cover this.
+  return retryOnContention(`preference write (${key})`, () =>
+    setPreferenceOnce(key, value, description)
+  );
+};
+
+const setPreferenceOnce = async (
   key: string,
   value: string,
   description?: string
