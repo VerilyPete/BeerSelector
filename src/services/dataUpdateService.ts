@@ -885,8 +885,12 @@ export async function sequentialRefreshAllData(): Promise<ManualRefreshResult> {
         // Rows arrived and none survived validation: malformed, not empty.
         // Leave the table alone and report failure rather than wiping a
         // populated tasted list and stamping over it for 12 hours.
+        // Reachable only for rows that HAVE ids but fail validateBeer's other
+        // requirements (missing or empty brew_name) — beerApi already rejects
+        // the all-ids-missing case upstream. The message says so rather than
+        // repeating the id claim, which would be false here.
         throw new Error(
-          `All ${myBeers.length} tasted beers from the API lack an id; refusing to write`
+          `All ${myBeers.length} tasted beers from the API failed validation; refusing to write`
         );
       }
       await setPreference('my_beers_last_update', new Date().toISOString());
@@ -1267,9 +1271,7 @@ export const refreshAllDataFromAPI = async (): Promise<{
       // This is the autoLogin -> CHECK IN path, so aborting here would fail a
       // check-in. Skipping the write is the lesser harm: a stale tasted list
       // beats a wiped one. Per-source reporting is 02 Phase 2.5's job.
-      console.error(
-        `Refusing to write my beers: all ${myBeersRaw.length} rows from the API lack an id`
-      );
+      console.error(`Refusing to write my beers: all ${myBeersRaw.length} rows failed validation`);
     }
 
     console.log('Fetching rewards from API...');

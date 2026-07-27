@@ -243,6 +243,27 @@ describe('Beer API', () => {
       expect(global.fetch).not.toHaveBeenCalled();
     });
 
+    it('throws rather than returning [] when every row lacks an id', async () => {
+      (preferences.getPreference as jest.Mock).mockImplementation((key: string) => {
+        if (key === 'is_visitor_mode') return Promise.resolve('false');
+        if (key === 'my_beers_api_url') return Promise.resolve('https://example.com/my.json');
+        return Promise.resolve(null);
+      });
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => [
+          {},
+          { tasted_brew_current_round: [{ brew_name: 'no id' }, { brew_name: 'nor here' }] },
+        ],
+      });
+
+      // This is where the distinguishing information was destroyed. Returning
+      // [] here made a malformed response indistinguishable from a genuine
+      // empty round for EVERY caller downstream — so no caller-side length
+      // check could tell them apart, and all three wiped the tasted table.
+      await expect(fetchMyBeersFromAPI()).rejects.toThrow(/lack an id/i);
+    });
+
     it('should fetch and return tasted beers', async () => {
       const mockBeers = [
         { id: '1', brew_name: 'Tasted Beer 1', brewer: 'Test Brewery' },

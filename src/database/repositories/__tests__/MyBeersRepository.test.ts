@@ -727,6 +727,32 @@ describe('MyBeersRepository', () => {
       lockSpy.mockRestore();
     });
 
+    it('insertMany takes the master lock', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      const lockSpy = jest.spyOn(databaseLockManager, 'withDatabaseLock');
+
+      await createRepository().insertMany(
+        nel([
+          {
+            id: '1',
+            brew_name: 'B',
+            brewer: 'X',
+            container_type: 'pint',
+            abv: null,
+            enrichment_confidence: null,
+            enrichment_source: null,
+          },
+        ])
+      );
+
+      // The destructive quadrant, and the one the first pass left unpinned:
+      // insertMany runs DELETE followed by ~200 inserts, so unlocked it races
+      // the exclusive allbeers import.
+      expect(lockSpy).toHaveBeenCalledWith('MyBeersRepository.insertMany', expect.any(Function));
+      lockSpy.mockRestore();
+    });
+
     it('replaceAllWithEmptyUnsafe does NOT take the master lock', async () => {
       const mockDatabase = createMockDatabase();
       (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);

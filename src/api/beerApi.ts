@@ -248,15 +248,21 @@ export const fetchMyBeersFromAPI = async (): Promise<Beerfinder[]> => {
         });
       }
 
-      // Return valid beers (could be empty if all beers are invalid)
       if (validBeers.length > 0) {
         return validBeers;
-      } else {
-        console.log(
-          'DB: No valid beers with IDs found in response, but returning empty array instead of error'
-        );
-        return [];
       }
+
+      // Rows arrived and none carried an id. Returning [] here is what
+      // destroyed the distinction between MALFORMED and a genuinely empty
+      // round — downstream every caller saw the same empty array, so no
+      // length check could tell them apart and all three wiped the tasted
+      // table while reporting success.
+      //
+      // Throwing is the minimal bridge: the callers' existing per-source
+      // catches already turn it into a reported failure with no write and no
+      // timestamp. 02 Phase 3 replaces it with FetchOutcome's `malformed`,
+      // which lets the caller decide rather than forcing a throw.
+      throw new Error(`My Beers response contained ${invalidBeers.length} rows and all lack an id`);
     }
 
     console.error('DB: Invalid response format from My Beers API');
