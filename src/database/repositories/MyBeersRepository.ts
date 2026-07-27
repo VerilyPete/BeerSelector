@@ -8,7 +8,7 @@
 import { getDatabase } from '../connection';
 import { BeerfinderWithContainerType } from '../../types/beer';
 import { databaseLockManager } from '../locks';
-import { toContentionError, withContentionMapping } from '../errors';
+import { toContentionError, withContentionMapping, isDatabaseLockedError } from '../errors';
 import {
   TastedBrewRow,
   TableInfo,
@@ -27,6 +27,47 @@ import { EnrichmentUpdate } from '../../types/enrichment';
  * - Clearing table for new users or round rollover
  * - Querying tasted beers by various criteria
  */
+/**
+ * Records a row-level insert failure and decides whether to keep going.
+ *
+ * Swallowing these inside the transaction — after the DELETE has already run in
+ * it — lets the transaction commit an EMPTY table while the method returns
+ * normally. The caller then stamps `my_beers_last_check` and the empty tasted
+ * list persists for 12 hours: the reported wrong-count symptom, reached without
+ * any wipe branch being involved.
+ *
+ * Contention is re-thrown immediately rather than counted. A `database is
+ * locked` abort says nothing about the row, and it is retryable, so collapsing
+ * it into a row-count failure would lose the one distinction that matters to the
+ * caller.
+ */
+function recordRowFailure(failures: unknown[], error: unknown): void {
+  if (isDatabaseLockedError(error)) {
+    throw error;
+  }
+  console.error('DB: Error inserting beer into tasted_brew_current_round:', error);
+  failures.push(error);
+}
+
+/**
+ * Throw if any row failed, naming how many of how many.
+ *
+ * A partial tasted list is not a useful state, so the transaction is allowed to
+ * roll back and leave the previous data intact — strictly better than an empty
+ * or half-populated table. The count is what makes the failure actionable: one
+ * malformed row from the API reads very differently from every row failing.
+ */
+function assertNoRowFailures(failures: readonly unknown[], attempted: number): void {
+  if (failures.length === 0) {
+    return;
+  }
+  throw new Error(
+    `Failed to insert ${failures.length} of ${attempted} tasted beers; ` +
+      `rolling back rather than committing a partial list. ` +
+      `First failure: ${failures[0] instanceof Error ? failures[0].message : String(failures[0])}`
+  );
+}
+
 export class MyBeersRepository {
   /**
    * Insert multiple tasted beers into the database
@@ -90,6 +131,7 @@ export class MyBeersRepository {
         try {
           // Use a transaction for clearing and inserting data
           console.log('DB: Starting transaction for populating My Beers table');
+          const rowFailures: unknown[] = [];
           await database.withTransactionAsync(async () => {
             // Only clear the table if we have valid beers to insert
             console.log('DB: Clearing existing data from tasted_brew_current_round table');
@@ -143,10 +185,15 @@ export class MyBeersRepository {
                     ]
                   );
                 } catch (err) {
-                  console.error('DB: Error inserting beer into tasted_brew_current_round:', err);
+                  recordRowFailure(rowFailures, err);
                 }
               }
             }
+
+            // Inside the transaction on purpose: throwing here rolls it back,
+            // leaving the previous tasted list intact rather than committing an
+            // empty or partial one.
+            assertNoRowFailures(rowFailures, validBeers.length);
           });
 
           // Verify final row count
@@ -237,6 +284,7 @@ export class MyBeersRepository {
       try {
         // Use a transaction for clearing and inserting data
         console.log('DB: Starting transaction for populating My Beers table');
+        const rowFailures: unknown[] = [];
         await database.withTransactionAsync(async () => {
           // Only clear the table if we have valid beers to insert
           console.log('DB: Clearing existing data from tasted_brew_current_round table');
@@ -290,10 +338,15 @@ export class MyBeersRepository {
                   ]
                 );
               } catch (err) {
-                console.error('DB: Error inserting beer into tasted_brew_current_round:', err);
+                recordRowFailure(rowFailures, err);
               }
             }
           }
+
+          // Inside the transaction on purpose: throwing here rolls it back,
+          // leaving the previous tasted list intact rather than committing an
+          // empty or partial one.
+          assertNoRowFailures(rowFailures, validBeers.length);
         });
 
         // Verify final row count

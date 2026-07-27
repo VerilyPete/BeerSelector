@@ -528,7 +528,12 @@ describe('MyBeersRepository', () => {
   });
 
   describe('error handling', () => {
-    it('should handle individual beer insert errors gracefully without throwing', async () => {
+    // INVERTED by plan 02 Phase 5 (was MyBeersRepository.test.ts:531).
+    // Previously asserted the import resolves when a row insert fails. That is
+    // the defect: the DELETE has already run in the same transaction, so
+    // "gracefully" meant committing an empty or partial table and reporting
+    // success. Rolling back and rejecting leaves the previous list intact.
+    it('rejects rather than committing a partial list when a row insert fails', async () => {
       const mockDatabase = createMockDatabase();
       (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
@@ -562,7 +567,7 @@ describe('MyBeersRepository', () => {
         .mockRejectedValueOnce(new Error('Insert failed for beer 1')) // First beer fails
         .mockResolvedValueOnce(undefined); // Second beer succeeds
 
-      await expect(repository.insertMany(beers)).resolves.not.toThrow();
+      await expect(repository.insertMany(beers)).rejects.toThrow(/1 of 2/);
     });
 
     it('should throw error on transaction failure', async () => {
@@ -636,6 +641,131 @@ describe('MyBeersRepository', () => {
       mockDatabase.withTransactionAsync.mockRejectedValueOnce(original);
 
       await expect(repository.insertMany(beers)).rejects.toBe(original);
+    });
+  });
+
+  describe('per-row insert failures', () => {
+    function oneBeer(): BeerfinderWithContainerType[] {
+      return [
+        {
+          id: '1',
+          brew_name: 'Test Beer',
+          brewer: 'Test Brewery',
+          container_type: 'pint',
+          abv: null,
+          enrichment_confidence: null,
+          enrichment_source: null,
+        },
+      ];
+    }
+
+    // A swallowed row error inside the transaction, AFTER the DELETE has run in
+    // that same transaction, commits an EMPTY table and returns normally. The
+    // caller then stamps my_beers_last_check and the empty list persists for 12
+    // hours — the reported wrong-count symptom, reached without any wipe branch.
+    it('insertMany rejects when a row insert fails', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      const repository = createRepository();
+
+      mockDatabase.runAsync.mockImplementation(async (sql: string) =>
+        String(sql).includes('INSERT')
+          ? Promise.reject(new Error('SQLITE_CONSTRAINT: NOT NULL'))
+          : Promise.resolve({ changes: 0, lastInsertRowId: 0 })
+      );
+
+      await expect(repository.insertMany(oneBeer())).rejects.toThrow();
+    });
+
+    it('insertMany reports the number of rows that failed to insert', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      const repository = createRepository();
+
+      mockDatabase.runAsync.mockImplementation(async (sql: string) =>
+        String(sql).includes('INSERT')
+          ? Promise.reject(new Error('SQLITE_CONSTRAINT: NOT NULL'))
+          : Promise.resolve({ changes: 0, lastInsertRowId: 0 })
+      );
+
+      // The count is what makes the failure actionable — one bad row from the
+      // API reads very differently from every row failing.
+      await expect(repository.insertMany(oneBeer())).rejects.toThrow(/1 of 1/);
+    });
+
+    it('insertManyUnsafe rejects when a row insert fails', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      const repository = createRepository();
+
+      mockDatabase.runAsync.mockImplementation(async (sql: string) =>
+        String(sql).includes('INSERT')
+          ? Promise.reject(new Error('SQLITE_CONSTRAINT: NOT NULL'))
+          : Promise.resolve({ changes: 0, lastInsertRowId: 0 })
+      );
+
+      await expect(repository.insertManyUnsafe(oneBeer())).rejects.toThrow(/1 of 1/);
+    });
+
+    it('surfaces a contention abort on a row as DatabaseContentionError, not a row-count error', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      const repository = createRepository();
+
+      mockDatabase.runAsync.mockImplementation(async (sql: string) =>
+        String(sql).includes('INSERT')
+          ? Promise.reject(new Error('database is locked'))
+          : Promise.resolve({ changes: 0, lastInsertRowId: 0 })
+      );
+
+      // Distinguishable from malformed data: one is retryable, the other is not.
+      //
+      // toBeInstanceOf ALONE is not enough here, and that is not a hypothetical:
+      // if contention were collected as a row failure, the aggregate message
+      // would quote it ("First failure: database is locked"), the substring
+      // matcher in isDatabaseLockedError would match the quote, and the wrapper
+      // would be applied anyway — passing for entirely the wrong reason. So this
+      // also pins that it did NOT become a row-count aggregate.
+      const thrown = await repository.insertMany(oneBeer()).catch(error => error);
+
+      expect(thrown).toBeInstanceOf(DatabaseContentionError);
+      // Checking the WRAPPED original, not the wrapper's message: the wrapper
+      // rewrites the message either way, so asserting on it cannot tell the two
+      // paths apart. If contention had been collected as a row failure, the
+      // original here would be the "Failed to insert 1 of 1..." aggregate.
+      const original = (thrown as DatabaseContentionError).originalError;
+      expect((original as Error).message).toBe('database is locked');
+    });
+
+    it('lets a row failure escape the transaction body so the engine rolls back', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      const repository = createRepository();
+
+      // The mocked connection cannot model rollback, so assert the property that
+      // CAUSES it: the failure must propagate out of the transaction callback.
+      // Throwing after the transaction closes would commit the empty table and
+      // then complain about it — which is the bug wearing a different hat.
+      let transactionRejected = false;
+      mockDatabase.withTransactionAsync.mockImplementation(
+        async (callback: () => Promise<void>) => {
+          try {
+            await callback();
+          } catch (error) {
+            transactionRejected = true;
+            throw error;
+          }
+        }
+      );
+      mockDatabase.runAsync.mockImplementation(async (sql: string) =>
+        String(sql).includes('INSERT')
+          ? Promise.reject(new Error('SQLITE_CONSTRAINT: NOT NULL'))
+          : Promise.resolve({ changes: 0, lastInsertRowId: 0 })
+      );
+
+      await expect(repository.insertMany(oneBeer())).rejects.toThrow();
+
+      expect(transactionRejected).toBe(true);
     });
   });
 
@@ -810,7 +940,9 @@ describe('MyBeersRepository', () => {
       expect(insertCalls).toHaveLength(2); // Only valid beers inserted
     });
 
-    it('should handle insert errors gracefully without throwing', async () => {
+    // INVERTED by plan 02 Phase 5 (was MyBeersRepository.test.ts:894), same
+    // reasoning as its locked twin above.
+    it('rejects rather than committing a partial list when a row insert fails', async () => {
       const mockDatabase = createMockDatabase();
       (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
@@ -832,7 +964,7 @@ describe('MyBeersRepository', () => {
         .mockResolvedValueOnce(undefined) // DELETE succeeds
         .mockRejectedValueOnce(new Error('Insert failed')); // INSERT fails
 
-      await expect(repository.insertManyUnsafe(beers)).resolves.not.toThrow();
+      await expect(repository.insertManyUnsafe(beers)).rejects.toThrow(/of /);
     });
 
     it('should throw error on transaction failure', async () => {
