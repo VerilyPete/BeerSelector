@@ -1161,123 +1161,165 @@ export const refreshAllDataFromAPI = async (): Promise<{
     const apiUrl = await getPreference('all_beers_api_url');
     const storeId = apiUrl ? extractStoreIdFromUrl(apiUrl) : null;
 
-    // =========================================================================
-    // ALL BEERS: Try proxy first, fall back to direct fetch
-    // =========================================================================
-    console.log('Fetching all beers from API...');
-    const taplistResult = await fetchTaplistFromProxyOrDirect(storeId);
-
+    // Hoisted so a failing source leaves the others intact rather than
+    // taking their results down with it. Each stays at its empty default,
+    // which is what the caller then sees for that source.
     let allBeersWithContainerTypes: BeerWithContainerType[] = [];
+    let myBeersWithContainerTypes: BeerfinderWithContainerType[] = [];
+    let rewards: Awaited<ReturnType<typeof fetchRewardsFromAPI>> = [];
 
-    if (taplistResult.notModified) {
-      console.log('All beers data not modified (304), skipping DB update');
-      await setPreference('all_beers_last_check', new Date().toISOString());
-      // Load existing beers from database for return value
-      // Note: We return empty array here; callers should handle accordingly
-    } else {
-      const { beers: allBeersRaw, etag } = taplistResult;
+    // Each source is isolated, mirroring sequentialRefreshAllData. This is the
+    // only one of the three refresh entry points that had no per-source catch,
+    // so a single failure aborted the remainder — and the live path is a
+    // CHECK IN with an expired session on a weak link: checkInBeer ->
+    // autoLogin -> here. The taplist write would land, the my-beers fetch would
+    // throw, and BOTH the my-beers and rewards writes were skipped, leaving a
+    // fresh taplist beside a stale tasted list: a wrong-high Beerfinder count.
+    //
+    // Deliberately does NOT reorder fetch versus write. Today the taplist is
+    // written before my-beers is fetched, so a my-beers failure still leaves
+    // the taplist written — the property 01 Phase 4 is protecting. This adds
+    // isolation WITHIN that order rather than changing it.
+    try {
+      // =========================================================================
+      // ALL BEERS: Try proxy first, fall back to direct fetch
+      // =========================================================================
+      console.log('Fetching all beers from API...');
+      const taplistResult = await fetchTaplistFromProxyOrDirect(storeId);
 
-      const allBeersValidation = validateBeerArray(allBeersRaw);
+      allBeersWithContainerTypes = [];
 
-      if (allBeersValidation.invalidBeers.length > 0) {
-        logWarning(`Skipping ${allBeersValidation.invalidBeers.length} invalid all beers`, {
-          operation: 'refreshAllDataFromAPI',
-          component: 'dataUpdateService',
-          additionalData: { summary: allBeersValidation.summary },
-        });
+      if (taplistResult.notModified) {
+        console.log('All beers data not modified (304), skipping DB update');
+        await setPreference('all_beers_last_check', new Date().toISOString());
+        // Load existing beers from database for return value
+        // Note: We return empty array here; callers should handle accordingly
+      } else {
+        const { beers: allBeersRaw, etag } = taplistResult;
+
+        const allBeersValidation = validateBeerArray(allBeersRaw);
+
+        if (allBeersValidation.invalidBeers.length > 0) {
+          logWarning(`Skipping ${allBeersValidation.invalidBeers.length} invalid all beers`, {
+            operation: 'refreshAllDataFromAPI',
+            component: 'dataUpdateService',
+            additionalData: { summary: allBeersValidation.summary },
+          });
+        }
+
+        if (allBeersValidation.validBeers.length === 0) {
+          throw new Error('No valid all beers found in API response');
+        }
+
+        // Calculate container types BEFORE insertion
+        console.log('Calculating container types for all beers...');
+        allBeersWithContainerTypes = calculateContainerTypes(allBeersValidation.validBeers);
+
+        const apiBeersToInsert = toNonEmpty(allBeersWithContainerTypes);
+        if (apiBeersToInsert === null) {
+          throw new Error('No valid all beers to insert after container-type calculation');
+        }
+        await beerRepository.insertManyUnsafe(apiBeersToInsert);
+
+        // Store ETag for future conditional requests
+        if (etag) {
+          await setPreference('all_beers_etag', etag);
+        }
       }
-
-      if (allBeersValidation.validBeers.length === 0) {
-        throw new Error('No valid all beers found in API response');
-      }
-
-      // Calculate container types BEFORE insertion
-      console.log('Calculating container types for all beers...');
-      allBeersWithContainerTypes = calculateContainerTypes(allBeersValidation.validBeers);
-
-      const apiBeersToInsert = toNonEmpty(allBeersWithContainerTypes);
-      if (apiBeersToInsert === null) {
-        throw new Error('No valid all beers to insert after container-type calculation');
-      }
-      await beerRepository.insertManyUnsafe(apiBeersToInsert);
-
-      // Store ETag for future conditional requests
-      if (etag) {
-        await setPreference('all_beers_etag', etag);
-      }
-    }
-
-    // =========================================================================
-    // MY BEERS: Fetch from FS, then batch enrichment
-    // =========================================================================
-    console.log('Fetching my beers from API...');
-    const myBeersRaw = await fetchMyBeersFromAPI();
-    const myBeersValidation = validateBeerArray(myBeersRaw);
-
-    if (myBeersValidation.invalidBeers.length > 0) {
-      logWarning(`Skipping ${myBeersValidation.invalidBeers.length} invalid my beers`, {
-        operation: 'refreshAllDataFromAPI',
+    } catch (error) {
+      logError(error, {
+        operation: 'refreshAllDataFromAPI - all beers',
         component: 'dataUpdateService',
-        additionalData: { summary: myBeersValidation.summary },
       });
     }
 
-    // Enrich BEFORE container type calculation so ABV is available for glass selection
-    let myBeersForContainerCalc = myBeersValidation.validBeers;
-    if (config.enrichment.isConfigured() && myBeersValidation.validBeers.length > 0) {
-      try {
-        const beerIds = myBeersValidation.validBeers.map(beer => beer.id);
-        console.log(
-          `[refreshAllDataFromAPI] Fetching enrichment for ${beerIds.length} tasted beers...`
-        );
+    try {
+      // =========================================================================
+      // MY BEERS: Fetch from FS, then batch enrichment
+      // =========================================================================
+      console.log('Fetching my beers from API...');
+      const myBeersRaw = await fetchMyBeersFromAPI();
+      const myBeersValidation = validateBeerArray(myBeersRaw);
 
-        const { enrichments: enrichmentData, missing: missingIds } =
-          await fetchEnrichmentBatchWithMissing(beerIds);
-        const enrichedCount = Object.keys(enrichmentData).length;
-
-        if (enrichedCount > 0) {
-          console.log(`[refreshAllDataFromAPI] Got enrichment for ${enrichedCount} tasted beers`);
-          myBeersForContainerCalc = mergeEnrichmentData(
-            myBeersValidation.validBeers,
-            enrichmentData
-          );
-        }
-
-        // Sync missing beers to Worker for enrichment (in background)
-        syncMissingBeersInBackground(
-          missingIds,
-          myBeersValidation.validBeers,
-          'refreshAllDataFromAPI'
-        );
-      } catch (enrichmentError) {
-        logWarning('Batch enrichment failed in refreshAllDataFromAPI, continuing without', {
+      if (myBeersValidation.invalidBeers.length > 0) {
+        logWarning(`Skipping ${myBeersValidation.invalidBeers.length} invalid my beers`, {
           operation: 'refreshAllDataFromAPI',
           component: 'dataUpdateService',
+          additionalData: { summary: myBeersValidation.summary },
         });
       }
+
+      // Enrich BEFORE container type calculation so ABV is available for glass selection
+      let myBeersForContainerCalc = myBeersValidation.validBeers;
+      if (config.enrichment.isConfigured() && myBeersValidation.validBeers.length > 0) {
+        try {
+          const beerIds = myBeersValidation.validBeers.map(beer => beer.id);
+          console.log(
+            `[refreshAllDataFromAPI] Fetching enrichment for ${beerIds.length} tasted beers...`
+          );
+
+          const { enrichments: enrichmentData, missing: missingIds } =
+            await fetchEnrichmentBatchWithMissing(beerIds);
+          const enrichedCount = Object.keys(enrichmentData).length;
+
+          if (enrichedCount > 0) {
+            console.log(`[refreshAllDataFromAPI] Got enrichment for ${enrichedCount} tasted beers`);
+            myBeersForContainerCalc = mergeEnrichmentData(
+              myBeersValidation.validBeers,
+              enrichmentData
+            );
+          }
+
+          // Sync missing beers to Worker for enrichment (in background)
+          syncMissingBeersInBackground(
+            missingIds,
+            myBeersValidation.validBeers,
+            'refreshAllDataFromAPI'
+          );
+        } catch (enrichmentError) {
+          logWarning('Batch enrichment failed in refreshAllDataFromAPI, continuing without', {
+            operation: 'refreshAllDataFromAPI',
+            component: 'dataUpdateService',
+          });
+        }
+      }
+
+      // Calculate container types AFTER enrichment so ABV is available for glass selection
+      console.log('Calculating container types for my beers...');
+      myBeersWithContainerTypes = calculateContainerTypes(myBeersForContainerCalc);
+
+      // Same split as sequentialRefreshAllData: only the RAW length can tell a
+      // genuine empty round from a response whose every row lacked an id.
+      const apiMyBeers = toNonEmpty(myBeersWithContainerTypes as BeerfinderWithContainerType[]);
+      if (apiMyBeers !== null) {
+        await myBeersRepository.insertManyUnsafe(apiMyBeers);
+      } else if (myBeersRaw.length === 0) {
+        await myBeersRepository.replaceAllWithEmptyUnsafe();
+      } else {
+        // This is the autoLogin -> CHECK IN path, so aborting here would fail a
+        // check-in. Skipping the write is the lesser harm: a stale tasted list
+        // beats a wiped one. Per-source reporting is 02 Phase 2.5's job.
+        console.error(
+          `Refusing to write my beers: all ${myBeersRaw.length} rows failed validation`
+        );
+      }
+    } catch (error) {
+      logError(error, {
+        operation: 'refreshAllDataFromAPI - my beers',
+        component: 'dataUpdateService',
+      });
     }
 
-    // Calculate container types AFTER enrichment so ABV is available for glass selection
-    console.log('Calculating container types for my beers...');
-    const myBeersWithContainerTypes = calculateContainerTypes(myBeersForContainerCalc);
-
-    // Same split as sequentialRefreshAllData: only the RAW length can tell a
-    // genuine empty round from a response whose every row lacked an id.
-    const apiMyBeers = toNonEmpty(myBeersWithContainerTypes as BeerfinderWithContainerType[]);
-    if (apiMyBeers !== null) {
-      await myBeersRepository.insertManyUnsafe(apiMyBeers);
-    } else if (myBeersRaw.length === 0) {
-      await myBeersRepository.replaceAllWithEmptyUnsafe();
-    } else {
-      // This is the autoLogin -> CHECK IN path, so aborting here would fail a
-      // check-in. Skipping the write is the lesser harm: a stale tasted list
-      // beats a wiped one. Per-source reporting is 02 Phase 2.5's job.
-      console.error(`Refusing to write my beers: all ${myBeersRaw.length} rows failed validation`);
+    try {
+      console.log('Fetching rewards from API...');
+      rewards = await fetchRewardsFromAPI();
+      await rewardsRepository.insertManyUnsafe(rewards);
+    } catch (error) {
+      logError(error, {
+        operation: 'refreshAllDataFromAPI - rewards',
+        component: 'dataUpdateService',
+      });
     }
-
-    console.log('Fetching rewards from API...');
-    const rewards = await fetchRewardsFromAPI();
-    await rewardsRepository.insertManyUnsafe(rewards);
 
     console.log(
       `Refreshed all data: ${allBeersWithContainerTypes.length} beers, ${myBeersWithContainerTypes.length} tasted beers, ${rewards.length} rewards`
