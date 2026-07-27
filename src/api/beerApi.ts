@@ -8,9 +8,10 @@ import { createErrorResponse } from '../utils/notificationUtils';
 import type { FetchOutcome, UnavailableReason, UnconditionalSource } from './fetchOutcome';
 
 /**
- * Helper function to retry fetch operations with exponential backoff
+ * Fetch with exponential backoff, bounded as a whole.
+ *
  * @param url - The URL to fetch
- * @param retries - Number of retry attempts (default: 3)
+ * @param retries - Maximum attempts, including the first (default: 3)
  * @param delay - Initial delay between retries in ms (default from config)
  * @returns Promise with the JSON response
  */
@@ -25,6 +26,32 @@ export const fetchWithRetry = async (
   // round. Callers now reject none:// URLs before calling, and return
   // `unavailable/not-applicable` instead.
 
+  // The deadline is computed ONCE, here, and then spent by however many attempts
+  // follow. Phase 5.0 armed a fresh `config.network.timeout` per attempt, which
+  // bounds an attempt and not the operation: three stalled attempts plus backoff
+  // came to ≈47.5s against a 15s master-lock hold, so the bound whose stated
+  // purpose was to keep a refresh inside that hold missed it by 3x. A caller
+  // asking for a 15s timeout is asking about the call it made, not about an
+  // implementation detail of how many times that call is repeated internally.
+  return attemptFetch(url, retries, delay, Date.now() + config.network.timeout);
+};
+
+/**
+ * One attempt against a chain-wide deadline, recursing until it succeeds, runs
+ * out of attempts, or runs out of budget.
+ *
+ * Separate from `fetchWithRetry` so `deadline` is a required parameter rather
+ * than an optional one. An optional deadline defaulting to "now + timeout" reads
+ * identically at the call site and silently renews the budget on every recursion
+ * — reintroducing the per-attempt bound this exists to remove, in a way no
+ * caller could see.
+ */
+const attemptFetch = async (
+  url: string,
+  retries: number,
+  delay: number,
+  deadline: number
+): Promise<unknown> => {
   // An unbounded request here can be an unbounded database lock hold: the full
   // refresh paths call this while holding the master lock, and past the lock's
   // hold timeout the grant is abandoned and every later writer blocks until this
@@ -35,7 +62,7 @@ export const fetchWithRetry = async (
   // lock-hold argument but not the bound itself — a request that never settles
   // is worth failing either way.)
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), config.network.timeout);
+  const timeoutId = setTimeout(() => controller.abort(), deadline - Date.now());
 
   try {
     const response = await fetch(url, { signal: controller.signal });
@@ -64,15 +91,37 @@ export const fetchWithRetry = async (
       throw error;
     }
 
+    // A 4xx is the server reading the request and rejecting it on its merits.
+    // Repeating it verbatim asks the same question and gets the same answer, so
+    // the retry buys nothing and costs 4.75s of a weak link's refresh budget.
+    // `createErrorResponse` already concedes the point — it maps 4xx to
+    // VALIDATION_ERROR and 5xx to SERVER_ERROR — and until now this loop
+    // contradicted it. 5xx keeps its retries: a 502 from a load balancer is the
+    // transient fault backoff is for.
+    //
+    // Keyed on the status rather than on "it threw", because a transport failure
+    // carries no status and must keep retrying — that is the case this whole
+    // plan exists for.
+    if (error instanceof HttpError && error.status < 500) {
+      throw error;
+    }
+
     if (retries <= 1) {
+      throw error;
+    }
+
+    // Sleeping past our own deadline buys nothing: the attempt it schedules is
+    // born already aborted, so the wait converts a real error into an AbortError
+    // that describes nothing that happened. Report what actually failed instead.
+    if (Date.now() + delay >= deadline) {
       throw error;
     }
 
     console.log(`Fetch failed, retrying in ${delay}ms... (${retries - 1} retries left)`);
     await new Promise(resolve => setTimeout(resolve, delay));
-    return fetchWithRetry(url, retries - 1, delay * 1.5);
+    return attemptFetch(url, retries - 1, delay * 1.5, deadline);
   } finally {
-    // Runs on the retry path too: `return fetchWithRetry(...)` in the catch
+    // Runs on the retry path too: `return attemptFetch(...)` in the catch
     // evaluates the call, then this clears THIS invocation's timer before the
     // promise is handed back. Each recursion arms and disarms its own.
     clearTimeout(timeoutId);
