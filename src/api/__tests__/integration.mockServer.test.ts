@@ -210,6 +210,13 @@ describe('API Integration with Mock Server', () => {
         expect(notFound.error.type).toBe(ApiErrorType.VALIDATION_ERROR);
         expect(notFound.error.statusCode).toBe(404);
       }
+
+      // Plan 05 Phase 5.4a: a 4xx is not retried. Asserted here because this is
+      // the only suite with a real server counting real requests — the Jest
+      // coverage of this policy counts calls to a `fetch` mock, which cannot
+      // show that the server was left alone. Written without being run: this
+      // suite needs a socket listen and fails with EPERM in the sandbox.
+      expect(mockServer.getRequestsForPath('/notfound.php').length).toBe(1);
     });
 
     it('should timeout on slow response', async () => {
