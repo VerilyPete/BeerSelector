@@ -12,6 +12,7 @@ import {
   FlyingSaucerResponses,
   RequestRecord,
 } from '../../__tests__/utils/mockServer';
+import { ApiErrorType } from '../../utils/notificationUtils';
 import {
   fetchBeersFromAPI,
   fetchMyBeersFromAPI,
@@ -186,6 +187,13 @@ describe('API Integration with Mock Server', () => {
       // than being read as a network error out of its message.
       const outcome = await fetchBeersFromAPI();
       expect(outcome.status).toBe('failed');
+      if (outcome.status === 'failed') {
+        // This suite is the only place a real HTTP status crosses a socket, so
+        // it is the right home for the classification assertion. A 5xx must not
+        // be read as a network error — that told the user to check the one thing
+        // they could do nothing about.
+        expect(outcome.error.type).toBe(ApiErrorType.SERVER_ERROR);
+      }
     });
 
     it('should handle 404 not found error', async () => {
@@ -193,8 +201,15 @@ describe('API Integration with Mock Server', () => {
 
       mockServer.setResponse('/notfound.php', FlyingSaucerResponses.notFound());
 
-      // INVERTED by plan 05 Phase 5.3.
-      expect((await fetchBeersFromAPI()).status).toBe('failed');
+      // INVERTED by plan 05 Phase 5.3. A 4xx is a client fault, so it classifies
+      // as VALIDATION_ERROR rather than SERVER_ERROR — the split has no other
+      // real-socket coverage.
+      const notFound = await fetchBeersFromAPI();
+      expect(notFound.status).toBe('failed');
+      if (notFound.status === 'failed') {
+        expect(notFound.error.type).toBe(ApiErrorType.VALIDATION_ERROR);
+        expect(notFound.error.statusCode).toBe(404);
+      }
     });
 
     it('should timeout on slow response', async () => {
