@@ -3,7 +3,8 @@ import { isBeer } from '../types/beer';
 import { Reward } from '../types/database';
 import { getPreference } from '../database/preferences';
 import { config } from '../config';
-import { MalformedResponseError } from './fetchOutcome';
+import { toNonEmpty } from './fetchOutcome';
+import type { FetchOutcome, FetchedSource, UnavailableReason } from './fetchOutcome';
 
 /**
  * Helper function to retry fetch operations with exponential backoff
@@ -17,14 +18,11 @@ export const fetchWithRetry = async (
   retries = 3,
   delay = config.network.retryDelay
 ): Promise<unknown> => {
-  // Special handling for none:// protocol which is used as a placeholder in visitor mode
-  if (url.startsWith('none://')) {
-    console.log(
-      `Detected none:// protocol URL: ${url}. Returning empty data instead of making network request.`
-    );
-    // Return an empty array structure that matches the expected format
-    return [null, { tasted_brew_current_round: [] }];
-  }
+  // The none:// synthesis that used to live here is GONE. It fabricated
+  // `[null, { tasted_brew_current_round: [] }]` — a server response that never
+  // existed — which every downstream parser then read as a legitimate empty
+  // round. Callers now reject none:// URLs before calling, and return
+  // `unavailable/not-applicable` instead.
 
   try {
     const response = await fetch(url);
@@ -46,17 +44,57 @@ export const fetchWithRetry = async (
 };
 
 /**
+ * Build an `unavailable` outcome.
+ *
+ * These are the conditions that used to collapse into a bare `[]` — the whole
+ * reason a caller could not tell "we never asked" from "the server said none".
+ */
+const unavailable = <T>(
+  code: UnavailableReason['code'],
+  detail: string
+): FetchedSource<FetchOutcome<T>> => ({ status: 'unavailable', reason: { code, detail } });
+
+/**
+ * Classify a parsed array into `data` or `confirmed-empty`.
+ *
+ * `confirmed-empty` means the server genuinely reported none — the only case in
+ * which clearing a local table is correct. Anything that arrived but could not
+ * be used is `malformed`, and the caller decides what that means.
+ */
+const fromArray = <T>(
+  items: readonly T[],
+  malformedDetail: string
+): FetchedSource<FetchOutcome<T>> =>
+  fetched(
+    toNonEmpty(items) === null
+      ? { kind: 'malformed', detail: malformedDetail }
+      : { kind: 'data', items: toNonEmpty(items)! }
+  );
+
+/**
+ * Wrap a payload outcome as a completed request.
+ *
+ * `etag: null` because only the all-beers proxy path carries ETags, and it
+ * handles them separately — these three functions never produce one.
+ */
+const fetched = <T>(data: FetchOutcome<T>): FetchedSource<FetchOutcome<T>> => ({
+  status: 'fetched',
+  data,
+  etag: null,
+});
+
+/**
  * Fetch all beers from the Flying Saucer API
  * @returns Promise with array of Beer objects
  */
-export const fetchBeersFromAPI = async (): Promise<Beer[]> => {
+export const fetchBeersFromAPI = async (): Promise<FetchedSource<FetchOutcome<Beer>>> => {
   try {
     // Get the API endpoint from preferences
     const apiUrl = await getPreference('all_beers_api_url');
 
     if (!apiUrl) {
       console.log('All beers API URL not found in preferences');
-      return []; // Return empty array instead of throwing an error
+      return unavailable('not-configured', 'all_beers_api_url is not set');
     }
 
     console.log('Fetching beers from API URL:', apiUrl);
@@ -74,7 +112,7 @@ export const fetchBeersFromAPI = async (): Promise<Beer[]> => {
       console.log(
         `Found regular format with brewInStock array (${data[1].brewInStock.length} beers)`
       );
-      return data[1].brewInStock;
+      return fromArray(data[1].brewInStock, 'brewInStock array contained no usable beers');
     }
 
     // 2. Visitor API format: may have different structure
@@ -125,7 +163,7 @@ export const fetchBeersFromAPI = async (): Promise<Beer[]> => {
 
       const beersArray = findBeersArray(data);
       if (beersArray && beersArray.length > 0) {
-        return beersArray;
+        return fromArray(beersArray, 'discovered beer array contained no usable beers');
       }
     }
 
@@ -152,15 +190,13 @@ export const fetchBeersFromAPI = async (): Promise<Beer[]> => {
  *
  * @returns Promise with array of Beerfinder (tasted beer) objects
  */
-export const fetchMyBeersFromAPI = async (): Promise<Beerfinder[]> => {
+export const fetchMyBeersFromAPI = async (): Promise<FetchedSource<FetchOutcome<Beerfinder>>> => {
   try {
     // First check if in visitor mode to immediately return empty array
     const isVisitorMode = (await getPreference('is_visitor_mode')) === 'true';
     if (isVisitorMode) {
-      console.log(
-        'DB: In visitor mode - fetchMyBeersFromAPI returning empty array without making network request'
-      );
-      return [];
+      console.log('DB: In visitor mode - my beers is not applicable');
+      return unavailable('not-applicable', 'visitor mode has no tasted beers');
     }
 
     // Get the API endpoint from preferences
@@ -169,13 +205,16 @@ export const fetchMyBeersFromAPI = async (): Promise<Beerfinder[]> => {
 
     if (!apiUrl) {
       console.log('DB: My beers API URL not found in preferences');
-      return []; // Return empty array instead of throwing an error
+      return unavailable('not-configured', 'my_beers_api_url is not set');
     }
 
     // Special handling for none:// protocol to avoid network errors
     if (apiUrl.startsWith('none://')) {
-      console.log('DB: Detected none:// protocol in my_beers_api_url, returning empty array');
-      return [];
+      // Rejected HERE, before any request. fetchWithRetry no longer synthesises
+      // a fake empty response for none://, so without this guard the URL would
+      // fall through to fetch() and burn three retries with backoff.
+      console.log('DB: none:// placeholder in my_beers_api_url - not applicable');
+      return unavailable('not-applicable', 'my_beers_api_url is a none:// placeholder');
     }
 
     console.log('DB: Making API request to fetch My Beers data...');
@@ -216,7 +255,9 @@ export const fetchMyBeersFromAPI = async (): Promise<Beerfinder[]> => {
         console.log(
           'DB: Empty tasted beers array - user has no tasted beers in current round (new user or round rollover at 200 beers)'
         );
-        return [];
+        // The server genuinely reported none. This is the ONLY case in which
+        // clearing the local tasted table is correct.
+        return fetched({ kind: 'confirmed-empty' });
       }
 
       // Validate the beers array - check for missing IDs
@@ -250,35 +291,17 @@ export const fetchMyBeersFromAPI = async (): Promise<Beerfinder[]> => {
       }
 
       if (validBeers.length > 0) {
-        return validBeers;
+        return fromArray(validBeers, 'no tasted beers survived id validation');
       }
 
-      // Rows arrived and none carried an id. Returning [] here is what
-      // destroyed the distinction between MALFORMED and a genuinely empty
-      // round — downstream every caller saw the same empty array, so no
-      // length check could tell them apart and all three wiped the tasted
-      // table while reporting success.
-      //
-      // Throwing is the minimal bridge. There are exactly TWO production
-      // callers — grep-verified, and note that fetchAndUpdateMyBeers is NOT one
-      // of them: it inlines its own fetch and parse, which is why 02 Phase 4
-      // exists. The throw lands differently in each:
-      //
-      //   sequentialRefreshAllData (:815)  per-source catch reports failure;
-      //       all-beers and rewards still run. Clean.
-      //   refreshAllDataFromAPI (:1213)    has NO per-source catch, so this
-      //       aborts the whole function and the rewards write after it is
-      //       SKIPPED — fresh taplist, stale tasted, stale rewards, which is
-      //       the scenario 02 Phase 2.5 exists to fix. autoLogin catches and
-      //       logs, so a check-in still proceeds and nothing reaches the user.
-      //       A missed rewards refresh is the price of not wiping the tasted
-      //       list, and rewards refresh on their own schedule.
-      //
-      // 02 Phase 3 replaces this with FetchOutcome's `malformed`, letting each
-      // caller decide instead of forcing a throw on both.
-      throw new MalformedResponseError(
-        `My Beers response contained ${invalidBeers.length} rows and all lack an id`
-      );
+      // Rows arrived and none carried an id: MALFORMED, not an empty round.
+      // Phase 2 bridged this with a throw because there was no way to say it in
+      // the return type; `malformed` is that way, and it lets each caller
+      // decide instead of forcing all of them to catch.
+      return fetched({
+        kind: 'malformed',
+        detail: `${invalidBeers.length} rows returned and none carried an id`,
+      });
     }
 
     console.error('DB: Invalid response format from My Beers API');
@@ -293,13 +316,13 @@ export const fetchMyBeersFromAPI = async (): Promise<Beerfinder[]> => {
  * Fetch user's rewards from the Flying Saucer API
  * @returns Promise with array of Reward objects
  */
-export const fetchRewardsFromAPI = async (): Promise<Reward[]> => {
+export const fetchRewardsFromAPI = async (): Promise<FetchedSource<FetchOutcome<Reward>>> => {
   try {
     // Check if in visitor mode first
     const isVisitorMode = (await getPreference('is_visitor_mode')) === 'true';
     if (isVisitorMode) {
-      console.log('In visitor mode - rewards not available, returning empty array');
-      return [];
+      console.log('In visitor mode - rewards not applicable');
+      return unavailable('not-applicable', 'visitor mode has no rewards');
     }
 
     // Get the API endpoint from preferences
@@ -307,14 +330,21 @@ export const fetchRewardsFromAPI = async (): Promise<Reward[]> => {
 
     if (!apiUrl) {
       console.log('My beers API URL not found in preferences');
-      return []; // Return empty array instead of throwing an error
+      return unavailable('not-configured', 'my_beers_api_url is not set');
     }
 
     const data = await fetchWithRetry(apiUrl);
 
     // Extract the reward array from the response
     if (data && Array.isArray(data) && data.length >= 3 && data[2] && data[2].reward) {
-      return data[2].reward;
+      // An empty reward list is a real state — a member with none earned yet —
+      // so it is confirmed-empty rather than malformed.
+      const rewards = data[2].reward as Reward[];
+      return fetched(
+        rewards.length === 0
+          ? { kind: 'confirmed-empty' }
+          : { kind: 'data', items: toNonEmpty(rewards)! }
+      );
     }
 
     throw new Error('Invalid response format from Rewards API');

@@ -6,6 +6,7 @@ import { fetchBeersFromAPI } from '../../api/beerApi';
 import { config } from '@/src/config';
 import * as fs from 'fs';
 import * as path from 'path';
+import { fetchedRows } from '../../api/__tests__/helpers/fetchOutcomeFixtures';
 
 // Mock dependencies
 jest.mock('../../database/preferences', () => ({
@@ -101,7 +102,7 @@ describe('dataUpdateService integration tests', () => {
       const rawBeers = allBeersData[1].brewInStock;
 
       // Mock fetchBeersFromAPI to return the raw beers (already extracted from API response)
-      (fetchBeersFromAPI as jest.Mock).mockResolvedValue(rawBeers);
+      (fetchBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(rawBeers));
 
       // Call the function
       const result = await fetchAndUpdateAllBeers();
@@ -162,7 +163,7 @@ describe('dataUpdateService integration tests', () => {
 
     it('should handle missing API URL by returning empty from fetchBeersFromAPI', async () => {
       // fetchBeersFromAPI returns [] when API URL is not configured
-      (fetchBeersFromAPI as jest.Mock).mockResolvedValue([]);
+      (fetchBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows([]));
 
       // Call the function
       const result = await fetchAndUpdateAllBeers();
@@ -197,7 +198,7 @@ describe('dataUpdateService integration tests', () => {
 
     it('should handle invalid data format from fetchBeersFromAPI', async () => {
       // fetchBeersFromAPI returns [] when response format is invalid
-      (fetchBeersFromAPI as jest.Mock).mockResolvedValue([]);
+      (fetchBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows([]));
 
       // Call the function
       const result = await fetchAndUpdateAllBeers();
@@ -458,7 +459,9 @@ describe('dataUpdateService integration tests', () => {
         config.setEnvironment('production');
 
         // fetchBeersFromAPI is mocked - it handles URL resolution internally
-        (fetchBeersFromAPI as jest.Mock).mockResolvedValue([{ id: '1', brew_name: 'Test' }]);
+        (fetchBeersFromAPI as jest.Mock).mockResolvedValue(
+          fetchedRows([{ id: '1', brew_name: 'Test' }])
+        );
 
         const result = await fetchAndUpdateAllBeers();
 
@@ -469,7 +472,9 @@ describe('dataUpdateService integration tests', () => {
       it('should use custom config when set', async () => {
         config.setCustomApiUrl('http://localhost:3000');
 
-        (fetchBeersFromAPI as jest.Mock).mockResolvedValue([{ id: '1', brew_name: 'Test' }]);
+        (fetchBeersFromAPI as jest.Mock).mockResolvedValue(
+          fetchedRows([{ id: '1', brew_name: 'Test' }])
+        );
 
         const result = await fetchAndUpdateAllBeers();
 
@@ -494,7 +499,9 @@ describe('dataUpdateService integration tests', () => {
 
     describe('Multiple Concurrent Requests', () => {
       it('should handle multiple all beers fetch requests', async () => {
-        (fetchBeersFromAPI as jest.Mock).mockResolvedValue([{ id: '1', brew_name: 'Test' }]);
+        (fetchBeersFromAPI as jest.Mock).mockResolvedValue(
+          fetchedRows([{ id: '1', brew_name: 'Test' }])
+        );
 
         // Start two concurrent updates
         const promise1 = fetchAndUpdateAllBeers();
@@ -553,7 +560,9 @@ describe('dataUpdateService integration tests', () => {
         // Should not have double slashes
         expect(constructedUrl).not.toContain('//api');
 
-        (fetchBeersFromAPI as jest.Mock).mockResolvedValue([{ id: '1', brew_name: 'Test' }]);
+        (fetchBeersFromAPI as jest.Mock).mockResolvedValue(
+          fetchedRows([{ id: '1', brew_name: 'Test' }])
+        );
 
         const result = await fetchAndUpdateAllBeers();
         expect(result.success).toBe(true);
@@ -566,7 +575,9 @@ describe('dataUpdateService integration tests', () => {
         expect(config.api.baseUrl).toBeDefined();
         expect(typeof config.api.baseUrl).toBe('string');
 
-        (fetchBeersFromAPI as jest.Mock).mockResolvedValue([{ id: '1', brew_name: 'Test' }]);
+        (fetchBeersFromAPI as jest.Mock).mockResolvedValue(
+          fetchedRows([{ id: '1', brew_name: 'Test' }])
+        );
 
         const result = await fetchAndUpdateAllBeers();
 

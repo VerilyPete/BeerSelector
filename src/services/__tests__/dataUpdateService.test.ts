@@ -24,6 +24,7 @@ import { myBeersRepository } from '../../database/repositories/MyBeersRepository
 import { rewardsRepository } from '../../database/repositories/RewardsRepository';
 import { databaseLockManager } from '../../database/DatabaseLockManager';
 import { fetchBeersFromAPI, fetchMyBeersFromAPI, fetchRewardsFromAPI } from '../../api/beerApi';
+import { fetchedRows } from '../../api/__tests__/helpers/fetchOutcomeFixtures';
 import {
   fetchBeersFromProxy,
   fetchEnrichmentBatchWithMissing,
@@ -190,7 +191,7 @@ describe('dataUpdateService', () => {
 
     it('should return failure result when fetchBeersFromAPI returns empty array', async () => {
       (getPreference as jest.Mock).mockResolvedValueOnce(testAllBeersUrl);
-      (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce([]);
+      (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce(fetchedRows([]));
 
       const result = await fetchAndUpdateAllBeers();
 
@@ -201,9 +202,9 @@ describe('dataUpdateService', () => {
 
     it('should return failure result when all beers are invalid', async () => {
       (getPreference as jest.Mock).mockResolvedValueOnce(testAllBeersUrl);
-      (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce([
-        { brew_name: 'No ID Beer', brewer: 'Brewery 1' },
-      ]);
+      (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce(
+        fetchedRows([{ brew_name: 'No ID Beer', brewer: 'Brewery 1' }])
+      );
 
       const result = await fetchAndUpdateAllBeers();
 
@@ -220,7 +221,7 @@ describe('dataUpdateService', () => {
         { id: 'beer-2', brew_name: 'Test Beer 2', brewer: 'Brewery 2' },
       ];
 
-      (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce(mockBeers);
+      (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce(fetchedRows(mockBeers));
       (beerRepository.insertMany as jest.Mock).mockResolvedValueOnce(undefined);
       (setPreference as jest.Mock).mockResolvedValue(undefined);
 
@@ -280,7 +281,9 @@ describe('dataUpdateService', () => {
 
     it('should delegate to fetchBeersFromAPI for fetching', async () => {
       (getPreference as jest.Mock).mockResolvedValueOnce(testAllBeersUrl);
-      (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce([{ id: '1', brew_name: 'Test' }]);
+      (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce(
+        fetchedRows([{ id: '1', brew_name: 'Test' }])
+      );
       (beerRepository.insertMany as jest.Mock).mockResolvedValueOnce(undefined);
       (setPreference as jest.Mock).mockResolvedValue(undefined);
 
@@ -298,7 +301,7 @@ describe('dataUpdateService', () => {
         { id: 'beer-3', brew_name: 'Valid Beer 2', brewer: 'Brewery 3' },
       ];
 
-      (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce(mockBeers);
+      (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce(fetchedRows(mockBeers));
       (beerRepository.insertMany as jest.Mock).mockResolvedValueOnce(undefined);
       (setPreference as jest.Mock).mockResolvedValue(undefined);
 
@@ -660,7 +663,9 @@ describe('dataUpdateService', () => {
       it('should work with production config base URL', async () => {
         const productionUrl = `${config.api.baseUrl}/visitor`;
         (getPreference as jest.Mock).mockResolvedValueOnce(productionUrl);
-        (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce([{ id: '1', brew_name: 'Test' }]);
+        (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce(
+          fetchedRows([{ id: '1', brew_name: 'Test' }])
+        );
         (beerRepository.insertMany as jest.Mock).mockResolvedValueOnce(undefined);
         (setPreference as jest.Mock).mockResolvedValue(undefined);
 
@@ -675,7 +680,9 @@ describe('dataUpdateService', () => {
         const customUrl = `${customBaseUrl}/api/beers`;
 
         (getPreference as jest.Mock).mockResolvedValueOnce(customUrl);
-        (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce([{ id: '1', brew_name: 'Test' }]);
+        (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce(
+          fetchedRows([{ id: '1', brew_name: 'Test' }])
+        );
         (beerRepository.insertMany as jest.Mock).mockResolvedValueOnce(undefined);
         (setPreference as jest.Mock).mockResolvedValue(undefined);
 
@@ -689,7 +696,9 @@ describe('dataUpdateService', () => {
     describe('Network Timeout Configuration', () => {
       it('should delegate fetch to fetchBeersFromAPI which handles timeouts', async () => {
         (getPreference as jest.Mock).mockResolvedValueOnce(testAllBeersUrl);
-        (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce([{ id: '1', brew_name: 'Test' }]);
+        (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce(
+          fetchedRows([{ id: '1', brew_name: 'Test' }])
+        );
         (beerRepository.insertMany as jest.Mock).mockResolvedValueOnce(undefined);
         (setPreference as jest.Mock).mockResolvedValue(undefined);
 
@@ -724,7 +733,9 @@ describe('dataUpdateService', () => {
       it('should accept HTTPS URLs', async () => {
         const httpsUrl = 'https://secure.api.com/beers';
         (getPreference as jest.Mock).mockResolvedValueOnce(httpsUrl);
-        (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce([{ id: '1', brew_name: 'Test' }]);
+        (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce(
+          fetchedRows([{ id: '1', brew_name: 'Test' }])
+        );
         (beerRepository.insertMany as jest.Mock).mockResolvedValueOnce(undefined);
         (setPreference as jest.Mock).mockResolvedValue(undefined);
 
@@ -737,7 +748,9 @@ describe('dataUpdateService', () => {
       it('should accept HTTP URLs', async () => {
         const httpUrl = 'http://localhost:3000/api/beers';
         (getPreference as jest.Mock).mockResolvedValueOnce(httpUrl);
-        (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce([{ id: '1', brew_name: 'Test' }]);
+        (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce(
+          fetchedRows([{ id: '1', brew_name: 'Test' }])
+        );
         (beerRepository.insertMany as jest.Mock).mockResolvedValueOnce(undefined);
         (setPreference as jest.Mock).mockResolvedValue(undefined);
 
@@ -755,7 +768,9 @@ describe('dataUpdateService', () => {
 
         const configBasedUrl = `${config.api.baseUrl}/custom/endpoint`;
         (getPreference as jest.Mock).mockResolvedValueOnce(configBasedUrl);
-        (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce([{ id: '1', brew_name: 'Test' }]);
+        (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce(
+          fetchedRows([{ id: '1', brew_name: 'Test' }])
+        );
         (beerRepository.insertMany as jest.Mock).mockResolvedValueOnce(undefined);
         (setPreference as jest.Mock).mockResolvedValue(undefined);
 
@@ -812,7 +827,7 @@ describe('dataUpdateService', () => {
 
       it('should properly categorize empty response as validation error', async () => {
         (getPreference as jest.Mock).mockResolvedValueOnce(testAllBeersUrl);
-        (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce([]);
+        (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce(fetchedRows([]));
 
         const result = await fetchAndUpdateAllBeers();
 
@@ -883,7 +898,7 @@ describe('dataUpdateService', () => {
     it('returns success with data when rewards are fetched successfully', async () => {
       const mockRewards = [{ id: 'reward-1', name: 'Free Beer' }];
       (getPreference as jest.Mock).mockResolvedValue('false');
-      (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(mockRewards);
+      (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockRewards));
       (rewardsRepository.insertMany as jest.Mock).mockResolvedValue(undefined);
 
       const result = await fetchAndUpdateRewards();
@@ -918,7 +933,7 @@ describe('dataUpdateService', () => {
     it('returns failure when rewardsRepository.insertMany throws', async () => {
       const mockRewards = [{ id: 'reward-1', name: 'Free Beer' }];
       (getPreference as jest.Mock).mockResolvedValue('false');
-      (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(mockRewards);
+      (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockRewards));
       (rewardsRepository.insertMany as jest.Mock).mockRejectedValue(new Error('DB write error'));
 
       const result = await fetchAndUpdateRewards();
@@ -935,9 +950,9 @@ describe('dataUpdateService', () => {
 
     it('acquires lock and releases it on success', async () => {
       (getPreference as jest.Mock).mockResolvedValue(null);
-      (fetchBeersFromAPI as jest.Mock).mockResolvedValue(mockAllBeers);
-      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(mockMyBeers);
-      (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(mockRewards);
+      (fetchBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockAllBeers));
+      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockMyBeers));
+      (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockRewards));
       (beerRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
       (myBeersRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
       (rewardsRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
@@ -954,8 +969,8 @@ describe('dataUpdateService', () => {
     it('releases lock even when an operation fails', async () => {
       (getPreference as jest.Mock).mockResolvedValue(null);
       (fetchBeersFromAPI as jest.Mock).mockRejectedValue(new Error('network fail'));
-      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(mockMyBeers);
-      (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(mockRewards);
+      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockMyBeers));
+      (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockRewards));
       (myBeersRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
       (rewardsRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
       (setPreference as jest.Mock).mockResolvedValue(undefined);
@@ -975,9 +990,9 @@ describe('dataUpdateService', () => {
 
     it('returns hasErrors=false when all operations succeed', async () => {
       (getPreference as jest.Mock).mockResolvedValue(null);
-      (fetchBeersFromAPI as jest.Mock).mockResolvedValue(mockAllBeers);
-      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(mockMyBeers);
-      (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(mockRewards);
+      (fetchBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockAllBeers));
+      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockMyBeers));
+      (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockRewards));
       (beerRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
       (myBeersRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
       (rewardsRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
@@ -994,8 +1009,8 @@ describe('dataUpdateService', () => {
     it('reports error in allBeersResult when all beers fetch fails', async () => {
       (getPreference as jest.Mock).mockResolvedValue(null);
       (fetchBeersFromAPI as jest.Mock).mockRejectedValue(new Error('fetch fail'));
-      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(mockMyBeers);
-      (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(mockRewards);
+      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockMyBeers));
+      (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockRewards));
       (myBeersRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
       (rewardsRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
       (setPreference as jest.Mock).mockResolvedValue(undefined);
@@ -1010,8 +1025,8 @@ describe('dataUpdateService', () => {
 
     it('reports error in rewardsResult when rewards fetch fails', async () => {
       (getPreference as jest.Mock).mockResolvedValue(null);
-      (fetchBeersFromAPI as jest.Mock).mockResolvedValue(mockAllBeers);
-      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(mockMyBeers);
+      (fetchBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockAllBeers));
+      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockMyBeers));
       (fetchRewardsFromAPI as jest.Mock).mockRejectedValue(new Error('rewards fail'));
       (beerRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
       (myBeersRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
@@ -1041,8 +1056,8 @@ describe('dataUpdateService', () => {
         ],
         cached: false,
       });
-      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(mockMyBeers);
-      (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(mockRewards);
+      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockMyBeers));
+      (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockRewards));
       (beerRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
       (myBeersRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
       (rewardsRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
@@ -1059,9 +1074,9 @@ describe('dataUpdateService', () => {
       (getPreference as jest.Mock).mockResolvedValue(storeUrl);
       (config.enrichment.isConfigured as jest.Mock).mockReturnValue(true);
       (fetchBeersFromProxy as jest.Mock).mockRejectedValue(new Error('proxy down'));
-      (fetchBeersFromAPI as jest.Mock).mockResolvedValue(mockAllBeers);
-      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(mockMyBeers);
-      (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(mockRewards);
+      (fetchBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockAllBeers));
+      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockMyBeers));
+      (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockRewards));
       (beerRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
       (myBeersRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
       (rewardsRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
@@ -1075,9 +1090,9 @@ describe('dataUpdateService', () => {
 
     it('sets last_update and last_check preferences on success', async () => {
       (getPreference as jest.Mock).mockResolvedValue(null);
-      (fetchBeersFromAPI as jest.Mock).mockResolvedValue(mockAllBeers);
-      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(mockMyBeers);
-      (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(mockRewards);
+      (fetchBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockAllBeers));
+      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockMyBeers));
+      (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockRewards));
       (beerRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
       (myBeersRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
       (rewardsRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
@@ -1106,9 +1121,9 @@ describe('dataUpdateService', () => {
     it('acquires lock and releases it on success', async () => {
       (areApiUrlsConfigured as jest.Mock).mockResolvedValue(true);
       (getPreference as jest.Mock).mockResolvedValue(null);
-      (fetchBeersFromAPI as jest.Mock).mockResolvedValue(mockAllBeers);
-      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(mockMyBeers);
-      (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(mockRewards);
+      (fetchBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockAllBeers));
+      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockMyBeers));
+      (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockRewards));
       (beerRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
       (myBeersRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
       (rewardsRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
@@ -1126,8 +1141,8 @@ describe('dataUpdateService', () => {
       (getPreference as jest.Mock).mockResolvedValue(null);
       (fetchBeersFromAPI as jest.Mock).mockRejectedValue(new Error('network fail'));
       // Now reachable: the other sources run even when all-beers fails.
-      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue([]);
-      (fetchRewardsFromAPI as jest.Mock).mockResolvedValue([]);
+      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows([]));
+      (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(fetchedRows([]));
 
       // INVERTED by plan 02 Phase 2.5 — a failing source no longer aborts the
       // function. The lock assertion below is the part that still matters.
@@ -1147,9 +1162,9 @@ describe('dataUpdateService', () => {
     it('returns all beers, my beers, and rewards on success', async () => {
       (areApiUrlsConfigured as jest.Mock).mockResolvedValue(true);
       (getPreference as jest.Mock).mockResolvedValue(null);
-      (fetchBeersFromAPI as jest.Mock).mockResolvedValue(mockAllBeers);
-      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(mockMyBeers);
-      (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(mockRewards);
+      (fetchBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockAllBeers));
+      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockMyBeers));
+      (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockRewards));
       (beerRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
       (myBeersRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
       (rewardsRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
@@ -1164,7 +1179,7 @@ describe('dataUpdateService', () => {
     it('throws when all beers response is empty', async () => {
       (areApiUrlsConfigured as jest.Mock).mockResolvedValue(true);
       (getPreference as jest.Mock).mockResolvedValue(null);
-      (fetchBeersFromAPI as jest.Mock).mockResolvedValue([]);
+      (fetchBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows([]));
 
       // INVERTED by plan 02 Phase 2.5: an empty taplist still fails ITS source
       // and writes nothing for it, but no longer aborts my-beers and rewards.
@@ -1191,8 +1206,8 @@ describe('dataUpdateService', () => {
         ],
         cached: false,
       });
-      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(mockMyBeers);
-      (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(mockRewards);
+      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockMyBeers));
+      (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockRewards));
       (beerRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
       (myBeersRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
       (rewardsRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
@@ -1209,9 +1224,9 @@ describe('dataUpdateService', () => {
       (getPreference as jest.Mock).mockResolvedValue(storeUrl);
       (config.enrichment.isConfigured as jest.Mock).mockReturnValue(true);
       (fetchBeersFromProxy as jest.Mock).mockRejectedValue(new Error('proxy down'));
-      (fetchBeersFromAPI as jest.Mock).mockResolvedValue(mockAllBeers);
-      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(mockMyBeers);
-      (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(mockRewards);
+      (fetchBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockAllBeers));
+      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockMyBeers));
+      (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockRewards));
       (beerRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
       (myBeersRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
       (rewardsRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
@@ -1226,9 +1241,9 @@ describe('dataUpdateService', () => {
       (areApiUrlsConfigured as jest.Mock).mockResolvedValue(true);
       (getPreference as jest.Mock).mockResolvedValue(null);
       (config.enrichment.isConfigured as jest.Mock).mockReturnValue(true);
-      (fetchBeersFromAPI as jest.Mock).mockResolvedValue(mockAllBeers);
-      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(mockMyBeers);
-      (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(mockRewards);
+      (fetchBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockAllBeers));
+      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockMyBeers));
+      (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockRewards));
       (fetchEnrichmentBatchWithMissing as jest.Mock).mockResolvedValue({
         enrichments: { 'beer-1': { enriched_abv: 5.5 } },
         missing: [],
@@ -1426,9 +1441,9 @@ describe('dataUpdateService', () => {
         const { config: mockConfig } = require('@/src/config');
         mockConfig.enrichment.isConfigured.mockReturnValue(false);
 
-        (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce([
-          { id: '1', brew_name: 'Test', brewer: 'Brewer' },
-        ]);
+        (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce(
+          fetchedRows([{ id: '1', brew_name: 'Test', brewer: 'Brewer' }])
+        );
 
         const result = await fetchTaplistFromProxyOrDirect('13879');
 
@@ -1553,9 +1568,9 @@ describe('dataUpdateService', () => {
           return Promise.resolve(null);
         });
 
-        (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce([
-          { id: '1', brew_name: 'Test IPA', brewer: 'Test Brewery' },
-        ]);
+        (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce(
+          fetchedRows([{ id: '1', brew_name: 'Test IPA', brewer: 'Test Brewery' }])
+        );
 
         (beerRepository.insertMany as jest.Mock).mockResolvedValueOnce(undefined);
         (setPreference as jest.Mock).mockResolvedValue(undefined);
@@ -1587,9 +1602,9 @@ describe('refreshAllDataFromAPI per-source isolation', () => {
   // success, the check-in proceeds, and the user is left with a fresh taplist,
   // a stale tasted list, and stale rewards — a wrong-high Beerfinder count.
   it('still writes rewards when the my-beers fetch fails', async () => {
-    (fetchBeersFromAPI as jest.Mock).mockResolvedValue(mockAllBeers);
+    (fetchBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockAllBeers));
     (fetchMyBeersFromAPI as jest.Mock).mockRejectedValue(new Error('network timeout'));
-    (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(mockRewards);
+    (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockRewards));
 
     await refreshAllDataFromAPI();
 
@@ -1597,9 +1612,9 @@ describe('refreshAllDataFromAPI per-source isolation', () => {
   });
 
   it('preserves the all-beers write when the my-beers fetch fails', async () => {
-    (fetchBeersFromAPI as jest.Mock).mockResolvedValue(mockAllBeers);
+    (fetchBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockAllBeers));
     (fetchMyBeersFromAPI as jest.Mock).mockRejectedValue(new Error('network timeout'));
-    (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(mockRewards);
+    (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockRewards));
 
     await expect(refreshAllDataFromAPI()).resolves.toBeDefined();
 
@@ -1607,8 +1622,8 @@ describe('refreshAllDataFromAPI per-source isolation', () => {
   });
 
   it('still writes the taplist and rewards when the rewards fetch fails', async () => {
-    (fetchBeersFromAPI as jest.Mock).mockResolvedValue(mockAllBeers);
-    (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(mockMyBeers);
+    (fetchBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockAllBeers));
+    (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockMyBeers));
     (fetchRewardsFromAPI as jest.Mock).mockRejectedValue(new Error('network timeout'));
 
     await refreshAllDataFromAPI();
@@ -1619,9 +1634,9 @@ describe('refreshAllDataFromAPI per-source isolation', () => {
 
   // GUARD — passes today via the existing finally. Not this phase's RED.
   it('releases the master lock when a source fails', async () => {
-    (fetchBeersFromAPI as jest.Mock).mockResolvedValue(mockAllBeers);
+    (fetchBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockAllBeers));
     (fetchMyBeersFromAPI as jest.Mock).mockRejectedValue(new Error('network timeout'));
-    (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(mockRewards);
+    (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockRewards));
 
     // Tolerates the rejection deliberately: this must pass BOTH today (where
     // the function still rejects) and after the fix (where it does not), or it
