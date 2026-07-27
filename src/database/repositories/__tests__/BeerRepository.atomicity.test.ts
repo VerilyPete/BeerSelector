@@ -31,6 +31,8 @@ import { BeerRepository } from '../BeerRepository';
 import { BeerWithContainerType } from '../../../types/beer';
 import * as connection from '../../connection';
 import { withAtomicWrite } from '../../transactions';
+import { toNonEmpty } from '../../../api/fetchOutcome';
+import type { NonEmptyArray } from '../../../api/fetchOutcome';
 
 jest.mock('../../connection');
 jest.mock('../../locks', () => ({
@@ -227,8 +229,10 @@ function createTransactionalFake(
   };
 }
 
-function makeBeers(count: number, prefix = 'new'): BeerWithContainerType[] {
-  return Array.from({ length: count }, (_, index) => ({
+function makeBeers(count: number, prefix = 'new'): NonEmptyArray<BeerWithContainerType> {
+  // The suite always builds a populated list; narrowing here keeps every
+  // call site free of assertions.
+  const beers = Array.from({ length: count }, (_, index) => ({
     id: `${prefix}-${index + 1}`,
     brew_name: `Beer ${index + 1}`,
     brewer: 'Test Brewery',
@@ -239,6 +243,9 @@ function makeBeers(count: number, prefix = 'new'): BeerWithContainerType[] {
     enrichment_confidence: null,
     enrichment_source: null,
   }));
+  const nonEmpty = toNonEmpty(beers);
+  if (nonEmpty === null) throw new Error('makeBeers called with count 0');
+  return nonEmpty;
 }
 
 describe('BeerRepository insert atomicity', () => {

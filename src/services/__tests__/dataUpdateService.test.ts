@@ -57,6 +57,8 @@ jest.mock('../../database/repositories/BeerRepository', () => ({
 
 jest.mock('../../database/repositories/MyBeersRepository', () => ({
   myBeersRepository: {
+    replaceAllWithEmpty: jest.fn(),
+    replaceAllWithEmptyUnsafe: jest.fn(),
     insertMany: jest.fn(),
     insertManyUnsafe: jest.fn(),
     updateEnrichmentData: jest.fn().mockResolvedValue(0),
@@ -413,9 +415,16 @@ describe('dataUpdateService', () => {
 
       const result = await fetchAndUpdateMyBeers();
 
-      expect(result.success).toBe(true);
-      expect(result.dataUpdated).toBe(true);
+      // INVERTED by plan 02 Phase 2. Previously asserted success with 0 items,
+      // and wrote an empty table on the way. Rows that all lack an id are
+      // MALFORMED, not an empty round — writing wiped a populated tasted list
+      // and stamping the timestamps hid it for 12 hours.
+      expect(result.success).toBe(false);
+      expect(result.dataUpdated).toBe(false);
       expect(result.itemCount).toBe(0);
+      expect(myBeersRepository.insertMany).not.toHaveBeenCalled();
+      expect(myBeersRepository.replaceAllWithEmpty).not.toHaveBeenCalled();
+      expect(setPreference).not.toHaveBeenCalledWith('my_beers_last_update', expect.anything());
     });
 
     it('should successfully update my beers', async () => {
@@ -520,10 +529,14 @@ describe('dataUpdateService', () => {
 
       const result = await fetchAndUpdateMyBeers();
 
+      // Still a success — the server genuinely reported zero tasted beers, which
+      // is a real state (new user, or the round rollover at 200). It just says
+      // so explicitly now instead of inferring it from an empty array.
       expect(result.success).toBe(true);
       expect(result.dataUpdated).toBe(true);
       expect(result.itemCount).toBe(0);
-      expect(myBeersRepository.insertMany).toHaveBeenCalledWith([]);
+      expect(myBeersRepository.replaceAllWithEmpty).toHaveBeenCalled();
+      expect(myBeersRepository.insertMany).not.toHaveBeenCalled();
     });
 
     it('should handle fetch timeout with AbortError', async () => {

@@ -7,6 +7,7 @@
 
 import { getDatabase } from '../connection';
 import { BeerfinderWithContainerType } from '../../types/beer';
+import type { NonEmptyArray } from '../../api/fetchOutcome';
 import { databaseLockManager } from '../locks';
 import { toContentionError, withContentionMapping, isDatabaseLockedError } from '../errors';
 import {
@@ -27,6 +28,26 @@ import { EnrichmentUpdate } from '../../types/enrichment';
  * - Clearing table for new users or round rollover
  * - Querying tasted beers by various criteria
  */
+/**
+ * Reject a payload in which no row carries a primary key.
+ *
+ * This is the branch that made narrowing the type insufficient on its own: a
+ * well-typed NonEmptyArray whose every row lacks an `id` passes the signature,
+ * reaches the filter, and — until now — ran DELETE and returned normally. The
+ * repository's own comment said it was "clearing table instead of throwing
+ * error". That choice is reversed here; the caller decides what malformed data
+ * means, and `FetchOutcome` gives it a `malformed` case to say so.
+ */
+function assertSomeRowsHaveIds(validCount: number, suppliedCount: number): void {
+  if (validCount > 0) {
+    return;
+  }
+  throw new Error(
+    `Refusing to write tasted beers: all ${suppliedCount} supplied rows lack an id. ` +
+      `Leaving the existing list intact — use replaceAllWithEmpty() to empty it deliberately.`
+  );
+}
+
 /**
  * Records a row-level insert failure and decides whether to keep going.
  *
@@ -80,51 +101,21 @@ export class MyBeersRepository {
    *
    * @param beers - Array of BeerfinderWithContainerType objects to insert
    */
-  async insertMany(beers: BeerfinderWithContainerType[]): Promise<void> {
+  async insertMany(beers: NonEmptyArray<BeerfinderWithContainerType>): Promise<void> {
     console.log(`DB: Populating My Beers table with ${beers.length} beers`);
 
     return databaseLockManager.withDatabaseLock('MyBeersRepository.insertMany', async () => {
       try {
         const database = await getDatabase();
 
-        // Handle empty array as valid (clear the table for new user or round rollover)
-        if (!beers || beers.length === 0) {
-          console.log(
-            'DB: Empty beers array - clearing tasted_brew_current_round table (new user or round rollover at 200 beers)'
-          );
-          await database.withTransactionAsync(async () => {
-            const before = await database.getFirstAsync<{ count: number }>(
-              'SELECT COUNT(*) as count FROM tasted_brew_current_round'
-            );
-            await database.runAsync('DELETE FROM tasted_brew_current_round');
-            console.log(
-              `Cleared tasted_brew_current_round table (removed ${before?.count ?? 0} rows)`
-            );
-          });
-          return;
-        }
-
-        // Count beers with valid IDs
+        // The empty-array branch is gone: emptying the table is now
+        // replaceAllWithEmpty(), asked for explicitly rather than inferred.
         const validBeers = beers.filter(beer => beer && beer.id);
         console.log(
           `DB: Found ${validBeers.length} valid beers with IDs out of ${beers.length} total beers`
         );
 
-        if (validBeers.length === 0) {
-          console.log(
-            'DB: No valid beers with IDs found, clearing table instead of throwing error'
-          );
-          await database.withTransactionAsync(async () => {
-            const before = await database.getFirstAsync<{ count: number }>(
-              'SELECT COUNT(*) as count FROM tasted_brew_current_round'
-            );
-            await database.runAsync('DELETE FROM tasted_brew_current_round');
-            console.log(
-              `Cleared tasted_brew_current_round table (removed ${before?.count ?? 0} rows)`
-            );
-          });
-          return;
-        }
+        assertSomeRowsHaveIds(validBeers.length, beers.length);
 
         console.log('DB: Database initialized for populating My Beers table');
 
@@ -229,7 +220,47 @@ export class MyBeersRepository {
    *
    * @param beers - Array of BeerfinderWithContainerType objects to insert
    */
-  async insertManyUnsafe(beers: BeerfinderWithContainerType[]): Promise<void> {
+  /**
+   * Empty the tasted table, deliberately.
+   *
+   * A legitimate operation — a new user, or the round rollover at 200 beers —
+   * that used to be inferred from `insertMany([])`. Inferring it is what let a
+   * benign empty response, a malformed one, and a genuine empty round all reach
+   * the same DELETE. Now it has to be asked for.
+   */
+  async replaceAllWithEmpty(): Promise<void> {
+    return databaseLockManager.withDatabaseLock('MyBeersRepository.replaceAllWithEmpty', () =>
+      withContentionMapping('tasted beers clear', () => this._deleteAllInternal())
+    );
+  }
+
+  /**
+   * Unlocked twin of `replaceAllWithEmpty`, for callers already holding the
+   * master lock.
+   */
+  async replaceAllWithEmptyUnsafe(): Promise<void> {
+    return withContentionMapping('tasted beers clear', () => this._deleteAllInternal());
+  }
+
+  /**
+   * Shared body for both empty variants.
+   *
+   * Deliberately carries NO read. The four branches this replaces each ran a
+   * count-before-delete purely to make a log line more informative, and a read
+   * inside a transaction is the one thing that fails silently when misrouted —
+   * it returns the pre-transaction snapshot rather than throwing. `runAsync`
+   * already reports `changes`, so the read buys nothing and costs a hazard.
+   */
+  private async _deleteAllInternal(): Promise<void> {
+    const database = await getDatabase();
+
+    await database.withTransactionAsync(async () => {
+      const cleared = await database.runAsync('DELETE FROM tasted_brew_current_round');
+      console.log(`Cleared tasted_brew_current_round table (removed ${cleared.changes} rows)`);
+    });
+  }
+
+  async insertManyUnsafe(beers: NonEmptyArray<BeerfinderWithContainerType>): Promise<void> {
     console.log(
       `DB: Populating My Beers table with ${beers.length} beers (UNSAFE - lock assumed held)`
     );
@@ -242,42 +273,14 @@ export class MyBeersRepository {
     // mapping entirely and reached the user as a raw UNKNOWN_ERROR. The locked
     // twin (insertMany) covers its equivalents; this one did not.
     return withContentionMapping('My Beers import', async () => {
-      // Handle empty array as valid (clear the table for new user or round rollover)
-      if (!beers || beers.length === 0) {
-        console.log(
-          'DB: Empty beers array - clearing tasted_brew_current_round table (new user or round rollover at 200 beers)'
-        );
-        await database.withTransactionAsync(async () => {
-          const before = await database.getFirstAsync<{ count: number }>(
-            'SELECT COUNT(*) as count FROM tasted_brew_current_round'
-          );
-          await database.runAsync('DELETE FROM tasted_brew_current_round');
-          console.log(
-            `Cleared tasted_brew_current_round table (removed ${before?.count ?? 0} rows)`
-          );
-        });
-        return;
-      }
-
-      // Count beers with valid IDs
+      // The empty-array branch is gone: emptying the table is now
+      // replaceAllWithEmptyUnsafe(), asked for explicitly rather than inferred.
       const validBeers = beers.filter(beer => beer && beer.id);
       console.log(
         `DB: Found ${validBeers.length} valid beers with IDs out of ${beers.length} total beers`
       );
 
-      if (validBeers.length === 0) {
-        console.log('DB: No valid beers with IDs found, clearing table instead of throwing error');
-        await database.withTransactionAsync(async () => {
-          const before = await database.getFirstAsync<{ count: number }>(
-            'SELECT COUNT(*) as count FROM tasted_brew_current_round'
-          );
-          await database.runAsync('DELETE FROM tasted_brew_current_round');
-          console.log(
-            `Cleared tasted_brew_current_round table (removed ${before?.count ?? 0} rows)`
-          );
-        });
-        return;
-      }
+      assertSomeRowsHaveIds(validBeers.length, beers.length);
 
       console.log('DB: Database initialized for populating My Beers table');
 

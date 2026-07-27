@@ -6,6 +6,8 @@
 import { MyBeersRepository } from '../MyBeersRepository';
 import { BeerfinderWithContainerType } from '../../../types/beer';
 import * as connection from '../../connection';
+import { toNonEmpty } from '../../../api/fetchOutcome';
+import type { NonEmptyArray } from '../../../api/fetchOutcome';
 import { databaseLockManager } from '../../locks';
 import { DatabaseContentionError } from '../../errors';
 
@@ -22,7 +24,9 @@ type MockDatabase = {
 function createMockDatabase(): MockDatabase {
   return {
     withTransactionAsync: jest.fn(async (callback: () => Promise<void>) => await callback()),
-    runAsync: jest.fn(),
+    // The real runAsync always resolves an SQLiteRunResult; the clear path
+    // reads `changes` off the DELETE instead of a count-before-delete read.
+    runAsync: jest.fn().mockResolvedValue({ changes: 0, lastInsertRowId: 0 }),
     getAllAsync: jest.fn(),
     getFirstAsync: jest.fn(),
   };
@@ -30,6 +34,17 @@ function createMockDatabase(): MockDatabase {
 
 function createRepository(): MyBeersRepository {
   return new MyBeersRepository();
+}
+
+/**
+ * Narrow a literal fixture array for the NonEmptyArray-typed repository
+ * signatures. Throws rather than asserting, so a fixture that is accidentally
+ * empty fails loudly instead of lying to the type system.
+ */
+function nel<T>(items: readonly T[]): NonEmptyArray<T> {
+  const narrowed = toNonEmpty(items);
+  if (narrowed === null) throw new Error('fixture array was unexpectedly empty');
+  return narrowed;
 }
 
 describe('MyBeersRepository', () => {
@@ -67,7 +82,7 @@ describe('MyBeersRepository', () => {
 
       mockDatabase.getFirstAsync.mockResolvedValue({ count: 0 });
 
-      await repository.insertMany(beers);
+      await repository.insertMany(nel(beers));
 
       // Should call getDatabase
       expect(connection.getDatabase).toHaveBeenCalled();
@@ -82,14 +97,18 @@ describe('MyBeersRepository', () => {
       );
     });
 
-    it('should handle empty array by clearing the table', async () => {
+    // INVERTED by plan 02 Phase 2. Previously asserted that insertMany([])
+    // clears the table. Inferring "empty the tasted list" from an empty array is
+    // exactly what let a benign empty response, a malformed one and a genuine
+    // empty round all reach the same DELETE. Emptying is now explicit.
+    it('should route an empty payload through replaceAllWithEmpty', async () => {
       const mockDatabase = createMockDatabase();
       (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
       jest.spyOn(console, 'log').mockImplementation();
       mockDatabase.getFirstAsync.mockResolvedValue({ count: 5 });
 
-      await repository.insertMany([]);
+      await repository.replaceAllWithEmpty();
 
       // Should clear the table
       expect(mockDatabase.runAsync).toHaveBeenCalledWith('DELETE FROM tasted_brew_current_round');
@@ -140,7 +159,7 @@ describe('MyBeersRepository', () => {
 
       mockDatabase.getFirstAsync.mockResolvedValue({ count: 0 });
 
-      await repository.insertMany(beers);
+      await repository.insertMany(nel(beers));
 
       // Should only insert the valid beers (2 beers)
       const insertCalls = mockDatabase.runAsync.mock.calls.filter((call: unknown[]) =>
@@ -152,7 +171,11 @@ describe('MyBeersRepository', () => {
       expect(insertCalls[1][1]).toContain('2');
     });
 
-    it('should clear table when all beers are invalid', async () => {
+    // INVERTED by plan 02 Phase 2. Previously asserted the table is CLEARED
+    // when every row lacks an id — the repository's own comment called it
+    // "clearing table instead of throwing error". Malformed input must not be
+    // able to empty a user's tasted list.
+    it('should throw rather than clear when all beers are invalid', async () => {
       const mockDatabase = createMockDatabase();
       (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
@@ -180,10 +203,12 @@ describe('MyBeersRepository', () => {
 
       mockDatabase.getFirstAsync.mockResolvedValue({ count: 0 });
 
-      await repository.insertMany(beers);
+      await expect(repository.insertMany(beers as never)).rejects.toThrow(/lack/i);
 
-      // Should clear the table
-      expect(mockDatabase.runAsync).toHaveBeenCalledWith('DELETE FROM tasted_brew_current_round');
+      // And must NOT have cleared the table
+      expect(mockDatabase.runAsync).not.toHaveBeenCalledWith(
+        'DELETE FROM tasted_brew_current_round'
+      );
 
       // Should not insert any beers
       const insertCalls = mockDatabase.runAsync.mock.calls.filter((call: unknown[]) =>
@@ -209,7 +234,7 @@ describe('MyBeersRepository', () => {
 
       mockDatabase.getFirstAsync.mockResolvedValue({ count: 0 });
 
-      await repository.insertMany(beers);
+      await repository.insertMany(nel(beers));
 
       // Should use transactions for batching
       expect(mockDatabase.withTransactionAsync).toHaveBeenCalled();
@@ -239,7 +264,7 @@ describe('MyBeersRepository', () => {
 
       mockDatabase.getFirstAsync.mockResolvedValue({ count: 0 });
 
-      await repository.insertMany(beers);
+      await repository.insertMany(nel(beers));
 
       // Should insert beer with empty strings for missing fields
       expect(mockDatabase.runAsync).toHaveBeenCalledWith(
@@ -266,7 +291,7 @@ describe('MyBeersRepository', () => {
 
       mockDatabase.runAsync.mockRejectedValueOnce(new Error('Database error'));
 
-      await expect(repository.insertMany(beers)).rejects.toThrow('Database error');
+      await expect(repository.insertMany(nel(beers))).rejects.toThrow('Database error');
     });
 
     it('should include all Beerfinder-specific fields in insert', async () => {
@@ -291,7 +316,7 @@ describe('MyBeersRepository', () => {
 
       mockDatabase.getFirstAsync.mockResolvedValue({ count: 0 });
 
-      await repository.insertMany(beers);
+      await repository.insertMany(nel(beers));
 
       // Should include roh_lap, tasted_date, review_ratings, chit_code
       expect(mockDatabase.runAsync).toHaveBeenCalledWith(
@@ -567,7 +592,7 @@ describe('MyBeersRepository', () => {
         .mockRejectedValueOnce(new Error('Insert failed for beer 1')) // First beer fails
         .mockResolvedValueOnce(undefined); // Second beer succeeds
 
-      await expect(repository.insertMany(beers)).rejects.toThrow(/1 of 2/);
+      await expect(repository.insertMany(nel(beers))).rejects.toThrow(/1 of 2/);
     });
 
     it('should throw error on transaction failure', async () => {
@@ -588,7 +613,7 @@ describe('MyBeersRepository', () => {
 
       mockDatabase.withTransactionAsync.mockRejectedValueOnce(new Error('Transaction failed'));
 
-      await expect(repository.insertMany(beers)).rejects.toThrow('Transaction failed');
+      await expect(repository.insertMany(nel(beers))).rejects.toThrow('Transaction failed');
     });
 
     // ----------------------------------------------------------
@@ -618,7 +643,9 @@ describe('MyBeersRepository', () => {
 
       mockDatabase.withTransactionAsync.mockRejectedValueOnce(new Error('database is locked'));
 
-      await expect(repository.insertMany(beers)).rejects.toBeInstanceOf(DatabaseContentionError);
+      await expect(repository.insertMany(nel(beers))).rejects.toBeInstanceOf(
+        DatabaseContentionError
+      );
     });
 
     it('insertMany leaves an unrelated database failure unwrapped', async () => {
@@ -640,7 +667,83 @@ describe('MyBeersRepository', () => {
 
       mockDatabase.withTransactionAsync.mockRejectedValueOnce(original);
 
-      await expect(repository.insertMany(beers)).rejects.toBe(original);
+      await expect(repository.insertMany(nel(beers))).rejects.toBe(original);
+    });
+  });
+
+  describe('malformed input must not wipe the table', () => {
+    // The branch this covers is why narrowing the type alone cannot fix the
+    // wipe: a NonEmptyArray whose every row lacks an `id` is perfectly
+    // well-typed, passes the signature, reaches the filter, and — before this —
+    // ran DELETE FROM tasted_brew_current_round and returned normally. The
+    // repository's own comment admitted it chose wiping over throwing.
+    const idless = [
+      { brew_name: 'no id here' },
+    ] as unknown as NonEmptyArray<BeerfinderWithContainerType>;
+
+    function deleteCalls(mockDatabase: ReturnType<typeof createMockDatabase>) {
+      return mockDatabase.runAsync.mock.calls.filter((call: unknown[]) =>
+        String(call[0]).includes('DELETE FROM tasted_brew_current_round')
+      );
+    }
+
+    it('insertMany throws when every supplied beer lacks an id', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+
+      await expect(createRepository().insertMany(idless)).rejects.toThrow(/lack/i);
+
+      expect(deleteCalls(mockDatabase)).toHaveLength(0);
+    });
+
+    it('insertManyUnsafe throws when every supplied beer lacks an id', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+
+      await expect(createRepository().insertManyUnsafe(idless)).rejects.toThrow(/lack/i);
+
+      expect(deleteCalls(mockDatabase)).toHaveLength(0);
+    });
+  });
+
+  describe('replaceAllWithEmpty', () => {
+    // Emptying the tasted table is legitimate — a new user, or the round
+    // rollover at 200 beers. It just has to be asked for explicitly rather than
+    // inferred from an array that happens to be empty.
+    it('issues exactly one delete against the tasted table', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+
+      await createRepository().replaceAllWithEmpty();
+
+      const deletes = mockDatabase.runAsync.mock.calls.filter((call: unknown[]) =>
+        String(call[0]).includes('DELETE FROM tasted_brew_current_round')
+      );
+      expect(deletes).toHaveLength(1);
+    });
+
+    it('has an unlocked twin for callers already holding the master lock', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+
+      await createRepository().replaceAllWithEmptyUnsafe();
+
+      const deletes = mockDatabase.runAsync.mock.calls.filter((call: unknown[]) =>
+        String(call[0]).includes('DELETE FROM tasted_brew_current_round')
+      );
+      expect(deletes).toHaveLength(1);
+    });
+  });
+
+  describe('signature', () => {
+    it('insertMany cannot be called with an empty array', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+
+      // Compile-time guard: the empty case now has an explicit method, so an
+      // empty array must not be expressible as "insert these".
+      // @ts-expect-error an empty array is not a NonEmptyArray
+      await expect(createRepository().insertMany([])).rejects.toThrow();
     });
   });
 
@@ -674,7 +777,7 @@ describe('MyBeersRepository', () => {
           : Promise.resolve({ changes: 0, lastInsertRowId: 0 })
       );
 
-      await expect(repository.insertMany(oneBeer())).rejects.toThrow();
+      await expect(repository.insertMany(nel(oneBeer()))).rejects.toThrow();
     });
 
     it('insertMany reports the number of rows that failed to insert', async () => {
@@ -690,7 +793,7 @@ describe('MyBeersRepository', () => {
 
       // The count is what makes the failure actionable — one bad row from the
       // API reads very differently from every row failing.
-      await expect(repository.insertMany(oneBeer())).rejects.toThrow(/1 of 1/);
+      await expect(repository.insertMany(nel(oneBeer()))).rejects.toThrow(/1 of 1/);
     });
 
     it('insertManyUnsafe rejects when a row insert fails', async () => {
@@ -704,7 +807,7 @@ describe('MyBeersRepository', () => {
           : Promise.resolve({ changes: 0, lastInsertRowId: 0 })
       );
 
-      await expect(repository.insertManyUnsafe(oneBeer())).rejects.toThrow(/1 of 1/);
+      await expect(repository.insertManyUnsafe(nel(oneBeer()))).rejects.toThrow(/1 of 1/);
     });
 
     it('surfaces a contention abort on a row as DatabaseContentionError, not a row-count error', async () => {
@@ -726,7 +829,7 @@ describe('MyBeersRepository', () => {
       // matcher in isDatabaseLockedError would match the quote, and the wrapper
       // would be applied anyway — passing for entirely the wrong reason. So this
       // also pins that it did NOT become a row-count aggregate.
-      const thrown = await repository.insertMany(oneBeer()).catch(error => error);
+      const thrown = await repository.insertMany(nel(oneBeer())).catch(error => error);
 
       expect(thrown).toBeInstanceOf(DatabaseContentionError);
       // Checking the WRAPPED original, not the wrapper's message: the wrapper
@@ -763,14 +866,14 @@ describe('MyBeersRepository', () => {
           : Promise.resolve({ changes: 0, lastInsertRowId: 0 })
       );
 
-      await expect(repository.insertMany(oneBeer())).rejects.toThrow();
+      await expect(repository.insertMany(nel(oneBeer()))).rejects.toThrow();
 
       expect(transactionRejected).toBe(true);
     });
   });
 
   describe('insertManyUnsafe contention mapping', () => {
-    it('maps a lock abort on the empty-array wipe to DatabaseContentionError', async () => {
+    it('maps a lock abort on replaceAllWithEmpty to DatabaseContentionError', async () => {
       const mockDatabase = createMockDatabase();
       (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
@@ -779,19 +882,21 @@ describe('MyBeersRepository', () => {
 
       // A bare DELETE is the statement most likely to abort under contention,
       // and these two branches used to run outside the mapping entirely.
-      await expect(repository.insertManyUnsafe([])).rejects.toBeInstanceOf(DatabaseContentionError);
+      await expect(repository.replaceAllWithEmptyUnsafe()).rejects.toBeInstanceOf(
+        DatabaseContentionError
+      );
     });
 
-    it('maps a lock abort on the no-valid-ids wipe to DatabaseContentionError', async () => {
+    it('maps a lock abort on the locked clear to DatabaseContentionError', async () => {
       const mockDatabase = createMockDatabase();
       (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
 
       mockDatabase.withTransactionAsync.mockRejectedValueOnce(new Error('database is locked'));
 
-      await expect(
-        repository.insertManyUnsafe([{ id: '' } as never, { id: null } as never])
-      ).rejects.toBeInstanceOf(DatabaseContentionError);
+      await expect(repository.replaceAllWithEmpty()).rejects.toBeInstanceOf(
+        DatabaseContentionError
+      );
     });
   });
 
@@ -825,7 +930,7 @@ describe('MyBeersRepository', () => {
 
       mockDatabase.getFirstAsync.mockResolvedValue({ count: 0 });
 
-      await repository.insertManyUnsafe(beers);
+      await repository.insertManyUnsafe(nel(beers));
 
       expect(mockDatabase.withTransactionAsync).toHaveBeenCalled();
       const insertCalls = mockDatabase.runAsync.mock.calls.filter((call: unknown[]) =>
@@ -834,19 +939,21 @@ describe('MyBeersRepository', () => {
       expect(insertCalls).toHaveLength(2);
     });
 
-    it('should handle empty array by clearing table', async () => {
+    // INVERTED by plan 02 Phase 2, same reasoning as the locked twin.
+    it('should route an empty payload through replaceAllWithEmptyUnsafe', async () => {
       const mockDatabase = createMockDatabase();
       (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
       jest.spyOn(console, 'log').mockImplementation();
       mockDatabase.getFirstAsync.mockResolvedValue({ count: 5 });
 
-      await repository.insertManyUnsafe([]);
+      await repository.replaceAllWithEmptyUnsafe();
 
       expect(mockDatabase.runAsync).toHaveBeenCalledWith('DELETE FROM tasted_brew_current_round');
     });
 
-    it('should clear table when all beers invalid', async () => {
+    // INVERTED by plan 02 Phase 2, same reasoning as the locked twin.
+    it('should throw rather than clear when all beers invalid', async () => {
       const mockDatabase = createMockDatabase();
       (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
@@ -865,9 +972,11 @@ describe('MyBeersRepository', () => {
 
       mockDatabase.getFirstAsync.mockResolvedValue({ count: 0 });
 
-      await repository.insertManyUnsafe(beers);
+      await expect(repository.insertManyUnsafe(beers as never)).rejects.toThrow(/lack/i);
 
-      expect(mockDatabase.runAsync).toHaveBeenCalledWith('DELETE FROM tasted_brew_current_round');
+      expect(mockDatabase.runAsync).not.toHaveBeenCalledWith(
+        'DELETE FROM tasted_brew_current_round'
+      );
     });
 
     it('should process beers in batches of 20', async () => {
@@ -887,7 +996,7 @@ describe('MyBeersRepository', () => {
 
       mockDatabase.getFirstAsync.mockResolvedValue({ count: 0 });
 
-      await repository.insertManyUnsafe(beers);
+      await repository.insertManyUnsafe(nel(beers));
 
       const insertCalls = mockDatabase.runAsync.mock.calls.filter((call: unknown[]) =>
         (call[0] as string).includes('INSERT OR REPLACE')
@@ -932,7 +1041,7 @@ describe('MyBeersRepository', () => {
 
       mockDatabase.getFirstAsync.mockResolvedValue({ count: 0 });
 
-      await repository.insertManyUnsafe(beers);
+      await repository.insertManyUnsafe(nel(beers));
 
       const insertCalls = mockDatabase.runAsync.mock.calls.filter((call: unknown[]) =>
         (call[0] as string).includes('INSERT OR REPLACE')
@@ -964,7 +1073,7 @@ describe('MyBeersRepository', () => {
         .mockResolvedValueOnce(undefined) // DELETE succeeds
         .mockRejectedValueOnce(new Error('Insert failed')); // INSERT fails
 
-      await expect(repository.insertManyUnsafe(beers)).rejects.toThrow(/of /);
+      await expect(repository.insertManyUnsafe(nel(beers))).rejects.toThrow(/of /);
     });
 
     it('should throw error on transaction failure', async () => {
@@ -985,7 +1094,7 @@ describe('MyBeersRepository', () => {
 
       mockDatabase.withTransactionAsync.mockRejectedValueOnce(new Error('Transaction failed'));
 
-      await expect(repository.insertManyUnsafe(beers)).rejects.toThrow('Transaction failed');
+      await expect(repository.insertManyUnsafe(nel(beers))).rejects.toThrow('Transaction failed');
     });
   });
   // ==========================================================================
@@ -1016,7 +1125,7 @@ describe('MyBeersRepository', () => {
 
       mockDatabase.runAsync.mockRejectedValue(new Error('Database error'));
 
-      await expect(repository.insertMany(beers)).rejects.toThrow();
+      await expect(repository.insertMany(nel(beers))).rejects.toThrow();
 
       expect(databaseLockManager.isLocked()).toBe(false);
       expect(databaseLockManager.getQueueLength()).toBe(0);
@@ -1038,7 +1147,7 @@ describe('MyBeersRepository', () => {
         },
       ];
 
-      await repository.insertMany(beers);
+      await repository.insertMany(nel(beers));
 
       expect(databaseLockManager.isLocked()).toBe(false);
     });

@@ -207,8 +207,10 @@ describe('Data Refresh Integration Tests', () => {
       expect(result.allBeers).toHaveLength(194);
       expect(result.myBeers).toHaveLength(0);
 
-      // Should still call insertMany for empty arrays (to clear old data)
-      expect(myBeersRepository.myBeersRepository.insertManyUnsafe).toHaveBeenCalledWith([]);
+      // INVERTED by plan 02 Phase 2: emptying the tasted table is now asked for
+      // explicitly rather than inferred from an empty array reaching insertMany.
+      expect(myBeersRepository.myBeersRepository.replaceAllWithEmptyUnsafe).toHaveBeenCalled();
+      expect(myBeersRepository.myBeersRepository.insertManyUnsafe).not.toHaveBeenCalled();
     });
 
     it('should handle round rollover (200 beers reached)', async () => {
@@ -241,7 +243,9 @@ describe('Data Refresh Integration Tests', () => {
       const result = await refreshAllDataFromAPI();
 
       expect(result.myBeers).toHaveLength(0);
-      expect(myBeersRepository.myBeersRepository.insertManyUnsafe).toHaveBeenCalledWith([]);
+      // INVERTED by plan 02 Phase 2, same reasoning: the round rollover is a
+      // genuine empty state and now says so explicitly.
+      expect(myBeersRepository.myBeersRepository.replaceAllWithEmptyUnsafe).toHaveBeenCalled();
     });
   });
 

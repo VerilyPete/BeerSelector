@@ -97,7 +97,11 @@ class OptimisticUpdateRepository {
         operationId: row.operation_id,
       };
     } catch (error) {
-      console.error('[OptimisticUpdateRepository] Error parsing rollback_data in row:', row.id, error);
+      console.error(
+        '[OptimisticUpdateRepository] Error parsing rollback_data in row:',
+        row.id,
+        error
+      );
       return null;
     }
   }
@@ -159,7 +163,7 @@ class OptimisticUpdateRepository {
       );
 
       return rows
-        .map((row) => this.rowToUpdate(row))
+        .map(row => this.rowToUpdate(row))
         .filter((u): u is OptimisticUpdate => u !== null);
     } catch (error) {
       console.error('[OptimisticUpdateRepository] Error getting all updates:', error);
@@ -199,7 +203,7 @@ class OptimisticUpdateRepository {
       );
 
       return rows
-        .map((row) => this.rowToUpdate(row))
+        .map(row => this.rowToUpdate(row))
         .filter((u): u is OptimisticUpdate => u !== null);
     } catch (error) {
       console.error('[OptimisticUpdateRepository] Error getting updates by status:', error);
@@ -222,7 +226,7 @@ class OptimisticUpdateRepository {
       );
 
       return rows
-        .map((row) => this.rowToUpdate(row))
+        .map(row => this.rowToUpdate(row))
         .filter((u): u is OptimisticUpdate => u !== null);
     } catch (error) {
       console.error('[OptimisticUpdateRepository] Error getting pending updates:', error);
@@ -281,12 +285,14 @@ class OptimisticUpdateRepository {
     try {
       const db = await getDatabase();
 
-      await db.runAsync(
-        `UPDATE ${this.tableName} SET operation_id = ? WHERE id = ?`,
-        [operationId, updateId]
-      );
+      await db.runAsync(`UPDATE ${this.tableName} SET operation_id = ? WHERE id = ?`, [
+        operationId,
+        updateId,
+      ]);
 
-      console.log(`[OptimisticUpdateRepository] Linked update ${updateId} to operation ${operationId}`);
+      console.log(
+        `[OptimisticUpdateRepository] Linked update ${updateId} to operation ${operationId}`
+      );
     } catch (error) {
       console.error('[OptimisticUpdateRepository] Error linking operation:', error);
       throw error;

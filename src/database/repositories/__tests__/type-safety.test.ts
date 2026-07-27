@@ -21,6 +21,8 @@ import {
 } from '@/src/types/beer';
 import { Reward } from '@/src/types/database';
 import { AllBeersRow, TastedBrewRow, RewardRow } from '../../schemaTypes';
+import { toNonEmpty } from '../../../api/fetchOutcome';
+import type { NonEmptyArray } from '../../../api/fetchOutcome';
 
 // Mock the database connection
 jest.mock('../../connection', () => ({
@@ -33,6 +35,17 @@ jest.mock('../../locks', () => ({
     withDatabaseLock: jest.fn(async (_name: string, task: () => Promise<unknown>) => task()),
   },
 }));
+
+/**
+ * Narrow a literal fixture array for the NonEmptyArray-typed repository
+ * signatures. Throws rather than asserting, so a fixture that is accidentally
+ * empty fails loudly instead of lying to the type system.
+ */
+function nel<T>(items: readonly T[]): NonEmptyArray<T> {
+  const narrowed = toNonEmpty(items);
+  if (narrowed === null) throw new Error('fixture array was unexpectedly empty');
+  return narrowed;
+}
 
 describe('Repository Type Safety', () => {
   describe('BeerRepository Type Safety', () => {
@@ -154,7 +167,7 @@ describe('Repository Type Safety', () => {
         },
       ];
 
-      await repository.insertMany(validBeers);
+      await repository.insertMany(nel(validBeers));
 
       // TypeScript should prevent passing wrong type
       // @ts-expect-error - Should not allow Beerfinder[]
@@ -266,7 +279,7 @@ describe('Repository Type Safety', () => {
         },
       ];
 
-      await repository.insertMany(validBeerfinders);
+      await repository.insertMany(nel(validBeerfinders));
 
       // TypeScript should prevent passing wrong type
       // @ts-expect-error - Should not allow Beer[] (missing tasted_date, roh_lap, etc.)
