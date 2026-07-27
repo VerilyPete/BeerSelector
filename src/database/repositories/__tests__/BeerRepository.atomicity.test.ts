@@ -57,6 +57,7 @@ type TransactionalFake = {
   readonly prepareCount: () => number;
   readonly finalizeCount: () => number;
   readonly failOnInsertNumber: (n: number) => void;
+  readonly failOnFinalize: () => void;
 };
 
 /**
@@ -82,6 +83,7 @@ function createTransactionalFake(
   let failAtInsert: number | null = null;
   let prepares = 0;
   let finalizes = 0;
+  let finalizeShouldThrow = false;
 
   const isWrite = (sql: string): boolean => /^\s*(DELETE|INSERT|UPDATE)/i.test(sql);
 
@@ -168,6 +170,9 @@ function createTransactionalFake(
         finalizeAsync: async (): Promise<void> => {
           finalized = true;
           finalizes += 1;
+          if (finalizeShouldThrow) {
+            throw new Error('SQLITE_MISUSE: cannot finalize on a failed transaction');
+          }
         },
       };
     },
@@ -215,6 +220,9 @@ function createTransactionalFake(
     finalizeCount: () => finalizes,
     failOnInsertNumber: (n: number) => {
       failAtInsert = n;
+    },
+    failOnFinalize: () => {
+      finalizeShouldThrow = true;
     },
   };
 }
@@ -288,6 +296,24 @@ describe('BeerRepository insert atomicity', () => {
     await expect(new BeerRepository().insertManyUnsafe(makeBeers(5))).rejects.toThrow();
 
     expect(fake.finalizeCount()).toBe(1);
+  });
+
+  it('surfaces the original failure when finalizing the statement also fails', async () => {
+    const fake = createTransactionalFake(['old-1', 'old-2', 'old-3']);
+    (connection.getDatabase as jest.Mock).mockResolvedValue(fake.db);
+    fake.failOnInsertNumber(2);
+    fake.failOnFinalize();
+    const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+
+    // If the body throws A and the finally throws B, JS discards A. Here A is
+    // the abort we must classify and B is a cleanup failure — losing A means a
+    // retryable contention error reaches the user as a hard UNKNOWN_ERROR.
+    await expect(new BeerRepository().insertManyUnsafe(makeBeers(5))).rejects.toThrow(
+      /simulated insert failure/
+    );
+
+    expect(fake.committedIds()).toEqual(['old-1', 'old-2', 'old-3']);
+    consoleSpy.mockRestore();
   });
 
   it('routes every query through the transaction object, not the database handle', async () => {

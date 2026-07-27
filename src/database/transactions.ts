@@ -65,8 +65,18 @@ export type TransactionLike = Pick<SQLiteDatabase, 'runAsync' | 'getFirstAsync' 
  * The platform is a parameter rather than a `Platform.OS` read so both branches
  * are unit-testable. The web branch is load-bearing, not a nicety:
  * `withExclusiveTransactionAsync` hard-throws on web as its first statement, so
- * calling it unguarded there would break every import. Web keeps exactly
- * today's semantics — degraded, not broken.
+ * calling it unguarded there would break every import.
+ *
+ * ⚠️ **Web is not equivalent to the pre-exclusive behaviour, and is in one
+ * respect worse.** Before this helper existed the import ran ~25 short
+ * transactions (the delete, then one per 50-row batch). Web now runs ONE
+ * non-exclusive transaction spanning the delete and every insert — which is
+ * exactly the shape review round 1 rejected for native, because a concurrent
+ * write gets absorbed into the transaction and rolled back with it while its
+ * caller has already been told it succeeded. Exclusivity closes that on native;
+ * web gets the widened window without the fix. Judged acceptable only because
+ * web is Expo scaffolding rather than a shipped target (CLAUDE.md pins iOS
+ * 17.6+), and stated here rather than papered over as "today's semantics".
  *
  * @param database - The SQLite database instance
  * @param platform - `'web'` for the non-exclusive fallback, `'native'` otherwise

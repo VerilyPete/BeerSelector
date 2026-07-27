@@ -4,12 +4,9 @@
  */
 
 import { Preference } from './types';
+import { toContentionError } from './errors';
 import { getDatabase } from './connection';
-import {
-  isPreferenceRow,
-  preferenceRowToPreference,
-  PreferenceRow
-} from './schemaTypes';
+import { isPreferenceRow, preferenceRowToPreference, PreferenceRow } from './schemaTypes';
 
 /**
  * Get a preference value by key
@@ -39,7 +36,11 @@ export const getPreference = async (key: string): Promise<string | null> => {
  * @param description Optional description for the preference
  * @throws Error if the database operation fails
  */
-export const setPreference = async (key: string, value: string, description?: string): Promise<void> => {
+export const setPreference = async (
+  key: string,
+  value: string,
+  description?: string
+): Promise<void> => {
   const database = await getDatabase();
 
   try {
@@ -63,7 +64,12 @@ export const setPreference = async (key: string, value: string, description?: st
     }
   } catch (error) {
     console.error(`Error setting preference ${key}:`, error);
-    throw error;
+    // This module takes NO master lock. Since the allbeers import moved to an
+    // exclusive transaction on a second native connection, SQLite's write lock
+    // — which is per database FILE, not per table — aborts every other writer
+    // for the duration of that import. Unmapped, a transient, retryable abort
+    // reaches the user as raw SQLite text through UNKNOWN_ERROR.
+    throw toContentionError(`preference write (${key})`, error);
   }
 };
 
@@ -81,9 +87,7 @@ export const getAllPreferences = async (): Promise<Preference[]> => {
     );
 
     // Validate and convert each row
-    return rows
-      .filter(row => isPreferenceRow(row))
-      .map(row => preferenceRowToPreference(row));
+    return rows.filter(row => isPreferenceRow(row)).map(row => preferenceRowToPreference(row));
   } catch (error) {
     console.error('Error getting all preferences:', error);
     return [];
@@ -101,13 +105,15 @@ export const getAllPreferences = async (): Promise<Preference[]> => {
 export const areApiUrlsConfigured = async (): Promise<boolean> => {
   try {
     // Check if we're in visitor mode
-    const isVisitor = await getPreference('is_visitor_mode') === 'true';
+    const isVisitor = (await getPreference('is_visitor_mode')) === 'true';
 
     // Get API URLs
     const allBeersApiUrl = await getPreference('all_beers_api_url');
     const myBeersApiUrl = await getPreference('my_beers_api_url');
 
-    console.log(`[areApiUrlsConfigured] isVisitor: ${isVisitor}, allBeersUrl: ${allBeersApiUrl ? 'SET' : 'NOT SET'}, myBeersUrl: ${myBeersApiUrl ? 'SET' : 'NOT SET'}`);
+    console.log(
+      `[areApiUrlsConfigured] isVisitor: ${isVisitor}, allBeersUrl: ${allBeersApiUrl ? 'SET' : 'NOT SET'}, myBeersUrl: ${myBeersApiUrl ? 'SET' : 'NOT SET'}`
+    );
 
     // In visitor mode, we only need the all_beers_api_url to be set
     if (isVisitor) {
