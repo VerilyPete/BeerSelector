@@ -11,6 +11,8 @@
  * - Prevents deadlocks with timeout protection
  */
 
+import { logError, ErrorContext } from '../utils/errorLogger';
+
 /**
  * Proof that the bearer currently holds the lock.
  *
@@ -45,6 +47,13 @@ export type LockLogger = {
 };
 
 /**
+ * Reports a condition that needs attention rather than a log line.
+ *
+ * Matches `logError` from `src/utils/errorLogger`, which is the default.
+ */
+export type LockErrorReporter = (error: unknown, context: ErrorContext) => void;
+
+/**
  * Construction options. Timeouts are options rather than constants so tests can
  * drive small budgets deterministically with fake timers.
  */
@@ -52,6 +61,7 @@ export type DatabaseLockManagerOptions = {
   readonly holdTimeoutMs?: number;
   readonly acquisitionTimeoutMs?: number;
   readonly logger?: LockLogger;
+  readonly reportError?: LockErrorReporter;
 };
 
 /**
@@ -90,6 +100,9 @@ export class DatabaseLockManager {
   private readonly LOCK_TIMEOUT_MS: number; // hold timeout
   private readonly ACQUISITION_TIMEOUT_MS: number; // acquisition timeout
   private readonly logger: LockLogger;
+  private readonly reportError: LockErrorReporter;
+  /** When the live grant was made, used to report how long an abandoned hold ran. */
+  private grantedAt: number = 0;
   /** Monotonic, stamped into every LockToken at grant time. */
   private grantSerial: number = 0;
   /** Monotonic, stamped into every queued request at enqueue time. */
@@ -117,6 +130,7 @@ export class DatabaseLockManager {
     this.LOCK_TIMEOUT_MS = options.holdTimeoutMs ?? 15000; // 15s for mobile UX
     this.ACQUISITION_TIMEOUT_MS = options.acquisitionTimeoutMs ?? 30000;
     this.logger = options.logger ?? console;
+    this.reportError = options.reportError ?? logError;
   }
 
   /**
@@ -306,8 +320,31 @@ export class DatabaseLockManager {
     }
 
     // Set safety timeout to auto-release lock after the hold timeout
+    this.grantedAt = Date.now();
     this.timeoutId = setTimeout(() => {
-      this.logger.warn(`Database lock forcibly released after timeout (${this.currentOperation})`);
+      const heldOperation = this.currentOperation;
+      const heldForMs = Date.now() - this.grantedAt;
+
+      // Reported as an error, not a log line. A forced release abandons a grant
+      // and blocks every writer until the holder returns — a console.warn is
+      // indistinguishable from routine chatter, and this is an incident.
+      this.reportError(
+        new Error(
+          `Database lock forcibly released after ${heldForMs}ms (${heldOperation}) — the holder never returned`
+        ),
+        {
+          operation: 'DatabaseLockManager.forceRelease',
+          component: 'database/DatabaseLockManager',
+          additionalData: {
+            heldOperation,
+            heldForMs,
+            holdTimeoutMs: this.LOCK_TIMEOUT_MS,
+            // Says whether this stalled anything, which is the difference
+            // between a curiosity and an incident.
+            queueLength: this.queue.length,
+          },
+        }
+      );
       this._forceRelease();
     }, this.LOCK_TIMEOUT_MS);
 

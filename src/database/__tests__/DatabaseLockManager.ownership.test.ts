@@ -251,6 +251,67 @@ describe('DatabaseLockManager grant ownership', () => {
   });
 });
 
+describe('forced release reporting', () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('reports a forced release through the error logger with the held operation and duration', async () => {
+    const reportError = jest.fn();
+    const lockManager = new DatabaseLockManager({ holdTimeoutMs: 5000, reportError });
+    await lockManager.acquire('slow-op');
+
+    jest.advanceTimersByTime(5000);
+
+    // A forced release is no longer routine bookkeeping — it abandons a grant
+    // and blocks every writer until the holder returns. A console.warn is
+    // indistinguishable from ordinary chatter, so it goes to the error logger.
+    expect(reportError).toHaveBeenCalledTimes(1);
+    const [error, context] = reportError.mock.calls[0];
+    expect(String((error as Error).message)).toContain('forcibly released');
+    expect(context).toEqual(
+      expect.objectContaining({
+        operation: 'DatabaseLockManager.forceRelease',
+        additionalData: expect.objectContaining({
+          heldOperation: 'slow-op',
+          heldForMs: 5000,
+          holdTimeoutMs: 5000,
+        }),
+      })
+    );
+  });
+
+  it('reports the number of writers left waiting on the abandoned hold', async () => {
+    const reportError = jest.fn();
+    const lockManager = new DatabaseLockManager({ holdTimeoutMs: 5000, reportError });
+    await lockManager.acquire('slow-op');
+    const waiter = lockManager.acquire('waiter-b');
+    waiter.catch(() => undefined);
+
+    jest.advanceTimersByTime(5000);
+
+    // The queue length is what says whether this stalled anything, which is the
+    // difference between a curiosity and an incident.
+    const [, context] = reportError.mock.calls[0];
+    expect(context.additionalData.queueLength).toBe(1);
+  });
+
+  it('does not report anything when the lock is released normally', async () => {
+    const reportError = jest.fn();
+    const lockManager = new DatabaseLockManager({ holdTimeoutMs: 5000, reportError });
+    const token = await lockManager.acquire('quick-op');
+
+    lockManager.release(token);
+    jest.advanceTimersByTime(5000);
+
+    expect(reportError).not.toHaveBeenCalled();
+  });
+});
+
 describe('withDatabaseLock', () => {
   beforeEach(() => {
     jest.useFakeTimers();

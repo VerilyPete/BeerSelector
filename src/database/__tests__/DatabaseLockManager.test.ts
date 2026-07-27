@@ -11,8 +11,10 @@ import { nameKeyedLock, NameKeyedLock } from './helpers/nameKeyedLock';
 // These suites identify operations by name, which is what they assert about.
 // The shim maps names to tokens; ownership is covered in
 // DatabaseLockManager.ownership.test.ts against the real API.
-function createLockManager(): DatabaseLockManager & NameKeyedLock {
-  const manager = new DatabaseLockManager();
+function createLockManager(
+  options: ConstructorParameters<typeof DatabaseLockManager>[0] = {}
+): DatabaseLockManager & NameKeyedLock {
+  const manager = new DatabaseLockManager(options);
   return Object.assign(manager, nameKeyedLock(manager));
 }
 
@@ -180,31 +182,33 @@ describe('DatabaseLockManager', () => {
     });
 
     it('should log warning when lock is forcibly released', async () => {
-      const lockManager = createLockManager();
-      const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
+      // Repointed from console.warn to the injected error reporter: a forced
+      // release abandons a grant and is reported as an incident, not chatter.
+      const reportError = jest.fn();
+      const lockManager = createLockManager({ reportError });
 
       await lockManager.acquireLock('timeout-test');
 
       // Trigger timeout
       jest.advanceTimersByTime(15000);
 
-      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('forcibly released'));
-
-      consoleSpy.mockRestore();
+      expect(reportError).toHaveBeenCalledWith(
+        expect.objectContaining({ message: expect.stringContaining('forcibly released') }),
+        expect.anything()
+      );
     });
 
     it('should clear timeout when lock is released normally', async () => {
-      const lockManager = createLockManager();
-      const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
+      const reportError = jest.fn();
+      const lockManager = createLockManager({ reportError });
 
       await lockManager.acquireLock('normal-operation');
       lockManager.releaseLock('normal-operation');
 
-      // Advance time - should not trigger warning since timeout was cleared
+      // Advance time - should not report anything since the timeout was cleared
       jest.advanceTimersByTime(15000);
 
-      expect(consoleSpy).not.toHaveBeenCalled();
-      consoleSpy.mockRestore();
+      expect(reportError).not.toHaveBeenCalled();
     });
   });
 
