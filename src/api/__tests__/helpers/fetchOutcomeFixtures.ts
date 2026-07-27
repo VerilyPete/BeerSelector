@@ -51,10 +51,10 @@ export function unavailable<T>(
 /**
  * The request was made and did not complete — offline, HTTP error, timeout.
  *
- * `beerApi` cannot produce this yet (plan 05 Phase 5.3 is what makes it
- * reachable); it still throws for transport failures. Consumers must handle the
- * arm regardless, so this builder exists to drive them directly. When 5.3 lands
- * this stops being the only way to reach the case.
+ * Plan 05 Phase 5.3 made this reachable in production — `beerApi` now returns
+ * `failed` for offline, HTTP-error and timeout cases rather than throwing. This
+ * builder remains the way to drive a specific classification at a consumer
+ * without staging a real transport failure.
  */
 export function failed<T>(
   type: ErrorResponse['type'] = ApiErrorType.NETWORK_ERROR,

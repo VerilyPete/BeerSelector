@@ -31,7 +31,7 @@ import {
   unavailable,
   failed,
 } from '../../api/__tests__/helpers/fetchOutcomeFixtures';
-import { ApiErrorType } from '../../utils/notificationUtils';
+import { ApiErrorType, getUserFriendlyErrorMessage } from '../../utils/notificationUtils';
 import { logError } from '../../utils/errorLogger';
 import {
   fetchBeersFromProxy,
@@ -275,9 +275,11 @@ describe('dataUpdateService', () => {
 
     it('should categorize AbortError as NETWORK_ERROR via createErrorResponse', async () => {
       (getPreference as jest.Mock).mockResolvedValueOnce(testAllBeersUrl);
-      const abortError = new Error('The operation was aborted');
-      abortError.name = 'AbortError';
-      (fetchBeersFromAPI as jest.Mock).mockRejectedValueOnce(abortError);
+      // An abort is classified inside beerApi now and arrives as `failed`;
+      // see beerApi.timeout.test.ts for the abort itself.
+      (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce(
+        failed(ApiErrorType.NETWORK_ERROR, 'Network connection error: request timed out')
+      );
 
       const result = await fetchAndUpdateAllBeers();
 
@@ -800,9 +802,14 @@ describe('dataUpdateService', () => {
 
     describe('Error Handling with Config', () => {
       it('should properly categorize network errors', async () => {
+        // Drives the REAL contract. Post-5.3 the fetchers cannot reject for a
+        // transport failure — their whole body is inside a try — so a rejecting
+        // mock tests a path production can no longer take. That is why the
+        // classification regression this test appears to guard stayed green:
+        // the mock preserved the old contract the code had already left.
         (getPreference as jest.Mock).mockResolvedValueOnce(testAllBeersUrl);
-        (fetchBeersFromAPI as jest.Mock).mockRejectedValueOnce(
-          new TypeError('Network request failed')
+        (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce(
+          failed(ApiErrorType.NETWORK_ERROR, 'Network connection error')
         );
 
         const result = await fetchAndUpdateAllBeers();
@@ -948,6 +955,81 @@ describe('dataUpdateService', () => {
 
       expect(result.success).toBe(false);
       expect(result.dataUpdated).toBe(false);
+    });
+  });
+
+  // Plan 05 Phase 5.3, review remediation.
+  //
+  // `decideRewards` forwards `source.error` intact, but the all-beers path went
+  // through `requireRows`, which threw `new Error(\`${label} failed: ${msg}\`)`.
+  // The enclosing catch then re-ran createErrorResponse on that plain Error,
+  // whose message matches none of the substring rules — so a typed SERVER_ERROR
+  // became UNKNOWN_ERROR, and UNKNOWN_ERROR returns error.message verbatim,
+  // putting "All beers failed: HTTP 500 Internal Server Error" in a user-facing
+  // alert. The classification was discarded one frame after it was built, on the
+  // very path the fix was written for.
+  describe('all-beers preserves the typed fetch error', () => {
+    beforeEach(() => {
+      (getPreference as jest.Mock).mockImplementation(async (key: string) =>
+        key === 'all_beers_api_url' ? 'https://example.com/all.json?sid=13884' : null
+      );
+    });
+
+    it('reports a 5xx as SERVER_ERROR rather than UNKNOWN_ERROR', async () => {
+      (fetchBeersFromAPI as jest.Mock).mockResolvedValue(
+        failed(ApiErrorType.SERVER_ERROR, 'HTTP 500 Internal Server Error')
+      );
+
+      const result = await fetchAndUpdateAllBeers();
+
+      expect(result.success).toBe(false);
+      expect(result.error?.type).toBe(ApiErrorType.SERVER_ERROR);
+    });
+
+    it('reports an offline fetch as NETWORK_ERROR', async () => {
+      // The other half: allNetworkErrors selects the softer "check your
+      // connection" alert, and it can only do that if the type survives.
+      (fetchBeersFromAPI as jest.Mock).mockResolvedValue(
+        failed(ApiErrorType.NETWORK_ERROR, 'Network connection error')
+      );
+
+      const result = await fetchAndUpdateAllBeers();
+
+      expect(result.error?.type).toBe(ApiErrorType.NETWORK_ERROR);
+    });
+
+    it('keeps allNetworkErrors true when every source is offline', async () => {
+      // THE regression this remediation exists for. Before 5.3 the fetchers threw
+      // a TypeError('Network request failed'), which createErrorResponse read as
+      // NETWORK_ERROR, so allNetworkErrors was true and the user saw ONE clean
+      // "check your internet connection" alert. Returning `failed` routed the
+      // error through requireRows and the my-beers switches, which stringified
+      // it into UNKNOWN_ERROR — flipping allNetworkErrors to false and putting
+      // "All beers failed: Network connection error" in the alert body.
+      //
+      // Making the fetch layer honest must not make the UI dishonest.
+      const offline = () => failed(ApiErrorType.NETWORK_ERROR, 'Network connection error');
+      (fetchBeersFromAPI as jest.Mock).mockResolvedValue(offline());
+      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(offline());
+      (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(offline());
+
+      const result = await sequentialRefreshAllData();
+
+      expect(result.hasErrors).toBe(true);
+      expect(result.allNetworkErrors).toBe(true);
+      expect(result.allBeersResult.error?.type).toBe(ApiErrorType.NETWORK_ERROR);
+      expect(result.myBeersResult.error?.type).toBe(ApiErrorType.NETWORK_ERROR);
+    });
+
+    it('does not leak the developer message into the user-facing channel', () => {
+      // UNKNOWN_ERROR and VALIDATION_ERROR return error.message verbatim;
+      // SERVER_ERROR has dedicated copy. This is what the type buys.
+      expect(
+        getUserFriendlyErrorMessage({
+          type: ApiErrorType.SERVER_ERROR,
+          message: 'All beers failed: HTTP 500 Internal Server Error',
+        })
+      ).not.toContain('HTTP 500');
     });
   });
 

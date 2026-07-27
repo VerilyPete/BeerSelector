@@ -7,7 +7,12 @@ import {
   BeerfinderWithContainerType,
 } from '../types/beer';
 import { Reward } from '../types/database';
-import { ApiErrorType, ErrorResponse, createErrorResponse } from '../utils/notificationUtils';
+import {
+  ApiErrorType,
+  ErrorResponse,
+  SourceFailureError,
+  createErrorResponse,
+} from '../utils/notificationUtils';
 import { beerRepository } from '../database/repositories/BeerRepository';
 import { myBeersRepository } from '../database/repositories/MyBeersRepository';
 import { rewardsRepository } from '../database/repositories/RewardsRepository';
@@ -246,7 +251,10 @@ function requireRows<T>(source: UnconditionalSource<FetchOutcome<T>>, label: str
     throw new Error(`${label} unavailable (${source.reason.code}): ${source.reason.detail}`);
   }
   if (source.status === 'failed') {
-    throw new Error(`${label} failed: ${source.error.message}`);
+    // Carries the ErrorResponse rather than its message. Stringifying here sent
+    // a typed NETWORK_ERROR to the enclosing catch as UNKNOWN_ERROR, which
+    // flipped `allNetworkErrors` off and put developer prose in the alert.
+    throw new SourceFailureError(source.error, label);
   }
   if (source.data.kind === 'malformed') {
     throw new Error(`${label} malformed: ${source.data.detail}`);
@@ -962,11 +970,14 @@ export async function sequentialRefreshAllData(): Promise<ManualRefreshResult> {
         console.log(`Sequential refresh: my beers not applicable — ${myBeersSource.reason.detail}`);
         myBeersResult = { success: true, dataUpdated: false };
       } else {
+        if (myBeersSource.status === 'failed') {
+          // Was `My beers could not be fetched (failed)` — which discarded the
+          // ErrorResponse whole, not even interpolating its message.
+          throw new SourceFailureError(myBeersSource.error, 'My beers');
+        }
         if (myBeersSource.status !== 'fetched') {
           throw new Error(
-            myBeersSource.status === 'unavailable'
-              ? `My beers unavailable (${myBeersSource.reason.code}): ${myBeersSource.reason.detail}`
-              : `My beers could not be fetched (${myBeersSource.status})`
+            `My beers unavailable (${myBeersSource.reason.code}): ${myBeersSource.reason.detail}`
           );
         }
         if (myBeersSource.data.kind === 'malformed') {
@@ -1429,11 +1440,14 @@ export const refreshAllDataFromAPI = async (): Promise<{
       ) {
         console.log(`My beers not applicable: ${myBeersSource.reason.detail}`);
       } else {
+        if (myBeersSource.status === 'failed') {
+          // Was `My beers could not be fetched (failed)` — which discarded the
+          // ErrorResponse whole, not even interpolating its message.
+          throw new SourceFailureError(myBeersSource.error, 'My beers');
+        }
         if (myBeersSource.status !== 'fetched') {
           throw new Error(
-            myBeersSource.status === 'unavailable'
-              ? `My beers unavailable (${myBeersSource.reason.code}): ${myBeersSource.reason.detail}`
-              : `My beers could not be fetched (${myBeersSource.status})`
+            `My beers unavailable (${myBeersSource.reason.code}): ${myBeersSource.reason.detail}`
           );
         }
         if (myBeersSource.data.kind === 'malformed') {

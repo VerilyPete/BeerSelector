@@ -17,7 +17,7 @@ import {
 } from '../notificationUtils';
 import type { ErrorResponse } from '../notificationUtils';
 import { DatabaseContentionError } from '../../database/errors';
-import { MalformedResponseError } from '../../api/fetchOutcome';
+import { HttpError, MalformedResponseError } from '../../api/fetchOutcome';
 
 jest.mock('react-native', () => ({
   Alert: {
@@ -278,6 +278,34 @@ describe('notificationUtils', () => {
       expect(result.type).toBe(ApiErrorType.MALFORMED_RESPONSE_ERROR);
       // Not retryable: the same request will return the same unusable body.
       expect(result.retryable).toBeUndefined();
+    });
+
+    it('createErrorResponse classifies a 5xx HttpError as SERVER_ERROR', () => {
+      const result = createErrorResponse(new HttpError(500, 'Internal Server Error'));
+
+      expect(result.type).toBe(ApiErrorType.SERVER_ERROR);
+      expect(result.statusCode).toBe(500);
+    });
+
+    it('createErrorResponse classifies a 4xx HttpError as VALIDATION_ERROR', () => {
+      // Matches this same function's rule for a plain object carrying
+      // `statusCode` (tested above): 4xx is a client fault, 5xx is a server
+      // fault. Classifying every non-2xx as SERVER_ERROR would tell a user whose
+      // request was rejected on its merits that "the server encountered an
+      // error", and would contradict the sibling rule 60 lines below.
+      const result = createErrorResponse(new HttpError(404, 'Not Found'));
+
+      expect(result.type).toBe(ApiErrorType.VALIDATION_ERROR);
+      expect(result.statusCode).toBe(404);
+    });
+
+    it('createErrorResponse does not read an HttpError by its message', () => {
+      // The whole point of the type. A message-classified 500 used to match the
+      // 'Failed to fetch' network rule and tell the user to check their
+      // connection — the one thing they could do nothing about.
+      const result = createErrorResponse(new HttpError(503, 'Service Unavailable'));
+
+      expect(result.type).not.toBe(ApiErrorType.NETWORK_ERROR);
     });
 
     it('createErrorResponse classifies a DatabaseContentionError as CONTENTION_ERROR', () => {

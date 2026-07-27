@@ -89,12 +89,15 @@ export type FetchOutcome<T> =
  * about a body. With the codes on the right side, no combination is
  * contradictory.
  *
- * The cost, stated honestly: my-beers and rewards inherit `unchanged`, which
- * they can never produce because neither supports conditional requests. One
- * inert case is cheaper than three constructible nonsense combinations that
- * every reader has to reason about — and the previous design's own prescribed
- * lift (`{ status: 'fetched', data: outcome, etag: null }`) handed them that
- * same inert case anyway, one layer up, plus a permanently-null etag.
+ * The cost, stated honestly: sources with no conditional requests inherit
+ * `unchanged`, which they can never produce. One inert case is cheaper than
+ * three constructible nonsense combinations that every reader has to reason
+ * about — and the previous design's own prescribed lift handed them that same
+ * inert case anyway, one layer up, plus a permanently-null etag.
+ *
+ * That cost is no longer paid at the producers: `UnconditionalSource` below
+ * excludes the arm for the three `beerApi` fetchers, so it survives only here,
+ * in the shared union, where the axis argument needs it.
  */
 export type FetchedSource<T> =
   | { readonly status: 'fetched'; readonly data: T; readonly etag: string | null }
@@ -113,8 +116,8 @@ export type FetchedSource<T> =
  * and `dataUpdateService` handles its 304 separately without ever building a
  * `FetchedSource`.
  *
- * Every consumer was therefore carrying a branch for a state its input could not
- * be in. Those branches cannot be tested through the public API, and an untested
+ * Two of the five consumers were therefore carrying a branch for a state their
+ * input could not be in. Those branches cannot be tested through the public API, and an untested
  * branch in the code that exists to stop non-answers becoming answers is exactly
  * where the next one hides — one of them was a `fail` carrying developer prose
  * into a user-facing channel. Narrowing here makes writing such a branch a
@@ -124,20 +127,6 @@ export type FetchedSource<T> =
  */
 export type UnconditionalSource<T> = Exclude<FetchedSource<T>, { readonly status: 'unchanged' }>;
 
-/**
- * A response arrived and could not be used.
- *
- * Typed so that callers — and the user-facing error formatter — can tell it
- * apart from a network failure or an unknown fault. Without this the raw
- * developer message reaches the Settings refresh alert verbatim, which is what
- * `CONTENTION_ERROR` already exists to prevent for the database layer.
- *
- * Deliberately NOT retryable: the same request returns the same unusable body,
- * so offering "try again" would be a lie.
- *
- * 02 Phase 3 folds this into `FetchOutcome`'s `malformed` case; until the
- * callers are migrated, the throw needs a type.
- */
 /**
  * The server answered with a non-2xx status.
  *
@@ -163,6 +152,23 @@ export class HttpError extends Error {
   }
 }
 
+/**
+ * A body arrived and could not be used.
+ *
+ * Typed so that callers — and the user-facing error formatter — can tell it
+ * apart from a network failure or an unknown fault. Without this the raw
+ * developer message reaches the Settings refresh alert verbatim, which is what
+ * `CONTENTION_ERROR` already exists to prevent for the database layer.
+ *
+ * Deliberately NOT retryable: the same request returns the same unusable body,
+ * so offering "try again" would be a lie.
+ *
+ * Retained deliberately although nothing throws it today. Plan 05 Phase 5.3
+ * migrated the three `beerApi` fetchers to return `fetched`/`malformed` instead,
+ * which is the better shape — but `createErrorResponse` still classifies this,
+ * and the classification is what stops the raw message reaching the user. Any
+ * future thrower gets that for free.
+ */
 export class MalformedResponseError extends Error {
   constructor(message: string) {
     super(message);
