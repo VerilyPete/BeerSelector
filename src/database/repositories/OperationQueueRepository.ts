@@ -31,7 +31,7 @@
  */
 
 import { getDatabase } from '../connection';
-import { toContentionError } from '../errors';
+import { toContentionError, retryOnContention } from '../errors';
 import {
   QueuedOperation,
   QueuedOperationRow,
@@ -53,6 +53,13 @@ class OperationQueueRepository {
    * @throws Error if operation cannot be added
    */
   async addOperation(operation: QueuedOperation): Promise<void> {
+    // Retried: this repository holds no lock, and OperationQueueContext calls
+    // retryAll() when the network is RESTORED — precisely when a taplist refresh
+    // is also running, so its exclusive transaction aborts these writes.
+    return retryOnContention('operation queue add', () => this.addOperationOnce(operation));
+  }
+
+  private async addOperationOnce(operation: QueuedOperation): Promise<void> {
     const database = await getDatabase();
 
     try {

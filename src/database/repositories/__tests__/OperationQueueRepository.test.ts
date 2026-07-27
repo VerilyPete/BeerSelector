@@ -412,8 +412,17 @@ describe('OperationQueueRepository', () => {
 });
 
 describe('OperationQueueRepository under database contention', () => {
+  // Global fake timers (jest.setup.js:141) would stall the retry backoff.
+  beforeEach(() => {
+    jest.useRealTimers();
+  });
+
+  afterEach(() => {
+    jest.useFakeTimers();
+  });
+
   it('maps a lock abort on addOperation to DatabaseContentionError', async () => {
-    mockDb.runAsync.mockRejectedValueOnce(new Error('database is locked'));
+    mockDb.runAsync.mockRejectedValue(new Error('database is locked'));
 
     // The live case: OperationQueueContext schedules retryAll() when the
     // network is restored, which is exactly when a taplist refresh runs. Since
@@ -430,5 +439,27 @@ describe('OperationQueueRepository under database contention', () => {
         updatedAt: 1,
       } as never)
     ).rejects.toBeInstanceOf(DatabaseContentionError);
+    // Retried before giving up.
+    expect(mockDb.runAsync.mock.calls.length).toBeGreaterThan(1);
+  });
+
+  it('recovers when the contending import finishes mid-retry', async () => {
+    mockDb.runAsync
+      .mockRejectedValueOnce(new Error('database is locked'))
+      .mockResolvedValueOnce(undefined);
+
+    // The realistic case: the taplist import commits and the queued write
+    // succeeds on the next attempt instead of being lost.
+    await expect(
+      operationQueueRepository.addOperation({
+        id: 'op-2',
+        type: 'CHECK_IN',
+        payload: { beerId: 'b-2' },
+        status: 'pending',
+        retryCount: 0,
+        createdAt: 1,
+        updatedAt: 1,
+      } as never)
+    ).resolves.toBeUndefined();
   });
 });
