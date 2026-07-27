@@ -163,14 +163,11 @@ const fromArray = <T>(
   );
 
 /**
- * Build a `failed` outcome from a thrown transport error.
+ * Build a `failed` outcome from a thrown transport error, classified by type.
  *
- * The `failed` arm has existed since 02 Phase 1 and nothing constructed it: all
- * three fetchers ended in `catch { throw }`, so offline, HTTP-error and timeout
- * cases left by the exception path and the consumers' exhaustive handling was
- * bypassed for the most common real-world failure. Callers were safe — they all
- * have catches — but got a string to re-parse instead of the typed error the
- * union exists to carry.
+ * Every transport failure leaves through here rather than through a `throw`, so
+ * callers learn what happened from a value they must destructure rather than
+ * from a message they would have to re-parse.
  */
 const failed = <T>(error: unknown): UnconditionalSource<FetchOutcome<T>> => ({
   status: 'failed',

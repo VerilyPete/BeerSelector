@@ -24,7 +24,7 @@
 import { fetchBeersFromAPI, fetchMyBeersFromAPI, fetchRewardsFromAPI } from '../beerApi';
 import * as preferences from '../../database/preferences';
 import { ApiErrorType } from '../../utils/notificationUtils';
-import type { FetchOutcome, FetchedSource } from '../fetchOutcome';
+import type { FetchOutcome, UnconditionalSource } from '../fetchOutcome';
 
 jest.mock('../../database/preferences');
 
@@ -39,7 +39,7 @@ const memberPrefs = (urlKey: string) => (key: string) => {
 /**
  * Drive a fetcher to completion.
  *
- * `jest.setup.js:141` installs fake timers for EVERY suite, so the backoff
+ * `jest.setup.js` calls `jest.useFakeTimers()` for EVERY suite, so the backoff
  * `setTimeout` inside fetchWithRetry never fires on its own — the promise simply
  * never settles and the test dies by timeout with nothing to say. Advancing well
  * past the retry schedule is what makes these tests about outcomes rather than
@@ -69,11 +69,15 @@ type FetcherCase = {
   readonly name: string;
   readonly urlKey: string;
   /**
-   * Widened to `unknown` rows so the three fetchers share one signature. The
-   * row TYPE is irrelevant here — every assertion is on `status` and `kind`,
-   * which is the whole point of driving all three from one table.
+   * Rows widened to `unknown` so the three fetchers share one signature — every
+   * assertion here is on `status` and `kind`, which is the point of the table.
+   *
+   * `UnconditionalSource`, NOT `FetchedSource`. Since the former is assignable
+   * to the latter, declaring this wide would let a regression that widens a
+   * fetcher's signature back to `FetchedSource` still typecheck — forfeiting the
+   * narrowing at the one place it would be caught.
    */
-  readonly call: () => Promise<FetchedSource<FetchOutcome<unknown>>>;
+  readonly call: () => Promise<UnconditionalSource<FetchOutcome<unknown>>>;
   readonly unusableBody: unknown;
 };
 

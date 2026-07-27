@@ -27,7 +27,11 @@ export type ErrorResponse = {
   originalError?: unknown;
   /**
    * True when the same operation is expected to succeed if retried.
-   * Currently set only for CONTENTION_ERROR.
+   *
+   * Set only for CONTENTION_ERROR. Deliberately NOT set for HTTP 5xx, even
+   * though a 5xx is retryable in principle: nothing reads this field yet, and a
+   * second setter whose value no code consumes is a claim the codebase does not
+   * honour. Wire it into a retry policy first, then set it.
    */
   readonly retryable?: boolean;
 };
@@ -107,7 +111,41 @@ export function formatApiErrorForUser(error: unknown): string {
  * @param error The original error
  * @returns A standardized error response
  */
+/**
+ * Carries an already-classified `ErrorResponse` across a `throw`.
+ *
+ * Some call sites learn the typed failure in one frame and can only report it
+ * from an enclosing `catch` several frames up. Throwing a plain
+ * `new Error(response.message)` there destroys the classification, and the catch
+ * then re-derives it from the string — which is the message-parsing this whole
+ * area exists to eliminate. Measured cost of getting this wrong: an offline
+ * refresh produced UNKNOWN_ERROR instead of NETWORK_ERROR, which flipped
+ * `allNetworkErrors` to false and replaced one clean "check your connection"
+ * alert with developer prose.
+ *
+ * `createErrorResponse` unwraps this back to the original response, so every
+ * existing `catch (e) { createErrorResponse(e) }` preserves classification with
+ * no change at the catch site.
+ */
+export class SourceFailureError extends Error {
+  constructor(
+    readonly response: ErrorResponse,
+    context: string
+  ) {
+    super(`${context}: ${response.message}`);
+    this.name = 'SourceFailureError';
+    // Required for `instanceof` to survive transpilation of Error subclasses.
+    Object.setPrototypeOf(this, SourceFailureError.prototype);
+  }
+}
+
 export function createErrorResponse(error: unknown): ErrorResponse {
+  // Already classified upstream — hand it back untouched. Must precede every
+  // rule below, all of which would re-derive a worse answer from the message.
+  if (error instanceof SourceFailureError) {
+    return error.response;
+  }
+
   // Classified by type, deliberately not by message. A write aborted by
   // database contention is transient, so it must not be reported as the hard
   // failure the UNKNOWN_ERROR default would make of it.
@@ -124,14 +162,19 @@ export function createErrorResponse(error: unknown): ErrorResponse {
   // reason as the two cases around it: the old thrown message began
   // "Failed to fetch", which the substring rules below read as a network error,
   // so a 500 told the user to check their internet connection and set
-  // `allNetworkErrors`. 5xx is retryable, 4xx is not — repeating a request the
-  // server rejected on its merits will be rejected again.
+  // `allNetworkErrors`.
+  //
+  // The 4xx/5xx split matches this function's own rule for a plain object
+  // carrying `statusCode` (below). Classifying every non-2xx as SERVER_ERROR
+  // would tell a user whose request was rejected on its merits that "the server
+  // encountered an error", and would contradict that sibling rule.
   if (error instanceof HttpError) {
+    const clientFault = error.status >= 400 && error.status < 500;
     return {
-      type: ApiErrorType.SERVER_ERROR,
+      type: clientFault ? ApiErrorType.VALIDATION_ERROR : ApiErrorType.SERVER_ERROR,
       message: error.message,
+      statusCode: error.status,
       originalError: error,
-      retryable: error.status >= 500,
     };
   }
 
