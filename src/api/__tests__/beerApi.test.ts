@@ -14,6 +14,7 @@ import {
 } from '../beerApi';
 import * as preferences from '../../database/preferences';
 import { config } from '@/src/config';
+import { MalformedResponseError } from '../fetchOutcome';
 
 process.env.EXPO_PUBLIC_API_RETRY_DELAY = '10';
 
@@ -260,7 +261,12 @@ describe('Beer API', () => {
       // This is where the distinguishing information was destroyed. Returning
       // [] here made a malformed response indistinguishable from a genuine
       // empty round for EVERY caller downstream — so no caller-side length
-      // check could tell them apart, and all three wiped the tasted table.
+      // check could tell them apart, and both callers wiped the tasted table.
+      //
+      // Asserts the TYPE, not just the message: an untyped Error carries the
+      // same text but falls through createErrorResponse to UNKNOWN_ERROR, and
+      // the developer prose then reaches the user's refresh alert verbatim.
+      await expect(fetchMyBeersFromAPI()).rejects.toBeInstanceOf(MalformedResponseError);
       await expect(fetchMyBeersFromAPI()).rejects.toThrow(/lack an id/i);
     });
 
