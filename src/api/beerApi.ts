@@ -3,6 +3,7 @@ import { isBeer } from '../types/beer';
 import { Reward } from '../types/database';
 import { getPreference } from '../database/preferences';
 import { config } from '../config';
+import { MalformedResponseError } from './fetchOutcome';
 
 /**
  * Helper function to retry fetch operations with exponential backoff
@@ -258,24 +259,26 @@ export const fetchMyBeersFromAPI = async (): Promise<Beerfinder[]> => {
       // length check could tell them apart and all three wiped the tasted
       // table while reporting success.
       //
-      // Throwing is the minimal bridge, and it lands differently per caller —
-      // worth knowing before Phase 3 changes it again:
-      //   fetchAndUpdateMyBeers   catches, reports failure, writes nothing,
-      //                           stamps no timestamp. Clean.
-      //   sequentialRefreshAllData  same, via its per-source catch; all-beers
-      //                           and rewards still run.
-      //   refreshAllDataFromAPI   has NO per-source catch, so this aborts the
-      //                           whole function and the rewards write after it
-      //                           is skipped. autoLogin catches and logs, so a
-      //                           check-in still proceeds. A missed rewards
-      //                           refresh is the price of not wiping the tasted
-      //                           table, and rewards refresh on their own
-      //                           schedule anyway. Per-source isolation there
-      //                           is 02 Phase 2.5's job.
+      // Throwing is the minimal bridge. There are exactly TWO production
+      // callers — grep-verified, and note that fetchAndUpdateMyBeers is NOT one
+      // of them: it inlines its own fetch and parse, which is why 02 Phase 4
+      // exists. The throw lands differently in each:
       //
-      // 02 Phase 3 replaces this with FetchOutcome's `malformed`, which lets
-      // each caller decide instead of forcing a throw on all three.
-      throw new Error(`My Beers response contained ${invalidBeers.length} rows and all lack an id`);
+      //   sequentialRefreshAllData (:815)  per-source catch reports failure;
+      //       all-beers and rewards still run. Clean.
+      //   refreshAllDataFromAPI (:1213)    has NO per-source catch, so this
+      //       aborts the whole function and the rewards write after it is
+      //       SKIPPED — fresh taplist, stale tasted, stale rewards, which is
+      //       the scenario 02 Phase 2.5 exists to fix. autoLogin catches and
+      //       logs, so a check-in still proceeds and nothing reaches the user.
+      //       A missed rewards refresh is the price of not wiping the tasted
+      //       list, and rewards refresh on their own schedule.
+      //
+      // 02 Phase 3 replaces this with FetchOutcome's `malformed`, letting each
+      // caller decide instead of forcing a throw on both.
+      throw new MalformedResponseError(
+        `My Beers response contained ${invalidBeers.length} rows and all lack an id`
+      );
     }
 
     console.error('DB: Invalid response format from My Beers API');

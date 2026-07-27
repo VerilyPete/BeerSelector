@@ -101,3 +101,26 @@ export type FetchedSource<T> =
   | { readonly status: 'unchanged' }
   | { readonly status: 'unavailable'; readonly reason: UnavailableReason }
   | { readonly status: 'failed'; readonly error: ErrorResponse };
+
+/**
+ * A response arrived and could not be used.
+ *
+ * Typed so that callers — and the user-facing error formatter — can tell it
+ * apart from a network failure or an unknown fault. Without this the raw
+ * developer message reaches the Settings refresh alert verbatim, which is what
+ * `CONTENTION_ERROR` already exists to prevent for the database layer.
+ *
+ * Deliberately NOT retryable: the same request returns the same unusable body,
+ * so offering "try again" would be a lie.
+ *
+ * 02 Phase 3 folds this into `FetchOutcome`'s `malformed` case; until the
+ * callers are migrated, the throw needs a type.
+ */
+export class MalformedResponseError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'MalformedResponseError';
+    // Required for `instanceof` to survive transpilation of Error subclasses.
+    Object.setPrototypeOf(this, MalformedResponseError.prototype);
+  }
+}

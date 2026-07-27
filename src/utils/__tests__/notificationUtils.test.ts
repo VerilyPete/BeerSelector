@@ -17,6 +17,7 @@ import {
 } from '../notificationUtils';
 import type { ErrorResponse } from '../notificationUtils';
 import { DatabaseContentionError } from '../../database/errors';
+import { MalformedResponseError } from '../../api/fetchOutcome';
 
 jest.mock('react-native', () => ({
   Alert: {
@@ -269,6 +270,16 @@ describe('notificationUtils', () => {
     // failure. Classification is by type, never by message.
     // ----------------------------------------------------------
 
+    it('createErrorResponse classifies a MalformedResponseError', () => {
+      const result = createErrorResponse(
+        new MalformedResponseError('My Beers response contained 2 rows and all lack an id')
+      );
+
+      expect(result.type).toBe(ApiErrorType.MALFORMED_RESPONSE_ERROR);
+      // Not retryable: the same request will return the same unusable body.
+      expect(result.retryable).toBeUndefined();
+    });
+
     it('createErrorResponse classifies a DatabaseContentionError as CONTENTION_ERROR', () => {
       const result = createErrorResponse(
         new DatabaseContentionError('allbeers write aborted: database is locked')
@@ -319,6 +330,23 @@ describe('notificationUtils', () => {
       const result = getUserFriendlyErrorMessage(makeError(ApiErrorType.SERVER_ERROR));
 
       expect(result).toBe('The server encountered an error. Please try again later.');
+    });
+
+    it('describes a malformed response without leaking the developer message', () => {
+      // Reachable and user-facing: Settings pull-to-refresh -> manualRefreshAllData
+      // -> sequentialRefreshAllData -> the malformed branch. Untyped, its raw
+      // text lands in the refresh alert as
+      // "Beerfinder data: My Beers response contained 2 rows and all lack an id".
+      const result = getUserFriendlyErrorMessage(
+        makeError(
+          ApiErrorType.MALFORMED_RESPONSE_ERROR,
+          'My Beers response contained 2 rows and all lack an id'
+        )
+      );
+
+      expect(result).toBe(
+        'The server sent data this app could not read. Your existing data has been kept.'
+      );
     });
 
     it('describes CONTENTION_ERROR as transient without leaking the SQLite message', () => {

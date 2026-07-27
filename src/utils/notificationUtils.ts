@@ -1,5 +1,6 @@
 import { Alert } from 'react-native';
 import { DatabaseContentionError } from '../database/errors';
+import { MalformedResponseError } from '../api/fetchOutcome';
 
 /**
  * Error types for API requests
@@ -11,6 +12,7 @@ export enum ApiErrorType {
   PARSE_ERROR = 'PARSE_ERROR',
   VALIDATION_ERROR = 'VALIDATION_ERROR',
   CONTENTION_ERROR = 'CONTENTION_ERROR',
+  MALFORMED_RESPONSE_ERROR = 'MALFORMED_RESPONSE_ERROR',
   UNKNOWN_ERROR = 'UNKNOWN_ERROR',
   INFO = 'INFO',
 }
@@ -118,6 +120,17 @@ export function createErrorResponse(error: unknown): ErrorResponse {
     };
   }
 
+  // A body arrived and was unusable. Classified by type so the raw developer
+  // message never reaches the user, and deliberately not retryable — the same
+  // request returns the same unusable body.
+  if (error instanceof MalformedResponseError) {
+    return {
+      type: ApiErrorType.MALFORMED_RESPONSE_ERROR,
+      message: error.message,
+      originalError: error,
+    };
+  }
+
   // Default error response
   const errorResponse: ErrorResponse = {
     type: ApiErrorType.UNKNOWN_ERROR,
@@ -191,6 +204,10 @@ export function getUserFriendlyErrorMessage(error: ErrorResponse): string {
 
     case ApiErrorType.PARSE_ERROR:
       return 'There was a problem processing the server response. Please try again.';
+
+    case ApiErrorType.MALFORMED_RESPONSE_ERROR:
+      // Deliberately ignores error.message, which carries developer prose.
+      return 'The server sent data this app could not read. Your existing data has been kept.';
 
     case ApiErrorType.CONTENTION_ERROR:
       // Deliberately ignores error.message, which carries the raw SQLite text.

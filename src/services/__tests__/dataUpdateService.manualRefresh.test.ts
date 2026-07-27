@@ -166,6 +166,29 @@ describe('sequentialRefreshAllData: empty vs malformed tasted beers', () => {
     expect(result.myBeersResult.success).toBe(true);
   });
 
+  it('does not clear the tasted table when every row fails validation', async () => {
+    // THIS is the test that covers the `else` arm. Rows carrying ids — so
+    // beerApi's own filter passes them through — that fail validateBeer on
+    // brew_name. A value the real function genuinely can return.
+    //
+    // The rejection test below covers a DIFFERENT path: beerApi throwing, which
+    // is caught by the outer per-source catch and never reaches this branch.
+    // Rewriting the original test to use a rejection fixed its motivation and
+    // silently moved it off the branch it was covering, leaving the malformed
+    // arm with no test at all.
+    (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue([
+      { id: 'm1', brew_name: '', brewer: 'X' },
+      { id: 'm2', brew_name: '', brewer: 'Y' },
+    ]);
+
+    const result = await svc.sequentialRefreshAllData();
+
+    expect(myBeersRepository.replaceAllWithEmptyUnsafe).not.toHaveBeenCalled();
+    expect(myBeersRepository.insertManyUnsafe).not.toHaveBeenCalled();
+    expect(result.myBeersResult.success).toBe(false);
+    expect(setPreference).not.toHaveBeenCalledWith('my_beers_last_update', expect.any(String));
+  });
+
   it('does not clear the tasted table when the fetch reports malformed rows', async () => {
     // The FIRST version of this test mocked fetchMyBeersFromAPI resolving
     // [{brew_name:'no id'}] — a value the real function CANNOT return, because

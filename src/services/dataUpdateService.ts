@@ -12,7 +12,7 @@ import { beerRepository } from '../database/repositories/BeerRepository';
 import { myBeersRepository } from '../database/repositories/MyBeersRepository';
 import { rewardsRepository } from '../database/repositories/RewardsRepository';
 import { databaseLockManager } from '../database/DatabaseLockManager';
-import { toNonEmpty } from '../api/fetchOutcome';
+import { toNonEmpty, MalformedResponseError } from '../api/fetchOutcome';
 import { validateBrewInStockResponse, validateBeerArray } from '../api/validators';
 import { logError, logWarning } from '../utils/errorLogger';
 import { calculateContainerTypes } from '../database/utils/glassTypeCalculator';
@@ -868,11 +868,12 @@ export async function sequentialRefreshAllData(): Promise<ManualRefreshResult> {
       const myBeersWithContainerTypes = calculateContainerTypes(beersForContainerCalc);
 
       // Two DIFFERENT conditions, which a bare [] cannot tell apart.
-      // fetchMyBeersFromAPI collapses five of them into an empty array —
-      // visitor mode, no URL, a none:// URL, a genuine empty round, and rows
-      // that all lack an id — and validateBeerArray drops id-less rows, so
-      // malformed data arrives here looking exactly like an empty round. Only
-      // the RAW length distinguishes them, so the split has to happen here.
+      // fetchMyBeersFromAPI still returns a bare [] for FOUR conditions —
+      // visitor mode, no URL, a none:// URL, and a genuine empty round. The
+      // fifth, rows that all lack an id, now throws upstream instead, which is
+      // what makes the split below meaningful. Of the four remaining, only the
+      // empty round should clear; 02 Phase 3's `unavailable` retires the other
+      // three, which still reach the clear arm today.
       const sequentialMyBeers = toNonEmpty(
         myBeersWithContainerTypes as BeerfinderWithContainerType[]
       );
@@ -889,7 +890,7 @@ export async function sequentialRefreshAllData(): Promise<ManualRefreshResult> {
         // requirements (missing or empty brew_name) — beerApi already rejects
         // the all-ids-missing case upstream. The message says so rather than
         // repeating the id claim, which would be false here.
-        throw new Error(
+        throw new MalformedResponseError(
           `All ${myBeers.length} tasted beers from the API failed validation; refusing to write`
         );
       }
