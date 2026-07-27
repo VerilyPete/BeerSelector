@@ -43,7 +43,12 @@ const memberPrefs = (urlKey: string) => (key: string) => {
  * `setTimeout` inside fetchWithRetry never fires on its own — the promise simply
  * never settles and the test dies by timeout with nothing to say. Advancing well
  * past the retry schedule is what makes these tests about outcomes rather than
- * about timers. This is also why the existing retry tests all advance the clock.
+ * about timers.
+ *
+ * Not every suite is affected: `beerApi.test.ts` restores real timers in an
+ * `afterEach` on its `fetchWithRetry` block, so the rest of that file runs on
+ * real timers and needs no advance. Do not assume fake timers are active
+ * wherever you happen to be.
  */
 const settle = async <T>(pending: Promise<T>): Promise<T> => {
   await jest.advanceTimersByTimeAsync(60_000);
@@ -149,11 +154,39 @@ describe.each(FETCHERS)('$name failure outcomes', ({ urlKey, call, unusableBody 
     }
   });
 
-  it('does not reject', async () => {
-    // The property the whole phase turns on, asserted directly: no caller should
-    // need a try/catch to learn that a fetch failed.
+  it('exhausts the retry budget before reporting failure, and still does not reject', async () => {
+    // The `resolves` half alone was strictly dominated by the first test, which
+    // awaits the same call with the same mock — no mutation existed that this
+    // caught and that one did not. The call count is the assertion only this
+    // test can make, and nothing else in the suite pins the default retry
+    // budget: `settle` advances 60s of virtual time, so raising `retries` from
+    // 3 to 8 would otherwise pass unnoticed.
     (global.fetch as jest.Mock).mockRejectedValue(new TypeError('Network request failed'));
 
     await expect(settle(call())).resolves.toBeDefined();
+    expect(global.fetch).toHaveBeenCalledTimes(3);
+  });
+
+  it('reports a timed-out request as failed', async () => {
+    // The commit claims "offline, HTTP-error and timeout"; the first two were
+    // covered here and the third only against `fetchWithRetry` directly. This is
+    // the timeout crossing a whole fetcher.
+    (global.fetch as jest.Mock).mockImplementation(
+      (_url: string, options: { signal: AbortSignal }) =>
+        new Promise((_resolve, reject) => {
+          options.signal.addEventListener('abort', () => {
+            const abort = new Error('The operation was aborted');
+            abort.name = 'AbortError';
+            reject(abort);
+          });
+        })
+    );
+
+    const outcome = await settle(call());
+
+    expect(outcome.status).toBe('failed');
+    if (outcome.status === 'failed') {
+      expect(outcome.error.type).toBe(ApiErrorType.NETWORK_ERROR);
+    }
   });
 });

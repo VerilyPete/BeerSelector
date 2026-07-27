@@ -5,7 +5,9 @@
  * tasted beers, and rewards from the Flying Saucer API.
  */
 
-// Speed up retry tests by setting shorter delay BEFORE config is loaded
+// NOTE: this assignment runs AFTER the hoisted imports, so config has already
+// been frozen at its default. Retry tests pass an explicit delay instead; this
+// line is inert and kept only because removing it is a separate change.
 import {
   fetchWithRetry,
   fetchBeersFromAPI,
