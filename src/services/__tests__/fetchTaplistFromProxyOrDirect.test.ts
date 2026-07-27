@@ -32,6 +32,8 @@ jest.mock('../../database/repositories/MyBeersRepository', () => ({
 
 jest.mock('../../database/repositories/RewardsRepository', () => ({
   rewardsRepository: {
+    replaceAllWithEmpty: jest.fn(async () => {}),
+    replaceAllWithEmptyUnsafe: jest.fn(async () => {}),
     insertMany: jest.fn(),
     insertManyUnsafe: jest.fn(),
   },

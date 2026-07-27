@@ -60,6 +60,54 @@ export function resetInFlightSequentialRefresh(): void {
 }
 
 /**
+ * How a caller wants to be treated when a refresh is already running.
+ */
+type SequentialRefreshOptions = {
+  /**
+   * Accept the running refresh's result instead of starting one (default), or
+   * wait for it to finish and then run fresh.
+   *
+   * `01` Phase 4 chose joining outright — "a caller wanting fresh data
+   * mid-refresh is served correctly by the in-flight result". That holds for
+   * automatic refreshes, which is what it was reasoned about. It does not hold
+   * for a caller that has already changed state the running refresh cannot see,
+   * and there are three of those:
+   *
+   * - `manualRefreshAllData` clears `all_beers_etag` on a rapid second refresh
+   *   so the user can force a full fetch. Joining hands back the result of a run
+   *   that read the OLD ETag, so the escape hatch becomes a silent no-op.
+   * - It also clears the four timestamp preferences. Joining a run that already
+   *   stamped them leaves them at `''`, and `shouldRefreshData` then forces a
+   *   redundant full refresh on the next app open.
+   * - The post-login refresh (`useLoginFlow` → `onRefreshData`) runs the moment
+   *   a visitor becomes a member. Joining a visitor-mode run returns
+   *   `my beers not applicable` as a success, with `silent: true` so nothing is
+   *   shown, and the tasted list is never fetched with the new credentials.
+   *
+   * Waiting costs a second serialised download for two explicit taps — which is
+   * what shipped before 5.4, so it is not a regression against any released
+   * behaviour. De-duplication keeps doing its job for the automatic refreshes it
+   * was added for.
+   */
+  readonly join?: boolean;
+};
+
+/**
+ * Wait until no refresh is running.
+ *
+ * Loops rather than awaiting once: another caller can start a run while we are
+ * waiting on this one, and returning then would defeat the point. A rejection is
+ * swallowed because we are waiting for the slot to clear, not for the outcome —
+ * and `runSequentialRefresh` reports failures in its result rather than throwing
+ * anyway.
+ */
+async function settleInFlightRefresh(): Promise<void> {
+  while (inFlightSequentialRefresh !== null) {
+    await inFlightSequentialRefresh.catch(() => undefined);
+  }
+}
+
+/**
  * The refresh currently running, if any, so a second caller joins it instead of
  * starting a competing one.
  *
@@ -967,7 +1015,16 @@ export async function fetchAndUpdateRewards(): Promise<DataUpdateResult> {
       return { success: true, dataUpdated: false };
     }
 
-    const rows = decision.action === 'clear' ? [] : [...decision.rows];
+    // `clear` goes through the clear, not through an empty insert. insertMany
+    // early-returns on `[]`, so this reported a successful update having done
+    // nothing — the server confirmed zero rewards and the stale ones stayed.
+    if (decision.action === 'clear') {
+      await rewardsRepository.replaceAllWithEmpty();
+      console.log('Updated rewards data successfully: 0 rewards (server confirmed none)');
+      return { success: true, dataUpdated: true, itemCount: 0 };
+    }
+
+    const rows = [...decision.rows];
     await rewardsRepository.insertMany(rows);
 
     console.log(`Updated rewards data successfully: ${rows.length} rewards`);
@@ -1003,10 +1060,16 @@ export async function fetchAndUpdateRewards(): Promise<DataUpdateResult> {
  * - Parallel with contention: ~4.5s (operations queue at lock manager)
  * - Sequential with master lock: ~1.5s (no queueing overhead)
  */
-export async function sequentialRefreshAllData(): Promise<ManualRefreshResult> {
-  if (inFlightSequentialRefresh !== null) {
-    console.log('Sequential refresh already in flight; joining it rather than starting another');
-    return inFlightSequentialRefresh;
+export async function sequentialRefreshAllData({
+  join = true,
+}: SequentialRefreshOptions = {}): Promise<ManualRefreshResult> {
+  if (join) {
+    if (inFlightSequentialRefresh !== null) {
+      console.log('Sequential refresh already in flight; joining it rather than starting another');
+      return inFlightSequentialRefresh;
+    }
+  } else {
+    await settleInFlightRefresh();
   }
 
   const run = runSequentialRefresh().finally(() => {
@@ -1400,7 +1463,15 @@ async function prepareRewards(): Promise<SourcePlan<RewardsWrite>> {
 
 /** Store rewards. Runs under the write lock; makes no network request. */
 async function writeRewards(write: RewardsWrite): Promise<DataUpdateResult> {
-  const rows = write.kind === 'clear' ? [] : [...write.rows];
+  // The two arms are different operations, not one operation with an empty
+  // argument. `insertManyUnsafe([])` early-returns without clearing, so routing
+  // `clear` through it left stale rewards behind and still reported an update.
+  if (write.kind === 'clear') {
+    await rewardsRepository.replaceAllWithEmptyUnsafe();
+    return { success: true, dataUpdated: true, itemCount: 0 };
+  }
+
+  const rows = [...write.rows];
   await rewardsRepository.insertManyUnsafe(rows);
   return { success: true, dataUpdated: true, itemCount: rows.length };
 }
@@ -1444,6 +1515,13 @@ export async function manualRefreshAllData(): Promise<ManualRefreshResult> {
       };
     }
 
+    // Wait out any running refresh BEFORE clearing anything. The clears below
+    // are this function's whole mechanism for forcing a full fetch, and a
+    // refresh already in flight has read the old values and will write its own
+    // over the top of ours the moment it reaches its write burst. Clearing
+    // first and then waiting would put our invalidation underneath its results.
+    await settleInFlightRefresh();
+
     // Force fresh data by clearing relevant timestamps
     console.log('Clearing timestamp checks for manual refresh (all data)');
     const now = Date.now();
@@ -1459,7 +1537,10 @@ export async function manualRefreshAllData(): Promise<ManualRefreshResult> {
 
     // Delegate to sequential refresh for proper lock coordination (CI-4 fix)
     // This avoids the lock contention that occurred with parallel Promise.allSettled()
-    return await sequentialRefreshAllData();
+    //
+    // `join: false` because the clears above are state a running refresh cannot
+    // see. See `SequentialRefreshOptions.join`.
+    return await sequentialRefreshAllData({ join: false });
   } catch (error) {
     logError(error, {
       operation: 'manualRefreshAllData',
@@ -1810,8 +1891,14 @@ export const refreshAllDataFromAPI = async (): Promise<{
       } else if (decision.action === 'skip') {
         console.log(`Rewards not applicable: ${decision.reason.detail}`);
       } else {
-        rewards = decision.action === 'clear' ? [] : [...decision.rows];
-        await rewardsRepository.insertManyUnsafe(rewards);
+        // See fetchAndUpdateRewards: an empty insert is not a clear.
+        if (decision.action === 'clear') {
+          rewards = [];
+          await rewardsRepository.replaceAllWithEmptyUnsafe();
+        } else {
+          rewards = [...decision.rows];
+          await rewardsRepository.insertManyUnsafe(rewards);
+        }
       }
     } catch (error) {
       logError(error, {

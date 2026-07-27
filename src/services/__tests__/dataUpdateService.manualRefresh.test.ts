@@ -4,6 +4,7 @@ import * as svc from '../../services/dataUpdateService';
 import { fetchBeersFromAPI, fetchMyBeersFromAPI, fetchRewardsFromAPI } from '../../api/beerApi';
 import { setPreference } from '../../database/preferences';
 import { myBeersRepository } from '../../database/repositories/MyBeersRepository';
+import { rewardsRepository } from '../../database/repositories/RewardsRepository';
 import {
   fetchedRows,
   confirmedEmpty,
@@ -41,6 +42,8 @@ jest.mock('../../database/repositories/MyBeersRepository', () => ({
 
 jest.mock('../../database/repositories/RewardsRepository', () => ({
   rewardsRepository: {
+    replaceAllWithEmpty: jest.fn(async () => {}),
+    replaceAllWithEmptyUnsafe: jest.fn(async () => {}),
     insertManyUnsafe: jest.fn(async () => {}),
   },
 }));
@@ -97,6 +100,36 @@ describe('manualRefreshAllData', () => {
     expect(result.allBeersResult.success).toBe(true);
     expect(result.myBeersResult.success).toBe(true);
     expect(result.rewardsResult.success).toBe(true);
+  });
+
+  it('clears the rewards table when the server confirms zero rewards', async () => {
+    // The sequentialRefreshAllData site. `fetchAndUpdateRewards` and
+    // `refreshAllDataFromAPI` have their own tests for the same property, and
+    // they are separate on purpose: the three sites carried three copies of
+    // `decision.action === 'clear' ? [] : rows` and routing two of them through
+    // a real clear while one kept the empty insert is indistinguishable, from
+    // the outside, from fixing none of them. Removing the clear here leaves the
+    // other two tests green.
+    (fetchBeersFromAPI as jest.Mock).mockResolvedValue(
+      fetchedRows([{ id: 'beer-1', brew_name: 'Test Beer 1', brewer: 'Test Brewery' }])
+    );
+    (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(
+      fetchedRows([
+        {
+          id: 'beer-1',
+          brew_name: 'Test Beer 1',
+          brewer: 'Test Brewery',
+          tasted_date: '2026-01-01',
+        },
+      ])
+    );
+    (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(confirmedEmpty());
+
+    const result = await svc.manualRefreshAllData();
+
+    expect(rewardsRepository.replaceAllWithEmptyUnsafe).toHaveBeenCalled();
+    expect(rewardsRepository.insertManyUnsafe).not.toHaveBeenCalled();
+    expect(result.rewardsResult).toEqual({ success: true, dataUpdated: true, itemCount: 0 });
   });
 
   it('handles partial failure and sets hasErrors', async () => {

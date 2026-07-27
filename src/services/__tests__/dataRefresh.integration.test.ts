@@ -306,7 +306,12 @@ describe('Data Refresh Integration Tests', () => {
       // still landed instead of being aborted alongside it.
       expect(beerRepository.beerRepository.insertManyUnsafe).not.toHaveBeenCalled();
       expect(myBeersRepository.myBeersRepository.insertManyUnsafe).toHaveBeenCalled();
-      expect(rewardsRepository.rewardsRepository.insertManyUnsafe).toHaveBeenCalled();
+      // These drive `fetchedRows([])` — a server-confirmed empty rewards list —
+      // so the write that proves the source was still processed is the CLEAR,
+      // not an insert. Until plan 05's review round this asserted
+      // `insertManyUnsafe`, which early-returns on an empty array: the source
+      // was reported as updated having touched nothing.
+      expect(rewardsRepository.rewardsRepository.replaceAllWithEmptyUnsafe).toHaveBeenCalled();
     });
 
     // INVERTED by plan 02 Phase 2.5 (was dataRefresh.integration.test.ts:282).
@@ -332,7 +337,12 @@ describe('Data Refresh Integration Tests', () => {
       await expect(refreshAllDataFromAPI()).resolves.toBeDefined();
 
       // The two healthy sources still landed.
-      expect(rewardsRepository.rewardsRepository.insertManyUnsafe).toHaveBeenCalled();
+      // These drive `fetchedRows([])` — a server-confirmed empty rewards list —
+      // so the write that proves the source was still processed is the CLEAR,
+      // not an insert. Until plan 05's review round this asserted
+      // `insertManyUnsafe`, which early-returns on an empty array: the source
+      // was reported as updated having touched nothing.
+      expect(rewardsRepository.rewardsRepository.replaceAllWithEmptyUnsafe).toHaveBeenCalled();
       expect(beerRepository.beerRepository.insertManyUnsafe).toHaveBeenCalled();
     });
 
@@ -399,7 +409,12 @@ describe('Data Refresh Integration Tests', () => {
       // isolated too, so the other sources still refresh.
       await expect(refreshAllDataFromAPI()).resolves.toBeDefined();
 
-      expect(rewardsRepository.rewardsRepository.insertManyUnsafe).toHaveBeenCalled();
+      // These drive `fetchedRows([])` — a server-confirmed empty rewards list —
+      // so the write that proves the source was still processed is the CLEAR,
+      // not an insert. Until plan 05's review round this asserted
+      // `insertManyUnsafe`, which early-returns on an empty array: the source
+      // was reported as updated having touched nothing.
+      expect(rewardsRepository.rewardsRepository.replaceAllWithEmptyUnsafe).toHaveBeenCalled();
     });
   });
 

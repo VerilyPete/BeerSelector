@@ -35,6 +35,8 @@ import {
   sequentialRefreshAllData,
   manualRefreshAllData,
   refreshAllDataFromAPI,
+  resetLastManualRefreshTime,
+  resetInFlightSequentialRefresh,
 } from '../dataUpdateService';
 import { getPreference, setPreference, areApiUrlsConfigured } from '../../database/preferences';
 import { fetchBeersFromAPI, fetchMyBeersFromAPI, fetchRewardsFromAPI } from '../../api/beerApi';
@@ -75,6 +77,8 @@ jest.mock('../../database/repositories/MyBeersRepository', () => ({
 
 jest.mock('../../database/repositories/RewardsRepository', () => ({
   rewardsRepository: {
+    replaceAllWithEmpty: jest.fn(async () => {}),
+    replaceAllWithEmptyUnsafe: jest.fn(async () => {}),
     insertMany: jest.fn(),
     insertManyUnsafe: jest.fn(),
   },
@@ -99,6 +103,8 @@ describe('Sequential Refresh Coordination', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     databaseLockManager.resetForTesting();
+    resetInFlightSequentialRefresh();
+    resetLastManualRefreshTime();
 
     (getPreference as jest.Mock).mockImplementation(async (key: string) => {
       if (key === 'all_beers_api_url') return 'http://api.example.com/all';
@@ -247,14 +253,85 @@ describe('Sequential Refresh Coordination', () => {
       expect(lockAcquisitions).toEqual(['refresh-all-data-write']);
     });
 
-    it('joins an in-flight refresh rather than starting a second one', async () => {
+    it('waits out an in-flight refresh and then runs its own', async () => {
+      // INVERTED. This asserted one fetch and one shared result — the
+      // de-duplication applying to explicit refreshes too. That is wrong for
+      // this entry point specifically: manualRefreshAllData exists to
+      // invalidate state and force a full fetch, and a run already in flight
+      // read the old state. Joining made the second tap a silent no-op.
+      //
+      // Two serialised downloads for two explicit taps is what shipped before
+      // 5.4, so this is not a regression against released behaviour. The
+      // automatic refreshes de-duplication was added for still join.
       const results = await Promise.all([manualRefreshAllData(), manualRefreshAllData()]);
 
-      // Two taps on a pull-to-refresh, one round trip. The de-duplication lives
-      // in sequentialRefreshAllData, so this asserts the manual entry point
-      // actually reaches it rather than doing its own thing.
-      expect(fetchBeersFromAPI).toHaveBeenCalledTimes(1);
-      expect(results[1]).toBe(results[0]);
+      expect(fetchBeersFromAPI).toHaveBeenCalledTimes(2);
+      expect(results[1]).not.toBe(results[0]);
+    });
+
+    it('clears the ETag only after the refresh it is overtaking has written', async () => {
+      // The rapid-double-refresh escape hatch, and the ONLY arrangement that
+      // tests it: the second call must arrive while the first is still running.
+      // With both calls awaited in turn there is never an in-flight refresh, the
+      // wait is a no-op, and deleting it entirely leaves the test green — which
+      // is exactly what the first version of this test did.
+      //
+      // If the clear lands mid-run, the running refresh's write burst stamps its
+      // own ETag over it and the next request 304s again, so the user's "refresh
+      // again, it still looks wrong" does nothing — twice.
+      const order: string[] = [];
+      (setPreference as jest.Mock).mockImplementation(async (key: string, value: string) => {
+        order.push(value === '' ? `clear:${key}` : `set:${key}`);
+      });
+      (beerRepository.insertManyUnsafe as jest.Mock).mockImplementation(async () => {
+        order.push('write:allBeers');
+      });
+
+      // Hold the FIRST refresh open at its rewards fetch, so the second call
+      // arrives mid-run rather than after it.
+      let releaseFirstRun: () => void = () => {};
+      const firstRunReachedRewards = new Promise<void>(resolve => {
+        (fetchRewardsFromAPI as jest.Mock).mockImplementationOnce(async () => {
+          resolve();
+          await new Promise<void>(release => {
+            releaseFirstRun = release;
+          });
+          return fetchedRows(REWARDS);
+        });
+      });
+
+      const first = manualRefreshAllData();
+      await firstRunReachedRewards;
+
+      const second = manualRefreshAllData();
+      // Give the second call every chance to run its clears early if it is
+      // going to: without the wait it does so on this tick.
+      await Promise.resolve();
+      await Promise.resolve();
+
+      releaseFirstRun();
+      await Promise.all([first, second]);
+
+      expect(order).toContain('write:allBeers');
+      expect(order.indexOf('clear:all_beers_etag')).toBeGreaterThan(
+        order.indexOf('write:allBeers')
+      );
+    });
+
+    it('re-stamps the timestamps it cleared', async () => {
+      // Joining a run that had already stamped left these at '' with fresh data
+      // in the table, and `shouldRefreshData` treats a missing timestamp as
+      // "never checked" — so the next app open paid for a full refresh it did
+      // not need.
+      const written = new Map<string, string>();
+      (setPreference as jest.Mock).mockImplementation(async (key: string, value: string) => {
+        written.set(key, value);
+      });
+
+      await manualRefreshAllData();
+
+      expect(written.get('all_beers_last_check')).not.toBe('');
+      expect(written.get('my_beers_last_check')).not.toBe('');
     });
   });
 

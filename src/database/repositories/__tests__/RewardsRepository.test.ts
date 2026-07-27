@@ -32,6 +32,55 @@ function createRepository(): RewardsRepository {
 }
 
 describe('RewardsRepository', () => {
+  describe('replaceAllWithEmpty', () => {
+    // The rewards table had no way to be emptied deliberately. `insertMany([])`
+    // early-returns on an empty array, so `decideRewards`'s `clear` — the arm
+    // that exists BECAUSE the server confirmed zero rewards — cleared nothing
+    // and still reported `dataUpdated: true`. Stale rewards, marked fresh.
+    //
+    // Mirrors MyBeersRepository, which learned the same lesson first: emptying
+    // a table has to be asked for, never inferred from an empty payload.
+    it('empties the rewards table', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      mockDatabase.runAsync.mockResolvedValue({ changes: 3 });
+
+      await createRepository().replaceAllWithEmpty();
+
+      expect(mockDatabase.runAsync).toHaveBeenCalledWith('DELETE FROM rewards');
+    });
+
+    it('takes the master lock', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      mockDatabase.runAsync.mockResolvedValue({ changes: 0 });
+      const lockSpy = jest.spyOn(databaseLockManager, 'withDatabaseLock');
+
+      await createRepository().replaceAllWithEmpty();
+
+      expect(lockSpy).toHaveBeenCalledWith(
+        'RewardsRepository.replaceAllWithEmpty',
+        expect.any(Function)
+      );
+      lockSpy.mockRestore();
+    });
+
+    it('replaceAllWithEmptyUnsafe does NOT take the master lock', async () => {
+      // The refresh paths call this while already holding the write lock; a
+      // nested acquisition there is the contention the master lock removed.
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      mockDatabase.runAsync.mockResolvedValue({ changes: 0 });
+      const lockSpy = jest.spyOn(databaseLockManager, 'withDatabaseLock');
+
+      await createRepository().replaceAllWithEmptyUnsafe();
+
+      expect(lockSpy).not.toHaveBeenCalled();
+      expect(mockDatabase.runAsync).toHaveBeenCalledWith('DELETE FROM rewards');
+      lockSpy.mockRestore();
+    });
+  });
+
   describe('insertMany', () => {
     it('should insert multiple rewards in batches', async () => {
       const mockDatabase = createMockDatabase();

@@ -77,7 +77,10 @@ jest.mock('../../database/repositories/MyBeersRepository', () => ({
 }));
 
 jest.mock('../../database/repositories/RewardsRepository', () => ({
-  rewardsRepository: { insertManyUnsafe: jest.fn(async () => {}) },
+  rewardsRepository: {
+    insertManyUnsafe: jest.fn(async () => {}),
+    replaceAllWithEmptyUnsafe: jest.fn(async () => {}),
+  },
 }));
 
 jest.mock('../../database/DatabaseLockManager', () => ({
