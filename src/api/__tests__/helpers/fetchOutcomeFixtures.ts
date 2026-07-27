@@ -11,6 +11,7 @@
 
 import type { FetchOutcome, FetchedSource, UnavailableReason } from '../../fetchOutcome';
 import { toNonEmpty } from '../../fetchOutcome';
+import { ApiErrorType, type ErrorResponse } from '../../../utils/notificationUtils';
 
 /**
  * A completed request whose body contained rows — or, for an empty array,
@@ -45,4 +46,19 @@ export function unavailable<T>(
   detail = 'not configured'
 ): FetchedSource<FetchOutcome<T>> {
   return { status: 'unavailable', reason: { code, detail } };
+}
+
+/**
+ * The request was made and did not complete — offline, HTTP error, timeout.
+ *
+ * `beerApi` cannot produce this yet (plan 05 Phase 5.3 is what makes it
+ * reachable); it still throws for transport failures. Consumers must handle the
+ * arm regardless, so this builder exists to drive them directly. When 5.3 lands
+ * this stops being the only way to reach the case.
+ */
+export function failed<T>(
+  type: ErrorResponse['type'] = ApiErrorType.NETWORK_ERROR,
+  message = 'network request failed'
+): FetchedSource<FetchOutcome<T>> {
+  return { status: 'failed', error: { type, message } };
 }

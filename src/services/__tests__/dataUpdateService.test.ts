@@ -24,7 +24,15 @@ import { myBeersRepository } from '../../database/repositories/MyBeersRepository
 import { rewardsRepository } from '../../database/repositories/RewardsRepository';
 import { databaseLockManager } from '../../database/DatabaseLockManager';
 import { fetchBeersFromAPI, fetchMyBeersFromAPI, fetchRewardsFromAPI } from '../../api/beerApi';
-import { fetchedRows } from '../../api/__tests__/helpers/fetchOutcomeFixtures';
+import {
+  fetchedRows,
+  confirmedEmpty,
+  malformed,
+  unavailable,
+  failed,
+} from '../../api/__tests__/helpers/fetchOutcomeFixtures';
+import { ApiErrorType } from '../../utils/notificationUtils';
+import { logError } from '../../utils/errorLogger';
 import {
   fetchBeersFromProxy,
   fetchEnrichmentBatchWithMissing,
@@ -940,6 +948,311 @@ describe('dataUpdateService', () => {
 
       expect(result.success).toBe(false);
       expect(result.dataUpdated).toBe(false);
+    });
+  });
+
+  // Plan 05 Phase 5.1.
+  //
+  // `rowsOrNone` flattened unavailable / failed / unchanged to `[]`, and every
+  // caller then reported `success: true, dataUpdated: true, itemCount: 0`. So
+  // "no rewards URL configured" and "the rewards fetch failed" both surfaced as
+  // a successful refresh that found zero rewards. That is the same defect class
+  // plan 02 exists to remove — a non-answer laundered into an answer —
+  // reintroduced one layer above the one 02 fixed.
+  //
+  // The mapping these tests pin, and why it is not "every non-data case fails":
+  //   data            → success, rows written
+  //   confirmed-empty → success; the server really did report none
+  //   not-applicable  → success, dataUpdated FALSE; visitor mode and a none://
+  //                     placeholder are normal states, and reporting them as
+  //                     errors drives a user-facing alert via hasErrors
+  //   not-configured  → failure; matches how the all-beers path already treats a
+  //                     missing URL. A deliberate departure from
+  //                     UnavailableReason's doc comment, which groups both codes
+  //                     as non-errors — that grouping is about the transport
+  //                     layer, not about what each consumer should do
+  //   failed          → failure, carrying the transport error
+  //   malformed       → failure; a body arrived and was unusable
+  describe('rewards outcome handling', () => {
+    beforeEach(() => {
+      (getPreference as jest.Mock).mockResolvedValue('false');
+      (rewardsRepository.insertMany as jest.Mock).mockResolvedValue(undefined);
+      (rewardsRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
+    });
+
+    describe('fetchAndUpdateRewards', () => {
+      it('reports failure when the rewards source is not configured', async () => {
+        (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(unavailable('not-configured'));
+
+        const result = await fetchAndUpdateRewards();
+
+        expect(result.success).toBe(false);
+        expect(result.dataUpdated).toBe(false);
+        // The TYPE is the assertion that matters, not merely that it failed:
+        // it decides which copy the user sees. Without this, swapping in
+        // UNKNOWN_ERROR passes, and UNKNOWN_ERROR returns error.message verbatim
+        // (notificationUtils.ts:222-224).
+        expect(result.error?.type).toBe(ApiErrorType.VALIDATION_ERROR);
+        expect(rewardsRepository.insertMany).not.toHaveBeenCalled();
+      });
+
+      it('reports failure when the rewards fetch fails', async () => {
+        (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(failed());
+
+        const result = await fetchAndUpdateRewards();
+
+        expect(result.success).toBe(false);
+        expect(result.dataUpdated).toBe(false);
+        expect(result.error?.type).toBe(ApiErrorType.NETWORK_ERROR);
+        expect(rewardsRepository.insertMany).not.toHaveBeenCalled();
+      });
+
+      it('forwards the transport error unchanged rather than re-deriving one', async () => {
+        // The previous test cannot distinguish forwarding from re-deriving,
+        // because the `failed()` fixture defaults to NETWORK_ERROR — the same
+        // type a hardcoded fallback would use. A non-default type and a specific
+        // message are what pin the passthrough, and the passthrough is the whole
+        // reason FetchedSource.failed carries a typed error.
+        (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(
+          failed(ApiErrorType.SERVER_ERROR, 'HTTP 503 from rewards')
+        );
+
+        const result = await fetchAndUpdateRewards();
+
+        expect(result.error?.type).toBe(ApiErrorType.SERVER_ERROR);
+        expect(result.error?.message).toBe('HTTP 503 from rewards');
+      });
+
+      it('reports failure when the rewards body is malformed', async () => {
+        (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(malformed());
+
+        const result = await fetchAndUpdateRewards();
+
+        expect(result.success).toBe(false);
+        // MALFORMED_RESPONSE_ERROR is the one type here with dedicated user copy
+        // that deliberately SUPPRESSES the developer message
+        // (notificationUtils.ts:208-210). Getting the type wrong leaks
+        // "Rewards response was unusable: …" to the user.
+        expect(result.error?.type).toBe(ApiErrorType.MALFORMED_RESPONSE_ERROR);
+        expect(rewardsRepository.insertMany).not.toHaveBeenCalled();
+      });
+
+      it('reports success without an update when rewards are not applicable', async () => {
+        (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(unavailable('not-applicable'));
+
+        const result = await fetchAndUpdateRewards();
+
+        // Not an error — but not an update either. Reporting dataUpdated here is
+        // what marked stale rewards fresh.
+        expect(result.success).toBe(true);
+        expect(result.dataUpdated).toBe(false);
+        expect(rewardsRepository.insertMany).not.toHaveBeenCalled();
+      });
+
+      it('reports a successful update when the server confirms zero rewards', async () => {
+        (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(confirmedEmpty());
+
+        const result = await fetchAndUpdateRewards();
+
+        // The one case where nothing to write is still a real answer.
+        expect(result.success).toBe(true);
+        expect(result.dataUpdated).toBe(true);
+        expect(result.itemCount).toBe(0);
+      });
+
+      // GUARD — passes before and after. Over-correction protection: the fix
+      // must not make the ordinary path stop writing.
+      it('writes rows and reports success when rewards arrive', async () => {
+        const rewards = [{ id: 'reward-1', name: 'Free Beer' }];
+        (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(fetchedRows(rewards));
+
+        const result = await fetchAndUpdateRewards();
+
+        expect(result.success).toBe(true);
+        expect(result.dataUpdated).toBe(true);
+        expect(rewardsRepository.insertMany).toHaveBeenCalledWith(rewards);
+      });
+    });
+
+    // Three call sites, three tests. Fixing two of three is indistinguishable
+    // from fixing none — the same reasoning plan 04 Phase 2 gives for its own
+    // triplicated ETag write.
+    describe('sequentialRefreshAllData', () => {
+      beforeEach(() => {
+        (fetchBeersFromAPI as jest.Mock).mockResolvedValue(
+          fetchedRows([{ id: 'beer-1', brew_name: 'Test IPA', brewer: 'Brewery 1' }])
+        );
+        (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(
+          fetchedRows([{ id: 'beer-1', brew_name: 'Test IPA', tasted_date: '2023-01-01' }])
+        );
+        (beerRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
+        (myBeersRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
+      });
+
+      it('reports rewards failure when the rewards fetch fails', async () => {
+        (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(failed());
+
+        const result = await sequentialRefreshAllData();
+
+        expect(result.rewardsResult.success).toBe(false);
+        expect(result.hasErrors).toBe(true);
+        // `allNetworkErrors` picks the softer "check your connection" alert over
+        // the generic one (useDataRefresh.ts:127). Nothing in this repo asserted
+        // it before these two tests, so threading a typed error through
+        // decideRewards was unverified end to end — telling "you're offline"
+        // from "something's misconfigured" is the point of doing it at all.
+        expect(result.allNetworkErrors).toBe(true);
+        expect(rewardsRepository.insertManyUnsafe).not.toHaveBeenCalled();
+      });
+
+      it('reports rewards failure when the rewards source is not configured', async () => {
+        (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(unavailable('not-configured'));
+
+        const result = await sequentialRefreshAllData();
+
+        expect(result.rewardsResult.success).toBe(false);
+        expect(result.rewardsResult.error?.type).toBe(ApiErrorType.VALIDATION_ERROR);
+        // A misconfiguration is NOT a network error — the other half of the pair.
+        expect(result.allNetworkErrors).toBe(false);
+        expect(rewardsRepository.insertManyUnsafe).not.toHaveBeenCalled();
+      });
+
+      /**
+       * A real visitor: BOTH member sources report not-applicable.
+       *
+       * The earlier version of these tests mocked `fetchMyBeersFromAPI` to return
+       * tasted-beer ROWS while calling itself a visitor test — a combination no
+       * visitor can produce. It asserted `hasErrors === false` and passed only
+       * because my-beers had succeeded, so it documented a property the system
+       * does not have.
+       */
+      const arrangeRealVisitor = (): void => {
+        (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(unavailable('not-applicable'));
+        (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(unavailable('not-applicable'));
+      };
+
+      describe('a real visitor refresh', () => {
+        it('does not report a rewards error for a visitor', async () => {
+          arrangeRealVisitor();
+
+          const result = await sequentialRefreshAllData();
+
+          // The property this phase actually controls.
+          expect(result.rewardsResult.success).toBe(true);
+          expect(result.rewardsResult.dataUpdated).toBe(false);
+        });
+
+        it('does not report a my-beers error for a visitor', async () => {
+          arrangeRealVisitor();
+
+          const result = await sequentialRefreshAllData();
+
+          // `not-applicable` means "this source does not apply to you", which is
+          // what visitor mode IS. Treating it as a failure put developer prose —
+          // "My beers unavailable (not-applicable): …" — into a user-facing Alert,
+          // because UNKNOWN_ERROR returns error.message verbatim.
+          expect(result.myBeersResult.success).toBe(true);
+          expect(result.myBeersResult.dataUpdated).toBe(false);
+        });
+
+        it('leaves the tasted table alone for a visitor', async () => {
+          arrangeRealVisitor();
+
+          await sequentialRefreshAllData();
+
+          // The distinction that must survive: `not-applicable` is not
+          // `confirmed-empty`. A visitor has no tasted list to clear, and clearing
+          // is correct ONLY when the server actually reported zero.
+          expect(myBeersRepository.replaceAllWithEmptyUnsafe).not.toHaveBeenCalled();
+          expect(myBeersRepository.insertManyUnsafe).not.toHaveBeenCalled();
+        });
+
+        it('raises no error alert at all for a visitor refresh', async () => {
+          arrangeRealVisitor();
+
+          const result = await sequentialRefreshAllData();
+
+          // The property plan 05 Phase 5.1's rationale is built on. It was only
+          // half true when 5.1 landed — rewards stopped raising an alert, my-beers
+          // still did — so this is the assertion that makes the rationale real.
+          expect(result.hasErrors).toBe(false);
+        });
+      });
+    });
+
+    describe('refreshAllDataFromAPI', () => {
+      beforeEach(() => {
+        (areApiUrlsConfigured as jest.Mock).mockResolvedValue(true);
+        (fetchBeersFromAPI as jest.Mock).mockResolvedValue(
+          fetchedRows([{ id: 'beer-1', brew_name: 'Test IPA', brewer: 'Brewery 1' }])
+        );
+        (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(
+          fetchedRows([{ id: 'beer-1', brew_name: 'Test IPA', tasted_date: '2023-01-01' }])
+        );
+        (beerRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
+        (myBeersRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
+      });
+
+      it('does not write rewards when the rewards fetch fails', async () => {
+        (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(failed());
+
+        const result = await refreshAllDataFromAPI();
+
+        // This entry point has no per-source success channel, so the only thing
+        // it can get wrong is writing on a non-answer. It must not.
+        expect(rewardsRepository.insertManyUnsafe).not.toHaveBeenCalled();
+        expect(result.rewards).toEqual([]);
+      });
+
+      it('does not let a failed rewards outcome escape refreshAllDataFromAPI', async () => {
+        (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(failed());
+
+        // Renamed from 'still writes the other sources when rewards fail', which
+        // could not fail for the reason its comment gave: rewards is the LAST
+        // source, so the beer and my-beers writes have already landed before it
+        // is even fetched. No rewards behaviour can un-write them. The property
+        // genuinely at risk is the new `throw` on a failed outcome escaping its
+        // own catch, which is what this asserts.
+        await expect(refreshAllDataFromAPI()).resolves.toBeDefined();
+
+        expect(beerRepository.insertManyUnsafe).toHaveBeenCalled();
+        expect(myBeersRepository.insertManyUnsafe).toHaveBeenCalled();
+      });
+
+      it('treats a not-applicable my-beers source as a skip, not a failure', async () => {
+        (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(unavailable('not-applicable'));
+
+        const result = await refreshAllDataFromAPI();
+
+        expect(myBeersRepository.insertManyUnsafe).not.toHaveBeenCalled();
+        expect(result.myBeers).toEqual([]);
+        // This is the autoLogin -> checkInBeer path, so throwing here logged an
+        // error on every visitor login. Same assertion shape as the rewards case:
+        // skip and fail are otherwise indistinguishable at a site with no success
+        // channel.
+        expect(logError).not.toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({ operation: 'refreshAllDataFromAPI - my beers' })
+        );
+      });
+
+      it('treats a not-applicable rewards source as a skip, not a failure', async () => {
+        (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(unavailable('not-applicable'));
+
+        const result = await refreshAllDataFromAPI();
+
+        expect(rewardsRepository.insertManyUnsafe).not.toHaveBeenCalled();
+        expect(result.rewards).toEqual([]);
+        // The only assertion that can tell skip from fail at a site with no
+        // success channel: both leave `rewards` empty and write nothing, and
+        // differ ONLY in whether the error path was taken. This is the
+        // autoLogin -> checkInBeer path, so a visitor or a none:// placeholder
+        // would otherwise silently log an error on every check-in.
+        expect(logError).not.toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({ operation: 'refreshAllDataFromAPI - rewards' })
+        );
+      });
     });
   });
 
