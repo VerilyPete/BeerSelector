@@ -300,6 +300,57 @@ describe('forced release reporting', () => {
     expect(context.additionalData.queueLength).toBe(1);
   });
 
+  it('still abandons the hold when the error reporter itself throws', async () => {
+    const lockManager = new DatabaseLockManager({
+      holdTimeoutMs: 100,
+      reportError: () => {
+        throw new Error('reporter blew up');
+      },
+    });
+    await lockManager.acquire('op');
+
+    const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+
+    jest.advanceTimersByTime(100);
+
+    // withDatabaseLock already puts release in a finally so a throwing task
+    // cannot skip the state transition. The hold timer must extend the same
+    // guarantee to its own: reporting is observability, and it must not be able
+    // to prevent the safety mechanism it is reporting on.
+    expect(lockManager.isLocked()).toBe(false);
+    expect(lockManager.hasAbandonedHolder()).toBe(true);
+    // And the reporter's own failure is surfaced rather than lost.
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining('error reporter threw'),
+      expect.anything()
+    );
+
+    consoleSpy.mockRestore();
+  });
+
+  it('measures the real hold duration rather than echoing the configured timeout', async () => {
+    const reportError = jest.fn();
+    const lockManager = new DatabaseLockManager({ holdTimeoutMs: 100, reportError });
+    await lockManager.acquire('op');
+
+    // Under fake timers the timer fires at exactly holdTimeoutMs, so a
+    // hard-coded `heldForMs = holdTimeoutMs` would satisfy every other test
+    // here. Jumping the wall clock separates a measurement from a constant —
+    // and this is also the iOS suspend/resume shape, where the app is frozen
+    // and the timer fires late on resume.
+    jest.setSystemTime(Date.now() + 3_600_000);
+    jest.advanceTimersByTime(100);
+
+    const [, context] = reportError.mock.calls[0];
+    expect(context.additionalData.heldForMs).toBeGreaterThan(3_600_000);
+    expect(context.additionalData.holdTimeoutMs).toBe(100);
+    // Overshoot ratio is what lets triage separate a genuinely slow write
+    // (overshoots by milliseconds) from a suspended app (overshoots by
+    // minutes). Without it, Phase 5's production logs cannot answer the
+    // question Phase 5 exists to answer.
+    expect(context.additionalData.overshootRatio).toBeGreaterThan(1000);
+  });
+
   it('does not report anything when the lock is released normally', async () => {
     const reportError = jest.fn();
     const lockManager = new DatabaseLockManager({ holdTimeoutMs: 5000, reportError });

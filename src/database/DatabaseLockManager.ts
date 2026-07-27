@@ -324,28 +324,55 @@ export class DatabaseLockManager {
     this.timeoutId = setTimeout(() => {
       const heldOperation = this.currentOperation;
       const heldForMs = Date.now() - this.grantedAt;
+      const queueLength = this.queue.length;
+      // How far past the budget this ran. A genuinely slow write overshoots by
+      // milliseconds; an app suspended by iOS overshoots by minutes, because
+      // setTimeout does not fire while suspended but Date.now() keeps moving.
+      // Triage needs to separate those, or Phase 5's production logs cannot
+      // answer the question Phase 5 exists to answer — whether the hold timeout
+      // fires under real load.
+      const overshootRatio = heldForMs / this.LOCK_TIMEOUT_MS;
+
+      // Abandon FIRST, report second. Reporting is observability and must not
+      // be able to prevent the safety mechanism it is reporting on: a throwing
+      // reporter used to escape this callback and leave the lock held with no
+      // abandonment recorded. `withDatabaseLock` already applies this discipline
+      // via its finally; the timer callback now extends it to its own.
+      this._forceRelease();
 
       // Reported as an error, not a log line. A forced release abandons a grant
       // and blocks every writer until the holder returns — a console.warn is
       // indistinguishable from routine chatter, and this is an incident.
-      this.reportError(
-        new Error(
-          `Database lock forcibly released after ${heldForMs}ms (${heldOperation}) — the holder never returned`
-        ),
-        {
-          operation: 'DatabaseLockManager.forceRelease',
-          component: 'database/DatabaseLockManager',
-          additionalData: {
-            heldOperation,
-            heldForMs,
-            holdTimeoutMs: this.LOCK_TIMEOUT_MS,
-            // Says whether this stalled anything, which is the difference
-            // between a curiosity and an incident.
-            queueLength: this.queue.length,
-          },
-        }
-      );
-      this._forceRelease();
+      try {
+        this.reportError(
+          new Error(
+            `Database lock forcibly released after ${heldForMs}ms (${heldOperation}) — the holder had not returned`
+          ),
+          {
+            operation: 'DatabaseLockManager.forceRelease',
+            component: 'database/DatabaseLockManager',
+            additionalData: {
+              heldOperation,
+              heldForMs,
+              holdTimeoutMs: this.LOCK_TIMEOUT_MS,
+              overshootRatio,
+              // Says whether this stalled anything, which is the difference
+              // between a curiosity and an incident.
+              queueLength,
+            },
+          }
+        );
+      } catch (reportingError) {
+        // Not swallowing: the reporter IS the error channel, so when it fails
+        // there is nowhere left to report to and console is the honest terminal
+        // handler. Letting it escape instead would only hand an unhandled
+        // exception to the runtime's global timer handler, losing both the
+        // original incident and the reporter's own failure.
+        console.error(
+          '[LockManager] error reporter threw while reporting a forced release',
+          reportingError
+        );
+      }
     }, this.LOCK_TIMEOUT_MS);
 
     resolve({ operationName, serial: this.grantSerial });
