@@ -131,6 +131,10 @@ describe('Repository Type Safety', () => {
         }),
         getFirstAsync: jest.fn().mockResolvedValue({ count: 0 }),
         runAsync: jest.fn().mockResolvedValue({ changes: 0, lastInsertRowId: 0 }),
+        prepareAsync: jest.fn().mockResolvedValue({
+          executeAsync: jest.fn().mockResolvedValue({ changes: 1, lastInsertRowId: 1 }),
+          finalizeAsync: jest.fn().mockResolvedValue(undefined),
+        }),
       };
 
       const { getDatabase } = require('../../connection');

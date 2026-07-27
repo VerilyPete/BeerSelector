@@ -74,20 +74,28 @@ export class BeerRepository {
       const cleared = await txn.runAsync('DELETE FROM allbeers');
       console.log(`Cleared allbeers table (removed ${cleared.changes} rows)`);
 
-      for (let i = 0; i < beers.length; i += batchSize) {
-        const batch = beers.slice(i, i + batchSize);
+      // Compiled ONCE and reused for every row. The whole import runs inside a
+      // single exclusive transaction whose entire span is covered by the 15s
+      // lock hold timeout, and blowing that timeout abandons the grant and
+      // blocks every other writer until this import finishes. Recompiling the
+      // same INSERT ~1200 times is the avoidable part of that budget.
+      const insert = await txn.prepareAsync(
+        `INSERT OR REPLACE INTO allbeers (
+          id, added_date, brew_name, brewer, brewer_loc,
+          brew_style, brew_container, review_count, review_rating,
+          brew_description, container_type, abv,
+          enrichment_confidence, enrichment_source
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      );
 
-        for (const beer of batch) {
-          if (!beer.id) continue; // Skip entries without an ID
+      try {
+        for (let i = 0; i < beers.length; i += batchSize) {
+          const batch = beers.slice(i, i + batchSize);
 
-          await txn.runAsync(
-            `INSERT OR REPLACE INTO allbeers (
-              id, added_date, brew_name, brewer, brewer_loc,
-              brew_style, brew_container, review_count, review_rating,
-              brew_description, container_type, abv,
-              enrichment_confidence, enrichment_source
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [
+          for (const beer of batch) {
+            if (!beer.id) continue; // Skip entries without an ID
+
+            await insert.executeAsync([
               beer.id,
               beer.added_date || '',
               beer.brew_name || '',
@@ -102,16 +110,20 @@ export class BeerRepository {
               beer.abv ?? null,
               beer.enrichment_confidence ?? null,
               beer.enrichment_source ?? null,
-            ]
-          );
-        }
+            ]);
+          }
 
-        // Log progress for larger batches
-        if ((i + batchSize) % 200 === 0 || i + batchSize >= beers.length) {
-          console.log(
-            `Imported ${Math.min(i + batchSize, beers.length)} of ${beers.length} beers...`
-          );
+          // Log progress for larger batches
+          if ((i + batchSize) % 200 === 0 || i + batchSize >= beers.length) {
+            console.log(
+              `Imported ${Math.min(i + batchSize, beers.length)} of ${beers.length} beers...`
+            );
+          }
         }
+      } finally {
+        // Runs on the failure path too: a statement left unfinalized inside a
+        // rolled-back transaction leaks a native handle.
+        await insert.finalizeAsync();
       }
     });
 
