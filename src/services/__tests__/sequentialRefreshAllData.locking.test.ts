@@ -18,17 +18,27 @@
  * targets.
  *
  * **Ordering is asserted from a recorded event log, never from wall-clock
- * timing.** Every mock settles immediately and no test uses fake timers.
+ * timing.** Every mock settles immediately and no test ADVANCES timers. The
+ * suite does inherit `jest.setup.js`'s global `jest.useFakeTimers()` — every
+ * suite in this repo does — and depends on nothing they control. Saying "no test
+ * uses fake timers" was simply false, and would mislead whoever first puts a
+ * timed retry on the refresh path, which would hang here rather than fail.
  */
 
 import { fetchBeersFromAPI, fetchMyBeersFromAPI, fetchRewardsFromAPI } from '../../api/beerApi';
 import { beerRepository } from '../../database/repositories/BeerRepository';
 import { myBeersRepository } from '../../database/repositories/MyBeersRepository';
 import { rewardsRepository } from '../../database/repositories/RewardsRepository';
-import { fetchEnrichmentBatchWithMissing, syncBeersToWorker } from '../enrichmentService';
+import {
+  fetchEnrichmentBatchWithMissing,
+  syncBeersToWorker,
+  fetchBeersFromProxy,
+} from '../enrichmentService';
 import { config } from '@/src/config';
+import { getPreference, setPreference } from '../../database/preferences';
+import { databaseLockManager } from '../../database/DatabaseLockManager';
 import { fetchedRows, failed, unavailable } from '../../api/__tests__/helpers/fetchOutcomeFixtures';
-import { sequentialRefreshAllData } from '../dataUpdateService';
+import { sequentialRefreshAllData, resetInFlightSequentialRefresh } from '../dataUpdateService';
 
 /**
  * One ordered log of everything worth ordering.
@@ -131,6 +141,17 @@ describe('sequentialRefreshAllData locking', () => {
     recordWrite(myBeersRepository.insertManyUnsafe as jest.Mock, 'myBeers');
     recordWrite(myBeersRepository.replaceAllWithEmptyUnsafe as jest.Mock, 'myBeers:clear');
     recordWrite(rewardsRepository.insertManyUnsafe as jest.Mock, 'rewards');
+  });
+
+  afterEach(() => {
+    // Two tests here spy on the `config.enrichment` getter and restore it on
+    // the last line of their own body. A test that fails before reaching that
+    // line leaves enrichment permanently "configured" for every later test in
+    // the file — and `clearAllMocks` does not undo a spy. That is the same
+    // cascade `refreshCoordination.test.ts` was fixed for, and the reason
+    // restore belongs here rather than in a test body.
+    jest.restoreAllMocks();
+    resetInFlightSequentialRefresh();
   });
 
   it('completes every network fetch before acquiring the database lock', async () => {
@@ -274,6 +295,56 @@ describe('sequentialRefreshAllData locking', () => {
     expect(rewardsRepository.insertManyUnsafe).toHaveBeenCalled();
   });
 
+  it('stamps the check timestamp and takes the lock for a 304', async () => {
+    // The 304 write path had NO coverage: `writeAllBeers`'s not-modified arm is
+    // reachable only through sequentialRefreshAllData, and the existing 304
+    // tests drive `fetchAndUpdateAllBeers`, which does not route through it.
+    //
+    // Two mutations survived the whole suite. Dropping the stamp, and — worse —
+    // classifying a 304 as `settled` rather than a write, which is a real
+    // regression: `all_beers_last_check` is never written, the 12-hour window
+    // never advances, and the app re-downloads the entire taplist on every
+    // launch. That is precisely what `AllBeersWrite`'s doc comment claims a 304
+    // is a write in order to prevent.
+    const enrichmentSpy = jest
+      .spyOn(config, 'enrichment', 'get')
+      .mockReturnValue({ ...config.enrichment, isConfigured: () => true });
+    (getPreference as jest.Mock).mockImplementation(async (key: string) => {
+      if (key === 'all_beers_api_url') return 'https://example.com/beers?sid=13885';
+      if (key === 'my_beers_api_url') return 'https://example.com/mybeers.json';
+      return null;
+    });
+    (fetchBeersFromProxy as jest.Mock).mockResolvedValue({
+      notModified: true,
+      beers: [],
+      etag: 'W/"unchanged"',
+    });
+    // The other two settle without writing, so the lock below is taken for the
+    // 304 alone — which is what makes the `settled` mutation visible.
+    respondsWith(
+      fetchMyBeersFromAPI as jest.Mock,
+      'myBeers',
+      unavailable('not-applicable', 'visitor mode')
+    );
+    respondsWith(
+      fetchRewardsFromAPI as jest.Mock,
+      'rewards',
+      unavailable('not-applicable', 'visitor mode')
+    );
+
+    const result = await sequentialRefreshAllData();
+
+    expect(setPreference).toHaveBeenCalledWith('all_beers_last_check', expect.any(String));
+    expect(beerRepository.insertManyUnsafe).not.toHaveBeenCalled();
+    expect(mockEvents.filter(event => event.startsWith('lock:'))).toEqual([
+      'lock:acquire',
+      'lock:release',
+    ]);
+    expect(result.allBeersResult).toEqual({ success: true, dataUpdated: false });
+
+    enrichmentSpy.mockRestore();
+  });
+
   it('does not acquire the lock at all when every fetch fails', async () => {
     respondsWith(fetchBeersFromAPI as jest.Mock, 'allBeers', failed());
     respondsWith(fetchMyBeersFromAPI as jest.Mock, 'myBeers', failed());
@@ -342,16 +413,26 @@ describe('sequentialRefreshAllData locking', () => {
     expect(first).not.toBe(second);
   });
 
-  it('clears the in-flight refresh even when a source fails', async () => {
-    // GUARD, for the failure path specifically: the clear must be in a `finally`.
-    // A leaked in-flight promise after an offline refresh would pin the app to
-    // that failed result for the rest of the session — and offline is precisely
-    // when the user retries.
-    respondsWith(fetchBeersFromAPI as jest.Mock, 'allBeers', failed());
-    respondsWith(fetchMyBeersFromAPI as jest.Mock, 'myBeers', failed());
-    respondsWith(fetchRewardsFromAPI as jest.Mock, 'rewards', failed());
+  it('clears the in-flight refresh when the refresh itself rejects', async () => {
+    // The clear must be in a `finally`, and this is the ONLY arrangement that
+    // proves it. Every source failing does not reject — each `prepare*` catches
+    // and reports — so the previous version of this test exercised the resolve
+    // path and stayed green when `.finally` was swapped for `.then`, while
+    // asserting nothing the success-path test above did not already cover.
+    //
+    // The one thing that genuinely rejects is the lock acquisition, which is
+    // also the path nothing else in the repo reaches: `withDatabaseLock` can
+    // reject on its 30s acquisition timeout, and a leak there would pin the app
+    // to a failed refresh for the rest of the session.
+    allSourcesSucceed();
+    (databaseLockManager.withDatabaseLock as jest.Mock).mockRejectedValueOnce(
+      new Error('lock acquisition timed out')
+    );
 
-    await sequentialRefreshAllData();
+    await expect(sequentialRefreshAllData()).rejects.toThrow('lock acquisition timed out');
+
+    // The slot must be free, so this starts a genuinely new run rather than
+    // handing back the rejected one.
     await sequentialRefreshAllData();
 
     expect(fetchBeersFromAPI).toHaveBeenCalledTimes(2);

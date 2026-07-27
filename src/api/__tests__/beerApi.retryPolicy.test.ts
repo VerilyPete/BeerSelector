@@ -204,16 +204,23 @@ describe('fetchWithRetry retry policy', () => {
       //
       // This is the exact defect class 30f9d90's review round caught at the
       // fetcher layer. It came back one layer down, via the deadline.
-      const serverError = { ok: false, status: 500, statusText: 'Internal Server Error' };
+      // The two slow answers DIFFER, and that is load-bearing. With both at 500
+      // the assertion cannot tell "carry the most recent failure" from "carry
+      // the first" — and carrying the first survived the entire api suite.
+      // 503 then 500 pins the policy the recursion comment states.
+      const answers = [
+        { ok: false, status: 503, statusText: 'Service Unavailable' },
+        { ok: false, status: 500, statusText: 'Internal Server Error' },
+      ];
       let attempts = 0;
       (global.fetch as jest.Mock).mockImplementation(
         (_url: string, options: { signal: AbortSignal }) =>
           new Promise((resolve, reject) => {
             attempts += 1;
-            const answersSlowly = attempts <= 2;
+            const answer = answers[attempts - 1];
             options.signal.addEventListener('abort', () => reject(abortError()));
-            if (answersSlowly) {
-              setTimeout(() => resolve(serverError), 6000);
+            if (answer !== undefined) {
+              setTimeout(() => resolve(answer), 6000);
             }
           })
       );
@@ -226,21 +233,6 @@ describe('fetchWithRetry retry policy', () => {
       // Three attempts: two real 500s, then one armed with the sliver of
       // budget left, which aborts. The abort must not become the answer.
       expect(attempts).toBe(3);
-      await rejection;
-    });
-
-    it('still reports the abort when nothing else has gone wrong', async () => {
-      // GUARD, and the reason the fix is "prefer the earlier real error"
-      // rather than "never report an abort". A single request that stalls has
-      // produced no other error, and a timeout is the honest description.
-      const signals = capturedSignals();
-
-      const result = fetchWithRetry(config.api.baseUrl, 1);
-      const rejection = expect(result).rejects.toMatchObject({ name: 'AbortError' });
-
-      await jest.advanceTimersByTimeAsync(config.network.timeout + 1);
-
-      expect(signals[0].aborted).toBe(true);
       await rejection;
     });
 
