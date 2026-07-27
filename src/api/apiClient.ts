@@ -259,6 +259,31 @@ export class ApiClient {
       // Get response text first to handle empty responses
       const responseText = await response.text();
 
+      // Two places in this codebase make contradictory claims about what a
+      // successful check-in looks like: the empty-body rule immediately below,
+      // and the SyntaxError branch in useOptimisticCheckIn that treats a
+      // NON-EMPTY unparseable body as success. Both cannot be right, and
+      // neither has ever been checked against a real response. This records
+      // what actually comes back so the rule can be settled with evidence.
+      //
+      // A response.url on a different origin means something intercepted the
+      // request — captive portal or carrier proxy — which is otherwise
+      // indistinguishable from success once the body has been swallowed.
+      // Both url and redirected are logged because RN populates the former
+      // reliably and the latter inconsistently.
+      //
+      // Body text may contain beer and store names; no credentials.
+      if (endpoint === config.api.endpoints.addToQueue) {
+        console.log(
+          `[check-in diagnostics] status=${response.status} ` +
+            `content-type=${response.headers?.get?.('content-type') ?? 'unknown'} ` +
+            `content-length=${response.headers?.get?.('content-length') ?? 'unknown'} ` +
+            `requestUrl=${url} responseUrl=${response.url ?? 'unknown'} ` +
+            `redirected=${response.redirected ?? 'unknown'} ` +
+            `body=${responseText.substring(0, 200)}`
+        );
+      }
+
       // Known limitation: empty body cannot satisfy arbitrary T.
       // Only addToQueue.php returns empty body on success.
       // beerService.ts:checkIn() guards with Object.keys(response.data).length === 0.
