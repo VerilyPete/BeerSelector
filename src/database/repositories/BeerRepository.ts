@@ -27,8 +27,9 @@ export class BeerRepository {
   /**
    * Insert multiple beers into the database
    *
-   * Clears existing data and inserts fresh records in batches of 50.
-   * Skips beers without valid IDs.
+   * Clears existing data and inserts fresh records in ONE exclusive
+   * transaction — the batch loop paces progress logging only, and is no longer
+   * a durability boundary. Skips beers without valid IDs.
    * Uses database lock to prevent concurrent operations.
    *
    * @param beers - Array of BeerWithContainerType objects to insert
@@ -123,7 +124,18 @@ export class BeerRepository {
       } finally {
         // Runs on the failure path too: a statement left unfinalized inside a
         // rolled-back transaction leaks a native handle.
-        await insert.finalizeAsync();
+        //
+        // Its own failure must never propagate. If the body threw A and this
+        // threw B, JS discards A and B wins — so a `database is locked` abort
+        // would reach withContentionMapping as a finalize error instead,
+        // fail the `database is locked` substring test, and be reported to the
+        // user as a hard UNKNOWN_ERROR. That is exactly the misclassification
+        // the typed contention error exists to prevent.
+        try {
+          await insert.finalizeAsync();
+        } catch (finalizeError) {
+          console.error('[BeerRepository] failed to finalize the insert statement', finalizeError);
+        }
       }
     });
 

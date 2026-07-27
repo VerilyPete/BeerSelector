@@ -639,6 +639,32 @@ describe('MyBeersRepository', () => {
     });
   });
 
+  describe('insertManyUnsafe contention mapping', () => {
+    it('maps a lock abort on the empty-array wipe to DatabaseContentionError', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      const repository = createRepository();
+
+      mockDatabase.withTransactionAsync.mockRejectedValueOnce(new Error('database is locked'));
+
+      // A bare DELETE is the statement most likely to abort under contention,
+      // and these two branches used to run outside the mapping entirely.
+      await expect(repository.insertManyUnsafe([])).rejects.toBeInstanceOf(DatabaseContentionError);
+    });
+
+    it('maps a lock abort on the no-valid-ids wipe to DatabaseContentionError', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      const repository = createRepository();
+
+      mockDatabase.withTransactionAsync.mockRejectedValueOnce(new Error('database is locked'));
+
+      await expect(
+        repository.insertManyUnsafe([{ id: '' } as never, { id: null } as never])
+      ).rejects.toBeInstanceOf(DatabaseContentionError);
+    });
+  });
+
   describe('insertManyUnsafe', () => {
     it('should insert beers without acquiring lock', async () => {
       const mockDatabase = createMockDatabase();

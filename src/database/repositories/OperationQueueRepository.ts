@@ -31,6 +31,7 @@
  */
 
 import { getDatabase } from '../connection';
+import { toContentionError } from '../errors';
 import {
   QueuedOperation,
   QueuedOperationRow,
@@ -73,10 +74,12 @@ class OperationQueueRepository {
         ]
       );
 
-      console.log(`[OperationQueueRepository] Added operation to queue: ${operation.id} (${operation.type})`);
+      console.log(
+        `[OperationQueueRepository] Added operation to queue: ${operation.id} (${operation.type})`
+      );
     } catch (error) {
       console.error('[OperationQueueRepository] Error adding operation to queue:', error);
-      throw error;
+      throw toContentionError('operation queue add', error);
     }
   }
 
@@ -166,7 +169,7 @@ class OperationQueueRepository {
       console.log(`[OperationQueueRepository] Updated operation ${id} status to ${status}`);
     } catch (error) {
       console.error(`[OperationQueueRepository] Error updating operation ${id} status:`, error);
-      throw error;
+      throw toContentionError('operation queue status update', error);
     }
   }
 
@@ -195,7 +198,7 @@ class OperationQueueRepository {
       console.log(`[OperationQueueRepository] Incremented retry count for operation ${id}`);
     } catch (error) {
       console.error(`[OperationQueueRepository] Error incrementing retry count for ${id}:`, error);
-      throw error;
+      throw toContentionError('operation queue retry increment', error);
     }
   }
 
@@ -208,15 +211,12 @@ class OperationQueueRepository {
     const database = await getDatabase();
 
     try {
-      await database.runAsync(
-        `DELETE FROM operation_queue WHERE id = ?`,
-        [id]
-      );
+      await database.runAsync(`DELETE FROM operation_queue WHERE id = ?`, [id]);
 
       console.log(`[OperationQueueRepository] Deleted operation ${id}`);
     } catch (error) {
       console.error(`[OperationQueueRepository] Error deleting operation ${id}:`, error);
-      throw error;
+      throw toContentionError('operation queue delete', error);
     }
   }
 
@@ -227,15 +227,14 @@ class OperationQueueRepository {
     const database = await getDatabase();
 
     try {
-      await database.runAsync(
-        `DELETE FROM operation_queue WHERE status = ?`,
-        [OperationStatus.SUCCESS]
-      );
+      await database.runAsync(`DELETE FROM operation_queue WHERE status = ?`, [
+        OperationStatus.SUCCESS,
+      ]);
 
       console.log('[OperationQueueRepository] Deleted all successful operations');
     } catch (error) {
       console.error('[OperationQueueRepository] Error deleting successful operations:', error);
-      throw error;
+      throw toContentionError('operation queue cleanup', error);
     }
   }
 
@@ -250,7 +249,7 @@ class OperationQueueRepository {
       console.log('[OperationQueueRepository] Cleared all operations from queue');
     } catch (error) {
       console.error('[OperationQueueRepository] Error clearing operation queue:', error);
-      throw error;
+      throw toContentionError('operation queue clear', error);
     }
   }
 
@@ -341,7 +340,7 @@ class OperationQueueRepository {
    */
   private rowsToOperations(rows: QueuedOperationRow[]): QueuedOperation[] {
     return rows
-      .map((row) => this.rowToOperation(row))
+      .map(row => this.rowToOperation(row))
       .filter((op): op is QueuedOperation => op !== null);
   }
 }
