@@ -1125,8 +1125,13 @@ describe('dataUpdateService', () => {
       (areApiUrlsConfigured as jest.Mock).mockResolvedValue(true);
       (getPreference as jest.Mock).mockResolvedValue(null);
       (fetchBeersFromAPI as jest.Mock).mockRejectedValue(new Error('network fail'));
+      // Now reachable: the other sources run even when all-beers fails.
+      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue([]);
+      (fetchRewardsFromAPI as jest.Mock).mockResolvedValue([]);
 
-      await expect(refreshAllDataFromAPI()).rejects.toThrow();
+      // INVERTED by plan 02 Phase 2.5 — a failing source no longer aborts the
+      // function. The lock assertion below is the part that still matters.
+      await refreshAllDataFromAPI();
 
       // Asserts the lock is actually free, not merely that the wrapper was
       // called. The manager behind this mock is real, so deleting the finally
@@ -1161,7 +1166,11 @@ describe('dataUpdateService', () => {
       (getPreference as jest.Mock).mockResolvedValue(null);
       (fetchBeersFromAPI as jest.Mock).mockResolvedValue([]);
 
-      await expect(refreshAllDataFromAPI()).rejects.toThrow('No valid all beers found');
+      // INVERTED by plan 02 Phase 2.5: an empty taplist still fails ITS source
+      // and writes nothing for it, but no longer aborts my-beers and rewards.
+      await expect(refreshAllDataFromAPI()).resolves.toBeDefined();
+
+      expect(beerRepository.insertManyUnsafe).not.toHaveBeenCalled();
     });
 
     it('uses proxy for all beers when enrichment is configured', async () => {
@@ -1556,5 +1565,69 @@ describe('dataUpdateService', () => {
         expect(setPreference).not.toHaveBeenCalledWith('all_beers_etag', expect.anything());
       });
     });
+  });
+});
+
+describe('refreshAllDataFromAPI per-source isolation', () => {
+  const mockAllBeers: Beer[] = [{ id: 'beer-1', brew_name: 'Test IPA', brewer: 'Brewery 1' }];
+  const mockMyBeers = [{ id: 'beer-1', brew_name: 'Test IPA', tasted_date: '2023-01-01' }];
+  const mockRewards = [{ id: 'reward-1', name: 'Free Beer' }];
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (areApiUrlsConfigured as jest.Mock).mockResolvedValue(true);
+    (getPreference as jest.Mock).mockResolvedValue(null);
+    (setPreference as jest.Mock).mockResolvedValue(undefined);
+  });
+
+  // The live scenario: CHECK IN with an expired session on a weak link.
+  // checkInBeer -> autoLogin -> refreshAllDataFromAPI. The taplist write
+  // succeeds, then the my-beers fetch throws, and the throw escapes past BOTH
+  // the my-beers write and the rewards write. autoLogin logs and returns
+  // success, the check-in proceeds, and the user is left with a fresh taplist,
+  // a stale tasted list, and stale rewards — a wrong-high Beerfinder count.
+  it('still writes rewards when the my-beers fetch fails', async () => {
+    (fetchBeersFromAPI as jest.Mock).mockResolvedValue(mockAllBeers);
+    (fetchMyBeersFromAPI as jest.Mock).mockRejectedValue(new Error('network timeout'));
+    (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(mockRewards);
+
+    await refreshAllDataFromAPI();
+
+    expect(rewardsRepository.insertManyUnsafe).toHaveBeenCalled();
+  });
+
+  it('preserves the all-beers write when the my-beers fetch fails', async () => {
+    (fetchBeersFromAPI as jest.Mock).mockResolvedValue(mockAllBeers);
+    (fetchMyBeersFromAPI as jest.Mock).mockRejectedValue(new Error('network timeout'));
+    (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(mockRewards);
+
+    await expect(refreshAllDataFromAPI()).resolves.toBeDefined();
+
+    expect(beerRepository.insertManyUnsafe).toHaveBeenCalled();
+  });
+
+  it('still writes the taplist and rewards when the rewards fetch fails', async () => {
+    (fetchBeersFromAPI as jest.Mock).mockResolvedValue(mockAllBeers);
+    (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(mockMyBeers);
+    (fetchRewardsFromAPI as jest.Mock).mockRejectedValue(new Error('network timeout'));
+
+    await refreshAllDataFromAPI();
+
+    expect(beerRepository.insertManyUnsafe).toHaveBeenCalled();
+    expect(myBeersRepository.insertManyUnsafe).toHaveBeenCalled();
+  });
+
+  // GUARD — passes today via the existing finally. Not this phase's RED.
+  it('releases the master lock when a source fails', async () => {
+    (fetchBeersFromAPI as jest.Mock).mockResolvedValue(mockAllBeers);
+    (fetchMyBeersFromAPI as jest.Mock).mockRejectedValue(new Error('network timeout'));
+    (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(mockRewards);
+
+    // Tolerates the rejection deliberately: this must pass BOTH today (where
+    // the function still rejects) and after the fix (where it does not), or it
+    // is not a guard — it would just be another RED wearing a GUARD label.
+    await refreshAllDataFromAPI().catch(() => undefined);
+
+    expect(databaseLockManager.isLocked()).toBe(false);
   });
 });

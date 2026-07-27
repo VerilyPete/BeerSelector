@@ -142,7 +142,8 @@ describe('Data Refresh Integration Tests', () => {
   });
 
   describe('Partial refresh scenarios', () => {
-    it('should handle empty all beers response', async () => {
+    // INVERTED by plan 02 Phase 2.5 (was dataRefresh.integration.test.ts:145).
+    it('does not abort the other sources when the taplist comes back empty', async () => {
       (preferences.getPreference as jest.Mock).mockImplementation((key: string) => {
         switch (key) {
           case 'is_visitor_mode':
@@ -170,10 +171,12 @@ describe('Data Refresh Integration Tests', () => {
         undefined
       );
 
-      // Empty all beers should throw an error - this is a critical failure
-      await expect(refreshAllDataFromAPI()).rejects.toThrow(
-        'No valid all beers found in API response'
-      );
+      // INVERTED by plan 02 Phase 2.5. An empty taplist is still a failure for
+      // THAT source — nothing is written for it — but it no longer aborts the
+      // other two, which is what per-source isolation buys.
+      await expect(refreshAllDataFromAPI()).resolves.toBeDefined();
+
+      expect(beerRepository.beerRepository.insertManyUnsafe).not.toHaveBeenCalled();
     });
 
     it('should handle empty my beers response (new user)', async () => {
@@ -260,7 +263,12 @@ describe('Data Refresh Integration Tests', () => {
       );
     });
 
-    it('should throw error when all beers API fails', async () => {
+    // INVERTED by plan 02 Phase 2.5 (was dataRefresh.integration.test.ts:263).
+    // Per-source isolation means one source failing no longer aborts the
+    // remainder — that is the whole point. The live case is a CHECK IN on a
+    // weak link, where aborting left a fresh taplist beside a stale tasted
+    // list and stale rewards.
+    it('does not abort the other sources when the all-beers API fails', async () => {
       (preferences.getPreference as jest.Mock).mockImplementation((key: string) => {
         switch (key) {
           case 'is_visitor_mode':
@@ -275,11 +283,25 @@ describe('Data Refresh Integration Tests', () => {
       });
 
       (beerApi.fetchBeersFromAPI as jest.Mock).mockRejectedValue(new Error('Network error'));
+      // The other two sources now actually RUN when all-beers fails, so they
+      // need mocking. Before isolation they were unreachable in this test —
+      // which is a fair illustration of what the change buys.
+      (beerApi.fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(
+        myBeersFixture[1].tasted_brew_current_round
+      );
+      (beerApi.fetchRewardsFromAPI as jest.Mock).mockResolvedValue([]);
 
-      await expect(refreshAllDataFromAPI()).rejects.toThrow('Network error');
+      await expect(refreshAllDataFromAPI()).resolves.toBeDefined();
+
+      // The taplist write is skipped — its source failed — but the other two
+      // still landed instead of being aborted alongside it.
+      expect(beerRepository.beerRepository.insertManyUnsafe).not.toHaveBeenCalled();
+      expect(myBeersRepository.myBeersRepository.insertManyUnsafe).toHaveBeenCalled();
+      expect(rewardsRepository.rewardsRepository.insertManyUnsafe).toHaveBeenCalled();
     });
 
-    it('should throw error when my beers API fails', async () => {
+    // INVERTED by plan 02 Phase 2.5 (was dataRefresh.integration.test.ts:282).
+    it('does not abort the other sources when the my-beers API fails', async () => {
       (preferences.getPreference as jest.Mock).mockImplementation((key: string) => {
         switch (key) {
           case 'is_visitor_mode':
@@ -296,10 +318,15 @@ describe('Data Refresh Integration Tests', () => {
       (beerApi.fetchBeersFromAPI as jest.Mock).mockResolvedValue(allBeersFixture[1].brewInStock);
       (beerApi.fetchMyBeersFromAPI as jest.Mock).mockRejectedValue(new Error('API timeout'));
 
-      await expect(refreshAllDataFromAPI()).rejects.toThrow('API timeout');
+      await expect(refreshAllDataFromAPI()).resolves.toBeDefined();
+
+      // The two healthy sources still landed.
+      expect(rewardsRepository.rewardsRepository.insertManyUnsafe).toHaveBeenCalled();
+      expect(beerRepository.beerRepository.insertManyUnsafe).toHaveBeenCalled();
     });
 
-    it('should throw error when rewards API fails', async () => {
+    // INVERTED by plan 02 Phase 2.5 (was dataRefresh.integration.test.ts:302).
+    it('does not abort the other sources when the rewards API fails', async () => {
       (preferences.getPreference as jest.Mock).mockImplementation((key: string) => {
         switch (key) {
           case 'is_visitor_mode':
@@ -321,10 +348,14 @@ describe('Data Refresh Integration Tests', () => {
         new Error('Rewards service unavailable')
       );
 
-      await expect(refreshAllDataFromAPI()).rejects.toThrow('Rewards service unavailable');
+      await expect(refreshAllDataFromAPI()).resolves.toBeDefined();
+
+      // The taplist and tasted writes still landed.
+      expect(beerRepository.beerRepository.insertManyUnsafe).toHaveBeenCalled();
     });
 
-    it('should handle database insertion failure', async () => {
+    // INVERTED by plan 02 Phase 2.5 (was dataRefresh.integration.test.ts:327).
+    it('does not abort the other sources when a database write fails', async () => {
       (preferences.getPreference as jest.Mock).mockImplementation((key: string) => {
         switch (key) {
           case 'is_visitor_mode':
@@ -349,7 +380,11 @@ describe('Data Refresh Integration Tests', () => {
         new Error('Database write failed')
       );
 
-      await expect(refreshAllDataFromAPI()).rejects.toThrow('Database write failed');
+      // INVERTED by plan 02 Phase 2.5: a write failure in one source is now
+      // isolated too, so the other sources still refresh.
+      await expect(refreshAllDataFromAPI()).resolves.toBeDefined();
+
+      expect(rewardsRepository.rewardsRepository.insertManyUnsafe).toHaveBeenCalled();
     });
   });
 
