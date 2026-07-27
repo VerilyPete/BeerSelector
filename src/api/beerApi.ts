@@ -3,8 +3,9 @@ import { isBeer } from '../types/beer';
 import { Reward } from '../types/database';
 import { getPreference } from '../database/preferences';
 import { config } from '../config';
-import { toNonEmpty } from './fetchOutcome';
-import type { FetchOutcome, FetchedSource, UnavailableReason } from './fetchOutcome';
+import { HttpError, toNonEmpty } from './fetchOutcome';
+import { createErrorResponse } from '../utils/notificationUtils';
+import type { FetchOutcome, UnavailableReason, UnconditionalSource } from './fetchOutcome';
 
 /**
  * Helper function to retry fetch operations with exponential backoff
@@ -40,7 +41,7 @@ export const fetchWithRetry = async (
     const response = await fetch(url, { signal: controller.signal });
 
     if (!response.ok) {
-      throw new Error(`Failed to fetch: ${response.status} ${response.statusText}`);
+      throw new HttpError(response.status, response.statusText);
     }
 
     return await response.json();
@@ -87,7 +88,7 @@ export const fetchWithRetry = async (
 const unavailable = <T>(
   code: UnavailableReason['code'],
   detail: string
-): FetchedSource<FetchOutcome<T>> => ({ status: 'unavailable', reason: { code, detail } });
+): UnconditionalSource<FetchOutcome<T>> => ({ status: 'unavailable', reason: { code, detail } });
 
 /**
  * A usable member API URL, or the reason there is not one.
@@ -154,7 +155,7 @@ const resolveMemberApiUrl = async (subject: string): Promise<MemberApiUrl> => {
 const fromArray = <T>(
   items: readonly T[],
   malformedDetail: string
-): FetchedSource<FetchOutcome<T>> =>
+): UnconditionalSource<FetchOutcome<T>> =>
   fetched(
     toNonEmpty(items) === null
       ? { kind: 'malformed', detail: malformedDetail }
@@ -162,12 +163,27 @@ const fromArray = <T>(
   );
 
 /**
+ * Build a `failed` outcome from a thrown transport error.
+ *
+ * The `failed` arm has existed since 02 Phase 1 and nothing constructed it: all
+ * three fetchers ended in `catch { throw }`, so offline, HTTP-error and timeout
+ * cases left by the exception path and the consumers' exhaustive handling was
+ * bypassed for the most common real-world failure. Callers were safe — they all
+ * have catches — but got a string to re-parse instead of the typed error the
+ * union exists to carry.
+ */
+const failed = <T>(error: unknown): UnconditionalSource<FetchOutcome<T>> => ({
+  status: 'failed',
+  error: createErrorResponse(error),
+});
+
+/**
  * Wrap a payload outcome as a completed request.
  *
  * `etag: null` because only the all-beers proxy path carries ETags, and it
  * handles them separately — these three functions never produce one.
  */
-const fetched = <T>(data: FetchOutcome<T>): FetchedSource<FetchOutcome<T>> => ({
+const fetched = <T>(data: FetchOutcome<T>): UnconditionalSource<FetchOutcome<T>> => ({
   status: 'fetched',
   data,
   etag: null,
@@ -177,7 +193,7 @@ const fetched = <T>(data: FetchOutcome<T>): FetchedSource<FetchOutcome<T>> => ({
  * Fetch all beers from the Flying Saucer API
  * @returns Promise with array of Beer objects
  */
-export const fetchBeersFromAPI = async (): Promise<FetchedSource<FetchOutcome<Beer>>> => {
+export const fetchBeersFromAPI = async (): Promise<UnconditionalSource<FetchOutcome<Beer>>> => {
   try {
     // Get the API endpoint from preferences
     const apiUrl = await getPreference('all_beers_api_url');
@@ -258,10 +274,16 @@ export const fetchBeersFromAPI = async (): Promise<FetchedSource<FetchOutcome<Be
     }
 
     console.error('Could not find beer data in API response');
-    throw new Error('Invalid response format from API');
+    // A body ARRIVED and could not be used — a fact about the body, not the
+    // request, so `malformed` rather than `failed`. Also not retryable: the same
+    // request returns the same unusable body.
+    return fetched({
+      kind: 'malformed',
+      detail: 'response contained no recognisable beer array',
+    });
   } catch (error) {
     console.error('Error fetching beers from API:', error);
-    throw error;
+    return failed(error);
   }
 };
 
@@ -280,7 +302,9 @@ export const fetchBeersFromAPI = async (): Promise<FetchedSource<FetchOutcome<Be
  *
  * @returns Promise with array of Beerfinder (tasted beer) objects
  */
-export const fetchMyBeersFromAPI = async (): Promise<FetchedSource<FetchOutcome<Beerfinder>>> => {
+export const fetchMyBeersFromAPI = async (): Promise<
+  UnconditionalSource<FetchOutcome<Beerfinder>>
+> => {
   try {
     const resolved = await resolveMemberApiUrl('tasted beers');
     if (!resolved.ok) {
@@ -375,10 +399,13 @@ export const fetchMyBeersFromAPI = async (): Promise<FetchedSource<FetchOutcome<
     }
 
     console.error('DB: Invalid response format from My Beers API');
-    throw new Error('Invalid response format from My Beers API');
+    return fetched({
+      kind: 'malformed',
+      detail: 'response contained no tasted_brew_current_round array',
+    });
   } catch (error) {
     console.error('DB: Error fetching My Beers from API:', error);
-    throw error;
+    return failed(error);
   }
 };
 
@@ -386,7 +413,7 @@ export const fetchMyBeersFromAPI = async (): Promise<FetchedSource<FetchOutcome<
  * Fetch user's rewards from the Flying Saucer API
  * @returns Promise with array of Reward objects
  */
-export const fetchRewardsFromAPI = async (): Promise<FetchedSource<FetchOutcome<Reward>>> => {
+export const fetchRewardsFromAPI = async (): Promise<UnconditionalSource<FetchOutcome<Reward>>> => {
   try {
     const resolved = await resolveMemberApiUrl('rewards');
     if (!resolved.ok) {
@@ -407,9 +434,12 @@ export const fetchRewardsFromAPI = async (): Promise<FetchedSource<FetchOutcome<
       );
     }
 
-    throw new Error('Invalid response format from Rewards API');
+    return fetched({
+      kind: 'malformed',
+      detail: 'response contained no reward array',
+    });
   } catch (error) {
     console.error('Error fetching Rewards from API:', error);
-    throw error;
+    return failed(error);
   }
 };

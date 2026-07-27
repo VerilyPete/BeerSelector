@@ -153,7 +153,9 @@ describe('Beer API', () => {
 
       const resultPromise = fetchWithRetry(config.api.baseUrl, 1, 10);
 
-      await expect(resultPromise).rejects.toThrow('Failed to fetch: 404 Not Found');
+      // HttpError, so createErrorResponse classifies by type rather than reading
+      // 'Failed to fetch' out of the message and calling it a network error.
+      await expect(resultPromise).rejects.toThrow('HTTP 404 Not Found');
     });
   });
 
@@ -210,7 +212,7 @@ describe('Beer API', () => {
       if (body.kind === 'data') expect(body.items).toEqual(mockBeers);
     });
 
-    it('should throw error when no beer data found in response', async () => {
+    it('reports malformed when no beer data is found in the response', async () => {
       const mockResponse = { someOtherData: 'value' };
 
       (preferences.getPreference as jest.Mock).mockResolvedValue(config.api.baseUrl);
@@ -219,17 +221,20 @@ describe('Beer API', () => {
         json: async () => mockResponse,
       });
 
-      await expect(fetchBeersFromAPI()).rejects.toThrow('Invalid response format from API');
+      // INVERTED by plan 05 Phase 5.3. A body arrived and was unusable, which is
+      // `fetched` + `malformed` — a fact about the body, not the request.
+      expect(payload(await fetchBeersFromAPI()).kind).toBe('malformed');
     });
 
-    it('should propagate fetch errors', async () => {
+    it('reports failed when the fetch rejects', async () => {
       (preferences.getPreference as jest.Mock).mockResolvedValue(config.api.baseUrl);
       // Mock fetch to always reject
       (global.fetch as jest.Mock).mockImplementation(() =>
         Promise.reject(new Error('Network error'))
       );
 
-      await expect(fetchBeersFromAPI()).rejects.toThrow('Network error');
+      // INVERTED by plan 05 Phase 5.3: transport failures arrive as `failed`.
+      expect((await fetchBeersFromAPI()).status).toBe('failed');
     });
   });
 
@@ -386,7 +391,7 @@ describe('Beer API', () => {
       expect(filtered.items[1].id).toBe('2');
     });
 
-    it('should throw error on invalid response format', async () => {
+    it('reports malformed on an invalid response format', async () => {
       const mockResponse = { someOtherData: 'value' };
 
       (preferences.getPreference as jest.Mock).mockImplementation((key: string) => {
@@ -400,12 +405,11 @@ describe('Beer API', () => {
         json: async () => mockResponse,
       });
 
-      await expect(fetchMyBeersFromAPI()).rejects.toThrow(
-        'Invalid response format from My Beers API'
-      );
+      // INVERTED by plan 05 Phase 5.3.
+      expect(payload(await fetchMyBeersFromAPI()).kind).toBe('malformed');
     });
 
-    it('should propagate fetch errors', async () => {
+    it('reports failed when the fetch rejects', async () => {
       (preferences.getPreference as jest.Mock).mockImplementation((key: string) => {
         if (key === 'is_visitor_mode') return Promise.resolve('false');
         if (key === 'my_beers_api_url')
@@ -417,7 +421,8 @@ describe('Beer API', () => {
         Promise.reject(new Error('Network error'))
       );
 
-      await expect(fetchMyBeersFromAPI()).rejects.toThrow('Network error');
+      // INVERTED by plan 05 Phase 5.3.
+      expect((await fetchMyBeersFromAPI()).status).toBe('failed');
     });
   });
 
@@ -473,7 +478,7 @@ describe('Beer API', () => {
       expect(preferences.getPreference).toHaveBeenCalledWith('my_beers_api_url');
     });
 
-    it('should throw error on invalid response format', async () => {
+    it('reports malformed on an invalid response format', async () => {
       const mockResponse = { someOtherData: 'value' };
 
       (preferences.getPreference as jest.Mock).mockImplementation((key: string) => {
@@ -487,12 +492,11 @@ describe('Beer API', () => {
         json: async () => mockResponse,
       });
 
-      await expect(fetchRewardsFromAPI()).rejects.toThrow(
-        'Invalid response format from Rewards API'
-      );
+      // INVERTED by plan 05 Phase 5.3.
+      expect(payload(await fetchRewardsFromAPI()).kind).toBe('malformed');
     });
 
-    it('should propagate fetch errors', async () => {
+    it('reports failed when the fetch rejects', async () => {
       (preferences.getPreference as jest.Mock).mockImplementation((key: string) => {
         if (key === 'is_visitor_mode') return Promise.resolve('false');
         if (key === 'my_beers_api_url')
@@ -504,7 +508,8 @@ describe('Beer API', () => {
         Promise.reject(new Error('Network error'))
       );
 
-      await expect(fetchRewardsFromAPI()).rejects.toThrow('Network error');
+      // INVERTED by plan 05 Phase 5.3.
+      expect((await fetchRewardsFromAPI()).status).toBe('failed');
     });
   });
 
