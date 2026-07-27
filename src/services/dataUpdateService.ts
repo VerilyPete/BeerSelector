@@ -12,6 +12,7 @@ import { beerRepository } from '../database/repositories/BeerRepository';
 import { myBeersRepository } from '../database/repositories/MyBeersRepository';
 import { rewardsRepository } from '../database/repositories/RewardsRepository';
 import { databaseLockManager } from '../database/DatabaseLockManager';
+import { toNonEmpty } from '../api/fetchOutcome';
 import { validateBrewInStockResponse, validateBeerArray } from '../api/validators';
 import { logError, logWarning } from '../utils/errorLogger';
 import { calculateContainerTypes } from '../database/utils/glassTypeCalculator';
@@ -317,8 +318,13 @@ export async function fetchAndUpdateAllBeers(): Promise<DataUpdateResult> {
     console.log('Calculating container types for beers...');
     const beersWithContainerTypes = calculateContainerTypes(validationResult.validBeers);
 
-    // Update the database with valid beers including container types
-    await beerRepository.insertMany(beersWithContainerTypes);
+    // Upstream validation has already rejected an empty taplist, so a null
+    // here would be a logic error rather than a server condition.
+    const beersToInsert = toNonEmpty(beersWithContainerTypes);
+    if (beersToInsert === null) {
+      throw new Error('No valid beers to insert after container-type calculation');
+    }
+    await beerRepository.insertMany(beersToInsert);
 
     // Store ETag for future conditional requests
     if (etag) {
@@ -506,8 +512,9 @@ export async function fetchAndUpdateMyBeers(): Promise<DataUpdateResult> {
       console.log(
         'Empty tasted beers array - user has no tasted beers in current round (new user or round rollover at 200 beers), clearing database'
       );
-      // Clear the database table since there are no beers
-      await myBeersRepository.insertMany([]);
+      // A confirmed-empty round: the server really did report zero tasted
+      // beers. Emptying is correct here, and now says so explicitly.
+      await myBeersRepository.replaceAllWithEmpty();
 
       // Update the last update timestamp
       await setPreference('my_beers_last_update', new Date().toISOString());
@@ -528,19 +535,20 @@ export async function fetchAndUpdateMyBeers(): Promise<DataUpdateResult> {
     );
 
     if (validBeers.length === 0) {
-      console.log('No valid beers with IDs found, but API returned data - clearing database');
-      // This means all beers in the response are invalid, so clear the database
-      await myBeersRepository.insertMany([]);
-
-      // Update the last update timestamp
-      await setPreference('my_beers_last_update', new Date().toISOString());
-      await setPreference('my_beers_last_check', new Date().toISOString());
-
-      console.log('Updated my beers data with 0 beers (all invalid)');
+      // The API returned rows and every one lacked an id — malformed, NOT an
+      // empty round. Leave the table alone and report failure. Writing here is
+      // what wiped a populated tasted list; stamping the timestamps then hid it
+      // for 12 hours. Phase 4 owns the surrounding semantics.
+      console.error(
+        `Refusing to write my beers: all ${myBeers.length} rows from the API lack an id`
+      );
       return {
-        success: true,
-        dataUpdated: true,
+        success: false,
+        dataUpdated: false,
         itemCount: 0,
+        error: createErrorResponse(
+          new Error(`All ${myBeers.length} tasted beers from the API lack an id`)
+        ),
       };
     }
 
@@ -587,8 +595,14 @@ export async function fetchAndUpdateMyBeers(): Promise<DataUpdateResult> {
     console.log('Calculating container types for tasted beers...');
     const beersWithContainerTypes = calculateContainerTypes(beersForContainerCalc);
 
-    // Update the database with the valid beers including container types and enrichment
-    await myBeersRepository.insertMany(beersWithContainerTypes as BeerfinderWithContainerType[]);
+    // toNonEmpty replaces a type assertion here, and validBeers.length was
+    // already checked above, so null means the container-type step dropped
+    // everything — a logic error worth surfacing rather than a silent clear.
+    const myBeersToInsert = toNonEmpty(beersWithContainerTypes as BeerfinderWithContainerType[]);
+    if (myBeersToInsert === null) {
+      throw new Error('No valid tasted beers to insert after container-type calculation');
+    }
+    await myBeersRepository.insertMany(myBeersToInsert);
 
     // Update the last update timestamp
     await setPreference('my_beers_last_update', new Date().toISOString());
@@ -764,7 +778,11 @@ export async function sequentialRefreshAllData(): Promise<ManualRefreshResult> {
         console.log('Sequential refresh: calculating container types for beers...');
         const beersWithContainerTypes = calculateContainerTypes(validationResult.validBeers);
 
-        await beerRepository.insertManyUnsafe(beersWithContainerTypes);
+        const sequentialBeers = toNonEmpty(beersWithContainerTypes);
+        if (sequentialBeers === null) {
+          throw new Error('No valid beers to insert after container-type calculation');
+        }
+        await beerRepository.insertManyUnsafe(sequentialBeers);
 
         // Store ETag for future conditional requests
         if (etag) {
@@ -849,10 +867,16 @@ export async function sequentialRefreshAllData(): Promise<ManualRefreshResult> {
       console.log('Sequential refresh: calculating container types for my beers...');
       const myBeersWithContainerTypes = calculateContainerTypes(beersForContainerCalc);
 
-      // Allow empty myBeers array (user may have no tasted beers)
-      await myBeersRepository.insertManyUnsafe(
+      // An empty tasted list is legitimate, but it must be stated rather than
+      // inferred from an array that happens to be empty.
+      const sequentialMyBeers = toNonEmpty(
         myBeersWithContainerTypes as BeerfinderWithContainerType[]
       );
+      if (sequentialMyBeers === null) {
+        await myBeersRepository.replaceAllWithEmptyUnsafe();
+      } else {
+        await myBeersRepository.insertManyUnsafe(sequentialMyBeers);
+      }
       await setPreference('my_beers_last_update', new Date().toISOString());
       await setPreference('my_beers_last_check', new Date().toISOString());
       myBeersResult = {
@@ -1154,7 +1178,11 @@ export const refreshAllDataFromAPI = async (): Promise<{
       console.log('Calculating container types for all beers...');
       allBeersWithContainerTypes = calculateContainerTypes(allBeersValidation.validBeers);
 
-      await beerRepository.insertManyUnsafe(allBeersWithContainerTypes);
+      const apiBeersToInsert = toNonEmpty(allBeersWithContainerTypes);
+      if (apiBeersToInsert === null) {
+        throw new Error('No valid all beers to insert after container-type calculation');
+      }
+      await beerRepository.insertManyUnsafe(apiBeersToInsert);
 
       // Store ETag for future conditional requests
       if (etag) {
@@ -1216,9 +1244,12 @@ export const refreshAllDataFromAPI = async (): Promise<{
     console.log('Calculating container types for my beers...');
     const myBeersWithContainerTypes = calculateContainerTypes(myBeersForContainerCalc);
 
-    await myBeersRepository.insertManyUnsafe(
-      myBeersWithContainerTypes as BeerfinderWithContainerType[]
-    );
+    const apiMyBeers = toNonEmpty(myBeersWithContainerTypes as BeerfinderWithContainerType[]);
+    if (apiMyBeers === null) {
+      await myBeersRepository.replaceAllWithEmptyUnsafe();
+    } else {
+      await myBeersRepository.insertManyUnsafe(apiMyBeers);
+    }
 
     console.log('Fetching rewards from API...');
     const rewards = await fetchRewardsFromAPI();

@@ -22,6 +22,8 @@ jest.mock('../../database/repositories/BeerRepository', () => ({
 jest.mock('../../database/repositories/MyBeersRepository', () => ({
   myBeersRepository: {
     insertMany: jest.fn(),
+    replaceAllWithEmpty: jest.fn(),
+    replaceAllWithEmptyUnsafe: jest.fn(),
   },
 }));
 
@@ -375,8 +377,10 @@ describe('dataUpdateService integration tests', () => {
       // Verify that fetch was called
       expect(global.fetch).toHaveBeenCalled();
 
-      // Verify that myBeersRepository.insertMany was called with empty array
-      expect(myBeersRepository.insertMany).toHaveBeenCalledWith([]);
+      // INVERTED by plan 02 Phase 2: a genuine empty round is now stated
+      // explicitly rather than inferred from an empty array.
+      expect(myBeersRepository.replaceAllWithEmpty).toHaveBeenCalled();
+      expect(myBeersRepository.insertMany).not.toHaveBeenCalled();
 
       // Verify that setPreference was called to update timestamps
       expect(setPreference).toHaveBeenCalledWith('my_beers_last_update', expect.any(String));
@@ -405,20 +409,25 @@ describe('dataUpdateService integration tests', () => {
       // Call the function
       const result = await fetchAndUpdateMyBeers();
 
-      // Verify the result - should now succeed with 0 items
-      expect(result.success).toBe(true);
-      expect(result.dataUpdated).toBe(true);
+      // INVERTED by plan 02 Phase 2. Rows that all lack an id are MALFORMED,
+      // not an empty round — the old behaviour wiped a populated tasted list
+      // and reported success.
+      expect(result.success).toBe(false);
+      expect(result.dataUpdated).toBe(false);
       expect(result.itemCount).toBe(0);
 
       // Verify that fetch was called
       expect(global.fetch).toHaveBeenCalled();
 
-      // Verify that myBeersRepository.insertMany was called with empty array
-      expect(myBeersRepository.insertMany).toHaveBeenCalledWith([]);
+      // Nothing was written, in either shape
+      expect(myBeersRepository.insertMany).not.toHaveBeenCalled();
+      expect(myBeersRepository.replaceAllWithEmpty).not.toHaveBeenCalled();
 
       // Verify that setPreference was called to update timestamps
-      expect(setPreference).toHaveBeenCalledWith('my_beers_last_update', expect.any(String));
-      expect(setPreference).toHaveBeenCalledWith('my_beers_last_check', expect.any(String));
+      // And crucially NOT stamped: stamping the timestamps after a malformed
+      // response is what hid the wiped list for the next 12 hours.
+      expect(setPreference).not.toHaveBeenCalledWith('my_beers_last_update', expect.any(String));
+      expect(setPreference).not.toHaveBeenCalledWith('my_beers_last_check', expect.any(String));
     });
 
     it('should handle fetch throwing an exception', async () => {

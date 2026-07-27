@@ -6,6 +6,8 @@
 import { BeerRepository } from '../BeerRepository';
 import { Beer, BeerWithContainerType } from '../../../types/beer';
 import * as connection from '../../connection';
+import { toNonEmpty } from '../../../api/fetchOutcome';
+import type { NonEmptyArray } from '../../../api/fetchOutcome';
 import { databaseLockManager } from '../../locks';
 
 // Mock the database connection module
@@ -62,6 +64,17 @@ function createRepository(): BeerRepository {
   return new BeerRepository();
 }
 
+/**
+ * Narrow a literal fixture array for the NonEmptyArray-typed repository
+ * signatures. Throws rather than asserting, so a fixture that is accidentally
+ * empty fails loudly instead of lying to the type system.
+ */
+function nel<T>(items: readonly T[]): NonEmptyArray<T> {
+  const narrowed = toNonEmpty(items);
+  if (narrowed === null) throw new Error('fixture array was unexpectedly empty');
+  return narrowed;
+}
+
 describe('BeerRepository', () => {
   describe('insertMany', () => {
     it('should insert multiple beers in batches', async () => {
@@ -93,7 +106,7 @@ describe('BeerRepository', () => {
 
       mockDatabase.getFirstAsync.mockResolvedValue({ count: 0 });
 
-      await repository.insertMany(beers);
+      await repository.insertMany(nel(beers));
 
       // Should call getDatabase
       expect(connection.getDatabase).toHaveBeenCalled();
@@ -143,7 +156,7 @@ describe('BeerRepository', () => {
 
       mockDatabase.getFirstAsync.mockResolvedValue({ count: 0 });
 
-      await repository.insertMany(beers);
+      await repository.insertMany(nel(beers));
 
       // Should only insert the valid beers (2 beers)
       const insertCalls = mockDatabase.statement.executeAsync.mock.calls;
@@ -168,7 +181,7 @@ describe('BeerRepository', () => {
 
       mockDatabase.getFirstAsync.mockResolvedValue({ count: 0 });
 
-      await repository.insertMany(beers);
+      await repository.insertMany(nel(beers));
 
       // The batch loop now paces progress logging only — the whole import runs
       // in ONE exclusive transaction, so there is no per-batch commit seam.
@@ -180,20 +193,19 @@ describe('BeerRepository', () => {
       expect(mockDatabase.statement.executeAsync).toHaveBeenCalledTimes(120);
     });
 
-    it('should handle empty beer array', async () => {
+    // INVERTED by plan 02 Phase 2. Previously asserted that insertMany([])
+    // clears the taplist and inserts nothing. A store with zero beers is not a
+    // real state, so unlike MyBeersRepository there is deliberately no
+    // replaceAllWithEmpty here — the empty case is simply not expressible.
+    it('cannot be called with an empty beer array', async () => {
       const mockDatabase = createMockDatabase();
       (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
 
-      mockDatabase.getFirstAsync.mockResolvedValue({ count: 0 });
+      // @ts-expect-error an empty array is not a NonEmptyArray
+      await expect(repository.insertMany([])).rejects.toThrow();
 
-      await repository.insertMany([]);
-
-      // Should still clear the table
-      expect(mockDatabase.runAsync).toHaveBeenCalledWith('DELETE FROM allbeers');
-
-      // Should not insert any beers
-      expect(mockDatabase.statement.executeAsync).not.toHaveBeenCalled();
+      expect(mockDatabase.runAsync).not.toHaveBeenCalledWith('DELETE FROM allbeers');
     });
 
     it('should handle beers with optional fields missing', async () => {
@@ -213,7 +225,7 @@ describe('BeerRepository', () => {
 
       mockDatabase.getFirstAsync.mockResolvedValue({ count: 0 });
 
-      await repository.insertMany(beers);
+      await repository.insertMany(nel(beers));
 
       // Should insert beer with empty strings for missing fields and container_type
       expect(mockDatabase.statement.executeAsync).toHaveBeenCalledWith(
@@ -238,7 +250,7 @@ describe('BeerRepository', () => {
 
       mockDatabase.runAsync.mockRejectedValueOnce(new Error('Database error'));
 
-      await expect(repository.insertMany(beers)).rejects.toThrow('Database error');
+      await expect(repository.insertMany(nel(beers))).rejects.toThrow('Database error');
     });
   });
 
@@ -887,7 +899,7 @@ describe('BeerRepository', () => {
 
       mockDatabase.runAsync.mockRejectedValue(new Error('Database error'));
 
-      await expect(repository.insertMany(beers)).rejects.toThrow();
+      await expect(repository.insertMany(nel(beers))).rejects.toThrow();
 
       expect(databaseLockManager.isLocked()).toBe(false);
       expect(databaseLockManager.getQueueLength()).toBe(0);
@@ -908,7 +920,7 @@ describe('BeerRepository', () => {
         },
       ];
 
-      await repository.insertMany(beers);
+      await repository.insertMany(nel(beers));
 
       expect(databaseLockManager.isLocked()).toBe(false);
     });

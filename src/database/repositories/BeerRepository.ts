@@ -8,6 +8,7 @@
 import { Platform } from 'react-native';
 import { getDatabase } from '../connection';
 import { BeerWithContainerType } from '../../types/beer';
+import type { NonEmptyArray } from '../../api/fetchOutcome';
 import { databaseLockManager } from '../locks';
 import { toContentionError, withContentionMapping } from '../errors';
 import { withAtomicWrite } from '../transactions';
@@ -34,7 +35,7 @@ export class BeerRepository {
    *
    * @param beers - Array of BeerWithContainerType objects to insert
    */
-  async insertMany(beers: BeerWithContainerType[]): Promise<void> {
+  async insertMany(beers: NonEmptyArray<BeerWithContainerType>): Promise<void> {
     await databaseLockManager.withDatabaseLock('BeerRepository.insertMany', () =>
       withContentionMapping('allbeers import', () => this._insertManyInternal(beers))
     );
@@ -48,7 +49,7 @@ export class BeerRepository {
    *
    * @param beers - Array of BeerWithContainerType objects to insert
    */
-  async insertManyUnsafe(beers: BeerWithContainerType[]): Promise<void> {
+  async insertManyUnsafe(beers: NonEmptyArray<BeerWithContainerType>): Promise<void> {
     await withContentionMapping('allbeers import', () => this._insertManyInternal(beers));
   }
 
@@ -57,7 +58,16 @@ export class BeerRepository {
    *
    * @param beers - Array of BeerWithContainerType objects to insert
    */
-  private async _insertManyInternal(beers: BeerWithContainerType[]): Promise<void> {
+  private async _insertManyInternal(beers: NonEmptyArray<BeerWithContainerType>): Promise<void> {
+    // Belt and braces with the NonEmptyArray signature. The type stops this at
+    // compile time, but this is the destructive path — a caller that casts past
+    // the type would otherwise run the DELETE and insert nothing, wiping the
+    // taplist. Unlike the tasted table there is no legitimate empty state here,
+    // so there is no replaceAllWithEmpty to redirect to.
+    if (beers.length === 0) {
+      throw new Error('Refusing to replace the taplist with an empty beer list');
+    }
+
     const database = await getDatabase();
 
     console.log(`Starting import of ${beers.length} beers...`);
