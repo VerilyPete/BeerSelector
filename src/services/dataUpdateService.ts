@@ -867,15 +867,27 @@ export async function sequentialRefreshAllData(): Promise<ManualRefreshResult> {
       console.log('Sequential refresh: calculating container types for my beers...');
       const myBeersWithContainerTypes = calculateContainerTypes(beersForContainerCalc);
 
-      // An empty tasted list is legitimate, but it must be stated rather than
-      // inferred from an array that happens to be empty.
+      // Two DIFFERENT conditions, which a bare [] cannot tell apart.
+      // fetchMyBeersFromAPI collapses five of them into an empty array —
+      // visitor mode, no URL, a none:// URL, a genuine empty round, and rows
+      // that all lack an id — and validateBeerArray drops id-less rows, so
+      // malformed data arrives here looking exactly like an empty round. Only
+      // the RAW length distinguishes them, so the split has to happen here.
       const sequentialMyBeers = toNonEmpty(
         myBeersWithContainerTypes as BeerfinderWithContainerType[]
       );
-      if (sequentialMyBeers === null) {
+      if (sequentialMyBeers !== null) {
+        await myBeersRepository.insertManyUnsafe(sequentialMyBeers);
+      } else if (myBeers.length === 0) {
+        // The server really did report zero tasted beers.
         await myBeersRepository.replaceAllWithEmptyUnsafe();
       } else {
-        await myBeersRepository.insertManyUnsafe(sequentialMyBeers);
+        // Rows arrived and none survived validation: malformed, not empty.
+        // Leave the table alone and report failure rather than wiping a
+        // populated tasted list and stamping over it for 12 hours.
+        throw new Error(
+          `All ${myBeers.length} tasted beers from the API lack an id; refusing to write`
+        );
       }
       await setPreference('my_beers_last_update', new Date().toISOString());
       await setPreference('my_beers_last_check', new Date().toISOString());
@@ -1244,11 +1256,20 @@ export const refreshAllDataFromAPI = async (): Promise<{
     console.log('Calculating container types for my beers...');
     const myBeersWithContainerTypes = calculateContainerTypes(myBeersForContainerCalc);
 
+    // Same split as sequentialRefreshAllData: only the RAW length can tell a
+    // genuine empty round from a response whose every row lacked an id.
     const apiMyBeers = toNonEmpty(myBeersWithContainerTypes as BeerfinderWithContainerType[]);
-    if (apiMyBeers === null) {
+    if (apiMyBeers !== null) {
+      await myBeersRepository.insertManyUnsafe(apiMyBeers);
+    } else if (myBeersRaw.length === 0) {
       await myBeersRepository.replaceAllWithEmptyUnsafe();
     } else {
-      await myBeersRepository.insertManyUnsafe(apiMyBeers);
+      // This is the autoLogin -> CHECK IN path, so aborting here would fail a
+      // check-in. Skipping the write is the lesser harm: a stale tasted list
+      // beats a wiped one. Per-source reporting is 02 Phase 2.5's job.
+      console.error(
+        `Refusing to write my beers: all ${myBeersRaw.length} rows from the API lack an id`
+      );
     }
 
     console.log('Fetching rewards from API...');

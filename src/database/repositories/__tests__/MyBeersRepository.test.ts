@@ -706,6 +706,64 @@ describe('MyBeersRepository', () => {
     });
   });
 
+  describe('lock discipline', () => {
+    // Nothing previously pinned this: the tests asserted the METHOD NAME, not
+    // that a lock was or was not taken, so swapping the two bodies left every
+    // assertion holding. The convention is unenforced by the lock manager, and
+    // 01 Phase 6 removes the hold timeout that currently rescues a mistake —
+    // after which calling the locked variant from inside the master lock would
+    // wedge permanently.
+    it('replaceAllWithEmpty takes the master lock', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      const lockSpy = jest.spyOn(databaseLockManager, 'withDatabaseLock');
+
+      await createRepository().replaceAllWithEmpty();
+
+      expect(lockSpy).toHaveBeenCalledWith(
+        'MyBeersRepository.replaceAllWithEmpty',
+        expect.any(Function)
+      );
+      lockSpy.mockRestore();
+    });
+
+    it('replaceAllWithEmptyUnsafe does NOT take the master lock', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      const lockSpy = jest.spyOn(databaseLockManager, 'withDatabaseLock');
+
+      await createRepository().replaceAllWithEmptyUnsafe();
+
+      // Its callers already hold it; acquiring again would queue behind their
+      // own live grant.
+      expect(lockSpy).not.toHaveBeenCalled();
+      lockSpy.mockRestore();
+    });
+
+    it('insertManyUnsafe does NOT take the master lock', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      const lockSpy = jest.spyOn(databaseLockManager, 'withDatabaseLock');
+
+      await createRepository().insertManyUnsafe(
+        nel([
+          {
+            id: '1',
+            brew_name: 'B',
+            brewer: 'X',
+            container_type: 'pint',
+            abv: null,
+            enrichment_confidence: null,
+            enrichment_source: null,
+          },
+        ])
+      );
+
+      expect(lockSpy).not.toHaveBeenCalled();
+      lockSpy.mockRestore();
+    });
+  });
+
   describe('replaceAllWithEmpty', () => {
     // Emptying the tasted table is legitimate — a new user, or the round
     // rollover at 200 beers. It just has to be asked for explicitly rather than
