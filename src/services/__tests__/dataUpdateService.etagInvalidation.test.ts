@@ -26,6 +26,8 @@ import { beerRepository } from '../../database/repositories/BeerRepository';
 import { fetchBeersFromProxy } from '../enrichmentService';
 import { config } from '@/src/config';
 import { fetchedRows, unavailable } from '../../api/__tests__/helpers/fetchOutcomeFixtures';
+import { databaseLockManager } from '../../database/DatabaseLockManager';
+import { ApiErrorType } from '../../utils/notificationUtils';
 
 jest.mock('../../database/preferences', () => ({
   getPreference: jest.fn(),
@@ -107,12 +109,19 @@ const freshnessStamps = (): unknown[] =>
 const clearBeforeInsert = (): boolean => {
   const setPreferenceMock = setPreference as jest.Mock;
   const insertOrder = (beerRepository.insertManyUnsafe as jest.Mock).mock.invocationCallOrder[0];
-  if (insertOrder === undefined) return false;
+  // Bounded BELOW by the fetch, not just above by the insert. Accepting any
+  // earlier clear made this green for the wrong reason: `manualRefreshAllData`
+  // emits its own escape-hatch clear before the fetch, so the helper could be
+  // satisfied by a clear this writer never made. The writer's pre-clear is the
+  // one that lands between fetching the taplist and storing it.
+  const fetchOrder = (fetchBeersFromProxy as jest.Mock).mock.invocationCallOrder[0];
+  if (insertOrder === undefined || fetchOrder === undefined) return false;
 
   return setPreferenceMock.mock.calls.some(
     (call: unknown[], index: number) =>
       call[0] === 'all_beers_etag' &&
       call[1] === '' &&
+      setPreferenceMock.mock.invocationCallOrder[index] > fetchOrder &&
       setPreferenceMock.mock.invocationCallOrder[index] < insertOrder
   );
 };
@@ -236,6 +245,12 @@ describe('taplist ETag invalidation', () => {
     // and the login one.
     expect(result.success).toBe(false);
     expect(freshnessStamps()).toHaveLength(0);
+    // The TYPE and wording, not merely "a failure". Every caller turns a throw
+    // into `success: false` too, so without this the test passes when the
+    // backstop path explodes — the same defect this file fixed one test above
+    // and reintroduced in its three siblings.
+    expect(result.error?.type).toBe(ApiErrorType.VALIDATION_ERROR);
+    expect(result.error?.message).toContain('no beers are stored');
   });
 
   it('refuses to believe a 304 with an empty table — manual refresh', async () => {
@@ -255,6 +270,9 @@ describe('taplist ETag invalidation', () => {
 
     expect(etagWrites()).toContain('');
     expect(result.allBeersResult.success).toBe(false);
+    expect(freshnessStamps()).toHaveLength(0);
+    expect(result.allBeersResult.error?.type).toBe(ApiErrorType.VALIDATION_ERROR);
+    expect(result.allBeersResult.error?.message).toContain('no beers are stored');
   });
 
   it('refuses to believe a 304 with an empty table — login', async () => {
@@ -274,6 +292,62 @@ describe('taplist ETag invalidation', () => {
 
     expect(etagWrites()).toContain('');
     expect(freshnessStamps()).toHaveLength(0);
+  });
+
+  it('keeps the stored ETag when the beer count cannot be read', async () => {
+    // `null` is "cannot tell", and the two wrong answers are both silent.
+    // Treating it as empty destroys a valid validator; treating it as trusted
+    // stamps last_check and reports success, which suppresses the next refresh
+    // for hours — and the likeliest cause of an unreadable count is a missing or
+    // corrupt `allbeers` table, i.e. exactly the state the backstop is for.
+    // Neither: keep the validator, stamp nothing, report the failure.
+    (beerRepository.count as jest.Mock).mockResolvedValue(null);
+    jest
+      .spyOn(config, 'enrichment', 'get')
+      .mockReturnValue({ ...config.enrichment, isConfigured: () => true });
+    (fetchBeersFromProxy as jest.Mock).mockResolvedValue({
+      beers: [],
+      storeId: '13879',
+      source: 'live',
+      etag: 'W/"old"',
+      notModified: true,
+    });
+
+    const result = await svc.fetchAndUpdateAllBeers();
+
+    expect(etagWrites()).toHaveLength(0);
+    expect(freshnessStamps()).toHaveLength(0);
+    expect(result.success).toBe(false);
+    expect(result.error?.message).toContain('could not be read');
+  });
+
+  it('takes the write lock before deciding a 304 is unbelievable', async () => {
+    // The count and the clear must be atomic. Reading the count outside the lock
+    // and clearing inside it grew the window between them from one await to a
+    // 30s lock acquisition — spent waiting on the writer most likely to fill the
+    // table — so a concurrent refresh could commit a full taplist and a valid
+    // ETag in the gap and have it cleared.
+    (beerRepository.count as jest.Mock).mockResolvedValue(0);
+    jest
+      .spyOn(config, 'enrichment', 'get')
+      .mockReturnValue({ ...config.enrichment, isConfigured: () => true });
+    (fetchBeersFromProxy as jest.Mock).mockResolvedValue({
+      beers: [],
+      storeId: '13879',
+      source: 'live',
+      etag: 'W/"old"',
+      notModified: true,
+    });
+
+    await svc.fetchAndUpdateAllBeers();
+
+    const lockedOperations = (databaseLockManager.withDatabaseLock as jest.Mock).mock.calls.map(
+      ([name]) => name
+    );
+    expect(lockedOperations).toContain('all-beers-etag-invalidate');
+    expect((beerRepository.count as jest.Mock).mock.invocationCallOrder[0]).toBeGreaterThan(
+      (databaseLockManager.withDatabaseLock as jest.Mock).mock.invocationCallOrder[0]
+    );
   });
 
   it('honours a 304 when the table actually holds rows', async () => {

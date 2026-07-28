@@ -14,6 +14,7 @@ import { toContentionError, withContentionMapping } from '../errors';
 import { withAtomicWrite } from '../transactions';
 import { isAllBeersRow, allBeersRowToBeerWithContainerType, AllBeersRow } from '../schemaTypes';
 import { EnrichmentUpdate } from '../../types/enrichment';
+import { logError } from '../../utils/errorLogger';
 
 /**
  * Repository class for Beer entity operations
@@ -187,7 +188,7 @@ export class BeerRepository {
       );
       return row?.count ?? null;
     } catch (error) {
-      console.error('[BeerRepository] count failed:', error);
+      logError(error, { operation: 'count', component: 'BeerRepository' });
       return null;
     }
   }

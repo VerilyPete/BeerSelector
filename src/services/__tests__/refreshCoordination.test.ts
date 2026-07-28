@@ -215,6 +215,9 @@ describe('Sequential Refresh Coordination', () => {
 
       releaseInFlight();
       await Promise.all([focusRefresh, forced]);
+      // Guard the tick budget above: if the forced refresh never reached the
+      // join, this test proves nothing and would pass vacuously.
+      expect((fetchBeersFromAPI as jest.Mock).mock.calls.length).toBeGreaterThan(callsBefore);
 
       // Three fetches: the priming refresh, the in-flight one, and the forced
       // one. Joining would give two, and the user's forced refresh would return
@@ -482,7 +485,14 @@ describe('Sequential Refresh Coordination', () => {
       const writeIndex = order.indexOf('write:allBeers');
       expect(timestampClears.length).toBeGreaterThan(0);
       expect(lastTimestampClear).toBeGreaterThan(writeIndex);
-      expect(order.slice(writeIndex, lastTimestampClear)).toContain('clear:all_beers_etag');
+      // Adjacency, restored. Dropping the hard-coded count of two was right;
+      // dropping adjacency with it was not — searching the whole span between
+      // the write and the timestamps is satisfied by the write burst's OWN
+      // post-commit clear, so the assertion survived moving the escape-hatch
+      // clear to before `settleInFlightRefresh`, which is precisely the mid-run
+      // clear this test exists to forbid. The escape-hatch clear is the one
+      // immediately preceding the timestamps it was written alongside.
+      expect(order[lastTimestampClear - 1]).toBe('clear:all_beers_etag');
     });
 
     it('re-stamps the timestamps it cleared', async () => {
