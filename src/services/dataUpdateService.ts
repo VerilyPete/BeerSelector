@@ -671,12 +671,16 @@ export async function fetchAndUpdateAllBeers(): Promise<DataUpdateResult> {
     if (beersToInsert === null) {
       throw new Error('No valid beers to insert after container-type calculation');
     }
-    // One critical section for the rows AND the ETag they imply. Previously
-    // `insertMany` took and released its own lock and the ETag write followed
-    // it unlocked, so a concurrent writer could land its rows in the gap and
-    // leave the table paired with this call's ETag — finding 7. Pairing is only
-    // sound if the two are one write.
+    // The lock excludes other lock-taking writers, which is what finding 7
+    // needed. It does NOT make these one write: `insertManyUnsafe` commits its
+    // own transaction and the ETag write is a separate one. Ordering is what
+    // makes that safe. Invalidating first means every interruption — a
+    // contention throw, process death, iOS suspending between the awaits —
+    // leaves a cleared ETag against either the old rows or the new ones, and
+    // both cost one full fetch. The reverse order strands the previous
+    // validator against replaced rows, and every later request 304s forever.
     await databaseLockManager.withDatabaseLock('all-beers-write', async () => {
+      await commitTaplistWrite({ kind: 'cleared' });
       await beerRepository.insertManyUnsafe(beersToInsert);
       await commitTaplistWrite(usedProxy ? { kind: 'proxy', etag } : { kind: 'fallback' });
     });
@@ -1307,6 +1311,11 @@ async function writeAllBeers(write: AllBeersWrite): Promise<DataUpdateResult> {
     return { success: true, dataUpdated: false };
   }
 
+  // Invalidate before replacing, commit after. See the same sequence in
+  // `fetchAndUpdateAllBeers`: the caller's lock excludes other writers but does
+  // not make these one transaction, so an interruption must leave a cleared
+  // ETag rather than the previous one against replaced rows.
+  await commitTaplistWrite({ kind: 'cleared' });
   await beerRepository.insertManyUnsafe(write.beers);
   await commitTaplistWrite(write.taplistSource);
 
@@ -1874,6 +1883,8 @@ async function writeAllBeersOnLogin(write: AllBeersWrite): Promise<DataUpdateRes
     return { success: true, dataUpdated: false };
   }
 
+  // Same invalidate-then-commit sequence as the other two writers.
+  await commitTaplistWrite({ kind: 'cleared' });
   await beerRepository.insertManyUnsafe(write.beers);
   await commitTaplistWrite(write.taplistSource);
   return { success: true, dataUpdated: true, itemCount: write.beers.length };
