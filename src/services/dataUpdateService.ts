@@ -72,6 +72,18 @@ const SEQUENTIAL_REFRESH = 'sequentialRefreshAllData';
 const REFRESH_FROM_API = 'refreshAllDataFromAPI';
 
 /**
+ * The only two values the shared `prepare*` phase may be labelled with.
+ *
+ * A bare `string` let a caller pass anything, and the label is interpolated as
+ * `${operation} - all beers` — so `prepareAllBeers('refreshAllDataFromAPI -
+ * rewards')` compiled and produced `refreshAllDataFromAPI - rewards - all
+ * beers`, and passing the wrong entry point's constant produced exactly the
+ * misdirection this threading exists to prevent. Two tests pin two of six
+ * emitting sites; the type covers all of them.
+ */
+type RefreshOperation = typeof SEQUENTIAL_REFRESH | typeof REFRESH_FROM_API;
+
+/**
  * How a caller wants to be treated when a refresh is already running.
  */
 type SequentialRefreshOptions = {
@@ -1141,7 +1153,7 @@ async function runSequentialRefresh(): Promise<ManualRefreshResult> {
     syncMissingBeersInBackground(
       pendingWorkerSync.missingIds,
       pendingWorkerSync.beers,
-      'sequentialRefresh'
+      SEQUENTIAL_REFRESH
     );
   }
 
@@ -1205,7 +1217,7 @@ async function applyPlan<TWrite>(
 /**
  * Fetch, validate and shape the taplist. No database access.
  */
-async function prepareAllBeers(operation: string): Promise<SourcePlan<AllBeersWrite>> {
+async function prepareAllBeers(operation: RefreshOperation): Promise<SourcePlan<AllBeersWrite>> {
   console.log(`[${operation}] fetching all beers`);
   try {
     // Get API URL to extract store ID for proxy
@@ -1291,7 +1303,7 @@ async function writeAllBeers(write: AllBeersWrite): Promise<DataUpdateResult> {
  * request inside the lock and forfeit most of this phase's benefit, since it is
  * the request over the largest id list.
  */
-async function prepareMyBeers(operation: string): Promise<MyBeersPreparation> {
+async function prepareMyBeers(operation: RefreshOperation): Promise<MyBeersPreparation> {
   console.log(`[${operation}] fetching my beers`);
   let workerSync: PendingWorkerSync | null = null;
   try {
@@ -1358,9 +1370,7 @@ async function prepareMyBeers(operation: string): Promise<MyBeersPreparation> {
     if (config.enrichment.isConfigured() && validationResult.validBeers.length > 0) {
       try {
         const beerIds = validationResult.validBeers.map(beer => beer.id);
-        console.log(
-          `[sequentialRefresh] Fetching enrichment for ${beerIds.length} tasted beers...`
-        );
+        console.log(`[${operation}] fetching enrichment for ${beerIds.length} tasted beers`);
 
         const { enrichments: enrichmentData, missing: missingIds } =
           await fetchEnrichmentBatchWithMissing(beerIds);
@@ -1440,7 +1450,7 @@ async function writeMyBeers(write: MyBeersWrite): Promise<DataUpdateResult> {
 }
 
 /** Fetch and classify rewards. No database access. */
-async function prepareRewards(operation: string): Promise<SourcePlan<RewardsWrite>> {
+async function prepareRewards(operation: RefreshOperation): Promise<SourcePlan<RewardsWrite>> {
   console.log(`[${operation}] fetching rewards`);
   try {
     const decision = decideRewards(await fetchRewardsFromAPI());
@@ -1718,18 +1728,17 @@ export const refreshAllDataFromAPI = async (): Promise<{
   const { plan: myBeersPlan, pendingWorkerSync } = await prepareMyBeers(REFRESH_FROM_API);
   const rewardsPlan = await prepareRewards(REFRESH_FROM_API);
 
-  // The rows this entry point returns ARE its output — it has no per-source
-  // success channel, and autoLogin -> checkInBeer consumes them. Derived from
-  // the same plans the writes use, so the two cannot disagree.
-  const allBeers = plannedRows(allBeersPlan, write =>
-    write.kind === 'replace' ? [...write.beers] : []
-  );
-  const myBeers = plannedRows(myBeersPlan, write =>
-    write.kind === 'replace' ? [...write.beers] : []
-  );
-  const rewards = plannedRows(rewardsPlan, write =>
-    write.kind === 'replace' ? [...write.rows] : []
-  );
+  // Derived from the same plans the writes consume, so a write and its
+  // reported rows come from one decision rather than two.
+  //
+  // An earlier version of this comment claimed "autoLogin -> checkInBeer
+  // consumes them". It does not: both production callers (`authService.ts:44`,
+  // `:399`) are a bare `await refreshAllDataFromAPI();` and discard the object.
+  // Only tests read it. The rows are kept accurate because the signature
+  // promises them, not because anything downstream reads them today.
+  const allBeers = plannedRows(allBeersPlan, allBeersRows);
+  const myBeers = plannedRows(myBeersPlan, myBeersRows);
+  const rewards = plannedRows(rewardsPlan, rewardsRows);
 
   const needsLock = [allBeersPlan, myBeersPlan, rewardsPlan].some(plan => plan.kind === 'write');
 
@@ -1763,6 +1772,50 @@ export const refreshAllDataFromAPI = async (): Promise<{
 
   return { allBeers, myBeers, rewards };
 };
+
+/**
+ * The rows each source's write will store.
+ *
+ * Exhaustive switches, and named per source rather than written as ternaries at
+ * the call site. A ternary with a catch-all `else []` answers "is this the
+ * replace arm?"; a switch answers "what does each arm mean?" — and the
+ * difference shows the moment an arm is added. With the ternary, giving
+ * `AllBeersWrite` a third arm made `writeAllBeersOnLogin` fail loudly on
+ * `write.beers` while the row derivation silently returned `[]`: the
+ * "wrote correctly, returned the wrong rows" split these exist to prevent.
+ *
+ * They do NOT make the pairing safe. Both `replace` arms name their field
+ * `beers`, and `BeerfinderWithContainerType` is `BeerWithContainerType` plus
+ * optional fields, so handing the my-beers plan to `allBeersRows` still
+ * typechecks. That one is caught by `dataRefresh.integration.test.ts`'s row
+ * counts, not by the compiler.
+ */
+function allBeersRows(write: AllBeersWrite): BeerWithContainerType[] {
+  switch (write.kind) {
+    case 'replace':
+      return [...write.beers];
+    case 'not-modified':
+      return [];
+  }
+}
+
+function myBeersRows(write: MyBeersWrite): BeerfinderWithContainerType[] {
+  switch (write.kind) {
+    case 'replace':
+      return [...write.beers];
+    case 'clear':
+      return [];
+  }
+}
+
+function rewardsRows(write: RewardsWrite): Reward[] {
+  switch (write.kind) {
+    case 'replace':
+      return [...write.rows];
+    case 'clear':
+      return [];
+  }
+}
 
 /**
  * The rows a plan will write, or none.
