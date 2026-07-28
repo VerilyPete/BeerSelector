@@ -32,7 +32,7 @@ import {
   failed,
 } from '../../api/__tests__/helpers/fetchOutcomeFixtures';
 import { ApiErrorType, getUserFriendlyErrorMessage } from '../../utils/notificationUtils';
-import { logError } from '../../utils/errorLogger';
+import { logError, logWarning } from '../../utils/errorLogger';
 import {
   fetchBeersFromProxy,
   fetchEnrichmentBatchWithMissing,
@@ -1326,6 +1326,26 @@ describe('dataUpdateService', () => {
         expect(logError).not.toHaveBeenCalledWith(
           expect.anything(),
           expect.objectContaining({ operation: 'refreshAllDataFromAPI - my beers' })
+        );
+      });
+
+      it('logs a rewards failure on a path that has nowhere else to report it', async () => {
+        (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(failed());
+
+        await refreshAllDataFromAPI();
+
+        // This entry point returns rows and has NO per-source success channel,
+        // so `rewards: []` is indistinguishable from "you have no rewards" to
+        // every caller. The log is therefore the only trace a rewards fetch
+        // failed at all — which is why the old inline block carried a dedicated
+        // logWarning, and why routing this path through the shared
+        // prepareRewards silently deleted the only signal there was.
+        //
+        // logWarning, not logError, so that skip and fail stay distinguishable
+        // exactly as the two tests below assert: skip logs nothing.
+        expect(logWarning).toHaveBeenCalledWith(
+          expect.stringContaining('Rewards refresh failed'),
+          expect.objectContaining({ operation: 'refreshAllDataFromAPI - rewards' })
         );
       });
 

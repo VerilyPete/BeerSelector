@@ -1446,6 +1446,24 @@ async function prepareRewards(operation: string): Promise<SourcePlan<RewardsWrit
     const decision = decideRewards(await fetchRewardsFromAPI());
 
     if (decision.action === 'fail') {
+      // Logged here rather than left to the caller, because one of the two
+      // callers has nowhere to put it. `sequentialRefreshAllData` carries the
+      // error out in `rewardsResult` and turns it into a user-facing alert;
+      // `refreshAllDataFromAPI` returns rows and nothing else, so `rewards: []`
+      // is indistinguishable from "you have no rewards" to everyone downstream.
+      //
+      // Its old inline block carried exactly this call, and routing it through
+      // this shared function deleted the only trace a rewards fetch had failed
+      // at all — a non-answer laundered into a successful-looking empty one,
+      // which is the failure mode this whole plan exists to remove.
+      //
+      // `logWarning`, not `logError`: skip and fail must stay distinguishable,
+      // and two tests assert that a skip reaches neither.
+      logWarning(`Rewards refresh failed: ${decision.error.message}`, {
+        operation: `${operation} - rewards`,
+        component: 'dataUpdateService',
+        additionalData: { errorType: decision.error.type },
+      });
       return {
         kind: 'settled',
         result: { success: false, dataUpdated: false, error: decision.error },
