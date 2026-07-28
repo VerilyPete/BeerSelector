@@ -390,7 +390,16 @@ describe('LoginWebView', () => {
       expect(mockOnLoginSuccess).toHaveBeenCalled();
     });
 
-    it('should save authentication cookies', async () => {
+    it('never writes session cookies to the preferences table', async () => {
+      // INVERTED. This used to assert the write. `auth_cookies` held the raw
+      // cookie jar — PHPSESSID included — as plaintext in an ordinary SQLite
+      // row, recoverable from a device backup or a database extraction. The
+      // same session is in SecureStore via `saveSessionData`, and no
+      // `getPreference('auth_cookies')` call site ever existed, so the write
+      // was pure exposure with no reader to justify it.
+      //
+      // Asserted as "no call with this key" rather than by counting writes, so
+      // that reintroducing it under any description or value still fails.
       const { getByTestId } = render(
         <LoginWebView
           visible={true}
@@ -421,12 +430,13 @@ describe('LoginWebView', () => {
       fireEvent(webview, 'onMessage', message);
 
       await waitFor(() => {
-        expect(setPreference).toHaveBeenCalledWith(
-          'auth_cookies',
-          JSON.stringify(testCookies),
-          'Authentication cookies'
-        );
+        expect(saveSessionData).toHaveBeenCalled();
       });
+
+      const keysWritten = (setPreference as jest.Mock).mock.calls.map(([key]) => key);
+      expect(keysWritten).not.toContain('auth_cookies');
+      const valuesWritten = (setPreference as jest.Mock).mock.calls.map(([, value]) => value);
+      expect(valuesWritten).not.toContain(JSON.stringify(testCookies));
     });
 
     it('should save login timestamp', async () => {
@@ -712,8 +722,11 @@ describe('LoginWebView', () => {
       // here: a contention failure on a value no code consults must not discard
       // a WebView authentication that already succeeded. Changing that catch to
       // a rethrow left the whole suite green.
+      // Keyed on `last_login_timestamp` since `auth_cookies` was removed: it is
+      // the remaining write in `recordUnreadLoginMetadata` with no reader, so
+      // it still exercises the swallow this test exists for.
       (setPreference as jest.Mock).mockImplementation((key: string) =>
-        key === 'auth_cookies'
+        key === 'last_login_timestamp'
           ? Promise.reject(new Error('database is locked'))
           : Promise.resolve(undefined)
       );
