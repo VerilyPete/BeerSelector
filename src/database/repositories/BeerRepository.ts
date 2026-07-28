@@ -168,21 +168,27 @@ export class BeerRepository {
    * already has the data, and against an empty table that assertion is false.
    * Counting is the cheap way to check without materialising every row.
    *
-   * @returns The row count, or 0 if the count cannot be read
+   * `null` means "cannot tell", which is deliberately NOT the same as zero. An
+   * earlier version returned 0 on failure and called that "wasteful, never
+   * wrong" — it was neither. The caller responds to a zero by DISCARDING the
+   * stored ETag and reporting a failure, so an unreadable count against a full
+   * table threw away a valid validator and raised an error blaming the server.
+   * Callers must trust a 304 when the count is unknown; only a known zero
+   * contradicts it.
+   *
+   * @returns The row count, or null if it cannot be read
    */
-  async count(): Promise<number> {
+  async count(): Promise<number | null> {
     const database = await getDatabase();
 
     try {
       const row = await database.getFirstAsync<{ count: number }>(
         'SELECT COUNT(*) as count FROM allbeers'
       );
-      return row?.count ?? 0;
+      return row?.count ?? null;
     } catch (error) {
       console.error('[BeerRepository] count failed:', error);
-      // Reporting 0 makes the caller distrust a 304 and fetch in full, which is
-      // the safe direction: wasteful, never wrong.
-      return 0;
+      return null;
     }
   }
 

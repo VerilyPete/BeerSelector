@@ -17,6 +17,14 @@
  *
  * The condition is transient: the same write attempted a moment later
  * succeeds. `retryable` records that so callers are not forced to re-derive it.
+ *
+ * **Two producers, and only one has that shape.** The description above is
+ * SQLITE_BUSY. `DatabaseLockManager._timeoutAcquisition` also throws this type,
+ * for a caller that waited out the app's own in-process advisory lock — which is
+ * a 30-second wait, not an instantaneous abort. The reuse is deliberate: both
+ * are local, transient and worth retrying, which is what callers and
+ * `createErrorResponse` key off. Only the timing shape differs, and no consumer
+ * branches on it.
  */
 export class DatabaseContentionError extends Error {
   readonly retryable = true;

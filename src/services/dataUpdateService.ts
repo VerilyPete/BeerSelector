@@ -410,6 +410,36 @@ export type TaplistFetchResult = {
  * @returns TaplistFetchResult with beers, proxy usage flag, and optional ETag
  * @throws Error if both proxy and direct fetch fail, or if direct fetch fails when proxy is not configured
  */
+/**
+ * The result of disbelieving a 304 because the table it describes is empty.
+ *
+ * NOT `SERVER_ERROR`. The server behaved correctly — it answered a conditional
+ * request this client chose to send — and the fault is local state. Classifying
+ * it by the server was the same mistake, in reverse, that typing the lock
+ * timeout fixed: describing a condition by where it surfaced rather than by
+ * what it is. It also had two concrete consequences.
+ * `getUserFriendlyErrorMessage` returns a fixed string for `SERVER_ERROR` and
+ * ignores `message`, so the wording below could never reach anyone; and
+ * `allNetworkErrors` requires every failing source to be a network or timeout
+ * error, so one `SERVER_ERROR` here would rob a genuinely offline user of the
+ * clean offline alert.
+ *
+ * The message no longer promises a retry. Nothing retries in this call — the
+ * ETag has been dropped and `all_beers_last_check` deliberately not stamped, so
+ * the NEXT refresh fetches in full.
+ */
+function emptyTableNotModifiedFailure(): DataUpdateResult {
+  return {
+    success: false,
+    dataUpdated: false,
+    error: {
+      type: ApiErrorType.VALIDATION_ERROR,
+      message:
+        'The server reported no changes, but no beers are stored. The next refresh will download the full list.',
+    },
+  };
+}
+
 export async function fetchTaplistFromProxyOrDirect(
   storeId: string | null
 ): Promise<TaplistFetchResult> {
@@ -428,7 +458,20 @@ export async function fetchTaplistFromProxyOrDirect(
   // full 200 rather than serving wrong rows. Keying by `storeId` keeps it that
   // way — joining across stores is the one thing here that could return the
   // wrong location's beers.
-  if (inFlightTaplistFetch !== null && inFlightTaplistFetch.storeId === storeId) {
+  // A null storeId does NOT join. It means the URL carried no `sid`, which is a
+  // wildcard rather than a store: an earlier comment here called two null
+  // callers "the same unidentified store, which is correct", and that is only
+  // defensible for the proxy path. The direct fallback calls
+  // `fetchBeersFromAPI`, which re-reads `all_beers_api_url` itself at fetch
+  // time, decoupled from the key the callers joined on — so one promise can
+  // resolve with whichever store's rows the preference happened to name at that
+  // instant, and the guard would hand them to every joined caller instead of
+  // one. Sharing is only safe when the key actually identifies the payload.
+  if (
+    storeId !== null &&
+    inFlightTaplistFetch !== null &&
+    inFlightTaplistFetch.storeId === storeId
+  ) {
     return inFlightTaplistFetch.promise;
   }
 
@@ -449,8 +492,20 @@ let inFlightTaplistFetch: {
   readonly promise: Promise<TaplistFetchResult>;
 } | null = null;
 
-/** Test seam: drop any in-flight taplist fetch between cases. */
-export function resetInFlightTaplistFetch(): void {
+/**
+ * Stop the next caller joining the taplist fetch currently in flight.
+ *
+ * Not a test seam. `manualRefreshAllData` needs this for the same reason it
+ * passes `join: false`: a fetch already running read the OLD ETag, so serving
+ * its result back makes the user's forced refresh a silent no-op. `join: false`
+ * only opts out of the SEQUENTIAL join — `settleInFlightRefresh` knows nothing
+ * about this one — so without dropping the entry the escape hatch is defeated
+ * one layer below where it is expressed.
+ *
+ * Dropping the entry does not cancel the running fetch. The caller that started
+ * it still receives its result; later callers simply start their own.
+ */
+export function dropInFlightTaplistFetch(): void {
   inFlightTaplistFetch = null;
 }
 
@@ -658,20 +713,19 @@ export async function fetchAndUpdateAllBeers(): Promise<DataUpdateResult> {
       // while the app reports itself up to date. Dropping the validator is what
       // breaks the loop: without it last_check is stamped and the next refresh
       // 304s again, forever.
-      if (!shouldTrustNotModified(await beerRepository.count())) {
+      const storedRows = await beerRepository.count();
+      if (storedRows !== null && !shouldTrustNotModified(storedRows)) {
         console.warn(
           '[dataUpdateService] 304 received but allbeers is empty — discarding the stored ETag'
         );
-        await commitTaplistWrite({ kind: 'cleared' });
-        return {
-          success: false,
-          dataUpdated: false,
-          error: {
-            type: ApiErrorType.SERVER_ERROR,
-            message:
-              'Server reported no changes but no beers are stored. Retrying with a full fetch.',
-          },
-        };
+        // Under the lock, like the copies of this branch in `writeAllBeers` and
+        // `writeAllBeersOnLogin` — those inherit it from their callers, and this
+        // one sits outside `withDatabaseLock` below, so without this the three
+        // textually identical branches were not equally protected.
+        await databaseLockManager.withDatabaseLock('all-beers-etag-invalidate', () =>
+          commitTaplistWrite({ kind: 'cleared' })
+        );
+        return emptyTableNotModifiedFailure();
       }
 
       console.log('All beers data not modified (304), skipping DB update');
@@ -734,14 +788,26 @@ export async function fetchAndUpdateAllBeers(): Promise<DataUpdateResult> {
     if (beersToInsert === null) {
       throw new Error('No valid beers to insert after container-type calculation');
     }
-    // The lock excludes other lock-taking writers, which is what finding 7
-    // needed. It does NOT make these one write: `insertManyUnsafe` commits its
-    // own transaction and the ETag write is a separate one. Ordering is what
-    // makes that safe. Invalidating first means every interruption — a
-    // contention throw, process death, iOS suspending between the awaits —
-    // leaves a cleared ETag against either the old rows or the new ones, and
-    // both cost one full fetch. The reverse order strands the previous
-    // validator against replaced rows, and every later request 304s forever.
+    // The lock excludes other lock-taking writers — and it is a single global
+    // mutex, not one per operation name, so the three write bursts cannot
+    // interleave at all. It does NOT make these one write: `insertManyUnsafe`
+    // commits its own transaction and the ETag write is a separate one.
+    //
+    // Ordering is what makes that safe. The guarantee is that no interruption
+    // can leave a validator that outlives the rows it describes — NOT, as an
+    // earlier version of this comment claimed, that every interruption leaves a
+    // cleared validator. If the pre-clear is itself the interruption, the old
+    // validator survives against the old, unreplaced rows, which is consistent
+    // and costs nothing. The reverse order is what strands a validator against
+    // replaced rows, and every later request then 304s forever.
+    //
+    // The cost, stated because the first version of this change did not: the
+    // pre-clear can throw after ~700ms of contention backoff, and it now runs
+    // BEFORE the rows land, so contention at that instant aborts the whole
+    // write. The user keeps stale rows and is told the app was busy, where
+    // previously they would have got fresh rows and a bad ETag record. That is
+    // the trade, and it is worth it — the bad ETag record is permanent and
+    // silent, the stale rows are neither.
     await databaseLockManager.withDatabaseLock('all-beers-write', async () => {
       await commitTaplistWrite({ kind: 'cleared' });
       await beerRepository.insertManyUnsafe(beersToInsert);
@@ -1370,20 +1436,13 @@ async function prepareAllBeers(operation: RefreshOperation): Promise<SourcePlan<
 /** Store the taplist. Runs under the write lock; makes no network request. */
 async function writeAllBeers(write: AllBeersWrite): Promise<DataUpdateResult> {
   if (write.kind === 'not-modified') {
-    if (!shouldTrustNotModified(await beerRepository.count())) {
+    const storedRows = await beerRepository.count();
+    if (storedRows !== null && !shouldTrustNotModified(storedRows)) {
       console.warn(
         '[dataUpdateService] 304 received but allbeers is empty — discarding the stored ETag'
       );
       await commitTaplistWrite({ kind: 'cleared' });
-      return {
-        success: false,
-        dataUpdated: false,
-        error: {
-          type: ApiErrorType.SERVER_ERROR,
-          message:
-            'Server reported no changes but no beers are stored. Retrying with a full fetch.',
-        },
-      };
+      return emptyTableNotModifiedFailure();
     }
     await setPreference('all_beers_last_check', new Date().toISOString());
     return { success: true, dataUpdated: false };
@@ -1676,6 +1735,15 @@ export async function manualRefreshAllData(): Promise<ManualRefreshResult> {
       await commitTaplistWrite({ kind: 'cleared' });
     }
     lastManualRefreshTime = now;
+
+    // The taplist-level twin of `join: false` below. A fetch already in flight
+    // read the preferences this function has just changed — including the ETag
+    // it may have cleared a few lines up — so joining it would hand the user
+    // back a result computed from the state they explicitly asked to discard.
+    // Opting out of the sequential join is not enough, because
+    // `settleInFlightRefresh` does not know this join point exists.
+    dropInFlightTaplistFetch();
+
     await setPreference('all_beers_last_update', '');
     await setPreference('all_beers_last_check', '');
     await setPreference('my_beers_last_update', '');
@@ -1963,20 +2031,13 @@ function plannedRows<TWrite, TRow>(
  */
 async function writeAllBeersOnLogin(write: AllBeersWrite): Promise<DataUpdateResult> {
   if (write.kind === 'not-modified') {
-    if (!shouldTrustNotModified(await beerRepository.count())) {
+    const storedRows = await beerRepository.count();
+    if (storedRows !== null && !shouldTrustNotModified(storedRows)) {
       console.warn(
         '[dataUpdateService] 304 received but allbeers is empty — discarding the stored ETag'
       );
       await commitTaplistWrite({ kind: 'cleared' });
-      return {
-        success: false,
-        dataUpdated: false,
-        error: {
-          type: ApiErrorType.SERVER_ERROR,
-          message:
-            'Server reported no changes but no beers are stored. Retrying with a full fetch.',
-        },
-      };
+      return emptyTableNotModifiedFailure();
     }
     await setPreference('all_beers_last_check', new Date().toISOString());
     return { success: true, dataUpdated: false };
