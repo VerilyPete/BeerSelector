@@ -12,6 +12,9 @@
  */
 
 import { logError, ErrorContext } from '../utils/errorLogger';
+// `errors.ts` imports nothing, so this cannot create a cycle with the lock
+// manager that several repositories reach through.
+import { DatabaseContentionError } from './errors';
 
 /**
  * Proof that the bearer currently holds the lock.
@@ -403,9 +406,17 @@ export class DatabaseLockManager {
       // Log warning
       this.logger.warn(`Lock acquisition timeout for ${operationName} after ${timeoutMs}ms`);
 
-      // Reject the promise
+      // Typed, not a bare Error. `createErrorResponse` classifies
+      // `DatabaseContentionError` by type; a plain Error fell through to its
+      // substring rules, where `message.includes('timeout')` reported a purely
+      // local lock problem as NETWORK_ERROR — telling the user to check their
+      // internet connection, often after the network fetch had already
+      // succeeded. Waiting out a lock is the same kind of condition as
+      // SQLITE_BUSY: local, transient, and worth retrying.
       request.reject(
-        new Error(`Lock acquisition timeout for ${operationName} after ${timeoutMs}ms`)
+        new DatabaseContentionError(
+          `Lock acquisition timeout for ${operationName} after ${timeoutMs}ms`
+        )
       );
     }
   }
