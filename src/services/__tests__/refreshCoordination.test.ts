@@ -365,12 +365,10 @@ describe('Sequential Refresh Coordination', () => {
       ]);
     });
 
-    it('still holds one lock across its whole body, pending Phase 5.5', async () => {
-      // Deliberately asserting the CURRENT shape of the login path, which plan
-      // 05 Phase 5.5 has not reached yet: it still fetches inside the lock. The
-      // test is here so that when 5.5 lands, this file goes red and says which
-      // property changed, rather than quietly continuing to pass under a name
-      // that no longer describes anything.
+    it('takes the database lock exactly once, for the write burst', async () => {
+      // Was 'still holds one lock across its whole body, pending Phase 5.5',
+      // asserting the pre-5.5 shape on purpose so this file would go red and
+      // name the property when 5.5 landed. It did exactly that.
       const lockAcquisitions: string[] = [];
       const originalWithLock = databaseLockManager.withDatabaseLock.bind(databaseLockManager);
       jest
@@ -382,7 +380,7 @@ describe('Sequential Refresh Coordination', () => {
 
       await refreshAllDataFromAPI();
 
-      expect(lockAcquisitions).toEqual(['refresh-all-from-api']);
+      expect(lockAcquisitions).toEqual(['refresh-all-from-api-write']);
     });
   });
 });
