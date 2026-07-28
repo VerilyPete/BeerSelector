@@ -37,7 +37,6 @@ export const CREATE_ALLBEERS_TABLE = `
   )
 `;
 
-
 /**
  * SQL statement to create the tasted_brew_current_round table
  * Stores the user's tasted beers for the current UFO Club plate
@@ -62,7 +61,6 @@ export const CREATE_TASTED_BREW_TABLE = `
     enrichment_source TEXT
   )
 `;
-
 
 /**
  * SQL statement to create the rewards table
@@ -256,6 +254,13 @@ async function runMigrations(database: SQLiteDatabase, fromVersion: number): Pro
     const { migrateToVersion7 } = await import('./migrations/migrateToV7');
     await migrateToVersion7(database);
     console.log('Migration to version 7 complete');
+  }
+
+  // Run migration to v8 (purge the plaintext auth_cookies preference)
+  if (fromVersion < 8) {
+    const { migrateToVersion8 } = await import('./migrations/migrateToV8');
+    await migrateToVersion8(database);
+    console.log('Migration to version 8 complete');
   }
 }
 

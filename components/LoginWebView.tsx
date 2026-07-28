@@ -25,9 +25,9 @@ type LoginWebViewProps = {
 /**
  * Write the login preferences that nothing reads.
  *
- * `user_json_url`, `store_json_url`, `last_login_timestamp` and `auth_cookies`
- * are each written at exactly one site — this one — and read nowhere in
- * production. No `getPreference` call site references any of them;
+ * `user_json_url`, `store_json_url` and `last_login_timestamp` are each written
+ * at exactly one site — this one — and read nowhere in production. No
+ * `getPreference` call site references any of them;
  * `getAllPreferences` does load them, but its only caller
  * (`hooks/useSettingsState.ts`) has that value dropped by `app/settings.tsx`,
  * and DeveloperSection's preference dump names five other keys. So there is
@@ -46,11 +46,9 @@ type LoginWebViewProps = {
 async function recordUnreadLoginMetadata({
   userJsonUrl,
   storeJsonUrl,
-  cookies,
 }: {
   userJsonUrl: string;
   storeJsonUrl: string;
-  cookies: unknown;
 }): Promise<void> {
   try {
     await setPreference('user_json_url', userJsonUrl, 'API endpoint for user data');
@@ -60,7 +58,16 @@ async function recordUnreadLoginMetadata({
       new Date().toISOString(),
       'Last successful login timestamp'
     );
-    await setPreference('auth_cookies', JSON.stringify(cookies), 'Authentication cookies');
+    // `auth_cookies` used to be written here: the entire cookie jar, PHPSESSID
+    // included, JSON-stringified into a plain SQLite row. It had no reader —
+    // no `getPreference('auth_cookies')` call site has ever existed — and the
+    // same session is persisted to SecureStore by `saveSessionData` a few
+    // lines below the caller. It was a credential at rest in a file that ends
+    // up in unencrypted device backups, bought nothing, and is gone.
+    // `migrateToV8` deletes the rows already on devices.
+    //
+    // The `cookies` parameter went with it rather than being left unused: the
+    // point is that this function has no business receiving them.
   } catch (error) {
     console.warn('Login metadata write failed; login continues because nothing reads it:', error);
   }
@@ -325,7 +332,7 @@ export default function LoginWebView({
               // them, and `getAllPreferences` loads them but its only caller drops
               // the value. A contention failure on a value nothing consults must
               // not abort a login whose WebView authentication already succeeded.
-              await recordUnreadLoginMetadata({ userJsonUrl, storeJsonUrl, cookies });
+              await recordUnreadLoginMetadata({ userJsonUrl, storeJsonUrl });
 
               const sessionData = extractSessionDataFromResponse(new Headers(), cookies);
               console.log('Extracted session data:', sessionData);
