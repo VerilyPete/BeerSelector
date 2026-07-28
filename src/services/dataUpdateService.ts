@@ -401,6 +401,78 @@ export type TaplistFetchResult = {
 };
 
 /**
+ * The result of disbelieving a 304 because the table it describes is empty.
+ *
+ * NOT `SERVER_ERROR`. The server behaved correctly — it answered a conditional
+ * request this client chose to send — and the fault is local state. Classifying
+ * it by the server was the same mistake, in reverse, that typing the lock
+ * timeout fixed: describing a condition by where it surfaced rather than by
+ * what it is.
+ *
+ * The concrete gain is exactly one thing: `getUserFriendlyErrorMessage` returns
+ * a fixed string for `SERVER_ERROR` and ignores `message`, so the wording below
+ * could never reach anyone. An earlier version of this comment also claimed the
+ * change protected `allNetworkErrors` — it does not. That predicate accepts only
+ * NETWORK_ERROR and TIMEOUT_ERROR, so VALIDATION_ERROR fails it exactly as
+ * SERVER_ERROR did, and a genuinely offline user still gets the per-source alert
+ * rather than the offline one.
+ *
+ * The message no longer promises a retry. Nothing retries in this call — the
+ * ETag has been dropped and `all_beers_last_check` deliberately not stamped, so
+ * the NEXT refresh fetches in full.
+ */
+function emptyTableNotModifiedFailure(verdict: NotModifiedVerdict): DataUpdateResult {
+  return {
+    success: false,
+    dataUpdated: false,
+    error: {
+      type: ApiErrorType.VALIDATION_ERROR,
+      message:
+        verdict === 'empty'
+          ? 'The server reported no changes, but no beers are stored. The next refresh will download the full list.'
+          : 'The server reported no changes, but the stored beers could not be read. The next refresh will download the full list.',
+    },
+  };
+}
+
+/**
+ * What a 304 is worth, given what the table actually holds.
+ *
+ * `unknown` exists because "cannot read the count" is not "the table is empty",
+ * and the two demand opposite handling. Treating unknown as empty destroys a
+ * valid validator; treating it as trusted stamps `all_beers_last_check` and
+ * reports success, which suppresses the next refresh for hours — and the most
+ * likely cause of an unreadable count is a missing or corrupt `allbeers` table,
+ * i.e. the very state the backstop exists for. Both wrong answers are silent;
+ * this one is neither, and leaves the next refresh free to retry.
+ */
+type NotModifiedVerdict = 'trusted' | 'empty' | 'unknown';
+
+/**
+ * Decide whether to believe a 304. MUST be called while holding the write lock:
+ * the count and any action taken on it have to be atomic, or a concurrent
+ * writer can fill the table between them and have its fresh ETag cleared.
+ */
+async function verifyNotModified(): Promise<NotModifiedVerdict> {
+  const storedRows = await beerRepository.count();
+
+  if (storedRows === null) {
+    console.warn(
+      '[dataUpdateService] 304 received but the beer count could not be read — keeping the stored ETag and retrying next refresh'
+    );
+    return 'unknown';
+  }
+
+  if (shouldTrustNotModified(storedRows)) return 'trusted';
+
+  console.warn(
+    '[dataUpdateService] 304 received but allbeers is empty — discarding the stored ETag'
+  );
+  await commitTaplistWrite({ kind: 'cleared' });
+  return 'empty';
+}
+
+/**
  * Shared helper that encapsulates the proxy-then-fallback taplist fetch logic.
  *
  * Tries the enrichment proxy first (if configured and storeId available),
@@ -410,36 +482,6 @@ export type TaplistFetchResult = {
  * @returns TaplistFetchResult with beers, proxy usage flag, and optional ETag
  * @throws Error if both proxy and direct fetch fail, or if direct fetch fails when proxy is not configured
  */
-/**
- * The result of disbelieving a 304 because the table it describes is empty.
- *
- * NOT `SERVER_ERROR`. The server behaved correctly — it answered a conditional
- * request this client chose to send — and the fault is local state. Classifying
- * it by the server was the same mistake, in reverse, that typing the lock
- * timeout fixed: describing a condition by where it surfaced rather than by
- * what it is. It also had two concrete consequences.
- * `getUserFriendlyErrorMessage` returns a fixed string for `SERVER_ERROR` and
- * ignores `message`, so the wording below could never reach anyone; and
- * `allNetworkErrors` requires every failing source to be a network or timeout
- * error, so one `SERVER_ERROR` here would rob a genuinely offline user of the
- * clean offline alert.
- *
- * The message no longer promises a retry. Nothing retries in this call — the
- * ETag has been dropped and `all_beers_last_check` deliberately not stamped, so
- * the NEXT refresh fetches in full.
- */
-function emptyTableNotModifiedFailure(): DataUpdateResult {
-  return {
-    success: false,
-    dataUpdated: false,
-    error: {
-      type: ApiErrorType.VALIDATION_ERROR,
-      message:
-        'The server reported no changes, but no beers are stored. The next refresh will download the full list.',
-    },
-  };
-}
-
 export async function fetchTaplistFromProxyOrDirect(
   storeId: string | null
 ): Promise<TaplistFetchResult> {
@@ -502,8 +544,18 @@ let inFlightTaplistFetch: {
  * about this one — so without dropping the entry the escape hatch is defeated
  * one layer below where it is expressed.
  *
- * Dropping the entry does not cancel the running fetch. The caller that started
- * it still receives its result; later callers simply start their own.
+ * Dropping the entry does not cancel the running fetch, and the consequence is
+ * larger than it sounds: the caller that started it not only receives its
+ * result, it goes on to WRITE that result — rows and ETag — to the database.
+ * So the forced refresh and the abandoned one both write, and the on-disk
+ * winner is whichever finishes last rather than whichever is fresher.
+ *
+ * That is acceptable, and better than what it replaces. Each writer commits its
+ * rows and its ETag inside one lock hold, so a late-landing older fetch leaves a
+ * CONSISTENT pair that revalidates correctly and self-heals on the next refresh
+ * — the cost is seconds of freshness and one duplicated download. The behaviour
+ * it replaces was the forced refresh being answered from the validator the user
+ * had just discarded, which discarded their request entirely and said nothing.
  */
 export function dropInFlightTaplistFetch(): void {
   inFlightTaplistFetch = null;
@@ -713,19 +765,21 @@ export async function fetchAndUpdateAllBeers(): Promise<DataUpdateResult> {
       // while the app reports itself up to date. Dropping the validator is what
       // breaks the loop: without it last_check is stamped and the next refresh
       // 304s again, forever.
-      const storedRows = await beerRepository.count();
-      if (storedRows !== null && !shouldTrustNotModified(storedRows)) {
-        console.warn(
-          '[dataUpdateService] 304 received but allbeers is empty — discarding the stored ETag'
-        );
-        // Under the lock, like the copies of this branch in `writeAllBeers` and
-        // `writeAllBeersOnLogin` — those inherit it from their callers, and this
-        // one sits outside `withDatabaseLock` below, so without this the three
-        // textually identical branches were not equally protected.
-        await databaseLockManager.withDatabaseLock('all-beers-etag-invalidate', () =>
-          commitTaplistWrite({ kind: 'cleared' })
-        );
-        return emptyTableNotModifiedFailure();
+      // Count AND clear inside one lock hold. Taking the lock around the clear
+      // alone was worse than taking none: it left the count outside, so the
+      // window between deciding "the table is empty" and acting on it grew from
+      // one await to a 30s lock acquisition — spent waiting on precisely the
+      // writer most likely to fill the table. A concurrent refresh could commit
+      // a full taplist and a valid ETag in that gap, and this path would then
+      // clear that just-committed validator and report "no beers are stored"
+      // with thousands stored. `writeAllBeers` and `writeAllBeersOnLogin` read
+      // and clear inside their caller's lock already; this now matches them.
+      const verdict = await databaseLockManager.withDatabaseLock('all-beers-etag-invalidate', () =>
+        verifyNotModified()
+      );
+
+      if (verdict !== 'trusted') {
+        return emptyTableNotModifiedFailure(verdict);
       }
 
       console.log('All beers data not modified (304), skipping DB update');
@@ -1436,13 +1490,10 @@ async function prepareAllBeers(operation: RefreshOperation): Promise<SourcePlan<
 /** Store the taplist. Runs under the write lock; makes no network request. */
 async function writeAllBeers(write: AllBeersWrite): Promise<DataUpdateResult> {
   if (write.kind === 'not-modified') {
-    const storedRows = await beerRepository.count();
-    if (storedRows !== null && !shouldTrustNotModified(storedRows)) {
-      console.warn(
-        '[dataUpdateService] 304 received but allbeers is empty — discarding the stored ETag'
-      );
-      await commitTaplistWrite({ kind: 'cleared' });
-      return emptyTableNotModifiedFailure();
+    // Already under the caller's lock, so the count and the clear are atomic.
+    const verdict = await verifyNotModified();
+    if (verdict !== 'trusted') {
+      return emptyTableNotModifiedFailure(verdict);
     }
     await setPreference('all_beers_last_check', new Date().toISOString());
     return { success: true, dataUpdated: false };
@@ -2031,13 +2082,10 @@ function plannedRows<TWrite, TRow>(
  */
 async function writeAllBeersOnLogin(write: AllBeersWrite): Promise<DataUpdateResult> {
   if (write.kind === 'not-modified') {
-    const storedRows = await beerRepository.count();
-    if (storedRows !== null && !shouldTrustNotModified(storedRows)) {
-      console.warn(
-        '[dataUpdateService] 304 received but allbeers is empty — discarding the stored ETag'
-      );
-      await commitTaplistWrite({ kind: 'cleared' });
-      return emptyTableNotModifiedFailure();
+    // Already under the caller's lock, so the count and the clear are atomic.
+    const verdict = await verifyNotModified();
+    if (verdict !== 'trusted') {
+      return emptyTableNotModifiedFailure(verdict);
     }
     await setPreference('all_beers_last_check', new Date().toISOString());
     return { success: true, dataUpdated: false };
