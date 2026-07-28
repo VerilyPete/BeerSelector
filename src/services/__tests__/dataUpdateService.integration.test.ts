@@ -17,6 +17,10 @@ jest.mock('../../database/preferences', () => ({
 jest.mock('../../database/repositories/BeerRepository', () => ({
   beerRepository: {
     insertMany: jest.fn(),
+    // Plan 04 Phase 2 / 05 Phase 5.6: fetchAndUpdateAllBeers now takes its own
+    // lock around the rows AND the ETag they imply, so it calls the unlocked
+    // variant. A mock without it makes the whole path fail as an undefined call.
+    insertManyUnsafe: jest.fn(),
   },
 }));
 
@@ -79,7 +83,7 @@ describe('dataUpdateService integration tests', () => {
     (setPreference as jest.Mock).mockResolvedValue(undefined);
 
     // Default mock for repository insertMany methods
-    (beerRepository.insertMany as jest.Mock).mockResolvedValue(undefined);
+    (beerRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
     (myBeersRepository.insertMany as jest.Mock).mockResolvedValue(undefined);
   });
 
@@ -115,11 +119,11 @@ describe('dataUpdateService integration tests', () => {
       // Verify that fetchBeersFromAPI was called
       expect(fetchBeersFromAPI).toHaveBeenCalledTimes(1);
 
-      // Verify that beerRepository.insertMany was called with the correct data
-      expect(beerRepository.insertMany).toHaveBeenCalledTimes(1);
+      // Verify that beerRepository.insertManyUnsafe was called with the correct data
+      expect(beerRepository.insertManyUnsafe).toHaveBeenCalledTimes(1);
 
       // Verify that the data passed to beerRepository.insertMany is valid
-      const beersPassedToPopulate = (beerRepository.insertMany as jest.Mock).mock.calls[0][0];
+      const beersPassedToPopulate = (beerRepository.insertManyUnsafe as jest.Mock).mock.calls[0][0];
       expect(Array.isArray(beersPassedToPopulate)).toBe(true);
 
       // Verify that valid beers were passed (service filters out beers without required fields)
@@ -172,8 +176,8 @@ describe('dataUpdateService integration tests', () => {
       expect(result.success).toBe(false);
       expect(result.dataUpdated).toBe(false);
 
-      // Verify that beerRepository.insertMany was not called
-      expect(beerRepository.insertMany).not.toHaveBeenCalled();
+      // Verify that beerRepository.insertManyUnsafe was not called
+      expect(beerRepository.insertManyUnsafe).not.toHaveBeenCalled();
     });
 
     it('should handle fetchBeersFromAPI throwing an error', async () => {
@@ -189,8 +193,8 @@ describe('dataUpdateService integration tests', () => {
       expect(result.success).toBe(false);
       expect(result.dataUpdated).toBe(false);
 
-      // Verify that beerRepository.insertMany was not called
-      expect(beerRepository.insertMany).not.toHaveBeenCalled();
+      // Verify that beerRepository.insertManyUnsafe was not called
+      expect(beerRepository.insertManyUnsafe).not.toHaveBeenCalled();
 
       // Verify that setPreference was not called
       expect(setPreference).not.toHaveBeenCalled();
@@ -207,8 +211,8 @@ describe('dataUpdateService integration tests', () => {
       expect(result.success).toBe(false);
       expect(result.dataUpdated).toBe(false);
 
-      // Verify that beerRepository.insertMany was not called
-      expect(beerRepository.insertMany).not.toHaveBeenCalled();
+      // Verify that beerRepository.insertManyUnsafe was not called
+      expect(beerRepository.insertManyUnsafe).not.toHaveBeenCalled();
 
       // Verify that setPreference was not called
       expect(setPreference).not.toHaveBeenCalled();
@@ -225,8 +229,8 @@ describe('dataUpdateService integration tests', () => {
       expect(result.success).toBe(false);
       expect(result.dataUpdated).toBe(false);
 
-      // Verify that beerRepository.insertMany was not called
-      expect(beerRepository.insertMany).not.toHaveBeenCalled();
+      // Verify that beerRepository.insertManyUnsafe was not called
+      expect(beerRepository.insertManyUnsafe).not.toHaveBeenCalled();
 
       // Verify that setPreference was not called
       expect(setPreference).not.toHaveBeenCalled();

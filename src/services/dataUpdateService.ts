@@ -18,6 +18,8 @@ import { myBeersRepository } from '../database/repositories/MyBeersRepository';
 import { rewardsRepository } from '../database/repositories/RewardsRepository';
 import { databaseLockManager } from '../database/DatabaseLockManager';
 import { toNonEmpty } from '../api/fetchOutcome';
+import { commitTaplistWrite, readTaplistEtag } from './taplistEtag';
+import type { TaplistWriteSource } from './taplistEtag';
 import type {
   FetchOutcome,
   NonEmptyArray,
@@ -201,7 +203,16 @@ type AllBeersWrite =
   | {
       readonly kind: 'replace';
       readonly beers: NonEmptyArray<BeerWithContainerType>;
-      readonly etag: string | null;
+      /**
+       * What produced these rows, so the writer can record the ETag they imply.
+       *
+       * The raw `etag` used to live here and each writer applied its own
+       * `if (etag)` — which is the defect: three sites deciding independently
+       * all kept the PREVIOUS ETag after a fallback write, leaving it naming
+       * proxy-enriched rows the table no longer held. `taplistEtag.ts` owns the
+       * decision now; the plan carries it and the writer only commits it.
+       */
+      readonly taplistSource: TaplistWriteSource;
     };
 
 /** A tasted-list write. `clear` is reachable only from `confirmed-empty`. */
@@ -405,8 +416,10 @@ export async function fetchTaplistFromProxyOrDirect(
   if (storeId && config.enrichment.isConfigured()) {
     try {
       console.log(`[dataUpdateService] Attempting enrichment proxy for store ${storeId}...`);
-      const storedEtag = await getPreference('all_beers_etag');
-      const proxyResponse = await fetchBeersFromProxy(storeId, storedEtag ?? undefined);
+      // Via the module, not the raw preference: `'' ?? undefined` is `''`, so
+      // reading directly forwarded a CLEARED ETag as an empty `If-None-Match`
+      // header instead of omitting it.
+      const proxyResponse = await fetchBeersFromProxy(storeId, await readTaplistEtag());
 
       if (proxyResponse.notModified) {
         console.log(`[dataUpdateService] 304 Not Modified for store ${storeId}`);
@@ -652,12 +665,15 @@ export async function fetchAndUpdateAllBeers(): Promise<DataUpdateResult> {
     if (beersToInsert === null) {
       throw new Error('No valid beers to insert after container-type calculation');
     }
-    await beerRepository.insertMany(beersToInsert);
-
-    // Store ETag for future conditional requests
-    if (etag) {
-      await setPreference('all_beers_etag', etag);
-    }
+    // One critical section for the rows AND the ETag they imply. Previously
+    // `insertMany` took and released its own lock and the ETag write followed
+    // it unlocked, so a concurrent writer could land its rows in the gap and
+    // leave the table paired with this call's ETag — finding 7. Pairing is only
+    // sound if the two are one write.
+    await databaseLockManager.withDatabaseLock('all-beers-write', async () => {
+      await beerRepository.insertManyUnsafe(beersToInsert);
+      await commitTaplistWrite(usedProxy ? { kind: 'proxy', etag } : { kind: 'fallback' });
+    });
 
     // Update the last update timestamp
     await setPreference('all_beers_last_update', new Date().toISOString());
@@ -1260,7 +1276,11 @@ async function prepareAllBeers(operation: RefreshOperation): Promise<SourcePlan<
 
     return {
       kind: 'write',
-      write: { kind: 'replace', beers: sequentialBeers, etag },
+      write: {
+        kind: 'replace',
+        beers: sequentialBeers,
+        taplistSource: taplistResult.usedProxy ? { kind: 'proxy', etag } : { kind: 'fallback' },
+      },
     };
   } catch (error) {
     logError(error, {
@@ -1282,11 +1302,7 @@ async function writeAllBeers(write: AllBeersWrite): Promise<DataUpdateResult> {
   }
 
   await beerRepository.insertManyUnsafe(write.beers);
-
-  // Store ETag for future conditional requests
-  if (write.etag) {
-    await setPreference('all_beers_etag', write.etag);
-  }
+  await commitTaplistWrite(write.taplistSource);
 
   await setPreference('all_beers_last_update', new Date().toISOString());
   await setPreference('all_beers_last_check', new Date().toISOString());
@@ -1853,9 +1869,7 @@ async function writeAllBeersOnLogin(write: AllBeersWrite): Promise<DataUpdateRes
   }
 
   await beerRepository.insertManyUnsafe(write.beers);
-  if (write.etag) {
-    await setPreference('all_beers_etag', write.etag);
-  }
+  await commitTaplistWrite(write.taplistSource);
   return { success: true, dataUpdated: true, itemCount: write.beers.length };
 }
 
