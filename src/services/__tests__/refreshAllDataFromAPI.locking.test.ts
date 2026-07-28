@@ -12,8 +12,14 @@
  * blocker rather than the concern; the concern is now a test (see
  * 'writes the sources that fetched successfully when another source fails').
  *
- * This is the `autoLogin` → `checkInBeer` path, so a lock held across a stalled
- * fetch here blocks a user trying to check a beer in.
+ * What releasing the lock actually buys, stated correctly: NOT a faster check-in
+ * for the user who triggered it. `checkInBeer` awaits `autoLogin`, which awaits
+ * this function whole (`authService.ts:44`), so that user waits out the refresh
+ * either way and the lock changes their wait by zero. The gain is that every
+ * OTHER lock consumer — the app-open `fetchAndUpdate*` writes,
+ * `BeerRepository.insertMany`, the enrichment sync's `updateEnrichmentData` —
+ * stops queueing behind this refresh's network phase. Real benefit, different
+ * mechanism than the one first claimed here.
  *
  * **Ordering is asserted from a recorded event log, never from wall-clock
  * timing.** Every mock settles immediately and no test ADVANCES timers; the
@@ -242,10 +248,15 @@ describe('refreshAllDataFromAPI locking', () => {
     expect(result).toEqual({ allBeers: [], myBeers: [], rewards: [] });
   });
 
-  it('does not acquire the lock for a visitor, who has nothing to write', async () => {
-    // A visitor reaches "nothing to write" through success rather than failure:
-    // my-beers and rewards are both `not-applicable`, and this is the
-    // autoLogin path, so it runs on every visitor launch.
+  it('does not acquire the lock when both member sources are not-applicable', async () => {
+    // "Nothing to write" reached through success rather than failure: my-beers
+    // and rewards both `not-applicable`.
+    //
+    // NOT via visitor mode, despite the name — `authService.ts:42` guards the
+    // call with `if (!isVisitorMode)`, so a true visitor never reaches this
+    // function at all. The reachable route is a `none://` placeholder URL on a
+    // member account. The scenario is real; an earlier version of this comment
+    // named the wrong cause for it.
     respondsWith(fetchBeersFromAPI as jest.Mock, 'allBeers', failed());
     respondsWith(
       fetchMyBeersFromAPI as jest.Mock,
