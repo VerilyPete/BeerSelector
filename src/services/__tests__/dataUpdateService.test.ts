@@ -58,6 +58,7 @@ jest.mock('../../database/preferences', () => ({
 // Mock repositories
 jest.mock('../../database/repositories/BeerRepository', () => ({
   beerRepository: {
+    count: jest.fn(async () => 12),
     insertMany: jest.fn(),
     insertManyUnsafe: jest.fn(),
     updateEnrichmentData: jest.fn().mockResolvedValue(0),

@@ -52,6 +52,7 @@ jest.mock('../../database/repositories/BeerRepository', () => ({
   beerRepository: {
     insertMany: jest.fn(async () => {}),
     insertManyUnsafe: jest.fn(async () => {}),
+    count: jest.fn(async () => 12),
   },
 }));
 
@@ -172,6 +173,91 @@ describe('taplist ETag invalidation', () => {
       expect(etagWrites()).toContain('');
       expect(etagWrites()).not.toContain('W/"old"');
     });
+  });
+
+  it('refuses to believe a 304 when the table it describes is empty', async () => {
+    // A 304 asserts "you already have this". Against an empty table that is
+    // false, and honouring it returns success with no rows and no error — the
+    // user sits looking at nothing while the app reports itself up to date, and
+    // every later refresh repeats it because last_check keeps being stamped.
+    //
+    // `shouldTrustNotModified` was written for exactly this in 04 Phase 1 and
+    // then had no production caller for the entire life of the branch — the
+    // third inert export in this module, after the two 5.6 wired in.
+    (beerRepository.count as jest.Mock).mockResolvedValue(0);
+    jest
+      .spyOn(config, 'enrichment', 'get')
+      .mockReturnValue({ ...config.enrichment, isConfigured: () => true });
+    (fetchBeersFromProxy as jest.Mock).mockResolvedValue({
+      beers: [],
+      storeId: '13879',
+      source: 'live',
+      etag: 'W/"old"',
+      notModified: true,
+    });
+
+    const result = await svc.fetchAndUpdateAllBeers();
+
+    // The stale validator is dropped, so the next request cannot 304 again.
+    expect(etagWrites()).toContain('');
+    expect(result.dataUpdated).toBe(false);
+  });
+
+  it('refuses to believe a 304 with an empty table — manual refresh', async () => {
+    (beerRepository.count as jest.Mock).mockResolvedValue(0);
+    jest
+      .spyOn(config, 'enrichment', 'get')
+      .mockReturnValue({ ...config.enrichment, isConfigured: () => true });
+    (fetchBeersFromProxy as jest.Mock).mockResolvedValue({
+      beers: [],
+      storeId: '13879',
+      source: 'live',
+      etag: 'W/"old"',
+      notModified: true,
+    });
+
+    const result = await svc.sequentialRefreshAllData();
+
+    expect(etagWrites()).toContain('');
+    expect(result.allBeersResult.success).toBe(false);
+  });
+
+  it('refuses to believe a 304 with an empty table — login', async () => {
+    (beerRepository.count as jest.Mock).mockResolvedValue(0);
+    jest
+      .spyOn(config, 'enrichment', 'get')
+      .mockReturnValue({ ...config.enrichment, isConfigured: () => true });
+    (fetchBeersFromProxy as jest.Mock).mockResolvedValue({
+      beers: [],
+      storeId: '13879',
+      source: 'live',
+      etag: 'W/"old"',
+      notModified: true,
+    });
+
+    await svc.refreshAllDataFromAPI();
+
+    expect(etagWrites()).toContain('');
+  });
+
+  it('honours a 304 when the table actually holds rows', async () => {
+    // The other direction: the backstop must not cost a full download on every
+    // ordinary 304, which is the entire point of the ETag.
+    (beerRepository.count as jest.Mock).mockResolvedValue(12);
+    jest
+      .spyOn(config, 'enrichment', 'get')
+      .mockReturnValue({ ...config.enrichment, isConfigured: () => true });
+    (fetchBeersFromProxy as jest.Mock).mockResolvedValue({
+      beers: [],
+      storeId: '13879',
+      source: 'live',
+      etag: 'W/"old"',
+      notModified: true,
+    });
+
+    await svc.fetchAndUpdateAllBeers();
+
+    expect(etagWrites()).not.toContain('');
   });
 
   it('stores the new ETag when the proxy returns a 200 carrying one', async () => {
