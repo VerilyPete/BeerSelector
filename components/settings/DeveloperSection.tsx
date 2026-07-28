@@ -7,6 +7,7 @@ import { beerRepository } from '@/src/database/repositories/BeerRepository';
 import { myBeersRepository } from '@/src/database/repositories/MyBeersRepository';
 import { rewardsRepository } from '@/src/database/repositories/RewardsRepository';
 import { getPreference, setPreference } from '@/src/database/preferences';
+import { commitTaplistWrite } from '@/src/services/taplistEtag';
 import { createMockSession } from '@/src/api/mockSession';
 import { clearSessionData } from '@/src/api/sessionManager';
 import SettingsSection from './SettingsSection';
@@ -159,6 +160,14 @@ Tasted Beers: ${lastMyBeersRefresh ? new Date(parseInt(lastMyBeersRefresh)).toLo
             try {
               console.log('Starting application reset...');
 
+              // Before the rows, not after. Emptying `allbeers` first leaves a
+              // window — app death, or any throw in the six awaits that used to
+              // sit between — where the table is empty but the ETag is still
+              // live. Every 304 path then trusts that ETag and returns without
+              // rows. Clearing the ETag first inverts the failure into a
+              // harmless extra full fetch.
+              await commitTaplistWrite({ kind: 'cleared' });
+
               await beerRepository.clear();
               console.log('Cleared all beers');
 
@@ -172,7 +181,6 @@ Tasted Beers: ${lastMyBeersRefresh ? new Date(parseInt(lastMyBeersRefresh)).toLo
               console.log('Cleared session data');
 
               await setPreference('all_beers_api_url', '', 'API endpoint for fetching all beers');
-              await setPreference('all_beers_etag', '', 'Cached ETag for all beers taplist');
               await setPreference(
                 'my_beers_api_url',
                 '',
