@@ -199,10 +199,19 @@ type SettledResult =
  * window advances even though no rows changed.
  */
 type AllBeersWrite =
-  | { readonly kind: 'not-modified' }
+  | { readonly kind: 'not-modified'; readonly fetchedFor: TaplistConfiguration }
   | {
       readonly kind: 'replace';
       readonly beers: NonEmptyArray<BeerWithContainerType>;
+      /**
+       * Which store's configuration these rows were fetched against.
+       *
+       * Carried on both arms because both are wrong to apply after a switch:
+       * `replace` would write the old store's rows and validator, and
+       * `not-modified` would stamp `all_beers_last_check` for a store it never
+       * checked — suppressing the new store's refresh for the next 12 hours.
+       */
+      readonly fetchedFor: TaplistConfiguration;
       /**
        * What produced these rows, so the writer can record the ETag they imply.
        *
@@ -368,6 +377,70 @@ function mapEnrichedBeerToAppBeer(beer: EnrichedBeerResponse): Beer {
     enrichment_confidence: beer.enrichment_confidence,
     enrichment_source: beer.enrichment_source,
   };
+}
+
+/**
+ * Which store the app is currently configured for.
+ *
+ * A branded string rather than a bare one so it cannot be passed where any
+ * other URL-shaped value is expected, and so the comparison below reads as a
+ * comparison of configurations rather than of strings.
+ */
+type TaplistConfiguration = string & { readonly __brand: 'TaplistConfiguration' };
+
+/**
+ * Read the configuration a taplist fetch is being made against.
+ *
+ * `all_beers_api_url` IS the store identity — it carries the `sid` — so it is
+ * used directly rather than through a separate epoch counter. A counter would
+ * be a second piece of state that every writer of the configuration has to
+ * remember to bump, and the failure mode of forgetting is silent. This cannot
+ * drift from the thing it describes, because it *is* the thing it describes.
+ *
+ * `null` and `''` both collapse to `''`: the login clears this key to shut the
+ * configuration gate, so an in-flight refresh that captured a real URL must
+ * treat the cleared state as a change. It is not "unknown, so allow".
+ */
+async function readTaplistConfiguration(): Promise<TaplistConfiguration> {
+  return ((await getPreference('all_beers_api_url')) ?? '') as TaplistConfiguration;
+}
+
+/**
+ * Whether rows fetched against `fetchedFor` may still be committed.
+ *
+ * MUST be called under the write lock. Called outside it, the configuration can
+ * change between the check and the write and the guard proves nothing — which
+ * is precisely the bug it exists to close, reintroduced one level up.
+ */
+async function taplistConfigurationHeld(fetchedFor: TaplistConfiguration): Promise<boolean> {
+  return (await readTaplistConfiguration()) === fetchedFor;
+}
+
+/**
+ * What a writer returns when it discards rows fetched for a store the app has
+ * since left.
+ *
+ * `success: true` deliberately, matching the `skip` arm of `decideRewards`:
+ * nothing failed, and the user is not the person to tell. The refresh did its
+ * job and correctly threw the answer away because a login moved the app
+ * somewhere else.
+ *
+ * That login does start its own refresh for the new store — `useLoginFlow`
+ * awaits `onRefreshData` (`useLoginFlow.ts:241`), which `app/settings.tsx:40`
+ * supplies as the only production caller. The prop is optional, so this is a
+ * property of that one call site rather than of the hook; if a second caller
+ * ever omits it, the recovery below is the next scheduled refresh instead.
+ *
+ * `dataUpdated: false` is the load-bearing half. It keeps the caller from
+ * stamping a freshness timestamp, so the new store's refresh still runs instead
+ * of being suppressed by the 12-hour window.
+ */
+function abandonedAfterStoreSwitch(operation: string): DataUpdateResult {
+  logWarning(`[${operation}] taplist discarded: store changed between fetch and write`, {
+    operation,
+    component: 'dataUpdateService',
+  });
+  return { success: true, dataUpdated: false };
 }
 
 /**
@@ -758,8 +831,11 @@ function decideRewards(source: UnconditionalSource<FetchOutcome<Reward>>): Rewar
  */
 export async function fetchAndUpdateAllBeers(): Promise<DataUpdateResult> {
   try {
-    // Get the API URL from preferences
-    const apiUrl = await getPreference('all_beers_api_url');
+    // Get the API URL from preferences. This one read serves as both the store
+    // to fetch and the configuration this refresh is bound to; see
+    // `readTaplistConfiguration`.
+    const fetchedFor = await readTaplistConfiguration();
+    const apiUrl = fetchedFor;
     if (!apiUrl) {
       logError('All beers API URL not set', {
         operation: 'fetchAndUpdateAllBeers',
@@ -885,11 +961,25 @@ export async function fetchAndUpdateAllBeers(): Promise<DataUpdateResult> {
     // previously they would have got fresh rows and a bad ETag record. That is
     // the trade, and it is worth it — the bad ETag record is permanent and
     // silent, the stale rows are neither.
-    await databaseLockManager.withDatabaseLock('all-beers-write', async () => {
+    const committed = await databaseLockManager.withDatabaseLock('all-beers-write', async () => {
+      // Under the lock, as on the two plan-based writers: `apiUrl` was read
+      // before the fetch, and a login can have switched stores since. Committing
+      // then writes the old store's rows AND its validator under the new store's
+      // configuration, which no later conditional request corrects — the row
+      // count is non-zero, so `shouldTrustNotModified` believes the 304.
+      if (!(await taplistConfigurationHeld(fetchedFor))) {
+        return false;
+      }
+
       await commitTaplistWrite({ kind: 'cleared' });
       await beerRepository.insertManyUnsafe(beersToInsert);
       await commitTaplistWrite(usedProxy ? { kind: 'proxy', etag } : { kind: 'fallback' });
+      return true;
     });
+
+    if (!committed) {
+      return abandonedAfterStoreSwitch('fetchAndUpdateAllBeers');
+    }
 
     // Update the last update timestamp
     await setPreference('all_beers_last_update', new Date().toISOString());
@@ -1452,16 +1542,18 @@ async function applyPlan<TWrite>(
 async function prepareAllBeers(operation: RefreshOperation): Promise<SourcePlan<AllBeersWrite>> {
   console.log(`[${operation}] fetching all beers`);
   try {
-    // Get API URL to extract store ID for proxy
-    const apiUrl = await getPreference('all_beers_api_url');
-    const storeId = apiUrl ? extractStoreIdFromUrl(apiUrl) : null;
+    // Get API URL to extract store ID for proxy. The same read also fixes which
+    // store this plan is for: everything below was fetched against THIS value,
+    // and the writer refuses to commit it under any other.
+    const fetchedFor = await readTaplistConfiguration();
+    const storeId = fetchedFor ? extractStoreIdFromUrl(fetchedFor) : null;
 
     const taplistResult = await fetchTaplistFromProxyOrDirect(storeId);
 
     // Handle 304 Not Modified
     if (taplistResult.notModified) {
       console.log(`[${operation}] all beers not modified (304), skipping table write`);
-      return { kind: 'write', write: { kind: 'not-modified' } };
+      return { kind: 'write', write: { kind: 'not-modified', fetchedFor } };
     }
 
     const { beers: allBeers, etag } = taplistResult;
@@ -1496,6 +1588,7 @@ async function prepareAllBeers(operation: RefreshOperation): Promise<SourcePlan<
         kind: 'replace',
         beers: sequentialBeers,
         taplistSource: taplistResult.usedProxy ? { kind: 'proxy', etag } : { kind: 'fallback' },
+        fetchedFor,
       },
     };
   } catch (error) {
@@ -1512,6 +1605,12 @@ async function prepareAllBeers(operation: RefreshOperation): Promise<SourcePlan<
 
 /** Store the taplist. Runs under the write lock; makes no network request. */
 async function writeAllBeers(write: AllBeersWrite): Promise<DataUpdateResult> {
+  // First statement in the writer, before the 304 branch as well as the replace
+  // one, and under the caller's lock — see `taplistConfigurationHeld`.
+  if (!(await taplistConfigurationHeld(write.fetchedFor))) {
+    return abandonedAfterStoreSwitch(SEQUENTIAL_REFRESH);
+  }
+
   if (write.kind === 'not-modified') {
     // Already under the caller's lock, so the count and the clear are atomic.
     const verdict = await verifyNotModified();
@@ -2104,6 +2203,13 @@ function plannedRows<TWrite, TRow>(
  * fetch does not) and it is recorded in plan 05 rather than fixed in passing.
  */
 async function writeAllBeersOnLogin(write: AllBeersWrite): Promise<DataUpdateResult> {
+  // Same guard as `writeAllBeers`, and needed here despite this being the login
+  // path's own writer: a second login (or a settings change) can land while
+  // this one is still fetching.
+  if (!(await taplistConfigurationHeld(write.fetchedFor))) {
+    return abandonedAfterStoreSwitch(REFRESH_FROM_API);
+  }
+
   if (write.kind === 'not-modified') {
     // Already under the caller's lock, so the count and the clear are atomic.
     const verdict = await verifyNotModified();
