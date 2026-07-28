@@ -1540,8 +1540,10 @@ describe('dataUpdateService', () => {
 
       await refreshAllDataFromAPI();
 
+      // Renamed from 'refresh-all-from-api' by plan 05 Phase 5.5: the lock no
+      // longer spans the sequence, only the write burst.
       expect(databaseLockManager.withDatabaseLock).toHaveBeenCalledWith(
-        'refresh-all-from-api',
+        'refresh-all-from-api-write',
         expect.any(Function)
       );
     });
@@ -1555,16 +1557,19 @@ describe('dataUpdateService', () => {
       (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(fetchedRows([]));
 
       // INVERTED by plan 02 Phase 2.5 — a failing source no longer aborts the
-      // function. The lock assertion below is the part that still matters.
+      // function. INVERTED AGAIN by 05 Phase 5.5: with all-beers failing and
+      // the other two sources confirmed-empty, my-beers clears and rewards
+      // writes nothing, so the lock IS still taken — but for the write burst
+      // alone, after every fetch has finished.
       await refreshAllDataFromAPI();
 
+      expect(databaseLockManager.withDatabaseLock).toHaveBeenCalledWith(
+        'refresh-all-from-api-write',
+        expect.any(Function)
+      );
       // Asserts the lock is actually free, not merely that the wrapper was
       // called. The manager behind this mock is real, so deleting the finally
       // from withDatabaseLock fails this.
-      expect(databaseLockManager.withDatabaseLock).toHaveBeenCalledWith(
-        'refresh-all-from-api',
-        expect.any(Function)
-      );
       expect(databaseLockManager.isLocked()).toBe(false);
       expect(databaseLockManager.getQueueLength()).toBe(0);
     });
