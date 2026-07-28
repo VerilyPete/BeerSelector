@@ -236,19 +236,25 @@ const resolveMemberApiUrl = async (subject: string): Promise<MemberApiUrl> => {
 /**
  * Classify a parsed array into `data` or `confirmed-empty`.
  *
- * `confirmed-empty` means the server genuinely reported none — the only case in
- * which clearing a local table is correct. Anything that arrived but could not
- * be used is `malformed`, and the caller decides what that means.
+ * `confirmed-empty` means the server genuinely reported none — a well-formed
+ * body that says zero. Whether zero is an acceptable answer is the caller's
+ * question, not this one's: an empty rewards list is a normal member state, and
+ * an empty taplist is rejected downstream as a VALIDATION_ERROR. Neither is a
+ * fact about the body being unusable.
+ *
+ * This used to return `malformed` for an empty array, contradicting the line
+ * above and every other classifier in this file. Only the `brewInStock` caller
+ * could reach it — the other two check `length > 0` first — and there it turned
+ * a working server's honest "nothing on tap" into a thrown plain Error that
+ * surfaced as UNKNOWN_ERROR. There is no malformed case left here, which is why
+ * the detail string this took as a second argument is gone rather than unused.
  */
-const fromArray = <T>(
-  items: readonly T[],
-  malformedDetail: string
-): UnconditionalSource<FetchOutcome<T>> =>
-  fetched(
-    toNonEmpty(items) === null
-      ? { kind: 'malformed', detail: malformedDetail }
-      : { kind: 'data', items: toNonEmpty(items)! }
+const fromArray = <T>(items: readonly T[]): UnconditionalSource<FetchOutcome<T>> => {
+  const nonEmpty = toNonEmpty(items);
+  return fetched(
+    nonEmpty === null ? { kind: 'confirmed-empty' } : { kind: 'data', items: nonEmpty }
   );
+};
 
 /**
  * Build a `failed` outcome from a thrown transport error, classified by type.
@@ -303,7 +309,7 @@ export const fetchBeersFromAPI = async (): Promise<UnconditionalSource<FetchOutc
       console.log(
         `Found regular format with brewInStock array (${data[1].brewInStock.length} beers)`
       );
-      return fromArray(data[1].brewInStock, 'brewInStock array contained no usable beers');
+      return fromArray(data[1].brewInStock);
     }
 
     // 2. Visitor API format: may have different structure
@@ -354,7 +360,7 @@ export const fetchBeersFromAPI = async (): Promise<UnconditionalSource<FetchOutc
 
       const beersArray = findBeersArray(data);
       if (beersArray && beersArray.length > 0) {
-        return fromArray(beersArray, 'discovered beer array contained no usable beers');
+        return fromArray(beersArray);
       }
     }
 
@@ -470,7 +476,7 @@ export const fetchMyBeersFromAPI = async (): Promise<
       }
 
       if (validBeers.length > 0) {
-        return fromArray(validBeers, 'no tasted beers survived id validation');
+        return fromArray(validBeers);
       }
 
       // Rows arrived and none carried an id: MALFORMED, not an empty round.
