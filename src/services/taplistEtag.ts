@@ -21,13 +21,19 @@
  * branching of their own, so there is nowhere else for a decision to hide.
  *
  * **Documented exception:** the background enrichment poll
- * (`BeerRepository.updateEnrichmentData`) does NOT clear the ETag. Its write is
- * purely additive — `COALESCE`, so it cannot delete rows or null an ABV — and
- * ufobeer `f57bb91` makes the server ETag cover enrichment, so a 304 provably
- * means the client already has that data. Clearing would force a full 200 on
- * exactly the weak links this plan exists to fix. That dependency on the
- * backend's combined ETag has already reversed once; if it reverses again,
- * this exception is the first thing to revisit.
+ * (`BeerRepository.updateEnrichmentData`) does NOT clear the ETag. It cannot
+ * delete rows, and `abv` and `brew_description` are `COALESCE`d so it cannot
+ * null them either — which is what this exception rests on. It is NOT "purely
+ * additive", as this comment used to claim: `enrichment_confidence` and
+ * `enrichment_source` are written unconditionally and can be overwritten with
+ * null. In practice the poll only targets rows missing enrichment, so an
+ * already-populated row is not normally revisited, but the SQL permits it.
+ *
+ * The other half is that ufobeer `f57bb91` makes the server ETag cover
+ * enrichment, so a 304 provably means the client already has that data.
+ * Clearing would force a full 200 on exactly the weak links this plan exists to
+ * fix. That dependency on the backend's combined ETag has already reversed
+ * once; if it reverses again, this exception is the first thing to revisit.
  */
 
 import { getPreference, setPreference } from '../database/preferences';
