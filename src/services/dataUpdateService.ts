@@ -1728,14 +1728,20 @@ export const refreshAllDataFromAPI = async (): Promise<{
   const { plan: myBeersPlan, pendingWorkerSync } = await prepareMyBeers(REFRESH_FROM_API);
   const rewardsPlan = await prepareRewards(REFRESH_FROM_API);
 
-  // Derived from the same plans the writes consume, so a write and its
-  // reported rows come from one decision rather than two.
+  // These are the rows the writes were PLANNED to store — not confirmation that
+  // they were stored. They are derived from the same plans, so the two cannot
+  // describe different decisions; they can still describe a decision that then
+  // failed, because `applyPlan` turns a throwing write into a result this
+  // function discards. A rejected taplist insert therefore still returns its
+  // rows. That is pre-existing behaviour, not something the plan derivation
+  // introduced, and an earlier version of this comment claiming the two "cannot
+  // disagree" was overstating it.
   //
-  // An earlier version of this comment claimed "autoLogin -> checkInBeer
-  // consumes them". It does not: both production callers (`authService.ts:44`,
-  // `:399`) are a bare `await refreshAllDataFromAPI();` and discard the object.
-  // Only tests read it. The rows are kept accurate because the signature
-  // promises them, not because anything downstream reads them today.
+  // That same earlier version also claimed "autoLogin -> checkInBeer consumes
+  // them". It does not: both production callers (`authService.ts:44`, `:399`)
+  // are a bare `await refreshAllDataFromAPI();` and discard the object. Only
+  // tests read it — which is why the logs are this function's real output
+  // channel, and why a source failing silently here mattered enough to fix.
   const allBeers = plannedRows(allBeersPlan, allBeersRows);
   const myBeers = plannedRows(myBeersPlan, myBeersRows);
   const rewards = plannedRows(rewardsPlan, rewardsRows);
