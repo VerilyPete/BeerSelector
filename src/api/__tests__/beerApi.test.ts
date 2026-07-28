@@ -214,6 +214,23 @@ describe('Beer API', () => {
       if (body.kind === 'data') expect(body.items).toEqual(mockBeers);
     });
 
+    it('reports confirmed-empty when brewInStock is present but empty', async () => {
+      // A store that genuinely has nothing on tap answers with a well-formed
+      // body and a zero-length array. That is the server reporting none, which
+      // the outcome model calls `confirmed-empty` — not a fact about the body
+      // being unusable. Classifying it `malformed` sent a plain Error up
+      // `requireRows` and the user saw UNKNOWN_ERROR for a working server.
+      const mockResponse = [{}, { brewInStock: [] }];
+
+      (preferences.getPreference as jest.Mock).mockResolvedValue(config.api.baseUrl);
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockResponse,
+      });
+
+      expect(payload(await fetchBeersFromAPI()).kind).toBe('confirmed-empty');
+    });
+
     it('reports malformed when no beer data is found in the response', async () => {
       const mockResponse = { someOtherData: 'value' };
 
