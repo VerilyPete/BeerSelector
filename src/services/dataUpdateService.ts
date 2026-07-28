@@ -1580,7 +1580,7 @@ export async function manualRefreshAllData(): Promise<ManualRefreshResult> {
     const now = Date.now();
     if (now - lastManualRefreshTime < RAPID_REFRESH_WINDOW_MS) {
       console.log('Rapid double-refresh detected, clearing ETag to force full fetch');
-      await setPreference('all_beers_etag', '');
+      await commitTaplistWrite({ kind: 'cleared' });
     }
     lastManualRefreshTime = now;
     await setPreference('all_beers_last_update', '');

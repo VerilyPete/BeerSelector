@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { Colors } from '@/constants/Colors';
 import { setPreference } from '@/src/database/preferences';
+import { commitTaplistWrite } from '@/src/services/taplistEtag';
 import { handleVisitorLogin } from '@/src/api/authService';
 import { saveSessionData, extractSessionDataFromResponse } from '@/src/api/sessionManager';
 import { isSessionData } from '@/src/types/api';
@@ -252,24 +253,34 @@ export default function LoginWebView({
               'Flag indicating whether the user is in visitor mode'
             );
 
-            setPreference('user_json_url', userJsonUrl, 'API endpoint for user data');
-            setPreference('store_json_url', storeJsonUrl, 'API endpoint for store data');
+            await setPreference('user_json_url', userJsonUrl, 'API endpoint for user data');
+            await setPreference('store_json_url', storeJsonUrl, 'API endpoint for store data');
 
-            setPreference(
+            await setPreference(
               'my_beers_api_url',
               userJsonUrl,
               'API endpoint for fetching Beerfinder beers'
             );
-            setPreference('all_beers_api_url', storeJsonUrl, 'API endpoint for fetching all beers');
-            setPreference('all_beers_etag', '', 'Cached ETag for all beers taplist');
+            await setPreference(
+              'all_beers_api_url',
+              storeJsonUrl,
+              'API endpoint for fetching all beers'
+            );
+            // The rows in `allbeers` belong to whoever was logged in before, so
+            // the stored ETag no longer describes them. Awaited deliberately:
+            // unawaited, a failure here is an unhandled rejection that leaves
+            // the previous store's ETag live, and `prepareAllBeers` can read it
+            // before this lands and serve the wrong location's taplist behind a
+            // 304.
+            await commitTaplistWrite({ kind: 'cleared' });
 
-            setPreference(
+            await setPreference(
               'last_login_timestamp',
               new Date().toISOString(),
               'Last successful login timestamp'
             );
 
-            setPreference('auth_cookies', JSON.stringify(cookies), 'Authentication cookies');
+            await setPreference('auth_cookies', JSON.stringify(cookies), 'Authentication cookies');
 
             const sessionData = extractSessionDataFromResponse(new Headers(), cookies);
             console.log('Extracted session data:', sessionData);
@@ -341,7 +352,7 @@ export default function LoginWebView({
                 storeJsonUrl,
                 'API endpoint for fetching all beers'
               );
-              await setPreference('all_beers_etag', '', 'Cached ETag for all beers taplist');
+              await commitTaplistWrite({ kind: 'cleared' });
 
               await setPreference(
                 'my_beers_api_url',

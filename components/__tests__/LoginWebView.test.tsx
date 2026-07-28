@@ -6,6 +6,7 @@ import { config } from '@/src/config';
 // Import after mocks
 import LoginWebView from '@/components/LoginWebView';
 import { setPreference } from '@/src/database/preferences';
+import { commitTaplistWrite } from '@/src/services/taplistEtag';
 import { saveSessionData } from '@/src/api/sessionManager';
 import { handleVisitorLogin } from '@/src/api/authService';
 
@@ -103,6 +104,12 @@ jest.mock('react-native-webview', () => {
 jest.mock('@/src/database/preferences', () => ({
   setPreference: jest.fn().mockResolvedValue(undefined),
   getPreference: jest.fn().mockResolvedValue(null),
+}));
+
+// Mock the taplist ETag owner. Login invalidates the stored ETag because the
+// rows in `allbeers` belong to whoever was logged in before.
+jest.mock('@/src/services/taplistEtag', () => ({
+  commitTaplistWrite: jest.fn().mockResolvedValue(undefined),
 }));
 
 // Mock session manager
@@ -479,6 +486,76 @@ describe('LoginWebView', () => {
           expect.any(String)
         );
       });
+    });
+  });
+
+  describe('Member Login - taplist ETag invalidation', () => {
+    const memberLoginMessage = {
+      nativeEvent: {
+        data: JSON.stringify({
+          type: 'URLs',
+          userJsonUrl: `${mockFsbsBaseUrl}/bk-member-json.php?uid=12345`,
+          storeJsonUrl: `${mockFsbsBaseUrl}/bk-store-json.php?sid=67`,
+          cookies: {
+            member: '12345',
+            session: 'test-session',
+            store__id: '67',
+            store: 'Test Store',
+          },
+        }),
+      },
+    };
+
+    const renderLogin = () =>
+      render(
+        <LoginWebView
+          visible={true}
+          onLoginSuccess={mockOnLoginSuccess}
+          onLoginCancel={mockOnLoginCancel}
+          onRefreshData={mockOnRefreshData}
+        />
+      );
+
+    it('does not report login success until the taplist ETag clear has been persisted', async () => {
+      // The store the user is logging into is not necessarily the store whose
+      // rows are in `allbeers`. Reporting success early lets the next refresh
+      // read the PREVIOUS store's ETag, send it as If-None-Match, and serve the
+      // wrong location's taplist behind a 304.
+      let releaseEtagClear: () => void = () => {};
+      (commitTaplistWrite as jest.Mock).mockReturnValueOnce(
+        new Promise<void>(resolve => {
+          releaseEtagClear = () => resolve();
+        })
+      );
+
+      const { getByTestId } = renderLogin();
+      fireEvent(getByTestId('webview-mock'), 'onMessage', memberLoginMessage);
+
+      await waitFor(() => {
+        expect(commitTaplistWrite).toHaveBeenCalledWith({ kind: 'cleared' });
+      });
+      expect(mockOnLoginSuccess).not.toHaveBeenCalled();
+
+      releaseEtagClear();
+
+      await waitFor(() => {
+        expect(mockOnLoginSuccess).toHaveBeenCalled();
+      });
+    });
+
+    it('cancels the login when the taplist ETag clear fails', async () => {
+      // Unawaited, this rejection is an unhandled promise: logged in dev,
+      // dropped in production, with the previous store's ETag left live and
+      // nobody told. Awaited, it reaches the handler's catch.
+      (commitTaplistWrite as jest.Mock).mockRejectedValueOnce(new Error('database is locked'));
+
+      const { getByTestId } = renderLogin();
+      fireEvent(getByTestId('webview-mock'), 'onMessage', memberLoginMessage);
+
+      await waitFor(() => {
+        expect(mockOnLoginCancel).toHaveBeenCalled();
+      });
+      expect(mockOnLoginSuccess).not.toHaveBeenCalled();
     });
   });
 
