@@ -38,7 +38,7 @@ import {
   fetchAndUpdateAllBeers,
   resetLastManualRefreshTime,
   resetInFlightSequentialRefresh,
-  resetInFlightTaplistFetch,
+  dropInFlightTaplistFetch,
 } from '../dataUpdateService';
 import { getPreference, setPreference, areApiUrlsConfigured } from '../../database/preferences';
 import { fetchBeersFromAPI, fetchMyBeersFromAPI, fetchRewardsFromAPI } from '../../api/beerApi';
@@ -107,7 +107,7 @@ describe('Sequential Refresh Coordination', () => {
     jest.clearAllMocks();
     databaseLockManager.resetForTesting();
     resetInFlightSequentialRefresh();
-    resetInFlightTaplistFetch();
+    dropInFlightTaplistFetch();
     resetLastManualRefreshTime();
 
     (getPreference as jest.Mock).mockImplementation(async (key: string) => {
@@ -142,11 +142,84 @@ describe('Sequential Refresh Coordination', () => {
       // `refreshAllDataFromAPI` via `autoLogin`. Either can start a second full
       // taplist download while the first is in flight, on exactly the weak links
       // this plan exists to cope with.
+      // A real store URL: de-duplication is keyed by `sid`, and a URL without
+      // one is a wildcard that deliberately does not join.
+      (getPreference as jest.Mock).mockImplementation(async (key: string) => {
+        if (key === 'all_beers_api_url') {
+          return 'https://fsbs.beerknurd.com/bk-store-json.php?sid=13879';
+        }
+        if (key === 'my_beers_api_url') return 'http://api.example.com/my';
+        return null;
+      });
+
       const results = await Promise.all([fetchAndUpdateAllBeers(), fetchAndUpdateAllBeers()]);
 
       expect(fetchBeersFromAPI).toHaveBeenCalledTimes(1);
+      // Both callers must be SERVED, not merely both succeed: asserting only
+      // `success` passes when the joiner is handed an empty result, which is the
+      // mutant this test exists to catch.
+      expect(results[0]).toEqual(results[1]);
       expect(results[0].success).toBe(true);
-      expect(results[1].success).toBe(true);
+      expect(results[0].dataUpdated).toBe(true);
+      expect(results[0].itemCount).toBe(ALL_BEERS.length);
+    });
+
+    it('does not serve the manual-refresh escape hatch from a fetch that predates it', async () => {
+      // `join: false` exists because a running refresh has already read the old
+      // ETag, so handing back its result makes the escape hatch a silent no-op —
+      // `SequentialRefreshOptions.join` says exactly that. The taplist-level
+      // join is a SECOND join point that `settleInFlightRefresh` knows nothing
+      // about, so `join: false` cannot reach it. A user double-pulling on a slow
+      // link is precisely how you arrive here.
+      // Identified store, so the join is actually available to be defeated.
+      (getPreference as jest.Mock).mockImplementation(async (key: string) => {
+        if (key === 'all_beers_api_url') {
+          return 'https://fsbs.beerknurd.com/bk-store-json.php?sid=13879';
+        }
+        if (key === 'my_beers_api_url') return 'http://api.example.com/my';
+        return null;
+      });
+
+      await manualRefreshAllData();
+      const callsBefore = (fetchBeersFromAPI as jest.Mock).mock.calls.length;
+
+      let releaseInFlight: () => void = () => {};
+      let reachedFetch: () => void = () => {};
+      const inFlightRegistered = new Promise<void>(resolve => {
+        reachedFetch = resolve;
+      });
+      (fetchBeersFromAPI as jest.Mock).mockImplementationOnce(async () => {
+        reachedFetch();
+        await new Promise<void>(resolve => {
+          releaseInFlight = resolve;
+        });
+        return fetchedRows(ALL_BEERS);
+      });
+
+      const focusRefresh = fetchAndUpdateAllBeers();
+      // Wait for the fetch to actually be in flight. A bare microtask tick is
+      // not enough — `fetchAndUpdateAllBeers` awaits several preference reads
+      // first, and without this the forced refresh starts before there is
+      // anything to join, which makes the test pass for the wrong reason.
+      await inFlightRegistered;
+
+      const forced = manualRefreshAllData();
+      // Let the forced refresh run all the way down to the taplist fetch before
+      // releasing. Its path there is settleInFlightRefresh, the ETag clear and
+      // four timestamp writes — all mocked, so all microtasks. Releasing sooner
+      // lets the in-flight entry clear before the forced refresh can join it,
+      // which is the test passing for the wrong reason.
+      for (let tick = 0; tick < 50; tick += 1) {
+        await Promise.resolve();
+      }
+
+      releaseInFlight();
+      await Promise.all([focusRefresh, forced]);
+
+      // Three fetches: the priming refresh, the in-flight one, and the forced
+      // one. Joining would give two, and the user's forced refresh would return
+      // a result computed from the ETag they just cleared.
+      expect((fetchBeersFromAPI as jest.Mock).mock.calls.length).toBeGreaterThan(callsBefore + 1);
     });
 
     it('does not let a different store join an in-flight fetch', async () => {
@@ -399,9 +472,17 @@ describe('Sequential Refresh Coordination', () => {
           entry === 'clear:all_beers_last_update' ? [...indices, index] : indices,
         []
       );
-      expect(timestampClears).toHaveLength(2);
-      expect(timestampClears[1]).toBeGreaterThan(order.indexOf('write:allBeers'));
-      expect(order[timestampClears[1] - 1]).toBe('clear:all_beers_etag');
+      // Deliberately not `toHaveLength(2)` and not positional adjacency. Pinning
+      // the exact count and the exact neighbour encodes a call sequence rather
+      // than the property, and this file has already been broken once by a
+      // legitimate change that added an ETag clear. What matters is that the
+      // LAST timestamp clear — the overtaking call's — lands after the overtaken
+      // run's write, with its ETag clear somewhere in that same burst.
+      const lastTimestampClear = timestampClears[timestampClears.length - 1];
+      const writeIndex = order.indexOf('write:allBeers');
+      expect(timestampClears.length).toBeGreaterThan(0);
+      expect(lastTimestampClear).toBeGreaterThan(writeIndex);
+      expect(order.slice(writeIndex, lastTimestampClear)).toContain('clear:all_beers_etag');
     });
 
     it('re-stamps the timestamps it cleared', async () => {

@@ -76,6 +76,52 @@ function nel<T>(items: readonly T[]): NonEmptyArray<T> {
 }
 
 describe('BeerRepository', () => {
+  describe('count', () => {
+    // The 304 backstop reads this to decide whether to believe the server. It
+    // had no direct coverage at all — every reference in the service tests is a
+    // mock — so the SQL, the result shape and the failure path were all
+    // unverified while three call sites depended on them.
+    it('reports how many rows the table holds', async () => {
+      const mockDatabase = createMockDatabase();
+      mockDatabase.getFirstAsync.mockResolvedValue({ count: 1200 });
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+
+      await expect(createRepository().count()).resolves.toBe(1200);
+      expect(mockDatabase.getFirstAsync).toHaveBeenCalledWith(
+        'SELECT COUNT(*) as count FROM allbeers'
+      );
+    });
+
+    it('reports zero when the table is genuinely empty', async () => {
+      const mockDatabase = createMockDatabase();
+      mockDatabase.getFirstAsync.mockResolvedValue({ count: 0 });
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+
+      await expect(createRepository().count()).resolves.toBe(0);
+    });
+
+    it('reports null rather than zero when the count cannot be read', async () => {
+      // The distinction the callers depend on. Returning 0 here would be a
+      // factual claim that the table is empty, and the caller answers that by
+      // DISCARDING the stored ETag and reporting a failure — so an unreadable
+      // count against a full table used to throw away a valid validator and
+      // raise an error blaming the server.
+      const mockDatabase = createMockDatabase();
+      mockDatabase.getFirstAsync.mockRejectedValue(new Error('database is locked'));
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+
+      await expect(createRepository().count()).resolves.toBeNull();
+    });
+
+    it('reports null when the query returns no row at all', async () => {
+      const mockDatabase = createMockDatabase();
+      mockDatabase.getFirstAsync.mockResolvedValue(null);
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+
+      await expect(createRepository().count()).resolves.toBeNull();
+    });
+  });
+
   describe('insertMany', () => {
     it('should insert multiple beers in batches', async () => {
       const mockDatabase = createMockDatabase();

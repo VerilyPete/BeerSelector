@@ -88,6 +88,35 @@ const etagWrites = (): unknown[] =>
     .filter(call => call[0] === 'all_beers_etag')
     .map(c => c[1]);
 
+/**
+ * Freshness stamps written this run.
+ *
+ * Stamping `all_beers_last_check` on the backstop path is what would make the
+ * empty-table state self-sustaining — the next refresh would skip, and the
+ * corrective full fetch would never happen.
+ */
+const freshnessStamps = (): unknown[] =>
+  (setPreference as jest.Mock).mock.calls.filter(call => call[0] === 'all_beers_last_check');
+
+/**
+ * Did an ETag clear land before the rows were replaced?
+ *
+ * The property all three writers must hold: no validator may outlive the rows it
+ * describes, so the invalidation has to precede the insert rather than follow it.
+ */
+const clearBeforeInsert = (): boolean => {
+  const setPreferenceMock = setPreference as jest.Mock;
+  const insertOrder = (beerRepository.insertManyUnsafe as jest.Mock).mock.invocationCallOrder[0];
+  if (insertOrder === undefined) return false;
+
+  return setPreferenceMock.mock.calls.some(
+    (call: unknown[], index: number) =>
+      call[0] === 'all_beers_etag' &&
+      call[1] === '' &&
+      setPreferenceMock.mock.invocationCallOrder[index] < insertOrder
+  );
+};
+
 const storedEtagIs = (value: string | null): void => {
   (getPreference as jest.Mock).mockImplementation(async (key: string) => {
     if (key === 'all_beers_api_url') return STORE_URL;
@@ -201,6 +230,12 @@ describe('taplist ETag invalidation', () => {
     // The stale validator is dropped, so the next request cannot 304 again.
     expect(etagWrites()).toContain('');
     expect(result.dataUpdated).toBe(false);
+    // A failure, and crucially last_check must NOT be stamped: stamping it is
+    // the mechanism that makes the empty-list state self-sustaining, and a
+    // mutant that stamped it while reporting success survived both this test
+    // and the login one.
+    expect(result.success).toBe(false);
+    expect(freshnessStamps()).toHaveLength(0);
   });
 
   it('refuses to believe a 304 with an empty table — manual refresh', async () => {
@@ -238,6 +273,7 @@ describe('taplist ETag invalidation', () => {
     await svc.refreshAllDataFromAPI();
 
     expect(etagWrites()).toContain('');
+    expect(freshnessStamps()).toHaveLength(0);
   });
 
   it('honours a 304 when the table actually holds rows', async () => {
@@ -255,9 +291,16 @@ describe('taplist ETag invalidation', () => {
       notModified: true,
     });
 
-    await svc.fetchAndUpdateAllBeers();
+    const result = await svc.fetchAndUpdateAllBeers();
 
+    // Positives, not just a negative: asserting only "no clear happened" is
+    // satisfied when the 304 path THROWS, so the old version of this test could
+    // not tell an honoured 304 from an exploded one.
     expect(etagWrites()).not.toContain('');
+    expect(result.success).toBe(true);
+    expect(result.dataUpdated).toBe(false);
+    expect(beerRepository.insertManyUnsafe).not.toHaveBeenCalled();
+    expect(freshnessStamps()).toHaveLength(1);
   });
 
   it('stores the new ETag when the proxy returns a 200 carrying one', async () => {
@@ -299,6 +342,28 @@ describe('taplist ETag invalidation', () => {
     expect(clearOrder).toBeDefined();
     expect(insertOrder).toBeDefined();
     expect(clearOrder).toBeLessThan(insertOrder);
+  });
+
+  it('invalidates before replacing on the manual-refresh path too', async () => {
+    // The ordering is applied at three writers. Until this test and the one
+    // below it, it was pinned at one: reverting the pre-clear in `writeAllBeers`
+    // or `writeAllBeersOnLogin` left the whole suite green. The two existing
+    // per-entry-point tests use the FALLBACK path, where the post-commit also
+    // writes '', so they cannot tell the pre-clear apart from the post-commit.
+    // Using a proxy ETag makes them distinguishable.
+    proxyReturns('W/"new"');
+
+    await svc.sequentialRefreshAllData();
+
+    expect(clearBeforeInsert()).toBe(true);
+  });
+
+  it('invalidates before replacing on the login path too', async () => {
+    proxyReturns('W/"new"');
+
+    await svc.refreshAllDataFromAPI();
+
+    expect(clearBeforeInsert()).toBe(true);
   });
 
   it('clears the stored ETag when the proxy returns a 200 without one', async () => {
