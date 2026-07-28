@@ -33,6 +33,8 @@ import { myBeersRepository } from '../../database/repositories/MyBeersRepository
 import { rewardsRepository } from '../../database/repositories/RewardsRepository';
 import { fetchEnrichmentBatchWithMissing, syncBeersToWorker } from '../enrichmentService';
 import { config } from '@/src/config';
+import { getPreference, setPreference } from '../../database/preferences';
+import { fetchBeersFromProxy } from '../enrichmentService';
 import { fetchedRows, failed, unavailable } from '../../api/__tests__/helpers/fetchOutcomeFixtures';
 import { refreshAllDataFromAPI } from '../dataUpdateService';
 
@@ -272,6 +274,94 @@ describe('refreshAllDataFromAPI locking', () => {
     await refreshAllDataFromAPI();
 
     expect(mockEvents.filter(event => event.startsWith('lock:'))).toEqual([]);
+  });
+
+  describe('what this path writes, which is deliberately less than the sequential path', () => {
+    /**
+     * 5.5 kept two write functions rather than sharing one, because
+     * `writeAllBeers`/`writeMyBeers` stamp freshness timestamps and this path
+     * never has — adding them would change when `checkAndRefreshOnAppOpen`
+     * considers data fresh. That was argued at length and held by NOTHING:
+     * swapping `writeAllBeersOnLogin` for `writeAllBeers` left every test green,
+     * as did deleting the ETag write outright. A deliberately preserved
+     * behaviour with no test is indistinguishable from an accident.
+     */
+    const taplistViaProxyWithEtag = (): void => {
+      jest
+        .spyOn(config, 'enrichment', 'get')
+        .mockReturnValue({ ...config.enrichment, isConfigured: () => true });
+      (getPreference as jest.Mock).mockImplementation(async (key: string) => {
+        if (key === 'all_beers_api_url') return 'https://example.com/beers?sid=13885';
+        if (key === 'my_beers_api_url') return 'https://example.com/mybeers.json';
+        return null;
+      });
+      (fetchBeersFromProxy as jest.Mock).mockResolvedValue({
+        notModified: false,
+        beers: [{ id: 'b1', brew_name: 'Proxy Beer', brewer: 'Brewery' }],
+        etag: 'W/"v1"',
+      });
+    };
+
+    const preferenceKeysWritten = (): string[] =>
+      (setPreference as jest.Mock).mock.calls.map(call => call[0]);
+
+    it('stores the ETag but not the freshness timestamps', async () => {
+      taplistViaProxyWithEtag();
+      respondsWith(fetchMyBeersFromAPI as jest.Mock, 'myBeers', fetchedRows(MY_BEERS));
+      respondsWith(fetchRewardsFromAPI as jest.Mock, 'rewards', fetchedRows(REWARDS));
+
+      await refreshAllDataFromAPI();
+
+      expect(preferenceKeysWritten()).toContain('all_beers_etag');
+      // The asymmetry, in both directions. `writeAllBeers` would add the first
+      // two and `writeMyBeers` the last two; this path writes none of them.
+      expect(preferenceKeysWritten()).not.toContain('all_beers_last_update');
+      expect(preferenceKeysWritten()).not.toContain('all_beers_last_check');
+      expect(preferenceKeysWritten()).not.toContain('my_beers_last_update');
+      expect(preferenceKeysWritten()).not.toContain('my_beers_last_check');
+    });
+
+    it('stamps only the check timestamp on a 304, and still takes the lock', async () => {
+      // The login path's 304 arm had no coverage: it is reachable only through
+      // this function, and the existing 304 tests drive fetchAndUpdateAllBeers.
+      // A 304 is classified as a WRITE precisely so the check timestamp still
+      // advances — the one preference this path does stamp.
+      jest
+        .spyOn(config, 'enrichment', 'get')
+        .mockReturnValue({ ...config.enrichment, isConfigured: () => true });
+      (getPreference as jest.Mock).mockImplementation(async (key: string) => {
+        if (key === 'all_beers_api_url') return 'https://example.com/beers?sid=13885';
+        if (key === 'my_beers_api_url') return 'https://example.com/mybeers.json';
+        return null;
+      });
+      (fetchBeersFromProxy as jest.Mock).mockResolvedValue({
+        notModified: true,
+        beers: [],
+        etag: 'W/"unchanged"',
+      });
+      respondsWith(
+        fetchMyBeersFromAPI as jest.Mock,
+        'myBeers',
+        unavailable('not-applicable', 'none:// placeholder')
+      );
+      respondsWith(
+        fetchRewardsFromAPI as jest.Mock,
+        'rewards',
+        unavailable('not-applicable', 'none:// placeholder')
+      );
+
+      const result = await refreshAllDataFromAPI();
+
+      expect(preferenceKeysWritten()).toContain('all_beers_last_check');
+      expect(beerRepository.insertManyUnsafe).not.toHaveBeenCalled();
+      expect(result.allBeers).toEqual([]);
+      // Taken for the 304 alone — which is what makes "a 304 is a write"
+      // load-bearing rather than a naming choice.
+      expect(mockEvents.filter(event => event.startsWith('lock:'))).toEqual([
+        'lock:acquire',
+        'lock:release',
+      ]);
+    });
   });
 
   it('returns the rows it wrote', async () => {
