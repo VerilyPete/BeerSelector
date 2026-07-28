@@ -7,7 +7,7 @@ import { config } from '@/src/config';
 import LoginWebView from '@/components/LoginWebView';
 import { setPreference } from '@/src/database/preferences';
 import { commitTaplistWrite } from '@/src/services/taplistEtag';
-import { saveSessionData } from '@/src/api/sessionManager';
+import { saveSessionData, extractSessionDataFromResponse } from '@/src/api/sessionManager';
 import { handleVisitorLogin } from '@/src/api/authService';
 
 // Test URL constants - prefixed with 'mock' to allow use in jest.mock() factory
@@ -576,6 +576,18 @@ describe('LoginWebView', () => {
       await waitFor(() => {
         expect(alertSpy).toHaveBeenCalled();
       });
+
+      // Asserting only that SOME alert fired let a mutant through: routing the
+      // catch to `handleClose` tells the user they cancelled the login, which is
+      // false and drops the retry hint, and the suite stayed green.
+      expect(alertSpy).toHaveBeenCalledWith(
+        'Login Failed',
+        expect.stringContaining('Could not finish signing you in'),
+        expect.any(Array)
+      );
+      expect(alertSpy).toHaveBeenCalledTimes(1);
+      expect(mockOnLoginCancel).toHaveBeenCalled();
+      expect(mockOnLoginSuccess).not.toHaveBeenCalled();
     });
 
     it('does not mark the app configured when the session cannot be saved', async () => {
@@ -593,10 +605,84 @@ describe('LoginWebView', () => {
         expect(mockOnLoginCancel).toHaveBeenCalled();
       });
 
-      const writtenKeys = (setPreference as jest.Mock).mock.calls.map(([key]) => key);
-      expect(writtenKeys).not.toContain('all_beers_api_url');
-      expect(writtenKeys).not.toContain('my_beers_api_url');
+      // The gate is `all_beers_api_url` being truthy — both branches of
+      // `areApiUrlsConfigured` require it. Asserting the key was never written
+      // would be wrong now that the login clears it first; what must not happen
+      // is the gate being left OPEN.
+      const gateWrites = (setPreference as jest.Mock).mock.calls.filter(
+        ([key]) => key === 'all_beers_api_url'
+      );
+      expect(gateWrites.every(([, value]) => !value)).toBe(true);
       expect(mockOnLoginSuccess).not.toHaveBeenCalled();
+    });
+
+    it('opens the configuration gate when the login completes', async () => {
+      // The negative test above passes if the gate writes are deleted outright,
+      // so it cannot be the only guard. This is the positive half: a successful
+      // login must leave all three keys `areApiUrlsConfigured` reads set, with
+      // `all_beers_api_url` truthy.
+      const { getByTestId } = renderLogin();
+      fireEvent(getByTestId('webview-mock'), 'onMessage', memberLoginMessage);
+
+      await waitFor(() => {
+        expect(mockOnLoginSuccess).toHaveBeenCalled();
+      });
+
+      const lastValueFor = (key: string) =>
+        (setPreference as jest.Mock).mock.calls.filter(([k]) => k === key).pop()?.[1];
+
+      expect(lastValueFor('all_beers_api_url')).toBe(`${mockFsbsBaseUrl}/bk-store-json.php?sid=67`);
+      expect(lastValueFor('my_beers_api_url')).toBe(
+        `${mockFsbsBaseUrl}/bk-member-json.php?uid=12345`
+      );
+      expect(lastValueFor('is_visitor_mode')).toBe('false');
+    });
+
+    it('does not report success when the login cookies are incomplete', async () => {
+      // Incomplete session data used to warn and fall through to the gate writes
+      // and `onLoginSuccess`, leaving the app configured with nothing in
+      // SecureStore. It never threw, so the catch could not see it.
+      (extractSessionDataFromResponse as jest.Mock).mockReturnValueOnce({
+        memberId: '12345',
+        sessionId: 'test-session',
+      });
+
+      const { getByTestId } = renderLogin();
+      fireEvent(getByTestId('webview-mock'), 'onMessage', memberLoginMessage);
+
+      await waitFor(() => {
+        expect(mockOnLoginCancel).toHaveBeenCalled();
+      });
+
+      expect(saveSessionData).not.toHaveBeenCalled();
+      expect(mockOnLoginSuccess).not.toHaveBeenCalled();
+      const gateWrites = (setPreference as jest.Mock).mock.calls.filter(
+        ([key]) => key === 'all_beers_api_url'
+      );
+      expect(gateWrites.every(([, value]) => !value)).toBe(true);
+    });
+
+    it('completes the login when a preference nothing reads fails to write', async () => {
+      // The swallow in `recordUnreadLoginMetadata` is the load-bearing decision
+      // here: a contention failure on a value no code consults must not discard
+      // a WebView authentication that already succeeded. Changing that catch to
+      // a rethrow left the whole suite green.
+      (setPreference as jest.Mock).mockImplementation((key: string) =>
+        key === 'auth_cookies'
+          ? Promise.reject(new Error('database is locked'))
+          : Promise.resolve(undefined)
+      );
+      const alertSpy = jest.spyOn(Alert, 'alert');
+
+      const { getByTestId } = renderLogin();
+      fireEvent(getByTestId('webview-mock'), 'onMessage', memberLoginMessage);
+
+      await waitFor(() => {
+        expect(mockOnLoginSuccess).toHaveBeenCalled();
+      });
+
+      expect(alertSpy).not.toHaveBeenCalled();
+      expect(mockOnLoginCancel).not.toHaveBeenCalled();
     });
   });
 

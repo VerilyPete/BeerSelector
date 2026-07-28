@@ -11,6 +11,7 @@ import { commitTaplistWrite } from '@/src/services/taplistEtag';
 import { handleVisitorLogin } from '@/src/api/authService';
 import { saveSessionData, extractSessionDataFromResponse } from '@/src/api/sessionManager';
 import { isSessionData } from '@/src/types/api';
+import { createErrorResponse, getUserFriendlyErrorMessage } from '@/src/utils/notificationUtils';
 import { config } from '@/src/config';
 
 type LoginWebViewProps = {
@@ -26,10 +27,21 @@ type LoginWebViewProps = {
  *
  * `user_json_url`, `store_json_url`, `last_login_timestamp` and `auth_cookies`
  * are each written at exactly one site — this one — and read nowhere in
- * production. They are worth keeping for diagnosing a login after the fact, but
- * a contention failure on a value no code consults must not abort the login:
- * the caller's catch would skip `saveSessionData`, which is the write
- * `autoLogin` actually depends on.
+ * production. No `getPreference` call site references any of them;
+ * `getAllPreferences` does load them, but its only caller
+ * (`hooks/useSettingsState.ts`) has that value dropped by `app/settings.tsx`,
+ * and DeveloperSection's preference dump names five other keys. So there is
+ * currently no way to see them in the app at all.
+ *
+ * They are kept because they cost nothing and describe the login, but a
+ * contention failure on a value nothing consults must not abort a login whose
+ * WebView authentication has already succeeded — the caller's catch would
+ * discard the whole thing and send the user back through the auth flow.
+ *
+ * Note this is deliberately NOT justified by `autoLogin`: `autoLogin` does not
+ * read the stored session, it POSTs `/auto-login.php` and calls
+ * `saveSessionData` itself. The real dependents of that write are the
+ * `getSessionData` readers — check-in, rewards, session validation.
  */
 async function recordUnreadLoginMetadata({
   userJsonUrl,
@@ -290,38 +302,63 @@ export default function LoginWebView({
               // URL paired with the old store's validator.
               await commitTaplistWrite({ kind: 'cleared' });
 
-              // Nothing reads these four — verified: zero `getPreference` call
-              // sites for any of them. A contention failure on a value no code
-              // consults must not abort the login, because aborting skips
-              // `saveSessionData` below, which is the write `autoLogin` depends on.
+              // Close the configuration gate before touching anything else.
+              //
+              // `areApiUrlsConfigured` has two branches and BOTH require
+              // `all_beers_api_url`, so clearing it is the one write that shuts
+              // the gate no matter what state the device was in. Ordering alone
+              // cannot do this: on a fresh install `null` and `'false'` are
+              // equivalent for `is_visitor_mode`, so the gate opens as soon as
+              // the URLs land; and for a visitor upgrading to member the visitor
+              // branch keeps it open for the whole login. Writing
+              // `all_beers_api_url` last then reopens it exactly once, at the end.
+              //
+              // The trade is deliberate: a login that fails partway now costs the
+              // user their previous configuration and returns them to Settings.
+              // That is worse than leaving a working config alone, and better
+              // than the alternative it replaces — silently configured in the
+              // wrong mode, or pointed at a mix of two stores, while being told
+              // the login failed.
+              await setPreference('all_beers_api_url', '', 'API endpoint for fetching all beers');
+
+              // Nothing reads these four — no `getPreference` call site for any of
+              // them, and `getAllPreferences` loads them but its only caller drops
+              // the value. A contention failure on a value nothing consults must
+              // not abort a login whose WebView authentication already succeeded.
               await recordUnreadLoginMetadata({ userJsonUrl, storeJsonUrl, cookies });
 
               const sessionData = extractSessionDataFromResponse(new Headers(), cookies);
               console.log('Extracted session data:', sessionData);
 
-              if (isSessionData(sessionData)) {
-                await saveSessionData(sessionData);
-                console.log('Member session data saved to SecureStore successfully');
-              } else {
-                console.warn(
-                  'Incomplete session data from member login cookies - missing required fields'
-                );
-                console.warn('Required: memberId, sessionId, storeId, storeName');
+              if (!isSessionData(sessionData)) {
+                // This used to warn four times and carry on to open the gate and
+                // report success — configured, nothing in SecureStore, and the
+                // user told they were signed in. It does not throw on its own, so
+                // the catch below could never see it. A missing `member_id` or
+                // `store_name` cookie is all it takes.
                 console.warn('Got:', {
                   hasMemberId: !!(sessionData && sessionData.memberId),
                   hasSessionId: !!(sessionData && sessionData.sessionId),
                   hasStoreId: !!(sessionData && sessionData.storeId),
                   hasStoreName: !!(sessionData && sessionData.storeName),
                 });
+                throw new Error(
+                  'Incomplete session data from member login cookies — required: memberId, sessionId, storeId, storeName'
+                );
               }
 
-              // The gate flips LAST. `areApiUrlsConfigured` reads exactly
-              // is_visitor_mode, all_beers_api_url and my_beers_api_url, and
-              // app/_layout.tsx routes on it. Writing them before the session is
-              // persisted let a failed login boot the app into full member mode
-              // with nothing in SecureStore — configured, unauthenticated, and
-              // with no record of the failure, since nothing reads the two keys
-              // that witnessed it.
+              await saveSessionData(sessionData);
+              console.log('Member session data saved to SecureStore successfully');
+
+              // Reopen the gate only now, with `all_beers_api_url` last — it is
+              // the key both branches of `areApiUrlsConfigured` require, so it is
+              // the single point at which this login becomes visible to
+              // app/_layout.tsx's routing.
+              await setPreference(
+                'is_visitor_mode',
+                'false',
+                'Flag indicating whether the user is in visitor mode'
+              );
               await setPreference(
                 'my_beers_api_url',
                 userJsonUrl,
@@ -331,11 +368,6 @@ export default function LoginWebView({
                 'all_beers_api_url',
                 storeJsonUrl,
                 'API endpoint for fetching all beers'
-              );
-              await setPreference(
-                'is_visitor_mode',
-                'false',
-                'Flag indicating whether the user is in visitor mode'
               );
 
               processedUrlsRef.current.clear();
@@ -347,13 +379,36 @@ export default function LoginWebView({
               // with no indication that anything had failed. The visitor branch
               // below has alerted on its own failures all along.
               console.error('Error completing member login:', error);
+              // Classified rather than hardcoded: contention really is transient
+              // and retrying works, but a SecureStore failure is durable and
+              // telling that user "usually temporary" sends them retrying against
+              // a wall. `createErrorResponse` already types both.
               Alert.alert(
                 'Login Failed',
-                'Could not finish signing you in. This is usually temporary — please try again.',
+                `Could not finish signing you in. ${getUserFriendlyErrorMessage(
+                  createErrorResponse(error)
+                )}`,
                 [{ text: 'OK' }]
               );
               onLoginCancel();
             }
+          } else {
+            // No `else` here left the modal open and inert: the injected regex
+            // posts `type: 'URLs'` with nulls whenever the member-dash HTML
+            // changes shape, and `injectPageSpecificJavaScript` has already added
+            // the URL to `processedUrlsRef`, so it will not retry. The user was
+            // left staring at a dashboard with no way forward but the close
+            // button, and nothing was logged for them or for us.
+            console.error('Member login message missing URLs:', {
+              hasUserJsonUrl: !!userJsonUrl,
+              hasStoreJsonUrl: !!storeJsonUrl,
+            });
+            Alert.alert(
+              'Login Failed',
+              'Could not read your account details from the Flying Saucer page. Please try again.',
+              [{ text: 'OK' }]
+            );
+            onLoginCancel();
           }
         } else if (data.type === 'VISITOR_LOGIN_ERROR') {
           console.error('Error extracting visitor login data in WebView:', data.error);
@@ -389,10 +444,23 @@ export default function LoginWebView({
             console.log('Visitor login result:', loginResult);
 
             if (loginResult.success) {
+              // Same shape as the member branch above, and for the same reasons.
+              // Clearing `all_beers_api_url` closes the gate whichever branch
+              // `areApiUrlsConfigured` takes; the ETag is invalidated before the
+              // URL that orphans it; and the same key, written last, is the
+              // single point where this login becomes visible to routing.
+              await setPreference('all_beers_api_url', '', 'API endpoint for fetching all beers');
+              await commitTaplistWrite({ kind: 'cleared' });
+
               await setPreference(
                 'is_visitor_mode',
                 'true',
                 'Flag indicating whether the user is in visitor mode'
+              );
+              await setPreference(
+                'my_beers_api_url',
+                'none://visitor_mode',
+                'Placeholder URL for visitor mode (not a real endpoint)'
               );
 
               const storeJsonUrl = `https://fsbs.beerknurd.com/bk-store-json.php?sid=${storeId}`;
@@ -401,13 +469,6 @@ export default function LoginWebView({
                 'all_beers_api_url',
                 storeJsonUrl,
                 'API endpoint for fetching all beers'
-              );
-              await commitTaplistWrite({ kind: 'cleared' });
-
-              await setPreference(
-                'my_beers_api_url',
-                'none://visitor_mode',
-                'Placeholder URL for visitor mode (not a real endpoint)'
               );
 
               processedUrlsRef.current.clear();

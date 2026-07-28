@@ -235,6 +235,36 @@ describe('manualRefreshAllData', () => {
 
     expect(clearOrders.some((order: number) => order < firstFetchOrder)).toBe(true);
   });
+
+  it('does not clear the ETag before fetching on a first manual refresh', async () => {
+    // The complement of the test above, and the guard on the 30-second window
+    // itself. Deleting `if (now - lastManualRefreshTime < RAPID_REFRESH_WINDOW_MS)`
+    // made every manual refresh force a full download, and the whole suite
+    // stayed green — the sibling tests all expect *a* clear, because the
+    // fallback write produces one too. Only the rapid-refresh clear runs before
+    // the taplist is fetched, so its absence there is what distinguishes them.
+    svc.resetLastManualRefreshTime();
+    (fetchBeersFromAPI as jest.Mock).mockResolvedValue(
+      fetchedRows([{ id: 'beer-1', brew_name: 'Test Beer', brewer: 'Brewery' }])
+    );
+    (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows([]));
+    (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(fetchedRows([]));
+
+    await svc.manualRefreshAllData();
+
+    const setPreferenceMock = setPreference as jest.Mock;
+    expect(fetchBeersFromAPI).toHaveBeenCalled();
+    const firstFetchOrder = (fetchBeersFromAPI as jest.Mock).mock.invocationCallOrder[0];
+    const clearOrders = setPreferenceMock.mock.calls
+      .map((call: unknown[], index: number) => ({
+        call,
+        order: setPreferenceMock.mock.invocationCallOrder[index],
+      }))
+      .filter(({ call }: { call: unknown[] }) => call[0] === 'all_beers_etag')
+      .map(({ order }: { order: number }) => order);
+
+    expect(clearOrders.every((order: number) => order > firstFetchOrder)).toBe(true);
+  });
 });
 
 describe('sequentialRefreshAllData: empty vs malformed tasted beers', () => {
