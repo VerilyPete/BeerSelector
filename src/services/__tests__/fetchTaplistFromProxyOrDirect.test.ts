@@ -12,7 +12,11 @@ import { fetchBeersFromProxy, recordFallback } from '../enrichmentService';
 import { fetchedRows } from '../../api/__tests__/helpers/fetchOutcomeFixtures';
 
 jest.mock('../../database/preferences', () => ({
-  getPreference: jest.fn(),
+  // Returns null, not undefined. The real signature is Promise<string | null>,
+  // and a bare jest.fn() answers `undefined` — which `normalizeStoredEtag`
+  // rightly does not defend against, since the type forbids it. An
+  // under-specified mock is the same trap as a stale one.
+  getPreference: jest.fn(async () => null),
   setPreference: jest.fn(),
 }));
 

@@ -1,0 +1,228 @@
+/**
+ * The stored ETag may only survive a write that it actually describes.
+ *
+ * Plan 04 Phase 2, sequenced as plan 05 Phase 5.6.
+ *
+ * `all_beers_etag` was written `if (etag)` at three separate sites, so a
+ * fallback write — which produces no ETag — left the PREVIOUS one in place. That
+ * ETag then names proxy-enriched rows the table no longer holds, every later
+ * conditional request 304s and returns without touching the database, and the
+ * ABV placards never come back. Findings 1 and 7 of the branch review.
+ *
+ * The fix is not an `else` branch at each site. It is that one module owns the
+ * correspondence: `taplistEtag.ts` decides, and the three writers only commit
+ * what it decided. That module has existed and been dead since 04 Phase 1 —
+ * `readTaplistEtag` and `commitTaplistWrite` had zero production importers.
+ *
+ * **Three entry points, three tests for the same property.** The bug was
+ * copy-pasted three times, and fixing two of three is indistinguishable from
+ * fixing none — the argument this plan has now had to make four separate times.
+ */
+
+import * as svc from '../dataUpdateService';
+import { fetchBeersFromAPI, fetchMyBeersFromAPI, fetchRewardsFromAPI } from '../../api/beerApi';
+import { getPreference, setPreference } from '../../database/preferences';
+import { fetchBeersFromProxy } from '../enrichmentService';
+import { config } from '@/src/config';
+import { fetchedRows, unavailable } from '../../api/__tests__/helpers/fetchOutcomeFixtures';
+
+jest.mock('../../database/preferences', () => ({
+  getPreference: jest.fn(),
+  setPreference: jest.fn(async () => {}),
+  areApiUrlsConfigured: jest.fn(async () => true),
+}));
+
+jest.mock('../../api/beerApi', () => ({
+  fetchBeersFromAPI: jest.fn(),
+  fetchMyBeersFromAPI: jest.fn(),
+  fetchRewardsFromAPI: jest.fn(),
+}));
+
+jest.mock('../enrichmentService', () => ({
+  fetchBeersFromProxy: jest.fn(),
+  fetchEnrichmentBatchWithMissing: jest.fn(async () => ({ enrichments: {}, missing: [] })),
+  syncBeersToWorker: jest.fn(async () => {}),
+  mergeEnrichmentData: jest.fn((beers: unknown) => beers),
+  recordFallback: jest.fn(),
+  pollForEnrichmentUpdates: jest.fn(),
+}));
+
+jest.mock('../../database/repositories/BeerRepository', () => ({
+  beerRepository: {
+    insertMany: jest.fn(async () => {}),
+    insertManyUnsafe: jest.fn(async () => {}),
+  },
+}));
+
+jest.mock('../../database/repositories/MyBeersRepository', () => ({
+  myBeersRepository: {
+    insertMany: jest.fn(async () => {}),
+    insertManyUnsafe: jest.fn(async () => {}),
+    replaceAllWithEmptyUnsafe: jest.fn(async () => {}),
+  },
+}));
+
+jest.mock('../../database/repositories/RewardsRepository', () => ({
+  rewardsRepository: {
+    insertMany: jest.fn(async () => {}),
+    insertManyUnsafe: jest.fn(async () => {}),
+    replaceAllWithEmpty: jest.fn(async () => {}),
+    replaceAllWithEmptyUnsafe: jest.fn(async () => {}),
+  },
+}));
+
+jest.mock('../../database/DatabaseLockManager', () => ({
+  databaseLockManager: {
+    withDatabaseLock: jest.fn(async (_name: string, task: () => Promise<unknown>) => task()),
+  },
+}));
+
+const TAPLIST = [{ id: 'b1', brew_name: 'Test IPA', brewer: 'Test Brewery' }];
+const STORE_URL = 'https://fsbs.beerknurd.com/bk-store-json.php?sid=13879';
+
+/** Every `all_beers_etag` value written, in order. */
+const etagWrites = (): unknown[] =>
+  (setPreference as jest.Mock).mock.calls
+    .filter(call => call[0] === 'all_beers_etag')
+    .map(c => c[1]);
+
+const storedEtagIs = (value: string | null): void => {
+  (getPreference as jest.Mock).mockImplementation(async (key: string) => {
+    if (key === 'all_beers_api_url') return STORE_URL;
+    if (key === 'my_beers_api_url') return 'https://example.com/mybeers.json';
+    if (key === 'all_beers_etag') return value;
+    return null;
+  });
+};
+
+/** The member sources answer "not for you", so only the taplist is in play. */
+const onlyTaplistMatters = (): void => {
+  (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(
+    unavailable('not-applicable', 'none:// placeholder')
+  );
+  (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(
+    unavailable('not-applicable', 'none:// placeholder')
+  );
+};
+
+/** Proxy configured and answering. */
+const proxyReturns = (etag: string | null): void => {
+  jest
+    .spyOn(config, 'enrichment', 'get')
+    .mockReturnValue({ ...config.enrichment, isConfigured: () => true });
+  (fetchBeersFromProxy as jest.Mock).mockResolvedValue({
+    beers: TAPLIST,
+    storeId: '13879',
+    source: 'live',
+    etag,
+    notModified: false,
+  });
+};
+
+/** Proxy configured but failing, so the direct Flying Saucer fetch supplies the taplist. */
+const proxyFailsAndDirectSucceeds = (): void => {
+  jest
+    .spyOn(config, 'enrichment', 'get')
+    .mockReturnValue({ ...config.enrichment, isConfigured: () => true });
+  (fetchBeersFromProxy as jest.Mock).mockRejectedValue(new Error('proxy unreachable'));
+  (fetchBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(TAPLIST));
+};
+
+describe('taplist ETag invalidation', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    svc.resetInFlightSequentialRefresh();
+    svc.resetLastManualRefreshTime();
+    storedEtagIs('W/"old"');
+    onlyTaplistMatters();
+    (fetchBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(TAPLIST));
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  describe('the reported bug: a fallback write leaves an ETag naming data the table no longer holds', () => {
+    // Three entry points, three tests. Same property, deliberately not shared:
+    // the defect was three copies and the fix has to be proven at each.
+    it('clears the stored ETag when the direct fallback supplies the taplist — app open', async () => {
+      proxyFailsAndDirectSucceeds();
+
+      await svc.fetchAndUpdateAllBeers();
+
+      expect(etagWrites()).toContain('');
+      expect(etagWrites()).not.toContain('W/"old"');
+    });
+
+    it('clears the stored ETag when the direct fallback supplies the taplist — manual refresh', async () => {
+      proxyFailsAndDirectSucceeds();
+
+      await svc.sequentialRefreshAllData();
+
+      expect(etagWrites()).toContain('');
+      expect(etagWrites()).not.toContain('W/"old"');
+    });
+
+    it('clears the stored ETag when the direct fallback supplies the taplist — login', async () => {
+      proxyFailsAndDirectSucceeds();
+
+      await svc.refreshAllDataFromAPI();
+
+      expect(etagWrites()).toContain('');
+      expect(etagWrites()).not.toContain('W/"old"');
+    });
+  });
+
+  it('stores the new ETag when the proxy returns a 200 carrying one', async () => {
+    // The other direction. A fix that cleared unconditionally would pass every
+    // test above and cost a full taplist download on every single refresh.
+    proxyReturns('W/"new"');
+
+    await svc.fetchAndUpdateAllBeers();
+
+    expect(etagWrites()).toContain('W/"new"');
+  });
+
+  it('clears the stored ETag when the proxy returns a 200 without one', async () => {
+    // A proxy answer with no ETag header cannot be revalidated later, so it is
+    // worth no more than a fallback write.
+    proxyReturns(null);
+
+    await svc.fetchAndUpdateAllBeers();
+
+    expect(etagWrites()).toContain('');
+  });
+
+  it('sends no If-None-Match once a fallback has cleared the ETag', async () => {
+    // The other half of the invariant, and a separate defect: the read went
+    // straight to the raw preference, and `'' ?? undefined` is `''` — so the
+    // cleared value was forwarded as an empty `If-None-Match` header rather
+    // than omitted.
+    storedEtagIs('');
+    proxyReturns('W/"new"');
+
+    await svc.fetchAndUpdateAllBeers();
+
+    expect(fetchBeersFromProxy).toHaveBeenCalledWith('13879', undefined);
+  });
+
+  it('leaves the stored ETag untouched on a 304', async () => {
+    // GUARD, passes before and after. A 304 means the table already matches the
+    // stored ETag, so there is nothing to invalidate — and this is the test that
+    // fails if the 304 branch is ever "simplified" into the write path.
+    jest
+      .spyOn(config, 'enrichment', 'get')
+      .mockReturnValue({ ...config.enrichment, isConfigured: () => true });
+    (fetchBeersFromProxy as jest.Mock).mockResolvedValue({
+      beers: [],
+      storeId: '13879',
+      source: 'live',
+      etag: 'W/"old"',
+      notModified: true,
+    });
+
+    await svc.fetchAndUpdateAllBeers();
+
+    expect(etagWrites()).toEqual([]);
+  });
+});

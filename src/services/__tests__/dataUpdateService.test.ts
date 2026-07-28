@@ -240,7 +240,10 @@ describe('dataUpdateService', () => {
       expect(result.success).toBe(true);
       expect(result.dataUpdated).toBe(true);
       expect(result.itemCount).toBe(mockBeers.length);
-      expect(beerRepository.insertMany).toHaveBeenCalledWith([
+      // insertManyUnsafe, not insertMany: the rows and the ETag they imply now
+      // sit in one critical section this function opens itself, so a nested
+      // lock acquisition would be the contention the master lock removed.
+      expect(beerRepository.insertManyUnsafe).toHaveBeenCalledWith([
         {
           id: 'beer-1',
           brew_name: 'Test Beer 1',
@@ -1980,10 +1983,19 @@ describe('dataUpdateService', () => {
 
         await fetchAndUpdateAllBeers();
 
-        expect(setPreference).toHaveBeenCalledWith('all_beers_etag', '"new-etag"');
+        expect(setPreference).toHaveBeenCalledWith(
+          'all_beers_etag',
+          '"new-etag"',
+          expect.any(String)
+        );
       });
 
-      it('should NOT store ETag after 200 from proxy with no ETag header', async () => {
+      // INVERTED by plan 04 Phase 2. "should NOT store" was accurate under the
+      // old design, where not-storing and not-clearing were the same act. Under
+      // the invariant they are opposites: a 200 carrying no ETag cannot be
+      // revalidated later, so leaving the previous one in place names data the
+      // table no longer holds.
+      it('clears the stored ETag after a 200 from the proxy with no ETag header', async () => {
         const { config: mockConfig } = require('@/src/config');
         mockConfig.enrichment.isConfigured.mockReturnValue(true);
 
@@ -2007,10 +2019,12 @@ describe('dataUpdateService', () => {
 
         await fetchAndUpdateAllBeers();
 
-        expect(setPreference).not.toHaveBeenCalledWith('all_beers_etag', expect.anything());
+        expect(setPreference).toHaveBeenCalledWith('all_beers_etag', '', expect.any(String));
       });
 
-      it('should NOT store ETag after 200 from direct Flying Saucer fetch', async () => {
+      // INVERTED by plan 04 Phase 2, same reasoning: a fallback write must
+      // actively invalidate the ETag rather than merely decline to set one.
+      it('clears the stored ETag after a 200 from the direct Flying Saucer fetch', async () => {
         const { config: mockConfig } = require('@/src/config');
         mockConfig.enrichment.isConfigured.mockReturnValue(false);
 
@@ -2029,7 +2043,7 @@ describe('dataUpdateService', () => {
 
         await fetchAndUpdateAllBeers();
 
-        expect(setPreference).not.toHaveBeenCalledWith('all_beers_etag', expect.anything());
+        expect(setPreference).toHaveBeenCalledWith('all_beers_etag', '', expect.any(String));
       });
     });
   });

@@ -169,7 +169,11 @@ describe('manualRefreshAllData', () => {
     expect(result.rewardsResult.success).toBe(true);
   });
 
-  it('does not clear ETag on first manual refresh', async () => {
+  // INVERTED by plan 04 Phase 2. The arrangement mocks `fetchBeersFromAPI` —
+  // the FALLBACK path — and a fallback write must clear the ETag, whether or
+  // not the rapid-refresh window also wanted it cleared. The rapid-refresh
+  // clear is a separate mechanism, asserted by the test below.
+  it('clears the ETag on the first manual refresh when the taplist came from the fallback', async () => {
     svc.resetLastManualRefreshTime();
     (fetchBeersFromAPI as jest.Mock).mockResolvedValue(
       fetchedRows([{ id: 'beer-1', brew_name: 'Test Beer', brewer: 'Brewery' }])
@@ -182,7 +186,8 @@ describe('manualRefreshAllData', () => {
     const etagClears = (setPreference as jest.Mock).mock.calls.filter(
       (c: unknown[]) => c[0] === 'all_beers_etag'
     );
-    expect(etagClears).toHaveLength(0);
+    expect(etagClears).not.toHaveLength(0);
+    expect(etagClears.every((c: unknown[]) => c[1] === '')).toBe(true);
   });
 
   it('clears ETag on rapid second manual refresh within 30s', async () => {
@@ -208,7 +213,12 @@ describe('manualRefreshAllData', () => {
     const etagClears = (setPreference as jest.Mock).mock.calls.filter(
       (c: unknown[]) => c[0] === 'all_beers_etag'
     );
-    expect(etagClears).toHaveLength(1);
+    // Two clears now, and both are correct: the rapid-refresh window clears to
+    // force a full fetch, and the fallback write clears because the rows it
+    // stored have no ETag. Asserting a count here pinned an implementation
+    // detail; what matters is that the ETag ends up cleared.
+    expect(etagClears.length).toBeGreaterThanOrEqual(1);
+    expect(etagClears.every((c: unknown[]) => c[1] === '')).toBe(true);
     expect(etagClears[0][1]).toBe('');
   });
 });
