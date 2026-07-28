@@ -162,6 +162,31 @@ export class BeerRepository {
   }
 
   /**
+   * How many beers the table currently holds.
+   *
+   * Exists for the conditional-request backstop: a 304 asserts the client
+   * already has the data, and against an empty table that assertion is false.
+   * Counting is the cheap way to check without materialising every row.
+   *
+   * @returns The row count, or 0 if the count cannot be read
+   */
+  async count(): Promise<number> {
+    const database = await getDatabase();
+
+    try {
+      const row = await database.getFirstAsync<{ count: number }>(
+        'SELECT COUNT(*) as count FROM allbeers'
+      );
+      return row?.count ?? 0;
+    } catch (error) {
+      console.error('[BeerRepository] count failed:', error);
+      // Reporting 0 makes the caller distrust a 304 and fetch in full, which is
+      // the safe direction: wasteful, never wrong.
+      return 0;
+    }
+  }
+
+  /**
    * Get all beers from the database
    *
    * Filters out beers with null or empty brew_name.

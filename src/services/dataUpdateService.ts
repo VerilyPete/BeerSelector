@@ -18,7 +18,7 @@ import { myBeersRepository } from '../database/repositories/MyBeersRepository';
 import { rewardsRepository } from '../database/repositories/RewardsRepository';
 import { databaseLockManager } from '../database/DatabaseLockManager';
 import { toNonEmpty } from '../api/fetchOutcome';
-import { commitTaplistWrite, readTaplistEtag } from './taplistEtag';
+import { commitTaplistWrite, readTaplistEtag, shouldTrustNotModified } from './taplistEtag';
 import type { TaplistWriteSource } from './taplistEtag';
 import type {
   FetchOutcome,
@@ -611,6 +611,27 @@ export async function fetchAndUpdateAllBeers(): Promise<DataUpdateResult> {
 
     // Handle 304 Not Modified — data hasn't changed, skip DB writes
     if (result.notModified) {
+      // ...unless the table it claims to describe is empty, in which case the
+      // assertion is false and honouring it strands the user looking at nothing
+      // while the app reports itself up to date. Dropping the validator is what
+      // breaks the loop: without it last_check is stamped and the next refresh
+      // 304s again, forever.
+      if (!shouldTrustNotModified(await beerRepository.count())) {
+        console.warn(
+          '[dataUpdateService] 304 received but allbeers is empty — discarding the stored ETag'
+        );
+        await commitTaplistWrite({ kind: 'cleared' });
+        return {
+          success: false,
+          dataUpdated: false,
+          error: {
+            type: ApiErrorType.SERVER_ERROR,
+            message:
+              'Server reported no changes but no beers are stored. Retrying with a full fetch.',
+          },
+        };
+      }
+
       console.log('All beers data not modified (304), skipping DB update');
       await setPreference('all_beers_last_check', new Date().toISOString());
       return { success: true, dataUpdated: false };
@@ -1307,6 +1328,21 @@ async function prepareAllBeers(operation: RefreshOperation): Promise<SourcePlan<
 /** Store the taplist. Runs under the write lock; makes no network request. */
 async function writeAllBeers(write: AllBeersWrite): Promise<DataUpdateResult> {
   if (write.kind === 'not-modified') {
+    if (!shouldTrustNotModified(await beerRepository.count())) {
+      console.warn(
+        '[dataUpdateService] 304 received but allbeers is empty — discarding the stored ETag'
+      );
+      await commitTaplistWrite({ kind: 'cleared' });
+      return {
+        success: false,
+        dataUpdated: false,
+        error: {
+          type: ApiErrorType.SERVER_ERROR,
+          message:
+            'Server reported no changes but no beers are stored. Retrying with a full fetch.',
+        },
+      };
+    }
     await setPreference('all_beers_last_check', new Date().toISOString());
     return { success: true, dataUpdated: false };
   }
@@ -1879,6 +1915,21 @@ function plannedRows<TWrite, TRow>(
  */
 async function writeAllBeersOnLogin(write: AllBeersWrite): Promise<DataUpdateResult> {
   if (write.kind === 'not-modified') {
+    if (!shouldTrustNotModified(await beerRepository.count())) {
+      console.warn(
+        '[dataUpdateService] 304 received but allbeers is empty — discarding the stored ETag'
+      );
+      await commitTaplistWrite({ kind: 'cleared' });
+      return {
+        success: false,
+        dataUpdated: false,
+        error: {
+          type: ApiErrorType.SERVER_ERROR,
+          message:
+            'Server reported no changes but no beers are stored. Retrying with a full fetch.',
+        },
+      };
+    }
     await setPreference('all_beers_last_check', new Date().toISOString());
     return { success: true, dataUpdated: false };
   }

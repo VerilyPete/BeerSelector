@@ -16,6 +16,7 @@ jest.mock('../../database/preferences', () => ({
 
 jest.mock('../../database/repositories/BeerRepository', () => ({
   beerRepository: {
+    count: jest.fn(async () => 12),
     insertMany: jest.fn(),
     // Plan 04 Phase 2 / 05 Phase 5.6: fetchAndUpdateAllBeers now takes its own
     // lock around the rows AND the ETag they imply, so it calls the unlocked

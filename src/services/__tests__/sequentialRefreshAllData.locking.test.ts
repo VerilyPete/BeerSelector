@@ -76,7 +76,7 @@ jest.mock('../enrichmentService', () => ({
 }));
 
 jest.mock('../../database/repositories/BeerRepository', () => ({
-  beerRepository: { insertManyUnsafe: jest.fn(async () => {}) },
+  beerRepository: { insertManyUnsafe: jest.fn(async () => {}), count: jest.fn(async () => 12) },
 }));
 
 jest.mock('../../database/repositories/MyBeersRepository', () => ({
