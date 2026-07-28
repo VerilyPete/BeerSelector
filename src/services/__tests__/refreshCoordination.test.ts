@@ -93,6 +93,20 @@ const MY_BEERS = [
 ];
 const REWARDS = [{ reward_id: '3', reward_type: 'badge' }];
 
+/**
+ * Drain microtasks until `predicate` holds, or give up after `ticks`.
+ *
+ * The suite inherits global fake timers, so this deliberately advances nothing
+ * — it only lets already-scheduled continuations run. The bound exists so a
+ * predicate that never becomes true fails the assertion that follows rather
+ * than spinning to the test timeout.
+ */
+const flushUntil = async (predicate: () => boolean, ticks = 50): Promise<void> => {
+  for (let i = 0; i < ticks && !predicate(); i++) {
+    await Promise.resolve();
+  }
+};
+
 /** Log the call, then answer with the real `FetchedSource` shape. */
 const logsAndResolves = (mock: jest.Mock, label: string, rows: readonly unknown[], log: string[]) =>
   mock.mockImplementation(async () => {
@@ -247,7 +261,14 @@ describe('Sequential Refresh Coordination', () => {
       });
 
       const first = fetchAndUpdateAllBeers();
-      await Promise.resolve();
+      // Wait until the first fetch is genuinely in flight, rather than for a
+      // fixed number of microtask ticks. `await Promise.resolve()` happened to
+      // be enough when this was written, so `releaseFirst` was assigned by the
+      // time it was called; one extra `await` anywhere upstream — the taplist
+      // write now reads the store configuration through a helper — left it as
+      // the no-op initialiser and the test hung for the full 30s timeout
+      // instead of failing. The condition is what this step actually needs.
+      await flushUntil(() => (fetchBeersFromAPI as jest.Mock).mock.calls.length > 0);
 
       (getPreference as jest.Mock).mockImplementation(async (key: string) => {
         if (key === 'all_beers_api_url') return storeUrl('13880');

@@ -224,8 +224,24 @@ describe('dataUpdateService', () => {
       expect(result.error).toBeDefined();
     });
 
+    /**
+     * Answer `all_beers_api_url` consistently, for every read.
+     *
+     * `mockResolvedValueOnce` is wrong for the two tests below now that the
+     * taplist write re-reads this preference under the lock to check the store
+     * has not changed mid-refresh. A one-shot mock answers the URL and then
+     * `undefined`, which the guard correctly reads as "the store switched" and
+     * abandons the write. Preferences are durable storage: a second read of an
+     * unwritten key returns the same value, and the fixture has to say so.
+     */
+    const taplistUrlIsStable = (): void => {
+      (getPreference as jest.Mock).mockImplementation(async (key: string) =>
+        key === 'all_beers_api_url' ? testAllBeersUrl : null
+      );
+    };
+
     it('should successfully update all beers', async () => {
-      (getPreference as jest.Mock).mockResolvedValueOnce(testAllBeersUrl);
+      taplistUrlIsStable();
 
       const mockBeers: Beer[] = [
         { id: 'beer-1', brew_name: 'Test Beer 1', brewer: 'Brewery 1' },
@@ -309,7 +325,7 @@ describe('dataUpdateService', () => {
     });
 
     it('should filter out invalid beers without IDs', async () => {
-      (getPreference as jest.Mock).mockResolvedValueOnce(testAllBeersUrl);
+      taplistUrlIsStable();
 
       const mockBeers = [
         { id: 'beer-1', brew_name: 'Valid Beer 1', brewer: 'Brewery 1' },
