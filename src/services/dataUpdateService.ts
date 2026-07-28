@@ -1715,7 +1715,13 @@ export async function checkAndRefreshOnAppOpen(
     const myBeersApiUrl = await getPreference('my_beers_api_url');
     const isVisitor = (await getPreference('is_visitor_mode')) === 'true';
 
-    // If URLs are not set yet, skip the refresh entirely without treating it as an error
+    // Deliberately NOT `areApiUrlsConfigured()`, which is the routing gate —
+    // "should the app show tabs or send the user to Settings". This is a
+    // different question: which individual sources are worth fetching. A member
+    // with only the taplist URL set is not "configured" for routing, but their
+    // taplist is still worth refreshing, and each source is gated separately
+    // below for that reason. Keeping the two questions distinct is the point;
+    // what was wrong was `useSettingsState` reimplementing the ROUTING one.
     if (!allBeersApiUrl && !myBeersApiUrl) {
       console.log('API URLs not configured yet, skipping automatic data refresh');
       return { updated: false, errors: [] };
