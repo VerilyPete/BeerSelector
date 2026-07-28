@@ -413,6 +413,48 @@ export type TaplistFetchResult = {
 export async function fetchTaplistFromProxyOrDirect(
   storeId: string | null
 ): Promise<TaplistFetchResult> {
+  // Keyed by store, so a second caller for the SAME taplist joins the fetch
+  // already running instead of starting a competing download.
+  //
+  // `sequentialRefreshAllData` de-duplicates itself, but two readers bypass
+  // that: `checkAndRefreshOnAppOpen`, fired from `useFocusEffect` on three tab
+  // screens behind a throttle that is explicitly not a mutex, and
+  // `refreshAllDataFromAPI` via `autoLogin`. Either could start a second full
+  // taplist download while the first was in flight.
+  //
+  // This is a bandwidth optimisation, not a correctness fix, and the
+  // distinction matters: because the proxy keys its validator to the requested
+  // store's own cached payload, a cross-store ETag simply misses and costs a
+  // full 200 rather than serving wrong rows. Keying by `storeId` keeps it that
+  // way — joining across stores is the one thing here that could return the
+  // wrong location's beers.
+  if (inFlightTaplistFetch !== null && inFlightTaplistFetch.storeId === storeId) {
+    return inFlightTaplistFetch.promise;
+  }
+
+  const run = runTaplistFetch(storeId).finally(() => {
+    if (inFlightTaplistFetch?.promise === run) {
+      inFlightTaplistFetch = null;
+    }
+  });
+  inFlightTaplistFetch = { storeId, promise: run };
+  return run;
+}
+
+/**
+ * The taplist fetch currently running, if any, keyed by the store it is for.
+ */
+let inFlightTaplistFetch: {
+  readonly storeId: string | null;
+  readonly promise: Promise<TaplistFetchResult>;
+} | null = null;
+
+/** Test seam: drop any in-flight taplist fetch between cases. */
+export function resetInFlightTaplistFetch(): void {
+  inFlightTaplistFetch = null;
+}
+
+async function runTaplistFetch(storeId: string | null): Promise<TaplistFetchResult> {
   if (storeId && config.enrichment.isConfigured()) {
     try {
       console.log(`[dataUpdateService] Attempting enrichment proxy for store ${storeId}...`);
