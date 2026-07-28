@@ -1329,6 +1329,23 @@ describe('dataUpdateService', () => {
         );
       });
 
+      it('labels its failures with its own entry point, not the sequential one', async () => {
+        (fetchBeersFromAPI as jest.Mock).mockRejectedValue(new Error('network fail'));
+
+        await refreshAllDataFromAPI();
+
+        // The `prepare*` phase is shared with sequentialRefreshAllData, and the
+        // operation label is the only thing that tells a reader which entry
+        // point a failure came from. `RefreshOperation` stops an INVALID label
+        // being passed; nothing stopped the wrong VALID one — swapping
+        // REFRESH_FROM_API for SEQUENTIAL_REFRESH here left every test green,
+        // on the path whose only output channel is the log.
+        expect(logError).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({ operation: 'refreshAllDataFromAPI - all beers' })
+        );
+      });
+
       it('logs a rewards failure on a path that has nowhere else to report it', async () => {
         (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(failed());
 
