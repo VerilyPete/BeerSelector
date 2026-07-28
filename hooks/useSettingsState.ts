@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { router } from 'expo-router';
-import { getAllPreferences } from '@/src/database/preferences';
+import { getAllPreferences, areApiUrlsConfigured } from '@/src/database/preferences';
 import { Preference } from '@/src/types/database';
 
 /**
@@ -86,12 +86,15 @@ export const useSettingsState = (): UseSettingsStateReturn => {
       const prefs = await getAllPreferences();
       setPreferences(prefs);
 
-      // Check if API URLs are set
-      const allBeersApiUrl = prefs.find(p => p.key === 'all_beers_api_url')?.value;
-      const myBeersApiUrl = prefs.find(p => p.key === 'my_beers_api_url')?.value;
-
-      // Set state based on whether URLs are configured
-      const configured = !!(allBeersApiUrl && myBeersApiUrl);
+      // Through the canonical predicate, not a local reimplementation. This
+      // used to compute `!!(all_beers_api_url && my_beers_api_url)` here,
+      // ignoring `is_visitor_mode` entirely — a second, diverging definition of
+      // "configured" that app/_layout.tsx's routing does not share. It agreed
+      // with `areApiUrlsConfigured` only by accident, because visitor login
+      // writes a truthy `none://visitor_mode` placeholder into
+      // `my_beers_api_url`. Anything that changed that placeholder would have
+      // split the two silently.
+      const configured = await areApiUrlsConfigured();
       setApiUrlsConfigured(configured);
       setIsFirstLogin(!configured);
     } catch (error) {
