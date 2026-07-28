@@ -324,9 +324,26 @@ describe('Sequential Refresh Coordination', () => {
       await Promise.all([first, second]);
 
       expect(order).toContain('write:allBeers');
-      expect(order.indexOf('clear:all_beers_etag')).toBeGreaterThan(
-        order.indexOf('write:allBeers')
+
+      // The escape-hatch clear must be identified, not just found. Every write
+      // burst now also clears the ETag before replacing the rows it describes,
+      // so `indexOf('clear:all_beers_etag')` finds that invalidation rather than
+      // this function's forced clear. The forced one is the clear immediately
+      // preceding the timestamp clears, which nothing but `manualRefreshAllData`
+      // emits.
+      // Both calls clear the timestamps unconditionally, so the first occurrence
+      // is the overtaking call's own opening clear at index 0. The SECOND is the
+      // one that had to wait for the in-flight run, and only the second call is
+      // inside the rapid window, so only it precedes its timestamps with an ETag
+      // clear.
+      const timestampClears = order.reduce<number[]>(
+        (indices, entry, index) =>
+          entry === 'clear:all_beers_last_update' ? [...indices, index] : indices,
+        []
       );
+      expect(timestampClears).toHaveLength(2);
+      expect(timestampClears[1]).toBeGreaterThan(order.indexOf('write:allBeers'));
+      expect(order[timestampClears[1] - 1]).toBe('clear:all_beers_etag');
     });
 
     it('re-stamps the timestamps it cleared', async () => {

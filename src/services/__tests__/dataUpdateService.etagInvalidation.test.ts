@@ -22,6 +22,7 @@
 import * as svc from '../dataUpdateService';
 import { fetchBeersFromAPI, fetchMyBeersFromAPI, fetchRewardsFromAPI } from '../../api/beerApi';
 import { getPreference, setPreference } from '../../database/preferences';
+import { beerRepository } from '../../database/repositories/BeerRepository';
 import { fetchBeersFromProxy } from '../enrichmentService';
 import { config } from '@/src/config';
 import { fetchedRows, unavailable } from '../../api/__tests__/helpers/fetchOutcomeFixtures';
@@ -181,6 +182,37 @@ describe('taplist ETag invalidation', () => {
     await svc.fetchAndUpdateAllBeers();
 
     expect(etagWrites()).toContain('W/"new"');
+  });
+
+  it('invalidates the stored ETag before the rows it describes are replaced', async () => {
+    // The lock around the rows write and the ETag write gives mutual exclusion,
+    // not atomicity: `insertManyUnsafe` commits its own transaction and the
+    // preference write is a separate one. If the second never happens — a
+    // contention throw, process death, iOS suspending the app between the two
+    // awaits — the table holds the new rows while `all_beers_etag` still holds
+    // the PREVIOUS proxy validator. Every later conditional request then 304s
+    // and returns without touching the database, permanently.
+    //
+    // Ordering makes the non-atomicity harmless. Clearing first means an
+    // interrupted write leaves a cleared ETag against either the old rows or the
+    // new ones, and both cost exactly one full fetch.
+    proxyReturns('W/"new"');
+
+    await svc.fetchAndUpdateAllBeers();
+
+    const setPreferenceMock = setPreference as jest.Mock;
+    const clearOrder = setPreferenceMock.mock.calls
+      .map((call: unknown[], index: number) => ({
+        call,
+        order: setPreferenceMock.mock.invocationCallOrder[index],
+      }))
+      .filter(({ call }: { call: unknown[] }) => call[0] === 'all_beers_etag' && call[1] === '')
+      .map(({ order }: { order: number }) => order)[0];
+    const insertOrder = (beerRepository.insertManyUnsafe as jest.Mock).mock.invocationCallOrder[0];
+
+    expect(clearOrder).toBeDefined();
+    expect(insertOrder).toBeDefined();
+    expect(clearOrder).toBeLessThan(insertOrder);
   });
 
   it('clears the stored ETag when the proxy returns a 200 without one', async () => {
