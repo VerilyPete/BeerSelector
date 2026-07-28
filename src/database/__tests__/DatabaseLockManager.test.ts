@@ -6,6 +6,7 @@
  */
 
 import { DatabaseLockManager } from '../DatabaseLockManager';
+import { DatabaseContentionError } from '../errors';
 import { nameKeyedLock, NameKeyedLock } from './helpers/nameKeyedLock';
 
 // These suites identify operations by name, which is what they assert about.
@@ -396,6 +397,26 @@ describe('DatabaseLockManager', () => {
 
       // Promise should reject with timeout error
       await expect(acquirePromise).rejects.toThrow(/timeout.*5000ms/i);
+
+      lockManager.releaseLock('blocking-operation');
+    });
+
+    it('rejects with a typed contention error, not a bare Error', async () => {
+      // A bare Error meant `createErrorResponse` fell through to its substring
+      // rules, where `message.includes('timeout')` classified a purely local
+      // lock problem as NETWORK_ERROR — so the user was told to check their
+      // internet connection about a database that was merely busy, often after
+      // the network fetch had already succeeded. `DatabaseContentionError` is
+      // classified by TYPE and carries `retryable`, which is what this
+      // condition actually is.
+      const lockManager = createLockManager();
+      await lockManager.acquireLock('blocking-operation');
+
+      const acquirePromise = lockManager.acquireLock('timeout-operation', 5000);
+      jest.advanceTimersByTime(5000);
+
+      await expect(acquirePromise).rejects.toBeInstanceOf(DatabaseContentionError);
+      await expect(acquirePromise).rejects.toMatchObject({ retryable: true });
 
       lockManager.releaseLock('blocking-operation');
     });
