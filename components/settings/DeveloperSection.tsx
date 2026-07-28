@@ -160,12 +160,16 @@ Tasted Beers: ${lastMyBeersRefresh ? new Date(parseInt(lastMyBeersRefresh)).toLo
             try {
               console.log('Starting application reset...');
 
-              // Before the rows, not after. Emptying `allbeers` first leaves a
-              // window — app death, or any throw in the six awaits that used to
+              // Before the rows, not after. Emptying `allbeers` first left a
+              // window — app death, or a throw in the three awaits that used to
               // sit between — where the table is empty but the ETag is still
               // live. Every 304 path then trusts that ETag and returns without
-              // rows. Clearing the ETag first inverts the failure into a
-              // harmless extra full fetch.
+              // rows. (The fourth await, clearing `all_beers_api_url`, closed
+              // the window itself: `prepareAllBeers` then gets a null storeId
+              // and never issues a conditional request at all.) Clearing the
+              // ETag first inverts the failure into a harmless extra full fetch,
+              // and `setPreference` retries contention where the
+              // `beerRepository.clear()` below does not.
               await commitTaplistWrite({ kind: 'cleared' });
 
               await beerRepository.clear();

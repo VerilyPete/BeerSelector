@@ -106,8 +106,10 @@ jest.mock('@/src/database/preferences', () => ({
   getPreference: jest.fn().mockResolvedValue(null),
 }));
 
-// Mock the taplist ETag owner. Login invalidates the stored ETag because the
-// rows in `allbeers` belong to whoever was logged in before.
+// Mock the taplist ETag owner. Login invalidates the stored ETag not because
+// the rows and the ETag disagree — they still match each other — but because
+// login repoints `all_beers_api_url` at a different store, leaving the ETag
+// naming a store the app no longer fetches from.
 jest.mock('@/src/services/taplistEtag', () => ({
   commitTaplistWrite: jest.fn().mockResolvedValue(undefined),
 }));
@@ -517,10 +519,12 @@ describe('LoginWebView', () => {
       );
 
     it('does not report login success until the taplist ETag clear has been persisted', async () => {
-      // The store the user is logging into is not necessarily the store whose
-      // rows are in `allbeers`. Reporting success early lets the next refresh
-      // read the PREVIOUS store's ETag, send it as If-None-Match, and serve the
-      // wrong location's taplist behind a 304.
+      // `onLoginSuccess` runs `handleLoginSuccess`, which calls `onRefreshData`.
+      // Reporting success before the clear lands lets that refresh read the
+      // PREVIOUS store's ETag. The proxy keys its ETag to the store's own cached
+      // payload, so a cross-store validator misses and costs a wasted full 200
+      // rather than wrong rows — this orders the clear ahead of the refresh it
+      // triggers, which is the guarantee available here.
       let releaseEtagClear: () => void = () => {};
       (commitTaplistWrite as jest.Mock).mockReturnValueOnce(
         new Promise<void>(resolve => {
@@ -555,6 +559,43 @@ describe('LoginWebView', () => {
       await waitFor(() => {
         expect(mockOnLoginCancel).toHaveBeenCalled();
       });
+      expect(mockOnLoginSuccess).not.toHaveBeenCalled();
+    });
+
+    it('tells the user when a member login fails', async () => {
+      // The visitor branch alerts on failure and a user-initiated close alerts.
+      // The member branch was the one path that said nothing at all — the modal
+      // just vanished and the user was left on Settings with no idea a database
+      // error had occurred, and no idea the login had not happened.
+      (commitTaplistWrite as jest.Mock).mockRejectedValueOnce(new Error('database is locked'));
+      const alertSpy = jest.spyOn(Alert, 'alert');
+
+      const { getByTestId } = renderLogin();
+      fireEvent(getByTestId('webview-mock'), 'onMessage', memberLoginMessage);
+
+      await waitFor(() => {
+        expect(alertSpy).toHaveBeenCalled();
+      });
+    });
+
+    it('does not mark the app configured when the session cannot be saved', async () => {
+      // `areApiUrlsConfigured` reads is_visitor_mode, all_beers_api_url and
+      // my_beers_api_url, and app/_layout.tsx routes on it. Writing those before
+      // the session is persisted lets a failed login boot the app straight into
+      // member mode with nothing in SecureStore — configured, unauthenticated,
+      // and unable to explain itself. The gate must be the last thing to flip.
+      (saveSessionData as jest.Mock).mockRejectedValueOnce(new Error('SecureStore unavailable'));
+
+      const { getByTestId } = renderLogin();
+      fireEvent(getByTestId('webview-mock'), 'onMessage', memberLoginMessage);
+
+      await waitFor(() => {
+        expect(mockOnLoginCancel).toHaveBeenCalled();
+      });
+
+      const writtenKeys = (setPreference as jest.Mock).mock.calls.map(([key]) => key);
+      expect(writtenKeys).not.toContain('all_beers_api_url');
+      expect(writtenKeys).not.toContain('my_beers_api_url');
       expect(mockOnLoginSuccess).not.toHaveBeenCalled();
     });
   });
@@ -593,6 +634,38 @@ describe('LoginWebView', () => {
           store__id: '67',
           store: 'Test Store',
         });
+      });
+    });
+
+    it('clears the stored ETag when logging in as a visitor', async () => {
+      // Guard, not a regression test: deleting the visitor branch's clear
+      // outright left the whole suite green. Visitor mode is taplist-only, so a
+      // surviving ETag from the previous store has nothing else on screen to
+      // contradict it.
+      (handleVisitorLogin as jest.Mock).mockResolvedValue({ success: true });
+
+      const { getByTestId } = render(
+        <LoginWebView
+          visible={true}
+          onLoginSuccess={mockOnLoginSuccess}
+          onLoginCancel={mockOnLoginCancel}
+          onRefreshData={mockOnRefreshData}
+        />
+      );
+
+      fireEvent(getByTestId('webview-mock'), 'onMessage', {
+        nativeEvent: {
+          data: JSON.stringify({
+            type: 'VISITOR_LOGIN',
+            cookies: { store__id: '67', store: 'Test Store' },
+            rawCookies: 'store__id=67; store=Test Store',
+            url: config.api.getFullUrl('visitor'),
+          }),
+        },
+      });
+
+      await waitFor(() => {
+        expect(commitTaplistWrite).toHaveBeenCalledWith({ kind: 'cleared' });
       });
     });
 

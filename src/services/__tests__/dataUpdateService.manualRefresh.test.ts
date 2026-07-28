@@ -210,16 +210,30 @@ describe('manualRefreshAllData', () => {
 
     await svc.manualRefreshAllData();
 
-    const etagClears = (setPreference as jest.Mock).mock.calls.filter(
+    const setPreferenceMock = setPreference as jest.Mock;
+    const etagClears = setPreferenceMock.mock.calls.filter(
       (c: unknown[]) => c[0] === 'all_beers_etag'
     );
-    // Two clears now, and both are correct: the rapid-refresh window clears to
-    // force a full fetch, and the fallback write clears because the rows it
-    // stored have no ETag. Asserting a count here pinned an implementation
-    // detail; what matters is that the ETag ends up cleared.
-    expect(etagClears.length).toBeGreaterThanOrEqual(1);
     expect(etagClears.every((c: unknown[]) => c[1] === '')).toBe(true);
-    expect(etagClears[0][1]).toBe('');
+
+    // Two clears happen, and both are correct: the rapid-refresh window clears
+    // to force a full fetch, and the fallback write clears because the rows it
+    // stored carry no ETag. Counting them pinned an implementation detail — but
+    // asserting only "at least one" meant the FALLBACK clear satisfied this test
+    // on its own, and deleting the rapid-refresh clear entirely left the whole
+    // suite green. Order is what separates them: only the rapid-refresh clear
+    // runs before the taplist is fetched.
+    expect(fetchBeersFromAPI).toHaveBeenCalled();
+    const firstFetchOrder = (fetchBeersFromAPI as jest.Mock).mock.invocationCallOrder[0];
+    const clearOrders = setPreferenceMock.mock.calls
+      .map((call: unknown[], index: number) => ({
+        call,
+        order: setPreferenceMock.mock.invocationCallOrder[index],
+      }))
+      .filter(({ call }: { call: unknown[] }) => call[0] === 'all_beers_etag')
+      .map(({ order }: { order: number }) => order);
+
+    expect(clearOrders.some((order: number) => order < firstFetchOrder)).toBe(true);
   });
 });
 
