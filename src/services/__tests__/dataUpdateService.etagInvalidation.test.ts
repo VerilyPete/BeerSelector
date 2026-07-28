@@ -290,6 +290,13 @@ describe('taplist ETag invalidation', () => {
 
     await svc.refreshAllDataFromAPI();
 
+    // Effects only, deliberately — and this is the one variant where that is
+    // right rather than lazy. `refreshAllDataFromAPI` discards `applyPlan`'s
+    // result, so `writeAllBeersOnLogin`'s returned object reaches no caller.
+    // Mutating it to report success is therefore EQUIVALENT, not a missed
+    // guard: with the ETag cleared and `all_beers_last_check` unstamped, the
+    // next refresh fetches in full either way. The observable contract here is
+    // the pair of side effects below, and both are asserted.
     expect(etagWrites()).toContain('');
     expect(freshnessStamps()).toHaveLength(0);
   });
