@@ -9,7 +9,13 @@ import { fetchTaplistFromProxyOrDirect } from '../dataUpdateService';
 import { config } from '@/src/config';
 import { fetchBeersFromAPI } from '../../api/beerApi';
 import { fetchBeersFromProxy, recordFallback } from '../enrichmentService';
-import { fetchedRows } from '../../api/__tests__/helpers/fetchOutcomeFixtures';
+import {
+  confirmedEmpty,
+  fetchedRows,
+  malformed,
+  unavailable,
+} from '../../api/__tests__/helpers/fetchOutcomeFixtures';
+import { ApiErrorType, createErrorResponse } from '../../utils/notificationUtils';
 
 jest.mock('../../database/preferences', () => ({
   // Returns null, not undefined. The real signature is Promise<string | null>,
@@ -244,6 +250,54 @@ describe('fetchTaplistFromProxyOrDirect', () => {
     (fetchBeersFromAPI as jest.Mock).mockRejectedValue(new Error('network error'));
 
     await expect(fetchTaplistFromProxyOrDirect('13885')).rejects.toThrow('network error');
+  });
+
+  describe('classification of non-data outcomes from the direct fetch', () => {
+    // `requireRows` threw a plain `Error` for `unavailable` and `malformed`,
+    // and `createErrorResponse` has no rule that recovers a type from a
+    // message — so both arrived at the user as UNKNOWN_ERROR. The sibling
+    // paths already report the same conditions as typed errors
+    // (`fetchAndUpdateAllBeers` returns VALIDATION_ERROR for a missing
+    // `all_beers_api_url`; `decideRewards` returns MALFORMED_RESPONSE_ERROR),
+    // so the same condition read differently depending on which entry point
+    // the user happened to trigger.
+    //
+    // These assert the classification a caller can act on, not the message —
+    // the message is what the old code forced callers to parse.
+    it('preserves a validation error when the taplist URL is not configured', async () => {
+      (fetchBeersFromAPI as jest.Mock).mockResolvedValue(unavailable('not-configured'));
+
+      const error = await fetchTaplistFromProxyOrDirect('13885').catch(e => e);
+
+      expect(createErrorResponse(error).type).toBe(ApiErrorType.VALIDATION_ERROR);
+    });
+
+    it('preserves a validation error when the taplist source is not applicable', async () => {
+      (fetchBeersFromAPI as jest.Mock).mockResolvedValue(unavailable('not-applicable'));
+
+      const error = await fetchTaplistFromProxyOrDirect('13885').catch(e => e);
+
+      expect(createErrorResponse(error).type).toBe(ApiErrorType.VALIDATION_ERROR);
+    });
+
+    it('preserves a malformed-response error when the body cannot be used', async () => {
+      (fetchBeersFromAPI as jest.Mock).mockResolvedValue(malformed('brewInStock was not an array'));
+
+      const error = await fetchTaplistFromProxyOrDirect('13885').catch(e => e);
+
+      expect(createErrorResponse(error).type).toBe(ApiErrorType.MALFORMED_RESPONSE_ERROR);
+    });
+
+    it('still returns no rows for a confirmed-empty taplist, leaving the verdict downstream', async () => {
+      // Deliberately NOT an error here. `fetchAndUpdateAllBeers` rejects an
+      // empty taplist as a VALIDATION_ERROR with a message about beer data,
+      // which is a better answer than anything this helper could give.
+      (fetchBeersFromAPI as jest.Mock).mockResolvedValue(confirmedEmpty());
+
+      await expect(fetchTaplistFromProxyOrDirect('13885')).resolves.toEqual(
+        expect.objectContaining({ beers: [], usedProxy: false })
+      );
+    });
   });
 
   it('returns etag as null when proxy does not return one', async () => {

@@ -622,7 +622,20 @@ async function runTaplistFetch(storeId: string | null): Promise<TaplistFetchResu
  */
 function requireRows<T>(source: UnconditionalSource<FetchOutcome<T>>, label: string): readonly T[] {
   if (source.status === 'unavailable') {
-    throw new Error(`${label} unavailable (${source.reason.code}): ${source.reason.detail}`);
+    // VALIDATION_ERROR for both codes, matching `fetchAndUpdateAllBeers`, which
+    // already reports a missing `all_beers_api_url` that way. The plain Error
+    // this replaces became UNKNOWN_ERROR at the enclosing catch, so the same
+    // unconfigured device got a typed, actionable error down one entry point
+    // and developer prose down the other. `not-applicable` joins it rather than
+    // being skipped as it is for rewards: there is no taplist-less mode, so a
+    // taplist that reports itself inapplicable is a misconfiguration too.
+    throw new SourceFailureError(
+      {
+        type: ApiErrorType.VALIDATION_ERROR,
+        message: `${label} unavailable (${source.reason.code}): ${source.reason.detail}`,
+      },
+      label
+    );
   }
   if (source.status === 'failed') {
     // Carries the ErrorResponse rather than its message. Stringifying here sent
@@ -631,7 +644,17 @@ function requireRows<T>(source: UnconditionalSource<FetchOutcome<T>>, label: str
     throw new SourceFailureError(source.error, label);
   }
   if (source.data.kind === 'malformed') {
-    throw new Error(`${label} malformed: ${source.data.detail}`);
+    // Same defect as the `unavailable` branch above, one line apart and missed
+    // when that one was found: `decideRewards` already classifies an unusable
+    // body as MALFORMED_RESPONSE_ERROR, whose user-facing copy exists precisely
+    // to keep parser text out of an alert.
+    throw new SourceFailureError(
+      {
+        type: ApiErrorType.MALFORMED_RESPONSE_ERROR,
+        message: `${label} malformed: ${source.data.detail}`,
+      },
+      label
+    );
   }
   if (source.data.kind === 'confirmed-empty') {
     // Returns empty rather than throwing: the taplist path already has
