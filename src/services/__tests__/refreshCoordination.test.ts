@@ -35,8 +35,10 @@ import {
   sequentialRefreshAllData,
   manualRefreshAllData,
   refreshAllDataFromAPI,
+  fetchAndUpdateAllBeers,
   resetLastManualRefreshTime,
   resetInFlightSequentialRefresh,
+  resetInFlightTaplistFetch,
 } from '../dataUpdateService';
 import { getPreference, setPreference, areApiUrlsConfigured } from '../../database/preferences';
 import { fetchBeersFromAPI, fetchMyBeersFromAPI, fetchRewardsFromAPI } from '../../api/beerApi';
@@ -105,6 +107,7 @@ describe('Sequential Refresh Coordination', () => {
     jest.clearAllMocks();
     databaseLockManager.resetForTesting();
     resetInFlightSequentialRefresh();
+    resetInFlightTaplistFetch();
     resetLastManualRefreshTime();
 
     (getPreference as jest.Mock).mockImplementation(async (key: string) => {
@@ -128,6 +131,60 @@ describe('Sequential Refresh Coordination', () => {
     // before the rewrite.
     jest.restoreAllMocks();
     databaseLockManager.resetForTesting();
+  });
+
+  describe('taplist fetch de-duplication', () => {
+    it('serves one taplist fetch to concurrent callers', async () => {
+      // `sequentialRefreshAllData` de-duplicates itself, but two production
+      // readers bypass that entirely: `checkAndRefreshOnAppOpen` — fired by
+      // `useFocusEffect` on three tab screens, behind a five-minute throttle its
+      // own comment concedes "is a throttle rather than a mutex" — and
+      // `refreshAllDataFromAPI` via `autoLogin`. Either can start a second full
+      // taplist download while the first is in flight, on exactly the weak links
+      // this plan exists to cope with.
+      const results = await Promise.all([fetchAndUpdateAllBeers(), fetchAndUpdateAllBeers()]);
+
+      expect(fetchBeersFromAPI).toHaveBeenCalledTimes(1);
+      expect(results[0].success).toBe(true);
+      expect(results[1].success).toBe(true);
+    });
+
+    it('does not let a different store join an in-flight fetch', async () => {
+      // Keyed by store, not a bare flag. Joining across stores would serve one
+      // location's taplist to a request for another — the only way this
+      // optimisation could produce wrong rows rather than merely save bytes.
+      // Real store URLs: the key is the `sid`, and a URL without one yields a
+      // null storeId that legitimately joins.
+      const storeUrl = (sid: string) => `https://fsbs.beerknurd.com/bk-store-json.php?sid=${sid}`;
+      (getPreference as jest.Mock).mockImplementation(async (key: string) => {
+        if (key === 'all_beers_api_url') return storeUrl('13879');
+        if (key === 'my_beers_api_url') return 'http://api.example.com/my';
+        return null;
+      });
+
+      let releaseFirst: () => void = () => {};
+      (fetchBeersFromAPI as jest.Mock).mockImplementationOnce(async () => {
+        await new Promise<void>(resolve => {
+          releaseFirst = resolve;
+        });
+        return fetchedRows(ALL_BEERS);
+      });
+
+      const first = fetchAndUpdateAllBeers();
+      await Promise.resolve();
+
+      (getPreference as jest.Mock).mockImplementation(async (key: string) => {
+        if (key === 'all_beers_api_url') return storeUrl('13880');
+        if (key === 'my_beers_api_url') return 'http://api.example.com/my';
+        return null;
+      });
+      const second = fetchAndUpdateAllBeers();
+
+      releaseFirst();
+      await Promise.all([first, second]);
+
+      expect(fetchBeersFromAPI).toHaveBeenCalledTimes(2);
+    });
   });
 
   describe('sequentialRefreshAllData', () => {
