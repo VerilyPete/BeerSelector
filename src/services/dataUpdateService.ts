@@ -416,9 +416,15 @@ export async function fetchTaplistFromProxyOrDirect(
   if (storeId && config.enrichment.isConfigured()) {
     try {
       console.log(`[dataUpdateService] Attempting enrichment proxy for store ${storeId}...`);
-      // Via the module, not the raw preference: `'' ?? undefined` is `''`, so
-      // reading directly forwarded a CLEARED ETag as an empty `If-None-Match`
-      // header instead of omitting it.
+      // Via the module, not the raw preference. This is defensive, not
+      // corrective: an earlier comment here claimed reading the preference
+      // directly sent a cleared ETag as an empty `If-None-Match`, which is
+      // false — `fetchBeersFromProxy` guards with `if (etag)`, and `''` is
+      // falsy, so the header was already omitted. What routing through
+      // `readTaplistEtag` actually buys is that the decision no longer depends
+      // on a falsiness check in another module, and `normalizeStoredEtag` trims,
+      // so a whitespace-only value omits the header instead of sending
+      // `If-None-Match:   `. No current writer produces that value.
       const proxyResponse = await fetchBeersFromProxy(storeId, await readTaplistEtag());
 
       if (proxyResponse.notModified) {
