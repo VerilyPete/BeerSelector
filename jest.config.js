@@ -45,7 +45,14 @@ module.exports = {
     // Optimization test uses renderHook() with RN context - causes Jest hangs
     'hooks/__tests__/useBeerFilters.optimization.test.ts',
     // Component tests that use WebView, Alert, or RN context - migrate to Maestro
-    'components/__tests__/LoginWebView.test.tsx',
+    //
+    // LoginWebView.test.tsx is NOT here any more. The stated reason for the
+    // quarantine did not hold: it does not hang, it runs in ~9s. It was red —
+    // 14 stale assertions, most of them from a single leaked mock
+    // implementation, a config mock that resolved endpoint names instead of
+    // paths, and two tests asserting a success alert that fd18c05 deleted in the
+    // same commit that wrote them. Quarantining it hid all of that, and it is
+    // where the login/ETag guards from plan 05 live.
     'components/__tests__/Beerfinder.loading.test.tsx',
     'components/__tests__/AllBeers.loading.test.tsx',
   ],

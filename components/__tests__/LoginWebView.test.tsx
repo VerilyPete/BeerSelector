@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, fireEvent, waitFor } from '@testing-library/react-native';
-import { Alert } from 'react-native';
+import { Alert, Modal } from 'react-native';
 import { config } from '@/src/config';
 
 // Import after mocks
@@ -20,12 +20,46 @@ const mockTestTimeout = 15000;
 const mockTestRetries = 3;
 const mockTestRetryDelay = 1000;
 
+// The real `getFullUrl` resolves through this map, so `memberDashboard` becomes
+// `/member-dash.php`. The mock used to interpolate the endpoint NAME instead,
+// producing `/memberDashboard.php` — which never matches the component's
+// `url.includes('member-dash.php')` check, so every injection test silently
+// asserted against a URL the component could not recognise.
+let mockCurrentBaseUrl: string | null = null;
+
+const mockEndpointPaths: Record<string, string> = {
+  kiosk: '/kiosk.php',
+  visitor: '/visitor.php',
+  memberDashboard: '/member-dash.php',
+  memberQueues: '/memberQueues.php',
+  addToQueue: '/addToQueue.php',
+  deleteQueuedBrew: '/deleteQueuedBrew.php',
+  addToRewardQueue: '/addToRewardQueue.php',
+  memberRewards: '/memberRewards.php',
+};
+
 // Mock config module (following gold standard pattern)
 jest.mock('@/src/config', () => ({
   config: {
     api: {
-      getFullUrl: jest.fn(endpoint => `${mockTestBaseUrl}/${endpoint}.php`),
-      baseUrl: mockTestBaseUrl,
+      getFullUrl: jest.fn(
+        endpoint => `${mockTestBaseUrl}${mockEndpointPaths[endpoint] ?? `/${endpoint}.php`}`
+      ),
+      // A getter, not a value. `jest.mock` factories are hoisted above the
+      // `const` declarations above, and Babel's transform makes that early read
+      // yield `undefined` instead of throwing — so a plain `baseUrl:
+      // mockTestBaseUrl` captured undefined. `getFullUrl` escaped this only
+      // because its closure runs when called, long after initialisation.
+      get baseUrl() {
+        return mockCurrentBaseUrl ?? mockTestBaseUrl;
+      },
+      // A setter, because a lifecycle test assigns to this directly to simulate
+      // an environment change. Without one the assignment silently no-ops
+      // against a getter-only property. `beforeEach` clears the override so the
+      // mutation cannot leak into the tests that follow.
+      set baseUrl(value: string) {
+        mockCurrentBaseUrl = value;
+      },
       endpoints: {
         kiosk: '/kiosk.php',
         visitor: '/visitor.php',
@@ -138,6 +172,14 @@ describe('LoginWebView', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockWebViewRef.current.injectJavaScript.mockClear();
+    // `clearAllMocks` resets calls but NOT implementations, so a test that
+    // points `getFullUrl` at a throwing stub leaks it into every test that
+    // follows. Restoring the default here is what makes this suite order
+    // -independent.
+    mockCurrentBaseUrl = null;
+    (config.api.getFullUrl as jest.Mock).mockImplementation(
+      (endpoint: string) => `${mockTestBaseUrl}${mockEndpointPaths[endpoint] ?? `/${endpoint}.php`}`
+    );
   });
 
   afterEach(() => {
@@ -168,10 +210,10 @@ describe('LoginWebView', () => {
         />
       );
 
-      // Modal should exist but not be visible
-      const modal = queryByTestId('login-webview-modal');
-      expect(modal).toBeTruthy();
-      expect(modal?.props.visible).toBe(false);
+      // A hidden Modal does not render its children at all, so the content is
+      // absent rather than present-and-flagged-invisible. The test name always
+      // described this; the assertion did not.
+      expect(queryByTestId('login-webview-modal')).toBeNull();
     });
 
     it('should render close button', () => {
@@ -342,7 +384,9 @@ describe('LoginWebView', () => {
       );
 
       expect(saveSessionData).toHaveBeenCalled();
-      expect(mockOnRefreshData).toHaveBeenCalled();
+      // Not `onRefreshData`: this component never calls it. `useLoginFlow`'s
+      // `handleLoginSuccess` does, in response to `onLoginSuccess` below. The
+      // assertion was testing the parent through the child.
       expect(mockOnLoginSuccess).toHaveBeenCalled();
     });
 
@@ -446,13 +490,14 @@ describe('LoginWebView', () => {
 
       fireEvent(webview, 'onMessage', message);
 
+      // fd18c05 removed the success alerts from this component — in the same
+      // commit that wrote these assertions. They have been red ever since, and
+      // the quarantine hid it. A successful login now reports through
+      // `onLoginSuccess` and stays silent; only failures alert.
       await waitFor(() => {
-        expect(alertSpy).toHaveBeenCalledWith(
-          'Login Successful',
-          expect.stringContaining('API URLs have been updated'),
-          expect.any(Array)
-        );
+        expect(mockOnLoginSuccess).toHaveBeenCalled();
       });
+      expect(alertSpy).not.toHaveBeenCalled();
     });
 
     it('should not process login if URLs are missing', async () => {
@@ -869,13 +914,12 @@ describe('LoginWebView', () => {
 
       fireEvent(webview, 'onMessage', message);
 
+      // Same story as the member success alert: fd18c05 removed it and left the
+      // assertion behind. Visitor login now reports through `onLoginSuccess`.
       await waitFor(() => {
-        expect(alertSpy).toHaveBeenCalledWith(
-          'Visitor Mode Active',
-          expect.stringContaining('browsing as a visitor'),
-          expect.any(Array)
-        );
+        expect(mockOnLoginSuccess).toHaveBeenCalled();
       });
+      expect(alertSpy).not.toHaveBeenCalled();
     });
 
     it('should handle visitor login failure', async () => {
@@ -1547,7 +1591,7 @@ describe('LoginWebView', () => {
     });
 
     it('should handle modal close via Android back button', () => {
-      const { getByTestId } = render(
+      const { UNSAFE_getByType } = render(
         <LoginWebView
           visible={true}
           onLoginSuccess={mockOnLoginSuccess}
@@ -1556,18 +1600,18 @@ describe('LoginWebView', () => {
         />
       );
 
-      const modal = getByTestId('login-webview-modal');
-
-      // Trigger onRequestClose (Android back button)
-      if (modal.props.onRequestClose) {
-        modal.props.onRequestClose();
-      }
+      // `onRequestClose` is a prop of the Modal; `login-webview-modal` is the
+      // View inside it, which has no such prop. The `if` meant the test silently
+      // asserted nothing whenever it looked at the wrong node — it did not fail,
+      // it just never fired. Reach the Modal itself.
+      const modal = UNSAFE_getByType(Modal);
+      modal.props.onRequestClose();
 
       expect(mockOnLoginCancel).toHaveBeenCalled();
     });
 
     it('should support accessibility labels', () => {
-      const { getByTestId } = render(
+      const { getByLabelText } = render(
         <LoginWebView
           visible={true}
           onLoginSuccess={mockOnLoginSuccess}
@@ -1576,9 +1620,10 @@ describe('LoginWebView', () => {
         />
       );
 
-      const modal = getByTestId('login-webview-modal');
-
-      expect(modal.props.accessibilityLabel).toBe('Flying Saucer login modal');
+      // `accessibilityLabel` is on the Modal; `login-webview-modal` is the View
+      // inside it. Reading the label off the View found undefined and always
+      // would have. Query by the label itself, which is what a screen reader does.
+      expect(getByLabelText('Flying Saucer login modal')).toBeTruthy();
     });
 
     it('should clear state when reopened after close', () => {
@@ -1684,7 +1729,10 @@ describe('LoginWebView', () => {
         endpoints.forEach(endpoint => {
           const url = config.api.getFullUrl(endpoint as any);
           expect(url).toBeTruthy();
-          expect(url).toContain(endpoint);
+          // Not `toContain(endpoint)`: the endpoint NAME is not in the URL —
+          // `memberDashboard` resolves to `/member-dash.php`. That assertion
+          // only ever held because the mock interpolated the name.
+          expect(url).toBe(`${mockTestBaseUrl}${mockEndpointPaths[endpoint]}`);
           expect(url).toMatch(/^https:\/\//);
         });
       });
