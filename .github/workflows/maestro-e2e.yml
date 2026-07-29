@@ -28,7 +28,7 @@ env:
 jobs:
   maestro-ios:
     name: Maestro E2E Tests (iOS)
-    runs-on: macos-13  # macos-13 or later for iOS simulator support
+    runs-on: macos-latest
     timeout-minutes: 45
 
     steps:
@@ -93,11 +93,24 @@ jobs:
           # List available simulators
           xcrun simctl list devices available
 
-          # Boot iPhone 16 Pro simulator (available on GitHub Actions runners)
-          xcrun simctl boot "iPhone 16 Pro" || true
-
-          # Wait for simulator to fully boot
-          xcrun simctl bootstatus "iPhone 16 Pro" -b || true
+          # Pick whatever iPhone the runner image actually provides, rather
+          # than naming one. These steps hardcoded specific models (16 Pro, 14
+          # Pro, and a 15-then-14 fallback), commented "available on GitHub
+          # Actions runners" — true when written, false by Xcode 26.5. The boot
+          # was `|| true`, so the miss surfaced two steps later as an xcodebuild
+          # destination error instead of here. Selecting from what is present
+          # cannot go stale, and failing loudly below beats failing obscurely.
+          UDID=$(xcrun simctl list devices available -j \
+            | jq -r '[.devices[][] | select(.isAvailable)] | map(select(.name | test("^iPhone"))) | last | .udid')
+          if [ -z "$UDID" ] || [ "$UDID" = "null" ]; then
+            echo "No iPhone simulator available on this runner image:"
+            xcrun simctl list devices
+            exit 1
+          fi
+          echo "Booting $(xcrun simctl list devices -j | jq -r --arg u "$UDID" '[.devices[][]|select(.udid==$u)]|first|.name') ($UDID)"
+          echo "SIMULATOR_UDID=$UDID" >> "$GITHUB_ENV"
+          xcrun simctl boot "$UDID" || true
+          xcrun simctl bootstatus "$UDID" -b || true
 
       - name: Setup test environment
         run: |
@@ -127,7 +140,7 @@ jobs:
             -configuration Debug \
             -sdk iphonesimulator \
             -derivedDataPath build \
-            -destination 'platform=iOS Simulator,name=iPhone 16 Pro' \
+            -destination 'generic/platform=iOS Simulator' \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             build
@@ -197,7 +210,7 @@ jobs:
 
   maestro-ios-critical:
     name: Maestro Critical Tests (iOS) - Fast
-    runs-on: macos-13
+    runs-on: macos-latest
     timeout-minutes: 20
 
     steps:
@@ -225,7 +238,25 @@ jobs:
           echo "$HOME/.maestro/bin" >> $GITHUB_PATH
 
       - name: Setup iOS Simulator
-        run: xcrun simctl boot "iPhone 16 Pro" || true
+        run: |
+          # Pick whatever iPhone the runner image actually provides, rather
+          # than naming one. These steps hardcoded specific models (16 Pro, 14
+          # Pro, and a 15-then-14 fallback), commented "available on GitHub
+          # Actions runners" — true when written, false by Xcode 26.5. The boot
+          # was `|| true`, so the miss surfaced two steps later as an xcodebuild
+          # destination error instead of here. Selecting from what is present
+          # cannot go stale, and failing loudly below beats failing obscurely.
+          UDID=$(xcrun simctl list devices available -j \
+            | jq -r '[.devices[][] | select(.isAvailable)] | map(select(.name | test("^iPhone"))) | last | .udid')
+          if [ -z "$UDID" ] || [ "$UDID" = "null" ]; then
+            echo "No iPhone simulator available on this runner image:"
+            xcrun simctl list devices
+            exit 1
+          fi
+          echo "Booting $(xcrun simctl list devices -j | jq -r --arg u "$UDID" '[.devices[][]|select(.udid==$u)]|first|.name') ($UDID)"
+          echo "SIMULATOR_UDID=$UDID" >> "$GITHUB_ENV"
+          xcrun simctl boot "$UDID" || true
+          xcrun simctl bootstatus "$UDID" -b || true
 
       - name: Prebuild and Build iOS app
         run: |
@@ -257,7 +288,7 @@ jobs:
 
   maestro-ios-parallel:
     name: Maestro iOS Tests (Parallel - ${{ matrix.test-group.name }})
-    runs-on: macos-13
+    runs-on: macos-latest
     timeout-minutes: 25
     if: github.event_name == 'pull_request'  # Only on PRs for speed
 
@@ -362,9 +393,24 @@ jobs:
 
       - name: Setup iOS Simulator
         run: |
-          # Boot iPhone 15 Pro simulator
-          xcrun simctl boot "iPhone 15 Pro" || xcrun simctl boot "iPhone 14 Pro" || true
-          xcrun simctl bootstatus "iPhone 15 Pro" -b || xcrun simctl bootstatus "iPhone 14 Pro" -b || true
+          # Pick whatever iPhone the runner image actually provides, rather
+          # than naming one. These steps hardcoded specific models (16 Pro, 14
+          # Pro, and a 15-then-14 fallback), commented "available on GitHub
+          # Actions runners" — true when written, false by Xcode 26.5. The boot
+          # was `|| true`, so the miss surfaced two steps later as an xcodebuild
+          # destination error instead of here. Selecting from what is present
+          # cannot go stale, and failing loudly below beats failing obscurely.
+          UDID=$(xcrun simctl list devices available -j \
+            | jq -r '[.devices[][] | select(.isAvailable)] | map(select(.name | test("^iPhone"))) | last | .udid')
+          if [ -z "$UDID" ] || [ "$UDID" = "null" ]; then
+            echo "No iPhone simulator available on this runner image:"
+            xcrun simctl list devices
+            exit 1
+          fi
+          echo "Booting $(xcrun simctl list devices -j | jq -r --arg u "$UDID" '[.devices[][]|select(.udid==$u)]|first|.name') ($UDID)"
+          echo "SIMULATOR_UDID=$UDID" >> "$GITHUB_ENV"
+          xcrun simctl boot "$UDID" || true
+          xcrun simctl bootstatus "$UDID" -b || true
 
       - name: Setup test environment
         run: |
@@ -393,7 +439,7 @@ jobs:
             -configuration Debug \
             -sdk iphonesimulator \
             -derivedDataPath build \
-            -destination 'platform=iOS Simulator,name=iPhone 16 Pro' \
+            -destination 'generic/platform=iOS Simulator' \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             build
