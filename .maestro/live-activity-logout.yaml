@@ -67,7 +67,13 @@ name: "Live Activity - Logout Cleanup"
       - tapOn:
           text: "Check Me In!"
       - waitForAnimationToEnd
-      - wait: 1500
+      # `wait: 1500` was here. Maestro has no `wait` command, so every flow using
+      # it failed to parse. `waitForAnimationToEnd` with a timeout is the bounded
+      # wait Maestro does have; it returns as soon as animations settle, so this
+      # is a ceiling rather than a fixed sleep — better for a test, but not
+      # identical to what was written.
+      - waitForAnimationToEnd:
+          timeout: 1500
 
 # At this point, we should have an active Live Activity
 # (or the beer was already queued)
@@ -116,7 +122,8 @@ name: "Live Activity - Logout Cleanup"
 
 # Wait for logout to complete
 # This should trigger endAllActivities() on the native side
-- wait: 2000
+- waitForAnimationToEnd:
+    timeout: 2000
 
 # ========================================
 # STEP 5: Verify Logged Out State

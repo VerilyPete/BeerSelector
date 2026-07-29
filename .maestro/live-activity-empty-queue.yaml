@@ -64,7 +64,13 @@ name: "Live Activity - Empty Queue Handling"
 - waitForAnimationToEnd
 
 # Wait for Live Activity to start
-- wait: 1500
+# `wait: 1500` was here. Maestro has no `wait` command, so every flow using
+# it failed to parse. `waitForAnimationToEnd` with a timeout is the bounded
+# wait Maestro does have; it returns as soon as animations settle, so this
+# is a ceiling rather than a fixed sleep — better for a test, but not
+# identical to what was written.
+- waitForAnimationToEnd:
+    timeout: 1500
 
 # Verify beer was added
 - assertVisible:
@@ -128,7 +134,8 @@ name: "Live Activity - Empty Queue Handling"
 
 # Wait for removal to process and Live Activity to end
 # The restart pattern with empty array should end the activity
-- wait: 2000
+- waitForAnimationToEnd:
+    timeout: 2000
 
 # ========================================
 # STEP 5: Verify Activity Ended
@@ -162,7 +169,8 @@ name: "Live Activity - Empty Queue Handling"
 - waitForAnimationToEnd
 
 # Wait for new Live Activity to start
-- wait: 1500
+- waitForAnimationToEnd:
+    timeout: 1500
 
 # Verify beer was queued (proves activity system recovered)
 - assertVisible:

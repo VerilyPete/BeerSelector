@@ -35,6 +35,11 @@ jobs:
       - name: Install Maestro
         run: |
           # Install Maestro with verbose output
+          # Pinned. `latest` is how this suite rotted: flows written against an
+          # older CLI stopped parsing when Maestro moved on, and nobody saw it
+          # because the pipeline was already failing earlier. A pin also makes
+          # local `maestro test .maestro/` a truthful predictor of CI.
+          export MAESTRO_VERSION=2.4.0
           curl -fsSL https://get.maestro.mobile.dev | bash
 
           # Verify installation directory exists
@@ -171,6 +176,11 @@ jobs:
       - name: Install Maestro
         run: |
           # Install Maestro with verbose output
+          # Pinned. `latest` is how this suite rotted: flows written against an
+          # older CLI stopped parsing when Maestro moved on, and nobody saw it
+          # because the pipeline was already failing earlier. A pin also makes
+          # local `maestro test .maestro/` a truthful predictor of CI.
+          export MAESTRO_VERSION=2.4.0
           curl -fsSL https://get.maestro.mobile.dev | bash
 
           # Verify installation directory exists
@@ -207,18 +217,16 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-      - name: Setup Android Emulator
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 31
-          target: google_apis
-          arch: x86_64
-          profile: pixel_5
-          force-avd-creation: false
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          disable-animations: true
-          script: echo "Emulator started"
-
+      # There was a second `android-emulator-runner` step here, before the two
+      # build steps, whose whole script was `echo "Emulator started"`. The
+      # emulator this action starts lives only for the duration of its own
+      # script, so that one was gone before anything could use it and the real
+      # test step below inherited a dead adb connection — "adb: device offline",
+      # three times, then failure. Booting an emulator and using it have to
+      # happen inside one invocation, which is what the working `maestro-android`
+      # job in maestro-e2e.yml does.
+      #
+      # Neither build step needs a device, so both simply run first.
       - name: Prebuild Expo app
         run: npx expo prebuild --platform android --clean
 
@@ -242,6 +250,12 @@ jobs:
           target: google_apis
           arch: x86_64
           profile: pixel_5
+          # Carried over from the deleted boot-only step: these were tuning the
+          # emulator that was thrown away, and absent from the one that actually
+          # ran the tests.
+          force-avd-creation: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
           script: |
             # Install app
             adb install android/app/build/outputs/apk/debug/app-debug.apk

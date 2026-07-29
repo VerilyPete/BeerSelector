@@ -75,7 +75,13 @@ name: "Live Activity - Restart Pattern on Queue Updates"
 - waitForAnimationToEnd
 
 # Wait additional time for Live Activity animation
-- wait: 1500
+# `wait: 1500` was here. Maestro has no `wait` command, so every flow using
+# it failed to parse. `waitForAnimationToEnd` with a timeout is the bounded
+# wait Maestro does have; it returns as soon as animations settle, so this
+# is a ceiling rather than a fixed sleep — better for a test, but not
+# identical to what was written.
+- waitForAnimationToEnd:
+    timeout: 1500
 
 # Verify success feedback (queued toast or visual indicator)
 # The exact text may vary based on implementation
@@ -116,7 +122,8 @@ name: "Live Activity - Restart Pattern on Queue Updates"
 # 1. Debounce delay (500ms)
 # 2. End activity animation
 # 3. Start new activity animation
-- wait: 2000
+- waitForAnimationToEnd:
+    timeout: 2000
 
 # Verify success feedback
 - assertVisible:

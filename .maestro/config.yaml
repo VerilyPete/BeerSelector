@@ -4,7 +4,9 @@
 env:
   # App ID for iOS and Android
   APP_ID_IOS: "org.verily.FSbeerselector"
-  APP_ID_ANDROID: "com.yourcompany.beerselector"
+  # Third place the scaffold placeholder survived, after the Android CI job
+  # and 16-offline-mode.yaml. The real package capitalises the B.
+  APP_ID_ANDROID: "org.verily.FSBeerselector"
 
   # Default to iOS for local testing
   APP_ID: ${APP_ID_IOS}
