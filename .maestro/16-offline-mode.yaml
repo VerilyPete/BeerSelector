@@ -31,10 +31,14 @@ tags:
 
 # Verify we can see beer list when online
 - waitForAnimationToEnd
+# `matching: contains` was here and is not a Maestro property. Maestro
+# validates every flow in the directory before running any of them, so this one
+# line aborted the entire suite — on both platforms — about twelve seconds in,
+# with zero tests executed. It was also redundant: `text: ".*"` already matches
+# anything, so removing it changes nothing this step asserts.
 - scrollUntilVisible:
     element:
       text: ".*"
-      matching: contains
     direction: DOWN
 
 # Enable airplane mode to simulate offline
@@ -94,7 +98,11 @@ tags:
       - waitForAnimationToEnd
 
 # Wait for network to reconnect
-- waitForAnimationToEnd: 5000
+# Was `waitForAnimationToEnd: 5000`. The scalar form is not valid — the
+# duration goes in a `timeout` key — and it produced the opaque "List is
+# empty" parse error that was sitting behind the `matching` one above.
+- waitForAnimationToEnd:
+    timeout: 5000
 
 # Verify offline indicator disappears (or becomes hidden)
 # Note: May need to check that it's NOT visible

@@ -23,7 +23,7 @@ env:
   EXPO_PUBLIC_USE_MOCK_SERVER: 'true'
   EXPO_PUBLIC_API_TIMEOUT: '30000'
   NODE_VERSION: '20'
-  MAESTRO_VERSION: 'latest'
+  MAESTRO_VERSION: '2.4.0'
 
 jobs:
   maestro-ios:
@@ -61,6 +61,11 @@ jobs:
       - name: Install Maestro CLI
         run: |
           # Install Maestro with verbose output
+          # Pinned. `latest` is how this suite rotted: flows written against an
+          # older CLI stopped parsing when Maestro moved on, and nobody saw it
+          # because the pipeline was already failing earlier. A pin also makes
+          # local `maestro test .maestro/` a truthful predictor of CI.
+          export MAESTRO_VERSION=2.4.0
           curl -fsSL https://get.maestro.mobile.dev | bash
 
           # Verify installation directory exists
@@ -234,6 +239,11 @@ jobs:
 
       - name: Install Maestro CLI
         run: |
+          # Pinned. `latest` is how this suite rotted: flows written against an
+          # older CLI stopped parsing when Maestro moved on, and nobody saw it
+          # because the pipeline was already failing earlier. A pin also makes
+          # local `maestro test .maestro/` a truthful predictor of CI.
+          export MAESTRO_VERSION=2.4.0
           curl -fsSL https://get.maestro.mobile.dev | bash
           echo "$HOME/.maestro/bin" >> $GITHUB_PATH
 
@@ -364,6 +374,11 @@ jobs:
       - name: Install Maestro CLI
         run: |
           # Install Maestro with verbose output
+          # Pinned. `latest` is how this suite rotted: flows written against an
+          # older CLI stopped parsing when Maestro moved on, and nobody saw it
+          # because the pipeline was already failing earlier. A pin also makes
+          # local `maestro test .maestro/` a truthful predictor of CI.
+          export MAESTRO_VERSION=2.4.0
           curl -fsSL https://get.maestro.mobile.dev | bash
 
           # Verify installation directory exists
@@ -544,6 +559,11 @@ jobs:
       - name: Install Maestro CLI
         run: |
           # Install Maestro with verbose output
+          # Pinned. `latest` is how this suite rotted: flows written against an
+          # older CLI stopped parsing when Maestro moved on, and nobody saw it
+          # because the pipeline was already failing earlier. A pin also makes
+          # local `maestro test .maestro/` a truthful predictor of CI.
+          export MAESTRO_VERSION=2.4.0
           curl -fsSL https://get.maestro.mobile.dev | bash
 
           # Verify installation directory exists

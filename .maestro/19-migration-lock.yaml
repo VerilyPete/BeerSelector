@@ -71,8 +71,12 @@ name: "Migration Lock - Schema Migrations Release the Master Lock"
 
 # The app must get past splash/initialisation. A migration that never returns
 # hangs here rather than erroring.
-- assertVisible:
-    text: "Settings"
+# `assertVisible` takes no `timeout` — the selector mapping rejects it and the
+# whole flow failed to parse, so this migration test has never run. Waiting with
+# a deadline is `extendedWaitUntil`, which is what the 30s was asking for.
+- extendedWaitUntil:
+    visible:
+      text: "Settings"
     timeout: 30000
 
 # ========================================

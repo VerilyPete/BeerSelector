@@ -230,7 +230,13 @@ appId: org.verily.FSbeerselector
 - runFlow:
     commands:
       # Wait a moment to observe skeleton
-      - wait: 500
+      # `wait: 500` was here. Maestro has no `wait` command, so every flow using
+      # it failed to parse. `waitForAnimationToEnd` with a timeout is the bounded
+      # wait Maestro does have; it returns as soon as animations settle, so this
+      # is a ceiling rather than a fixed sleep — better for a test, but not
+      # identical to what was written.
+      - waitForAnimationToEnd:
+          timeout: 500
 
       # Skeleton should be visible during this time
       - assertVisible:
