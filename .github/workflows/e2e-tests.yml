@@ -66,8 +66,24 @@ jobs:
         run: |
           # List available simulators
           xcrun simctl list devices
-          # Boot iPhone 16 Pro simulator (available on GitHub Actions runners)
-          xcrun simctl boot "iPhone 16 Pro" || true
+          # Pick whatever iPhone the runner image actually provides, rather
+          # than naming one. These steps hardcoded specific models (16 Pro, 14
+          # Pro, and a 15-then-14 fallback), commented "available on GitHub
+          # Actions runners" — true when written, false by Xcode 26.5. The boot
+          # was `|| true`, so the miss surfaced two steps later as an xcodebuild
+          # destination error instead of here. Selecting from what is present
+          # cannot go stale, and failing loudly below beats failing obscurely.
+          UDID=$(xcrun simctl list devices available -j \
+            | jq -r '[.devices[][] | select(.isAvailable)] | map(select(.name | test("^iPhone"))) | last | .udid')
+          if [ -z "$UDID" ] || [ "$UDID" = "null" ]; then
+            echo "No iPhone simulator available on this runner image:"
+            xcrun simctl list devices
+            exit 1
+          fi
+          echo "Booting $(xcrun simctl list devices -j | jq -r --arg u "$UDID" '[.devices[][]|select(.udid==$u)]|first|.name') ($UDID)"
+          echo "SIMULATOR_UDID=$UDID" >> "$GITHUB_ENV"
+          xcrun simctl boot "$UDID" || true
+          xcrun simctl bootstatus "$UDID" -b || true
 
       - name: Prebuild Expo app
         run: npx expo prebuild --platform ios --clean
@@ -81,7 +97,7 @@ jobs:
             -configuration Debug \
             -sdk iphonesimulator \
             -derivedDataPath build \
-            -destination 'platform=iOS Simulator,name=iPhone 16 Pro' \
+            -destination 'generic/platform=iOS Simulator' \
             build
 
       - name: Install app on simulator
@@ -117,7 +133,14 @@ jobs:
 
   maestro-tests-android:
     name: Maestro E2E Tests (Android)
-    runs-on: macos-latest
+    # ubuntu, not macos. This job asks for `arch: x86_64` AVDs, and
+    # `macos-latest` is Apple Silicon — the emulator cannot start, which is what
+    # "could not connect to TCP port 5554: Connection refused" and the boot
+    # timeout were. It never reached the app. The sibling `maestro-android` job
+    # in maestro-e2e.yml already runs this exact combination on ubuntu, so this
+    # is adopting a working configuration rather than inventing one. Linux
+    # runners also give the emulator KVM, enabled below.
+    runs-on: ubuntu-latest
     timeout-minutes: 60
 
     steps:
@@ -175,6 +198,15 @@ jobs:
           # Verify installation works
           maestro --version
 
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Enable KVM for emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
       - name: Setup Android Emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -198,7 +230,13 @@ jobs:
       - name: Run Maestro E2E tests on Android
         uses: reactivecircus/android-emulator-runner@v2
         env:
-          APP_ID: com.yourcompany.beerselector
+          # Was `com.yourcompany.beerselector`, a scaffold placeholder that has
+          # never matched anything. Maestro would have failed to find the app
+          # even with a booted emulator, so the emulator fault was hiding a
+          # second one behind it. Note the Android package capitalises the B and
+          # the iOS bundle does not — they genuinely differ, so this is not a
+          # copy of the value used by the iOS jobs.
+          APP_ID: org.verily.FSBeerselector
         with:
           api-level: 31
           target: google_apis
@@ -260,7 +298,24 @@ jobs:
 
       - name: Setup iOS Simulator
         run: |
-          xcrun simctl boot "iPhone 14 Pro" || true
+          # Pick whatever iPhone the runner image actually provides, rather
+          # than naming one. These steps hardcoded specific models (16 Pro, 14
+          # Pro, and a 15-then-14 fallback), commented "available on GitHub
+          # Actions runners" — true when written, false by Xcode 26.5. The boot
+          # was `|| true`, so the miss surfaced two steps later as an xcodebuild
+          # destination error instead of here. Selecting from what is present
+          # cannot go stale, and failing loudly below beats failing obscurely.
+          UDID=$(xcrun simctl list devices available -j \
+            | jq -r '[.devices[][] | select(.isAvailable)] | map(select(.name | test("^iPhone"))) | last | .udid')
+          if [ -z "$UDID" ] || [ "$UDID" = "null" ]; then
+            echo "No iPhone simulator available on this runner image:"
+            xcrun simctl list devices
+            exit 1
+          fi
+          echo "Booting $(xcrun simctl list devices -j | jq -r --arg u "$UDID" '[.devices[][]|select(.udid==$u)]|first|.name') ($UDID)"
+          echo "SIMULATOR_UDID=$UDID" >> "$GITHUB_ENV"
+          xcrun simctl boot "$UDID" || true
+          xcrun simctl bootstatus "$UDID" -b || true
 
       - name: Prebuild Expo app
         run: npx expo prebuild --platform ios --clean
@@ -274,7 +329,7 @@ jobs:
             -configuration Release \
             -sdk iphonesimulator \
             -derivedDataPath build \
-            -destination 'platform=iOS Simulator,name=iPhone 16 Pro' \
+            -destination 'generic/platform=iOS Simulator' \
             build
 
       - name: Install app on simulator
