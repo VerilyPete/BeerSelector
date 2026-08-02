@@ -61,10 +61,9 @@ jobs:
       - name: Install Maestro CLI
         run: |
           # Install Maestro with verbose output
-          # Pinned. `latest` is how this suite rotted: flows written against an
-          # older CLI stopped parsing when Maestro moved on, and nobody saw it
-          # because the pipeline was already failing earlier. A pin also makes
-          # local `maestro test .maestro/` a truthful predictor of CI.
+          # Pinned. Why, and the caveat that this does NOT by itself make a
+          # local run predict CI (nothing pins your machine): see "How Maestro
+          # validates this suite", point 4, in .maestro/README.md.
           export MAESTRO_VERSION=2.4.0
           curl -fsSL https://get.maestro.mobile.dev | bash
 
@@ -97,9 +96,11 @@ jobs:
           # ignores an unset/misread env var, or an upstream change to how the
           # version is selected could all still produce a working `maestro`
           # binary that passes the checks above while being the wrong
-          # version. The pin's entire purpose — a fixed, locally-reproducible
-          # CLI, per the comment above — depends on this being asserted, not
-          # merely printed.
+          # version. The pin's entire purpose — a fixed, reproducible CLI —
+          # depends on this being asserted, not merely printed.
+          #
+          # CANONICAL: the other four copies of this step point here rather
+          # than restating the argument.
           ACTUAL_VERSION=$(maestro --version)
           if [ "$ACTUAL_VERSION" != "$MAESTRO_VERSION" ]; then
             echo "Error: installed Maestro is '$ACTUAL_VERSION', expected '$MAESTRO_VERSION'"
@@ -264,10 +265,9 @@ jobs:
 
       - name: Install Maestro CLI
         run: |
-          # Pinned. `latest` is how this suite rotted: flows written against an
-          # older CLI stopped parsing when Maestro moved on, and nobody saw it
-          # because the pipeline was already failing earlier. A pin also makes
-          # local `maestro test .maestro/` a truthful predictor of CI.
+          # Pinned. Why, and the caveat that this does NOT by itself make a
+          # local run predict CI (nothing pins your machine): see "How Maestro
+          # validates this suite", point 4, in .maestro/README.md.
           #
           # This step used to be three lines: install, add to PATH, done — no
           # `-d`/`-f` guard on the install succeeding, no pin assertion. Every
@@ -445,10 +445,9 @@ jobs:
       - name: Install Maestro CLI
         run: |
           # Install Maestro with verbose output
-          # Pinned. `latest` is how this suite rotted: flows written against an
-          # older CLI stopped parsing when Maestro moved on, and nobody saw it
-          # because the pipeline was already failing earlier. A pin also makes
-          # local `maestro test .maestro/` a truthful predictor of CI.
+          # Pinned. Why, and the caveat that this does NOT by itself make a
+          # local run predict CI (nothing pins your machine): see "How Maestro
+          # validates this suite", point 4, in .maestro/README.md.
           export MAESTRO_VERSION=2.4.0
           curl -fsSL https://get.maestro.mobile.dev | bash
 
@@ -474,16 +473,9 @@ jobs:
           # Add to PATH for future steps
           echo "$HOME/.maestro/bin" >> $GITHUB_PATH
 
-          # Assert the pin actually took. The checks above catch an installer
-          # that failed outright; they say nothing about which VERSION landed.
-          # `MAESTRO_VERSION` is read by the installer script, not enforced by
-          # it — a corrupt or partial download, an installer that silently
-          # ignores an unset/misread env var, or an upstream change to how the
-          # version is selected could all still produce a working `maestro`
-          # binary that passes the checks above while being the wrong
-          # version. The pin's entire purpose — a fixed, locally-reproducible
-          # CLI, per the comment above — depends on this being asserted, not
-          # merely printed.
+          # Assert the pin actually took — the checks above prove only that
+          # SOME maestro installed, not which version. Full argument at the
+          # canonical copy of this step in .github/workflows/maestro-e2e.yml.
           ACTUAL_VERSION=$(maestro --version)
           if [ "$ACTUAL_VERSION" != "$MAESTRO_VERSION" ]; then
             echo "Error: installed Maestro is '$ACTUAL_VERSION', expected '$MAESTRO_VERSION'"
@@ -676,10 +668,9 @@ jobs:
       - name: Install Maestro CLI
         run: |
           # Install Maestro with verbose output
-          # Pinned. `latest` is how this suite rotted: flows written against an
-          # older CLI stopped parsing when Maestro moved on, and nobody saw it
-          # because the pipeline was already failing earlier. A pin also makes
-          # local `maestro test .maestro/` a truthful predictor of CI.
+          # Pinned. Why, and the caveat that this does NOT by itself make a
+          # local run predict CI (nothing pins your machine): see "How Maestro
+          # validates this suite", point 4, in .maestro/README.md.
           export MAESTRO_VERSION=2.4.0
           curl -fsSL https://get.maestro.mobile.dev | bash
 
@@ -705,16 +696,9 @@ jobs:
           # Add to PATH for future steps
           echo "$HOME/.maestro/bin" >> $GITHUB_PATH
 
-          # Assert the pin actually took. The checks above catch an installer
-          # that failed outright; they say nothing about which VERSION landed.
-          # `MAESTRO_VERSION` is read by the installer script, not enforced by
-          # it — a corrupt or partial download, an installer that silently
-          # ignores an unset/misread env var, or an upstream change to how the
-          # version is selected could all still produce a working `maestro`
-          # binary that passes the checks above while being the wrong
-          # version. The pin's entire purpose — a fixed, locally-reproducible
-          # CLI, per the comment above — depends on this being asserted, not
-          # merely printed.
+          # Assert the pin actually took — the checks above prove only that
+          # SOME maestro installed, not which version. Full argument at the
+          # canonical copy of this step in .github/workflows/maestro-e2e.yml.
           ACTUAL_VERSION=$(maestro --version)
           if [ "$ACTUAL_VERSION" != "$MAESTRO_VERSION" ]; then
             echo "Error: installed Maestro is '$ACTUAL_VERSION', expected '$MAESTRO_VERSION'"

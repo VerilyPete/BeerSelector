@@ -179,33 +179,58 @@ Every one of these is mine.
       Corrected to three, and reduced to a pointer at the docstring rather than
       a second copy of the argument — the restatement is why the two could
       disagree. Re-verified all three keys have no reader before saying so.
-**5.6–5.10 are BLOCKED, deliberately. Do not start them.** Every one lives in
-`.maestro/*` or `.github/workflows/*`, which Codex is rewriting for Wave 6.
-Two agents in those files means a conflict, and the whole point of splitting
-Wave 5 was to avoid one. They unblock when Wave 6 lands.
+**5.6–5.10 were blocked on Wave 6; Wave 6 has landed and they are now done.**
+The warning below was worth heeding: re-verifying against the tree first found
+that two were already fixed and one had a false diagnosis in this very file.
 
-When they do unblock, re-verify each claim against the tree first. Wave 6
-edits the very files these five describe, so the odds that some of these
-descriptions are stale on arrival are high — and 5.2 and 5.3 have already
-demonstrated, in this wave, what happens when a Wave 5 instruction is executed
-literally after an earlier wave has moved the code underneath it. 5.11's
-remaining half is in the same files and is blocked with them.
+Every claim below was checked by running the mutation against Maestro 2.4.0
+locally, not by reading. The verified CLI behaviours are now stated once in
+`.maestro/README.md` § "How Maestro validates this suite"; the flow and
+workflow comments point there.
 
-- [ ] 5.6 "every flow using `wait` failed to parse" — `beer-list-loading.yaml`
-      parses fine; nested `runFlow: commands:` without `when:` is not validated
-      at that depth.
-- [ ] 5.7 "adopting a working configuration" — that job was failing too.
-- [ ] 5.8 Placeholder count wrong; `16-offline-mode.yaml:1` still carries it;
-      `README.md:376` is a fourth site.
-- [ ] 5.9 "twelve seconds / both platforms" — unverifiable, and sits oddly beside
-      the claim that CI never got that far.
-- [ ] 5.10 Pin comment claims local is a truthful predictor; nothing pins local.
-- [~] 5.11 ~90 lines of duplicated comment prose — and the duplication *caused*
-      5.6 by copy-paste. Collapse to one canonical statement.
-      **PARTIAL, and left partial on purpose — not an oversight to tidy up.**
-      Source-file half done; the `.maestro`/workflow half is blocked with
-      5.6–5.10 above. Marked `[~]` rather than `[x]` so nobody reads it as
-      finished and skips the remainder. The
+- [x] 5.6 "every flow using `wait` failed to parse" — the claim is false, but
+      **this plan's stated reason for it was also false**, and executing it
+      literally would have written a second wrong explanation over the first.
+      Probed it: nested `runFlow: commands:` *is* validated, with or without
+      `when:` — an invalid command there is rejected exactly as at top level.
+      The real cause is that `beer-list-loading.yaml` is 12 concatenated YAML
+      documents; Maestro reads only the first `header --- commands` pair and
+      silently ignores the rest, so that file's `wait` was never parsed at all.
+      Proven by a file whose later documents held an invalid command *and* a
+      guaranteed-failing assertion: it ran `launchApp` and reported success.
+      Corrected in all five sites — four now state the real (suite-aborting)
+      consequence, and the fifth records why it was the exception.
+      **This is the second time a Wave 5 item's diagnosis was itself wrong**
+      (see 261cf1f6). Re-verify before executing is not a formality here.
+- [x] 5.7 Already fixed by Wave 6's revert (`3204becf`) — the "adopting a
+      working configuration" phrasing no longer exists in the tree. No edit
+      made; confirmed absent rather than assumed.
+- [x] 5.8 Already fixed by the same commit — no `placeholder` or `yourcompany`
+      string survives anywhere in `.maestro`, `.github`, or `README.md`, and
+      the cited `README.md:376` is past the end of the file. Nothing to do.
+- [x] 5.9 Split by what could actually be checked. The load-bearing half is
+      **true and now verified**: a directory holding one valid and one invalid
+      flow ran zero tests — validation is whole-directory and precedes
+      execution. The other half is gone: "both platforms" was never observed
+      (Android is known-red and never got this far) and "twelve seconds" was
+      never measured. The platform claim is retained explicitly as an
+      inference, since it is a reasonable one, rather than deleted or left
+      masquerading as an observation.
+- [x] 5.10 The pin comment's "makes local a truthful predictor of CI" is
+      conditionally false — nothing pins or checks the local CLI. Restated with
+      the condition and the command that tests it (`maestro --version` must
+      print 2.4.0). Removed from all six duplicated sites in the process.
+- [x] 5.11 ~90 lines of duplicated comment prose — and the duplication *caused*
+      5.6 by copy-paste. Collapse to one canonical statement. **NOW COMPLETE.**
+      The `.maestro`/workflow half: the pin rationale appeared **6×** and the
+      pin-assertion argument **5×**, byte-identical. The pin rationale is now
+      in `.maestro/README.md` with all six sites pointing at it; the assertion
+      argument keeps one canonical copy in `maestro-e2e.yml`, marked as such,
+      with four pointers. The `wait` prose (5×) collapsed to the README too.
+      This confirmed 5.11's causal claim rather than assuming it: the false
+      "every flow" sentence was present in all five copies, so a single
+      copy-paste propagated one wrong sentence to five files.
+      The earlier source-file half: the
       duplicated block in source was the `auth_cookies` rationale, restated in
       `migrateToV8.ts`, `LoginWebView.tsx` and `LoginWebView.test.tsx` — ~39
       lines carrying the same three assertions, and all three carried 5.1's
@@ -218,16 +243,60 @@ remaining half is in the same files and is blocked with them.
 
 ## Wave 6 — tooling and CI
 
-- [ ] 6.1 `verify-migration.sh` reports PASS when staging silently failed or the
+- [x] 6.1 `verify-migration.sh` reports PASS when staging silently failed or the
       app was reinstalled. `q()` discards sqlite3's exit status; no `set -e`.
       Must assert staging landed, and require the planted marker to survive.
-- [ ] 6.2 **38 flows hardcode the iOS bundle**; none use `${APP_ID}`. Every
-      Android change in `f5c7d953` is inert.
-- [ ] 6.3 `maestro-e2e.yml` is green regardless — its summary job decides PASS by
+      Done in `2788fbd0`; the false PASS was reproduced before being fixed.
+- [x] 6.2 **WON'T DO — closed by user direction, twice.** Was implemented in
+      `2788fbd0` (all 39 `appId:` headers parameterised to `${APP_ID}`) and
+      fully unwound 12 minutes later in `3204becf`: Android is not a focus.
+      Re-confirmed by the user on 2026-08-02 after the question was re-raised.
+      Current tree hardcodes `org.verily.FSbeerselector` in all 39 headers and
+      carries no `-e APP_ID=` anywhere, so bare `maestro test .maestro/X.yaml`
+      works — which the local validation loop depends on.
+      **Note for whoever reads this next:** the item was re-raised against a
+      working tree that had already been reverted, i.e. the question was asked
+      about a state that no longer existed. `git log -1` against the specific
+      file before re-opening a Wave 6 item.
+      If Android is ever revived, `.maestro/config.yaml` records both real
+      bundle IDs and states plainly that nothing currently reads them.
+- [x] 6.3 `maestro-e2e.yml` is green regardless — its summary job decides PASS by
       testing whether an artifact directory exists, and never exits non-zero.
-- [ ] 6.4 `|| true` still masks `bootstatus`; the selected UDID is exported and
+      Done in `2788fbd0`, which also found a second decorative summary job that
+      this item had not flagged.
+- [x] 6.4 `|| true` still masks `bootstatus`; the selected UDID is exported and
       never used (install falls back to `booted`, reintroducing the ambiguity).
-- [ ] 6.5 Maestro pin unasserted; `maestro-ios-critical` has no install guard.
+      Done in `2788fbd0` — all five `SIMULATOR_UDID` sites, not just the one
+      named here.
+- [x] 6.5 Maestro pin unasserted; `maestro-ios-critical` has no install guard.
+      Done in `2788fbd0`. The pin's *comment* was separately false (5.10).
+
+---
+
+## Wave 7 — found while verifying Wave 5, not yet fixed
+
+Both surfaced from 5.6. Neither is a comment defect, so neither was fixed as
+part of a comment-correction wave; both are recorded where a reader will hit
+them and are tracked here.
+
+- [ ] 7.1 **`beer-list-loading.yaml` is 12 flows in one file and only the first
+      runs.** Maestro reads one `header --- commands` pair per file and ignores
+      every later document — silently, and without parse-checking it. The file
+      presents as 12 tests and is 1; scenarios 2-4 in its own header have never
+      been exercised. Fixing it means splitting documents 2-12 into their own
+      files and registering each. Not mechanical: the one test that *does* run
+      currently fails at `tapOn: "All Beers Tab"`, so the other 11 should be
+      assumed red until shown otherwise. A ⚠️ header now states this in-file.
+      Worth a grep for the same shape before it recurs — it is invisible from
+      a passing run, which is exactly how it survived this long.
+- [ ] 7.2 **Seven flow files are unregistered in `config.yaml` and run
+      nowhere**: `beer-list-filter`, `beer-list-loading`, `beer-list-scroll`,
+      `beer-list-search`, `LOGIN_WEBVIEW_ERROR_HANDLING`,
+      `MP-7-STEP-2-OPERATION-QUEUE-TESTS`, `SETTINGS_AUTO_LOGIN`. `config.yaml`
+      already warns that unregistered flows are invisible, and two others were
+      adopted for exactly this reason — these seven were left. Decide per file:
+      register it, or delete it. Leaving a test file that runs nowhere is the
+      same failure mode this whole round is about.
 
 ---
 
