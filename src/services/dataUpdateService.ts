@@ -428,9 +428,17 @@ async function readTaplistConfiguration(): Promise<TaplistConfiguration> {
 /**
  * Whether rows fetched against `fetchedFor` may still be committed.
  *
- * MUST be called under the write lock. Called outside it, the configuration can
- * change between the check and the write and the guard proves nothing — which
- * is precisely the bug it exists to close, reintroduced one level up.
+ * MUST be called under the write lock — but that alone does not make the
+ * check-then-write atomic. It's only sound because `LoginWebView.tsx`'s
+ * gate-open bursts (the writes of a NEW, non-empty `all_beers_api_url`) take
+ * the SAME `databaseLockManager` lock. `setPreference` itself still takes no
+ * lock — it can't; ~8 sites in this file call it from inside a held lock and
+ * would self-deadlock if it did — so any future writer of a real store URL
+ * that doesn't explicitly join this lock reopens the exact race this guard
+ * exists to close, silently. A write of `''` (login's gate-close,
+ * `DeveloperSection.tsx`'s reset) does not need the lock: `null` and `''` both
+ * read as "changed" below, so racing to `''` unlocked only ever causes a safe,
+ * cheap abandon, never a bad commit.
  */
 async function taplistConfigurationHeld(fetchedFor: TaplistConfiguration): Promise<boolean> {
   return (await readTaplistConfiguration()) === fetchedFor;

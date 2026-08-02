@@ -8,6 +8,7 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 import { Colors } from '@/constants/Colors';
 import { setPreference } from '@/src/database/preferences';
 import { commitTaplistWrite } from '@/src/services/taplistEtag';
+import { databaseLockManager } from '@/src/database/DatabaseLockManager';
 import { handleVisitorLogin } from '@/src/api/authService';
 import { saveSessionData, extractSessionDataFromResponse } from '@/src/api/sessionManager';
 import { isSessionData } from '@/src/types/api';
@@ -361,21 +362,53 @@ export default function LoginWebView({
               // the key both branches of `areApiUrlsConfigured` require, so it is
               // the single point at which this login becomes visible to
               // app/_layout.tsx's routing.
-              await setPreference(
-                'is_visitor_mode',
-                'false',
-                'Flag indicating whether the user is in visitor mode'
-              );
-              await setPreference(
-                'my_beers_api_url',
-                userJsonUrl,
-                'API endpoint for fetching Beerfinder beers'
-              );
-              await setPreference(
-                'all_beers_api_url',
-                storeJsonUrl,
-                'API endpoint for fetching all beers'
-              );
+              //
+              // Under the SAME lock the taplist writers hold
+              // (`dataUpdateService.ts`'s `taplistConfigurationHeld`/
+              // `writeAllBeers`/`writeAllBeersOnLogin`), and only this burst —
+              // not the gate-close above, not `recordUnreadLoginMetadata`, not
+              // `saveSessionData`. That guard re-reads `all_beers_api_url` while
+              // holding the lock and compares it to the URL its rows were
+              // fetched against; the comparison only means anything if the
+              // write that could invalidate it cannot land mid-hold. Before
+              // this, it could: `setPreference` takes no lock of its own (~8
+              // sites in `dataUpdateService` already call it from inside a held
+              // lock, so it deliberately never will), so a taplist writer's
+              // check could pass and this write could still land before that
+              // writer's commit — same store URL at check time, different rows
+              // in the table by the time the write actually happens.
+              //
+              // Scoped to just this burst on purpose. `LOCK_TIMEOUT_MS` is 15s
+              // and a forced release does not hand the lock to the next
+              // waiter — it blocks every database consumer until the
+              // abandoned holder itself returns. `saveSessionData` is
+              // uncontrolled Keychain I/O with no such bound, so it and
+              // everything before it stay outside any hold.
+              //
+              // Only a write of a NEW, non-empty store URL needs this lock.
+              // Gate-close writes (`:329` above, `DeveloperSection.tsx:187`)
+              // set `all_beers_api_url` to `''`, and the guard already treats
+              // that as "changed" and abandons — see
+              // `readTaplistConfiguration`'s doc comment. A future writer of a
+              // real store URL that skips this lock reopens the gap this
+              // closes.
+              await databaseLockManager.withDatabaseLock('login-config-commit', async () => {
+                await setPreference(
+                  'is_visitor_mode',
+                  'false',
+                  'Flag indicating whether the user is in visitor mode'
+                );
+                await setPreference(
+                  'my_beers_api_url',
+                  userJsonUrl,
+                  'API endpoint for fetching Beerfinder beers'
+                );
+                await setPreference(
+                  'all_beers_api_url',
+                  storeJsonUrl,
+                  'API endpoint for fetching all beers'
+                );
+              });
 
               processedUrlsRef.current.clear();
 
@@ -459,24 +492,33 @@ export default function LoginWebView({
               await setPreference('all_beers_api_url', '', 'API endpoint for fetching all beers');
               await commitTaplistWrite({ kind: 'cleared' });
 
-              await setPreference(
-                'is_visitor_mode',
-                'true',
-                'Flag indicating whether the user is in visitor mode'
-              );
-              await setPreference(
-                'my_beers_api_url',
-                'none://visitor_mode',
-                'Placeholder URL for visitor mode (not a real endpoint)'
-              );
+              // Same lock, same reasoning, as the member branch's gate-open
+              // burst above — see the comment there. No SecureStore step on
+              // this path (`handleVisitorLogin` already completed above,
+              // before the gate-close write), so there is nothing slow to keep
+              // out of the hold; the scoping still matches for consistency
+              // with the member branch and so a future addition here doesn't
+              // have to rediscover why it's scoped this way.
+              await databaseLockManager.withDatabaseLock('login-config-commit', async () => {
+                await setPreference(
+                  'is_visitor_mode',
+                  'true',
+                  'Flag indicating whether the user is in visitor mode'
+                );
+                await setPreference(
+                  'my_beers_api_url',
+                  'none://visitor_mode',
+                  'Placeholder URL for visitor mode (not a real endpoint)'
+                );
 
-              const storeJsonUrl = `https://fsbs.beerknurd.com/bk-store-json.php?sid=${storeId}`;
-              console.log('Setting all_beers_api_url to:', storeJsonUrl);
-              await setPreference(
-                'all_beers_api_url',
-                storeJsonUrl,
-                'API endpoint for fetching all beers'
-              );
+                const storeJsonUrl = `https://fsbs.beerknurd.com/bk-store-json.php?sid=${storeId}`;
+                console.log('Setting all_beers_api_url to:', storeJsonUrl);
+                await setPreference(
+                  'all_beers_api_url',
+                  storeJsonUrl,
+                  'API endpoint for fetching all beers'
+                );
+              });
 
               processedUrlsRef.current.clear();
 
