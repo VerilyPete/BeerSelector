@@ -64,11 +64,11 @@ name: "Live Activity - Empty Queue Handling"
 - waitForAnimationToEnd
 
 # Wait for Live Activity to start
-# `wait: 1500` was here. Maestro has no `wait` command, so every flow using
-# it failed to parse. `waitForAnimationToEnd` with a timeout is the bounded
-# wait Maestro does have; it returns as soon as animations settle, so this
-# is a ceiling rather than a fixed sleep — better for a test, but not
-# identical to what was written.
+# `wait: 1500` was here, and it aborted the whole suite: Maestro has no `wait`
+# command, and one invalid command anywhere in this directory stops every flow
+# in it from running. See "How Maestro validates this suite", points 1-2, in
+# README.md. `waitForAnimationToEnd` is a ceiling, not a fixed sleep — it
+# returns as soon as animations settle, so this is not what was written.
 - waitForAnimationToEnd:
     timeout: 1500
 

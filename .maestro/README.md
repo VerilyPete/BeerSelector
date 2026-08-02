@@ -27,6 +27,57 @@ maestro test .maestro/ --debug
 
 ---
 
+## How Maestro validates this suite
+
+Canonical statement of the CLI behaviours this suite depends on. Several flow
+files and both workflow files used to restate these inline; they now point
+here instead. All four were verified against Maestro **2.4.0**, the pinned
+version, by running the failing case — not inferred from documentation.
+
+**1. Validation is whole-directory and happens before any test runs.**
+`maestro test .maestro/` parses every flow in the directory first. One invalid
+property in one flow aborts the entire run with **zero tests executed** — the
+other flows do not run and do not report. Verified: a directory holding one
+valid flow and one flow with `matching: contains` under `scrollUntilVisible`
+produced only `Unknown Property: matching`; the valid flow never started.
+
+This is why a single bad line reads as "the whole suite is broken" rather than
+"one test failed", and why a parse fault must be fixed before any result from
+this directory means anything.
+
+**2. Validation reaches nested `runFlow: commands:`.**
+There is no depth at which an invalid command stops being checked. A `wait: 500`
+nested inside `runFlow: commands:` is rejected with the same error, pointing at
+the nested line, as one at the top level. Maestro has no `wait` command at all;
+`waitForAnimationToEnd` with a `timeout` is the bounded wait it does have, and
+it returns as soon as animations settle, so it is a ceiling rather than a fixed
+sleep — better for a test, but not identical to a sleep.
+
+**3. Only the first two YAML documents in a file are read.**
+A flow file is `header --- commands`. Maestro reads that pair and **silently
+ignores every subsequent document**. Anything after the second `---` is dead
+text: it is not executed, and it is not even parse-checked, so an invalid
+command there raises nothing. Verified: a file whose third and fourth documents
+contained both an invalid `wait` and a guaranteed-failing assertion ran only
+`launchApp` and **reported success**.
+
+`beer-list-loading.yaml` is built this way — see the warning in its header.
+
+**4. The pin makes local a truthful predictor only if local matches.**
+CI pins `MAESTRO_VERSION=2.4.0` and asserts it took. Nothing pins or checks
+your machine. Local `maestro test .maestro/` predicts CI only while your CLI is
+also 2.4.0, which nothing enforces — confirm before trusting a local pass:
+
+```bash
+maestro --version   # must print 2.4.0 to match CI
+```
+
+`latest` is how this suite rotted in the first place: flows written against an
+older CLI stopped parsing when Maestro moved on, and nobody noticed because the
+pipeline was already failing earlier for a different reason.
+
+---
+
 ## Test Suite Overview
 
 **Total Tests:** 19 test files

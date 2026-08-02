@@ -9,6 +9,30 @@
 # 2. Skeleton disappears when data loads
 # 3. Pull-to-refresh shows spinner (not skeleton)
 # 4. Loading states work consistently across all tabs
+#
+# ⚠️  ONLY THE FIRST TEST IN THIS FILE RUNS. THE OTHER ELEVEN DO NOT.
+#
+# This file concatenates 12 flows as 12 `appId: --- commands` document pairs in
+# one file. Maestro reads the first pair and silently ignores the rest — see
+# "How Maestro validates this suite", point 3, in .maestro/README.md. Everything
+# below line 46 is dead text. It is not executed, and it is not parse-checked
+# either, so an invalid command down there raises nothing and the flow still
+# reports success.
+#
+# That is why the `wait: 500` this file used to carry never broke anything,
+# while the same line in a single-document flow aborted the whole suite.
+#
+# Two consequences worth being explicit about:
+#   - The file looks like 12 tests and is 1. Do not read a pass here as
+#     coverage of scenarios 2-4 above; nothing has ever exercised them.
+#   - Fixing it means splitting documents 2-12 into their own flow files and
+#     registering each in config.yaml. That is real work with real failures
+#     behind it — the one test that does run currently fails at `tapOn:
+#     "All Beers Tab"` — and it is tracked, not done. Do not assume the split
+#     is mechanical.
+#
+# This file is also unregistered in config.yaml, so it runs nowhere in CI. Both
+# facts are tracked in plans/review-remediation-round-8.md.
 
 appId: org.verily.FSbeerselector
 ---
@@ -230,11 +254,11 @@ appId: org.verily.FSbeerselector
 - runFlow:
     commands:
       # Wait a moment to observe skeleton
-      # `wait: 500` was here. Maestro has no `wait` command, so every flow using
-      # it failed to parse. `waitForAnimationToEnd` with a timeout is the bounded
-      # wait Maestro does have; it returns as soon as animations settle, so this
-      # is a ceiling rather than a fixed sleep — better for a test, but not
-      # identical to what was written.
+      # `wait: 500` was here. Maestro has no `wait` command — but unlike the
+      # identical line in the single-document flows, this one broke nothing,
+      # because it sits in a document Maestro never reads (see the ⚠️ header).
+      # It was replaced for consistency, not because it was failing.
+      # `waitForAnimationToEnd` is a ceiling, not a fixed sleep.
       - waitForAnimationToEnd:
           timeout: 500
 
