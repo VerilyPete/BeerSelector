@@ -31,6 +31,7 @@ import { ApiErrorType } from '../../utils/notificationUtils';
 
 jest.mock('../../database/preferences', () => ({
   getPreference: jest.fn(),
+
   setPreference: jest.fn(async () => {}),
   areApiUrlsConfigured: jest.fn(async () => true),
 }));

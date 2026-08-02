@@ -18,6 +18,7 @@ jest.mock('../apiClientInstance', () => ({
 // Mock database functions
 jest.mock('../../database/preferences', () => ({
   getPreference: jest.fn().mockResolvedValue(null),
+
   setPreference: jest.fn().mockResolvedValue(undefined),
   areApiUrlsConfigured: jest.fn().mockResolvedValue(true),
 }));
@@ -61,10 +62,10 @@ describe('authService', () => {
 
       // Check that the API client was called correctly
       expect(mockApiClient.post).toHaveBeenCalledWith('/auto-login.php', {});
-      
+
       // Check that session data was saved
       expect(saveSessionData).toHaveBeenCalledWith(mockSessionData);
-      
+
       // Check that the result is correct
       expect(result).toEqual({
         success: true,
@@ -88,10 +89,10 @@ describe('authService', () => {
 
       // Check that the API client was called correctly
       expect(mockApiClient.post).toHaveBeenCalledWith('/auto-login.php', {});
-      
+
       // Check that session data was not saved
       expect(saveSessionData).not.toHaveBeenCalled();
-      
+
       // Check that the result is correct
       expect(result).toEqual({
         success: false,
@@ -146,10 +147,10 @@ describe('authService', () => {
         username: 'testuser',
         password: 'password123',
       });
-      
+
       // Check that session data was saved
       expect(saveSessionData).toHaveBeenCalledWith(mockSessionData);
-      
+
       // Check that the result is correct
       expect(result).toEqual({
         success: true,
@@ -176,10 +177,10 @@ describe('authService', () => {
         username: 'testuser',
         password: 'wrongpassword',
       });
-      
+
       // Check that session data was not saved
       expect(saveSessionData).not.toHaveBeenCalled();
-      
+
       // Check that the result is correct
       expect(result).toEqual({
         success: false,
@@ -191,10 +192,10 @@ describe('authService', () => {
     it('should validate input parameters', async () => {
       // Test with empty username
       let result = await login('', 'password123');
-      
+
       // Check that the API client was not called
       expect(mockApiClient.post).not.toHaveBeenCalled();
-      
+
       // Check that the result is correct
       expect(result).toEqual({
         success: false,
@@ -204,10 +205,10 @@ describe('authService', () => {
 
       // Test with empty password
       result = await login('testuser', '');
-      
+
       // Check that the API client was not called
       expect(mockApiClient.post).not.toHaveBeenCalled();
-      
+
       // Check that the result is correct
       expect(result).toEqual({
         success: false,
@@ -229,10 +230,10 @@ describe('authService', () => {
 
       // Check that the API client was called correctly
       expect(mockApiClient.post).toHaveBeenCalledWith('/logout.php', {});
-      
+
       // Check that session data was cleared
       expect(clearSessionData).toHaveBeenCalled();
-      
+
       // Check that the result is correct
       expect(result).toEqual({
         success: true,
@@ -259,7 +260,8 @@ describe('authService', () => {
 
   describe('handleTapThatAppLogin', () => {
     it('should parse cookies string and save session data', async () => {
-      const cookiesString = 'PHPSESSID=test-session-id; member_id=test-member-id; store__id=test-store-id; store_name=Test%20Store';
+      const cookiesString =
+        'PHPSESSID=test-session-id; member_id=test-member-id; store__id=test-store-id; store_name=Test%20Store';
 
       const result = await handleTapThatAppLogin(cookiesString);
 
@@ -325,10 +327,10 @@ describe('authService', () => {
         member_id: 'test-member-id',
         store__id: 'test-store-id',
       });
-      
+
       // Check that session data was not saved
       expect(saveSessionData).not.toHaveBeenCalled();
-      
+
       // Check that the result is correct
       expect(result).toEqual({
         success: false,
@@ -341,7 +343,7 @@ describe('authService', () => {
         PHPSESSID: 'test-session-id',
         store__id: 'test-store-id',
       });
-      
+
       // Check that the result is correct
       expect(result).toEqual({
         success: false,
@@ -354,7 +356,7 @@ describe('authService', () => {
         PHPSESSID: 'test-session-id',
         member_id: 'test-member-id',
       });
-      
+
       // Check that the result is correct
       expect(result).toEqual({
         success: false,
@@ -365,7 +367,8 @@ describe('authService', () => {
 
     it('should handle malformed cookie values gracefully', async () => {
       // Malformed store_name (invalid URI component)
-      const cookiesString = 'PHPSESSID=test-session-id; member_id=test-member-id; store__id=test-store-id; store_name=%invalid';
+      const cookiesString =
+        'PHPSESSID=test-session-id; member_id=test-member-id; store__id=test-store-id; store_name=%invalid';
 
       const result = await handleTapThatAppLogin(cookiesString);
 

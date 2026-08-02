@@ -11,6 +11,7 @@ import { fetchedRows } from '../../api/__tests__/helpers/fetchOutcomeFixtures';
 // Mock dependencies
 jest.mock('../../database/preferences', () => ({
   getPreference: jest.fn(),
+
   setPreference: jest.fn(),
 }));
 

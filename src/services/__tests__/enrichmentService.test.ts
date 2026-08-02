@@ -57,6 +57,7 @@ jest.mock('@/src/config', () => ({
 // Mock preferences
 jest.mock('@/src/database/preferences', () => ({
   getPreference: jest.fn(),
+
   setPreference: jest.fn(),
 }));
 

@@ -52,6 +52,7 @@ jest.mock('../../database/db', () => ({
 
 jest.mock('../../database/preferences', () => ({
   getPreference: jest.fn(),
+
   setPreference: jest.fn(),
   areApiUrlsConfigured: jest.fn(),
 }));

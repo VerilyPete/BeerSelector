@@ -23,6 +23,8 @@
  */
 
 import { fetchBeersFromAPI, fetchMyBeersFromAPI, fetchRewardsFromAPI } from '../../api/beerApi';
+import { fetchBeersFromProxy } from '../enrichmentService';
+import { config } from '@/src/config';
 import { beerRepository } from '../../database/repositories/BeerRepository';
 import { setPreference } from '../../database/preferences';
 import { fetchedRows, confirmedEmpty } from '../../api/__tests__/helpers/fetchOutcomeFixtures';
@@ -125,6 +127,11 @@ beforeEach(() => {
   mockTaplistUrl = STORE_A;
   resetInFlightSequentialRefresh();
   dropInFlightTaplistFetch();
+  // Reset explicitly: `jest.clearAllMocks()` clears calls but NOT a
+  // `mockReturnValue`, so the 304 tests below — which need the proxy path —
+  // would leak `true` into every test after them and silently reroute their
+  // fetches. Caught by two previously-passing tests going red.
+  (config.enrichment.isConfigured as jest.Mock).mockReturnValue(false);
   (fetchBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(ALL_BEERS));
   (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(confirmedEmpty());
   (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(confirmedEmpty());
@@ -195,6 +202,84 @@ describe('a store switch between fetch and commit', () => {
       const result = await fetchAndUpdateAllBeers();
 
       expect(result.dataUpdated).toBe(false);
+    });
+  });
+
+  describe('when the server answers 304', () => {
+    // A 304 writes no rows, which is why the guard was originally applied only
+    // to the replace arm. That reasoning was wrong: a 304 stamps
+    // `all_beers_last_check`, and stamping it for a store the app is no longer
+    // pointed at suppresses the NEW store's refresh for the next twelve hours.
+    // The `AllBeersWrite` doc says exactly this — it is the stated reason
+    // `fetchedFor` is carried on the `not-modified` arm — and the arm it
+    // describes had no guard. Three reviewers found this independently and no
+    // test in this file set `notModified: true`.
+    const respondNotModifiedThenSwitchStore = (): void => {
+      (fetchBeersFromProxy as jest.Mock).mockImplementation(async () => {
+        mockTaplistUrl = STORE_B;
+        return { beers: [], source: 'cache', notModified: true };
+      });
+      (config.enrichment.isConfigured as jest.Mock).mockReturnValue(true);
+    };
+
+    it('does not stamp the check timestamp on the direct path', async () => {
+      respondNotModifiedThenSwitchStore();
+
+      await fetchAndUpdateAllBeers();
+
+      expect(writtenKeys()).not.toContain('all_beers_last_check');
+    });
+
+    it('does not stamp the check timestamp on the manual/focus path', async () => {
+      respondNotModifiedThenSwitchStore();
+
+      await sequentialRefreshAllData();
+
+      expect(writtenKeys()).not.toContain('all_beers_last_check');
+    });
+
+    it('does not stamp the check timestamp on the login path', async () => {
+      respondNotModifiedThenSwitchStore();
+
+      await refreshAllDataFromAPI();
+
+      expect(writtenKeys()).not.toContain('all_beers_last_check');
+    });
+
+    it('still stamps the check timestamp when the store did not change', async () => {
+      // The other half: a 304 for the store we are still on is a successful
+      // freshness check and must advance the window, or every refresh re-fetches
+      // in full and the ETag buys nothing.
+      (fetchBeersFromProxy as jest.Mock).mockResolvedValue({
+        beers: [],
+        source: 'cache',
+        notModified: true,
+      });
+      (config.enrichment.isConfigured as jest.Mock).mockReturnValue(true);
+
+      await fetchAndUpdateAllBeers();
+
+      expect(writtenKeys()).toContain('all_beers_last_check');
+    });
+  });
+
+  describe('when the configuration is cleared rather than switched', () => {
+    it('does not commit rows against a cleared configuration', async () => {
+      // `''` is the live state during EVERY login: LoginWebView clears
+      // `all_beers_api_url` to shut the configuration gate before writing the
+      // new store. A refresh acquiring the lock in that window must abandon —
+      // the rows belong to the old store and the app is mid-switch. The mutant
+      // `current === '' || current === fetchedFor` survived the whole suite,
+      // because this file only ever flipped STORE_A -> STORE_B.
+      (fetchBeersFromAPI as jest.Mock).mockImplementation(async () => {
+        mockTaplistUrl = '';
+        return fetchedRows(ALL_BEERS);
+      });
+
+      await sequentialRefreshAllData();
+
+      expect(beerRepository.insertManyUnsafe).not.toHaveBeenCalled();
+      expect(writtenKeys()).not.toContain('all_beers_last_check');
     });
   });
 
