@@ -13,6 +13,12 @@ import {
   getCurrentSchemaVersion,
   recordMigration,
 } from './schemaVersion';
+import { migrateToVersion3 } from './migrations/migrateToV3';
+import { migrateToVersion4 } from './migrations/migrateToV4';
+import { migrateToVersion5 } from './migrations/migrateToV5';
+import { migrateToVersion6 } from './migrations/migrateToV6';
+import { migrateToVersion7 } from './migrations/migrateToV7';
+import { migrateToVersion8 } from './migrations/migrateToV8';
 
 /**
  * SQL statement to create the allbeers table
@@ -219,46 +225,48 @@ export const setupTables = async (database: SQLiteDatabase): Promise<void> => {
  * @param fromVersion - Current schema version
  */
 async function runMigrations(database: SQLiteDatabase, fromVersion: number): Promise<void> {
+  // The six migrations are imported statically. They used `await import(...)`,
+  // which Jest cannot execute without --experimental-vm-modules — so this
+  // function, and `CURRENT_SCHEMA_VERSION` with it, had ZERO test coverage.
+  // Mutation testing proved the cost: reverting the version constant, or
+  // deleting a dispatch arm, passed all 93 suites unchanged while meaning a
+  // migration never runs on any device. The dynamic form bought nothing to
+  // offset that — Metro bundles these modules regardless, so there was no
+  // code-splitting to lose. See migrationDispatch.test.ts.
   console.log(`Running migrations from version ${fromVersion} to ${CURRENT_SCHEMA_VERSION}...`);
 
   // Run migration to v3 (add glass_type column)
   if (fromVersion < 3) {
-    const { migrateToVersion3 } = await import('./migrations/migrateToV3');
     await migrateToVersion3(database);
     console.log('Migration to version 3 complete');
   }
 
   // Run migration to v4 (rename glass_type to container_type, add can/bottle support)
   if (fromVersion < 4) {
-    const { migrateToVersion4 } = await import('./migrations/migrateToV4');
     await migrateToVersion4(database);
     console.log('Migration to version 4 complete');
   }
 
   // Run migration to v5 (add flight container type detection)
   if (fromVersion < 5) {
-    const { migrateToVersion5 } = await import('./migrations/migrateToV5');
     await migrateToVersion5(database);
     console.log('Migration to version 5 complete');
   }
 
   // Run migration to v6 (add abv column)
   if (fromVersion < 6) {
-    const { migrateToVersion6 } = await import('./migrations/migrateToV6');
     await migrateToVersion6(database);
     console.log('Migration to version 6 complete');
   }
 
   // Run migration to v7 (add enrichment columns)
   if (fromVersion < 7) {
-    const { migrateToVersion7 } = await import('./migrations/migrateToV7');
     await migrateToVersion7(database);
     console.log('Migration to version 7 complete');
   }
 
   // Run migration to v8 (purge the plaintext auth_cookies preference)
   if (fromVersion < 8) {
-    const { migrateToVersion8 } = await import('./migrations/migrateToV8');
     await migrateToVersion8(database);
     console.log('Migration to version 8 complete');
   }
