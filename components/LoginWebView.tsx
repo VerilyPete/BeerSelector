@@ -27,12 +27,17 @@ type LoginWebViewProps = {
  * Write the login preferences that nothing reads.
  *
  * `user_json_url`, `store_json_url` and `last_login_timestamp` are each written
- * at exactly one site — this one — and read nowhere in production. No
- * `getPreference` call site references any of them;
- * `getAllPreferences` does load them, but its only caller
- * (`hooks/useSettingsState.ts`) has that value dropped by `app/settings.tsx`,
- * and DeveloperSection's preference dump names five other keys. So there is
- * currently no way to see them in the app at all.
+ * at exactly one site — this one — and, in the tree as it stands, read nowhere
+ * in production. No `getPreference` call site references any of them, and
+ * `getAllPreferences` — the OTHER way to read a preference, and the one an
+ * argument from `getPreference` call sites alone would miss — does load them,
+ * but its only caller (`hooks/useSettingsState.ts:86`) has that value dropped
+ * by `app/settings.tsx:30`, and DeveloperSection's preference dump names five
+ * other keys. So there is currently no way to see them in the app at all.
+ *
+ * Scoped to the current tree deliberately. The same reasoning about
+ * `auth_cookies` was written as a claim about all history, and was false —
+ * `migrateToV8`'s docstring has the details. Re-verify rather than inherit.
  *
  * They are kept because they cost nothing and describe the login, but a
  * contention failure on a value nothing consults must not abort a login whose
@@ -60,12 +65,14 @@ async function recordUnreadLoginMetadata({
       'Last successful login timestamp'
     );
     // `auth_cookies` used to be written here: the entire cookie jar, PHPSESSID
-    // included, JSON-stringified into a plain SQLite row. It had no reader —
-    // no `getPreference('auth_cookies')` call site has ever existed — and the
-    // same session is persisted to SecureStore by `saveSessionData` a few
-    // lines below the caller. It was a credential at rest in a file that ends
-    // up in unencrypted device backups, bought nothing, and is gone.
-    // `migrateToV8` deletes the rows already on devices.
+    // included, JSON-stringified into a plain SQLite row, while the same
+    // session was already going to SecureStore via `saveSessionData` a few
+    // lines below the caller. `migrateToV8` deletes the rows already on
+    // devices, and its docstring is the canonical account — including a
+    // correction to what this comment used to claim about the key's history,
+    // and the difference between a row being unlinked and a credential being
+    // gone. Do not restate either here; three copies of that story is how the
+    // false version of it survived review.
     //
     // The `cookies` parameter went with it rather than being left unused: the
     // point is that this function has no business receiving them.
@@ -329,10 +336,13 @@ export default function LoginWebView({
               // the login failed.
               await setPreference('all_beers_api_url', '', 'API endpoint for fetching all beers');
 
-              // Nothing reads these four — no `getPreference` call site for any of
-              // them, and `getAllPreferences` loads them but its only caller drops
-              // the value. A contention failure on a value nothing consults must
-              // not abort a login whose WebView authentication already succeeded.
+              // Three keys, and nothing reads any of them; the argument for that
+              // is in `recordUnreadLoginMetadata`'s docstring, which is where it
+              // belongs. It said "these four" until now — `auth_cookies` was
+              // removed from the list at the top of this file and left in the
+              // count 300 lines down. A contention failure on a value nothing
+              // consults must not abort a login whose WebView authentication
+              // already succeeded.
               await recordUnreadLoginMetadata({ userJsonUrl, storeJsonUrl });
 
               const sessionData = extractSessionDataFromResponse(new Headers(), cookies);

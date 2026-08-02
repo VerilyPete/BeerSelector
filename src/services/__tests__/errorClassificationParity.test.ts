@@ -1,19 +1,28 @@
 /**
  * The same condition must classify the same way whichever entry point sees it.
  *
+ * Written against a live defect, and kept as the thing that stops it returning.
+ * The past tense below is deliberate: every step of this is fixed, and these
+ * tests are what hold it fixed.
+ *
  * `be4f6258` gave `requireRows` typed errors so that a missing URL or an
- * unusable body stops arriving as UNKNOWN_ERROR — whose renderer returns
+ * unusable body stopped arriving as UNKNOWN_ERROR — whose renderer returns
  * `error.message` verbatim, putting developer prose in a user-facing alert.
  * It fixed the helper and left the identical defect two functions away:
- * `prepareAllBeers` throws a plain `Error` for an empty taplist, so the
- * sequential/manual path still produces UNKNOWN_ERROR for a condition the
- * direct path reports as VALIDATION_ERROR.
+ * `prepareAllBeers` threw a plain `Error` for an empty taplist, so the
+ * sequential/manual path produced UNKNOWN_ERROR for a condition the direct
+ * path already reported as VALIDATION_ERROR.
  *
  * `43bd001a` then routed MORE traffic into it. An empty `brewInStock` used to
  * be `malformed`, which `be4f6258` types as MALFORMED_RESPONSE_ERROR with copy
- * written to suppress exactly this. Reclassifying it to `confirmed-empty` sends
+ * written to suppress exactly this. Reclassifying it to `confirmed-empty` sent
  * it through `requireRows`' `[]` return and onto the untyped throw instead — so
  * the fix routed the case around its own improvement.
+ *
+ * `prepareAllBeers` now throws a typed `SourceFailureError` carrying
+ * VALIDATION_ERROR, matching the direct path. Both writers classify the empty
+ * taplist identically, and the three tests below are the only thing asserting
+ * that they still do.
  *
  * These tests assert parity between entry points rather than a specific
  * message, because the message is the thing that leaks.
@@ -114,10 +123,11 @@ describe('an empty taplist', () => {
   });
 
   it('is the same validation error on the manual/focus path', async () => {
-    // This is the defect. The sequential path threw a plain Error, which
-    // `createErrorResponse` maps to UNKNOWN_ERROR, whose renderer returns the
-    // message verbatim — so the user read "No valid beers found in API
-    // response" in an alert.
+    // This is the arm that carried the defect. The sequential path threw a
+    // plain Error, which `createErrorResponse` maps to UNKNOWN_ERROR, whose
+    // renderer returns the message verbatim — so the user read "No valid beers
+    // found in API response" in an alert. It throws a typed error now; this
+    // assertion is what stops it going back.
     const result = await sequentialRefreshAllData();
 
     expect(result.allBeersResult.success).toBe(false);

@@ -758,11 +758,16 @@ function requireRows<T>(source: UnconditionalSource<FetchOutcome<T>>, label: str
     );
   }
   if (source.data.kind === 'confirmed-empty') {
-    // Returns empty rather than throwing: the taplist path already has
-    // validation downstream that rejects an empty store and reports it as a
-    // VALIDATION_ERROR, which is a better categorisation than anything this
-    // helper could produce. The distinction that matters here — data versus
-    // "we never asked" — is still enforced above.
+    // Returns empty rather than throwing: both taplist writers downstream —
+    // `fetchAndUpdateAllBeers` and `prepareAllBeers` — reject an empty store
+    // and report it as a VALIDATION_ERROR, which is a better categorisation
+    // than anything this helper could produce. "Both" is load-bearing and was
+    // not true when this comment was written: `prepareAllBeers` threw a plain
+    // Error, so returning `[]` here handed the sequential/manual path a
+    // condition it surfaced as UNKNOWN_ERROR. Delegating downstream is only
+    // correct while every downstream classifies it, which
+    // `errorClassificationParity.test.ts` now enforces. The distinction that
+    // matters here — data versus "we never asked" — is still enforced above.
     return [];
   }
   return source.data.items;
