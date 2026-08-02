@@ -1,4 +1,4 @@
-appId: org.verily.FSbeerselector
+appId: ${APP_ID}
 name: "Live Activity - Empty Queue Handling"
 ---
 # Test Flow: Live Activity Ends When Queue Becomes Empty

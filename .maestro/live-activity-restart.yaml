@@ -1,4 +1,4 @@
-appId: org.verily.FSbeerselector
+appId: ${APP_ID}
 name: "Live Activity - Restart Pattern on Queue Updates"
 ---
 # Test Flow: Live Activity Restart Pattern

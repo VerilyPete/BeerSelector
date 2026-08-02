@@ -1,4 +1,4 @@
-appId: org.verily.FSbeerselector
+appId: ${APP_ID}
 name: "Settings - Auto-Login & Advanced Features"
 ---
 # Test Flow: Settings Auto-Login and Development Features

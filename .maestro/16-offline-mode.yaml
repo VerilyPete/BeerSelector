@@ -1,4 +1,4 @@
-appId: com.yourcompany.beerselector
+appId: ${APP_ID}
 name: Offline Mode - Network State Detection
 tags:
   - offline
