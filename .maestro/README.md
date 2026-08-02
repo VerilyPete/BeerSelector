@@ -61,7 +61,13 @@ command there raises nothing. Verified: a file whose third and fourth documents
 contained both an invalid `wait` and a guaranteed-failing assertion ran only
 `launchApp` and **reported success**.
 
-`beer-list-loading.yaml` is built this way — see the warning in its header.
+`beer-list-loading.yaml` was built this way — 12 flows in one file, of which
+Maestro ran the first. It has been split into `20-loading-*.yaml` through
+`31-loading-*.yaml` (Wave 7.1) and removed. Those 12 are currently RED and
+deliberately unregistered; each states why in its own header.
+
+If you are adding a flow, one file is one flow. A second `appId:` in a file is
+always a bug, and `grep -c '^appId:' .maestro/*.yaml` finds it.
 
 **4. The pin makes local a truthful predictor only if local matches.**
 CI pins `MAESTRO_VERSION=2.4.0` and asserts it took. Nothing pins or checks

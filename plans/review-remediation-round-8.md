@@ -279,24 +279,68 @@ Both surfaced from 5.6. Neither is a comment defect, so neither was fixed as
 part of a comment-correction wave; both are recorded where a reader will hit
 them and are tracked here.
 
-- [ ] 7.1 **`beer-list-loading.yaml` is 12 flows in one file and only the first
-      runs.** Maestro reads one `header --- commands` pair per file and ignores
-      every later document — silently, and without parse-checking it. The file
-      presents as 12 tests and is 1; scenarios 2-4 in its own header have never
-      been exercised. Fixing it means splitting documents 2-12 into their own
-      files and registering each. Not mechanical: the one test that *does* run
-      currently fails at `tapOn: "All Beers Tab"`, so the other 11 should be
-      assumed red until shown otherwise. A ⚠️ header now states this in-file.
-      Worth a grep for the same shape before it recurs — it is invisible from
-      a passing run, which is exactly how it survived this long.
-- [ ] 7.2 **Seven flow files are unregistered in `config.yaml` and run
-      nowhere**: `beer-list-filter`, `beer-list-loading`, `beer-list-scroll`,
-      `beer-list-search`, `LOGIN_WEBVIEW_ERROR_HANDLING`,
-      `MP-7-STEP-2-OPERATION-QUEUE-TESTS`, `SETTINGS_AUTO_LOGIN`. `config.yaml`
-      already warns that unregistered flows are invisible, and two others were
-      adopted for exactly this reason — these seven were left. Decide per file:
-      register it, or delete it. Leaving a test file that runs nowhere is the
-      same failure mode this whole round is about.
+- [x] 7.1 **`beer-list-loading.yaml` was 12 flows in one file and only the first
+      ran.** Split into `20-loading-*.yaml` … `31-loading-*.yaml`; the original
+      is deleted. Each new file is exactly two YAML documents (asserted
+      programmatically), and all 12 parse — verified by running them as a
+      directory, which is decisive because a parse fault aborts the whole
+      directory, so any flow executing proves every flow parsed.
+      `grep -c '^appId:' .maestro/*.yaml` now returns 1 everywhere; that grep
+      is the standing check, and it is in README.md.
+
+      **They are RED and deliberately NOT registered.** Registering 12
+      known-red flows buys a permanently red pipeline, which gets ignored just
+      as reliably as a false green. The non-registration is loud rather than
+      silent: every file states its own status in its header.
+
+      Found on the way, and fixed: all 12 tapped `"All Beers Tab"` /
+      `"Beerfinder Tab"` / `"Tasted Brews Tab"`. **None of those exist.** The
+      real titles are `"All Beer"`, `"Beerfinder"`, `"Tasted Brews"`
+      (`app/(tabs)/_layout.tsx`, and 52 uses across the registered flows). 16
+      selectors corrected here, 3 more in the `beer-list-*` files. Verified
+      against source and existing usage, not against a green run.
+
+      **What is NOT established, stated plainly because the first version of
+      this entry got it wrong.** These flows fail locally at the first `tapOn`,
+      and the first draft of their status blocks blamed `clearState: true`.
+      That was an overclaim. Probing the simulator showed the installed app is
+      itself unconfigured and sits on Settings even with `clearState: false`,
+      so the local failure does not demonstrate the diagnosis. What IS
+      established, machine-independently, is that `clearState: true` wipes
+      preferences and `11-settings-first-launch.yaml` asserts the app then
+      locks to Settings until API URLs are configured — so the precondition gap
+      is real, proven by that flow rather than by this run. Whether these 12
+      pass once the app is configured is **unknown and untested**.
+      Next step is to give them the onboarding sequence `11-*` performs, while
+      keeping `clearState: true`. Flipping to `clearState: false` would likely
+      make them green and VACUOUS — the skeleton they assert on is what shows
+      before cached data arrives. That route is a deleted test wearing a tick.
+- [~] 7.2 **Unregistered flow files.** `beer-list-loading` is resolved by 7.1.
+      Six remain, all confirmed single-document, all still unregistered:
+      - `beer-list-filter`, `beer-list-scroll`, `beer-list-search` — dead tab
+        selectors corrected (3 total). Still red locally, but for the
+        environment reason in 7.1, so their true status is **unknown**. They do
+        not wipe state, so they are the most likely of this set to pass once
+        the app under test is configured. Assess these first.
+      - `LOGIN_WEBVIEW_ERROR_HANDLING` (544 lines), `SETTINGS_AUTO_LOGIN` (805
+        lines), `MP-7-STEP-2-OPERATION-QUEUE-TESTS` (166 lines) — **not run,
+        so nothing is claimed about them.** The last one does
+        `runFlow: file: ./06-login-flow-member.yaml`, i.e. it needs a real
+        member login; the other two are large enough to deserve reading before
+        running.
+
+      Deciding register-vs-delete honestly needs a configured app on the
+      simulator, which this pass did not have. That is the blocker to name, not
+      a reason to guess. Two of these were adopted in an earlier round for
+      exactly this reason; leaving a test file that runs nowhere is the same
+      failure mode as a test that cannot fail.
+- [ ] 7.3 **The local validation loop cannot currently reach any tab.** The app
+      installed on the simulator has no API URLs configured, so every flow that
+      taps a tab fails there regardless of its own correctness — which is why
+      this pass could confirm parse-correctness but not behaviour. Establishing
+      a configured-app fixture (or a documented setup flow to run first) is a
+      precondition for 7.1 and 7.2, and for any claim that a local pass
+      predicts CI.
 
 ---
 

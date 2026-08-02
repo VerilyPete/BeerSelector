@@ -1,0 +1,71 @@
+# .maestro/31-loading-all-tabs.yaml
+# Test 12: All Tabs - Consistent Loading Behavior
+#
+# Split out of beer-list-loading.yaml (Wave 7.1). That file concatenated
+# these 12 flows as 12 YAML documents, and Maestro only ever read the
+# first — the other 11 had never run. See "How Maestro validates this
+# suite", point 3, in README.md.
+#
+# STATUS: RED here, cause only PARTLY established. Not registered in
+# config.yaml. See Wave 7.1 in plans/review-remediation-round-8.md.
+#
+# Ran against Maestro 2.4.0 on a simulator: fails in 19s at the first `tapOn`
+# with "Element not found". Two separate things are true, and conflating them
+# would repeat the mistake this round exists to correct:
+#
+#   1. ESTABLISHED, machine-independent: this flow does
+#      `launchApp: clearState: true`, and 11-settings-first-launch.yaml asserts
+#      that after a state wipe the app redirects to Settings and refuses to
+#      navigate away until API URLs are configured. There is no tab to tap at
+#      that point. This is a real precondition gap in the test.
+#
+#   2. NOT ESTABLISHED: the local run cannot demonstrate it, because the app
+#      installed on this simulator is itself unconfigured and sits on Settings
+#      even with clearState: false. So the observed failure does not prove
+#      point 1 caused it — point 1 is proven by 11-*, not by this run. Whether
+#      the flow passes once the app is configured is UNKNOWN and untested.
+#
+# A dead selector was also fixed on the way: this flow tapped "All Beers Tab" /
+# "Beerfinder Tab" / "Tasted Brews Tab", none of which exist. The real titles
+# are "All Beer", "Beerfinder" and "Tasted Brews" (app/(tabs)/_layout.tsx, and
+# 52 uses across the registered flows). That correction is verified by source,
+# not by a green run.
+#
+# Fixing the precondition: configure the app first, keeping clearState: true.
+# Do NOT just flip to clearState: false — the skeleton these flows assert on is
+# what shows before cached data arrives, so warm state may leave nothing to
+# catch and the test VACUOUS. That is a green tick bought by deleting the test.
+
+appId: org.verily.FSbeerselector
+---
+- launchApp:
+    clearState: true
+
+# Dismiss Expo dev menu if present
+- runFlow:
+    when:
+      visible: "Reload"
+    commands:
+      - pressKey: Escape
+      - waitForAnimationToEnd
+
+# Test each tab has consistent loading UX
+- tapOn: "All Beer"
+- assertVisible:
+    id: "skeleton-loader"
+- waitForAnimationToEnd
+- assertNotVisible: "skeleton-loader"
+
+- tapOn: "Beerfinder"
+- assertVisible:
+    id: "skeleton-loader"
+- waitForAnimationToEnd
+- assertNotVisible: "skeleton-loader"
+
+- tapOn: "Tasted Brews"
+- assertVisible:
+    id: "skeleton-loader"
+- waitForAnimationToEnd
+- assertNotVisible: "skeleton-loader"
+
+# All tabs should behave consistently
