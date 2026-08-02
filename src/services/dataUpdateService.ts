@@ -402,6 +402,26 @@ type TaplistConfiguration = string & { readonly __brand: 'TaplistConfiguration' 
  * treat the cleared state as a change. It is not "unknown, so allow".
  */
 async function readTaplistConfiguration(): Promise<TaplistConfiguration> {
+  // KNOWN LIMITATION, stated because the previous version of this comment
+  // addressed only one of the two producers of `null`.
+  //
+  // `getPreference` swallows read errors and returns `null`, which collapses
+  // here to `''` and reads as "the store changed". A read that FAILED —
+  // contention from the exclusive taplist import is the documented cause — is
+  // therefore indistinguishable from a login clearing the key, and a correct
+  // taplist is discarded while the refresh reports success.
+  //
+  // The obvious fix, a non-swallowing `getPreferenceStrict`, was built and
+  // reverted: every test that stubs `getPreference` at runtime must then stub
+  // both, and forgetting is silent — six suites went green-to-red on the split
+  // and two more would have passed for the wrong reason. That is a two-place
+  // invariant across ~20 files, which is the same objection that ruled out a
+  // generation counter. Fixing this properly means making `getPreference` stop
+  // swallowing and updating the callers that want a default, which is a
+  // separate change with its own blast radius.
+  //
+  // Impact is bounded: no timestamp is stamped on the abandon path, so the next
+  // refresh retries rather than being suppressed for twelve hours.
   return ((await getPreference('all_beers_api_url')) ?? '') as TaplistConfiguration;
 }
 
@@ -873,16 +893,45 @@ export async function fetchAndUpdateAllBeers(): Promise<DataUpdateResult> {
       // clear that just-committed validator and report "no beers are stored"
       // with thousands stored. `writeAllBeers` and `writeAllBeersOnLogin` read
       // and clear inside their caller's lock already; this now matches them.
-      const verdict = await databaseLockManager.withDatabaseLock('all-beers-etag-invalidate', () =>
-        verifyNotModified()
+      // The store-switch guard belongs here too, and the stamp belongs INSIDE
+      // the hold with it.
+      //
+      // This arm writes no rows, which is why the guard was originally applied
+      // only to the replace path. That reasoning was wrong: it stamps
+      // `all_beers_last_check`, and stamping that for a store the app has left
+      // suppresses the NEW store's refresh for the next twelve hours — the user
+      // sits on the old store's taplist with automatic recovery switched off.
+      // The `AllBeersWrite` doc states this as the reason `fetchedFor` is
+      // carried on the `not-modified` arm; this is the path that ignored it.
+      //
+      // The stamp moved inside the lock because leaving it outside reintroduces
+      // the same window one statement later: the guard would pass, the login
+      // would land, and the stamp would commit under the new configuration.
+      const outcome = await databaseLockManager.withDatabaseLock(
+        'all-beers-etag-invalidate',
+        async () => {
+          if (!(await taplistConfigurationHeld(fetchedFor))) {
+            return { kind: 'store-changed' } as const;
+          }
+
+          const verdict = await verifyNotModified();
+          if (verdict !== 'trusted') {
+            return { kind: 'untrusted', verdict } as const;
+          }
+
+          await setPreference('all_beers_last_check', new Date().toISOString());
+          return { kind: 'stamped' } as const;
+        }
       );
 
-      if (verdict !== 'trusted') {
-        return emptyTableNotModifiedFailure(verdict);
+      if (outcome.kind === 'store-changed') {
+        return abandonedAfterStoreSwitch('fetchAndUpdateAllBeers');
+      }
+      if (outcome.kind === 'untrusted') {
+        return emptyTableNotModifiedFailure(outcome.verdict);
       }
 
       console.log('All beers data not modified (304), skipping DB update');
-      await setPreference('all_beers_last_check', new Date().toISOString());
       return { success: true, dataUpdated: false };
     }
 
@@ -1570,7 +1619,21 @@ async function prepareAllBeers(operation: RefreshOperation): Promise<SourcePlan<
     }
 
     if (validationResult.validBeers.length === 0) {
-      throw new Error('No valid beers found in API response');
+      // Typed, for the reason `requireRows` is: a plain Error becomes
+      // UNKNOWN_ERROR, whose renderer returns `error.message` verbatim, so this
+      // string went straight into a user-facing alert. `fetchAndUpdateAllBeers`
+      // reports the same condition as a VALIDATION_ERROR with copy written for
+      // a person to read; this path contradicted it. The empty-taplist case
+      // reaches here specifically because 43bd001a reclassified it away from
+      // `malformed`, which be4f6258 had just given a typed error — so the two
+      // fixes together routed this case around both of them.
+      throw new SourceFailureError(
+        {
+          type: ApiErrorType.VALIDATION_ERROR,
+          message: 'No valid beer data received from server',
+        },
+        `${operation} - all beers`
+      );
     }
 
     // Calculate container types BEFORE insertion
@@ -1579,7 +1642,17 @@ async function prepareAllBeers(operation: RefreshOperation): Promise<SourcePlan<
 
     const sequentialBeers = toNonEmpty(beersWithContainerTypes);
     if (sequentialBeers === null) {
-      throw new Error('No valid beers to insert after container-type calculation');
+      // Same treatment, though this arm looks unreachable: container-type
+      // calculation is 1:1 and a non-empty input was established above. Typed
+      // anyway rather than argued about — an unreachable plain Error is one
+      // refactor away from being a reachable UNKNOWN_ERROR.
+      throw new SourceFailureError(
+        {
+          type: ApiErrorType.VALIDATION_ERROR,
+          message: 'No valid beer data received from server',
+        },
+        `${operation} - all beers`
+      );
     }
 
     return {
