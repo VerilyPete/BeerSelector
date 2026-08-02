@@ -1,4 +1,4 @@
-appId: ${APP_ID}
+appId: org.verily.FSbeerselector
 name: "Live Activity - Logout Cleanup"
 ---
 # Test Flow: Live Activity Ends on Logout

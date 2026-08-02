@@ -1,4 +1,4 @@
-appId: ${APP_ID}
+appId: org.verily.FSbeerselector
 name: "Beer List - Search and Filter Functionality"
 ---
 # Test Flow: Search and Filter Functionality

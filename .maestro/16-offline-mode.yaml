@@ -1,4 +1,4 @@
-appId: ${APP_ID}
+appId: org.verily.FSbeerselector
 name: Offline Mode - Network State Detection
 tags:
   - offline
