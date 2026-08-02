@@ -1,4 +1,4 @@
-appId: org.verily.FSbeerselector
+appId: ${APP_ID}
 name: "Migration Lock - Schema Migrations Release the Master Lock"
 ---
 # Test Flow: Schema migration lock lifetime

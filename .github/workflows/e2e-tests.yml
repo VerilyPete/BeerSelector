@@ -64,8 +64,22 @@ jobs:
           # Add to PATH for future steps
           echo "$HOME/.maestro/bin" >> $GITHUB_PATH
 
-          # Verify installation works
-          maestro --version
+          # Assert the pin actually took. The checks above catch an installer
+          # that failed outright; they say nothing about which VERSION landed.
+          # `MAESTRO_VERSION` is read by the installer script, not enforced by
+          # it — a corrupt or partial download, an installer that silently
+          # ignores an unset/misread env var, or an upstream change to how the
+          # version is selected could all still produce a working `maestro`
+          # binary that passes the checks above while being the wrong
+          # version. The pin's entire purpose — a fixed, locally-reproducible
+          # CLI, per the comment above — depends on this being asserted, not
+          # merely printed.
+          ACTUAL_VERSION=$(maestro --version)
+          if [ "$ACTUAL_VERSION" != "$MAESTRO_VERSION" ]; then
+            echo "Error: installed Maestro is '$ACTUAL_VERSION', expected '$MAESTRO_VERSION'"
+            exit 1
+          fi
+          echo "Maestro $ACTUAL_VERSION installed (pinned)"
 
       - name: Setup iOS Simulator
         run: |
@@ -74,10 +88,17 @@ jobs:
           # Pick whatever iPhone the runner image actually provides, rather
           # than naming one. These steps hardcoded specific models (16 Pro, 14
           # Pro, and a 15-then-14 fallback), commented "available on GitHub
-          # Actions runners" — true when written, false by Xcode 26.5. The boot
-          # was `|| true`, so the miss surfaced two steps later as an xcodebuild
-          # destination error instead of here. Selecting from what is present
-          # cannot go stale, and failing loudly below beats failing obscurely.
+          # Actions runners" — true when written, false by Xcode 26.5.
+          # Selecting from what is present cannot go stale.
+          #
+          # `|| true` on `boot` only, not on `bootstatus`. An already-booted
+          # device makes `simctl boot` exit non-zero for a benign reason —
+          # common on a fresh runner — and that alone used to be swallowed
+          # right along with a real failure, surfacing two steps later as an
+          # opaque `simctl install`/xcodebuild destination error instead of
+          # here. `bootstatus` is the actual gate: it blocks until the
+          # device reaches Booted, and is what must fail loudly if it never
+          # does.
           UDID=$(xcrun simctl list devices available -j \
             | jq -r '[.devices[][] | select(.isAvailable)] | map(select(.name | test("^iPhone"))) | last | .udid')
           if [ -z "$UDID" ] || [ "$UDID" = "null" ]; then
@@ -88,7 +109,7 @@ jobs:
           echo "Booting $(xcrun simctl list devices -j | jq -r --arg u "$UDID" '[.devices[][]|select(.udid==$u)]|first|.name') ($UDID)"
           echo "SIMULATOR_UDID=$UDID" >> "$GITHUB_ENV"
           xcrun simctl boot "$UDID" || true
-          xcrun simctl bootstatus "$UDID" -b || true
+          xcrun simctl bootstatus "$UDID" -b
 
       - name: Prebuild Expo app
         run: npx expo prebuild --platform ios --clean
@@ -111,14 +132,22 @@ jobs:
           APP_PATH=$(find ios/build -name "*.app" -type d | head -n 1)
           echo "App path: $APP_PATH"
 
-          # Install on simulator
-          xcrun simctl install booted "$APP_PATH"
+          # $SIMULATOR_UDID, not `booted` — exported to $GITHUB_ENV by
+          # "Setup iOS Simulator" above. Bare `booted` silently picks
+          # whichever simulator simctl considers "the" booted one, which is
+          # exactly the ambiguity that step's UDID selection exists to
+          # remove, and reopens it if more than one simulator is running.
+          xcrun simctl install "$SIMULATOR_UDID" "$APP_PATH"
 
       - name: Run Maestro E2E tests
-        env:
-          APP_ID: org.verily.FSbeerselector
         run: |
-          maestro test .maestro/ \
+          # `-e APP_ID=...` on the command line, not an `env:` block: a
+          # step-level GitHub Actions `env:` only becomes a shell variable,
+          # and Maestro 2.4.0 does not read `${APP_ID}` in a flow's `appId:`
+          # header from the process environment, `.maestro/config.yaml`, or
+          # an explicit `--config` pointing at it — verified directly against
+          # the CLI. `-e` is the only mechanism that resolves it.
+          maestro test -e APP_ID=org.verily.FSbeerselector .maestro/ \
             --format junit \
             --output test-results/maestro-ios.xml
 
@@ -205,8 +234,22 @@ jobs:
           # Add to PATH for future steps
           echo "$HOME/.maestro/bin" >> $GITHUB_PATH
 
-          # Verify installation works
-          maestro --version
+          # Assert the pin actually took. The checks above catch an installer
+          # that failed outright; they say nothing about which VERSION landed.
+          # `MAESTRO_VERSION` is read by the installer script, not enforced by
+          # it — a corrupt or partial download, an installer that silently
+          # ignores an unset/misread env var, or an upstream change to how the
+          # version is selected could all still produce a working `maestro`
+          # binary that passes the checks above while being the wrong
+          # version. The pin's entire purpose — a fixed, locally-reproducible
+          # CLI, per the comment above — depends on this being asserted, not
+          # merely printed.
+          ACTUAL_VERSION=$(maestro --version)
+          if [ "$ACTUAL_VERSION" != "$MAESTRO_VERSION" ]; then
+            echo "Error: installed Maestro is '$ACTUAL_VERSION', expected '$MAESTRO_VERSION'"
+            exit 1
+          fi
+          echo "Maestro $ACTUAL_VERSION installed (pinned)"
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
@@ -237,14 +280,6 @@ jobs:
 
       - name: Run Maestro E2E tests on Android
         uses: reactivecircus/android-emulator-runner@v2
-        env:
-          # Was `com.yourcompany.beerselector`, a scaffold placeholder that has
-          # never matched anything. Maestro would have failed to find the app
-          # even with a booted emulator, so the emulator fault was hiding a
-          # second one behind it. Note the Android package capitalises the B and
-          # the iOS bundle does not — they genuinely differ, so this is not a
-          # copy of the value used by the iOS jobs.
-          APP_ID: org.verily.FSBeerselector
         with:
           api-level: 31
           target: google_apis
@@ -260,8 +295,14 @@ jobs:
             # Install app
             adb install android/app/build/outputs/apk/debug/app-debug.apk
 
-            # Run Maestro tests
-            maestro test .maestro/ \
+            # Run Maestro tests. `-e APP_ID=...` on the command line, not the
+            # `env:` block this step used to carry — see the comment on this
+            # pattern in the iOS job's "Run Maestro E2E tests" step above; a
+            # GitHub Actions step `env:` does not reach Maestro's own
+            # `${APP_ID}` flow-header substitution. `org.verily.FSBeerselector`
+            # — capital B, matching app.json's android.package — is not the
+            # same string as the iOS bundle ID; they genuinely differ.
+            maestro test -e APP_ID=org.verily.FSBeerselector .maestro/ \
               --format junit \
               --output test-results/maestro-android.xml
 
@@ -315,10 +356,17 @@ jobs:
           # Pick whatever iPhone the runner image actually provides, rather
           # than naming one. These steps hardcoded specific models (16 Pro, 14
           # Pro, and a 15-then-14 fallback), commented "available on GitHub
-          # Actions runners" — true when written, false by Xcode 26.5. The boot
-          # was `|| true`, so the miss surfaced two steps later as an xcodebuild
-          # destination error instead of here. Selecting from what is present
-          # cannot go stale, and failing loudly below beats failing obscurely.
+          # Actions runners" — true when written, false by Xcode 26.5.
+          # Selecting from what is present cannot go stale.
+          #
+          # `|| true` on `boot` only, not on `bootstatus`. An already-booted
+          # device makes `simctl boot` exit non-zero for a benign reason —
+          # common on a fresh runner — and that alone used to be swallowed
+          # right along with a real failure, surfacing two steps later as an
+          # opaque `simctl install`/xcodebuild destination error instead of
+          # here. `bootstatus` is the actual gate: it blocks until the
+          # device reaches Booted, and is what must fail loudly if it never
+          # does.
           UDID=$(xcrun simctl list devices available -j \
             | jq -r '[.devices[][] | select(.isAvailable)] | map(select(.name | test("^iPhone"))) | last | .udid')
           if [ -z "$UDID" ] || [ "$UDID" = "null" ]; then
@@ -329,7 +377,7 @@ jobs:
           echo "Booting $(xcrun simctl list devices -j | jq -r --arg u "$UDID" '[.devices[][]|select(.udid==$u)]|first|.name') ($UDID)"
           echo "SIMULATOR_UDID=$UDID" >> "$GITHUB_ENV"
           xcrun simctl boot "$UDID" || true
-          xcrun simctl bootstatus "$UDID" -b || true
+          xcrun simctl bootstatus "$UDID" -b
 
       - name: Prebuild Expo app
         run: npx expo prebuild --platform ios --clean
@@ -349,7 +397,9 @@ jobs:
       - name: Install app on simulator
         run: |
           APP_PATH=$(find ios/build -name "*.app" -type d | head -n 1)
-          xcrun simctl install booted "$APP_PATH"
+          # $SIMULATOR_UDID, not `booted` — see the comment on this pattern in
+          # the iOS job's "Install app on simulator" step above.
+          xcrun simctl install "$SIMULATOR_UDID" "$APP_PATH"
 
       - name: Run Flashlight performance tests
         env:
@@ -383,27 +433,45 @@ jobs:
         uses: actions/download-artifact@v4
 
       - name: Generate test summary
+        env:
+          # `needs.<job>.result` — GitHub's own tracked outcome, not a proxy
+          # for it. The directory-existence checks below used to be the only
+          # signal here, and every upload step in `maestro-tests-ios` /
+          # `maestro-tests-android` / `performance-tests` runs with
+          # `if: always()` so results are still available for debugging after
+          # a failure — meaning the directories this checked for were present
+          # whether the run passed OR failed. It could report the run
+          # complete; it could never report it failed. Same defect as
+          # `maestro-e2e.yml`'s `test-summary`, fixed the same way.
+          IOS_RESULT: ${{ needs.maestro-tests-ios.result }}
+          ANDROID_RESULT: ${{ needs.maestro-tests-android.result }}
+          PERF_RESULT: ${{ needs.performance-tests.result }}
         run: |
-          echo "## E2E Test Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## E2E Test Summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
 
-          # Check if iOS tests passed
-          if [ -d "maestro-test-results-ios" ]; then
-            echo "✅ iOS Maestro tests completed" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "❌ iOS Maestro tests failed" >> $GITHUB_STEP_SUMMARY
-          fi
+          overall_fail=0
 
-          # Check if Android tests passed
-          if [ -d "maestro-test-results-android" ]; then
-            echo "✅ Android Maestro tests completed" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "❌ Android Maestro tests failed" >> $GITHUB_STEP_SUMMARY
-          fi
+          # $1 = human label, $2 = needs.<job>.result value.
+          report() {
+            case "$2" in
+              success)  echo "✅ $1 completed" >> "$GITHUB_STEP_SUMMARY" ;;
+              skipped)  echo "⏭️ $1 skipped" >> "$GITHUB_STEP_SUMMARY" ;;
+              *)
+                echo "❌ $1 failed (job result: $2)" >> "$GITHUB_STEP_SUMMARY"
+                overall_fail=1
+                ;;
+            esac
+          }
 
-          # Check if performance tests passed
-          if [ -d "performance-report" ]; then
-            echo "✅ Performance tests completed" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "❌ Performance tests failed" >> $GITHUB_STEP_SUMMARY
+          report "iOS Maestro tests" "$IOS_RESULT"
+          report "Android Maestro tests" "$ANDROID_RESULT"
+          report "Performance tests" "$PERF_RESULT"
+
+          # Previously nothing here ever ran `exit 1`, so this job — and the
+          # PR check it drives — was green regardless of what the lines above
+          # said, including when every upstream job failed outright.
+          if [ "$overall_fail" -ne 0 ]; then
+            echo "One or more E2E jobs did not succeed — see the summary above." >&2
+            exit 1
           fi

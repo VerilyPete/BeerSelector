@@ -1,4 +1,4 @@
-appId: org.verily.FSbeerselector
+appId: ${APP_ID}
 name: "Settings - First Launch Configuration Flow"
 ---
 # Test Flow: First Launch Settings Configuration

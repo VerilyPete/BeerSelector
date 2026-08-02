@@ -1,4 +1,4 @@
-appId: org.verily.FSbeerselector
+appId: ${APP_ID}
 name: "Live Activity - Deep Link Cold Launch & Tab Bar Responsiveness"
 ---
 # Verifies the fix for the Dynamic Island / Live Activity cold-launch bug:

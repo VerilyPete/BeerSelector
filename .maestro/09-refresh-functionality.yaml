@@ -1,4 +1,4 @@
-appId: org.verily.FSbeerselector
+appId: ${APP_ID}
 name: "Data Refresh - Pull-to-Refresh and Manual Refresh"
 ---
 # Test Flow: Data Refresh Functionality

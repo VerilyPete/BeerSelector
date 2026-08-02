@@ -1,15 +1,21 @@
 # Maestro Configuration for BeerSelector
-# This file defines environment variables and settings for Maestro tests
-
-env:
-  # App ID for iOS and Android
-  APP_ID_IOS: "org.verily.FSbeerselector"
-  # Third place the scaffold placeholder survived, after the Android CI job
-  # and 16-offline-mode.yaml. The real package capitalises the B.
-  APP_ID_ANDROID: "org.verily.FSBeerselector"
-
-  # Default to iOS for local testing
-  APP_ID: ${APP_ID_IOS}
+# This file defines the workspace's flow list and settings for Maestro tests.
+#
+# NOT variable substitution. An `env:` block here looks like it should feed
+# `${APP_ID}` into every flow's `appId:` header, and an earlier version of this
+# file — and every doc example that used to write `APP_ID=x maestro test
+# .maestro/` — assumed exactly that. Neither works: verified against the
+# installed Maestro CLI (2.4.0) that this `env:` block, an exported shell
+# `APP_ID`, and an explicit `--config` pointing at this file are all silently
+# ignored by flow-header substitution — every one of them launches "app
+# undefined". The only mechanism that actually resolves `${APP_ID}` in a flow
+# is `-e APP_ID=value` on the `maestro test` command line, which is what every
+# CI job and documented local command now uses. These two are kept as the
+# single source of truth for the two values callers pass via `-e`, not as
+# something this file wires up on its own:
+#   APP_ID_IOS:     org.verily.FSbeerselector
+#   APP_ID_ANDROID: org.verily.FSBeerselector   (capital B — matches
+#                   app.json's android.package; iOS does not capitalise it)
 
 # Test suite configuration
 flows:

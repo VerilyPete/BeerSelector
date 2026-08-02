@@ -1,4 +1,4 @@
-appId: org.verily.FSbeerselector
+appId: ${APP_ID}
 name: "Config Validation - URL Configuration and Validation"
 ---
 # Test Flow: Configuration Module Validation

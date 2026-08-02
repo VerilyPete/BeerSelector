@@ -1,5 +1,5 @@
 # .maestro/beer-list-filter.yaml
-appId: org.verily.FSbeerselector
+appId: ${APP_ID}
 ---
 - launchApp
 

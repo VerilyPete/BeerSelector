@@ -10,19 +10,19 @@ Comprehensive end-to-end test suite for the BeerSelector React Native applicatio
 
 ```bash
 # From project root
-maestro test .maestro/
+maestro test -e APP_ID=org.verily.FSbeerselector .maestro/
 ```
 
 ### Run Specific Test
 
 ```bash
-maestro test .maestro/01-beer-list-rendering.yaml
+maestro test -e APP_ID=org.verily.FSbeerselector .maestro/01-beer-list-rendering.yaml
 ```
 
 ### Run with Debug Output
 
 ```bash
-maestro test .maestro/ --debug
+maestro test -e APP_ID=org.verily.FSbeerselector .maestro/ --debug
 ```
 
 ---
@@ -36,6 +36,7 @@ maestro test .maestro/ --debug
 ### Test Categories
 
 **Core Functionality (Tests 01-05)**
+
 - Beer list rendering and scrolling
 - Search and filter operations
 - Beer item expansion and details
@@ -43,6 +44,7 @@ maestro test .maestro/ --debug
 - Navigation and tab switching
 
 **Authentication & Settings (Tests 06-11)**
+
 - Member login flow
 - Visitor mode login
 - Auto-login functionality
@@ -51,6 +53,7 @@ maestro test .maestro/ --debug
 - First launch setup
 
 **Error Handling & Resilience (Tests 12-16)**
+
 - Offline scenarios (airplane mode)
 - Network timeout recovery
 - API error handling
@@ -58,6 +61,7 @@ maestro test .maestro/ --debug
 - Offline mode indicators
 
 **Advanced Flows**
+
 - Login WebView error handling (`LOGIN_WEBVIEW_ERROR_HANDLING.yaml`)
 - Settings auto-login (`SETTINGS_AUTO_LOGIN.yaml`)
 - Operation queue tests (`MP-7-STEP-2-OPERATION-QUEUE-TESTS.yaml`)
@@ -99,10 +103,11 @@ EXPO_PUBLIC_API_TIMEOUT=30000         # 30 second timeout for CI
     echo "$HOME/.maestro/bin" >> $GITHUB_PATH
 
 - name: Run Maestro Tests
-  env:
-    APP_ID: org.verily.FSbeerselector
   run: |
-    maestro test .maestro/ \
+    # `-e APP_ID=...` on the command line — an `env:` block here only becomes
+    # a shell variable, and Maestro does not read `${APP_ID}` in a flow's
+    # `appId:` header from the process environment or from config.yaml.
+    maestro test -e APP_ID=org.verily.FSbeerselector .maestro/ \
       --format junit \
       --output maestro-results.xml
 ```
@@ -110,20 +115,23 @@ EXPO_PUBLIC_API_TIMEOUT=30000         # 30 second timeout for CI
 ### CI Test Strategy
 
 **Pull Request Validation (Fast - ~15 min with parallel execution)**
+
 ```bash
 # Run only critical P0 tests
-maestro test .maestro/01-beer-list-rendering.yaml
-maestro test .maestro/06-login-flow-member.yaml
-maestro test .maestro/07-login-flow-visitor.yaml
+maestro test -e APP_ID=org.verily.FSbeerselector .maestro/01-beer-list-rendering.yaml
+maestro test -e APP_ID=org.verily.FSbeerselector .maestro/06-login-flow-member.yaml
+maestro test -e APP_ID=org.verily.FSbeerselector .maestro/07-login-flow-visitor.yaml
 ```
 
 **Nightly Builds (Comprehensive - ~45 min)**
+
 ```bash
 # Run full test suite
-maestro test .maestro/
+maestro test -e APP_ID=org.verily.FSbeerselector .maestro/
 ```
 
 **Release Candidates (Exhaustive)**
+
 ```bash
 # Run all tests on both platforms
 npm run test:e2e:ios
@@ -135,6 +143,7 @@ npm run test:e2e:android
 **GitHub Actions automatically runs tests in parallel on pull requests**, reducing feedback time from 45 minutes to ~15 minutes. Tests are organized into logical groups that run concurrently:
 
 **Test Groups:**
+
 1. **login-flows** (3 tests) - Authentication and login flows
 2. **settings** (3 tests) - Settings and configuration
 3. **beer-features** (5 tests) - Beer list features and navigation
@@ -145,26 +154,28 @@ npm run test:e2e:android
 
 ```bash
 # Using background jobs (simple approach)
-maestro test .maestro/06-login-flow-member.yaml &
-maestro test .maestro/07-login-flow-visitor.yaml &
-maestro test .maestro/10-settings-configuration.yaml &
-maestro test .maestro/01-beer-list-rendering.yaml &
+maestro test -e APP_ID=org.verily.FSbeerselector .maestro/06-login-flow-member.yaml &
+maestro test -e APP_ID=org.verily.FSbeerselector .maestro/07-login-flow-visitor.yaml &
+maestro test -e APP_ID=org.verily.FSbeerselector .maestro/10-settings-configuration.yaml &
+maestro test -e APP_ID=org.verily.FSbeerselector .maestro/01-beer-list-rendering.yaml &
 wait  # Wait for all background jobs to complete
 ```
 
 ```bash
 # Using GNU parallel (advanced - requires gnu-parallel installation)
 # Run all tests in parallel with 4 concurrent jobs
-parallel -j 4 maestro test ::: .maestro/*.yaml
+parallel -j 4 maestro test -e APP_ID=org.verily.FSbeerselector ::: .maestro/*.yaml
 ```
 
 **Benefits of Parallel Execution:**
+
 - 3x faster test execution (45min sequential → 15min parallel)
 - Faster PR feedback loop
 - Better CI resource utilization
 - Isolated test failures (easier debugging)
 
 **Trade-offs:**
+
 - Requires more CI minutes/runner instances
 - May require more simulator/emulator resources locally
 - Test failures may be harder to debug without sequential context
@@ -176,42 +187,42 @@ parallel -j 4 maestro test ::: .maestro/*.yaml
 
 ### Core Functionality
 
-| File | Purpose | Duration |
-|------|---------|----------|
-| `01-beer-list-rendering.yaml` | Beer list display and scrolling | ~2 min |
-| `02-search-and-filter.yaml` | Search/filter operations | ~4 min |
-| `03-beer-item-expansion.yaml` | Beer details expansion | ~3 min |
-| `04-empty-states.yaml` | Empty state handling | ~3 min |
-| `05-navigation-and-tabs.yaml` | Tab navigation | ~3 min |
+| File                          | Purpose                         | Duration |
+| ----------------------------- | ------------------------------- | -------- |
+| `01-beer-list-rendering.yaml` | Beer list display and scrolling | ~2 min   |
+| `02-search-and-filter.yaml`   | Search/filter operations        | ~4 min   |
+| `03-beer-item-expansion.yaml` | Beer details expansion          | ~3 min   |
+| `04-empty-states.yaml`        | Empty state handling            | ~3 min   |
+| `05-navigation-and-tabs.yaml` | Tab navigation                  | ~3 min   |
 
 ### Authentication & Settings
 
-| File | Purpose | Duration |
-|------|---------|----------|
-| `06-login-flow-member.yaml` | UFO Club member login | ~5 min |
-| `07-login-flow-visitor.yaml` | Visitor mode login | ~6 min |
-| `08-auto-login.yaml` | Auto-login on startup | ~6 min |
-| `09-refresh-functionality.yaml` | Data refresh operations | ~5 min |
-| `10-settings-configuration.yaml` | Settings screen flows | ~7 min |
-| `11-settings-first-launch.yaml` | First launch setup | ~8 min |
+| File                             | Purpose                 | Duration |
+| -------------------------------- | ----------------------- | -------- |
+| `06-login-flow-member.yaml`      | UFO Club member login   | ~5 min   |
+| `07-login-flow-visitor.yaml`     | Visitor mode login      | ~6 min   |
+| `08-auto-login.yaml`             | Auto-login on startup   | ~6 min   |
+| `09-refresh-functionality.yaml`  | Data refresh operations | ~5 min   |
+| `10-settings-configuration.yaml` | Settings screen flows   | ~7 min   |
+| `11-settings-first-launch.yaml`  | First launch setup      | ~8 min   |
 
 ### Error Handling
 
-| File | Purpose | Duration |
-|------|---------|----------|
-| `12-offline-scenarios.yaml` | Offline mode testing | ~8 min |
-| `13-network-timeout-recovery.yaml` | Network timeout handling | ~11 min |
-| `14-api-error-handling.yaml` | API error scenarios | ~13 min |
-| `15-config-validation.yaml` | Configuration validation | ~6 min |
-| `16-offline-mode.yaml` | Offline indicators | ~3 min |
+| File                               | Purpose                  | Duration |
+| ---------------------------------- | ------------------------ | -------- |
+| `12-offline-scenarios.yaml`        | Offline mode testing     | ~8 min   |
+| `13-network-timeout-recovery.yaml` | Network timeout handling | ~11 min  |
+| `14-api-error-handling.yaml`       | API error scenarios      | ~13 min  |
+| `15-config-validation.yaml`        | Configuration validation | ~6 min   |
+| `16-offline-mode.yaml`             | Offline indicators       | ~3 min   |
 
 ### Advanced Flows
 
-| File | Purpose | Duration |
-|------|---------|----------|
-| `LOGIN_WEBVIEW_ERROR_HANDLING.yaml` | WebView error recovery | ~12 min |
-| `SETTINGS_AUTO_LOGIN.yaml` | Settings auto-login flow | ~16 min |
-| `MP-7-STEP-2-OPERATION-QUEUE-TESTS.yaml` | Operation queue testing | ~4 min |
+| File                                     | Purpose                  | Duration |
+| ---------------------------------------- | ------------------------ | -------- |
+| `LOGIN_WEBVIEW_ERROR_HANDLING.yaml`      | WebView error recovery   | ~12 min  |
+| `SETTINGS_AUTO_LOGIN.yaml`               | Settings auto-login flow | ~16 min  |
+| `MP-7-STEP-2-OPERATION-QUEUE-TESTS.yaml` | Operation queue testing  | ~4 min   |
 
 ---
 
@@ -220,46 +231,52 @@ parallel -j 4 maestro test ::: .maestro/*.yaml
 ### Run Tests by Priority
 
 **P0 - Critical (Must pass before merge)**
+
 ```bash
-maestro test .maestro/01-beer-list-rendering.yaml
-maestro test .maestro/06-login-flow-member.yaml
-maestro test .maestro/07-login-flow-visitor.yaml
+maestro test -e APP_ID=org.verily.FSbeerselector .maestro/01-beer-list-rendering.yaml
+maestro test -e APP_ID=org.verily.FSbeerselector .maestro/06-login-flow-member.yaml
+maestro test -e APP_ID=org.verily.FSbeerselector .maestro/07-login-flow-visitor.yaml
 ```
 
 **P1 - Important (Should pass before release)**
+
 ```bash
-maestro test .maestro/09-refresh-functionality.yaml
-maestro test .maestro/10-settings-configuration.yaml
-maestro test .maestro/SETTINGS_AUTO_LOGIN.yaml
+maestro test -e APP_ID=org.verily.FSbeerselector .maestro/09-refresh-functionality.yaml
+maestro test -e APP_ID=org.verily.FSbeerselector .maestro/10-settings-configuration.yaml
+maestro test -e APP_ID=org.verily.FSbeerselector .maestro/SETTINGS_AUTO_LOGIN.yaml
 ```
 
 **P2 - Nice to have (Optional, manual testing OK)**
+
 ```bash
-maestro test .maestro/12-offline-scenarios.yaml
-maestro test .maestro/13-network-timeout-recovery.yaml
+maestro test -e APP_ID=org.verily.FSbeerselector .maestro/12-offline-scenarios.yaml
+maestro test -e APP_ID=org.verily.FSbeerselector .maestro/13-network-timeout-recovery.yaml
 ```
 
 ### Run Tests by Feature
 
 **Beer List Features**
+
 ```bash
-maestro test .maestro/01-beer-list-rendering.yaml
-maestro test .maestro/02-search-and-filter.yaml
-maestro test .maestro/03-beer-item-expansion.yaml
+maestro test -e APP_ID=org.verily.FSbeerselector .maestro/01-beer-list-rendering.yaml
+maestro test -e APP_ID=org.verily.FSbeerselector .maestro/02-search-and-filter.yaml
+maestro test -e APP_ID=org.verily.FSbeerselector .maestro/03-beer-item-expansion.yaml
 ```
 
 **Login & Authentication**
+
 ```bash
-maestro test .maestro/06-login-flow-member.yaml
-maestro test .maestro/07-login-flow-visitor.yaml
-maestro test .maestro/LOGIN_WEBVIEW_ERROR_HANDLING.yaml
+maestro test -e APP_ID=org.verily.FSbeerselector .maestro/06-login-flow-member.yaml
+maestro test -e APP_ID=org.verily.FSbeerselector .maestro/07-login-flow-visitor.yaml
+maestro test -e APP_ID=org.verily.FSbeerselector .maestro/LOGIN_WEBVIEW_ERROR_HANDLING.yaml
 ```
 
 **Settings & Configuration**
+
 ```bash
-maestro test .maestro/10-settings-configuration.yaml
-maestro test .maestro/11-settings-first-launch.yaml
-maestro test .maestro/SETTINGS_AUTO_LOGIN.yaml
+maestro test -e APP_ID=org.verily.FSbeerselector .maestro/10-settings-configuration.yaml
+maestro test -e APP_ID=org.verily.FSbeerselector .maestro/11-settings-first-launch.yaml
+maestro test -e APP_ID=org.verily.FSbeerselector .maestro/SETTINGS_AUTO_LOGIN.yaml
 ```
 
 ---
@@ -284,9 +301,9 @@ app.get('/all_beers.php', (req, res) => {
     {
       brewInStock: [
         { id: 1, name: 'Test Beer 1', brewery: 'Test Brewery' },
-        { id: 2, name: 'Test Beer 2', brewery: 'Another Brewery' }
-      ]
-    }
+        { id: 2, name: 'Test Beer 2', brewery: 'Another Brewery' },
+      ],
+    },
   ]);
 });
 
@@ -295,10 +312,8 @@ app.get('/my_beers.php', (req, res) => {
   res.json([
     {},
     {
-      brewInStock: [
-        { id: 1, name: 'Tasted Beer 1', brewery: 'Test Brewery' }
-      ]
-    }
+      brewInStock: [{ id: 1, name: 'Tasted Beer 1', brewery: 'Test Brewery' }],
+    },
   ]);
 });
 
@@ -352,7 +367,7 @@ xcodebuild -workspace BeerSelector.xcworkspace -scheme BeerSelector -configurati
 cd ..
 
 # Run tests
-APP_ID=org.verily.FSbeerselector maestro test .maestro/
+maestro test -e APP_ID=org.verily.FSbeerselector .maestro/
 ```
 
 ### Android
@@ -372,8 +387,9 @@ cd android
 adb install app/build/outputs/apk/debug/app-debug.apk
 cd ..
 
-# Run tests
-APP_ID=com.yourcompany.beerselector maestro test .maestro/
+# Run tests. org.verily.FSBeerselector — capital B, matching app.json's
+# android.package. Not the same string as the iOS bundle ID above.
+maestro test -e APP_ID=org.verily.FSBeerselector .maestro/
 ```
 
 ---
@@ -385,6 +401,7 @@ APP_ID=com.yourcompany.beerselector maestro test .maestro/
 **Issue:** Maestro can't launch the app
 
 **Solution:**
+
 ```bash
 # Verify app is installed
 # iOS:
@@ -401,6 +418,7 @@ adb shell pm list packages | grep beerselector
 **Issue:** Tests hang or timeout
 
 **Solution:**
+
 1. Increase timeouts in test files
 2. Check simulator/emulator performance
 3. Close other apps consuming resources
@@ -411,6 +429,7 @@ adb shell pm list packages | grep beerselector
 **Issue:** WebView interactions don't work
 
 **Solution:**
+
 1. Verify WebView testIDs are present
 2. Add longer waits for WebView rendering
 3. Check network connectivity (if not using mock server)
@@ -420,6 +439,7 @@ adb shell pm list packages | grep beerselector
 **Issue:** Test 12 (offline scenarios) fails
 
 **Solution:**
+
 1. Enable airplane mode BEFORE running test
 2. Ensure app has data from previous online session
 3. Don't force quit app before running test
@@ -473,10 +493,10 @@ appId: ${APP_ID}
     clearState: true
 
 - assertVisible:
-    text: "Expected Element"
+    text: 'Expected Element'
 
 - tapOn:
-    testID: "button-id"
+    testID: 'button-id'
 
 - waitForAnimationToEnd:
     timeout: 5000
@@ -503,6 +523,7 @@ appId: ${APP_ID}
 ### Support
 
 For questions or issues:
+
 1. Check this README and related documentation
 2. Review test file comments for detailed explanations
 3. Check GitHub Issues for known problems
