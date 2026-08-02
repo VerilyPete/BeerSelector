@@ -410,8 +410,14 @@ describe('LoginWebView', () => {
       // `getPreference('auth_cookies')` call site ever existed, so the write
       // was pure exposure with no reader to justify it.
       //
-      // Asserted as "no call with this key" rather than by counting writes, so
-      // that reintroducing it under any description or value still fails.
+      // Asserted two ways, because the key alone is not the property. The
+      // property is that no session cookie VALUE reaches the preferences
+      // table — under `auth_cookies`, under any other key, whole jar or single
+      // token. An earlier version asserted only the key and the serialised
+      // jar, and mutation testing found the gap that leaves: writing just
+      // `cookies.session` under a blameless-looking key survived it. That is
+      // the realistic shape of a reintroduction, and it exposes the one cookie
+      // that actually matters.
       const { getByTestId } = render(
         <LoginWebView
           visible={true}
@@ -423,9 +429,15 @@ describe('LoginWebView', () => {
 
       const webview = getByTestId('webview-mock');
 
+      // Deliberately unmistakable values. The assertion below is a substring
+      // search over every preference value written, which is only safe from
+      // false positives if the fixture's values cannot plausibly occur inside a
+      // legitimate one — a bare `'12345'` could turn up inside a store URL and
+      // fail this test for a change that leaked nothing. `PHPSESSID` is the
+      // real name of the cookie this whole removal is about.
       const testCookies = {
-        member: '12345',
-        session: 'test-session',
+        member_id: 'sentinel-member-id-not-for-storage',
+        PHPSESSID: 'sentinel-php-session-token-not-for-storage',
       };
 
       const message = {
@@ -445,10 +457,20 @@ describe('LoginWebView', () => {
         expect(saveSessionData).toHaveBeenCalled();
       });
 
-      const keysWritten = (setPreference as jest.Mock).mock.calls.map(([key]) => key);
-      expect(keysWritten).not.toContain('auth_cookies');
-      const valuesWritten = (setPreference as jest.Mock).mock.calls.map(([, value]) => value);
-      expect(valuesWritten).not.toContain(JSON.stringify(testCookies));
+      const writes = (setPreference as jest.Mock).mock.calls;
+
+      // The key that used to carry the jar, named explicitly so the specific
+      // regression reads as itself in the failure output.
+      expect(writes.map(([key]) => key)).not.toContain('auth_cookies');
+
+      // Then the property that actually matters, independent of naming: no
+      // cookie value, and no serialisation containing one, was written under
+      // ANY key. `filter` rather than a boolean so a failure names the
+      // offending write instead of just asserting that one exists.
+      for (const cookieValue of [...Object.values(testCookies), JSON.stringify(testCookies)]) {
+        const leakingWrites = writes.filter(([, value]) => String(value).includes(cookieValue));
+        expect(leakingWrites).toEqual([]);
+      }
     });
 
     it('should save login timestamp', async () => {

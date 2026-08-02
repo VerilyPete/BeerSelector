@@ -219,25 +219,38 @@ describe('Sequential Refresh Coordination', () => {
       await inFlightRegistered;
 
       const forced = manualRefreshAllData();
-      // Let the forced refresh run all the way down to the taplist fetch before
-      // releasing. Its path there is settleInFlightRefresh, the ETag clear and
-      // four timestamp writes — all mocked, so all microtasks. Releasing sooner
-      // lets the in-flight entry clear before the forced refresh can join it,
-      // which is the test passing for the wrong reason.
-      for (let tick = 0; tick < 50; tick += 1) {
-        await Promise.resolve();
-      }
+      // Wait for the forced refresh to start its OWN taplist fetch while the
+      // first is still in flight. That is the whole claim, and it is only
+      // observable BEFORE the release — which is why the count is captured
+      // here and asserted after, rather than measured at the end.
+      //
+      // This replaces a fixed 50-tick loop, which was fail-OPEN. Exceeding that
+      // budget did not fail the test: the forced refresh simply arrived after
+      // the in-flight entry had already been cleared by the release, started
+      // its own fetch for that reason instead of the intended one, and the
+      // final count came out identical. Mutation-testing it confirmed the
+      // consequence — removing `dropInFlightTaplistFetch` from
+      // `manualRefreshAllData` with 60 extra microtasks upstream left this test
+      // green. One extra `await` on the path to the join was all it took to
+      // retire the test permanently without it ever going red.
+      //
+      // Reading the count before the release inverts that. A forced refresh
+      // that joins, and one that arrives too late to have tried, are now both
+      // failures rather than both passes. The budget can therefore be generous:
+      // overshooting it costs a slow test, not a false green.
+      await flushUntil(
+        () => (fetchBeersFromAPI as jest.Mock).mock.calls.length > callsBefore + 1,
+        500
+      );
+      const callsWhileFirstInFlight = (fetchBeersFromAPI as jest.Mock).mock.calls.length;
 
       releaseInFlight();
       await Promise.all([focusRefresh, forced]);
-      // Guard the tick budget above: if the forced refresh never reached the
-      // join, this test proves nothing and would pass vacuously.
-      expect((fetchBeersFromAPI as jest.Mock).mock.calls.length).toBeGreaterThan(callsBefore);
 
-      // Three fetches: the priming refresh, the in-flight one, and the forced
-      // one. Joining would give two, and the user's forced refresh would return
-      // a result computed from the ETag they just cleared.
-      expect((fetchBeersFromAPI as jest.Mock).mock.calls.length).toBeGreaterThan(callsBefore + 1);
+      // Three fetches by this point: the priming refresh, the in-flight one, and
+      // the forced one. Joining would give two, and the user's forced refresh
+      // would return a result computed from the ETag they just cleared.
+      expect(callsWhileFirstInFlight).toBeGreaterThan(callsBefore + 1);
     });
 
     it('does not let a different store join an in-flight fetch', async () => {
@@ -277,11 +290,21 @@ describe('Sequential Refresh Coordination', () => {
         return null;
       });
       const second = fetchAndUpdateAllBeers();
+      // Measured while the first fetch is still in flight, for the same reason
+      // as the escape-hatch test above: counting at the end cannot tell "refused
+      // to join a different store" from "arrived after the in-flight entry had
+      // already been released and had nothing to join". Both give two.
+      //
+      // Confirmed by mutation: dropping `storeId` from the join condition
+      // entirely, with 40 extra microtasks upstream of the join, left the
+      // end-of-test count at two and this test green.
+      await flushUntil(() => (fetchBeersFromAPI as jest.Mock).mock.calls.length > 1, 500);
+      const callsWhileFirstInFlight = (fetchBeersFromAPI as jest.Mock).mock.calls.length;
 
       releaseFirst();
       await Promise.all([first, second]);
 
-      expect(fetchBeersFromAPI).toHaveBeenCalledTimes(2);
+      expect(callsWhileFirstInFlight).toBe(2);
     });
   });
 
@@ -470,11 +493,22 @@ describe('Sequential Refresh Coordination', () => {
       const first = manualRefreshAllData();
       await firstRunReachedRewards;
 
+      // The first run is parked at its rewards fetch and appends nothing more
+      // until released, so anything recorded from here until the release came
+      // from the overtaking call — and the overtaking call recording ANY write
+      // while the run it is overtaking is still in flight is the defect.
+      const entriesWhileFirstParked = order.length;
+
       const second = manualRefreshAllData();
-      // Give the second call every chance to run its clears early if it is
-      // going to: without the wait it does so on this tick.
-      await Promise.resolve();
-      await Promise.resolve();
+      // Drain until the second call records something, or until the budget is
+      // spent. This replaces a two-tick wait that was fail-OPEN: it gave the
+      // second call exactly two microtasks to misbehave, so the moment anything
+      // upstream needed a third the test passed without observing the thing it
+      // names. Mutation confirmed it — deleting `settleInFlightRefresh` from
+      // this function with 60 extra microtasks in front of it left this test
+      // green. Here a longer drain can only make the assertion stricter.
+      await flushUntil(() => order.length > entriesWhileFirstParked, 500);
+      expect(order.slice(entriesWhileFirstParked)).toEqual([]);
 
       releaseFirstRun();
       await Promise.all([first, second]);

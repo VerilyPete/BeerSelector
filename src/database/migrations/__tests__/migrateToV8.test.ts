@@ -10,22 +10,58 @@ jest.mock('../../schemaVersion', () => ({
   recordMigration: jest.fn().mockResolvedValue(undefined),
 }));
 
+/** One write the migration made, and whether a transaction was open for it. */
+type WriteLogEntry = { readonly write: string; readonly transactionsOpen: number };
+
 type MockDb = {
   getAllAsync: jest.Mock;
   execAsync: jest.Mock;
   runAsync: jest.Mock;
   withTransactionAsync: jest.Mock;
+  /**
+   * Every write, in order, tagged with the transaction depth at the moment it
+   * ran.
+   *
+   * `withTransactionAsync` used to be `jest.fn(callback => callback())` — a
+   * passthrough, which is indistinguishable from no transaction at all. Under
+   * it, deleting the transaction wrapper or moving `recordMigration` outside it
+   * were both undetectable, and this file's five tests stayed green for either.
+   * The mock has to model the one thing it is being asked about.
+   */
+  writeLog: WriteLogEntry[];
 };
 
 function createMockMigrationDb(): MockDb {
   databaseLockManager.resetForTesting();
   jest.restoreAllMocks();
   (recordMigration as jest.Mock).mockClear();
+
+  // A depth count rather than a boolean, so a nested transaction still reads as
+  // open and cannot be mistaken for the outer one having closed.
+  let transactionsOpen = 0;
+  const writeLog: WriteLogEntry[] = [];
+
+  // `recordMigration` is a module mock, so its position relative to the
+  // transaction is only observable if it reports it here.
+  (recordMigration as jest.Mock).mockImplementation(async () => {
+    writeLog.push({ write: 'recordMigration', transactionsOpen });
+  });
+
   return {
     getAllAsync: jest.fn().mockResolvedValue([]),
     execAsync: jest.fn().mockResolvedValue(undefined),
-    runAsync: jest.fn().mockResolvedValue(undefined),
-    withTransactionAsync: jest.fn(async (callback: () => Promise<void>) => await callback()),
+    runAsync: jest.fn(async (sql: string) => {
+      writeLog.push({ write: sql.trim().split(/\s+/)[0].toUpperCase(), transactionsOpen });
+    }),
+    withTransactionAsync: jest.fn(async (callback: () => Promise<void>) => {
+      transactionsOpen += 1;
+      try {
+        await callback();
+      } finally {
+        transactionsOpen -= 1;
+      }
+    }),
+    writeLog,
   };
 }
 
@@ -57,6 +93,23 @@ describe('migrateToVersion8', () => {
 
     expect(lockSpy).toHaveBeenCalledWith('schema-migration-v8', expect.any(Function));
     expect(databaseLockManager.isLocked()).toBe(false);
+  });
+
+  it('deletes the row and records the version inside one transaction', async () => {
+    // The two writes have to commit together or not at all, and the order in
+    // which they fail is the whole point. Delete-then-crash re-runs on the next
+    // launch and deletes nothing, which is harmless. Record-then-fail-to-delete
+    // leaves a session cookie on the device with the schema asserting it was
+    // purged — and because the version gate has moved past 8, nothing will ever
+    // look again. The transaction is what makes the second ordering impossible.
+    const db = createMockMigrationDb();
+
+    await migrateToVersion8(db as never);
+
+    expect(db.writeLog).toEqual([
+      { write: 'DELETE', transactionsOpen: 1 },
+      { write: 'recordMigration', transactionsOpen: 1 },
+    ]);
   });
 
   it('records the migration', async () => {
