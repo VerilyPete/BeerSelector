@@ -289,9 +289,14 @@ describe('fetchTaplistFromProxyOrDirect', () => {
     });
 
     it('still returns no rows for a confirmed-empty taplist, leaving the verdict downstream', async () => {
-      // Deliberately NOT an error here. `fetchAndUpdateAllBeers` rejects an
-      // empty taplist as a VALIDATION_ERROR with a message about beer data,
-      // which is a better answer than anything this helper could give.
+      // Deliberately NOT an error here. Both taplist writers —
+      // `fetchAndUpdateAllBeers` and `prepareAllBeers` — reject an empty
+      // taplist as a VALIDATION_ERROR with a message about beer data, which is
+      // a better answer than anything this helper could give. This named only
+      // `fetchAndUpdateAllBeers`, which was accurate and incomplete in the way
+      // that mattered: `prepareAllBeers` did not classify it at all, so the
+      // condition this test hands downstream reached the user as UNKNOWN_ERROR
+      // on the sequential/manual path.
       (fetchBeersFromAPI as jest.Mock).mockResolvedValue(confirmedEmpty());
 
       await expect(fetchTaplistFromProxyOrDirect('13885')).resolves.toEqual(

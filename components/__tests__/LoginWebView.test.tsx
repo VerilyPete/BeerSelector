@@ -405,10 +405,11 @@ describe('LoginWebView', () => {
     it('never writes session cookies to the preferences table', async () => {
       // INVERTED. This used to assert the write. `auth_cookies` held the raw
       // cookie jar — PHPSESSID included — as plaintext in an ordinary SQLite
-      // row, recoverable from a device backup or a database extraction. The
-      // same session is in SecureStore via `saveSessionData`, and no
-      // `getPreference('auth_cookies')` call site ever existed, so the write
-      // was pure exposure with no reader to justify it.
+      // row, while the same session was already in SecureStore via
+      // `saveSessionData`. `migrateToV8`'s docstring is the canonical account
+      // of why it went and what its removal does and does not achieve; this
+      // comment used to carry its own copy, which is how a false claim about
+      // the key's history came to be asserted in three files at once.
       //
       // Asserted two ways, because the key alone is not the property. The
       // property is that no session cookie VALUE reaches the preferences

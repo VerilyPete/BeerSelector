@@ -239,8 +239,13 @@ const resolveMemberApiUrl = async (subject: string): Promise<MemberApiUrl> => {
  * `confirmed-empty` means the server genuinely reported none — a well-formed
  * body that says zero. Whether zero is an acceptable answer is the caller's
  * question, not this one's: an empty rewards list is a normal member state, and
- * an empty taplist is rejected downstream as a VALIDATION_ERROR. Neither is a
- * fact about the body being unusable.
+ * an empty taplist is rejected as a VALIDATION_ERROR by both of the taplist
+ * writers that can see it — `fetchAndUpdateAllBeers` and `prepareAllBeers`.
+ * Both, now: this said "downstream" while only the direct path classified it,
+ * and the sequential/manual path still threw a plain Error that reached the
+ * user as UNKNOWN_ERROR. `errorClassificationParity.test.ts` is what holds the
+ * two together, and is the thing to check before trusting this sentence again.
+ * Neither case is a fact about the body being unusable.
  *
  * This used to return `malformed` for an empty array, contradicting the line
  * above and every other classifier in this file. Only the `brewInStock` caller

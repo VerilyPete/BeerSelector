@@ -108,19 +108,50 @@ take the lock — ~8 sites call it from inside a held lock and would stall 30s.
 
 Every one of these is mine.
 
-- [ ] 5.1 **"no `getPreference('auth_cookies')` call site has ever existed"** —
+- [x] 5.1 **"no `getPreference('auth_cookies')` call site has ever existed"** —
       FALSE. `authService.autoLogin` read it (`6dabf2b9` → `e727cf0c`), and a
       settings debug panel read it via `getAllPreferences` until `dc7a02f9`.
       Asserted in 4 places including a commit message. Verified against the
       current tree only, then stated as a claim about all history.
-- [ ] 5.2 "MUST be called under the write lock" implies the lock makes
+      Both history claims independently verified against the blobs before
+      rewriting: `autoLogin` read it as its ONLY input, and `app/settings.tsx`
+      rendered the value on screen. Corrected in `migrateToV8`'s docstring,
+      which now also records that the inference "no `getPreference` call site
+      therefore no reader" was unsound in itself — `getAllPreferences` is a
+      second read path, and is the one the settings panel used. `a3254636`'s
+      message cannot be rewritten, so the docstring names it as the correction
+      of record.
+- [x] 5.2 "MUST be called under the write lock" implies the lock makes
       check-and-write atomic. It does not — the mutator takes no lock.
-- [ ] 5.3 "rejected downstream as a VALIDATION_ERROR" (`dataUpdateService:733`,
+      **ALREADY FIXED by Wave 3 (`7c585f2a`) — no change made.** The docstring
+      now says the lock alone does not make check-then-write atomic and that
+      soundness comes from `LoginWebView`'s gate-open bursts joining the same
+      lock. Verified: both bursts do (`LoginWebView.tsx:395`, `:502`), and the
+      three unlocked writes are all `''` (`:330`, `:492`,
+      `DeveloperSection.tsx:196`), which the guard reads as "changed".
+- [x] 5.3 "rejected downstream as a VALIDATION_ERROR" (`dataUpdateService:733`,
       `beerApi:242`, and a test comment) — true of one of two paths.
-- [ ] 5.4 "the credential is gone" — `DELETE` unlinks; no `secure_delete`, no
+      **True of BOTH paths now** — Wave 2 (`7013cd27`) typed `prepareAllBeers`.
+      So the fix is to say which paths and why "both" is load-bearing, not to
+      soften the claim. Corrected at `beerApi.ts`, `dataUpdateService.ts` and
+      `fetchTaplistFromProxyOrDirect.test.ts`, each pointing at
+      `errorClassificationParity.test.ts` as the thing that enforces parity.
+      **Found a fourth site the plan missed**: that parity suite's own
+      file docstring, and an inline comment at its second test, still described
+      the defect in the PRESENT tense as though unfixed. Both corrected.
+- [x] 5.4 "the credential is gone" — `DELETE` unlinks; no `secure_delete`, no
       `VACUUM`, WAL on. The bytes survive against the stated threat model.
-- [ ] 5.5 `LoginWebView:331` "Nothing reads these four" — now three. Fixed the
+      Premise verified: no `secure_delete` or `VACUUM` anywhere, WAL enabled at
+      `connection.ts:25`. `migrateToV8`'s docstring now states what the DELETE
+      does guarantee (no query returns it) and what it does not (the bytes are
+      not overwritten; the pre-delete page image can persist in `beers.db-wal`
+      until checkpoint), and says the honest word is "unlinked", not "gone".
+      The remedy is named and deliberately not taken — it is a behaviour change.
+- [x] 5.5 `LoginWebView:331` "Nothing reads these four" — now three. Fixed the
       docstring at `:28` and missed this one 300 lines down.
+      Corrected to three, and reduced to a pointer at the docstring rather than
+      a second copy of the argument — the restatement is why the two could
+      disagree. Re-verified all three keys have no reader before saying so.
 - [ ] 5.6 "every flow using `wait` failed to parse" — `beer-list-loading.yaml`
       parses fine; nested `runFlow: commands:` without `when:` is not validated
       at that depth.
@@ -130,8 +161,18 @@ Every one of these is mine.
 - [ ] 5.9 "twelve seconds / both platforms" — unverifiable, and sits oddly beside
       the claim that CI never got that far.
 - [ ] 5.10 Pin comment claims local is a truthful predictor; nothing pins local.
-- [ ] 5.11 ~90 lines of duplicated comment prose — and the duplication *caused*
+- [~] 5.11 ~90 lines of duplicated comment prose — and the duplication *caused*
       5.6 by copy-paste. Collapse to one canonical statement.
+      **Source-file half done; `.maestro`/workflow half left for Codex.** The
+      duplicated block in source was the `auth_cookies` rationale, restated in
+      `migrateToV8.ts`, `LoginWebView.tsx` and `LoginWebView.test.tsx` — ~39
+      lines carrying the same three assertions, and all three carried 5.1's
+      false sentence. `migrateToV8`'s docstring is now the canonical statement
+      and the other two are pointers that say so. Checked and deliberately NOT
+      collapsed: the lock invariant appears in both `taplistConfigurationHeld`
+      and `DeveloperSection.tsx:187`, but those are two site-specific arguments
+      that cross-reference each other rather than one text pasted twice — which
+      is the pattern this item wants, not the one it condemns.
 
 ## Wave 6 — tooling and CI
 
