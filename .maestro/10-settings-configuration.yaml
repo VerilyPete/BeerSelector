@@ -1,4 +1,4 @@
-appId: ${APP_ID}
+appId: org.verily.FSbeerselector
 name: "Settings - Configuration and Data Management"
 ---
 # Test Flow: Settings Configuration and Management

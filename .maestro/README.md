@@ -10,19 +10,19 @@ Comprehensive end-to-end test suite for the BeerSelector React Native applicatio
 
 ```bash
 # From project root
-maestro test -e APP_ID=org.verily.FSbeerselector .maestro/
+maestro test .maestro/
 ```
 
 ### Run Specific Test
 
 ```bash
-maestro test -e APP_ID=org.verily.FSbeerselector .maestro/01-beer-list-rendering.yaml
+maestro test .maestro/01-beer-list-rendering.yaml
 ```
 
 ### Run with Debug Output
 
 ```bash
-maestro test -e APP_ID=org.verily.FSbeerselector .maestro/ --debug
+maestro test .maestro/ --debug
 ```
 
 ---
@@ -104,10 +104,7 @@ EXPO_PUBLIC_API_TIMEOUT=30000         # 30 second timeout for CI
 
 - name: Run Maestro Tests
   run: |
-    # `-e APP_ID=...` on the command line — an `env:` block here only becomes
-    # a shell variable, and Maestro does not read `${APP_ID}` in a flow's
-    # `appId:` header from the process environment or from config.yaml.
-    maestro test -e APP_ID=org.verily.FSbeerselector .maestro/ \
+    maestro test .maestro/ \
       --format junit \
       --output maestro-results.xml
 ```
@@ -118,16 +115,16 @@ EXPO_PUBLIC_API_TIMEOUT=30000         # 30 second timeout for CI
 
 ```bash
 # Run only critical P0 tests
-maestro test -e APP_ID=org.verily.FSbeerselector .maestro/01-beer-list-rendering.yaml
-maestro test -e APP_ID=org.verily.FSbeerselector .maestro/06-login-flow-member.yaml
-maestro test -e APP_ID=org.verily.FSbeerselector .maestro/07-login-flow-visitor.yaml
+maestro test .maestro/01-beer-list-rendering.yaml
+maestro test .maestro/06-login-flow-member.yaml
+maestro test .maestro/07-login-flow-visitor.yaml
 ```
 
 **Nightly Builds (Comprehensive - ~45 min)**
 
 ```bash
 # Run full test suite
-maestro test -e APP_ID=org.verily.FSbeerselector .maestro/
+maestro test .maestro/
 ```
 
 **Release Candidates (Exhaustive)**
@@ -154,17 +151,17 @@ npm run test:e2e:android
 
 ```bash
 # Using background jobs (simple approach)
-maestro test -e APP_ID=org.verily.FSbeerselector .maestro/06-login-flow-member.yaml &
-maestro test -e APP_ID=org.verily.FSbeerselector .maestro/07-login-flow-visitor.yaml &
-maestro test -e APP_ID=org.verily.FSbeerselector .maestro/10-settings-configuration.yaml &
-maestro test -e APP_ID=org.verily.FSbeerselector .maestro/01-beer-list-rendering.yaml &
+maestro test .maestro/06-login-flow-member.yaml &
+maestro test .maestro/07-login-flow-visitor.yaml &
+maestro test .maestro/10-settings-configuration.yaml &
+maestro test .maestro/01-beer-list-rendering.yaml &
 wait  # Wait for all background jobs to complete
 ```
 
 ```bash
 # Using GNU parallel (advanced - requires gnu-parallel installation)
 # Run all tests in parallel with 4 concurrent jobs
-parallel -j 4 maestro test -e APP_ID=org.verily.FSbeerselector ::: .maestro/*.yaml
+parallel -j 4 maestro test ::: .maestro/*.yaml
 ```
 
 **Benefits of Parallel Execution:**
@@ -233,24 +230,24 @@ parallel -j 4 maestro test -e APP_ID=org.verily.FSbeerselector ::: .maestro/*.ya
 **P0 - Critical (Must pass before merge)**
 
 ```bash
-maestro test -e APP_ID=org.verily.FSbeerselector .maestro/01-beer-list-rendering.yaml
-maestro test -e APP_ID=org.verily.FSbeerselector .maestro/06-login-flow-member.yaml
-maestro test -e APP_ID=org.verily.FSbeerselector .maestro/07-login-flow-visitor.yaml
+maestro test .maestro/01-beer-list-rendering.yaml
+maestro test .maestro/06-login-flow-member.yaml
+maestro test .maestro/07-login-flow-visitor.yaml
 ```
 
 **P1 - Important (Should pass before release)**
 
 ```bash
-maestro test -e APP_ID=org.verily.FSbeerselector .maestro/09-refresh-functionality.yaml
-maestro test -e APP_ID=org.verily.FSbeerselector .maestro/10-settings-configuration.yaml
-maestro test -e APP_ID=org.verily.FSbeerselector .maestro/SETTINGS_AUTO_LOGIN.yaml
+maestro test .maestro/09-refresh-functionality.yaml
+maestro test .maestro/10-settings-configuration.yaml
+maestro test .maestro/SETTINGS_AUTO_LOGIN.yaml
 ```
 
 **P2 - Nice to have (Optional, manual testing OK)**
 
 ```bash
-maestro test -e APP_ID=org.verily.FSbeerselector .maestro/12-offline-scenarios.yaml
-maestro test -e APP_ID=org.verily.FSbeerselector .maestro/13-network-timeout-recovery.yaml
+maestro test .maestro/12-offline-scenarios.yaml
+maestro test .maestro/13-network-timeout-recovery.yaml
 ```
 
 ### Run Tests by Feature
@@ -258,25 +255,25 @@ maestro test -e APP_ID=org.verily.FSbeerselector .maestro/13-network-timeout-rec
 **Beer List Features**
 
 ```bash
-maestro test -e APP_ID=org.verily.FSbeerselector .maestro/01-beer-list-rendering.yaml
-maestro test -e APP_ID=org.verily.FSbeerselector .maestro/02-search-and-filter.yaml
-maestro test -e APP_ID=org.verily.FSbeerselector .maestro/03-beer-item-expansion.yaml
+maestro test .maestro/01-beer-list-rendering.yaml
+maestro test .maestro/02-search-and-filter.yaml
+maestro test .maestro/03-beer-item-expansion.yaml
 ```
 
 **Login & Authentication**
 
 ```bash
-maestro test -e APP_ID=org.verily.FSbeerselector .maestro/06-login-flow-member.yaml
-maestro test -e APP_ID=org.verily.FSbeerselector .maestro/07-login-flow-visitor.yaml
-maestro test -e APP_ID=org.verily.FSbeerselector .maestro/LOGIN_WEBVIEW_ERROR_HANDLING.yaml
+maestro test .maestro/06-login-flow-member.yaml
+maestro test .maestro/07-login-flow-visitor.yaml
+maestro test .maestro/LOGIN_WEBVIEW_ERROR_HANDLING.yaml
 ```
 
 **Settings & Configuration**
 
 ```bash
-maestro test -e APP_ID=org.verily.FSbeerselector .maestro/10-settings-configuration.yaml
-maestro test -e APP_ID=org.verily.FSbeerselector .maestro/11-settings-first-launch.yaml
-maestro test -e APP_ID=org.verily.FSbeerselector .maestro/SETTINGS_AUTO_LOGIN.yaml
+maestro test .maestro/10-settings-configuration.yaml
+maestro test .maestro/11-settings-first-launch.yaml
+maestro test .maestro/SETTINGS_AUTO_LOGIN.yaml
 ```
 
 ---
@@ -367,30 +364,18 @@ xcodebuild -workspace BeerSelector.xcworkspace -scheme BeerSelector -configurati
 cd ..
 
 # Run tests
-maestro test -e APP_ID=org.verily.FSbeerselector .maestro/
+maestro test .maestro/
 ```
 
 ### Android
 
-```bash
-# Install Maestro
-curl -fsSL https://get.maestro.mobile.dev | bash
-
-# Start emulator
-emulator -avd Pixel_5_API_31 &
-adb wait-for-device
-
-# Build and install app
-npx expo prebuild --platform android
-cd android
-./gradlew assembleDebug
-adb install app/build/outputs/apk/debug/app-debug.apk
-cd ..
-
-# Run tests. org.verily.FSBeerselector — capital B, matching app.json's
-# android.package. Not the same string as the iOS bundle ID above.
-maestro test -e APP_ID=org.verily.FSBeerselector .maestro/
-```
+**Not currently supported.** Every flow's `appId:` header hardcodes
+`org.verily.FSbeerselector` — the iOS bundle ID — directly, by decision, not
+oversight. Running `maestro test .maestro/` against an Android build (package
+`org.verily.FSBeerselector`, per `app.json` — capital B, genuinely a
+different string) will fail at `launchApp` immediately; that's expected, not
+a setup problem to chase. `.maestro/config.yaml` documents both bundle IDs
+for reference, in case Android support is added back later.
 
 ---
 
@@ -476,13 +461,13 @@ adb shell pm list packages | grep beerselector
 2. **Follow naming convention** - Numbered for core tests (01-19)
 3. **Add to config.yaml** - Include in main test suite
 4. **Document in README** - Update this file with test details
-5. **Test locally** - Verify on iOS and Android
+5. **Test locally** - Verify on iOS (Android is not currently supported)
 6. **Add to CI** - Include in appropriate CI job
 
 ### Test File Template
 
 ```yaml
-appId: ${APP_ID}
+appId: org.verily.FSbeerselector
 ---
 # Test Name: Feature Description
 # Priority: P0/P1/P2

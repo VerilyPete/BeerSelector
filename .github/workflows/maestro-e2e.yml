@@ -200,13 +200,7 @@ jobs:
 
       - name: Run Maestro E2E Tests
         run: |
-          # `-e APP_ID=...` on the command line, not an `env:` block above: a
-          # step-level GitHub Actions `env:` only becomes a shell variable,
-          # and Maestro 2.4.0 does not read `${APP_ID}` in a flow's `appId:`
-          # header from the process environment, from `.maestro/config.yaml`,
-          # or from an explicit `--config` pointing at it — verified directly
-          # against the CLI. `-e` is the only mechanism that resolves it.
-          maestro test -e APP_ID=org.verily.FSbeerselector .maestro/ \
+          maestro test .maestro/ \
             --format junit \
             --output maestro-results.xml
 
@@ -361,12 +355,10 @@ jobs:
 
       - name: Run Critical P0 Tests Only
         run: |
-          # `-e APP_ID=...` per invocation — see the comment on this pattern
-          # in the main "Run Maestro E2E Tests" step above.
-          maestro test -e APP_ID=org.verily.FSbeerselector .maestro/01-beer-list-rendering.yaml
-          maestro test -e APP_ID=org.verily.FSbeerselector .maestro/06-login-flow-member.yaml
-          maestro test -e APP_ID=org.verily.FSbeerselector .maestro/07-login-flow-visitor.yaml
-          maestro test -e APP_ID=org.verily.FSbeerselector .maestro/09-refresh-functionality.yaml
+          maestro test .maestro/01-beer-list-rendering.yaml
+          maestro test .maestro/06-login-flow-member.yaml
+          maestro test .maestro/07-login-flow-visitor.yaml
+          maestro test .maestro/09-refresh-functionality.yaml
 
       - name: Upload results
         if: always()
@@ -581,9 +573,6 @@ jobs:
         run: |
           echo "Running ${{ matrix.test-group.description }}"
 
-          # `-e APP_ID=...` per invocation — see the comment on this pattern
-          # in the main "Run Maestro E2E Tests" step above.
-          #
           # `|| true` per test, not on the loop: every test in the group must
           # still run even after an earlier one fails — that's the point of
           # grouping them — but the step as a whole must not silently swallow
@@ -595,7 +584,7 @@ jobs:
           group_failed=0
           for test in ${{ matrix.test-group.tests }}; do
             echo "Running test: $test"
-            maestro test -e APP_ID=org.verily.FSbeerselector "$test" \
+            maestro test "$test" \
               --format junit \
               --output "maestro-results-${{ matrix.test-group.name }}-$(basename $test .yaml).xml" || group_failed=1
           done
@@ -644,6 +633,16 @@ jobs:
     name: Maestro E2E Tests (Android)
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    # Known-red, non-blocking. Every flow's `appId:` hardcodes
+    # org.verily.FSbeerselector — the iOS bundle — by design; Android is not
+    # a supported target right now. This job WILL fail at launchApp, every
+    # time, and that is expected rather than a regression to chase.
+    # `continue-on-error` keeps it from blocking merges while `test-summary`
+    # still reports its real (red) result rather than hiding it — see the
+    # comment there. Kept, not deleted, so re-enabling Android later is a
+    # config change (parameterise appId again, drop this line) rather than a
+    # rebuild.
+    continue-on-error: true
 
     steps:
       - name: Checkout code
@@ -772,13 +771,12 @@ jobs:
               sleep 5
             fi
 
-            # Run Maestro tests. `org.verily.FSBeerselector` — capital B,
-            # matching app.json's android.package — NOT the iOS bundle ID.
-            # This step previously passed no APP_ID at all, so every flow's
-            # hardcoded (now `${APP_ID}`) appId resolved to the iOS app on a
-            # device that only ever had the Android one installed; every
-            # Android run failed at launchApp before anything under test ran.
-            maestro test -e APP_ID=org.verily.FSBeerselector .maestro/ \
+            # Run Maestro tests. Every flow hardcodes the iOS bundle ID
+            # (org.verily.FSbeerselector) — see the note on this job above.
+            # This will fail at launchApp against the Android build
+            # (org.verily.FSBeerselector, per app.json) every time; that is
+            # the known, accepted state, not a bug in this step.
+            maestro test .maestro/ \
               --format junit \
               --output maestro-results-android.xml
 
@@ -838,7 +836,6 @@ jobs:
           # catch.
           IOS_RESULT: ${{ needs.maestro-ios.result }}
           IOS_PARALLEL_RESULT: ${{ needs.maestro-ios-parallel.result }}
-          ANDROID_RESULT: ${{ needs.maestro-android.result }}
         run: |
           echo "## 🧪 Maestro E2E Test Summary" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
@@ -894,7 +891,30 @@ jobs:
             echo "" >> "$GITHUB_STEP_SUMMARY"
           fi
 
-          report_platform "Android Tests" "$ANDROID_RESULT"
+          # Android is known-red and non-blocking (`continue-on-error: true`
+          # on the `maestro-android` job — see the comment there and in
+          # .maestro/config.yaml). That setting makes
+          # `needs.maestro-android.result` UNRELIABLE for reporting here:
+          # GitHub Actions reports "success" in the `needs` context for a
+          # continue-on-error job even when its steps genuinely failed, which
+          # would make this section claim PASSED unconditionally — the exact
+          # "green that means nothing" this whole job exists to stop
+          # printing. Inspecting the uploaded JUnit XML directly (same
+          # technique as the parallel per-group detail above) reports what
+          # actually happened instead. Deliberately not fed into
+          # `overall_fail`: Android isn't a supported target right now, so
+          # gating the PR check on it would be a failure nobody can act on.
+          android_dir="test-results/maestro-test-results-android"
+          if [ ! -d "$android_dir" ]; then
+            echo "### ❔ Android Tests - NO RESULTS" >> "$GITHUB_STEP_SUMMARY"
+            echo "Known-red, non-blocking — Android is not a supported target right now (see .maestro/config.yaml). No results were uploaded." >> "$GITHUB_STEP_SUMMARY"
+          elif grep -rlq '<failure' "$android_dir" 2>/dev/null; then
+            echo "### ❌ Android Tests - FAILED" >> "$GITHUB_STEP_SUMMARY"
+            echo "Known-red, non-blocking — Android is not a supported target right now (see .maestro/config.yaml)." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "### ✅ Android Tests - PASSED" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          echo "" >> "$GITHUB_STEP_SUMMARY"
 
           # Test artifacts
           echo "### 📦 Test Artifacts" >> "$GITHUB_STEP_SUMMARY"

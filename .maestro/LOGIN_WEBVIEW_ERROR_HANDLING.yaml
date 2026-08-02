@@ -1,4 +1,4 @@
-appId: ${APP_ID}
+appId: org.verily.FSbeerselector
 name: "Login WebView - Error Handling & Edge Cases"
 ---
 # Test Flow: WebView Error Handling Scenarios

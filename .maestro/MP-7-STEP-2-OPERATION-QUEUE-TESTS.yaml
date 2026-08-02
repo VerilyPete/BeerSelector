@@ -11,9 +11,9 @@
 # - Test device must support network simulation
 #
 # Run with:
-#   maestro test -e APP_ID=org.verily.FSbeerselector .maestro/MP-7-STEP-2-OPERATION-QUEUE-TESTS.yaml
+#   maestro test .maestro/MP-7-STEP-2-OPERATION-QUEUE-TESTS.yaml
 
-appId: ${APP_ID}
+appId: org.verily.FSbeerselector
 ---
 
 # ==============================================================================

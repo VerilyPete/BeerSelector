@@ -1,4 +1,4 @@
-appId: ${APP_ID}
+appId: org.verily.FSbeerselector
 name: "Login Flow - UFO Club Member Authentication"
 ---
 # Test Flow: UFO Club Member Login

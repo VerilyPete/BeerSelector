@@ -1,21 +1,25 @@
 # Maestro Configuration for BeerSelector
 # This file defines the workspace's flow list and settings for Maestro tests.
 #
-# NOT variable substitution. An `env:` block here looks like it should feed
-# `${APP_ID}` into every flow's `appId:` header, and an earlier version of this
-# file — and every doc example that used to write `APP_ID=x maestro test
-# .maestro/` — assumed exactly that. Neither works: verified against the
-# installed Maestro CLI (2.4.0) that this `env:` block, an exported shell
-# `APP_ID`, and an explicit `--config` pointing at this file are all silently
-# ignored by flow-header substitution — every one of them launches "app
-# undefined". The only mechanism that actually resolves `${APP_ID}` in a flow
-# is `-e APP_ID=value` on the `maestro test` command line, which is what every
-# CI job and documented local command now uses. These two are kept as the
-# single source of truth for the two values callers pass via `-e`, not as
-# something this file wires up on its own:
-#   APP_ID_IOS:     org.verily.FSbeerselector
-#   APP_ID_ANDROID: org.verily.FSBeerselector   (capital B — matches
-#                   app.json's android.package; iOS does not capitalise it)
+# Every flow's `appId:` hardcodes org.verily.FSbeerselector directly — the
+# suite is iOS-only, by decision, not by oversight or leftover scaffolding.
+# Android is not a supported target right now, and no `${APP_ID}` or `-e`
+# plumbing exists anywhere in this repo to make one flow file serve both
+# platforms; an earlier version of this comment described exactly that
+# mechanism, and it never worked (verified against the installed Maestro CLI:
+# an `env:` block here, an exported shell var, and `--config` pointing at this
+# file are all ignored by flow-header substitution regardless).
+#
+# The two Android CI jobs (`maestro-android` / `maestro-tests-android`) still
+# run — kept, not deleted — but are marked `continue-on-error: true` and
+# known-red in their own comments: they launch the iOS bundle ID against an
+# Android build and fail at that step every time. If Android becomes a
+# supported target again, that plumbing has to be rebuilt; the reference
+# values below are the two real bundle IDs to use, for whoever does that,
+# not something currently read by anything:
+#   iOS:     org.verily.FSbeerselector
+#   Android: org.verily.FSBeerselector   (capital B — matches app.json's
+#            android.package; iOS does not capitalise it)
 
 # Test suite configuration
 flows:

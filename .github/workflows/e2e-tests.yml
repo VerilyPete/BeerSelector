@@ -141,13 +141,7 @@ jobs:
 
       - name: Run Maestro E2E tests
         run: |
-          # `-e APP_ID=...` on the command line, not an `env:` block: a
-          # step-level GitHub Actions `env:` only becomes a shell variable,
-          # and Maestro 2.4.0 does not read `${APP_ID}` in a flow's `appId:`
-          # header from the process environment, `.maestro/config.yaml`, or
-          # an explicit `--config` pointing at it — verified directly against
-          # the CLI. `-e` is the only mechanism that resolves it.
-          maestro test -e APP_ID=org.verily.FSbeerselector .maestro/ \
+          maestro test .maestro/ \
             --format junit \
             --output test-results/maestro-ios.xml
 
@@ -171,9 +165,18 @@ jobs:
     # `macos-latest` is Apple Silicon — the emulator cannot start, which is what
     # "could not connect to TCP port 5554: Connection refused" and the boot
     # timeout were. It never reached the app. The sibling `maestro-android` job
-    # in maestro-e2e.yml already runs this exact combination on ubuntu, so this
-    # is adopting a working configuration rather than inventing one. Linux
-    # runners also give the emulator KVM, enabled below.
+    # in maestro-e2e.yml already runs this same ubuntu/x86_64/KVM combination —
+    # NOT "a working configuration": that job was failing too, for a separate
+    # reason (every flow's `appId:` hardcodes the iOS bundle ID, and still
+    # does — Android is not a supported target right now, by explicit
+    # decision, not oversight). Adopting the emulator setup here is still
+    # right; it just was never evidence this job would pass. Linux runners
+    # also give the emulator KVM, enabled below.
+    #
+    # Known-red, non-blocking — see the equivalent comment on `maestro-android`
+    # in maestro-e2e.yml. `continue-on-error` keeps it from blocking merges;
+    # `test-summary` still reports its real result rather than hiding it.
+    continue-on-error: true
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
@@ -295,14 +298,12 @@ jobs:
             # Install app
             adb install android/app/build/outputs/apk/debug/app-debug.apk
 
-            # Run Maestro tests. `-e APP_ID=...` on the command line, not the
-            # `env:` block this step used to carry — see the comment on this
-            # pattern in the iOS job's "Run Maestro E2E tests" step above; a
-            # GitHub Actions step `env:` does not reach Maestro's own
-            # `${APP_ID}` flow-header substitution. `org.verily.FSBeerselector`
-            # — capital B, matching app.json's android.package — is not the
-            # same string as the iOS bundle ID; they genuinely differ.
-            maestro test -e APP_ID=org.verily.FSBeerselector .maestro/ \
+            # Run Maestro tests. Every flow hardcodes the iOS bundle ID
+            # (org.verily.FSbeerselector) — see the note on this job above.
+            # This will fail at launchApp against the Android build
+            # (org.verily.FSBeerselector, per app.json) every time; that is
+            # the known, accepted state, not a bug in this step.
+            maestro test .maestro/ \
               --format junit \
               --output test-results/maestro-android.xml
 
@@ -444,7 +445,6 @@ jobs:
           # complete; it could never report it failed. Same defect as
           # `maestro-e2e.yml`'s `test-summary`, fixed the same way.
           IOS_RESULT: ${{ needs.maestro-tests-ios.result }}
-          ANDROID_RESULT: ${{ needs.maestro-tests-android.result }}
           PERF_RESULT: ${{ needs.performance-tests.result }}
         run: |
           echo "## E2E Test Summary" >> "$GITHUB_STEP_SUMMARY"
@@ -465,7 +465,26 @@ jobs:
           }
 
           report "iOS Maestro tests" "$IOS_RESULT"
-          report "Android Maestro tests" "$ANDROID_RESULT"
+
+          # Android is known-red and non-blocking (`continue-on-error: true`
+          # on `maestro-tests-android` — see the comment there and in
+          # .maestro/config.yaml). That setting makes
+          # `needs.maestro-tests-android.result` UNRELIABLE here: GitHub
+          # Actions reports "success" in the `needs` context for a
+          # continue-on-error job even when its steps genuinely failed, which
+          # would make `report()` claim it completed unconditionally.
+          # Inspecting the uploaded JUnit XML directly reports what actually
+          # happened. Deliberately not fed into `overall_fail`: Android isn't
+          # a supported target right now, so gating the check on it would be
+          # a failure nobody can act on.
+          if [ ! -d "maestro-test-results-android" ]; then
+            echo "❔ Android Maestro tests: known-red, non-blocking (Android is not a supported target — see .maestro/config.yaml); no results uploaded" >> "$GITHUB_STEP_SUMMARY"
+          elif grep -rlq '<failure' "maestro-test-results-android" 2>/dev/null; then
+            echo "❌ Android Maestro tests failed — known-red, non-blocking (Android is not a supported target — see .maestro/config.yaml)" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "✅ Android Maestro tests completed" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
           report "Performance tests" "$PERF_RESULT"
 
           # Previously nothing here ever ran `exit 1`, so this job — and the

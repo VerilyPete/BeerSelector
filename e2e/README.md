@@ -193,44 +193,31 @@ npm run test:e2e
 Or directly with Maestro:
 
 ```bash
-maestro test -e APP_ID=org.verily.FSbeerselector .maestro/
+maestro test .maestro/
 ```
 
 #### Run specific test flow:
 
 ```bash
-maestro test -e APP_ID=org.verily.FSbeerselector .maestro/01-beer-list-rendering.yaml
+maestro test .maestro/01-beer-list-rendering.yaml
 ```
 
 #### Run on specific device:
 
 ```bash
-# iOS
-maestro test --device "iPhone 14 Pro" -e APP_ID=org.verily.FSbeerselector .maestro/
-
-# Android
-maestro test --device "emulator-5554" -e APP_ID=org.verily.FSBeerselector .maestro/
+maestro test --device "iPhone 14 Pro" .maestro/
 ```
 
-#### Run with environment variables:
-
-`-e APP_ID=...` on the command line — every flow's `appId:` header reads
-`${APP_ID}`, and `-e` is the only mechanism that resolves it. A step-level
-`env:` block, an exported shell variable, or `.maestro/config.yaml`'s own
-values are all silently ignored by this substitution.
-
-```bash
-# iOS
-maestro test -e APP_ID=org.verily.FSbeerselector .maestro/
-
-# Android — capital B, matching app.json's android.package
-maestro test -e APP_ID=org.verily.FSBeerselector .maestro/
-```
+Android is not currently supported: every flow's `appId:` header hardcodes
+`org.verily.FSbeerselector` (the iOS bundle ID) directly, by decision, not
+oversight. Running Maestro against an Android build (package
+`org.verily.FSBeerselector`, per `app.json` — capital B, genuinely a
+different string) fails at `launchApp` immediately.
 
 #### Generate test report:
 
 ```bash
-maestro test -e APP_ID=org.verily.FSbeerselector .maestro/ --format junit --output test-results/maestro.xml
+maestro test .maestro/ --format junit --output test-results/maestro.xml
 ```
 
 ### Flashlight Tests (Performance)
@@ -282,7 +269,7 @@ flashlight report .flashlight/reports/latest.json
 **Run**:
 
 ```bash
-maestro test -e APP_ID=org.verily.FSbeerselector .maestro/01-beer-list-rendering.yaml
+maestro test .maestro/01-beer-list-rendering.yaml
 ```
 
 ### 2. Search and Filter Functionality
@@ -306,7 +293,7 @@ maestro test -e APP_ID=org.verily.FSbeerselector .maestro/01-beer-list-rendering
 **Run**:
 
 ```bash
-maestro test -e APP_ID=org.verily.FSbeerselector .maestro/02-search-and-filter.yaml
+maestro test .maestro/02-search-and-filter.yaml
 ```
 
 ### 3. Beer Item Expansion
@@ -327,7 +314,7 @@ maestro test -e APP_ID=org.verily.FSbeerselector .maestro/02-search-and-filter.y
 **Run**:
 
 ```bash
-maestro test -e APP_ID=org.verily.FSbeerselector .maestro/03-beer-item-expansion.yaml
+maestro test .maestro/03-beer-item-expansion.yaml
 ```
 
 ### 4. Empty States and Edge Cases
@@ -350,7 +337,7 @@ maestro test -e APP_ID=org.verily.FSbeerselector .maestro/03-beer-item-expansion
 **Run**:
 
 ```bash
-maestro test -e APP_ID=org.verily.FSbeerselector .maestro/04-empty-states.yaml
+maestro test .maestro/04-empty-states.yaml
 ```
 
 ### 5. Navigation and Tab Switching
@@ -371,7 +358,7 @@ maestro test -e APP_ID=org.verily.FSbeerselector .maestro/04-empty-states.yaml
 **Run**:
 
 ```bash
-maestro test -e APP_ID=org.verily.FSbeerselector .maestro/05-navigation-and-tabs.yaml
+maestro test .maestro/05-navigation-and-tabs.yaml
 ```
 
 ## Performance Testing
@@ -435,7 +422,7 @@ jobs:
         run: npx expo run:ios --configuration Release
 
       - name: Run Maestro tests
-        run: maestro test -e APP_ID=org.verily.FSbeerselector .maestro/
+        run: maestro test .maestro/
 
       - name: Upload test results
         if: always()
@@ -479,7 +466,7 @@ jobs:
 ### Maestro Test Structure
 
 ```yaml
-appId: ${APP_ID}
+appId: org.verily.FSbeerselector
 name: 'Your Test Name'
 ---
 # Test Flow Description
@@ -594,8 +581,8 @@ When adding new components, include `testID` props:
 
 **Solutions**:
 
-- Verify app is built: `npx expo run:ios` or `npx expo run:android`
-- Check you passed `-e APP_ID=...` — see "Run with environment variables" above; `.maestro/config.yaml` documents the two values but does not supply them to a flow on its own
+- Verify app is built: `npx expo run:ios` (Android is not currently
+  supported — every flow's `appId:` hardcodes the iOS bundle ID)
 - Ensure simulator/emulator is running
 - Check Maestro can see device: `maestro devices`
 
@@ -614,7 +601,7 @@ When adding new components, include `testID` props:
 Run tests in debug mode to see what Maestro is doing:
 
 ```bash
-maestro test --debug -e APP_ID=org.verily.FSbeerselector .maestro/01-beer-list-rendering.yaml
+maestro test --debug .maestro/01-beer-list-rendering.yaml
 ```
 
 View Maestro Studio (interactive test runner):
