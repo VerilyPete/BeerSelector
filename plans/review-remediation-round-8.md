@@ -130,15 +130,42 @@ Every one of these is mine.
       three unlocked writes are all `''` (`:330`, `:492`,
       `DeveloperSection.tsx:196`), which the guard reads as "changed".
 - [x] 5.3 "rejected downstream as a VALIDATION_ERROR" (`dataUpdateService:733`,
-      `beerApi:242`, and a test comment) — true of one of two paths.
-      **True of BOTH paths now** — Wave 2 (`7013cd27`) typed `prepareAllBeers`.
-      So the fix is to say which paths and why "both" is load-bearing, not to
-      soften the claim. Corrected at `beerApi.ts`, `dataUpdateService.ts` and
-      `fetchTaplistFromProxyOrDirect.test.ts`, each pointing at
-      `errorClassificationParity.test.ts` as the thing that enforces parity.
-      **Found a fourth site the plan missed**: that parity suite's own
-      file docstring, and an inline comment at its second test, still described
-      the defect in the PRESENT tense as though unfixed. Both corrected.
+      `beerApi:242`, and a test comment).
+
+      **The diagnosis this item originally carried — "true of one of two
+      paths" — was itself stale, and acting on it would have made the comments
+      worse. Do not follow it. It is struck out here rather than deleted
+      because the mistake is the instructive part.** It was accurate when
+      written. Wave 2 (`7013cd27`) then gave `prepareAllBeers` a typed
+      `SourceFailureError`, which made the claim true of BOTH paths — so
+      "soften it, it overclaims" would have deleted a true statement about
+      working code. This is the second time this round a Wave 5 instruction has
+      been outrun by an earlier wave's fix (see 5.2, which needed no change at
+      all). Verify the claim against the tree before rewriting it; the plan is
+      older than the code.
+
+      Fixed by naming the two paths and saying why "both" is load-bearing —
+      delegating the empty case downstream is only correct while EVERY
+      downstream classifies it, so the sentence is a dependency, not a
+      description. Corrected at `beerApi.ts`, `dataUpdateService.ts` and
+      `fetchTaplistFromProxyOrDirect.test.ts`, each now pointing at
+      `errorClassificationParity.test.ts` as the thing that enforces the parity
+      they rely on.
+
+      **A fourth site, which this item did not list and which is the worst of
+      them**: `errorClassificationParity.test.ts`'s own file docstring, plus an
+      inline comment on its second test, still described the defect in the
+      PRESENT tense — a test file explaining that the behaviour proven correct
+      immediately below is broken. Written in the same commit that fixed it.
+      Both moved to past tense, with the tests named as what now holds it.
+
+      LESSON, and it generalises past this branch: **a test file's own prose can
+      go stale against the tests beneath it, and nothing in the suite catches
+      that.** A wrong assertion goes red. A docstring that contradicts its own
+      assertions stays green forever, and it is read as the authority on what
+      the tests mean — so it misleads with more weight than an ordinary comment,
+      not less. When a fix lands, the prose in the test file that proves it is
+      part of the change, not commentary on it.
 - [x] 5.4 "the credential is gone" — `DELETE` unlinks; no `secure_delete`, no
       `VACUUM`, WAL on. The bytes survive against the stated threat model.
       Premise verified: no `secure_delete` or `VACUUM` anywhere, WAL enabled at
@@ -152,6 +179,18 @@ Every one of these is mine.
       Corrected to three, and reduced to a pointer at the docstring rather than
       a second copy of the argument — the restatement is why the two could
       disagree. Re-verified all three keys have no reader before saying so.
+**5.6–5.10 are BLOCKED, deliberately. Do not start them.** Every one lives in
+`.maestro/*` or `.github/workflows/*`, which Codex is rewriting for Wave 6.
+Two agents in those files means a conflict, and the whole point of splitting
+Wave 5 was to avoid one. They unblock when Wave 6 lands.
+
+When they do unblock, re-verify each claim against the tree first. Wave 6
+edits the very files these five describe, so the odds that some of these
+descriptions are stale on arrival are high — and 5.2 and 5.3 have already
+demonstrated, in this wave, what happens when a Wave 5 instruction is executed
+literally after an earlier wave has moved the code underneath it. 5.11's
+remaining half is in the same files and is blocked with them.
+
 - [ ] 5.6 "every flow using `wait` failed to parse" — `beer-list-loading.yaml`
       parses fine; nested `runFlow: commands:` without `when:` is not validated
       at that depth.
@@ -163,7 +202,10 @@ Every one of these is mine.
 - [ ] 5.10 Pin comment claims local is a truthful predictor; nothing pins local.
 - [~] 5.11 ~90 lines of duplicated comment prose — and the duplication *caused*
       5.6 by copy-paste. Collapse to one canonical statement.
-      **Source-file half done; `.maestro`/workflow half left for Codex.** The
+      **PARTIAL, and left partial on purpose — not an oversight to tidy up.**
+      Source-file half done; the `.maestro`/workflow half is blocked with
+      5.6–5.10 above. Marked `[~]` rather than `[x]` so nobody reads it as
+      finished and skips the remainder. The
       duplicated block in source was the `auth_cookies` rationale, restated in
       `migrateToV8.ts`, `LoginWebView.tsx` and `LoginWebView.test.tsx` — ~39
       lines carrying the same three assertions, and all three carried 5.1's
