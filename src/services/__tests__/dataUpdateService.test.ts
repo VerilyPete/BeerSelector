@@ -155,6 +155,32 @@ describe('dataUpdateService', () => {
   const testAllBeersUrl = `${config.api.baseUrl}/api/all-beers`;
   const testMyBeersUrl = `${config.api.baseUrl}/api/my-beers`;
 
+  /**
+   * Answer `all_beers_api_url` with `url` consistently, for every read.
+   *
+   * `mockResolvedValueOnce` is wrong for any test that reaches the taplist
+   * write, because the write re-reads this preference under the lock to check
+   * the store has not changed mid-refresh. A one-shot mock answers the URL and
+   * then `undefined`, which the guard correctly reads as "the store switched"
+   * and abandons the write. Preferences are durable storage: a second read of
+   * an unwritten key returns the same value, and the fixture has to say so.
+   *
+   * Takes the URL rather than assuming `testAllBeersUrl`: the Config
+   * Integration tests below each exist to show a particular URL shape works, so
+   * substituting a different one would delete the thing they test.
+   *
+   * At `describe('dataUpdateService')` scope rather than inside
+   * `fetchAndUpdateAllBeers`, because it was scoped there when it was written
+   * and the five Config Integration tests that needed it could not see it. They
+   * silently took the abandon path for it instead — asserting only that a fetch
+   * happened, and passing against a taplist write that inserted nothing.
+   */
+  const taplistUrlIsStable = (url: string = testAllBeersUrl): void => {
+    (getPreference as jest.Mock).mockImplementation(async (key: string) =>
+      key === 'all_beers_api_url' ? url : null
+    );
+  };
+
   beforeEach(() => {
     jest.clearAllMocks();
 
@@ -224,22 +250,6 @@ describe('dataUpdateService', () => {
       expect(result.dataUpdated).toBe(false);
       expect(result.error).toBeDefined();
     });
-
-    /**
-     * Answer `all_beers_api_url` consistently, for every read.
-     *
-     * `mockResolvedValueOnce` is wrong for the two tests below now that the
-     * taplist write re-reads this preference under the lock to check the store
-     * has not changed mid-refresh. A one-shot mock answers the URL and then
-     * `undefined`, which the guard correctly reads as "the store switched" and
-     * abandons the write. Preferences are durable storage: a second read of an
-     * unwritten key returns the same value, and the fixture has to say so.
-     */
-    const taplistUrlIsStable = (): void => {
-      (getPreference as jest.Mock).mockImplementation(async (key: string) =>
-        key === 'all_beers_api_url' ? testAllBeersUrl : null
-      );
-    };
 
     it('should successfully update all beers', async () => {
       taplistUrlIsStable();
@@ -693,51 +703,64 @@ describe('dataUpdateService', () => {
 
   describe('Config Integration', () => {
     describe('Environment Configuration', () => {
+      // Each of these asserts the rows LANDED, not merely that a fetch was
+      // attempted. `success: true` alone is satisfied by
+      // `abandonedAfterStoreSwitch`, which is what these five did for a while:
+      // the one-shot preference mock made the write's own guard read "the store
+      // switched", so every one of them passed against a taplist write that
+      // inserted nothing. `dataUpdated` and the insert are what make the name of
+      // the test its actual subject.
       it('should work with production config base URL', async () => {
         const productionUrl = `${config.api.baseUrl}/visitor`;
-        (getPreference as jest.Mock).mockResolvedValueOnce(productionUrl);
+        taplistUrlIsStable(productionUrl);
         (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce(
           fetchedRows([{ id: '1', brew_name: 'Test' }])
         );
-        (beerRepository.insertMany as jest.Mock).mockResolvedValueOnce(undefined);
         (setPreference as jest.Mock).mockResolvedValue(undefined);
 
         const result = await fetchAndUpdateAllBeers();
 
         expect(result.success).toBe(true);
+        expect(result.dataUpdated).toBe(true);
         expect(fetchBeersFromAPI).toHaveBeenCalled();
+        expect(beerRepository.insertManyUnsafe).toHaveBeenCalled();
       });
 
       it('should work with custom API URL', async () => {
         const customBaseUrl = 'https://staging.flyingsaucer.com';
         const customUrl = `${customBaseUrl}/api/beers`;
 
-        (getPreference as jest.Mock).mockResolvedValueOnce(customUrl);
+        taplistUrlIsStable(customUrl);
         (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce(
           fetchedRows([{ id: '1', brew_name: 'Test' }])
         );
-        (beerRepository.insertMany as jest.Mock).mockResolvedValueOnce(undefined);
         (setPreference as jest.Mock).mockResolvedValue(undefined);
 
         const result = await fetchAndUpdateAllBeers();
 
         expect(result.success).toBe(true);
+        expect(result.dataUpdated).toBe(true);
         expect(fetchBeersFromAPI).toHaveBeenCalled();
+        expect(beerRepository.insertManyUnsafe).toHaveBeenCalled();
       });
     });
 
     describe('Network Timeout Configuration', () => {
       it('should delegate fetch to fetchBeersFromAPI which handles timeouts', async () => {
-        (getPreference as jest.Mock).mockResolvedValueOnce(testAllBeersUrl);
+        // Same fixture as the five above, for the same reason. "Delegates the
+        // fetch" is technically satisfied by a refresh that fetches and then
+        // abandons the write, so this would have stayed green while doing half
+        // of what it describes.
+        taplistUrlIsStable();
         (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce(
           fetchedRows([{ id: '1', brew_name: 'Test' }])
         );
-        (beerRepository.insertMany as jest.Mock).mockResolvedValueOnce(undefined);
         (setPreference as jest.Mock).mockResolvedValue(undefined);
 
-        await fetchAndUpdateAllBeers();
+        const result = await fetchAndUpdateAllBeers();
 
         expect(fetchBeersFromAPI).toHaveBeenCalled();
+        expect(result.dataUpdated).toBe(true);
       });
 
       it('should handle timeout gracefully', async () => {
@@ -765,32 +788,34 @@ describe('dataUpdateService', () => {
 
       it('should accept HTTPS URLs', async () => {
         const httpsUrl = 'https://secure.api.com/beers';
-        (getPreference as jest.Mock).mockResolvedValueOnce(httpsUrl);
+        taplistUrlIsStable(httpsUrl);
         (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce(
           fetchedRows([{ id: '1', brew_name: 'Test' }])
         );
-        (beerRepository.insertMany as jest.Mock).mockResolvedValueOnce(undefined);
         (setPreference as jest.Mock).mockResolvedValue(undefined);
 
         const result = await fetchAndUpdateAllBeers();
 
         expect(result.success).toBe(true);
+        expect(result.dataUpdated).toBe(true);
         expect(fetchBeersFromAPI).toHaveBeenCalled();
+        expect(beerRepository.insertManyUnsafe).toHaveBeenCalled();
       });
 
       it('should accept HTTP URLs', async () => {
         const httpUrl = 'http://localhost:3000/api/beers';
-        (getPreference as jest.Mock).mockResolvedValueOnce(httpUrl);
+        taplistUrlIsStable(httpUrl);
         (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce(
           fetchedRows([{ id: '1', brew_name: 'Test' }])
         );
-        (beerRepository.insertMany as jest.Mock).mockResolvedValueOnce(undefined);
         (setPreference as jest.Mock).mockResolvedValue(undefined);
 
         const result = await fetchAndUpdateAllBeers();
 
         expect(result.success).toBe(true);
+        expect(result.dataUpdated).toBe(true);
         expect(fetchBeersFromAPI).toHaveBeenCalled();
+        expect(beerRepository.insertManyUnsafe).toHaveBeenCalled();
       });
     });
 
@@ -800,17 +825,18 @@ describe('dataUpdateService', () => {
         expect(typeof config.api.baseUrl).toBe('string');
 
         const configBasedUrl = `${config.api.baseUrl}/custom/endpoint`;
-        (getPreference as jest.Mock).mockResolvedValueOnce(configBasedUrl);
+        taplistUrlIsStable(configBasedUrl);
         (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce(
           fetchedRows([{ id: '1', brew_name: 'Test' }])
         );
-        (beerRepository.insertMany as jest.Mock).mockResolvedValueOnce(undefined);
         (setPreference as jest.Mock).mockResolvedValue(undefined);
 
         const result = await fetchAndUpdateAllBeers();
 
         expect(result.success).toBe(true);
+        expect(result.dataUpdated).toBe(true);
         expect(fetchBeersFromAPI).toHaveBeenCalled();
+        expect(beerRepository.insertManyUnsafe).toHaveBeenCalled();
       });
 
       it('should respect config network settings for timeout handling', async () => {
