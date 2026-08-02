@@ -184,6 +184,15 @@ Tasted Beers: ${lastMyBeersRefresh ? new Date(parseInt(lastMyBeersRefresh)).toLo
               await clearSessionData();
               console.log('Cleared session data');
 
+              // Unlocked, deliberately: this writes '', not a new store URL.
+              // `LoginWebView.tsx`'s gate-open bursts take
+              // `databaseLockManager` because a taplist writer's
+              // check-then-commit (`dataUpdateService.ts`) is only safe from a
+              // login racing it in if THAT write can't land mid-hold — but the
+              // guard already treats '' as "changed" and abandons, so racing
+              // to '' unlocked is safe today. If this ever writes a real store
+              // URL instead, it needs the same lock, or it reopens the exact
+              // gap the login-path fix closed.
               await setPreference('all_beers_api_url', '', 'API endpoint for fetching all beers');
               await setPreference(
                 'my_beers_api_url',

@@ -9,6 +9,14 @@ import { setPreference } from '@/src/database/preferences';
 import { commitTaplistWrite } from '@/src/services/taplistEtag';
 import { saveSessionData, extractSessionDataFromResponse } from '@/src/api/sessionManager';
 import { handleVisitorLogin } from '@/src/api/authService';
+// Deliberately NOT mocked. The behaviour under test — that the gate-open
+// write genuinely queues behind a concurrent lock holder rather than merely
+// running after it in program order — only exists in the real FIFO queue.
+// The passthrough mock used elsewhere in this codebase
+// (`jest.fn(async (_name, task) => task())`) always resolves as a plain
+// function call, so a test built on it cannot tell "wrapped in a lock" from
+// "not wrapped at all" apart — the exact gap this suite exists to close.
+import { databaseLockManager } from '@/src/database/DatabaseLockManager';
 
 // Test URL constants - prefixed with 'mock' to allow use in jest.mock() factory
 const mockTestBaseUrl = 'https://test.beerknurd.com';
@@ -184,6 +192,10 @@ describe('LoginWebView', () => {
 
   afterEach(() => {
     jest.clearAllMocks();
+    // Guards every test in the file, not just the ones below that take the
+    // lock deliberately: a test that fails mid-hold would otherwise leave the
+    // singleton locked for every test that runs after it in this file.
+    databaseLockManager.resetForTesting();
   });
 
   describe('Component Rendering', () => {
@@ -742,6 +754,57 @@ describe('LoginWebView', () => {
       expect(alertSpy).not.toHaveBeenCalled();
       expect(mockOnLoginCancel).not.toHaveBeenCalled();
     });
+
+    it('queues the new store URL behind a concurrent taplist writer holding the database lock', async () => {
+      // Proves the gate-open burst (:364-378) genuinely shares
+      // `databaseLockManager` with the taplist writers, not merely that it
+      // runs after them in program order. A taplist writer's
+      // check-then-commit sequence (`dataUpdateService.ts`) is only safe from
+      // this login racing it in if the login's authoritative
+      // `all_beers_api_url` write cannot land while that writer holds the
+      // lock — so this simulates exactly that: a held lock, a login arriving
+      // while it's held, and proof the write is deferred rather than
+      // interleaved.
+      let releaseTaplistHold: () => void = () => {};
+      const taplistHold = databaseLockManager.withDatabaseLock(
+        'all-beers-write',
+        () =>
+          new Promise<void>(resolve => {
+            releaseTaplistHold = resolve;
+          })
+      );
+      expect(databaseLockManager.isLocked()).toBe(true);
+
+      const { getByTestId } = renderLogin();
+      fireEvent(getByTestId('webview-mock'), 'onMessage', memberLoginMessage);
+
+      // Deterministic rather than a tick count: the login's acquire call
+      // enqueues synchronously the moment the handler reaches it, so waiting
+      // for queue length 1 is waiting for "the handler tried to write the new
+      // store URL and was made to wait" — not for an arbitrary amount of
+      // event-loop churn.
+      await waitFor(() => {
+        expect(databaseLockManager.getQueueLength()).toBe(1);
+      });
+
+      expect(setPreference).not.toHaveBeenCalledWith(
+        'all_beers_api_url',
+        `${mockFsbsBaseUrl}/bk-store-json.php?sid=67`,
+        'API endpoint for fetching all beers'
+      );
+
+      releaseTaplistHold();
+      await taplistHold;
+
+      await waitFor(() => {
+        expect(setPreference).toHaveBeenCalledWith(
+          'all_beers_api_url',
+          `${mockFsbsBaseUrl}/bk-store-json.php?sid=67`,
+          'API endpoint for fetching all beers'
+        );
+      });
+      expect(mockOnLoginSuccess).toHaveBeenCalled();
+    });
   });
 
   describe('WebView Message Handling - Visitor Login', () => {
@@ -1011,6 +1074,65 @@ describe('LoginWebView', () => {
           expect.any(Array)
         );
       });
+    });
+
+    it('queues the new store URL behind a concurrent taplist writer holding the database lock', async () => {
+      // Visitor mirror of the member-path test above. `handleVisitorLogin`'s
+      // network call completes before any preference write starts here, so
+      // there is no SecureStore-shaped hazard to worry about — this is purely
+      // proving the gate-open burst (:462-479) shares the real lock too.
+      (handleVisitorLogin as jest.Mock).mockResolvedValue({ success: true });
+
+      let releaseTaplistHold: () => void = () => {};
+      const taplistHold = databaseLockManager.withDatabaseLock(
+        'all-beers-write',
+        () =>
+          new Promise<void>(resolve => {
+            releaseTaplistHold = resolve;
+          })
+      );
+
+      const { getByTestId } = render(
+        <LoginWebView
+          visible={true}
+          onLoginSuccess={mockOnLoginSuccess}
+          onLoginCancel={mockOnLoginCancel}
+          onRefreshData={mockOnRefreshData}
+        />
+      );
+
+      fireEvent(getByTestId('webview-mock'), 'onMessage', {
+        nativeEvent: {
+          data: JSON.stringify({
+            type: 'VISITOR_LOGIN',
+            cookies: { store__id: '67', store: 'Test Store' },
+            rawCookies: 'store__id=67; store=Test Store',
+            url: config.api.getFullUrl('visitor'),
+          }),
+        },
+      });
+
+      await waitFor(() => {
+        expect(databaseLockManager.getQueueLength()).toBe(1);
+      });
+
+      expect(setPreference).not.toHaveBeenCalledWith(
+        'all_beers_api_url',
+        `${mockFsbsBaseUrl}/bk-store-json.php?sid=67`,
+        'API endpoint for fetching all beers'
+      );
+
+      releaseTaplistHold();
+      await taplistHold;
+
+      await waitFor(() => {
+        expect(setPreference).toHaveBeenCalledWith(
+          'all_beers_api_url',
+          `${mockFsbsBaseUrl}/bk-store-json.php?sid=67`,
+          'API endpoint for fetching all beers'
+        );
+      });
+      expect(mockOnLoginSuccess).toHaveBeenCalled();
     });
   });
 
