@@ -88,7 +88,7 @@ name: "Migration Lock - Schema Migrations Release the Master Lock"
 # the assertions after it cannot distinguish a completed refresh from a wedged
 # one. Kept because the write itself still exercises the lock path on device.
 
-- tapOn: "All Beer"
+- tapOn: "All Beers"
 - waitForAnimationToEnd
 
 - assertVisible:
@@ -144,7 +144,7 @@ name: "Migration Lock - Schema Migrations Release the Master Lock"
       - pressKey: Escape
       - waitForAnimationToEnd
 
-- tapOn: "All Beer"
+- tapOn: "All Beers"
 - waitForAnimationToEnd
 
 - assertVisible:

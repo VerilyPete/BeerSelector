@@ -18,7 +18,7 @@ name: "Beer List - Item Expansion and Interaction"
       - waitForAnimationToEnd
 
 # Step 2: Navigate to All Beer tab
-- tapOn: "All Beer"
+- tapOn: "All Beers"
 - waitForAnimationToEnd
 
 # Step 3: Wait for beer list to load

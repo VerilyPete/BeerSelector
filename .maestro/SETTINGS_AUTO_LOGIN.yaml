@@ -751,7 +751,7 @@ name: "Settings - Auto-Login & Advanced Features"
     text: "All Beer"
 
 # Verify app is fully functional
-- tapOn: "All Beer"
+- tapOn: "All Beers"
 - waitForAnimationToEnd
 
 # Verify beer list loads

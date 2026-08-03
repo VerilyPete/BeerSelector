@@ -242,7 +242,7 @@ name: "Offline Mode - Local Data Access and Offline-First Architecture"
 # ========================================
 
 # Step 37: Navigate back to All Beer tab
-- tapOn: "All Beer"
+- tapOn: "All Beers"
 - waitForAnimationToEnd
 
 # Step 38: Verify beer list still displays cached data

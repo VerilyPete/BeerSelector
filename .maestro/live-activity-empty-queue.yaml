@@ -181,7 +181,7 @@ name: "Live Activity - Empty Queue Handling"
 # ========================================
 
 # Navigate through tabs to verify app stability
-- tapOn: "All Beer"
+- tapOn: "All Beers"
 - waitForAnimationToEnd
 - assertVisible:
     id: "all-beers-container"

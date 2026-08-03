@@ -30,7 +30,7 @@ name: "Data Refresh - Pull-to-Refresh and Manual Refresh"
 # ========================================
 
 # Step 3: Navigate to All Beer tab
-- tapOn: "All Beer"
+- tapOn: "All Beers"
 - waitForAnimationToEnd
 
 # Step 4: Verify initial beer list is visible
@@ -135,7 +135,7 @@ name: "Data Refresh - Pull-to-Refresh and Manual Refresh"
 # ========================================
 
 # Step 23: Go back to All Beer tab for duplicate prevention test
-- tapOn: "All Beer"
+- tapOn: "All Beers"
 - waitForAnimationToEnd
 
 # Step 24: Perform first refresh
@@ -208,7 +208,7 @@ name: "Data Refresh - Pull-to-Refresh and Manual Refresh"
     text: "Refresh All Beer Data"
 
 # Step 38: Navigate back to beer list to verify data updated
-- tapOn: "All Beer"
+- tapOn: "All Beers"
 - waitForAnimationToEnd
 
 # Step 39: Verify beer list is still functioning

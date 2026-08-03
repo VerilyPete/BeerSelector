@@ -21,7 +21,7 @@ name: "Beer List - Rendering and Scrolling"
       - waitForAnimationToEnd
 
 # Step 3: Navigate to All Beer tab (if not already there)
-- tapOn: "All Beer"
+- tapOn: "All Beers"
 - waitForAnimationToEnd
 
 # Step 4: Verify beer list container is visible

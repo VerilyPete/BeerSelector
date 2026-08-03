@@ -13,6 +13,18 @@
 # with "Element not found". Two separate things are true, and conflating them
 # would repeat the mistake this round exists to correct:
 #
+#   0. EXCEPTION — THIS FLOW IS THE ONE THAT DOES NOT. The block below was
+#      written once and pasted into all twelve headers, and it asserts
+#      `clearState: true` of each. This file uses a bare `- launchApp` and is
+#      the only one of the twelve with no clearState at all. Point 1 below is
+#      therefore FALSE OF THIS FILE, and the fix it prescribes — "configure the
+#      app first, keeping clearState: true" — is written against a precondition
+#      this flow does not have. Whatever makes this one red, it is not the
+#      state wipe. Diagnose it separately.
+#      (Recorded rather than quietly deleted: a claim asserted uniformly across
+#      twelve files by copy-paste, and false in one of them, is the exact
+#      defect shape this whole round is about.)
+#
 #   1. ESTABLISHED, machine-independent: this flow does
 #      `launchApp: clearState: true`, and 11-settings-first-launch.yaml asserts
 #      that after a state wipe the app redirects to Settings and refuses to
@@ -26,10 +38,16 @@
 #      the flow passes once the app is configured is UNKNOWN and untested.
 #
 # A dead selector was also fixed on the way: this flow tapped "All Beers Tab" /
-# "Beerfinder Tab" / "Tasted Brews Tab", none of which exist. The real titles
-# are "All Beer", "Beerfinder" and "Tasted Brews" (app/(tabs)/_layout.tsx, and
-# 52 uses across the registered flows). That correction is verified by source,
-# not by a green run.
+# "Beerfinder Tab" / "Tasted Brews Tab", none of which exist. The replacements
+# are "All Beer" / "Beerfinder" / "Tasted Brews".
+#
+# CORRECTION: the justification first written here cited
+# app/(tabs)/_layout.tsx's `Tabs.Screen options={{title:...}}` values. That
+# citation was WRONG. The custom TerminalTabBar renders TAB_CONFIGS labels —
+# "HOME"/"BEERS"/"FINDER"/"TASTED" — and never reads options.title. The
+# replacements are still right, but for a different reason: they match the Home
+# tab's NavigationCards and the per-screen ScanlineTitle headers. Point 5 in
+# README.md has the real mapping and what remains unverified.
 #
 # Fixing the precondition: configure the app first, keeping clearState: true.
 # Do NOT just flip to clearState: false — the skeleton these flows assert on is
@@ -48,7 +66,7 @@ appId: org.verily.FSbeerselector
       - pressKey: Escape
       - waitForAnimationToEnd
 
-- tapOn: "All Beer"
+- tapOn: "All Beers"
 
 # Wait for initial load
 - waitForAnimationToEnd
