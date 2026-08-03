@@ -147,7 +147,7 @@ alternatives if it does not hold.
 
 ## Test Suite Overview
 
-**Total Tests:** 19 test files
+**Flow files:** 39 (**21** registered in `config.yaml`; the rest run nowhere — see Wave 7.2)
 **Total Scenarios:** 100+ test scenarios
 **Coverage:** Core user flows, error handling, offline support
 
