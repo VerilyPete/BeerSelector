@@ -152,7 +152,7 @@ name: "Live Activity - Logout Cleanup"
 # but we can verify the app state is clean
 
 # Verify app is responsive
-- tapOn: "All Beer"
+- tapOn: "All Beers"
 - waitForAnimationToEnd
 
 # In logged-out state, All Beer should still be accessible
@@ -179,7 +179,7 @@ name: "Live Activity - Logout Cleanup"
 # ========================================
 
 # Verify the app is fully functional in logged-out state
-- tapOn: "All Beer"
+- tapOn: "All Beers"
 - waitForAnimationToEnd
 
 # Test basic functionality

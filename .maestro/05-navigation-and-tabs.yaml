@@ -17,7 +17,7 @@ name: "Navigation - Tab Switching and State Persistence"
       - waitForAnimationToEnd
 
 # Step 2: Start on Home/All Beer tab
-- tapOn: "All Beer"
+- tapOn: "All Beers"
 - waitForAnimationToEnd
 
 # Test Basic Tab Navigation
@@ -44,7 +44,7 @@ name: "Navigation - Tab Switching and State Persistence"
 - waitForAnimationToEnd
 
 # Step 8: Navigate back to All Beer tab
-- tapOn: "All Beer"
+- tapOn: "All Beers"
 - waitForAnimationToEnd
 
 # Step 9: Verify All Beer screen is displayed
@@ -85,7 +85,7 @@ name: "Navigation - Tab Switching and State Persistence"
 - waitForAnimationToEnd
 
 # Step 16: Navigate back to All Beer
-- tapOn: "All Beer"
+- tapOn: "All Beers"
 - waitForAnimationToEnd
 
 # Step 17: Verify search is still applied
@@ -117,13 +117,13 @@ name: "Navigation - Tab Switching and State Persistence"
 - tapOn: "Beerfinder"
 - waitForAnimationToEnd
 
-- tapOn: "All Beer"
+- tapOn: "All Beers"
 - waitForAnimationToEnd
 
 - tapOn: "Tasted Brews"
 - waitForAnimationToEnd
 
-- tapOn: "All Beer"
+- tapOn: "All Beers"
 - waitForAnimationToEnd
 
 # Step 23: Verify All Beer screen is still functional
@@ -158,7 +158,7 @@ name: "Navigation - Tab Switching and State Persistence"
 - waitForAnimationToEnd
 
 # Step 28: Switch back to All Beer
-- tapOn: "All Beer"
+- tapOn: "All Beers"
 - waitForAnimationToEnd
 
 # Step 29: Verify list is displayed (refresh should have completed or been canceled)
@@ -174,7 +174,7 @@ name: "Navigation - Tab Switching and State Persistence"
     commands:
       - tapOn: "Beerfinder"
       - waitForAnimationToEnd
-      - tapOn: "All Beer"
+      - tapOn: "All Beers"
       - waitForAnimationToEnd
 
 # Step 31: Verify app is still responsive

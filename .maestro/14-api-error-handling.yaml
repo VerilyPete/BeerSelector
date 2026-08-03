@@ -121,7 +121,7 @@ name: "API Error Handling - Invalid URLs, Auth Errors, and Data Validation"
 # ========================================
 
 # Step 17: Navigate to All Beer tab
-- tapOn: "All Beer"
+- tapOn: "All Beers"
 - waitForAnimationToEnd
 
 # Step 18: Verify beer list or empty state
@@ -156,7 +156,7 @@ name: "API Error Handling - Invalid URLs, Auth Errors, and Data Validation"
 # ========================================
 
 # Step 24: Test search on potentially empty data
-- tapOn: "All Beer"
+- tapOn: "All Beers"
 - waitForAnimationToEnd
 
 # Step 25: Attempt search
@@ -267,7 +267,7 @@ name: "API Error Handling - Invalid URLs, Auth Errors, and Data Validation"
     text: "Refresh All Beer Data"
 
 # Step 42: Navigate back to beer list
-- tapOn: "All Beer"
+- tapOn: "All Beers"
 - waitForAnimationToEnd
 
 # Step 43: Verify app stability after potential errors
@@ -310,7 +310,7 @@ name: "API Error Handling - Invalid URLs, Auth Errors, and Data Validation"
 # ========================================
 
 # Step 47: Return to All Beer tab
-- tapOn: "All Beer"
+- tapOn: "All Beers"
 - waitForAnimationToEnd
 
 # Step 48: Verify final state stable

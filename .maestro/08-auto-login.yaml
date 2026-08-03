@@ -98,7 +98,7 @@ name: "Auto-Login - Session Persistence and Recovery"
 # This confirms auto-login restored full member access
 
 # Navigate back to All Beer
-- tapOn: "All Beer"
+- tapOn: "All Beers"
 - waitForAnimationToEnd
 
 # ======================
@@ -302,7 +302,7 @@ name: "Auto-Login - Session Persistence and Recovery"
 
 # Navigate to All Beer
 - tapOn:
-    text: "All Beer"
+    text: "All Beers"
 - waitForAnimationToEnd
 
 # Verify refreshed data is displayed

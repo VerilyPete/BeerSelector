@@ -26,7 +26,7 @@ tags:
 
 # Go to All Beers tab (if not already there)
 - tapOn:
-    text: "All Beer"
+    text: "All Beers"
     retryTapIfNoChange: false
 
 # Verify we can see beer list when online
@@ -86,7 +86,7 @@ tags:
 - assertVisible: "No Internet Connection"
 
 # Go back to All Beer
-- tapOn: "All Beer"
+- tapOn: "All Beers"
 - waitForAnimationToEnd
 
 # Disable airplane mode to go back online

@@ -39,7 +39,7 @@ name: "Live Activity - Deep Link Cold Launch & Tab Bar Responsiveness"
 
 # REGRESSION GUARD: the bug was an inert tab bar. Tapping another tab must
 # actually navigate (no haptic / no nav was the failure signature).
-- tapOn: "All Beer"
+- tapOn: "All Beers"
 - waitForAnimationToEnd
 - assertVisible:
     id: "all-beers-container"

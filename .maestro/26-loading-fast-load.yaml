@@ -26,10 +26,16 @@
 #      the flow passes once the app is configured is UNKNOWN and untested.
 #
 # A dead selector was also fixed on the way: this flow tapped "All Beers Tab" /
-# "Beerfinder Tab" / "Tasted Brews Tab", none of which exist. The real titles
-# are "All Beer", "Beerfinder" and "Tasted Brews" (app/(tabs)/_layout.tsx, and
-# 52 uses across the registered flows). That correction is verified by source,
-# not by a green run.
+# "Beerfinder Tab" / "Tasted Brews Tab", none of which exist. The replacements
+# are "All Beer" / "Beerfinder" / "Tasted Brews".
+#
+# CORRECTION: the justification first written here cited
+# app/(tabs)/_layout.tsx's `Tabs.Screen options={{title:...}}` values. That
+# citation was WRONG. The custom TerminalTabBar renders TAB_CONFIGS labels —
+# "HOME"/"BEERS"/"FINDER"/"TASTED" — and never reads options.title. The
+# replacements are still right, but for a different reason: they match the Home
+# tab's NavigationCards and the per-screen ScanlineTitle headers. Point 5 in
+# README.md has the real mapping and what remains unverified.
 #
 # Fixing the precondition: configure the app first, keeping clearState: true.
 # Do NOT just flip to clearState: false — the skeleton these flows assert on is

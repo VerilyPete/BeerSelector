@@ -141,7 +141,7 @@ name: "Settings - First Launch Configuration Flow"
 # ========================================
 
 # Step 24: Verify All Beer tab is accessible
-- tapOn: "All Beer"
+- tapOn: "All Beers"
 - waitForAnimationToEnd
 
 # Step 25: Verify beer list loads in visitor mode
@@ -252,7 +252,7 @@ name: "Settings - First Launch Configuration Flow"
     text: "Home"
 
 # Step 46: Navigate to All Beer tab
-- tapOn: "All Beer"
+- tapOn: "All Beers"
 - waitForAnimationToEnd
 
 # Step 47: Verify beer data is visible
@@ -304,7 +304,7 @@ name: "Settings - First Launch Configuration Flow"
 # ========================================
 
 # Step 54: Verify app is fully functional after first launch
-- tapOn: "All Beer"
+- tapOn: "All Beers"
 - waitForAnimationToEnd
 
 # Step 55: Verify search functionality works

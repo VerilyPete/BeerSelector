@@ -17,7 +17,7 @@ name: "Beer List - Empty States and Edge Cases"
       - waitForAnimationToEnd
 
 # Step 2: Navigate to All Beer tab
-- tapOn: "All Beer"
+- tapOn: "All Beers"
 - waitForAnimationToEnd
 
 # Test Empty Search Results

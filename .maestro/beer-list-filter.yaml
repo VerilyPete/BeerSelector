@@ -11,7 +11,7 @@ appId: org.verily.FSbeerselector
       - pressKey: Escape
       - waitForAnimationToEnd
 
-- tapOn: "All Beer"
+- tapOn: "All Beers"
 - waitForAnimationToEnd
 
 # Test filter toggle responsiveness

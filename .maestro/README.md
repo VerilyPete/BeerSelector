@@ -82,6 +82,67 @@ maestro --version   # must print 2.4.0 to match CI
 older CLI stopped parsing when Maestro moved on, and nobody noticed because the
 pipeline was already failing earlier for a different reason.
 
+**5. Tapping a tab by its title is not what it looks like, and may not work
+after the first hop.**
+
+This one corrects an earlier claim made in this README's own history. Flows tap
+`"All Beer"`, `"Beerfinder"` and `"Tasted Brews"`, and those were once
+justified by citing the `Tabs.Screen options={{ title: ... }}` values in
+`app/(tabs)/_layout.tsx`. **That citation was wrong.** The custom
+`TerminalTabBar` renders `TAB_CONFIGS` labels — `HOME`, `BEERS`, `FINDER`,
+`TASTED` — and never reads `options.title`. Those titles are dead config; no
+tab bar item carries the text any flow taps.
+
+Where the strings actually live:
+
+| String                                            | Real source                                                      |
+| ------------------------------------------------- | ---------------------------------------------------------------- |
+| `"All Beers"` / `"Beerfinder"` / `"Tasted Brews"` | Home tab `NavigationCard` titles, `app/(tabs)/index.tsx:199-225` |
+| `"All Beer"`                                      | `ScanlineTitle` on `beerlist.tsx`                                |
+| `"Beerfinder"`                                    | `ScanlineTitle` on `mybeers.tsx:60`                              |
+| `"Tasted Brews"`                                  | `ScanlineTitle` on `tastedbrews.tsx`                             |
+
+**Maestro anchors the text regex to the element's WHOLE text.** A bare
+substring does not match. Verified against 2.4.0 on a booted simulator with
+"Settings" on screen:
+
+| selector       | result       |
+| -------------- | ------------ |
+| `"Setting"`    | **no match** |
+| `"Setting.*"`  | matches      |
+| `".*etting.*"` | matches      |
+| `"Settings"`   | matches      |
+
+An earlier version of this point claimed the opposite — that `"All Beer"`
+matches the `"All Beers"` card because matching is by regex. The premise is
+true and the inference was false, and 16 selectors were changed on the strength
+of it. Metacharacters work; substrings do not.
+
+Consequences, since they are not symmetrical:
+
+- `"Beerfinder"` and `"Tasted Brews"` **are** the exact `NavigationCard`
+  titles, so those taps have a real target from Home.
+- `"All Beer"` is **not**. The card is `"All Beers"` (plural); the only element
+  whose whole text is `"All Beer"` is the `ScanlineTitle` on `beerlist.tsx:26`
+  — the header of the screen the tap is trying to _reach_. So use `"All Beers"`
+  to navigate and `"All Beer"` only to assert arrival. They are different
+  strings for different jobs, which is exactly how this went wrong.
+
+A **second** tab tap, issued after leaving Home, is the open question.
+React Navigation detaches inactive screens by default
+(`detachInactiveScreens`, and `ResourceSavingView` sets `display: none`), which
+removes Home's cards from the hierarchy — so there may be nothing left to
+match. **This is unverified in both directions.** It is source-level reasoning;
+no configured simulator was available to run it (see 7.3 in
+`plans/review-remediation-round-8.md`).
+
+Ten registered flows depend on this — `05-navigation-and-tabs.yaml` alone taps
+14 times — so if the multi-hop assumption is false, it is false for flows that
+predate this work and are presumed to pass. Establish it on a configured
+simulator before trusting any multi-hop flow, new or old. Navigating via Home
+between hops, or matching `testID="nav-*"` on the cards, are the obvious
+alternatives if it does not hold.
+
 ---
 
 ## Test Suite Overview
