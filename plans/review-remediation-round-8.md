@@ -882,3 +882,55 @@ four spurious failures. Caught by diffing before interpreting rather than after.
 Attributable either to an Edit tool re-applying from a stale buffer or to the
 concurrent writer; the two are indistinguishable after the fact, which is itself
 the argument for the hash-fenced protocol.
+
+---
+
+# Round 10 — review of the fixes
+
+Findings 9.1, 9.2, 9.4, 9.6, 9.14, 9.15, 9.18 and 9.20 were fixed in
+`5d9def70..a1c3b269`. The same reviewers were asked to check the fixes, which
+were produced from their own findings.
+
+## Codex — seams and deadlock: clean
+
+Deadlock was the real risk in this batch: 9.14 makes three previously-unlocked
+`setPreference` calls take `databaseLockManager`, and 9.15 extends an existing
+hold across two more writes, against a **single global non-reentrant mutex**.
+
+Traced all 20 `withDatabaseLock` sites for reentrancy; no path holds the lock
+and then transitively re-acquires it. The load-bearing checks, each
+re-verified here in the main session rather than accepted:
+
+- `preferences.ts` and `taplistEtag.ts` contain **zero** lock references, so
+  every wrapper 9.14 added wraps a genuinely lock-free leaf.
+- `lockHeld` is a bare boolean with no holder identity — non-reentrant
+  confirmed, so a nested acquisition would hang to the 15s force-release
+  rather than pass through.
+- LoginWebView's four acquisitions are sequential, not nested (4 sites: two
+  gate-close added by 9.14, two gate-open pre-existing).
+- The write functions called from inside a hold are all the `Unsafe`,
+  caller-must-hold-lock variants by construction.
+
+## Worth recording: 9.6's guard is a NO-OP at one of its sites
+
+At `fetchAndUpdateAllBeers`, `if (!apiUrl)` returns early before the fetch
+starts, so `fetchedFor` is always truthy by the time
+`taplistConfigurationHeld` runs there. 9.6's empty-config rejection therefore
+does nothing at that call site — it is belt-and-suspenders, not the guard that
+protects it.
+
+It does real work on the sequential path (`prepareAllBeers` / `writeAllBeers`),
+which tolerates an empty configuration and passes `storeId: null` with no
+`!apiUrl` guard of its own. That is exactly where the defect was found.
+
+Recorded because a future reader could otherwise see the guard at the top of
+`taplistConfigurationHeld` and reason that it protects the direct path. It does
+not; the early return does. That is the shape of half the defects in round 9 —
+a guarantee attributed to the wrong mechanism.
+
+## CI (9.4) — sound
+
+`\|` alternation is a GNU grep BRE extension and `ubuntu-latest` ships GNU
+grep. `<error` cannot false-match `errors="0"` (needs `<` adjacent) and — a
+case not previously checked — cannot match the closing tag `</error>` either.
+No previously-gating branch became non-gating or vice versa.
