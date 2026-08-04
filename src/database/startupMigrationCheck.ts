@@ -19,6 +19,41 @@ export type StartupMigrationOutcome =
 /** Receives 0-100 during a migration, then `null` when it finishes or fails. */
 export type StartupMigrationProgress = (progress: number | null) => void;
 
+/** What to show the user, or `null` to say nothing. */
+export type StartupMigrationAlert = { readonly title: string; readonly message: string };
+
+/**
+ * What a person should be told about a startup migration outcome.
+ *
+ * A pure function, and in this module rather than in the component, because
+ * mutation testing found the alternative unguarded: deleting the entire
+ * `Alert.alert('Database Update Failed', …)` block from `app/_layout.tsx`
+ * changed no test result anywhere in the suite. `runStartupMigrationCheck`
+ * reported `migration-failed` faithfully and nothing checked that the caller
+ * did anything with it — the extraction had moved the logic somewhere testable
+ * and left the DECISION behind, in the one place this repo cannot test.
+ *
+ * So the decision moves too, and `_layout.tsx` is reduced to rendering whatever
+ * this returns. Deleting an arm here fails a test.
+ *
+ * `version-unreadable` returning null is a deliberate answer, not an omission.
+ * Not aborting startup is the whole point of containing that error, and an
+ * alert about a transient database read the user can do nothing about — on a
+ * launch that is otherwise about to succeed — would be noise. Previously no
+ * caller consumed that status at all, so the same silence was in force but
+ * nobody had decided on it.
+ */
+export function startupMigrationAlert(
+  outcome: StartupMigrationOutcome
+): StartupMigrationAlert | null {
+  return outcome.status === 'migration-failed'
+    ? {
+        title: 'Database Update Failed',
+        message: 'The app may not function correctly. Please restart the app.',
+      }
+    : null;
+}
+
 /**
  * The post-setup schema check that used to live inline in `app/_layout.tsx`.
  *

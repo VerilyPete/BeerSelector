@@ -28,7 +28,10 @@ import {
 } from '@/src/services/dataUpdateService';
 import { getPreference, setPreference, areApiUrlsConfigured } from '@/src/database/preferences';
 import { getDatabase, closeDatabaseConnection } from '@/src/database/connection';
-import { runStartupMigrationCheck } from '@/src/database/startupMigrationCheck';
+import {
+  runStartupMigrationCheck,
+  startupMigrationAlert,
+} from '@/src/database/startupMigrationCheck';
 import { AppProvider } from '@/context/AppContext';
 import { NetworkProvider } from '@/context/NetworkContext';
 import { OperationQueueProvider } from '@/context/OperationQueueContext';
@@ -178,12 +181,14 @@ export default function RootLayout() {
           const db = await getDatabase();
           const migrationOutcome = await runStartupMigrationCheck(db, setMigrationProgress);
 
-          if (migrationOutcome.status === 'migration-failed') {
-            Alert.alert(
-              'Database Update Failed',
-              'The app may not function correctly. Please restart the app.',
-              [{ text: 'OK' }]
-            );
+          // Which outcomes deserve an alert, and what it says, is decided by
+          // `startupMigrationAlert` — a pure function with tests. It lived here
+          // as an inline `if` until mutation testing showed the entire block
+          // could be deleted without failing anything, this being a component
+          // the repo cannot test. All that is left here is rendering.
+          const alert = startupMigrationAlert(migrationOutcome);
+          if (alert) {
+            Alert.alert(alert.title, alert.message, [{ text: 'OK' }]);
           }
 
           // Check if API URLs are set using centralized helper
