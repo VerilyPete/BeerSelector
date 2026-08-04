@@ -456,6 +456,25 @@ async function readTaplistConfiguration(): Promise<TaplistConfiguration> {
  * writer holds the lock"), which was written red against the unlocked writes.
  */
 async function taplistConfigurationHeld(fetchedFor: TaplistConfiguration): Promise<boolean> {
+  // An empty `fetchedFor` can never authorise a commit, and is rejected before
+  // the comparison rather than by it.
+  //
+  // `''` is three different states wearing one value: the read failed
+  // (`getPreference` swallows and returns null), the app was never configured,
+  // or the configuration was deliberately cleared. Equality cannot separate
+  // them, so `'' === ''` used to PASS — and the caller that matters,
+  // `prepareAllBeers`, deliberately tolerates the empty case and passes
+  // `storeId: null`, so it never had a `!apiUrl` guard of its own the way
+  // `fetchAndUpdateAllBeers` does.
+  //
+  // The damaging path is a FAILED READ, not a cleared config: `fetchBeersFromAPI`
+  // re-reads the preference itself, so it can return real rows for a real store
+  // while this function's caller has no idea which store that was. Committing
+  // them stamps the freshness window for a store nobody established. Rows we
+  // cannot attribute are exactly the rows that must be thrown away.
+  if (!fetchedFor) {
+    return false;
+  }
   return (await readTaplistConfiguration()) === fetchedFor;
 }
 
