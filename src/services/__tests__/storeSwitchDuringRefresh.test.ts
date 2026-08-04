@@ -85,9 +85,24 @@ jest.mock('../../database/repositories/RewardsRepository', () => ({
   },
 }));
 
+// Tracks WHO holds the lock while the task runs. A bare passthrough stub can
+// observe that a lock was ACQUIRED but never that work happened INSIDE the
+// hold, and an empty-hold mutant with the guarded work hoisted out satisfies
+// every acquisition-shaped assertion. Mutation testing confirmed that mutant
+// survived the full 2241-test suite at this site.
+let mockLockHolder: string | null = null;
+
 jest.mock('../../database/DatabaseLockManager', () => ({
   databaseLockManager: {
-    withDatabaseLock: jest.fn(async (_name: string, task: () => Promise<unknown>) => task()),
+    withDatabaseLock: jest.fn(async (name: string, task: () => Promise<unknown>) => {
+      mockLockHolder = name;
+      try {
+        return await task();
+      } finally {
+        mockLockHolder = null;
+      }
+    }),
+    getCurrentOperation: () => mockLockHolder,
   },
 }));
 
@@ -289,6 +304,27 @@ describe('a store switch between fetch and commit', () => {
 
       expect(beerRepository.insertManyUnsafe).toHaveBeenCalled();
       expect(writtenKeys()).toContain('all_beers_last_check');
+    });
+
+    it('commits the rows while holding the write lock, not merely after taking it', async () => {
+      // The containment half of the guard. Every other test here asserts that
+      // a store switch is DETECTED; none asserts that the detection and the
+      // commit happen inside one hold. A hold whose body is empty, with the
+      // guard and the insert hoisted out after it, passes all of them — the
+      // lock is still acquired, the guard still runs, the rows still land —
+      // while reintroducing the exact window the lock exists to close.
+      const holderDuringInsert: (string | null)[] = [];
+      (beerRepository.insertManyUnsafe as jest.Mock).mockImplementation(async () => {
+        holderDuringInsert.push(mockLockHolder);
+      });
+
+      await sequentialRefreshAllData();
+
+      // 'refresh-all-data-write', not 'all-beers-write': the sequential path
+      // holds one lock across the whole refresh rather than one per source.
+      // The first draft of this test asserted the per-source name and failed —
+      // the expectation was wrong, not the code.
+      expect(holderDuringInsert).toEqual(['refresh-all-data-write']);
     });
 
     it('writes when the same store is re-selected', async () => {
