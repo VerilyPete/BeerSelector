@@ -1070,16 +1070,32 @@ export async function fetchAndUpdateAllBeers(): Promise<DataUpdateResult> {
       await commitTaplistWrite({ kind: 'cleared' });
       await beerRepository.insertManyUnsafe(beersToInsert);
       await commitTaplistWrite(usedProxy ? { kind: 'proxy', etag } : { kind: 'fallback' });
+
+      // Stamped INSIDE the hold, with the guard and the commit it describes.
+      // These were outside it, one statement after the hold returned — and the
+      // login's gate-open burst takes this same lock, so it runs the instant
+      // the hold releases, which is exactly the gap these two statements used
+      // to sit in. The stamp then landed under the NEW store's configuration.
+      //
+      // This is the same principle the 304 arm above already applies, quoted
+      // from the commit that applied it: "Left outside, it reintroduces the
+      // same window one statement later." Two of the three arms followed it;
+      // this one did not.
+      //
+      // It is also the half of the store-switch race that actually persists.
+      // The proxy keys its validator per store, so a cross-store ETag misses
+      // and returns a 200 and the rows correct themselves on the next refresh.
+      // A freshness stamp does not self-correct — it suppresses the automatic
+      // refresh for twelve hours, so the user sits on the previous store's
+      // taplist until something manual happens.
+      await setPreference('all_beers_last_update', new Date().toISOString());
+      await setPreference('all_beers_last_check', new Date().toISOString());
       return true;
     });
 
     if (!committed) {
       return abandonedAfterStoreSwitch('fetchAndUpdateAllBeers');
     }
-
-    // Update the last update timestamp
-    await setPreference('all_beers_last_update', new Date().toISOString());
-    await setPreference('all_beers_last_check', new Date().toISOString());
 
     console.log(
       `Updated all beers data with ${validationResult.validBeers.length} valid beers (skipped ${validationResult.invalidBeers.length} invalid)`
