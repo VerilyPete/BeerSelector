@@ -422,6 +422,28 @@ async function readTaplistConfiguration(): Promise<TaplistConfiguration> {
   //
   // Impact is bounded: no timestamp is stamped on the abandon path, so the next
   // refresh retries rather than being suppressed for twelve hours.
+  //
+  // BUT THE BLAST RADIUS IS ONE FUNCTION LARGER THAN THE ABOVE STATES. Every
+  // sentence so far describes the WRITE guard. The same `''` is also read at
+  // the START of a refresh, and there it is worse, because it corrupts the
+  // fetch before there is anything to guard:
+  //
+  //   `prepareAllBeers` reads this, derives `storeId = null` from `''`, and
+  //   `runTaplistFetch` then skips the enrichment proxy entirely — the
+  //   `storeId &&` arm is false — so the app performs a full, non-enriched,
+  //   ETag-less download of the whole taplist. The write guard then abandons
+  //   it, and `abandonedAfterStoreSwitch` reports `success: true`.
+  //
+  // So a single swallowed read spends a complete uncached download and reports
+  // success, with the enrichment the proxy exists to add silently absent. The
+  // `success: true` is justified below for a REAL store switch — "the user is
+  // not the person to tell" — and that justification does not hold when the
+  // cause was a failed read and no store ever changed.
+  //
+  // This bites the sequential path specifically: `fetchAndUpdateAllBeers`
+  // early-returns on `!apiUrl` before fetching, and `prepareAllBeers` has no
+  // such guard. That is the same asymmetry the `unavailableCopy` work found
+  // from the other end.
   return ((await getPreference('all_beers_api_url')) ?? '') as TaplistConfiguration;
 }
 
