@@ -101,7 +101,17 @@ jobs:
           #
           # CANONICAL: the other four copies of this step point here rather
           # than restating the argument.
-          ACTUAL_VERSION=$(maestro --version)
+          # `tail -1`, and analytics silenced, because `maestro --version`
+          # does NOT print only a version. On a fresh runner it emits
+          # "Anonymous analytics enabled. To opt out, set
+          # MAESTRO_CLI_NO_ANALYTICS..." FIRST, and the bare `$(...)` captured
+          # that banner as the version. The comparison below then failed
+          # against every possible pin, so this step exited 1 on every job on
+          # every run — which is why the whole E2E suite was red, on both
+          # workflows, before any simulator or flow was involved.
+          # The env var suppresses the banner; `tail -1` is the belt to its
+          # braces, so a future notice printed on stdout cannot resurrect this.
+          ACTUAL_VERSION=$(MAESTRO_CLI_NO_ANALYTICS=true maestro --version | tail -1)
           if [ "$ACTUAL_VERSION" != "$MAESTRO_VERSION" ]; then
             echo "Error: installed Maestro is '$ACTUAL_VERSION', expected '$MAESTRO_VERSION'"
             exit 1
@@ -302,7 +312,7 @@ jobs:
 
           # Assert the pin actually took — see the comment on this pattern in
           # the "maestro-ios" job's "Install Maestro CLI" step.
-          ACTUAL_VERSION=$(maestro --version)
+          ACTUAL_VERSION=$(MAESTRO_CLI_NO_ANALYTICS=true maestro --version | tail -1)
           if [ "$ACTUAL_VERSION" != "$MAESTRO_VERSION" ]; then
             echo "Error: installed Maestro is '$ACTUAL_VERSION', expected '$MAESTRO_VERSION'"
             exit 1
@@ -476,7 +486,7 @@ jobs:
           # Assert the pin actually took — the checks above prove only that
           # SOME maestro installed, not which version. Full argument at the
           # canonical copy of this step in .github/workflows/maestro-e2e.yml.
-          ACTUAL_VERSION=$(maestro --version)
+          ACTUAL_VERSION=$(MAESTRO_CLI_NO_ANALYTICS=true maestro --version | tail -1)
           if [ "$ACTUAL_VERSION" != "$MAESTRO_VERSION" ]; then
             echo "Error: installed Maestro is '$ACTUAL_VERSION', expected '$MAESTRO_VERSION'"
             exit 1
@@ -699,7 +709,7 @@ jobs:
           # Assert the pin actually took — the checks above prove only that
           # SOME maestro installed, not which version. Full argument at the
           # canonical copy of this step in .github/workflows/maestro-e2e.yml.
-          ACTUAL_VERSION=$(maestro --version)
+          ACTUAL_VERSION=$(MAESTRO_CLI_NO_ANALYTICS=true maestro --version | tail -1)
           if [ "$ACTUAL_VERSION" != "$MAESTRO_VERSION" ]; then
             echo "Error: installed Maestro is '$ACTUAL_VERSION', expected '$MAESTRO_VERSION'"
             exit 1
