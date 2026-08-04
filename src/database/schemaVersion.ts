@@ -22,11 +22,35 @@ export const CREATE_SCHEMA_VERSION_TABLE = `
  * that means "this database has no migrations applied". So a transient fault
  * became a replay of all six migrations against a fully migrated database.
  *
- * Which does not merely waste time. Re-running migration 7 reaches
- * `recordMigration(database, 7)`, `version` is `INTEGER PRIMARY KEY`, and the
- * second insert fails with SQLITE_CONSTRAINT_PRIMARYKEY — so the recovery path
- * from a transient error is a throw, and one the retry in `_layout.tsx` cannot
- * clear because that retry never touches the database.
+ * Which does not merely waste time. `setupTables` takes the pre-versioned
+ * branch and calls `runMigrations(database, 2)`, which starts at
+ * `migrateToVersion3`; on an already-migrated database the `ALTER TABLE ... ADD
+ * COLUMN glass_type` succeeds, because `migrateToVersion4` renamed that column
+ * and freed the name. It then throws at `recordMigration(database, 3)` on the
+ * `INTEGER PRIMARY KEY`, inside `withTransactionAsync`, so it rolls back
+ * cleanly. The retry in `_layout.tsx` does run — this happens inside
+ * `setupDatabase()`, so `dbInitialized` is still false — but it cannot help:
+ * `resetDatabaseState()` clears in-process state only, so the second attempt
+ * meets identical on-disk state and fails identically.
+ *
+ * (An earlier version of this comment said migration 7 and
+ * `recordMigration(database, 7)`, and that the retry "never touches the
+ * database". Both were wrong: it borrowed 9.2's mechanism, which concerns a
+ * device entering at version 7, and applied it to a replay that enters at 2.
+ * Corrected after review.)
+ *
+ * A caveat this comment owes the reader, also from review: at the `setupTables`
+ * call site the catch below is very nearly unreachable, because
+ * `CREATE TABLE IF NOT EXISTS schema_version` runs immediately before the read,
+ * and a fresh install gets 0 from `SELECT MAX(version)` over an empty table
+ * (`{version: null}` → `?? 0`) rather than from the catch. The narrowing still
+ * earns its place — it is what stops a locked or corrupt database being read as
+ * "no migrations applied" — but it guards a narrower door than it first appears
+ * to.
+ *
+ * The other caller, `runStartupMigrationCheck`, deliberately contains the throw
+ * rather than propagating it. See that module for why the two call sites want
+ * opposite things.
  *
  * Matched on the message because expo-sqlite surfaces no structured code here.
  * That is a weaker test than an error code and is deliberately the narrow half:
