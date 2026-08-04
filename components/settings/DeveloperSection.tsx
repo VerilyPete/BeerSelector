@@ -10,6 +10,7 @@ import { getPreference, setPreference } from '@/src/database/preferences';
 import { commitTaplistWrite } from '@/src/services/taplistEtag';
 import { createMockSession } from '@/src/api/mockSession';
 import { clearSessionData } from '@/src/api/sessionManager';
+import { databaseLockManager } from '@/src/database/DatabaseLockManager';
 import SettingsSection from './SettingsSection';
 import SettingsItem from './SettingsItem';
 
@@ -184,16 +185,17 @@ Tasted Beers: ${lastMyBeersRefresh ? new Date(parseInt(lastMyBeersRefresh)).toLo
               await clearSessionData();
               console.log('Cleared session data');
 
-              // Unlocked, deliberately: this writes '', not a new store URL.
-              // `LoginWebView.tsx`'s gate-open bursts take
-              // `databaseLockManager` because a taplist writer's
-              // check-then-commit (`dataUpdateService.ts`) is only safe from a
-              // login racing it in if THAT write can't land mid-hold — but the
-              // guard already treats '' as "changed" and abandons, so racing
-              // to '' unlocked is safe today. If this ever writes a real store
-              // URL instead, it needs the same lock, or it reopens the exact
-              // gap the login-path fix closed.
-              await setPreference('all_beers_api_url', '', 'API endpoint for fetching all beers');
+              // Locked, like the login's gate-close write. The previous comment
+              // here argued the opposite — that writing '' rather than a real
+              // store URL made the lock unnecessary, because the guard treats ''
+              // as "changed" and abandons. That reasoning only covers a '' that
+              // lands BEFORE a writer's guard read. One landing after the guard
+              // and before the commit leaves the old store's rows and validator
+              // committed under a configuration that no longer names them, which
+              // is the same bad commit the login-path fix closes.
+              await databaseLockManager.withDatabaseLock('developer-reset-config', async () => {
+                await setPreference('all_beers_api_url', '', 'API endpoint for fetching all beers');
+              });
               await setPreference(
                 'my_beers_api_url',
                 '',

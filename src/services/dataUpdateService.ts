@@ -435,10 +435,25 @@ async function readTaplistConfiguration(): Promise<TaplistConfiguration> {
  * lock — it can't; ~8 sites in this file call it from inside a held lock and
  * would self-deadlock if it did — so any future writer of a real store URL
  * that doesn't explicitly join this lock reopens the exact race this guard
- * exists to close, silently. A write of `''` (login's gate-close,
- * `DeveloperSection.tsx`'s reset) does not need the lock: `null` and `''` both
- * read as "changed" below, so racing to `''` unlocked only ever causes a safe,
- * cheap abandon, never a bad commit.
+ * exists to close, silently.
+ *
+ * EVERY writer of this key joins the lock, including writes of `''`. An earlier
+ * version of this docstring exempted them — "racing to `''` unlocked only ever
+ * causes a safe, cheap abandon, never a bad commit" — and that was false. It is
+ * true only of a `''` that lands BEFORE a writer's guard read, where the guard
+ * reads "changed" and abandons. A `''` landing AFTER the guard read and BEFORE
+ * the commit is the window this lock exists to close: the writer reads store A,
+ * the guard passes, the `''` lands, and the writer then commits A's rows, A's
+ * validator and a fresh `all_beers_last_check` under a configuration that no
+ * longer names A. The reasoning covered one interleaving and was stated as if
+ * it covered both.
+ *
+ * The three sites are `LoginWebView.tsx`'s member and visitor gate-close writes
+ * and `DeveloperSection.tsx`'s reset; all three now take the lock, so a `''`
+ * lands either before the guard or after the commit and never between them.
+ * Proven by a test that stages exactly that interleaving
+ * (`LoginWebView.test.tsx`, "does not clear the store URL while a taplist
+ * writer holds the lock"), which was written red against the unlocked writes.
  */
 async function taplistConfigurationHeld(fetchedFor: TaplistConfiguration): Promise<boolean> {
   return (await readTaplistConfiguration()) === fetchedFor;

@@ -861,6 +861,59 @@ describe('LoginWebView', () => {
       // executed while THIS operation held the lock".
       expect(holderDuringStoreUrlWrite).toEqual(['login-config-commit']);
     });
+
+    it('does not clear the store URL while a taplist writer holds the lock', async () => {
+      // 9.14. `taplistConfigurationHeld`'s docstring justified leaving the
+      // gate-CLOSE write of '' outside the lock: "racing to '' unlocked only
+      // ever causes a safe, cheap abandon, never a bad commit."
+      //
+      // That holds only if the '' lands BEFORE the writer's guard read. It can
+      // equally land AFTER the guard read and BEFORE the commit, which is the
+      // window the lock exists to close: the writer reads store A, the guard
+      // passes, this '' lands, and the writer then commits A's rows, A's ETag
+      // and a fresh timestamp under a configuration that no longer says A.
+      //
+      // This test stages exactly that — a writer holding the lock while a login
+      // arrives — and asserts the clear cannot interleave with it. It was
+      // written RED: before the fix the '' write recorded 'all-beers-write',
+      // i.e. it landed in the middle of another operation's hold.
+      const holderDuringClear: (string | null)[] = [];
+      (setPreference as jest.Mock).mockImplementation(async (key: string, value: string) => {
+        if (key === 'all_beers_api_url' && value === '') {
+          holderDuringClear.push(databaseLockManager.getCurrentOperation());
+        }
+      });
+
+      let releaseTaplistHold: () => void = () => {};
+      const taplistHold = databaseLockManager.withDatabaseLock(
+        'all-beers-write',
+        () =>
+          new Promise<void>(resolve => {
+            releaseTaplistHold = resolve;
+          })
+      );
+
+      const { getByTestId } = renderLogin();
+      fireEvent(getByTestId('webview-mock'), 'onMessage', memberLoginMessage);
+
+      await waitFor(() => {
+        expect(databaseLockManager.getQueueLength()).toBe(1);
+      });
+
+      // The clear must not have happened yet — it is queued behind the writer.
+      expect(holderDuringClear).toEqual([]);
+
+      releaseTaplistHold();
+      await taplistHold;
+
+      await waitFor(() => {
+        expect(mockOnLoginSuccess).toHaveBeenCalled();
+      });
+
+      // And when it does happen, it happens under the lock — never interleaved
+      // into someone else's hold.
+      expect(holderDuringClear).toEqual(['login-config-commit']);
+    });
   });
 
   describe('WebView Message Handling - Visitor Login', () => {
