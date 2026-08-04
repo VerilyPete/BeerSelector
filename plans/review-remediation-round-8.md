@@ -367,7 +367,7 @@ session rather than taken on trust.
 
 ## Launch-blocking / high
 
-- [ ] 9.1 **The "moved inside the lock" fix has no test behind it.** Mutant:
+- [x] 9.1 **The "moved inside the lock" fix has no test behind it.** Mutant:
       keep `withDatabaseLock('all-beers-etag-invalidate', ...)` but empty its
       body and run guard + `verifyNotModified()` + the `all_beers_last_check`
       stamp after the hold returns. **29 tests pass.** The fix `7c585f2a`
@@ -445,7 +445,7 @@ session rather than taken on trust.
       checkable by reading it. A mutant that removes the lock call ENTIRELY
       does die on that test — which is exactly what makes the gap easy to miss,
       and is why the test reads as stronger than it is.
-- [ ] 9.2 **Migration re-run guards for versions 3-7 are untested, and a
+- [x] 9.2 **Migration re-run guards for versions 3-7 are untested, and a
       regression is launch-blocking.** Mutant: delete `if (fromVersion < 7)` at
       `src/database/schema.ts:263` while keeping the call. `migrationDispatch`
       stays green (5/5).
@@ -513,7 +513,7 @@ session rather than taken on trust.
       reaches that helper's cleared-vs-switched logic because it passes
       `storeId: null` by design. The helper is fixed; the caller can still feed
       it `''`.
-- [ ] 9.3 **VERIFIED HERE. Most of this branch's error-classification work
+- [x] 9.3 **VERIFIED HERE. Most of this branch's error-classification work
       reaches nobody on the automatic paths.** `app/_layout.tsx:115` wraps
       `fetchAndUpdateAllBeers()` in try/catch and discards the returned
       `DataUpdateResult` — but the function *returns* `{success:false, error}`
@@ -531,7 +531,7 @@ session rather than taken on trust.
       Pre-existing (both call sites predate the branch), but it is why a real
       chunk of this round has no observable effect.
 
-- [ ] 9.14 **The justification for leaving the gate-close writes unlocked is
+- [x] 9.14 **The justification for leaving the gate-close writes unlocked is
       FALSE.** `dataUpdateService.ts:439-441` claims racing to `''` unlocked
       "only ever causes a safe, cheap abandon, never a bad commit". That holds
       only if the `''` write lands BEFORE the guard read. `setPreference` takes
@@ -554,7 +554,7 @@ session rather than taken on trust.
       transaction the login's write hits SQLITE_BUSY and retries — but the gap
       between guard read and pre-clear, and between insert and ETag commit, are
       both real and unprotected.
-- [ ] 9.15 **The stamp the 304 fix moved inside the lock is still outside it,
+- [x] 9.15 **The stamp the 304 fix moved inside the lock is still outside it,
       one arm away.** `7013cd27` states the principle: "Left outside, it
       reintroduces the same window one statement later."
       `fetchAndUpdateAllBeers`'s SUCCESS path stamps `all_beers_last_update` and
@@ -570,7 +570,7 @@ session rather than taken on trust.
       refresh suppressed for up to twelve hours — bounded in practice by the
       login's `manualRefreshAllData` clearing those timestamps, unless that
       refresh then fails.
-- [ ] 9.16 **INDEPENDENT CONFIRMATION OF 9.2, from an isolated tree.**
+- [x] 9.16 **INDEPENDENT CONFIRMATION OF 9.2, from an isolated tree.**
       Replacing `if (fromVersion < 3)` and `if (fromVersion < 6)` with
       `if (false)` in `schema.ts` leaves **all 30 database suites / 680 tests
       green**. Reached separately from `tests`' v7 mutant, by a different
@@ -581,7 +581,7 @@ session rather than taken on trust.
       broader than what it covers, because the `storedVersionIs(6)` fixture can
       only ever exercise the v7 and v8 arms. Four of the six arms remain in
       exactly the state the commit was written to fix.
-- [ ] 9.17 **The login can now fail for a reason it could not before, and that
+- [x] 9.17 **The login can now fail for a reason it could not before, and that
       is not recorded anywhere.** `withDatabaseLock` rejects after a 30s
       acquisition timeout with `DatabaseContentionError`, and
       `DatabaseLockManager._forceRelease` (`:427-457`) refuses to grant the lock
@@ -595,7 +595,7 @@ session rather than taken on trust.
       never mentions it can now fail the login itself. Recoverable by restart,
       so low severity — but it is a new failure mode introduced by the fix and
       undocumented.
-- [ ] 9.18 **Two comments contradict each other on whether the race
+- [x] 9.18 **Two comments contradict each other on whether the race
       self-corrects; unresolved.** `:1030` (and `storeSwitchDuringRefresh.test.ts:8-11`,
       and `7c585f2a`'s message) says no later conditional request corrects the
       cross-store rows, because the row count is non-zero so
@@ -629,7 +629,7 @@ session rather than taken on trust.
       suppresses that refresh for up to twelve hours. That makes **9.15 the
       durable half of the pair, not the lesser one** — the fix stays justified,
       on corrected grounds.
-- [ ] 9.19 **Stale line citations, four of five wrong.** The in-code pointer at
+- [x] 9.19 **Stale line citations, four of five wrong.** The in-code pointer at
       `LoginWebView.tsx:399` says "Gate-close writes (`:329` above,
       `DeveloperSection.tsx:187`)" — the write is at `:337` (`:329` is a comment
       line), and `DeveloperSection.tsx:187` is the second line of a comment,
@@ -644,7 +644,7 @@ session rather than taken on trust.
       durable pointer a future writer is told to follow, and this round has
       already been bitten twice by following a stale pointer.
 
-- [ ] 9.20 **The pre-clear trade-off is justified by the premise 9.18 just
+- [x] 9.20 **The pre-clear trade-off is justified by the premise 9.18 just
       refuted.** `dataUpdateService.ts:1023-1025` states the cost of moving the
       ETag pre-clear before the rows land — contention at that instant aborts
       the whole write, so "the user keeps stale rows and is told the app was
@@ -694,7 +694,7 @@ session rather than taken on trust.
       This defect is confined to two comments; it is not a pattern spreading
       through the file.
 
-- [ ] 9.21 **35 `tapOn: "All Beer"` remain in REGISTERED flows, and by the
+- [x] 9.21 **35 `tapOn: "All Beer"` remain in REGISTERED flows, and by the
       anchored-regex result none of them can ever have worked.** The point-5 fix
       corrected 12 selectors — but those were in unregistered, known-red flows,
       so they were inert. These 36 (35 registered, 1 in `SETTINGS_AUTO_LOGIN`)
@@ -733,7 +733,7 @@ session rather than taken on trust.
 
 ## Medium
 
-- [ ] 9.4 **The Android summary prints "✅ PASSED" for the job documented three
+- [x] 9.4 **The Android summary prints "✅ PASSED" for the job documented three
       lines above as failing every time.** `maestro-e2e.yml:892-900`,
       `e2e-tests.yml:464-470` decide pass/fail by grepping for `<failure`. A
       launch failure — which is what the known-red Android job produces — is
@@ -745,7 +745,7 @@ session rather than taken on trust.
       `maestro-e2e.yml:865-874`, which feeds the table a human reads to find
       which group failed and can contradict the ❌ headline above it.
       Confirmed not over-eager: `<failure` does not false-match `failures="0"`.
-- [ ] 9.5 **Developer prose reaches a user-facing alert verbatim.**
+- [x] 9.5 **Developer prose reaches a user-facing alert verbatim.**
       `dataUpdateService.ts:733-739` throws VALIDATION_ERROR with
       `` `${label} unavailable (${source.reason.code}): ${source.reason.detail}` ``
       → `All beers unavailable (not-configured): all_beers_api_url is not set`.
@@ -759,7 +759,7 @@ session rather than taken on trust.
       type rather than message. Right for UNKNOWN_ERROR; wrong for
       VALIDATION_ERROR, where the message IS what the user reads. The suite
       forbids UNKNOWN_ERROR but does not hold the copy together.
-- [ ] 9.6 **A cleared configuration IS treated as "allow", in exactly one
+- [x] 9.6 **A cleared configuration IS treated as "allow", in exactly one
       path.** `fetchAndUpdateAllBeers:872` guards `if (!apiUrl)`, so
       `taplistConfigurationHeld('')` is unreachable there. `prepareAllBeers`
       (`:1611-1612`) has no such guard and passes `storeId: null` deliberately;
@@ -776,14 +776,14 @@ session rather than taken on trust.
       Two worse variants confirmed closed: `fetchBeersFromAPI:297` returns
       `unavailable` for a genuinely absent URL, and a 304 cannot co-occur with
       `fetchedFor === ''`.
-- [ ] 9.7 **`readTaplistConfiguration`'s documented limitation has a trigger the
+- [x] 9.7 **`readTaplistConfiguration`'s documented limitation has a trigger the
       comment does not name.** The comment (`:405-424`) frames the swallow as a
       write-time problem. It also bites at fetch time (`:1611`, `:870`) and is
       worse there: `fetchedFor = ''` → `storeId = null` → the enrichment proxy
       is skipped → a full non-enriched ETag-less download runs → is abandoned at
       the write guard → and is reported **`success: true`**. The comment is
       accurate; the blast radius is one function larger than stated.
-- [ ] 9.8 **Tab selectors: the citation was wrong, and the multi-hop case is
+- [x] 9.8 **Tab selectors: the citation was wrong, and the multi-hop case is
       unverified.** `app/(tabs)/_layout.tsx`'s `options.title` values are dead
       config — the custom `TerminalTabBar` renders `HOME`/`BEERS`/`FINDER`/
       `TASTED` and never reads them. The strings tapped by flows live on the
@@ -803,18 +803,18 @@ session rather than taken on trust.
 
 ## Low
 
-- [ ] 9.9 `verify-migration.sh inspect` exits 0 over a completely unreadable
+- [x] 9.9 `verify-migration.sh inspect` exits 0 over a completely unreadable
       database (`:124-131`). `report()`'s explicit `return 0` — correct for the
       `PROBE_KEY=''` reason its comment gives — also masks every `q` failure
       inside it, and `inspect`'s whole body is `report`. `q` writes
       `SQLITE ERROR` to stderr so a human sees it, but a wrapping script sees
       success plus three blank fields. `downgrade` and `assert` unaffected.
       Flagged because the rest of this script now takes the opposite position.
-- [ ] 9.10 `maestro-ios-critical` is in neither the summary's `needs` nor its
+- [x] 9.10 `maestro-ios-critical` is in neither the summary's `needs` nor its
       body (`maestro-e2e.yml:799`). It has no `continue-on-error` so it fails
       the workflow on its own — not silent — but the summary can print all-✅
       while the critical-path job is red.
-- [ ] 9.11 `getCurrentSchemaVersion` (`schemaVersion.ts:19-25`) catches
+- [x] 9.11 `getCurrentSchemaVersion` (`schemaVersion.ts:19-25`) catches
       everything and returns `0`, commented "Table doesn't exist yet". A read
       failing for corruption or SQLITE_BUSY also returns 0, which replays all
       six migrations against an already-migrated database. Outside the diff, but
@@ -822,13 +822,13 @@ session rather than taken on trust.
 
 ## Corrections to round 8's own account
 
-- [ ] 9.12 `bdf139cd` claims a sixth test — "should delegate fetch to
+- [x] 9.12 `bdf139cd` claims a sixth test — "should delegate fetch to
       fetchBeersFromAPI which handles timeouts" (`dataUpdateService.test.ts:749`)
       — was "fixed with them". It no longer reaches the abandon path and does
       assert `dataUpdated === true`, but it does NOT assert the insert and stays
       green under the deleted-insert mutant. Fixed in the sense the commit
       means, not in the sense the sentence reads.
-- [ ] 9.13 `src/api/__tests__/authService.test.ts` (+43) is **entirely Prettier
+- [x] 9.13 `src/api/__tests__/authService.test.ts` (+43) is **entirely Prettier
       reformatting** — no assertion changed, no test added. It was listed as a
       review target on the strength of its diffstat alone; it contributes
       nothing to test effectiveness this round.
@@ -934,3 +934,71 @@ a guarantee attributed to the wrong mechanism.
 grep. `<error` cannot false-match `errors="0"` (needs `<` adjacent) and — a
 case not previously checked — cannot match the closing tag `</error>` either.
 No previously-gating branch became non-gating or vice versa.
+
+---
+
+# Round 11 — working round 9 to exhaustion
+
+Every round-9 finding is now closed, and the checkboxes above are ticked to
+match. Twelve unticked boxes remain in waves 1-3 and wave 7; those are round 8's
+own plan and were NOT re-audited in this round — they are left as found rather
+than ticked on the assumption that round 9 reviewing them implies they landed.
+
+## What was fixed, and what each cost
+
+| finding | outcome |
+|---|---|
+| 9.3 | claim scoped to the manual path; behaviour deliberately unchanged |
+| 9.5 | three throw sites given authored copy via one `unavailableCopy` helper |
+| 9.7 | fetch-time trigger named; the blast radius really is one function larger |
+| 9.9 | `report()` propagates `q` failures; `inspect` can report red |
+| 9.10 | `maestro-ios-critical` joins the summary's `needs` and body |
+| 9.11 | only "no such table" means version zero; everything else propagates |
+| 9.17 | the login failure the lock fix created is written where it happens |
+| 9.19 | all 28 citations on the branch audited; one stale, and it was mine |
+| 9.8, 9.21 | already resolved in the tree; verified, not assumed |
+| 9.12, 9.13 | corrections to the account, recorded above; no code implied |
+
+## Two things this round found that round 9 did not
+
+**A test had been failing on the branch for as long as plan 02 Phase 3 has
+existed.** `integration.mockServer.test.ts:621` still demanded the `none://`
+synthesis Phase 3 deleted. It survived five review rounds because it was hidden
+twice over: locally inside 88 `listen EPERM` failures from a sandbox blocking the
+mock server's socket, and in CI because **CI runs no jest at all** —
+`.github/workflows/` holds only the two e2e jobs. Worth stating plainly: every
+"all green" claim in this plan's history describes a suite nothing in CI runs.
+
+**9.5 and 9.7 are the same asymmetry from two ends.** `fetchAndUpdateAllBeers`
+early-returns on `!apiUrl`; `prepareAllBeers` does not. 9.5 found it as diverging
+user-facing copy, 9.7 as a wasted uncached download reported as success. Neither
+reviewer connected them, and the shared cause is one missing guard.
+
+## Method note
+
+Every behavioural fix was mutation-checked against the full suite, and each claim
+of "kills exactly N tests" in the commit messages is a measured number, not an
+estimate. Round 10 retracted a mutation claim that had not been measured; this
+round measured all of them, including the three in 9.5 and the one in 9.11.
+
+The 9.9 and 9.10 fixes were exercised rather than reasoned about — the real `q`
+and `report` text against a corrupt database file, and the real summary step
+against a red critical job — because both are shell that CI never fails on.
+
+## Exit condition, restated
+
+Unchanged from round 8: done when the reviewers return only nits a senior
+engineer would defer. Round 11 has had no independent review. Nothing here has
+been reviewed by anyone but its author.
+
+## Standing recommendation, not actioned
+
+**Run jest in CI.** It is the single change that would have caught the stale
+`none://` test on the day it broke, and it is the reason a review round could
+report a green suite that no automated system had ever run.
+
+**Five pre-existing tsc errors in `dataUpdateService.ts`** were confirmed
+unchanged in count and kind across every commit this round (`validateBrewInStockResponse`
+unused, two `string | null | undefined` assignments, two `BeerWithContainerType`
+mismatches). Untouched deliberately — outside this branch's scope, but they mean
+`tsc --noEmit` cannot gate anything until they are cleared.
