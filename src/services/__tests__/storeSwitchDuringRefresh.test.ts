@@ -6,9 +6,17 @@
  * rewrites `all_beers_api_url` and clears the taplist ETag without taking that
  * lock at all. So a refresh that fetched store A can acquire the lock after a
  * login has switched to store B, and write A's rows — and, worse, A's validator
- * — under B's configuration. `shouldTrustNotModified` then passes, because rows
- * exist, so the mismatch survives the next conditional request rather than
- * being corrected by it.
+ * — under B's configuration.
+ *
+ * An earlier version of this header said `shouldTrustNotModified` then passes,
+ * so "the mismatch survives the next conditional request rather than being
+ * corrected by it". That is false — the proxy keys its validator per store, so
+ * A's ETag against B's `sid` misses and returns a 200, and
+ * `shouldTrustNotModified` is never reached. The ROWS self-correct.
+ *
+ * What does not self-correct is the freshness stamp: `all_beers_last_check`
+ * written under B's configuration suppresses the automatic refresh for twelve
+ * hours. That is the harm these tests actually protect against.
  *
  * The guard is the configuration itself rather than a separate counter: the
  * writer re-reads `all_beers_api_url` under the lock and compares it to the one

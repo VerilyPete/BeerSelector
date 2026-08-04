@@ -864,9 +864,13 @@ jobs:
             echo "" >> "$GITHUB_STEP_SUMMARY"
             for group in login-flows settings beer-features offline-network error-handling; do
               dir="test-results/maestro-parallel-results-$group"
+              # `<error` as well as `<failure`, and "XML present" before either:
+              # see the Android block below for why both arms matter.
               if [ ! -d "$dir" ]; then
                 echo "- ❔ **$group**: no results uploaded" >> "$GITHUB_STEP_SUMMARY"
-              elif grep -rlq '<failure' "$dir" 2>/dev/null; then
+              elif ! find "$dir" -name '*.xml' -type f 2>/dev/null | grep -q .; then
+                echo "- ❔ **$group**: INCONCLUSIVE (artifact uploaded, no JUnit XML)" >> "$GITHUB_STEP_SUMMARY"
+              elif grep -rlq '<failure\|<error' "$dir" 2>/dev/null; then
                 echo "- ❌ **$group**: FAILED" >> "$GITHUB_STEP_SUMMARY"
               else
                 echo "- ✅ **$group**: PASSED" >> "$GITHUB_STEP_SUMMARY"
@@ -889,10 +893,23 @@ jobs:
           # `overall_fail`: Android isn't a supported target right now, so
           # gating the PR check on it would be a failure nobody can act on.
           android_dir="test-results/maestro-test-results-android"
+          #
+          # Matches `<error` as well as `<failure`. A launch failure — which is
+          # what this job produces every run, because the flows carry the iOS
+          # bundle ID — is reported by JUnit as `<error>`, so grepping only for
+          # `<failure` printed "✅ PASSED" three lines under prose calling the
+          # job known-red. An artifact holding `~/.maestro/tests/` logs but no
+          # XML (maestro died before writing one) also fell through to PASSED,
+          # and `if: always()` guarantees the directory exists either way.
+          # Both cases reproduced against constructed artifact directories.
+          # `<error` cannot false-match `errors="0"`: the `<` must be adjacent.
           if [ ! -d "$android_dir" ]; then
             echo "### ❔ Android Tests - NO RESULTS" >> "$GITHUB_STEP_SUMMARY"
             echo "Known-red, non-blocking — Android is not a supported target right now (see .maestro/config.yaml). No results were uploaded." >> "$GITHUB_STEP_SUMMARY"
-          elif grep -rlq '<failure' "$android_dir" 2>/dev/null; then
+          elif ! find "$android_dir" -name '*.xml' -type f 2>/dev/null | grep -q .; then
+            echo "### ❔ Android Tests - INCONCLUSIVE" >> "$GITHUB_STEP_SUMMARY"
+            echo "An artifact was uploaded but contains no JUnit XML, so nothing can be concluded from it. Known-red, non-blocking (see .maestro/config.yaml)." >> "$GITHUB_STEP_SUMMARY"
+          elif grep -rlq '<failure\|<error' "$android_dir" 2>/dev/null; then
             echo "### ❌ Android Tests - FAILED" >> "$GITHUB_STEP_SUMMARY"
             echo "Known-red, non-blocking — Android is not a supported target right now (see .maestro/config.yaml)." >> "$GITHUB_STEP_SUMMARY"
           else
