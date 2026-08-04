@@ -30,7 +30,7 @@
  */
 
 import type { SQLiteDatabase } from 'expo-sqlite';
-import { runStartupMigrationCheck } from '../startupMigrationCheck';
+import { runStartupMigrationCheck, startupMigrationAlert } from '../startupMigrationCheck';
 import { getCurrentSchemaVersion, CURRENT_SCHEMA_VERSION } from '../schemaVersion';
 import { migrateToVersion3 } from '../migrations/migrateToV3';
 
@@ -144,5 +144,52 @@ describe('runStartupMigrationCheck', () => {
     await runStartupMigrationCheck(database, p => progress.push(p));
 
     expect(progress[progress.length - 1]).toBeNull();
+  });
+});
+
+/**
+ * The half of the fix that was still unwired.
+ *
+ * Mutation testing found that deleting the entire `Alert.alert('Database Update
+ * Failed', …)` block from `app/_layout.tsx` changed no test result. The module
+ * reported `migration-failed` correctly and nothing verified the caller acted on
+ * it — the extraction moved the logic somewhere testable and left the decision
+ * about what a user is told behind, one layer up, in the component this repo
+ * cannot test under Jest.
+ *
+ * So the decision moves too. `startupMigrationAlert` is the whole
+ * outcome-to-user-message mapping as a pure function; `_layout.tsx` is reduced
+ * to rendering whatever it returns. Deleting an arm from it now fails here.
+ *
+ * It answers for `version-unreadable` as well, which previously no caller
+ * consumed at all. Staying silent there is a deliberate choice — not aborting
+ * startup is the entire point of the containment — but it is now a choice
+ * written down and pinned, rather than one made by omission.
+ */
+describe('startupMigrationAlert', () => {
+  it('tells the user when a migration actually failed', () => {
+    const alert = startupMigrationAlert({ status: 'migration-failed', error: new Error('boom') });
+
+    expect(alert).toEqual({
+      title: 'Database Update Failed',
+      message: 'The app may not function correctly. Please restart the app.',
+    });
+  });
+
+  it('says nothing when the migration succeeded', () => {
+    expect(startupMigrationAlert({ status: 'migrated', from: 7 })).toBeNull();
+  });
+
+  it('says nothing when there was nothing to do', () => {
+    expect(startupMigrationAlert({ status: 'up-to-date', version: 8 })).toBeNull();
+  });
+
+  it('stays silent when the version could not be read, deliberately', () => {
+    // The startup continues on stale-but-serviceable state; an alert here would
+    // tell a user about a transient database read they can do nothing about,
+    // on a launch that is otherwise about to work.
+    expect(
+      startupMigrationAlert({ status: 'version-unreadable', error: new Error('locked') })
+    ).toBeNull();
   });
 });
