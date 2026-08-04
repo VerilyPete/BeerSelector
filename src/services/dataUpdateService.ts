@@ -1054,15 +1054,46 @@ export async function fetchAndUpdateAllBeers(): Promise<DataUpdateResult> {
     // pre-clear can throw after ~700ms of contention backoff, and it now runs
     // BEFORE the rows land, so contention at that instant aborts the whole
     // write. The user keeps stale rows and is told the app was busy, where
-    // previously they would have got fresh rows and a bad ETag record. That is
-    // the trade, and it is worth it — the bad ETag record is permanent and
-    // silent, the stale rows are neither.
+    // previously they would have got fresh rows and a bad ETag record.
+    //
+    // That trade was justified here as "worth it — the bad ETag record is
+    // permanent and silent, the stale rows are neither". PERMANENT IS WRONG.
+    // The proxy keys its validator to the requested store's own cached payload,
+    // so a stale or cross-store ETag MISSES and returns a full 200; the bad
+    // record is corrected by the next request rather than surviving it. It is
+    // silent, but it is not permanent, and both halves of that comparison
+    // self-correct.
+    //
+    // The trade still looks right, on different grounds: an abort tells the
+    // user something, and a silent wrong record tells them nothing even if it
+    // is short-lived. But it is re-derived here rather than inherited, because
+    // the reason originally given for it was false.
+    //
+    // Not to be confused with the same wording a few lines up and down
+    // (`:933`, `:1051`, "304s forever"). Those describe a validator that
+    // genuinely MATCHES the server it is next sent to — same store, valid
+    // ETag — where 304-forever is correct behaviour and the comments are
+    // sound. The refutation applies only to a validator sent to a store it was
+    // not minted for.
     const committed = await databaseLockManager.withDatabaseLock('all-beers-write', async () => {
       // Under the lock, as on the two plan-based writers: `apiUrl` was read
       // before the fetch, and a login can have switched stores since. Committing
       // then writes the old store's rows AND its validator under the new store's
-      // configuration, which no later conditional request corrects — the row
-      // count is non-zero, so `shouldTrustNotModified` believes the 304.
+      // configuration.
+      //
+      // This used to add "which no later conditional request corrects — the row
+      // count is non-zero, so `shouldTrustNotModified` believes the 304". That
+      // is FALSE, and `shouldTrustNotModified` is never even reached: the proxy
+      // keys its validator per store (`buildCombinedEtag` over the payload
+      // fetched for the requested `sid`), so the old store's ETag against the
+      // new store's `sid` misses and returns a 200. The rows correct themselves
+      // on the next refresh.
+      //
+      // The guard is still needed, for the half that does NOT self-correct: the
+      // freshness stamp. `all_beers_last_check` written under the new store's
+      // configuration suppresses the automatic refresh for twelve hours, so the
+      // user sits on the previous store's taplist until something manual
+      // happens.
       if (!(await taplistConfigurationHeld(fetchedFor))) {
         return false;
       }
