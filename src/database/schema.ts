@@ -266,7 +266,7 @@ async function runMigrations(database: SQLiteDatabase, fromVersion: number): Pro
   }
 
   // Run migration to v8 (purge the plaintext auth_cookies preference)
-  if (fromVersion <= 8) {
+  if (fromVersion < 8) {
     await migrateToVersion8(database);
     console.log('Migration to version 8 complete');
   }
