@@ -864,8 +864,9 @@ jobs:
             echo "" >> "$GITHUB_STEP_SUMMARY"
             for group in login-flows settings beer-features offline-network error-handling; do
               dir="test-results/maestro-parallel-results-$group"
-              # `<error` as well as `<failure`, and "XML present" before either:
-              # see the Android block below for why both arms matter.
+              # "XML present" before content: see the Android block below. The
+              # `<error` alternation there is inert against Maestro 2.4.0 and
+              # kept only as insurance; the XML-presence arm is the real fix.
               if [ ! -d "$dir" ]; then
                 echo "- ❔ **$group**: no results uploaded" >> "$GITHUB_STEP_SUMMARY"
               elif ! find "$dir" -name '*.xml' -type f 2>/dev/null | grep -q .; then
@@ -894,15 +895,31 @@ jobs:
           # gating the PR check on it would be a failure nobody can act on.
           android_dir="test-results/maestro-test-results-android"
           #
-          # Matches `<error` as well as `<failure`. A launch failure — which is
-          # what this job produces every run, because the flows carry the iOS
-          # bundle ID — is reported by JUnit as `<error>`, so grepping only for
-          # `<failure` printed "✅ PASSED" three lines under prose calling the
-          # job known-red. An artifact holding `~/.maestro/tests/` logs but no
-          # XML (maestro died before writing one) also fell through to PASSED,
-          # and `if: always()` guarantees the directory exists either way.
-          # Both cases reproduced against constructed artifact directories.
-          # `<error` cannot false-match `errors="0"`: the `<` must be adjacent.
+          # WHY THIS IS NOT `grep '<failure'` ALONE — corrected, because the
+          # reason first given here was false.
+          #
+          # The original claim was that a launch failure is JUnit `<error>`
+          # rather than `<failure>`, so the old grep printed PASSED for the
+          # known-red Android job. That is WRONG. Maestro 2.4.0's own reporter
+          # (`JUnitTestSuiteReporter`, verified against the installed jar with
+          # javap) has a `Failure` class and no `Error` class: `TestCase` holds
+          # `status: FlowStatus` plus an optional `failure`, and `TestSuite`
+          # holds `failures` with no `errors`. A launch failure is emitted as
+          # `<testcase status="ERROR"><failure>…</failure></testcase>` — ERROR
+          # is an attribute VALUE, never an element. So the old grep DID catch
+          # that job, and the `\|<error` half of this pattern is inert against
+          # any XML Maestro 2.4.0 can produce. It is kept as cheap insurance
+          # against a future reporter change, not because it fixes anything.
+          #
+          # THE REAL DEFECT IS THE ARM BELOW IT. A directory holding logs but
+          # no JUnit XML fell through to PASSED — silence reported as success.
+          # That one is genuine and is reproduced against fixtures.
+          #
+          # Note also that the artifact directory is NOT guaranteed to exist:
+          # `if: always()` guarantees the upload STEP runs, but
+          # `actions/upload-artifact@v4` defaults to `if-no-files-found: warn`,
+          # so a job dying before maestro writes anything produces no artifact
+          # and no directory, and the `[ ! -d ]` arm fires instead.
           if [ ! -d "$android_dir" ]; then
             echo "### ❔ Android Tests - NO RESULTS" >> "$GITHUB_STEP_SUMMARY"
             echo "Known-red, non-blocking — Android is not a supported target right now (see .maestro/config.yaml). No results were uploaded." >> "$GITHUB_STEP_SUMMARY"
