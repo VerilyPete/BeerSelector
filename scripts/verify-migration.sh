@@ -132,8 +132,13 @@ q() {
 # 'staged' over a write that silently failed is worse than no tool at all".
 #
 # So: still decoupled from PROBE_KEY, no longer decoupled from failure. Each
-# read's status is captured and the worst one is returned, AFTER printing what
-# was obtained — a partially readable database should still show what it could.
+# read's status is captured and the LAST failing one is returned, AFTER printing
+# what was obtained — a partially readable database should still show what it
+# could. Last-failure-wins, not worst-failure-wins: `rc=$?` overwrites. The
+# distinction is immaterial in practice because sqlite3 exits 1 for nearly
+# everything, but this round is specifically about comments claiming more than
+# the code delivers, and "the worst one" is what this said before two reviewers
+# pointed out it does not.
 report() {
   local rc=0 rows max probe
   rows=$(q "SELECT group_concat(version, ',') FROM (SELECT version FROM schema_version ORDER BY version)") || rc=$?
