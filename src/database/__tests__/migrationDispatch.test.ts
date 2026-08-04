@@ -23,6 +23,10 @@ import { setupDatabase, resetDatabaseState } from '../db';
 import * as connection from '../connection';
 import { migrateToVersion8 } from '../migrations/migrateToV8';
 import { migrateToVersion7 } from '../migrations/migrateToV7';
+import { migrateToVersion6 } from '../migrations/migrateToV6';
+import { migrateToVersion5 } from '../migrations/migrateToV5';
+import { migrateToVersion4 } from '../migrations/migrateToV4';
+import { migrateToVersion3 } from '../migrations/migrateToV3';
 import { CURRENT_SCHEMA_VERSION } from '../schemaVersion';
 
 jest.mock('../connection');
@@ -31,6 +35,18 @@ jest.mock('../migrations/migrateToV8', () => ({
 }));
 jest.mock('../migrations/migrateToV7', () => ({
   migrateToVersion7: jest.fn().mockResolvedValue(undefined),
+}));
+jest.mock('../migrations/migrateToV6', () => ({
+  migrateToVersion6: jest.fn().mockResolvedValue(undefined),
+}));
+jest.mock('../migrations/migrateToV5', () => ({
+  migrateToVersion5: jest.fn().mockResolvedValue(undefined),
+}));
+jest.mock('../migrations/migrateToV4', () => ({
+  migrateToVersion4: jest.fn().mockResolvedValue(undefined),
+}));
+jest.mock('../migrations/migrateToV3', () => ({
+  migrateToVersion3: jest.fn().mockResolvedValue(undefined),
 }));
 
 describe('migration dispatch', () => {
@@ -111,6 +127,64 @@ describe('migration dispatch', () => {
     expect(migrateToVersion7).toHaveBeenCalledWith(mockDatabase);
     expect(migrateToVersion8).toHaveBeenCalledWith(mockDatabase);
   });
+
+  /**
+   * Every dispatch arm, both directions, at every stored version.
+   *
+   * The tests above prove the v7 and v8 arms are wired. They cannot say
+   * anything about v3-v6: `storedVersionIs(6)` is the lowest input any of them
+   * uses, and from 6 the only arms left to take are 7 and 8. So four of the six
+   * guards had no coverage at all, and `if (fromVersion < 3)` or
+   * `if (fromVersion < 6)` could be deleted with all 680 database tests green.
+   *
+   * That is not a hypothetical. Dropping the `< 7` guard makes a v7 device —
+   * everyone upgrading from the current release — re-run migration 7, whose
+   * `recordMigration(database, 7)` INSERTs a duplicate into an INTEGER PRIMARY
+   * KEY. It throws, `setupTables` rethrows, and `app/_layout.tsx` retries once
+   * against identical on-disk state, fails identically, and routes into the app
+   * anyway. The app looks fine. `schema_version` is pinned at 7 forever, the v8
+   * arm is never reached, and the plaintext `auth_cookies` jar the v8 migration
+   * exists to delete survives on every device that ever completed a member
+   * login. Reproduced end to end against a real SQLite engine (errcode 1555).
+   *
+   * A per-version table is used rather than one case per arm so that adding a
+   * migration without extending this list is itself a failure.
+   */
+  const DISPATCH_ARMS: readonly (readonly [number, jest.Mock])[] = [
+    [3, migrateToVersion3 as jest.Mock],
+    [4, migrateToVersion4 as jest.Mock],
+    [5, migrateToVersion5 as jest.Mock],
+    [6, migrateToVersion6 as jest.Mock],
+    [7, migrateToVersion7 as jest.Mock],
+    [8, migrateToVersion8 as jest.Mock],
+  ];
+
+  it('covers every dispatch arm in runMigrations', () => {
+    // Guards the table above against a new migration being added to
+    // `runMigrations` without a case here — which would silently shrink this
+    // file's coverage back to the gap it was written to close.
+    expect(DISPATCH_ARMS.map(([version]) => version)).toEqual([3, 4, 5, 6, 7, 8]);
+    expect(DISPATCH_ARMS[DISPATCH_ARMS.length - 1][0]).toBe(CURRENT_SCHEMA_VERSION);
+  });
+
+  it.each([2, 3, 4, 5, 6, 7])(
+    'runs every later migration and no earlier one from stored version %i',
+    async stored => {
+      storedVersionIs(stored);
+
+      await setupDatabase();
+
+      for (const [version, migrate] of DISPATCH_ARMS) {
+        if (version <= stored) {
+          // Already applied. Re-running it is the defect: `recordMigration`
+          // would insert a duplicate primary key and abort the whole chain.
+          expect(migrate).not.toHaveBeenCalled();
+        } else {
+          expect(migrate).toHaveBeenCalledWith(mockDatabase);
+        }
+      }
+    }
+  );
 
   it('runs no migration on a database from the future', async () => {
     // A rollback to an older build leaves a stored version ABOVE this build's

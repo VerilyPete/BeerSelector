@@ -788,6 +788,33 @@ describe('LoginWebView', () => {
       // lock — so this simulates exactly that: a held lock, a login arriving
       // while it's held, and proof the write is deferred rather than
       // interleaved.
+      // Records which operation held the lock AT THE MOMENT the store URL was
+      // written. Everything else in this test observes the ACQUISITION; only
+      // this observes CONTAINMENT, and the difference is the whole point.
+      //
+      // Mutation testing showed the rest of this test is satisfied by
+      // acquire-release-then-write: the queue still reaches 1 because `acquire`
+      // enqueues, the write still hasn't landed at that instant because the
+      // `await` hasn't resolved, and it still appears after the release. Every
+      // assertion below passed against a `withDatabaseLock` call whose body was
+      // EMPTY and whose writes were hoisted out after it — reintroducing the
+      // entire race this test exists to prove closed, across all 72 tests in
+      // this file and the full 2241-test suite.
+      //
+      // Under correct code this is 'login-config-commit'. Under that mutant the
+      // lock is already released when the write runs, so it is null.
+      const holderDuringStoreUrlWrite: (string | null)[] = [];
+      (setPreference as jest.Mock).mockImplementation(async (key: string, value: string) => {
+        // Non-empty only. The gate-CLOSE write of '' is deliberately unlocked,
+        // so it lands while the taplist writer still holds the lock and would
+        // otherwise show up here as 'all-beers-write'. It is the authoritative
+        // store URL — the one a racing writer must not see mid-commit — whose
+        // containment this asserts.
+        if (key === 'all_beers_api_url' && value !== '') {
+          holderDuringStoreUrlWrite.push(databaseLockManager.getCurrentOperation());
+        }
+      });
+
       let releaseTaplistHold: () => void = () => {};
       const taplistHold = databaseLockManager.withDatabaseLock(
         'all-beers-write',
@@ -827,6 +854,12 @@ describe('LoginWebView', () => {
         );
       });
       expect(mockOnLoginSuccess).toHaveBeenCalled();
+
+      // The containment assertion. Not "a lock was acquired at some point
+      // before this write" — that is what `getQueueLength()` above establishes,
+      // and it is what the empty-hold mutant satisfies — but "this write
+      // executed while THIS operation held the lock".
+      expect(holderDuringStoreUrlWrite).toEqual(['login-config-commit']);
     });
   });
 
@@ -1106,6 +1139,20 @@ describe('LoginWebView', () => {
       // proving the gate-open burst (:462-479) shares the real lock too.
       (handleVisitorLogin as jest.Mock).mockResolvedValue({ success: true });
 
+      // Containment recorder — see the member-path test for why the rest of
+      // this test cannot distinguish a real hold from an empty one.
+      const holderDuringStoreUrlWrite: (string | null)[] = [];
+      (setPreference as jest.Mock).mockImplementation(async (key: string, value: string) => {
+        // Non-empty only. The gate-CLOSE write of '' is deliberately unlocked,
+        // so it lands while the taplist writer still holds the lock and would
+        // otherwise show up here as 'all-beers-write'. It is the authoritative
+        // store URL — the one a racing writer must not see mid-commit — whose
+        // containment this asserts.
+        if (key === 'all_beers_api_url' && value !== '') {
+          holderDuringStoreUrlWrite.push(databaseLockManager.getCurrentOperation());
+        }
+      });
+
       let releaseTaplistHold: () => void = () => {};
       const taplistHold = databaseLockManager.withDatabaseLock(
         'all-beers-write',
@@ -1156,6 +1203,10 @@ describe('LoginWebView', () => {
         );
       });
       expect(mockOnLoginSuccess).toHaveBeenCalled();
+
+      // Containment, not acquisition — the visitor burst gets the same check
+      // as the member one, because it had the same gap.
+      expect(holderDuringStoreUrlWrite).toEqual(['login-config-commit']);
     });
   });
 
