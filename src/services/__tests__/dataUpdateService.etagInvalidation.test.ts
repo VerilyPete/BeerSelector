@@ -76,9 +76,23 @@ jest.mock('../../database/repositories/RewardsRepository', () => ({
   },
 }));
 
+// Tracks WHO holds the lock while the task runs, so a test can assert that
+// work happened INSIDE the hold rather than merely after the acquisition.
+// A bare passthrough cannot see the difference, and that blindness let an
+// empty-hold mutant survive the whole 2241-test suite.
+let mockLockHolder: string | null = null;
+
 jest.mock('../../database/DatabaseLockManager', () => ({
   databaseLockManager: {
-    withDatabaseLock: jest.fn(async (_name: string, task: () => Promise<unknown>) => task()),
+    withDatabaseLock: jest.fn(async (name: string, task: () => Promise<unknown>) => {
+      mockLockHolder = name;
+      try {
+        return await task();
+      } finally {
+        mockLockHolder = null;
+      }
+    }),
+    getCurrentOperation: () => mockLockHolder,
   },
 }));
 
@@ -335,7 +349,12 @@ describe('taplist ETag invalidation', () => {
     // 30s lock acquisition — spent waiting on the writer most likely to fill the
     // table — so a concurrent refresh could commit a full taplist and a valid
     // ETag in the gap and have it cleared.
-    (beerRepository.count as jest.Mock).mockResolvedValue(0);
+    // Record which operation held the lock at the moment the count was read.
+    const holderDuringCount: (string | null)[] = [];
+    (beerRepository.count as jest.Mock).mockImplementation(async () => {
+      holderDuringCount.push(mockLockHolder);
+      return 0;
+    });
     jest
       .spyOn(config, 'enrichment', 'get')
       .mockReturnValue({ ...config.enrichment, isConfigured: () => true });
@@ -353,9 +372,17 @@ describe('taplist ETag invalidation', () => {
       ([name]) => name
     );
     expect(lockedOperations).toContain('all-beers-etag-invalidate');
-    expect((beerRepository.count as jest.Mock).mock.invocationCallOrder[0]).toBeGreaterThan(
-      (databaseLockManager.withDatabaseLock as jest.Mock).mock.invocationCallOrder[0]
-    );
+
+    // Containment, not ordering. The two assertions this replaces — that the
+    // lock name appears in the call list, and that `count` has a later
+    // invocationCallOrder than `withDatabaseLock` — are both satisfied by a
+    // hold whose body is EMPTY with the work hoisted out after it: the lock
+    // WAS called, and the count DOES follow that call. Mutation testing
+    // confirmed that mutant survives the full suite at this site.
+    //
+    // Asserting the holder at call time cannot be satisfied that way: outside
+    // the hold there is no holder, so this records null.
+    expect(holderDuringCount).toEqual(['all-beers-etag-invalidate']);
   });
 
   it('honours a 304 when the table actually holds rows', async () => {
