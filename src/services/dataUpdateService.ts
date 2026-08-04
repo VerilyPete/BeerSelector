@@ -560,10 +560,11 @@ export type TaplistFetchResult = {
  * `getUserFriendlyErrorMessage`. On the two automatic paths it structurally
  * cannot, and neither is a bug this function can fix:
  *
- *   - app open — `app/_layout.tsx:115` awaits `fetchAndUpdateAllBeers()` and
- *     discards the returned `DataUpdateResult`. Its `catch` is not a second
- *     chance: this function RETURNS the failure and does not throw, so the
- *     catch never fires for it.
+ *   - app open — the three `fetchAndUpdate*` awaits in `app/_layout.tsx` each
+ *     discard the returned `DataUpdateResult`. Their `catch` is not a second
+ *     chance: these functions RETURN the failure and do not throw, so the
+ *     catch never fires for it. (Cited by symbol, not line: the line this
+ *     first cited was pushed down by the very comment that records it.)
  *   - tab focus — the three tab screens call `checkAndRefreshOnAppOpen(2)` and
  *     read `result.updated` only. That result carries an `errors:
  *     ErrorResponse[]`, and nothing in `app/`, `hooks/`, `components/` or
