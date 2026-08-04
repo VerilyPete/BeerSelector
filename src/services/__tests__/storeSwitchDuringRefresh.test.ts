@@ -296,6 +296,32 @@ describe('a store switch between fetch and commit', () => {
       expect(beerRepository.insertManyUnsafe).not.toHaveBeenCalled();
       expect(writtenKeys()).not.toContain('all_beers_last_check');
     });
+
+    it('does not commit rows fetched when the configuration could not be read', async () => {
+      // 9.6, and the mirror image of the test above. There the read succeeded
+      // and the configuration changed underneath it. Here the READ ITSELF
+      // failed, and the equality guard cannot tell the difference.
+      //
+      // `getPreference` swallows its errors and returns null, which
+      // `readTaplistConfiguration` maps to ''. So a failed read produces the
+      // same '' as "deliberately cleared" and "never configured" — three
+      // distinct states collapsed into one sentinel. `fetchBeersFromAPI` then
+      // re-reads the preference ITSELF, gets the real URL, and returns real
+      // rows for a store this refresh cannot name.
+      //
+      // At the write guard the comparison is `'' === ''`, which PASSES, so the
+      // rows are committed and the freshness window stamped for a store nobody
+      // established. `fetchAndUpdateAllBeers` is safe here only because it
+      // guards `if (!apiUrl)` before fetching; this path deliberately tolerates
+      // the empty case and passes `storeId: null`, so it had no such guard.
+      mockTaplistUrl = '';
+      (fetchBeersFromAPI as jest.Mock).mockImplementation(async () => fetchedRows(ALL_BEERS));
+
+      await sequentialRefreshAllData();
+
+      expect(beerRepository.insertManyUnsafe).not.toHaveBeenCalled();
+      expect(writtenKeys()).not.toContain('all_beers_last_check');
+    });
   });
 
   describe('when the configuration did not change', () => {

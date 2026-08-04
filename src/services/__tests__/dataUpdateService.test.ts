@@ -1583,7 +1583,14 @@ describe('dataUpdateService', () => {
     });
 
     it('sets last_update and last_check preferences on success', async () => {
-      (getPreference as jest.Mock).mockResolvedValue(null);
+      // A configured taplist URL, not null. `fetchBeersFromAPI` below returns rows,
+      // and in production that is only possible when this key is set — an absent URL
+      // makes it return `unavailable('not-configured')`. With null the pair is an
+      // impossible state, and the all-beers write is now correctly refused, because
+      // rows that cannot be attributed to a store must not be committed.
+      (getPreference as jest.Mock).mockImplementation(async (key: string) =>
+        key === 'all_beers_api_url' ? 'https://example.com/allbeers.json' : null
+      );
       (fetchBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockAllBeers));
       (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockMyBeers));
       (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockRewards));
@@ -2101,7 +2108,14 @@ describe('refreshAllDataFromAPI per-source isolation', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (areApiUrlsConfigured as jest.Mock).mockResolvedValue(true);
-    (getPreference as jest.Mock).mockResolvedValue(null);
+    // A configured taplist URL, not null. `fetchBeersFromAPI` below returns rows,
+    // and in production that is only possible when this key is set — an absent URL
+    // makes it return `unavailable('not-configured')`. With null the pair is an
+    // impossible state, and the all-beers write is now correctly refused, because
+    // rows that cannot be attributed to a store must not be committed.
+    (getPreference as jest.Mock).mockImplementation(async (key: string) =>
+      key === 'all_beers_api_url' ? 'https://example.com/allbeers.json' : null
+    );
     (setPreference as jest.Mock).mockResolvedValue(undefined);
   });
 
