@@ -1002,3 +1002,107 @@ unchanged in count and kind across every commit this round (`validateBrewInStock
 unused, two `string | null | undefined` assignments, two `BeerWithContainerType`
 mismatches). Untouched deliberately — outside this branch's scope, but they mean
 `tsc --noEmit` cannot gate anything until they are cleared.
+
+---
+
+# Round 12 — the full treatment, and what it found in round 11
+
+Five reviewers in parallel — `pr-reviewer`, `review-failures`, `review-correctness`,
+`review-tests`, and Codex — against `1ad3fc4f..HEAD`. Fixes committed as
+`d5fb0a73`.
+
+Round 11 claimed every round-9 finding was closed. It was, but round 11 itself
+carried a code defect, four unguarded tests, four false comment claims and a
+refuted headline number. This round is the answer to "nothing here has been read
+by anyone but its author".
+
+## The one code defect
+
+**`getCurrentSchemaVersion` has two callers and 9.11 only reasoned about one.**
+Found independently by Codex and `review-failures`. The second is in
+`app/_layout.tsx`, *after* `dbInitialized = true`, where the outer catch neither
+retries nor alerts. So 9.11 made a transient `SQLITE_BUSY` silently skip the
+migration check, the `first_launch` routing to Settings, and the Live Activity
+sync — a first-launch user lands in an empty tab UI with nothing on screen to
+explain it. 9.11 fixed a silent failure at one site and created one at the other.
+
+Fixed by extracting `runStartupMigrationCheck`, which cannot throw. It left the
+component because it was untestable there — this repo cannot test components
+under Jest, and the neighbouring `databaseLifecycle.test.tsx` copes by testing a
+hand-copied *mirror* of the implementation, which by construction cannot catch a
+change to the real code.
+
+## Four surviving mutants in round 11's own tests
+
+`review-tests` found all four; all four now die.
+
+| survivor | why it survived |
+|---|---|
+| the authored copy | asserted only *relatively* — "Bananas." on both sides passed 418/418 |
+| the my-beers copy | guarded only negatively; any wrong-but-tidy sentence passed |
+| `unavailableCopy`'s `not-applicable` arm | zero coverage — and `developerProse` lists `not-applicable` specifically, so the regex was written to catch a string the suite could never produce |
+| "detail kept for diagnosis" | deleting all three `logError` calls passed 418/418 |
+
+The first is the sharpest: `migrationDispatch.test.ts` documents that exact trap
+against itself — a literal `7` rather than `CURRENT_SCHEMA_VERSION - 1`, because
+the relative form is vacuous against the mutation that matters. The reasoning was
+one file away and was not applied.
+
+## Four false claims in my own comments
+
+- `recordMigration(database, 7)` and "the retry never touches the database" —
+  both wrong. The replay enters at 2, throws at `recordMigration(database, 3)`
+  inside a transaction that rolls back, and the retry *does* run; it just cannot
+  help. The account had borrowed 9.2's mechanism and applied it to a different
+  path.
+- "VALIDATION_ERROR is the one classification whose renderer returns the message
+  verbatim" — it is one of three. Read literally, that sentence licenses leaving
+  an UNKNOWN_ERROR site interpolated, which is the exact defect the same commit
+  was fixing.
+- the parity suite claimed UNKNOWN_ERROR's renderer *discards* the message. It
+  publishes it — as the same file states correctly twice elsewhere.
+- "three throw sites given authored copy via one helper" — two call the helper.
+
+## 9.19 refuted, and then my correction to it also corrected
+
+Three reviewers independently found three more stale citations, all introduced
+one commit before the audit, one of them 41 lines wrong the day it was written,
+in the only file that commit edited.
+
+Root cause, checked rather than assumed: the audit regex accepted a citation only
+if it carried a `.ts` filename or sat immediately after a backtick, so the
+`symbol:NNN` form was never in the set. A reviewer proposed the more damning
+reading — that the audit saw them and mis-resolved them by eye — and offered an
+arithmetic reconciliation to 28. Re-running the original script at that commit
+shows it captured **27**, not 28, and did not capture those three. The totals
+coincided across two different partitions.
+
+So: the tooling explanation is correct, the harsher one is wrong, **and the
+commit message's own "all 28 citations" was inflated by one before any of this.**
+Recorded here because the commit is pushed and cannot be amended.
+
+The conclusion is unflattering either way: a partial sweep was reported as
+exhaustive. A better regex fixes half of that.
+
+## Method
+
+Every behavioural fix mutation-checked. The five round-11 mutation claims were
+independently re-measured by two reviewers using different isolation strategies
+— one a `git archive HEAD` scratch tree, one the live tree — and both got the
+same five answers, so those numbers now have two sources rather than one.
+
+**Process failure worth recording:** two reviewers were told to mutate the same
+single checkout concurrently, and did, contaminating each other's runs. Both
+stopped and reported rather than publishing the contaminated numbers, which is
+the only reason it was recoverable. Give each mutation agent its own worktree.
+
+## Still open
+
+- **CI is red and was red before this branch.** The iOS jobs fail in the
+  xcodebuild step, before any Maestro flow runs. Independent of these changes.
+- **Jest still does not run in CI.** Unchanged and still the highest-value fix.
+- **Five pre-existing `tsc` errors** in `dataUpdateService.ts`, unchanged.
+- `runStartupMigrationCheck` calls only `migrateToVersion3`, preserved from the
+  inline block rather than silently upgraded to the full chain. A device at v4-7
+  reaching that branch gets one migration. That is a decision for whoever owns
+  the migration story.
