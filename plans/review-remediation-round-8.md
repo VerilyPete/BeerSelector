@@ -959,6 +959,15 @@ than ticked on the assumption that round 9 reviewing them implies they landed.
 | 9.8, 9.21 | already resolved in the tree; verified, not assumed |
 | 9.12, 9.13 | corrections to the account, recorded above; no code implied |
 
+The nine remaining ticks — 9.1, 9.2, 9.4, 9.6, 9.14, 9.15, 9.16, 9.18, 9.20 —
+were closed BEFORE this round, in `5d9def70..a1c3b269`, and round 11 ticked their
+boxes without saying so. A reviewer flagged that a document whose whole purpose
+is to not overclaim had nine unexplained ticks, in a file that already has the
+row format for exactly this case. Fair. They were spot-checked rather than taken
+on trust — 9.1 and 9.2 are genuinely closed by `9458de0f`, and
+`migrationDispatch.test.ts` covers every dispatch arm from 3 to 8 — so the ticks
+are accurate. They were simply undocumented.
+
 ## Two things this round found that round 9 did not
 
 **A test had been failing on the branch for as long as plan 02 Phase 3 has

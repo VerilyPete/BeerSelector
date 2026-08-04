@@ -105,6 +105,21 @@ jest.mock('@/src/config', () => {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  // `mockReset`, because `clearAllMocks` clears call data and NOT
+  // implementations. `taplistUrlUnset()` installs an unset-URL implementation on
+  // `getPreference`, which otherwise persists into every later test in the file
+  // — passing today only because the tests that follow it happen not to care,
+  // and silently handing the next test appended here an unconfigured taplist.
+  // Same leak found and fixed in `migrationDispatch.test.ts`; this is its twin,
+  // caught by a second reviewer after the first.
+  (getPreference as jest.Mock).mockReset();
+  (getPreference as jest.Mock).mockImplementation(async (key: string) =>
+    key === 'all_beers_api_url'
+      ? 'https://fsbs.beerknurd.com/bk-store-json.php?sid=13885'
+      : key === 'my_beers_api_url'
+        ? 'https://example.com/mybeers.json'
+        : null
+  );
   resetInFlightSequentialRefresh();
   dropInFlightTaplistFetch();
   (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(confirmedEmpty());
@@ -329,7 +344,10 @@ describe('the message a user actually reads', () => {
 
     expect(logError).toHaveBeenCalledWith(
       expect.stringContaining('not-configured'),
-      expect.objectContaining({ component: 'dataUpdateService' })
+      // `anything()`, not `objectContaining({ component: 'dataUpdateService' })`
+      // — the module name is not the behaviour under test, and pinning it makes
+      // a rename fail this for no user-visible reason.
+      expect.anything()
     );
     expect(logError).toHaveBeenCalledWith(
       expect.stringContaining('all_beers_api_url'),
