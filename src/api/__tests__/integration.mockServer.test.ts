@@ -618,13 +618,29 @@ describe('API Integration with Mock Server', () => {
       expect(Array.isArray(result)).toBe(true);
     }, 10000);
 
-    it('should handle none:// protocol URLs for visitor mode', async () => {
+    // INVERTED by plan 02 Phase 3, which this file was missed by: the assertion
+    // here still demanded the synthesised `[null, { tasted_brew_current_round:
+    // [] }]` that Phase 3 deleted, and had been failing ever since. Its sibling
+    // in beerApi.test.ts:84 was skipped at the time; this one is re-aimed
+    // instead, because skipping both would leave the removal itself unpinned.
+    //
+    // The caller-side tests (beerApi.test.ts:790, :891) pin that none:// is
+    // rejected BEFORE a request. They cannot pin that fetchWithRetry stopped
+    // fabricating, because they never reach it — restore the synthesis and they
+    // stay green. This is the test that dies for that mutant: it hands the
+    // placeholder straight to fetchWithRetry, so a fabricated body resolves
+    // where a rejection is required.
+    //
+    // `retries = 1` because an unsupported protocol is not a transient fault
+    // and there is nothing to wait for; the default 3 would spend backoff
+    // proving that twice more.
+    it('rejects a none:// URL rather than synthesising an empty round', async () => {
       const noneUrl = 'none://placeholder';
 
-      const result = await fetchWithRetry(noneUrl);
+      await expect(fetchWithRetry(noneUrl, 1, 10)).rejects.toThrow();
 
-      // Should return empty data without making network request
-      expect(result).toEqual([null, { tasted_brew_current_round: [] }]);
+      // The URL never became a request against the real server behind this
+      // suite — which is the half of the old assertion that stayed true.
       expect(mockServer.getRequests()).toHaveLength(0);
     });
 
