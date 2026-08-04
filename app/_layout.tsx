@@ -111,6 +111,19 @@ export default function RootLayout() {
 
         const shouldFetchData = await areApiUrlsConfigured();
         if (shouldFetchData) {
+          // These three catches handle less than they appear to, and the gap is
+          // recorded rather than papered over. Each `fetchAndUpdate*` RETURNS
+          // `{ success: false, error }` for every failure the network work on
+          // this branch classifies — it does not throw — so the catch below
+          // fires only for something unforeseen, and the returned result, error
+          // and all, is discarded on the floor.
+          //
+          // The consequence is that an app-open refresh cannot tell the user
+          // anything, however carefully the failure was typed; only a manual
+          // refresh renders these. Left as-is deliberately: the fix is a UI
+          // affordance this app does not have, and an Alert on every cold start
+          // would be worse than the silence. See `emptyTableNotModifiedFailure`
+          // in dataUpdateService.ts for the full account.
           try {
             await fetchAndUpdateAllBeers();
           } catch (e) {
