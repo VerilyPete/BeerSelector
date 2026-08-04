@@ -205,4 +205,74 @@ describe('migration dispatch', () => {
     expect(migrateToVersion8).not.toHaveBeenCalled();
     expect(migrateToVersion7).not.toHaveBeenCalled();
   });
+
+  /**
+   * The version read is the input every assertion above trusts.
+   *
+   * `getCurrentSchemaVersion` caught EVERYTHING and returned 0, under a comment
+   * reading "Table doesn't exist yet" — which is one reason the read can fail,
+   * offered as though it were the only one. A locked or corrupt database
+   * answers the same way, and 0 is the one value that means "fresh install, run
+   * everything": a transient fault replays all six migrations against a fully
+   * migrated database.
+   *
+   * That is not a slow launch, it is a throw. 9.2 established that re-running
+   * migration 7 reaches `recordMigration(database, 7)` against an
+   * `INTEGER PRIMARY KEY`, and the second insert fails with
+   * SQLITE_CONSTRAINT_PRIMARYKEY. So the recovery path from a transient error
+   * is a hard failure — and the cause is unrecoverable by the retry in
+   * `_layout.tsx`, which never touches the database.
+   *
+   * These two tests are the pair: the swallow must survive for the reason its
+   * comment gives, and must not survive for any other.
+   */
+  /** Fail the `schema_version` read specifically, leaving other queries alone. */
+  const versionReadFailsWith = (error: Error): void => {
+    mockGetFirstAsync.mockImplementation(async (sql: string) => {
+      if (sql.includes('schema_version')) throw error;
+      return { count: 0 };
+    });
+  };
+
+  it('still treats a missing schema_version table as a fresh install', async () => {
+    // The reason the catch exists, kept working. On a genuinely new install the
+    // table is absent and the read throws; version 0 plus no `allbeers` in
+    // `sqlite_master` (the default `getAllAsync` mock returns none) is the
+    // fresh-install branch, which creates tables AT the current version and
+    // deliberately runs no migration.
+    versionReadFailsWith(new Error('no such table: schema_version'));
+
+    await setupDatabase();
+
+    expect(migrateToVersion3).not.toHaveBeenCalled();
+    expect(mockDatabase.runAsync).toHaveBeenCalledWith(expect.stringContaining('schema_version'), [
+      CURRENT_SCHEMA_VERSION,
+      expect.any(String),
+    ]);
+  });
+
+  it('migrates a pre-versioned database when the table is absent but tables exist', async () => {
+    // The other arm behind the same swallowed error, and the one that makes it
+    // load-bearing rather than merely tolerated: an upgrade from a build with
+    // no `schema_version` table. It must reach `runMigrations(database, 2)`.
+    versionReadFailsWith(new Error('no such table: schema_version'));
+    mockDatabase.getAllAsync.mockResolvedValueOnce([{ name: 'allbeers' }]);
+
+    await setupDatabase();
+
+    expect(migrateToVersion3).toHaveBeenCalledWith(mockDatabase);
+    expect(migrateToVersion8).toHaveBeenCalledWith(mockDatabase);
+  });
+
+  it('does not replay migrations when the version read fails for any other reason', async () => {
+    // A locked database is the realistic case, and the one the old catch could
+    // not tell apart from an absent table.
+    versionReadFailsWith(new Error('database is locked'));
+
+    await expect(setupDatabase()).rejects.toThrow(/database is locked/);
+
+    expect(migrateToVersion3).not.toHaveBeenCalled();
+    expect(migrateToVersion7).not.toHaveBeenCalled();
+    expect(migrateToVersion8).not.toHaveBeenCalled();
+  });
 });
