@@ -465,8 +465,11 @@ jobs:
             echo "❔ Android Maestro tests: known-red, non-blocking (Android is not a supported target — see .maestro/config.yaml); no results uploaded" >> "$GITHUB_STEP_SUMMARY"
           elif ! find "maestro-test-results-android" -name '*.xml' -type f 2>/dev/null | grep -q .; then
             echo "### ❔ Android Tests - INCONCLUSIVE (artifact uploaded, no JUnit XML)" >> "$GITHUB_STEP_SUMMARY"
-          # `<error` as well as `<failure`: a launch failure, which is what the
-          # known-red Android job produces, is reported as `<error>`.
+          # The `<error` alternation is INERT against Maestro 2.4.0, which has
+          # no Error class and emits launch failures as
+          # `<testcase status="ERROR"><failure>…</failure></testcase>`. Kept as
+          # insurance against a reporter change. The real fix is the
+          # XML-presence arm above it.
           elif grep -rlq '<failure\|<error' "maestro-test-results-android" 2>/dev/null; then
             echo "❌ Android Maestro tests failed — known-red, non-blocking (Android is not a supported target — see .maestro/config.yaml)" >> "$GITHUB_STEP_SUMMARY"
           else
