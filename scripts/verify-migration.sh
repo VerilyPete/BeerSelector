@@ -119,15 +119,32 @@ q() {
 # not because anything failed, but because bash propagates a compound
 # command's exit status as the function's return value. `inspect`, whose body
 # is just `report`, would then exit non-zero having printed nothing but
-# correct output. The explicit `return 0` decouples "did the report run" from
+# correct output. The explicit `return 0` decoupled "did the report run" from
 # "did the last line's guard happen to be true".
+#
+# It also decoupled it from "did any of these reads WORK", which was too much.
+# A bare `return 0` masked every `q` failure inside the function, and `inspect`
+# is nothing but `report` — so `inspect` exited 0 over a completely unreadable
+# database, printing three blank fields. `q` writes SQLITE ERROR to stderr, so
+# a human at a terminal sees it; a wrapping script sees success. That is the
+# position this script argues against everywhere else — see `downgrade` below,
+# where every write is checked because "a verification tool that reports
+# 'staged' over a write that silently failed is worse than no tool at all".
+#
+# So: still decoupled from PROBE_KEY, no longer decoupled from failure. Each
+# read's status is captured and the worst one is returned, AFTER printing what
+# was obtained — a partially readable database should still show what it could.
 report() {
-  echo "  schema_version rows : $(q "SELECT group_concat(version, ',') FROM (SELECT version FROM schema_version ORDER BY version)")"
-  echo "  MAX(version)        : $(q 'SELECT MAX(version) FROM schema_version')"
+  local rc=0 rows max probe
+  rows=$(q "SELECT group_concat(version, ',') FROM (SELECT version FROM schema_version ORDER BY version)") || rc=$?
+  echo "  schema_version rows : $rows"
+  max=$(q 'SELECT MAX(version) FROM schema_version') || rc=$?
+  echo "  MAX(version)        : $max"
   if [ -n "$PROBE_KEY" ]; then
-    echo "  $PROBE_KEY row : $(q "SELECT COALESCE((SELECT value FROM preferences WHERE key='$PROBE_KEY'), '<absent>')")"
+    probe=$(q "SELECT COALESCE((SELECT value FROM preferences WHERE key='$PROBE_KEY'), '<absent>')") || rc=$?
+    echo "  $PROBE_KEY row : $probe"
   fi
-  return 0
+  return "$rc"
 }
 
 case "$STAGE" in
