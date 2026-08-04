@@ -344,6 +344,19 @@ describe('a store switch between fetch and commit', () => {
         holderDuringInsert.push(mockLockHolder);
       });
 
+      // The freshness stamp too, not just the insert. 9.15 was a stamp written
+      // one statement AFTER its hold returned, on a different arm; these two
+      // stamp inside the CALLER's hold rather than one of their own, so the
+      // containment is real but comes from somewhere else and is worth
+      // asserting rather than assuming.
+      const holderDuringStamp: (string | null)[] = [];
+      const realSetPreference = setPreference as jest.Mock;
+      realSetPreference.mockImplementation(async (key: string) => {
+        if (key === 'all_beers_last_check') {
+          holderDuringStamp.push(mockLockHolder);
+        }
+      });
+
       await sequentialRefreshAllData();
 
       // 'refresh-all-data-write', not 'all-beers-write': the sequential path
@@ -351,6 +364,7 @@ describe('a store switch between fetch and commit', () => {
       // The first draft of this test asserted the per-source name and failed —
       // the expectation was wrong, not the code.
       expect(holderDuringInsert).toEqual(['refresh-all-data-write']);
+      expect(holderDuringStamp).toEqual(['refresh-all-data-write']);
     });
 
     it('writes when the same store is re-selected', async () => {

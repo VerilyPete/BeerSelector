@@ -385,6 +385,34 @@ describe('taplist ETag invalidation', () => {
     expect(holderDuringCount).toEqual(['all-beers-etag-invalidate']);
   });
 
+  it('stamps the freshness window while still holding the write lock', async () => {
+    // 9.15. `7013cd27` moved the 304 arm's stamp inside its hold and stated the
+    // principle: "Left outside, it reintroduces the same window one statement
+    // later." The success path does not follow it — `all_beers_last_update` and
+    // `all_beers_last_check` are written AFTER `withDatabaseLock` returns.
+    //
+    // The login's gate-open burst now takes the same lock, so it runs the
+    // instant that hold releases — i.e. between the commit and these two
+    // statements. The stamp then lands under the NEW store's configuration.
+    //
+    // 9.18 is why this is the half that matters. A cross-store ETag misses at
+    // the proxy and returns a 200, so the rows self-correct on the next
+    // refresh. The stamp does not: `all_beers_last_check` suppresses the
+    // automatic refresh for twelve hours, so the user sits on the old store's
+    // rows until something manual happens. The durable harm is here, not in the
+    // validator.
+    const holderDuringStamp: (string | null)[] = [];
+    (setPreference as jest.Mock).mockImplementation(async (key: string) => {
+      if (key === 'all_beers_last_check') {
+        holderDuringStamp.push(mockLockHolder);
+      }
+    });
+
+    await svc.fetchAndUpdateAllBeers();
+
+    expect(holderDuringStamp).toEqual(['all-beers-write']);
+  });
+
   it('honours a 304 when the table actually holds rows', async () => {
     // The other direction: the backstop must not cost a full download on every
     // ordinary 304, which is the entire point of the ETag.
