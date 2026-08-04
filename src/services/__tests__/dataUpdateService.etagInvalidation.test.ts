@@ -428,6 +428,14 @@ describe('taplist ETag invalidation', () => {
     await svc.fetchAndUpdateAllBeers();
 
     expect(holderDuringStamp).toEqual(['all-beers-write']);
+
+    // And the guard read on THIS arm. The recorder assertions elsewhere pin
+    // 'all-beers-etag-invalidate' (304 arm) and 'refresh-all-data-write'
+    // (sequential); nothing pinned 'all-beers-write', so hoisting its guard out
+    // of the hold and passing the boolean in survived both service test files
+    // AND the full suite. That is the replace arm — the one 9.6, 9.15 and 9.20
+    // are all about.
+    expect(mockConfigReadHolders).toContain('all-beers-write');
   });
 
   it('honours a 304 when the table actually holds rows', async () => {

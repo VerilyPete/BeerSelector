@@ -118,8 +118,15 @@ jest.mock('../../database/repositories/RewardsRepository', () => ({
 // Tracks WHO holds the lock while the task runs. A bare passthrough stub can
 // observe that a lock was ACQUIRED but never that work happened INSIDE the
 // hold, and an empty-hold mutant with the guarded work hoisted out satisfies
-// every acquisition-shaped assertion. Mutation testing confirmed that mutant
-// survived the full 2241-test suite at this site.
+// every acquisition-shaped assertion.
+//
+// Scope of that claim, corrected: the empty-hold mutant survives THIS FILE's
+// assertions (13/13 green before the recorder was added). It does NOT survive
+// the full suite — `sequentialRefreshAllData.locking.test.ts`'s "holds the lock
+// across every write" catches it, and did so before any of this was written.
+// An earlier version of this comment claimed the full suite missed it, which
+// was false: the file-level result was measured and the suite-level extension
+// was assumed.
 let mockLockHolder: string | null = null;
 
 jest.mock('../../database/DatabaseLockManager', () => ({
