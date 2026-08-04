@@ -750,6 +750,37 @@ async function runTaplistFetch(storeId: string | null): Promise<TaplistFetchResu
 }
 
 /**
+ * The sentence a person reads when a source could not be asked at all.
+ *
+ * VALIDATION_ERROR is the one classification whose renderer returns
+ * `error.message` verbatim (`notificationUtils.ts:275`). For every other type
+ * the message is a developer detail sitting behind authored copy; for this one
+ * it IS the copy. Interpolating `reason.code` and `reason.detail` into it —
+ * which is what all three throw sites below used to do — published
+ * `All beers unavailable (not-configured): all_beers_api_url is not set` to a
+ * user, naming a preference key they have no way to act on.
+ *
+ * Shared rather than written per site for the reason `resolveMemberApiUrl` is
+ * shared: the last round fixed the TYPE at each site independently and left the
+ * COPY diverging, which reads as a difference between the paths rather than the
+ * omission it was. One function is what makes the next site correct by default.
+ *
+ * The `not-configured` wording is `fetchAndUpdateAllBeers:917` verbatim, because
+ * parity with it is the property under test.
+ *
+ * Reachability, so the wording is not mistaken for a guess: `not-configured` is
+ * the only code any producer currently reaches here — `beerApi.ts:299` is the
+ * sole `unavailable` the taplist can return, and `prepareMyBeers` routes
+ * `not-applicable` to a quiet success before it can arrive. The second arm is
+ * defensive, and is worded to stay true rather than to match the first.
+ */
+function unavailableCopy(label: string, code: UnavailableReason['code']): string {
+  return code === 'not-configured'
+    ? `${label} API URL not set. Please log in to configure API URLs.`
+    : `${label} is not available for this account.`;
+}
+
+/**
  * Unwrap a completed fetch into its rows, or throw with the reason.
  *
  * For sources where nothing but rows is a usable answer — the taplist, where a
@@ -765,10 +796,20 @@ function requireRows<T>(source: UnconditionalSource<FetchOutcome<T>>, label: str
     // and developer prose down the other. `not-applicable` joins it rather than
     // being skipped as it is for rewards: there is no taplist-less mode, so a
     // taplist that reports itself inapplicable is a misconfiguration too.
+    //
+    // Matching the type was only half of it. The message went on carrying the
+    // reason code and detail into a renderer that publishes them, so the typed
+    // error and the plain one read identically to the user — see
+    // `unavailableCopy`. The detail is kept for diagnosis, off the alert.
+    logError(`${label} unavailable (${source.reason.code}): ${source.reason.detail}`, {
+      operation: 'requireRows',
+      component: 'dataUpdateService',
+    });
     throw new SourceFailureError(
       {
         type: ApiErrorType.VALIDATION_ERROR,
-        message: `${label} unavailable (${source.reason.code}): ${source.reason.detail}`,
+        message: unavailableCopy(label, source.reason.code),
+        originalError: source.reason,
       },
       label
     );
@@ -1843,12 +1884,41 @@ async function prepareMyBeers(operation: RefreshOperation): Promise<MyBeersPrepa
       throw new SourceFailureError(myBeersSource.error, 'My beers');
     }
     if (myBeersSource.status !== 'fetched') {
-      throw new Error(
-        `My beers unavailable (${myBeersSource.reason.code}): ${myBeersSource.reason.detail}`
+      // The arm that survives the `not-applicable` return above is
+      // `not-configured` — a member whose `my_beers_api_url` was never written.
+      // It threw a plain Error, so `createErrorResponse` classified it
+      // UNKNOWN_ERROR, whose renderer ALSO returns the message verbatim: the
+      // defect the comment above describes as fixed was fixed for visitor mode
+      // only, and the same sentence still reached an alert down this arm.
+      logError(
+        `My beers unavailable (${myBeersSource.reason.code}): ${myBeersSource.reason.detail}`,
+        { operation: 'prepareMyBeers', component: 'dataUpdateService' }
+      );
+      throw new SourceFailureError(
+        {
+          type: ApiErrorType.VALIDATION_ERROR,
+          message: unavailableCopy('My beers', myBeersSource.reason.code),
+          originalError: myBeersSource.reason,
+        },
+        'My beers'
       );
     }
     if (myBeersSource.data.kind === 'malformed') {
-      throw new Error(`My beers malformed: ${myBeersSource.data.detail}`);
+      // Third instance, one line from the second. `requireRows` types this
+      // MALFORMED_RESPONSE_ERROR precisely because that renderer discards the
+      // message, and the detail here is parser text — "N rows returned and none
+      // carried an id". Untyped, it read out to the user.
+      logError(`My beers malformed: ${myBeersSource.data.detail}`, {
+        operation: 'prepareMyBeers',
+        component: 'dataUpdateService',
+      });
+      throw new SourceFailureError(
+        {
+          type: ApiErrorType.MALFORMED_RESPONSE_ERROR,
+          message: `My beers malformed: ${myBeersSource.data.detail}`,
+        },
+        'My beers'
+      );
     }
     if (myBeersSource.data.kind === 'confirmed-empty') {
       // The one case in which emptying the table is correct: the server was
