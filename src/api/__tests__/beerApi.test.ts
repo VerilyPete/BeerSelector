@@ -76,18 +76,22 @@ describe('Beer API', () => {
       expect(result).toEqual(mockData);
     });
 
-    // INVERTED by plan 02 Phase 3. fetchWithRetry no longer fabricates
-    // `[null, { tasted_brew_current_round: [] }]` for none:// — a server
-    // response that never existed, which every downstream parser read as a
-    // legitimate empty round. Callers reject none:// before calling now, which
-    // the 'reports not-applicable for a none:// URL' test below pins.
-    it.skip('should handle none:// protocol URLs by returning empty data', async () => {
-      const resultPromise = fetchWithRetry('none://placeholder');
-      const result = await resultPromise;
-
-      expect(global.fetch).not.toHaveBeenCalled();
-      expect(result).toEqual([null, { tasted_brew_current_round: [] }]);
-    });
+    // DELETED, not skipped: 'should handle none:// protocol URLs by returning
+    // empty data'. It asserted the synthesised `[null, {
+    // tasted_brew_current_round: [] }]` that plan 02 Phase 3 removed, so it
+    // could never be un-skipped — its body described behaviour that no longer
+    // exists, and leaving it in place invited someone to "repair" the suite by
+    // restoring the fabrication.
+    //
+    // It was kept skipped on the grounds that deleting it would leave the
+    // removal unpinned. That no longer holds: `integration.mockServer.test.ts`
+    // now hands a none:// URL straight to `fetchWithRetry` and requires a
+    // rejection, and mutation testing confirms it is the ONLY test in the suite
+    // that dies when the synthesis is restored — 241 tests across all 14
+    // `src/api/__tests__` suites stay green, this one does not.
+    //
+    // The replacement behaviour — callers rejecting none:// before the request
+    // — stays pinned by 'reports not-applicable for a none:// URL' below.
 
     it('should retry on fetch failure', async () => {
       const mockData = { brewInStock: [] };

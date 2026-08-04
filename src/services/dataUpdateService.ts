@@ -440,6 +440,13 @@ async function readTaplistConfiguration(): Promise<TaplistConfiguration> {
   // not the person to tell" — and that justification does not hold when the
   // cause was a failed read and no store ever changed.
   //
+  // Narrower than it first reads, and review was right to pin this down: the
+  // download only happens if THIS read fails while the second one — inside
+  // `fetchBeersFromAPI` — succeeds. A persistently failing read returns
+  // `not-configured` from there instead, `requireRows` throws, and the result
+  // is `success: false` with no download at all. The wasteful path needs a
+  // transient fault, not a sustained one.
+  //
   // This bites the sequential path specifically: `fetchAndUpdateAllBeers`
   // early-returns on `!apiUrl` before fetching, and `prepareAllBeers` has no
   // such guard. That is the same asymmetry the `unavailableCopy` work found
@@ -801,21 +808,39 @@ async function runTaplistFetch(storeId: string | null): Promise<TaplistFetchResu
 /**
  * The sentence a person reads when a source could not be asked at all.
  *
- * VALIDATION_ERROR is the one classification whose renderer returns
- * `error.message` verbatim (`notificationUtils.ts:275`). For every other type
- * the message is a developer detail sitting behind authored copy; for this one
- * it IS the copy. Interpolating `reason.code` and `reason.detail` into it —
- * which is what all three throw sites below used to do — published
+ * VALIDATION_ERROR is one of THREE classifications whose renderer returns
+ * `error.message` verbatim. `getUserFriendlyErrorMessage` does it in the
+ * VALIDATION_ERROR, INFO and UNKNOWN_ERROR/default arms; every other type
+ * discards the message behind authored copy. For those three the message IS
+ * the copy. Interpolating `reason.code` and `reason.detail` into it — which is
+ * what the throw sites below used to do — published
  * `All beers unavailable (not-configured): all_beers_api_url is not set` to a
  * user, naming a preference key they have no way to act on.
+ *
+ * This said "the one classification", which was false and dangerously so: read
+ * literally it licenses leaving an UNKNOWN_ERROR site interpolated, which is
+ * exactly the defect being fixed at `prepareMyBeers` twelve hundred lines below.
+ * INFO is live too — `fetchAndUpdateMyBeers` returns an INFO-typed error in
+ * visitor mode. Corrected after review; the commit message and the sibling
+ * comment at the my-beers throw both had it right, and only this docstring —
+ * the one meant to be canonical — had it wrong.
  *
  * Shared rather than written per site for the reason `resolveMemberApiUrl` is
  * shared: the last round fixed the TYPE at each site independently and left the
  * COPY diverging, which reads as a difference between the paths rather than the
  * omission it was. One function is what makes the next site correct by default.
  *
- * The `not-configured` wording is `fetchAndUpdateAllBeers:917` verbatim, because
- * parity with it is the property under test.
+ * TWO call sites, not three — `requireRows` and the `prepareMyBeers`
+ * not-configured arm. The third site changed in the same commit is the
+ * `prepareMyBeers` malformed throw, which needs no copy at all because
+ * MALFORMED_RESPONSE_ERROR's renderer discards the message outright. That
+ * commit's message said "three throw sites given authored copy via one helper",
+ * which overstates it; three sites were fixed, two of them this way.
+ *
+ * The `not-configured` wording is `fetchAndUpdateAllBeers`'s own `!apiUrl` copy
+ * verbatim, because parity with it is the property under test. Cited by symbol:
+ * this said `:917` and was wrong when written, which is the third time on this
+ * branch a line citation has rotted before it was read.
  *
  * Reachability, so the wording is not mistaken for a guess: `not-configured` is
  * the only code any producer currently reaches here — `beerApi.ts:299` is the

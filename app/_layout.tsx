@@ -28,8 +28,7 @@ import {
 } from '@/src/services/dataUpdateService';
 import { getPreference, setPreference, areApiUrlsConfigured } from '@/src/database/preferences';
 import { getDatabase, closeDatabaseConnection } from '@/src/database/connection';
-import { getCurrentSchemaVersion, CURRENT_SCHEMA_VERSION } from '@/src/database/schemaVersion';
-import { migrateToVersion3 } from '@/src/database/migrations/migrateToV3';
+import { runStartupMigrationCheck } from '@/src/database/startupMigrationCheck';
 import { AppProvider } from '@/context/AppContext';
 import { NetworkProvider } from '@/context/NetworkContext';
 import { OperationQueueProvider } from '@/context/OperationQueueContext';
@@ -158,34 +157,33 @@ export default function RootLayout() {
 
           await runPostSetupInit();
 
-          // Check for schema migrations
+          // Check for schema migrations.
+          //
+          // Contained in `runStartupMigrationCheck` rather than inline, because
+          // NOTHING here may throw. This point is past `dbInitialized = true`,
+          // so the catch below takes its `else` branch — which does not retry
+          // and does not alert. Anything thrown from this check therefore
+          // silently skips everything after it: the API-URL / `first_launch`
+          // routing that sends a new user to Settings, and the Live Activity
+          // sync. A transient SQLITE_BUSY would land a first-launch user in the
+          // tab UI with no configuration and no explanation.
+          //
+          // That became reachable when 9.11 made `getCurrentSchemaVersion`
+          // propagate unrecognised read failures. 9.11 is right at its other
+          // call site, inside `setupTables`, where a throw lands here with
+          // `dbInitialized` still false and DOES drive the retry. The reasoning
+          // was done against that site alone and inverted its own intent here.
+          // Found by review, not by test — the block was untestable while it
+          // lived inside this component.
           const db = await getDatabase();
-          const currentVersion = await getCurrentSchemaVersion(db);
+          const migrationOutcome = await runStartupMigrationCheck(db, setMigrationProgress);
 
-          if (currentVersion < CURRENT_SCHEMA_VERSION) {
-            console.log(
-              `Migration needed from version ${currentVersion} to ${CURRENT_SCHEMA_VERSION}...`
+          if (migrationOutcome.status === 'migration-failed') {
+            Alert.alert(
+              'Database Update Failed',
+              'The app may not function correctly. Please restart the app.',
+              [{ text: 'OK' }]
             );
-            setMigrationProgress(0);
-
-            try {
-              // Run migration with progress callback
-              await migrateToVersion3(db, (current, total) => {
-                const progress = (current / total) * 100;
-                setMigrationProgress(progress);
-              });
-
-              setMigrationProgress(null);
-              console.log('Migration complete, reloading app state...');
-            } catch (error) {
-              console.error('Migration failed:', error);
-              setMigrationProgress(null); // Reset UI even on error
-              Alert.alert(
-                'Database Update Failed',
-                'The app may not function correctly. Please restart the app.',
-                [{ text: 'OK' }]
-              );
-            }
           }
 
           // Check if API URLs are set using centralized helper

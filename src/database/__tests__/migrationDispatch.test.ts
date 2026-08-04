@@ -76,6 +76,19 @@ describe('migration dispatch', () => {
 
   afterEach(() => {
     jest.restoreAllMocks();
+    // `mockReset`, not just `clearAllMocks`/`restoreAllMocks`. Neither of those
+    // removes an implementation installed on a bare `jest.fn()`:
+    // `clearAllMocks` clears calls only, `restoreAllMocks` restores `spyOn`
+    // spies only, and this project sets neither `resetMocks` nor `restoreMocks`
+    // in its Jest config. `versionReadFailsWith` installs a THROWING
+    // implementation, which would otherwise persist into every test that runs
+    // after it in this file.
+    //
+    // Harmless today purely by position — those tests are last, and the ones
+    // above override with `mockResolvedValue`. That is luck, and the next test
+    // appended here would inherit a database that throws on every
+    // `schema_version` read. Found by review, not by a failure.
+    mockGetFirstAsync.mockReset();
   });
 
   it('runs the v8 migration on a database at version 7', async () => {
@@ -216,12 +229,26 @@ describe('migration dispatch', () => {
    * everything": a transient fault replays all six migrations against a fully
    * migrated database.
    *
-   * That is not a slow launch, it is a throw. 9.2 established that re-running
-   * migration 7 reaches `recordMigration(database, 7)` against an
-   * `INTEGER PRIMARY KEY`, and the second insert fails with
-   * SQLITE_CONSTRAINT_PRIMARYKEY. So the recovery path from a transient error
-   * is a hard failure — and the cause is unrecoverable by the retry in
-   * `_layout.tsx`, which never touches the database.
+   * That is not a slow launch, it is a throw — but by a route this comment
+   * originally described wrongly in every particular. The corrected account:
+   * `setupTables` enters the pre-versioned branch and calls
+   * `runMigrations(database, 2)`, which starts at `migrateToVersion3`. On an
+   * already-migrated database `ALTER TABLE allbeers ADD COLUMN glass_type`
+   * SUCCEEDS, because `migrateToVersion4` renamed that column to
+   * `container_type` and left the name free. It then throws at
+   * `recordMigration(database, 3)` — version 3, not 7 — on the
+   * `INTEGER PRIMARY KEY`. That sits inside `withTransactionAsync`, so it rolls
+   * back and the stray column does not persist.
+   *
+   * The retry in `_layout.tsx` DOES run, and the earlier claim that it "never
+   * touches the database" was simply false: this throw happens inside
+   * `setupDatabase()`, so `dbInitialized` is still false and the retry calls
+   * `resetDatabaseState()` and `setupDatabase()` again. What it cannot do is
+   * HELP — it clears in-process state only, so the second attempt meets
+   * identical on-disk state and fails identically.
+   *
+   * Corrected after review caught the original account borrowing 9.2's
+   * migration-7 mechanism and applying it to a path that starts at 3.
    *
    * These two tests are the pair: the swallow must survive for the reason its
    * comment gives, and must not survive for any other.
@@ -234,13 +261,33 @@ describe('migration dispatch', () => {
     });
   };
 
-  it('still treats a missing schema_version table as a fresh install', async () => {
-    // The reason the catch exists, kept working. On a genuinely new install the
-    // table is absent and the read throws; version 0 plus no `allbeers` in
-    // `sqlite_master` (the default `getAllAsync` mock returns none) is the
-    // fresh-install branch, which creates tables AT the current version and
-    // deliberately runs no migration.
-    versionReadFailsWith(new Error('no such table: schema_version'));
+  /**
+   * Version zero as production actually produces it.
+   *
+   * These two tests originally drove a THROWING read, on the assumption that a
+   * missing `schema_version` table is how a fresh install reports itself. It is
+   * not, and review caught it: `setupTables` runs
+   * `CREATE TABLE IF NOT EXISTS schema_version` immediately before the read, so
+   * the table is never absent at that point. A fresh install gets zero because
+   * `SELECT MAX(version)` is an aggregate with no `GROUP BY` — it returns one
+   * row, `{ version: null }`, over an empty table — and `?? 0` turns that into
+   * 0. The catch is not involved at all.
+   *
+   * Driving them through the reachable input means they now describe a state
+   * the app can genuinely be in. The `getAllAsync` result is what separates the
+   * two cases, exactly as it does in `schema.ts`.
+   */
+  const versionTableIsEmpty = (): void => {
+    mockGetFirstAsync.mockImplementation(async (sql: string) =>
+      sql.includes('schema_version') ? { version: null } : { count: 0 }
+    );
+  };
+
+  it('treats an empty schema_version table with no tables as a fresh install', async () => {
+    // No `allbeers` in `sqlite_master` — the default `getAllAsync` mock returns
+    // none — so this is the fresh-install branch, which creates tables AT the
+    // current version and deliberately runs no migration.
+    versionTableIsEmpty();
 
     await setupDatabase();
 
@@ -251,11 +298,13 @@ describe('migration dispatch', () => {
     ]);
   });
 
-  it('migrates a pre-versioned database when the table is absent but tables exist', async () => {
-    // The other arm behind the same swallowed error, and the one that makes it
-    // load-bearing rather than merely tolerated: an upgrade from a build with
-    // no `schema_version` table. It must reach `runMigrations(database, 2)`.
-    versionReadFailsWith(new Error('no such table: schema_version'));
+  it('migrates a pre-versioned database whose tables exist but version does not', async () => {
+    // The TestFlight-upgrader path: tables present, no version recorded. Review
+    // confirmed this test is the ONLY cover for it anywhere in the suite —
+    // `schema.test.ts` hard-sets `getAllAsync` to `[]` in its `beforeEach` and
+    // never takes this branch — and it is what pins the `runMigrations(database,
+    // 2)` entry point, whose boundary dies to a `2` → `3` mutant.
+    versionTableIsEmpty();
     mockDatabase.getAllAsync.mockResolvedValueOnce([{ name: 'allbeers' }]);
 
     await setupDatabase();

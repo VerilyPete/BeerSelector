@@ -36,6 +36,7 @@ import {
 } from '../../api/__tests__/helpers/fetchOutcomeFixtures';
 import { ApiErrorType, getUserFriendlyErrorMessage } from '../../utils/notificationUtils';
 import { getPreference } from '../../database/preferences';
+import { logError } from '../../utils/errorLogger';
 import {
   sequentialRefreshAllData,
   fetchAndUpdateAllBeers,
@@ -155,14 +156,21 @@ describe('an empty taplist', () => {
  * Type parity was never the whole job.
  *
  * The block above deliberately asserts type rather than message, and says so.
- * That is right for UNKNOWN_ERROR and MALFORMED_RESPONSE_ERROR, whose renderers
- * discard `error.message` — reaching them IS the fix. It is not right for
- * VALIDATION_ERROR: `getUserFriendlyErrorMessage` returns its message verbatim
- * (`notificationUtils.ts:275`), so for that one type the message is not a
- * developer detail behind the classification, it is the classification's entire
- * user-visible output. A suite that forbids UNKNOWN_ERROR and then lets
- * VALIDATION_ERROR carry `not-configured: all_beers_api_url is not set` has
- * moved the leak, not closed it.
+ * That is right for MALFORMED_RESPONSE_ERROR, whose renderer discards
+ * `error.message` — reaching it IS the fix. It is not right for
+ * VALIDATION_ERROR: `getUserFriendlyErrorMessage` returns its message verbatim,
+ * so for that type the message is not a developer detail behind the
+ * classification, it is the classification's entire user-visible output. A
+ * suite that forbids UNKNOWN_ERROR and then lets VALIDATION_ERROR carry
+ * `not-configured: all_beers_api_url is not set` has moved the leak, not closed
+ * it.
+ *
+ * An earlier version of this paragraph grouped UNKNOWN_ERROR with
+ * MALFORMED_RESPONSE_ERROR as a renderer that discards the message. It does
+ * not — it publishes it, which is the whole reason the tests below forbid it by
+ * name, and which this same file states correctly twice elsewhere. Forbidding
+ * UNKNOWN_ERROR is worth doing because its copy is unauthored, not because it
+ * is silent. Corrected after review.
  *
  * These tests therefore assert what a person reads, and they assert it
  * negatively — no reason code, no snake_case preference name — because the
@@ -181,9 +189,10 @@ describe('the message a user actually reads', () => {
   // configured — which put the DIRECT path into `requireRows` too and made both
   // paths leak identically, hiding the asymmetry behind a passing parity test.
   //
-  // The asymmetry is real: `fetchAndUpdateAllBeers:906` returns authored copy on
-  // `!apiUrl` before it fetches; `prepareAllBeers:1692` reads the same value,
-  // takes `storeId = null` from it, and carries on into the fetch.
+  // The asymmetry is real: `fetchAndUpdateAllBeers` returns authored copy on
+  // `!apiUrl` before it fetches; `prepareAllBeers` reads the same value, takes
+  // `storeId = null` from it, and carries on into the fetch. (By symbol — both
+  // line numbers this originally cited were already wrong when written.)
   const taplistUrlUnset = () => {
     (getPreference as jest.Mock).mockImplementation(async (key: string) =>
       key === 'all_beers_api_url' ? null : key === 'my_beers_api_url' ? 'https://x/my.json' : null
@@ -218,6 +227,77 @@ describe('the message a user actually reads', () => {
     );
   });
 
+  // RELATIVE PLUS ABSOLUTE. The parity assertion above is relative — it dies if
+  // one side moves and survives if BOTH do. Mutation testing showed exactly
+  // that: changing `unavailableCopy`'s not-configured arm AND the direct path's
+  // string to "Bananas." passed all 418 service tests. The authored copy is the
+  // entire deliverable of this work and had no positive assertion anywhere in
+  // the repo.
+  //
+  // This is the same trap `migrationDispatch.test.ts` documents against itself
+  // — a literal 7 rather than `CURRENT_SCHEMA_VERSION - 1`, because the
+  // relative form is vacuous against the mutation that matters. The reasoning
+  // was there to copy and was not copied.
+  //
+  // Both sentences are asserted verbatim, so a reworded alert is a deliberate
+  // act with a test to update, not a silent edit.
+  it('says the authored sentence, not merely a clean one, for the taplist', async () => {
+    taplistUrlUnset();
+
+    const direct = await fetchAndUpdateAllBeers();
+
+    expect(getUserFriendlyErrorMessage(direct.error!)).toBe(
+      'All beers API URL not set. Please log in to configure API URLs.'
+    );
+  });
+
+  it('says the authored sentence, not merely a clean one, for my beers', async () => {
+    // The anchor this suite was missing. `fetchAndUpdateMyBeers` hardcodes this
+    // exact sentence, so it is the direct-path reference for my-beers in the
+    // same way `fetchAndUpdateAllBeers` is for the taplist — and it makes the
+    // my-beers copy positively pinned rather than guarded only by "contains no
+    // developer prose", which any wrong-but-tidy sentence satisfies.
+    (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(
+      unavailable('not-configured', 'my_beers_api_url is not set')
+    );
+
+    const result = await sequentialRefreshAllData();
+
+    expect(getUserFriendlyErrorMessage(result.myBeersResult.error!)).toBe(
+      'My beers API URL not set. Please log in to configure API URLs.'
+    );
+  });
+
+  it('keeps developer prose out of the not-applicable arm too', async () => {
+    // `unavailableCopy`'s second arm had ZERO coverage: mutating it to leak
+    // `unavailable (not-applicable)` survived all 418 service tests. Worse, the
+    // `developerProse` regex above lists `not-applicable` specifically, so that
+    // alternation was dead weight — the suite could not produce the string it
+    // was written to catch.
+    //
+    // Reachability is why it was untested: `beerApi.ts:299` only ever emits
+    // `not-configured`, and `prepareMyBeers` intercepts `not-applicable` before
+    // it reaches a throw. So this arm is defensive code today. It is tested
+    // rather than deleted because the guarantee is about what a user reads, and
+    // the first producer that does emit `not-applicable` should not be the
+    // thing that discovers the copy was never checked.
+    (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(
+      unavailable('not-applicable', 'my_beers_api_url is a none:// placeholder')
+    );
+    (fetchBeersFromAPI as jest.Mock).mockResolvedValue(
+      unavailable('not-applicable', 'all_beers_api_url is a none:// placeholder')
+    );
+
+    const sequential = await sequentialRefreshAllData();
+
+    expect(getUserFriendlyErrorMessage(sequential.allBeersResult.error!)).not.toMatch(
+      developerProse
+    );
+    expect(getUserFriendlyErrorMessage(sequential.allBeersResult.error!)).toBe(
+      'All beers is not available for this account.'
+    );
+  });
+
   it('names no internal identifier when a member has no my-beers URL', async () => {
     // `prepareMyBeers` routes `not-applicable` to a quiet success, so the arm
     // that still throws is `not-configured` — a member whose my_beers_api_url
@@ -232,6 +312,29 @@ describe('the message a user actually reads', () => {
     expect(result.myBeersResult.success).toBe(false);
     expect(result.myBeersResult.error?.type).not.toBe(ApiErrorType.UNKNOWN_ERROR);
     expect(getUserFriendlyErrorMessage(result.myBeersResult.error!)).not.toMatch(developerProse);
+  });
+
+  it('still records the detail it took out of the alert', async () => {
+    // The other half of every fix in this block, and the half nothing asserted:
+    // deleting all three new `logError` calls survived 418/418 tests. "Off the
+    // alert, but kept for diagnosis" was a claim in a comment with no test
+    // behind it — which on this branch is the defect, not merely a gap.
+    //
+    // Asserted on the reason code and the preference key together, because
+    // those are precisely the two things removed from the user-facing string;
+    // if they are absent here as well, the information is simply gone.
+    taplistUrlUnset();
+
+    await sequentialRefreshAllData();
+
+    expect(logError).toHaveBeenCalledWith(
+      expect.stringContaining('not-configured'),
+      expect.objectContaining({ component: 'dataUpdateService' })
+    );
+    expect(logError).toHaveBeenCalledWith(
+      expect.stringContaining('all_beers_api_url'),
+      expect.anything()
+    );
   });
 
   it('keeps parser text out of the alert when my beers arrives unusable', async () => {
