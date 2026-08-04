@@ -334,7 +334,18 @@ export default function LoginWebView({
               // than the alternative it replaces — silently configured in the
               // wrong mode, or pointed at a mix of two stores, while being told
               // the login failed.
-              await setPreference('all_beers_api_url', '', 'API endpoint for fetching all beers');
+              // Under the SAME lock as the gate-open burst below. The docstring on
+              // `taplistConfigurationHeld` used to argue this write was exempt —
+              // "racing to '' unlocked only ever causes a safe, cheap abandon, never
+              // a bad commit" — which is true only if the '' lands BEFORE a writer's
+              // guard read. Landing after the guard and before the commit leaves the
+              // old store's rows, its ETag and a fresh timestamp committed under a
+              // configuration that no longer names it. Taking the lock removes the
+              // interleaving entirely: this now lands either before the guard (read
+              // as "changed", safe abandon) or after the commit completes.
+              await databaseLockManager.withDatabaseLock('login-config-commit', async () => {
+                await setPreference('all_beers_api_url', '', 'API endpoint for fetching all beers');
+              });
 
               // Three keys, and nothing reads any of them; the argument for that
               // is in `recordUnreadLoginMetadata`'s docstring, which is where it
@@ -499,7 +510,18 @@ export default function LoginWebView({
               // `areApiUrlsConfigured` takes; the ETag is invalidated before the
               // URL that orphans it; and the same key, written last, is the
               // single point where this login becomes visible to routing.
-              await setPreference('all_beers_api_url', '', 'API endpoint for fetching all beers');
+              // Under the SAME lock as the gate-open burst below. The docstring on
+              // `taplistConfigurationHeld` used to argue this write was exempt —
+              // "racing to '' unlocked only ever causes a safe, cheap abandon, never
+              // a bad commit" — which is true only if the '' lands BEFORE a writer's
+              // guard read. Landing after the guard and before the commit leaves the
+              // old store's rows, its ETag and a fresh timestamp committed under a
+              // configuration that no longer names it. Taking the lock removes the
+              // interleaving entirely: this now lands either before the guard (read
+              // as "changed", safe abandon) or after the commit completes.
+              await databaseLockManager.withDatabaseLock('login-config-commit', async () => {
+                await setPreference('all_beers_api_url', '', 'API endpoint for fetching all beers');
+              });
               await commitTaplistWrite({ kind: 'cleared' });
 
               // Same lock, same reasoning, as the member branch's gate-open
