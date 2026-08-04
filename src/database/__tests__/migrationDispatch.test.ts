@@ -167,7 +167,15 @@ describe('migration dispatch', () => {
     expect(DISPATCH_ARMS[DISPATCH_ARMS.length - 1][0]).toBe(CURRENT_SCHEMA_VERSION);
   });
 
-  it.each([2, 3, 4, 5, 6, 7])(
+  // Derived, not a literal. `DISPATCH_ARMS` has a drift guard — the meta-test
+  // above fails if a new migration is added without extending it — but a bare
+  // `[2, 3, 4, 5, 6, 7]` had none. Whoever bumps CURRENT_SCHEMA_VERSION to 9
+  // would be forced to extend the table and NOT told to extend this list, so
+  // arm 8 would sit untested exactly as arms 3-6 did: the same gap, moved along
+  // by one version.
+  const STORED_VERSIONS = Array.from({ length: CURRENT_SCHEMA_VERSION - 2 }, (_, i) => i + 2);
+
+  it.each(STORED_VERSIONS)(
     'runs every later migration and no earlier one from stored version %i',
     async stored => {
       storedVersionIs(stored);

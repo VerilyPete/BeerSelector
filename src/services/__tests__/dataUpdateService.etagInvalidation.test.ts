@@ -141,9 +141,22 @@ const clearBeforeInsert = (): boolean => {
   );
 };
 
+/**
+ * Which operation held the lock at each read of `all_beers_api_url`.
+ *
+ * `holderDuringCount` pins the COUNT inside the hold, but the guard READ that
+ * authorises the commit can be hoisted out and its boolean passed in — leaving
+ * every other assertion green while reopening check-then-commit across the lock
+ * boundary. Recording the read closes that.
+ */
+const mockConfigReadHolders: (string | null)[] = [];
+
 const storedEtagIs = (value: string | null): void => {
   (getPreference as jest.Mock).mockImplementation(async (key: string) => {
-    if (key === 'all_beers_api_url') return STORE_URL;
+    if (key === 'all_beers_api_url') {
+      mockConfigReadHolders.push(mockLockHolder);
+      return STORE_URL;
+    }
     if (key === 'my_beers_api_url') return 'https://example.com/mybeers.json';
     if (key === 'all_beers_etag') return value;
     return null;
@@ -186,6 +199,7 @@ const proxyFailsAndDirectSucceeds = (): void => {
 describe('taplist ETag invalidation', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockConfigReadHolders.length = 0;
     svc.resetInFlightSequentialRefresh();
     svc.resetLastManualRefreshTime();
     storedEtagIs('W/"old"');
@@ -383,6 +397,9 @@ describe('taplist ETag invalidation', () => {
     // Asserting the holder at call time cannot be satisfied that way: outside
     // the hold there is no holder, so this records null.
     expect(holderDuringCount).toEqual(['all-beers-etag-invalidate']);
+
+    // And the guard read, which the count assertion alone cannot pin.
+    expect(mockConfigReadHolders).toContain('all-beers-etag-invalidate');
   });
 
   it('stamps the freshness window while still holding the write lock', async () => {

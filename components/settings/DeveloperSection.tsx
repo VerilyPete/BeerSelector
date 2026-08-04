@@ -193,6 +193,13 @@ Tasted Beers: ${lastMyBeersRefresh ? new Date(parseInt(lastMyBeersRefresh)).toLo
               // and before the commit leaves the old store's rows and validator
               // committed under a configuration that no longer names them, which
               // is the same bad commit the login-path fix closes.
+              // UNTESTED, and untestable as things stand: there is no test file
+              // anywhere in this repo referencing DeveloperSection. Removing
+              // this lock leaves the entire suite at baseline, so nothing
+              // protects it from being undone. Recorded rather than left
+              // silent — the two sibling sites in LoginWebView each have a test
+              // that stages the interleaving and goes red without the lock, and
+              // this one only has the argument.
               await databaseLockManager.withDatabaseLock('developer-reset-config', async () => {
                 await setPreference('all_beers_api_url', '', 'API endpoint for fetching all beers');
               });

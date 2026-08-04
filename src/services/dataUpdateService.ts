@@ -432,7 +432,8 @@ async function readTaplistConfiguration(): Promise<TaplistConfiguration> {
  * check-then-write atomic. It's only sound because `LoginWebView.tsx`'s
  * gate-open bursts (the writes of a NEW, non-empty `all_beers_api_url`) take
  * the SAME `databaseLockManager` lock. `setPreference` itself still takes no
- * lock — it can't; ~8 sites in this file call it from inside a held lock and
+ * lock — it can't; at least 11 sites in this file call it from inside a held
+ * lock (the count was "~8" before 9.15 moved two stamps inward) and
  * would self-deadlock if it did — so any future writer of a real store URL
  * that doesn't explicitly join this lock reopens the exact race this guard
  * exists to close, silently.

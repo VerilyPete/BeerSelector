@@ -50,9 +50,31 @@ const STORE_B = 'https://fsbs.beerknurd.com/bk-store-json.php?sid=13880';
 /** The value `all_beers_api_url` currently answers with. Flipped mid-test. */
 let mockTaplistUrl = STORE_A;
 
+/**
+ * Which operation held the lock at each read of `all_beers_api_url`.
+ *
+ * The containment assertions in this file record the holder at the INSERT and
+ * at the STAMP. Both still run inside the hold if the guard READ is hoisted out
+ * of it and its boolean passed in:
+ *
+ *     const passed = await taplistConfigurationHeld(fetchedFor);
+ *     await withDatabaseLock('...', async () => { if (!passed) return false; ... });
+ *
+ * and that hoist IS the race — read store A outside the lock, a login writes
+ * store B, the commit lands under B. Mutation testing confirmed the full suite
+ * stayed green against it: the instruments were real but aimed one statement
+ * too late, watching the commit rather than the check that authorises it.
+ *
+ * Recording the read pins both to the same hold, which is the actual invariant.
+ */
+const mockConfigReadHolders: (string | null)[] = [];
+
 jest.mock('../../database/preferences', () => ({
   getPreference: jest.fn(async (key: string) => {
-    if (key === 'all_beers_api_url') return mockTaplistUrl;
+    if (key === 'all_beers_api_url') {
+      mockConfigReadHolders.push(mockLockHolder);
+      return mockTaplistUrl;
+    }
     if (key === 'my_beers_api_url') return 'https://example.com/mybeers.json';
     return null;
   }),
@@ -147,6 +169,7 @@ const fetchThenSwitchStore = (): void => {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockConfigReadHolders.length = 0;
   mockTaplistUrl = STORE_A;
   resetInFlightSequentialRefresh();
   dropInFlightTaplistFetch();
@@ -373,6 +396,10 @@ describe('a store switch between fetch and commit', () => {
       // the expectation was wrong, not the code.
       expect(holderDuringInsert).toEqual(['refresh-all-data-write']);
       expect(holderDuringStamp).toEqual(['refresh-all-data-write']);
+
+      // And the READ that authorises them, which is the half the other two
+      // assertions cannot see.
+      expect(mockConfigReadHolders).toContain('refresh-all-data-write');
     });
 
     it('writes when the same store is re-selected', async () => {
