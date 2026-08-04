@@ -545,13 +545,39 @@ export type TaplistFetchResult = {
  * timeout fixed: describing a condition by where it surfaced rather than by
  * what it is.
  *
- * The concrete gain is exactly one thing: `getUserFriendlyErrorMessage` returns
- * a fixed string for `SERVER_ERROR` and ignores `message`, so the wording below
- * could never reach anyone. An earlier version of this comment also claimed the
- * change protected `allNetworkErrors` — it does not. That predicate accepts only
- * NETWORK_ERROR and TIMEOUT_ERROR, so VALIDATION_ERROR fails it exactly as
- * SERVER_ERROR did, and a genuinely offline user still gets the per-source alert
- * rather than the offline one.
+ * The concrete gain is one thing, on one path: `getUserFriendlyErrorMessage`
+ * returns a fixed string for `SERVER_ERROR` and ignores `message`, so the
+ * wording below could never reach anyone. An earlier version of this comment
+ * also claimed the change protected `allNetworkErrors` — it does not. That
+ * predicate accepts only NETWORK_ERROR and TIMEOUT_ERROR, so VALIDATION_ERROR
+ * fails it exactly as SERVER_ERROR did, and a genuinely offline user still gets
+ * the per-source alert rather than the offline one.
+ *
+ * "On one path" is the correction round 9 forced, and it is a real limit on
+ * this whole line of work rather than a caveat about this function. The wording
+ * reaches a person ONLY through a manual refresh: `useDataRefresh` and
+ * `useSettingsRefresh` render it via `buildRefreshErrorMessages`, which calls
+ * `getUserFriendlyErrorMessage`. On the two automatic paths it structurally
+ * cannot, and neither is a bug this function can fix:
+ *
+ *   - app open — `app/_layout.tsx:115` awaits `fetchAndUpdateAllBeers()` and
+ *     discards the returned `DataUpdateResult`. Its `catch` is not a second
+ *     chance: this function RETURNS the failure and does not throw, so the
+ *     catch never fires for it.
+ *   - tab focus — the three tab screens call `checkAndRefreshOnAppOpen(2)` and
+ *     read `result.updated` only. That result carries an `errors:
+ *     ErrorResponse[]`, and nothing in `app/`, `hooks/`, `components/` or
+ *     `context/` reads `.errors` from anything — verified by grep, not assumed.
+ *
+ * What survives on those paths is a `console.error`, which in a release build
+ * with no debugger attached is nobody. Both call sites predate this branch, so
+ * this is a pre-existing limit rather than a regression — but it is why some of
+ * the classification work here has no observable effect, and choosing a type
+ * for its user-facing copy is worth doing only where copy is read.
+ *
+ * Deliberately not fixed here: surfacing automatic-path failures needs a UI
+ * affordance (this app has no non-modal notice), and an `Alert` on every app
+ * open is worse than the silence.
  *
  * The message no longer promises a retry. Nothing retries in this call — the
  * ETag has been dropped and `all_beers_last_check` deliberately not stamped, so
