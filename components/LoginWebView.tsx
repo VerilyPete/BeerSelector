@@ -420,6 +420,28 @@ export default function LoginWebView({
               // in `dataUpdateService.ts` for the full argument. Line numbers
               // are deliberately not cited here: the two that were have both
               // gone stale on this branch already.
+              //
+              // WHAT THIS COSTS, recorded because taking the lock here created
+              // a way for the login itself to fail that did not exist before.
+              // `acquire` rejects with `DatabaseContentionError` after 30s, and
+              // `_forceRelease` grants the lock to nobody — not the queue, not a
+              // new arrival — until an abandoned holder returns, which it may
+              // never do. A login landing in that window rejects here, into the
+              // catch below: the user is alerted "Could not finish signing you
+              // in" and `onLoginCancel()` runs.
+              //
+              // The sharp edge is that the gate-close `''` write above has
+              // ALREADY committed by then, so the user's previous
+              // `all_beers_api_url` is gone and they are routed to Settings with
+              // no configuration — having done nothing wrong. The visitor branch
+              // below is identical in both respects.
+              //
+              // Accepted rather than fixed: a restart clears it, the window
+              // requires an abandoned 15s hold to coincide with a login, and the
+              // alternative — writing the new configuration before closing the
+              // gate — reopens the cross-store commit this lock exists to
+              // prevent. Plan 01 Phase 6 removes the hold timeout that creates
+              // the abandoned state at all, which is the real fix.
               await databaseLockManager.withDatabaseLock('login-config-commit', async () => {
                 await setPreference(
                   'is_visitor_mode',
