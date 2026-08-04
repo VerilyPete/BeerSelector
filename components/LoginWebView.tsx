@@ -406,13 +406,20 @@ export default function LoginWebView({
               // uncontrolled Keychain I/O with no such bound, so it and
               // everything before it stay outside any hold.
               //
-              // Only a write of a NEW, non-empty store URL needs this lock.
-              // Gate-close writes (`:329` above, `DeveloperSection.tsx:187`)
-              // set `all_beers_api_url` to `''`, and the guard already treats
-              // that as "changed" and abandons — see
-              // `readTaplistConfiguration`'s doc comment. A future writer of a
-              // real store URL that skips this lock reopens the gap this
-              // closes.
+              // EVERY writer of `all_beers_api_url` needs this lock, including
+              // writes of `''`. This comment used to say the opposite — that
+              // only a NEW, non-empty store URL needed it, because the guard
+              // treats `''` as "changed" and abandons — and that reasoning was
+              // refuted: it covers a `''` landing BEFORE a writer's guard read,
+              // and says nothing about one landing after the guard and before
+              // the commit, which leaves the old store's rows committed under a
+              // configuration that no longer names them.
+              //
+              // The gate-close writes above and in `DeveloperSection` now take
+              // this same lock for that reason. See `taplistConfigurationHeld`
+              // in `dataUpdateService.ts` for the full argument. Line numbers
+              // are deliberately not cited here: the two that were have both
+              // gone stale on this branch already.
               await databaseLockManager.withDatabaseLock('login-config-commit', async () => {
                 await setPreference(
                   'is_visitor_mode',

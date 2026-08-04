@@ -805,11 +805,16 @@ describe('LoginWebView', () => {
       // lock is already released when the write runs, so it is null.
       const holderDuringStoreUrlWrite: (string | null)[] = [];
       (setPreference as jest.Mock).mockImplementation(async (key: string, value: string) => {
-        // Non-empty only. The gate-CLOSE write of '' is deliberately unlocked,
-        // so it lands while the taplist writer still holds the lock and would
-        // otherwise show up here as 'all-beers-write'. It is the authoritative
-        // store URL — the one a racing writer must not see mid-commit — whose
-        // containment this asserts.
+        // Non-empty only, isolating the authoritative store URL — the write a
+        // racing taplist writer must not see mid-commit.
+        //
+        // The reason first given here was that the gate-close write of '' is
+        // "deliberately unlocked, so it lands while the taplist writer still
+        // holds the lock". That was true when written and false one commit
+        // later: 9.14 put the gate-close write under this same lock, so it now
+        // records 'login-config-commit' too, never 'all-beers-write'. The
+        // filter is still needed — it separates two writes under the same
+        // holder — but not for the reason originally stated.
         if (key === 'all_beers_api_url' && value !== '') {
           holderDuringStoreUrlWrite.push(databaseLockManager.getCurrentOperation());
         }
@@ -1189,18 +1194,23 @@ describe('LoginWebView', () => {
       // Visitor mirror of the member-path test above. `handleVisitorLogin`'s
       // network call completes before any preference write starts here, so
       // there is no SecureStore-shaped hazard to worry about — this is purely
-      // proving the gate-open burst (:462-479) shares the real lock too.
+      // proving the visitor gate-open burst shares the real lock too.
       (handleVisitorLogin as jest.Mock).mockResolvedValue({ success: true });
 
       // Containment recorder — see the member-path test for why the rest of
       // this test cannot distinguish a real hold from an empty one.
       const holderDuringStoreUrlWrite: (string | null)[] = [];
       (setPreference as jest.Mock).mockImplementation(async (key: string, value: string) => {
-        // Non-empty only. The gate-CLOSE write of '' is deliberately unlocked,
-        // so it lands while the taplist writer still holds the lock and would
-        // otherwise show up here as 'all-beers-write'. It is the authoritative
-        // store URL — the one a racing writer must not see mid-commit — whose
-        // containment this asserts.
+        // Non-empty only, isolating the authoritative store URL — the write a
+        // racing taplist writer must not see mid-commit.
+        //
+        // The reason first given here was that the gate-close write of '' is
+        // "deliberately unlocked, so it lands while the taplist writer still
+        // holds the lock". That was true when written and false one commit
+        // later: 9.14 put the gate-close write under this same lock, so it now
+        // records 'login-config-commit' too, never 'all-beers-write'. The
+        // filter is still needed — it separates two writes under the same
+        // holder — but not for the reason originally stated.
         if (key === 'all_beers_api_url' && value !== '') {
           holderDuringStoreUrlWrite.push(databaseLockManager.getCurrentOperation());
         }
@@ -1260,6 +1270,81 @@ describe('LoginWebView', () => {
       // Containment, not acquisition — the visitor burst gets the same check
       // as the member one, because it had the same gap.
       expect(holderDuringStoreUrlWrite).toEqual(['login-config-commit']);
+    });
+
+    it('does not clear the store URL while a taplist writer holds the lock (visitor)', async () => {
+      // 9.14, visitor path. 9.14 changed three sites and only the member
+      // one was covered; removing the lock at the visitor gate-close left
+      // this suite 73/73 green. Same staging, other branch.
+      // 9.14. `taplistConfigurationHeld`'s docstring justified leaving the
+      // gate-CLOSE write of '' outside the lock: "racing to '' unlocked only
+      // ever causes a safe, cheap abandon, never a bad commit."
+      //
+      // That holds only if the '' lands BEFORE the writer's guard read. It can
+      // equally land AFTER the guard read and BEFORE the commit, which is the
+      // window the lock exists to close: the writer reads store A, the guard
+      // passes, this '' lands, and the writer then commits A's rows, A's ETag
+      // and a fresh timestamp under a configuration that no longer says A.
+      //
+      // This test stages exactly that — a writer holding the lock while a login
+      // arrives — and asserts the clear cannot interleave with it. It was
+      // written RED: before the fix the '' write recorded 'all-beers-write',
+      // i.e. it landed in the middle of another operation's hold.
+      const holderDuringClear: (string | null)[] = [];
+      (setPreference as jest.Mock).mockImplementation(async (key: string, value: string) => {
+        if (key === 'all_beers_api_url' && value === '') {
+          holderDuringClear.push(databaseLockManager.getCurrentOperation());
+        }
+      });
+
+      let releaseTaplistHold: () => void = () => {};
+      const taplistHold = databaseLockManager.withDatabaseLock(
+        'all-beers-write',
+        () =>
+          new Promise<void>(resolve => {
+            releaseTaplistHold = resolve;
+          })
+      );
+
+      (handleVisitorLogin as jest.Mock).mockResolvedValue({ success: true });
+
+      const { getByTestId } = render(
+        <LoginWebView
+          visible={true}
+          onLoginSuccess={mockOnLoginSuccess}
+          onLoginCancel={mockOnLoginCancel}
+          onRefreshData={mockOnRefreshData}
+        />
+      );
+
+      fireEvent(getByTestId('webview-mock'), 'onMessage', {
+        nativeEvent: {
+          data: JSON.stringify({
+            type: 'VISITOR_LOGIN',
+            cookies: { store__id: '67', store: 'Test Store' },
+            rawCookies: 'store__id=67; store=Test Store',
+            url: config.api.getFullUrl('visitor'),
+          }),
+        },
+      });
+
+      await waitFor(() => {
+        expect(databaseLockManager.getQueueLength()).toBe(1);
+      });
+
+      // The clear must not have happened yet — it is queued behind the writer.
+      expect(holderDuringClear).toEqual([]);
+
+      releaseTaplistHold();
+      await taplistHold;
+
+      await waitFor(() => {
+        expect(mockOnLoginSuccess).toHaveBeenCalled();
+      });
+
+      // And when it does happen, it happens under the lock — never interleaved
+      // into someone else's hold.
+      expect(holderDuringClear).toEqual(['login-config-commit']);
     });
   });
 
