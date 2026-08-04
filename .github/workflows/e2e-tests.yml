@@ -66,7 +66,7 @@ jobs:
           # Assert the pin actually took — the checks above prove only that
           # SOME maestro installed, not which version. Full argument at the
           # canonical copy of this step in .github/workflows/maestro-e2e.yml.
-          ACTUAL_VERSION=$(maestro --version)
+          ACTUAL_VERSION=$(MAESTRO_CLI_NO_ANALYTICS=true maestro --version | tail -1)
           if [ "$ACTUAL_VERSION" != "$MAESTRO_VERSION" ]; then
             echo "Error: installed Maestro is '$ACTUAL_VERSION', expected '$MAESTRO_VERSION'"
             exit 1
@@ -231,7 +231,7 @@ jobs:
           # Assert the pin actually took — the checks above prove only that
           # SOME maestro installed, not which version. Full argument at the
           # canonical copy of this step in .github/workflows/maestro-e2e.yml.
-          ACTUAL_VERSION=$(maestro --version)
+          ACTUAL_VERSION=$(MAESTRO_CLI_NO_ANALYTICS=true maestro --version | tail -1)
           if [ "$ACTUAL_VERSION" != "$MAESTRO_VERSION" ]; then
             echo "Error: installed Maestro is '$ACTUAL_VERSION', expected '$MAESTRO_VERSION'"
             exit 1

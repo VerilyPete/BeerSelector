@@ -54,22 +54,41 @@ describe('runStartupMigrationCheck', () => {
 
   afterEach(() => jest.restoreAllMocks());
 
-  it('reports migration-needed and runs the migration when behind', async () => {
+  it('runs the migration when behind, and drives progress from 0 to cleared', async () => {
     (getCurrentSchemaVersion as jest.Mock).mockResolvedValue(CURRENT_SCHEMA_VERSION - 1);
+    // The mock must INVOKE its callback. With a bare `mockResolvedValue` the
+    // percentage arithmetic is dead under test, so `(current / total) * 100`
+    // could drop the `* 100` — or the callback could be dropped from the call
+    // entirely — and every test stayed green.
+    (migrateToVersion3 as jest.Mock).mockImplementation(async (_db, onProgress) => {
+      onProgress(1, 4);
+    });
+    const progress: (number | null)[] = [];
 
-    const outcome = await runStartupMigrationCheck(database, () => {});
+    const outcome = await runStartupMigrationCheck(database, p => progress.push(p));
 
-    expect(migrateToVersion3).toHaveBeenCalled();
-    expect(outcome.status).toBe('migrated');
+    // Passed the real database, not merely called: `toHaveBeenCalled()` with no
+    // arguments would survive the migration being handed `null`.
+    expect(migrateToVersion3).toHaveBeenCalledWith(database, expect.any(Function));
+    expect(outcome).toEqual({ status: 'migrated', from: CURRENT_SCHEMA_VERSION - 1 });
+    // The whole sequence, not just its last element. 0 on entry proves the
+    // overlay appears, 25 proves the percentage is a percentage, null proves it
+    // is cleared on the SUCCESS path — which is the case the failure test below
+    // names a contrast against but cannot itself check.
+    expect(progress).toEqual([0, 25, null]);
   });
 
   it('does nothing when the database is already at the current version', async () => {
     (getCurrentSchemaVersion as jest.Mock).mockResolvedValue(CURRENT_SCHEMA_VERSION);
+    const progress: (number | null)[] = [];
 
-    const outcome = await runStartupMigrationCheck(database, () => {});
+    const outcome = await runStartupMigrationCheck(database, p => progress.push(p));
 
     expect(migrateToVersion3).not.toHaveBeenCalled();
-    expect(outcome.status).toBe('up-to-date');
+    expect(outcome).toEqual({ status: 'up-to-date', version: CURRENT_SCHEMA_VERSION });
+    // Nothing at all, not even a 0: a progress overlay that flashes on every
+    // launch of an up-to-date device is a regression this would otherwise miss.
+    expect(progress).toEqual([]);
   });
 
   it('contains an unreadable version instead of throwing, and says which error', async () => {
@@ -110,6 +129,14 @@ describe('runStartupMigrationCheck', () => {
     // The original block reset the progress UI in its catch as well as its
     // success path, with the comment "Reset UI even on error". A regression here
     // strands a progress bar on screen forever.
+    //
+    // This test's NAME asserts a contrast it cannot check on its own, which is
+    // how it originally passed while the success path went unguarded: moving
+    // `onProgress(null)` out of the `finally` and into the `catch` kept this
+    // green and stranded the bar after every successful migration — the exact
+    // defect the `finally` exists to prevent. The success half of the contrast
+    // now lives in the migration test above; both are needed for either to mean
+    // anything.
     (getCurrentSchemaVersion as jest.Mock).mockResolvedValue(CURRENT_SCHEMA_VERSION - 1);
     (migrateToVersion3 as jest.Mock).mockRejectedValue(new Error('migration exploded'));
     const progress: (number | null)[] = [];
