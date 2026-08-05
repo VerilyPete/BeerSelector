@@ -19,7 +19,8 @@ This plan is about the suite, not the change.
 | 21/21 flows fail on their first assertion | **Certain** | CI log, run 30943454950 |
 | No JUnit XML has ever been produced | **Certain** | `FileNotFoundException: test-results/maestro-ios.xml`; no `mkdir -p` in either workflow |
 | Jest never runs in CI | **Certain** | `.github/workflows/` contains only the two e2e workflows |
-| The app renders nothing because it is a Debug build with no Metro | **High, not verified** | see below |
+| The app renders nothing because it is a Debug build with no Metro | **Proven at source** | upgraded from "High, not verified" — see below |
+| CI will hit the real production API once the launch is fixed | **Certain** | `ENV_BASE_URLS` — every environment is the same live host |
 | The flows' selectors are correct once the app renders | **Unknown** | cannot be known until the app renders |
 
 ## The leading hypothesis
@@ -49,9 +50,41 @@ Four things fit this and little else does:
 The repo already has the counter-example: the performance job builds
 `-configuration Release` (`e2e-tests.yml:376`). The E2E jobs did not follow it.
 
-**This is a hypothesis with strong circumstantial support, not a verified
-diagnosis.** Nobody has watched the app launch on a CI simulator. Phase 1 is
-designed to confirm or kill it cheaply before any other work is done.
+### Upgraded to proven, by review
+
+Adversarial review was asked to kill this hypothesis and could not. It found the
+source instead — `ios/BeerSelector/AppDelegate.swift:96-101`:
+
+```swift
+override func bundleURL() -> URL? {
+    #if DEBUG
+    return RCTBundleURLProvider.sharedSettings().jsBundleURL(forBundleRoot: ".expo/.virtual-metro-entry")
+    #else
+    return Bundle.main.url(forResource: "main", withExtension: "jsbundle")
+    #endif
+}
+```
+
+Unconditional, with no fallback. The `expo-dev-client` dependency in
+`package.json` does not change this: there is no `EXDevLauncher` wiring in
+`ios/BeerSelector`, so the app uses plain `RCTBundleURLProvider` and the classic
+RN rule applies exactly as assumed.
+
+The corroborating argument is stronger than the one this plan originally made:
+**the Settings-only flows fail identically to the data-dependent ones.**
+First-launch routing to Settings needs no network at all — it is pure
+`areApiUrlsConfigured()` / `first_launch` preference logic. Settings failing too
+is explicable only if JS never evaluates, which rules out "wrong selector" and
+"wrong app state" as competing causes rather than merely making them less likely.
+
+`-configuration Release` is confirmed viable with no signing work:
+`project.pbxproj` scopes `CODE_SIGN_IDENTITY` to `[sdk=iphoneos*]`, so a
+simulator Release build needs no identity, team or profile, and there is no
+`expo-updates` runtime dependency to configure.
+
+Phase 1 is therefore no longer load-bearing. It is kept because it is cheap and
+because a screenshot is the difference between believing this and knowing it —
+but nothing now blocks on it.
 
 ## Phase 1 — prove the diagnosis before fixing anything
 
@@ -83,7 +116,54 @@ failure went unseen for so long.
 - [ ] 2.3 Assert in the workflow that the JUnit XML exists and contains at least
       one `<testsuite>`. A missing report should fail loudly, not silently.
 
-## Phase 3 — fix the launch (assuming Phase 1 confirms)
+## Phase 2.5 — BLOCKING: decide what CI is allowed to talk to
+
+**Do this before Phase 3, not after.** Fixing the launch is what makes it
+dangerous, and right now the danger is invisible because nothing renders.
+
+Two facts, both verified:
+
+1. **The mock server is dead wiring.** `maestro-e2e.yml` sets
+   `EXPO_PUBLIC_USE_MOCK_SERVER: 'true'` and runs `npm run mock-server &`, but
+   `USE_MOCK_SERVER` appears **nowhere** in `src/`, `app/`, `components/` or
+   `hooks/` outside test files. The app has never read it. The server starts,
+   idles, and is killed.
+2. **Every environment points at the live third-party server.**
+   `src/config/config.ts:267-271`:
+
+   ```
+   development: 'https://tapthatapp.beerknurd.com'  // "Same as production for now"
+   staging:     'https://tapthatapp.beerknurd.com'
+   production:  'https://tapthatapp.beerknurd.com'
+   ```
+
+   There is no non-production URL in the codebase. `currentEnvironment` also
+   defaults to `'production'` and no workflow sets `EXPO_PUBLIC_DEFAULT_ENV`, but
+   that hardly matters when all three resolve identically.
+
+So the moment Phase 3 succeeds, every flow that gets far enough starts issuing
+real requests to Flying Saucer's production API from GitHub-hosted runners, on
+every push and every PR. That is someone else's service. It is not ours to load
+-test by accident, and "the E2E suite finally works" is exactly the change that
+would start doing it at CI frequency.
+
+Partially defanged today — a `clearState: true` install has no session, so most
+flows route to Settings before reaching an API call, and the member-login flow
+has its real assertions commented out pending credentials. That is luck and a
+half-finished flow, not a control.
+
+- [ ] 2.5a Decide the policy explicitly: mock server, recorded fixtures, a
+      dedicated test account against the real service, or E2E flows that never
+      authenticate. Write the decision down.
+- [ ] 2.5b Either wire `EXPO_PUBLIC_USE_MOCK_SERVER` into `config.ts` so it
+      actually redirects the base URL, or delete the mock-server steps and the
+      env var. Dead CI wiring that looks like a safety control is worse than no
+      control, because it reads as one.
+- [ ] 2.5c Add a real non-production entry to `ENV_BASE_URLS`, or document why
+      all three being identical is intended.
+- [ ] 2.5d Gate: Phase 3 does not land until 2.5a is answered.
+
+## Phase 3 — fix the launch
 
 - [ ] 3.1 Switch the E2E iOS builds to `-configuration Release`, matching the
       performance job. Preferred over starting Metro: no background process to
@@ -93,6 +173,12 @@ failure went unseen for so long.
 - [ ] 3.3 Re-run and record how many of the 21 now pass. Expect partial success,
       not green: the launch fix cannot fix a wrong selector.
 - [ ] 3.4 Remove the "Dismiss Expo dev menu" steps if Release makes them dead.
+- [ ] 3.5 Watch specifically for the NEXT failure mode, which review identified
+      and which looks identical from the outside: `app/_layout.tsx` returns
+      `null` while `!loaded || !initialRoute`, so if `useFonts` or the async init
+      chain never resolves, the screen stays blank and every assertion times out
+      exactly as it does today. A blank screen after Phase 3 is not evidence that
+      Phase 3 failed — check the JS actually evaluated before re-diagnosing.
 
 ## Phase 4 — the flows themselves
 
@@ -122,10 +208,37 @@ Only meaningful once the app renders. Finding 9.21 corrected 48 selectors that
       anything yet: there are 141 pre-existing errors, 5 of them in
       `dataUpdateService.ts`.
 
+## Phase 6 — stop paying twice for the same run
+
+Raised by review, and the biggest cost item in the file. `maestro-e2e.yml`'s
+`maestro-ios` job and `e2e-tests.yml`'s `maestro-tests-ios` job run on the same
+triggers, build the same Debug configuration, and execute the same `.maestro/`
+directory on `macos-latest` — the most expensive runner class — on every push.
+Two full macOS allocations doing identical work, with 45-60 minute timeouts.
+
+This plan fixes near-identical install and summary bugs in both files for the
+second time without ever asking why there are two.
+
+- [ ] 6.1 Decide whether `e2e-tests.yml`'s iOS job should be deleted in favour of
+      `maestro-e2e.yml`'s, which already has the critical-path and parallel
+      matrix the other lacks. `e2e-tests.yml` would keep only its unique
+      Flashlight performance job.
+- [ ] 6.2 Cache CocoaPods. `ios/Pods` and `Podfile.lock` are gitignored and
+      `expo prebuild --clean` regenerates the native project from scratch in all
+      five macOS jobs, every run, with no cache.
+- [ ] 6.3 `actions/cache@v3` → `@v4` throughout. Minor, free, do it alongside
+      Phase 2.
+
 ## Sequencing
 
 5.1 is independent of everything else and delivers the most value per hour — do
-it first or in parallel. Then 1, 2, 3, 4 in order.
+it first or in parallel. Then 1, 2, **2.5**, 3, 4 in order. 6 can go any time and
+pays for itself immediately.
+
+**2.5 is a hard gate on 3.** Everything else here is about making CI tell the
+truth; 2.5 is about not pointing a newly-working test suite at a third party's
+production service. It is the one item where doing the work in the wrong order
+causes harm outside this repo.
 
 Phase 4 is open-ended and should not block the rest. A repo whose unit tests run
 in CI and whose E2E suite is honestly red is in a better position than one where
