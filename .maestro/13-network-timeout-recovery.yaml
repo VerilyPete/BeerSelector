@@ -46,7 +46,7 @@ name: "Network Timeout and Error Recovery"
       - waitForAnimationToEnd
 
 # Step 3: Navigate to All Beer tab
-- tapOn: "All Beer"
+- tapOn: "All Beers"
 - waitForAnimationToEnd
 
 # Step 4: Verify initial state
@@ -234,7 +234,7 @@ name: "Network Timeout and Error Recovery"
 # ========================================
 
 # Step 33: Navigate back to All Beer after potential errors
-- tapOn: "All Beer"
+- tapOn: "All Beers"
 - waitForAnimationToEnd
 
 # Step 34: Verify app recovered and data visible
@@ -302,7 +302,7 @@ name: "Network Timeout and Error Recovery"
     id: "search-bar"
 
 # Step 46: Return to All Beer tab
-- tapOn: "All Beer"
+- tapOn: "All Beers"
 - waitForAnimationToEnd
 
 # Step 47: Verify final state stable

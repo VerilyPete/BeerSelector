@@ -1,13 +1,22 @@
 import React from 'react';
 import { render, fireEvent, waitFor } from '@testing-library/react-native';
-import { Alert } from 'react-native';
+import { Alert, Modal } from 'react-native';
 import { config } from '@/src/config';
 
 // Import after mocks
 import LoginWebView from '@/components/LoginWebView';
 import { setPreference } from '@/src/database/preferences';
-import { saveSessionData } from '@/src/api/sessionManager';
+import { commitTaplistWrite } from '@/src/services/taplistEtag';
+import { saveSessionData, extractSessionDataFromResponse } from '@/src/api/sessionManager';
 import { handleVisitorLogin } from '@/src/api/authService';
+// Deliberately NOT mocked. The behaviour under test — that the gate-open
+// write genuinely queues behind a concurrent lock holder rather than merely
+// running after it in program order — only exists in the real FIFO queue.
+// The passthrough mock used elsewhere in this codebase
+// (`jest.fn(async (_name, task) => task())`) always resolves as a plain
+// function call, so a test built on it cannot tell "wrapped in a lock" from
+// "not wrapped at all" apart — the exact gap this suite exists to close.
+import { databaseLockManager } from '@/src/database/DatabaseLockManager';
 
 // Test URL constants - prefixed with 'mock' to allow use in jest.mock() factory
 const mockTestBaseUrl = 'https://test.beerknurd.com';
@@ -19,12 +28,46 @@ const mockTestTimeout = 15000;
 const mockTestRetries = 3;
 const mockTestRetryDelay = 1000;
 
+// The real `getFullUrl` resolves through this map, so `memberDashboard` becomes
+// `/member-dash.php`. The mock used to interpolate the endpoint NAME instead,
+// producing `/memberDashboard.php` — which never matches the component's
+// `url.includes('member-dash.php')` check, so every injection test silently
+// asserted against a URL the component could not recognise.
+let mockCurrentBaseUrl: string | null = null;
+
+const mockEndpointPaths: Record<string, string> = {
+  kiosk: '/kiosk.php',
+  visitor: '/visitor.php',
+  memberDashboard: '/member-dash.php',
+  memberQueues: '/memberQueues.php',
+  addToQueue: '/addToQueue.php',
+  deleteQueuedBrew: '/deleteQueuedBrew.php',
+  addToRewardQueue: '/addToRewardQueue.php',
+  memberRewards: '/memberRewards.php',
+};
+
 // Mock config module (following gold standard pattern)
 jest.mock('@/src/config', () => ({
   config: {
     api: {
-      getFullUrl: jest.fn(endpoint => `${mockTestBaseUrl}/${endpoint}.php`),
-      baseUrl: mockTestBaseUrl,
+      getFullUrl: jest.fn(
+        endpoint => `${mockTestBaseUrl}${mockEndpointPaths[endpoint] ?? `/${endpoint}.php`}`
+      ),
+      // A getter, not a value. `jest.mock` factories are hoisted above the
+      // `const` declarations above, and Babel's transform makes that early read
+      // yield `undefined` instead of throwing — so a plain `baseUrl:
+      // mockTestBaseUrl` captured undefined. `getFullUrl` escaped this only
+      // because its closure runs when called, long after initialisation.
+      get baseUrl() {
+        return mockCurrentBaseUrl ?? mockTestBaseUrl;
+      },
+      // A setter, because a lifecycle test assigns to this directly to simulate
+      // an environment change. Without one the assignment silently no-ops
+      // against a getter-only property. `beforeEach` clears the override so the
+      // mutation cannot leak into the tests that follow.
+      set baseUrl(value: string) {
+        mockCurrentBaseUrl = value;
+      },
       endpoints: {
         kiosk: '/kiosk.php',
         visitor: '/visitor.php',
@@ -105,6 +148,14 @@ jest.mock('@/src/database/preferences', () => ({
   getPreference: jest.fn().mockResolvedValue(null),
 }));
 
+// Mock the taplist ETag owner. Login invalidates the stored ETag not because
+// the rows and the ETag disagree — they still match each other — but because
+// login repoints `all_beers_api_url` at a different store, leaving the ETag
+// naming a store the app no longer fetches from.
+jest.mock('@/src/services/taplistEtag', () => ({
+  commitTaplistWrite: jest.fn().mockResolvedValue(undefined),
+}));
+
 // Mock session manager
 jest.mock('@/src/api/sessionManager', () => ({
   saveSessionData: jest.fn().mockResolvedValue(undefined),
@@ -129,10 +180,22 @@ describe('LoginWebView', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockWebViewRef.current.injectJavaScript.mockClear();
+    // `clearAllMocks` resets calls but NOT implementations, so a test that
+    // points `getFullUrl` at a throwing stub leaks it into every test that
+    // follows. Restoring the default here is what makes this suite order
+    // -independent.
+    mockCurrentBaseUrl = null;
+    (config.api.getFullUrl as jest.Mock).mockImplementation(
+      (endpoint: string) => `${mockTestBaseUrl}${mockEndpointPaths[endpoint] ?? `/${endpoint}.php`}`
+    );
   });
 
   afterEach(() => {
     jest.clearAllMocks();
+    // Guards every test in the file, not just the ones below that take the
+    // lock deliberately: a test that fails mid-hold would otherwise leave the
+    // singleton locked for every test that runs after it in this file.
+    databaseLockManager.resetForTesting();
   });
 
   describe('Component Rendering', () => {
@@ -159,10 +222,10 @@ describe('LoginWebView', () => {
         />
       );
 
-      // Modal should exist but not be visible
-      const modal = queryByTestId('login-webview-modal');
-      expect(modal).toBeTruthy();
-      expect(modal?.props.visible).toBe(false);
+      // A hidden Modal does not render its children at all, so the content is
+      // absent rather than present-and-flagged-invisible. The test name always
+      // described this; the assertion did not.
+      expect(queryByTestId('login-webview-modal')).toBeNull();
     });
 
     it('should render close button', () => {
@@ -333,11 +396,29 @@ describe('LoginWebView', () => {
       );
 
       expect(saveSessionData).toHaveBeenCalled();
-      expect(mockOnRefreshData).toHaveBeenCalled();
+      // Not `onRefreshData`: this component never calls it. `useLoginFlow`'s
+      // `handleLoginSuccess` does, in response to `onLoginSuccess` below. The
+      // assertion was testing the parent through the child.
       expect(mockOnLoginSuccess).toHaveBeenCalled();
     });
 
-    it('should save authentication cookies', async () => {
+    it('never writes session cookies to the preferences table', async () => {
+      // INVERTED. This used to assert the write. `auth_cookies` held the raw
+      // cookie jar — PHPSESSID included — as plaintext in an ordinary SQLite
+      // row, while the same session was already in SecureStore via
+      // `saveSessionData`. `migrateToV8`'s docstring is the canonical account
+      // of why it went and what its removal does and does not achieve; this
+      // comment used to carry its own copy, which is how a false claim about
+      // the key's history came to be asserted in three files at once.
+      //
+      // Asserted two ways, because the key alone is not the property. The
+      // property is that no session cookie VALUE reaches the preferences
+      // table — under `auth_cookies`, under any other key, whole jar or single
+      // token. An earlier version asserted only the key and the serialised
+      // jar, and mutation testing found the gap that leaves: writing just
+      // `cookies.session` under a blameless-looking key survived it. That is
+      // the realistic shape of a reintroduction, and it exposes the one cookie
+      // that actually matters.
       const { getByTestId } = render(
         <LoginWebView
           visible={true}
@@ -349,9 +430,15 @@ describe('LoginWebView', () => {
 
       const webview = getByTestId('webview-mock');
 
+      // Deliberately unmistakable values. The assertion below is a substring
+      // search over every preference value written, which is only safe from
+      // false positives if the fixture's values cannot plausibly occur inside a
+      // legitimate one — a bare `'12345'` could turn up inside a store URL and
+      // fail this test for a change that leaked nothing. `PHPSESSID` is the
+      // real name of the cookie this whole removal is about.
       const testCookies = {
-        member: '12345',
-        session: 'test-session',
+        member_id: 'sentinel-member-id-not-for-storage',
+        PHPSESSID: 'sentinel-php-session-token-not-for-storage',
       };
 
       const message = {
@@ -368,12 +455,23 @@ describe('LoginWebView', () => {
       fireEvent(webview, 'onMessage', message);
 
       await waitFor(() => {
-        expect(setPreference).toHaveBeenCalledWith(
-          'auth_cookies',
-          JSON.stringify(testCookies),
-          'Authentication cookies'
-        );
+        expect(saveSessionData).toHaveBeenCalled();
       });
+
+      const writes = (setPreference as jest.Mock).mock.calls;
+
+      // The key that used to carry the jar, named explicitly so the specific
+      // regression reads as itself in the failure output.
+      expect(writes.map(([key]) => key)).not.toContain('auth_cookies');
+
+      // Then the property that actually matters, independent of naming: no
+      // cookie value, and no serialisation containing one, was written under
+      // ANY key. `filter` rather than a boolean so a failure names the
+      // offending write instead of just asserting that one exists.
+      for (const cookieValue of [...Object.values(testCookies), JSON.stringify(testCookies)]) {
+        const leakingWrites = writes.filter(([, value]) => String(value).includes(cookieValue));
+        expect(leakingWrites).toEqual([]);
+      }
     });
 
     it('should save login timestamp', async () => {
@@ -437,13 +535,14 @@ describe('LoginWebView', () => {
 
       fireEvent(webview, 'onMessage', message);
 
+      // fd18c05 removed the success alerts from this component — in the same
+      // commit that wrote these assertions. They have been red ever since, and
+      // the quarantine hid it. A successful login now reports through
+      // `onLoginSuccess` and stays silent; only failures alert.
       await waitFor(() => {
-        expect(alertSpy).toHaveBeenCalledWith(
-          'Login Successful',
-          expect.stringContaining('API URLs have been updated'),
-          expect.any(Array)
-        );
+        expect(mockOnLoginSuccess).toHaveBeenCalled();
       });
+      expect(alertSpy).not.toHaveBeenCalled();
     });
 
     it('should not process login if URLs are missing', async () => {
@@ -482,6 +581,346 @@ describe('LoginWebView', () => {
     });
   });
 
+  describe('Member Login - taplist ETag invalidation', () => {
+    const memberLoginMessage = {
+      nativeEvent: {
+        data: JSON.stringify({
+          type: 'URLs',
+          userJsonUrl: `${mockFsbsBaseUrl}/bk-member-json.php?uid=12345`,
+          storeJsonUrl: `${mockFsbsBaseUrl}/bk-store-json.php?sid=67`,
+          cookies: {
+            member: '12345',
+            session: 'test-session',
+            store__id: '67',
+            store: 'Test Store',
+          },
+        }),
+      },
+    };
+
+    const renderLogin = () =>
+      render(
+        <LoginWebView
+          visible={true}
+          onLoginSuccess={mockOnLoginSuccess}
+          onLoginCancel={mockOnLoginCancel}
+          onRefreshData={mockOnRefreshData}
+        />
+      );
+
+    it('does not report login success until the taplist ETag clear has been persisted', async () => {
+      // `onLoginSuccess` runs `handleLoginSuccess`, which calls `onRefreshData`.
+      // Reporting success before the clear lands lets that refresh read the
+      // PREVIOUS store's ETag. The proxy keys its ETag to the store's own cached
+      // payload, so a cross-store validator misses and costs a wasted full 200
+      // rather than wrong rows — this orders the clear ahead of the refresh it
+      // triggers, which is the guarantee available here.
+      let releaseEtagClear: () => void = () => {};
+      (commitTaplistWrite as jest.Mock).mockReturnValueOnce(
+        new Promise<void>(resolve => {
+          releaseEtagClear = () => resolve();
+        })
+      );
+
+      const { getByTestId } = renderLogin();
+      fireEvent(getByTestId('webview-mock'), 'onMessage', memberLoginMessage);
+
+      await waitFor(() => {
+        expect(commitTaplistWrite).toHaveBeenCalledWith({ kind: 'cleared' });
+      });
+      expect(mockOnLoginSuccess).not.toHaveBeenCalled();
+
+      releaseEtagClear();
+
+      await waitFor(() => {
+        expect(mockOnLoginSuccess).toHaveBeenCalled();
+      });
+    });
+
+    it('cancels the login when the taplist ETag clear fails', async () => {
+      // Unawaited, this rejection is an unhandled promise: logged in dev,
+      // dropped in production, with the previous store's ETag left live and
+      // nobody told. Awaited, it reaches the handler's catch.
+      (commitTaplistWrite as jest.Mock).mockRejectedValueOnce(new Error('database is locked'));
+
+      const { getByTestId } = renderLogin();
+      fireEvent(getByTestId('webview-mock'), 'onMessage', memberLoginMessage);
+
+      await waitFor(() => {
+        expect(mockOnLoginCancel).toHaveBeenCalled();
+      });
+      expect(mockOnLoginSuccess).not.toHaveBeenCalled();
+    });
+
+    it('tells the user when a member login fails', async () => {
+      // The visitor branch alerts on failure and a user-initiated close alerts.
+      // The member branch was the one path that said nothing at all — the modal
+      // just vanished and the user was left on Settings with no idea a database
+      // error had occurred, and no idea the login had not happened.
+      (commitTaplistWrite as jest.Mock).mockRejectedValueOnce(new Error('database is locked'));
+      const alertSpy = jest.spyOn(Alert, 'alert');
+
+      const { getByTestId } = renderLogin();
+      fireEvent(getByTestId('webview-mock'), 'onMessage', memberLoginMessage);
+
+      await waitFor(() => {
+        expect(alertSpy).toHaveBeenCalled();
+      });
+
+      // Asserting only that SOME alert fired let a mutant through: routing the
+      // catch to `handleClose` tells the user they cancelled the login, which is
+      // false and drops the retry hint, and the suite stayed green.
+      expect(alertSpy).toHaveBeenCalledWith(
+        'Login Failed',
+        expect.stringContaining('Could not finish signing you in'),
+        expect.any(Array)
+      );
+      expect(alertSpy).toHaveBeenCalledTimes(1);
+      expect(mockOnLoginCancel).toHaveBeenCalled();
+      expect(mockOnLoginSuccess).not.toHaveBeenCalled();
+    });
+
+    it('does not mark the app configured when the session cannot be saved', async () => {
+      // `areApiUrlsConfigured` reads is_visitor_mode, all_beers_api_url and
+      // my_beers_api_url, and app/_layout.tsx routes on it. Writing those before
+      // the session is persisted lets a failed login boot the app straight into
+      // member mode with nothing in SecureStore — configured, unauthenticated,
+      // and unable to explain itself. The gate must be the last thing to flip.
+      (saveSessionData as jest.Mock).mockRejectedValueOnce(new Error('SecureStore unavailable'));
+
+      const { getByTestId } = renderLogin();
+      fireEvent(getByTestId('webview-mock'), 'onMessage', memberLoginMessage);
+
+      await waitFor(() => {
+        expect(mockOnLoginCancel).toHaveBeenCalled();
+      });
+
+      // The gate is `all_beers_api_url` being truthy — both branches of
+      // `areApiUrlsConfigured` require it. Asserting the key was never written
+      // would be wrong now that the login clears it first; what must not happen
+      // is the gate being left OPEN.
+      const gateWrites = (setPreference as jest.Mock).mock.calls.filter(
+        ([key]) => key === 'all_beers_api_url'
+      );
+      expect(gateWrites.every(([, value]) => !value)).toBe(true);
+      expect(mockOnLoginSuccess).not.toHaveBeenCalled();
+    });
+
+    it('opens the configuration gate when the login completes', async () => {
+      // The negative test above passes if the gate writes are deleted outright,
+      // so it cannot be the only guard. This is the positive half: a successful
+      // login must leave all three keys `areApiUrlsConfigured` reads set, with
+      // `all_beers_api_url` truthy.
+      const { getByTestId } = renderLogin();
+      fireEvent(getByTestId('webview-mock'), 'onMessage', memberLoginMessage);
+
+      await waitFor(() => {
+        expect(mockOnLoginSuccess).toHaveBeenCalled();
+      });
+
+      const lastValueFor = (key: string) =>
+        (setPreference as jest.Mock).mock.calls.filter(([k]) => k === key).pop()?.[1];
+
+      expect(lastValueFor('all_beers_api_url')).toBe(`${mockFsbsBaseUrl}/bk-store-json.php?sid=67`);
+      expect(lastValueFor('my_beers_api_url')).toBe(
+        `${mockFsbsBaseUrl}/bk-member-json.php?uid=12345`
+      );
+      expect(lastValueFor('is_visitor_mode')).toBe('false');
+    });
+
+    it('does not report success when the login cookies are incomplete', async () => {
+      // Incomplete session data used to warn and fall through to the gate writes
+      // and `onLoginSuccess`, leaving the app configured with nothing in
+      // SecureStore. It never threw, so the catch could not see it.
+      (extractSessionDataFromResponse as jest.Mock).mockReturnValueOnce({
+        memberId: '12345',
+        sessionId: 'test-session',
+      });
+
+      const { getByTestId } = renderLogin();
+      fireEvent(getByTestId('webview-mock'), 'onMessage', memberLoginMessage);
+
+      await waitFor(() => {
+        expect(mockOnLoginCancel).toHaveBeenCalled();
+      });
+
+      expect(saveSessionData).not.toHaveBeenCalled();
+      expect(mockOnLoginSuccess).not.toHaveBeenCalled();
+      const gateWrites = (setPreference as jest.Mock).mock.calls.filter(
+        ([key]) => key === 'all_beers_api_url'
+      );
+      expect(gateWrites.every(([, value]) => !value)).toBe(true);
+    });
+
+    it('completes the login when a preference nothing reads fails to write', async () => {
+      // The swallow in `recordUnreadLoginMetadata` is the load-bearing decision
+      // here: a contention failure on a value no code consults must not discard
+      // a WebView authentication that already succeeded. Changing that catch to
+      // a rethrow left the whole suite green.
+      // Keyed on `last_login_timestamp` since `auth_cookies` was removed: it is
+      // the remaining write in `recordUnreadLoginMetadata` with no reader, so
+      // it still exercises the swallow this test exists for.
+      (setPreference as jest.Mock).mockImplementation((key: string) =>
+        key === 'last_login_timestamp'
+          ? Promise.reject(new Error('database is locked'))
+          : Promise.resolve(undefined)
+      );
+      const alertSpy = jest.spyOn(Alert, 'alert');
+
+      const { getByTestId } = renderLogin();
+      fireEvent(getByTestId('webview-mock'), 'onMessage', memberLoginMessage);
+
+      await waitFor(() => {
+        expect(mockOnLoginSuccess).toHaveBeenCalled();
+      });
+
+      expect(alertSpy).not.toHaveBeenCalled();
+      expect(mockOnLoginCancel).not.toHaveBeenCalled();
+    });
+
+    it('queues the new store URL behind a concurrent taplist writer holding the database lock', async () => {
+      // Proves the gate-open burst (:364-378) genuinely shares
+      // `databaseLockManager` with the taplist writers, not merely that it
+      // runs after them in program order. A taplist writer's
+      // check-then-commit sequence (`dataUpdateService.ts`) is only safe from
+      // this login racing it in if the login's authoritative
+      // `all_beers_api_url` write cannot land while that writer holds the
+      // lock — so this simulates exactly that: a held lock, a login arriving
+      // while it's held, and proof the write is deferred rather than
+      // interleaved.
+      // Records which operation held the lock AT THE MOMENT the store URL was
+      // written. Everything else in this test observes the ACQUISITION; only
+      // this observes CONTAINMENT, and the difference is the whole point.
+      //
+      // Mutation testing showed the rest of this test is satisfied by
+      // acquire-release-then-write: the queue still reaches 1 because `acquire`
+      // enqueues, the write still hasn't landed at that instant because the
+      // `await` hasn't resolved, and it still appears after the release. Every
+      // assertion below passed against a `withDatabaseLock` call whose body was
+      // EMPTY and whose writes were hoisted out after it — reintroducing the
+      // entire race this test exists to prove closed, across all 72 tests in
+      // this file and the full 2241-test suite.
+      //
+      // Under correct code this is 'login-config-commit'. Under that mutant the
+      // lock is already released when the write runs, so it is null.
+      const holderDuringStoreUrlWrite: (string | null)[] = [];
+      (setPreference as jest.Mock).mockImplementation(async (key: string, value: string) => {
+        // Non-empty only, isolating the authoritative store URL — the write a
+        // racing taplist writer must not see mid-commit.
+        //
+        // The reason first given here was that the gate-close write of '' is
+        // "deliberately unlocked, so it lands while the taplist writer still
+        // holds the lock". That was true when written and false one commit
+        // later: 9.14 put the gate-close write under this same lock, so it now
+        // records 'login-config-commit' too, never 'all-beers-write'. The
+        // filter is still needed — it separates two writes under the same
+        // holder — but not for the reason originally stated.
+        if (key === 'all_beers_api_url' && value !== '') {
+          holderDuringStoreUrlWrite.push(databaseLockManager.getCurrentOperation());
+        }
+      });
+
+      let releaseTaplistHold: () => void = () => {};
+      const taplistHold = databaseLockManager.withDatabaseLock(
+        'all-beers-write',
+        () =>
+          new Promise<void>(resolve => {
+            releaseTaplistHold = resolve;
+          })
+      );
+      expect(databaseLockManager.isLocked()).toBe(true);
+
+      const { getByTestId } = renderLogin();
+      fireEvent(getByTestId('webview-mock'), 'onMessage', memberLoginMessage);
+
+      // Deterministic rather than a tick count: the login's acquire call
+      // enqueues synchronously the moment the handler reaches it, so waiting
+      // for queue length 1 is waiting for "the handler tried to write the new
+      // store URL and was made to wait" — not for an arbitrary amount of
+      // event-loop churn.
+      await waitFor(() => {
+        expect(databaseLockManager.getQueueLength()).toBe(1);
+      });
+
+      expect(setPreference).not.toHaveBeenCalledWith(
+        'all_beers_api_url',
+        `${mockFsbsBaseUrl}/bk-store-json.php?sid=67`,
+        'API endpoint for fetching all beers'
+      );
+
+      releaseTaplistHold();
+      await taplistHold;
+
+      await waitFor(() => {
+        expect(setPreference).toHaveBeenCalledWith(
+          'all_beers_api_url',
+          `${mockFsbsBaseUrl}/bk-store-json.php?sid=67`,
+          'API endpoint for fetching all beers'
+        );
+      });
+      expect(mockOnLoginSuccess).toHaveBeenCalled();
+
+      // The containment assertion. Not "a lock was acquired at some point
+      // before this write" — that is what `getQueueLength()` above establishes,
+      // and it is what the empty-hold mutant satisfies — but "this write
+      // executed while THIS operation held the lock".
+      expect(holderDuringStoreUrlWrite).toEqual(['login-config-commit']);
+    });
+
+    it('does not clear the store URL while a taplist writer holds the lock', async () => {
+      // 9.14. `taplistConfigurationHeld`'s docstring justified leaving the
+      // gate-CLOSE write of '' outside the lock: "racing to '' unlocked only
+      // ever causes a safe, cheap abandon, never a bad commit."
+      //
+      // That holds only if the '' lands BEFORE the writer's guard read. It can
+      // equally land AFTER the guard read and BEFORE the commit, which is the
+      // window the lock exists to close: the writer reads store A, the guard
+      // passes, this '' lands, and the writer then commits A's rows, A's ETag
+      // and a fresh timestamp under a configuration that no longer says A.
+      //
+      // This test stages exactly that — a writer holding the lock while a login
+      // arrives — and asserts the clear cannot interleave with it. It was
+      // written RED: before the fix the '' write recorded 'all-beers-write',
+      // i.e. it landed in the middle of another operation's hold.
+      const holderDuringClear: (string | null)[] = [];
+      (setPreference as jest.Mock).mockImplementation(async (key: string, value: string) => {
+        if (key === 'all_beers_api_url' && value === '') {
+          holderDuringClear.push(databaseLockManager.getCurrentOperation());
+        }
+      });
+
+      let releaseTaplistHold: () => void = () => {};
+      const taplistHold = databaseLockManager.withDatabaseLock(
+        'all-beers-write',
+        () =>
+          new Promise<void>(resolve => {
+            releaseTaplistHold = resolve;
+          })
+      );
+
+      const { getByTestId } = renderLogin();
+      fireEvent(getByTestId('webview-mock'), 'onMessage', memberLoginMessage);
+
+      await waitFor(() => {
+        expect(databaseLockManager.getQueueLength()).toBe(1);
+      });
+
+      // The clear must not have happened yet — it is queued behind the writer.
+      expect(holderDuringClear).toEqual([]);
+
+      releaseTaplistHold();
+      await taplistHold;
+
+      await waitFor(() => {
+        expect(mockOnLoginSuccess).toHaveBeenCalled();
+      });
+
+      // And when it does happen, it happens under the lock — never interleaved
+      // into someone else's hold.
+      expect(holderDuringClear).toEqual(['login-config-commit']);
+    });
+  });
+
   describe('WebView Message Handling - Visitor Login', () => {
     it('should handle VISITOR_LOGIN message', async () => {
       const { getByTestId } = render(
@@ -516,6 +955,38 @@ describe('LoginWebView', () => {
           store__id: '67',
           store: 'Test Store',
         });
+      });
+    });
+
+    it('clears the stored ETag when logging in as a visitor', async () => {
+      // Guard, not a regression test: deleting the visitor branch's clear
+      // outright left the whole suite green. Visitor mode is taplist-only, so a
+      // surviving ETag from the previous store has nothing else on screen to
+      // contradict it.
+      (handleVisitorLogin as jest.Mock).mockResolvedValue({ success: true });
+
+      const { getByTestId } = render(
+        <LoginWebView
+          visible={true}
+          onLoginSuccess={mockOnLoginSuccess}
+          onLoginCancel={mockOnLoginCancel}
+          onRefreshData={mockOnRefreshData}
+        />
+      );
+
+      fireEvent(getByTestId('webview-mock'), 'onMessage', {
+        nativeEvent: {
+          data: JSON.stringify({
+            type: 'VISITOR_LOGIN',
+            cookies: { store__id: '67', store: 'Test Store' },
+            rawCookies: 'store__id=67; store=Test Store',
+            url: config.api.getFullUrl('visitor'),
+          }),
+        },
+      });
+
+      await waitFor(() => {
+        expect(commitTaplistWrite).toHaveBeenCalledWith({ kind: 'cleared' });
       });
     });
 
@@ -633,13 +1104,12 @@ describe('LoginWebView', () => {
 
       fireEvent(webview, 'onMessage', message);
 
+      // Same story as the member success alert: fd18c05 removed it and left the
+      // assertion behind. Visitor login now reports through `onLoginSuccess`.
       await waitFor(() => {
-        expect(alertSpy).toHaveBeenCalledWith(
-          'Visitor Mode Active',
-          expect.stringContaining('browsing as a visitor'),
-          expect.any(Array)
-        );
+        expect(mockOnLoginSuccess).toHaveBeenCalled();
       });
+      expect(alertSpy).not.toHaveBeenCalled();
     });
 
     it('should handle visitor login failure', async () => {
@@ -718,6 +1188,163 @@ describe('LoginWebView', () => {
           expect.any(Array)
         );
       });
+    });
+
+    it('queues the new store URL behind a concurrent taplist writer holding the database lock', async () => {
+      // Visitor mirror of the member-path test above. `handleVisitorLogin`'s
+      // network call completes before any preference write starts here, so
+      // there is no SecureStore-shaped hazard to worry about — this is purely
+      // proving the visitor gate-open burst shares the real lock too.
+      (handleVisitorLogin as jest.Mock).mockResolvedValue({ success: true });
+
+      // Containment recorder — see the member-path test for why the rest of
+      // this test cannot distinguish a real hold from an empty one.
+      const holderDuringStoreUrlWrite: (string | null)[] = [];
+      (setPreference as jest.Mock).mockImplementation(async (key: string, value: string) => {
+        // Non-empty only, isolating the authoritative store URL — the write a
+        // racing taplist writer must not see mid-commit.
+        //
+        // The reason first given here was that the gate-close write of '' is
+        // "deliberately unlocked, so it lands while the taplist writer still
+        // holds the lock". That was true when written and false one commit
+        // later: 9.14 put the gate-close write under this same lock, so it now
+        // records 'login-config-commit' too, never 'all-beers-write'. The
+        // filter is still needed — it separates two writes under the same
+        // holder — but not for the reason originally stated.
+        if (key === 'all_beers_api_url' && value !== '') {
+          holderDuringStoreUrlWrite.push(databaseLockManager.getCurrentOperation());
+        }
+      });
+
+      let releaseTaplistHold: () => void = () => {};
+      const taplistHold = databaseLockManager.withDatabaseLock(
+        'all-beers-write',
+        () =>
+          new Promise<void>(resolve => {
+            releaseTaplistHold = resolve;
+          })
+      );
+
+      const { getByTestId } = render(
+        <LoginWebView
+          visible={true}
+          onLoginSuccess={mockOnLoginSuccess}
+          onLoginCancel={mockOnLoginCancel}
+          onRefreshData={mockOnRefreshData}
+        />
+      );
+
+      fireEvent(getByTestId('webview-mock'), 'onMessage', {
+        nativeEvent: {
+          data: JSON.stringify({
+            type: 'VISITOR_LOGIN',
+            cookies: { store__id: '67', store: 'Test Store' },
+            rawCookies: 'store__id=67; store=Test Store',
+            url: config.api.getFullUrl('visitor'),
+          }),
+        },
+      });
+
+      await waitFor(() => {
+        expect(databaseLockManager.getQueueLength()).toBe(1);
+      });
+
+      expect(setPreference).not.toHaveBeenCalledWith(
+        'all_beers_api_url',
+        `${mockFsbsBaseUrl}/bk-store-json.php?sid=67`,
+        'API endpoint for fetching all beers'
+      );
+
+      releaseTaplistHold();
+      await taplistHold;
+
+      await waitFor(() => {
+        expect(setPreference).toHaveBeenCalledWith(
+          'all_beers_api_url',
+          `${mockFsbsBaseUrl}/bk-store-json.php?sid=67`,
+          'API endpoint for fetching all beers'
+        );
+      });
+      expect(mockOnLoginSuccess).toHaveBeenCalled();
+
+      // Containment, not acquisition — the visitor burst gets the same check
+      // as the member one, because it had the same gap.
+      expect(holderDuringStoreUrlWrite).toEqual(['login-config-commit']);
+    });
+
+    it('does not clear the store URL while a taplist writer holds the lock (visitor)', async () => {
+      // 9.14, visitor path. 9.14 changed three sites and only the member
+      // one was covered; removing the lock at the visitor gate-close left
+      // this suite 73/73 green. Same staging, other branch.
+      // 9.14. `taplistConfigurationHeld`'s docstring justified leaving the
+      // gate-CLOSE write of '' outside the lock: "racing to '' unlocked only
+      // ever causes a safe, cheap abandon, never a bad commit."
+      //
+      // That holds only if the '' lands BEFORE the writer's guard read. It can
+      // equally land AFTER the guard read and BEFORE the commit, which is the
+      // window the lock exists to close: the writer reads store A, the guard
+      // passes, this '' lands, and the writer then commits A's rows, A's ETag
+      // and a fresh timestamp under a configuration that no longer says A.
+      //
+      // This test stages exactly that — a writer holding the lock while a login
+      // arrives — and asserts the clear cannot interleave with it. It was
+      // written RED: before the fix the '' write recorded 'all-beers-write',
+      // i.e. it landed in the middle of another operation's hold.
+      const holderDuringClear: (string | null)[] = [];
+      (setPreference as jest.Mock).mockImplementation(async (key: string, value: string) => {
+        if (key === 'all_beers_api_url' && value === '') {
+          holderDuringClear.push(databaseLockManager.getCurrentOperation());
+        }
+      });
+
+      let releaseTaplistHold: () => void = () => {};
+      const taplistHold = databaseLockManager.withDatabaseLock(
+        'all-beers-write',
+        () =>
+          new Promise<void>(resolve => {
+            releaseTaplistHold = resolve;
+          })
+      );
+
+      (handleVisitorLogin as jest.Mock).mockResolvedValue({ success: true });
+
+      const { getByTestId } = render(
+        <LoginWebView
+          visible={true}
+          onLoginSuccess={mockOnLoginSuccess}
+          onLoginCancel={mockOnLoginCancel}
+          onRefreshData={mockOnRefreshData}
+        />
+      );
+
+      fireEvent(getByTestId('webview-mock'), 'onMessage', {
+        nativeEvent: {
+          data: JSON.stringify({
+            type: 'VISITOR_LOGIN',
+            cookies: { store__id: '67', store: 'Test Store' },
+            rawCookies: 'store__id=67; store=Test Store',
+            url: config.api.getFullUrl('visitor'),
+          }),
+        },
+      });
+
+      await waitFor(() => {
+        expect(databaseLockManager.getQueueLength()).toBe(1);
+      });
+
+      // The clear must not have happened yet — it is queued behind the writer.
+      expect(holderDuringClear).toEqual([]);
+
+      releaseTaplistHold();
+      await taplistHold;
+
+      await waitFor(() => {
+        expect(mockOnLoginSuccess).toHaveBeenCalled();
+      });
+
+      // And when it does happen, it happens under the lock — never interleaved
+      // into someone else's hold.
+      expect(holderDuringClear).toEqual(['login-config-commit']);
     });
   });
 
@@ -1311,7 +1938,7 @@ describe('LoginWebView', () => {
     });
 
     it('should handle modal close via Android back button', () => {
-      const { getByTestId } = render(
+      const { UNSAFE_getByType } = render(
         <LoginWebView
           visible={true}
           onLoginSuccess={mockOnLoginSuccess}
@@ -1320,18 +1947,18 @@ describe('LoginWebView', () => {
         />
       );
 
-      const modal = getByTestId('login-webview-modal');
-
-      // Trigger onRequestClose (Android back button)
-      if (modal.props.onRequestClose) {
-        modal.props.onRequestClose();
-      }
+      // `onRequestClose` is a prop of the Modal; `login-webview-modal` is the
+      // View inside it, which has no such prop. The `if` meant the test silently
+      // asserted nothing whenever it looked at the wrong node — it did not fail,
+      // it just never fired. Reach the Modal itself.
+      const modal = UNSAFE_getByType(Modal);
+      modal.props.onRequestClose();
 
       expect(mockOnLoginCancel).toHaveBeenCalled();
     });
 
     it('should support accessibility labels', () => {
-      const { getByTestId } = render(
+      const { getByLabelText } = render(
         <LoginWebView
           visible={true}
           onLoginSuccess={mockOnLoginSuccess}
@@ -1340,9 +1967,10 @@ describe('LoginWebView', () => {
         />
       );
 
-      const modal = getByTestId('login-webview-modal');
-
-      expect(modal.props.accessibilityLabel).toBe('Flying Saucer login modal');
+      // `accessibilityLabel` is on the Modal; `login-webview-modal` is the View
+      // inside it. Reading the label off the View found undefined and always
+      // would have. Query by the label itself, which is what a screen reader does.
+      expect(getByLabelText('Flying Saucer login modal')).toBeTruthy();
     });
 
     it('should clear state when reopened after close', () => {
@@ -1448,7 +2076,10 @@ describe('LoginWebView', () => {
         endpoints.forEach(endpoint => {
           const url = config.api.getFullUrl(endpoint as any);
           expect(url).toBeTruthy();
-          expect(url).toContain(endpoint);
+          // Not `toContain(endpoint)`: the endpoint NAME is not in the URL —
+          // `memberDashboard` resolves to `/member-dash.php`. That assertion
+          // only ever held because the mock interpolated the name.
+          expect(url).toBe(`${mockTestBaseUrl}${mockEndpointPaths[endpoint]}`);
           expect(url).toMatch(/^https:\/\//);
         });
       });

@@ -8,12 +8,8 @@
 import { getDatabase } from '../connection';
 import { Reward } from '../../types/database';
 import { databaseLockManager } from '../locks';
-import {
-  isRewardRow,
-  rewardRowToReward,
-  RewardRow,
-  isCountResult
-} from '../schemaTypes';
+import { toContentionError, withContentionMapping } from '../errors';
+import { isRewardRow, rewardRowToReward, RewardRow, isCountResult } from '../schemaTypes';
 
 /**
  * Repository class for Reward entity operations
@@ -38,17 +34,9 @@ export class RewardsRepository {
       return;
     }
 
-    // Acquire database lock to prevent concurrent operations
-    if (!await databaseLockManager.acquireLock('RewardsRepository.insertMany')) {
-      throw new Error('Could not acquire database lock for rewards insertion');
-    }
-
-    try {
-      await this._insertManyInternal(rewards);
-    } finally {
-      // Always release the lock
-      databaseLockManager.releaseLock('RewardsRepository.insertMany');
-    }
+    await databaseLockManager.withDatabaseLock('RewardsRepository.insertMany', () =>
+      withContentionMapping('rewards import', () => this._insertManyInternal(rewards))
+    );
   }
 
   /**
@@ -65,7 +53,44 @@ export class RewardsRepository {
       return;
     }
 
-    await this._insertManyInternal(rewards);
+    await withContentionMapping('rewards import', () => this._insertManyInternal(rewards));
+  }
+
+  /**
+   * Empty the rewards table, deliberately.
+   *
+   * There was no way to do this. `insertMany([])` early-returns on an empty
+   * array, so `decideRewards`'s `clear` arm — which exists precisely because the
+   * server *confirmed* zero rewards — reached the repository, did nothing, and
+   * still reported `dataUpdated: true`. Stale rewards, marked fresh: the exact
+   * shape plan 02 was written to remove, surviving at the one call that looked
+   * like it was already handled.
+   *
+   * Named after `MyBeersRepository.replaceAllWithEmpty`, which learned this
+   * first: emptying a table is asked for, never inferred from an empty payload.
+   */
+  async replaceAllWithEmpty(): Promise<void> {
+    return databaseLockManager.withDatabaseLock('RewardsRepository.replaceAllWithEmpty', () =>
+      withContentionMapping('rewards clear', () => this._deleteAllInternal())
+    );
+  }
+
+  /**
+   * Unlocked twin of `replaceAllWithEmpty`, for callers already holding the
+   * master lock.
+   */
+  async replaceAllWithEmptyUnsafe(): Promise<void> {
+    return withContentionMapping('rewards clear', () => this._deleteAllInternal());
+  }
+
+  /** Shared body for both empty variants. */
+  private async _deleteAllInternal(): Promise<void> {
+    const database = await getDatabase();
+
+    await database.withTransactionAsync(async () => {
+      const cleared = await database.runAsync('DELETE FROM rewards');
+      console.log(`Cleared rewards table (removed ${cleared.changes} rows)`);
+    });
   }
 
   /**
@@ -91,11 +116,7 @@ export class RewardsRepository {
         const values: (string | number)[] = [];
 
         batch.forEach(reward => {
-          values.push(
-            reward.reward_id || '',
-            reward.redeemed || '0',
-            reward.reward_type || ''
-          );
+          values.push(reward.reward_id || '', reward.redeemed || '0', reward.reward_type || '');
         });
 
         await database.runAsync(
@@ -129,9 +150,7 @@ export class RewardsRepository {
       );
 
       // Validate and convert each row
-      return rows
-        .filter(row => isRewardRow(row))
-        .map(row => rewardRowToReward(row));
+      return rows.filter(row => isRewardRow(row)).map(row => rewardRowToReward(row));
     } catch (error) {
       console.error('Error getting rewards:', error);
       return [];
@@ -185,9 +204,7 @@ export class RewardsRepository {
       );
 
       // Validate and convert each row
-      return rows
-        .filter(row => isRewardRow(row))
-        .map(row => rewardRowToReward(row));
+      return rows.filter(row => isRewardRow(row)).map(row => rewardRowToReward(row));
     } catch (error) {
       console.error('Error getting rewards by type:', error);
       throw error;
@@ -211,9 +228,7 @@ export class RewardsRepository {
       );
 
       // Validate and convert each row
-      return rows
-        .filter(row => isRewardRow(row))
-        .map(row => rewardRowToReward(row));
+      return rows.filter(row => isRewardRow(row)).map(row => rewardRowToReward(row));
     } catch (error) {
       console.error('Error getting redeemed rewards:', error);
       throw error;
@@ -238,9 +253,7 @@ export class RewardsRepository {
       );
 
       // Validate and convert each row
-      return rows
-        .filter(row => isRewardRow(row))
-        .map(row => rewardRowToReward(row));
+      return rows.filter(row => isRewardRow(row)).map(row => rewardRowToReward(row));
     } catch (error) {
       console.error('Error getting unredeemed rewards:', error);
       throw error;
@@ -260,7 +273,7 @@ export class RewardsRepository {
       });
     } catch (error) {
       console.error('Error clearing rewards:', error);
-      throw error;
+      throw toContentionError('rewards clear', error);
     }
   }
 

@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { Alert } from 'react-native';
 import { manualRefreshAllData } from '@/src/services/dataUpdateService';
 import { getPreference } from '@/src/database/preferences';
-import { getUserFriendlyErrorMessage } from '@/src/utils/notificationUtils';
+import { buildRefreshErrorMessages } from '@/src/utils/refreshErrorMessages';
 
 /**
  * Return value of the useSettingsRefresh hook
@@ -93,18 +93,10 @@ export const useSettingsRefresh = (): UseSettingsRefreshReturn => {
         }
         // Otherwise, show individual error messages for each endpoint
         else {
-          // Collect error messages
-          const errorMessages: string[] = [];
-
-          if (!result.allBeersResult.success && result.allBeersResult.error) {
-            const allBeersError = getUserFriendlyErrorMessage(result.allBeersResult.error);
-            errorMessages.push(`All Beer data: ${allBeersError}`);
-          }
-
-          if (!result.myBeersResult.success && result.myBeersResult.error) {
-            const myBeersError = getUserFriendlyErrorMessage(result.myBeersResult.error);
-            errorMessages.push(`Beerfinder data: ${myBeersError}`);
-          }
+          // One line per failed source, rewards included — omitting it here
+          // while `hasErrors` counted it produced an error dialog with an empty
+          // body. See refreshErrorMessages.ts.
+          const errorMessages = buildRefreshErrorMessages(result);
 
           // Show error alert with all error messages
           Alert.alert(

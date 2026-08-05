@@ -1,6 +1,7 @@
 import { getPreference, setPreference, getAllPreferences } from '../preferences';
 import { Preference } from '../../types/database';
 import * as connection from '../connection';
+import { DatabaseContentionError } from '../errors';
 
 // Mock the connection module
 jest.mock('../connection');
@@ -86,7 +87,7 @@ describe('Preference Functions', () => {
     it('should handle special characters in key', async () => {
       const { mockDatabase, mockGetFirstAsync } = createMockPreferencesDb();
       (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
-      const specialKey = "test'key\"with\\special";
+      const specialKey = 'test\'key"with\\special';
       mockGetFirstAsync.mockResolvedValue({ value: 'special_value' });
 
       const result = await getPreference(specialKey);
@@ -161,7 +162,7 @@ describe('Preference Functions', () => {
     it('should handle special characters in value', async () => {
       const { mockDatabase } = createMockPreferencesDb();
       (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
-      const specialValue = "value'with\"special\\chars";
+      const specialValue = 'value\'with"special\\chars';
 
       await setPreference('special_key', specialValue, 'Special chars test');
 
@@ -182,10 +183,7 @@ describe('Preference Functions', () => {
         'Database write error'
       );
 
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'Error setting preference error_key:',
-        dbError
-      );
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Error setting preference error_key:', dbError);
       consoleErrorSpy.mockRestore();
     });
 
@@ -335,5 +333,41 @@ describe('Preference Functions', () => {
 
       expect(mockDatabase.runAsync).toHaveBeenCalledTimes(3);
     });
+  });
+});
+
+describe('preferences under database contention', () => {
+  // jest.setup.js:141 turns on fake timers for EVERY suite, so the retry's
+  // backoff sleep would never fire and the await would hang to the 30s test
+  // timeout. Real timers here; the whole budget is well under a second.
+  beforeEach(() => {
+    jest.useRealTimers();
+  });
+
+  afterEach(() => {
+    jest.useFakeTimers();
+  });
+
+  it('maps a lock abort on setPreference to DatabaseContentionError', async () => {
+    const { mockDatabase, mockRunAsync } = createMockPreferencesDb();
+    (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+    mockRunAsync.mockRejectedValue(new Error('database is locked'));
+
+    // preferences.ts takes NO master lock, and since the allbeers import moved
+    // to an exclusive transaction on a second connection, SQLite's file-level
+    // write lock aborts every other writer for the duration of that import.
+    // Unmapped, this reached the user as raw SQLite text via UNKNOWN_ERROR.
+    await expect(setPreference('some_key', 'v')).rejects.toBeInstanceOf(DatabaseContentionError);
+    // Retried before giving up, rather than failing on the first collision.
+    expect(mockRunAsync.mock.calls.length).toBeGreaterThan(1);
+  });
+
+  it('leaves an unrelated failure unwrapped', async () => {
+    const { mockDatabase, mockRunAsync } = createMockPreferencesDb();
+    (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+    const original = new Error('no such table: preferences');
+    mockRunAsync.mockRejectedValue(original);
+
+    await expect(setPreference('some_key', 'v')).rejects.toBe(original);
   });
 });

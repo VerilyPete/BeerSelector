@@ -1,50 +1,71 @@
 /**
- * Tests for sequential refresh coordination to prevent lock contention
+ * How concurrent refreshes are kept from colliding.
  *
- * HP-2 Step 5c COMPLETED (November 8, 2025): These tests verify that refresh operations are properly
- * coordinated to avoid database lock contention that occurs when multiple
- * operations try to acquire locks simultaneously.
+ * Rewritten by plan 05 Phase 5.4. The original file's premise was the defect:
+ * it asserted that the master lock was held for the whole refresh sequence and
+ * that three concurrent refreshes should perform three full sets of fetches,
+ * queued behind one another. Both are now wrong on purpose.
  *
- * IMPLEMENTATION STATUS: ✅ COMPLETE
- * - sequentialRefreshAllData() implemented (lines 542-677)
- * - manualRefreshAllData() delegates to sequential (line 715)
- * - refreshAllDataFromAPI() uses master lock (lines 839-891)
+ * - The lock covers the write burst only. Holding it across the fetches is what
+ *   let one stalled request outlive the 15s hold timeout and wedge every later
+ *   writer. Ordering of fetch versus lock is asserted in
+ *   `sequentialRefreshAllData.locking.test.ts`, which owns that property.
+ * - Concurrent refreshes de-duplicate rather than queue. Three queued refreshes
+ *   meant three full taplist downloads on a link too weak for one; the second
+ *   and third callers now receive the first one's promise.
+ *
+ * **Two of the original tests were deleted rather than rewritten.** One asserted
+ * that a run with every dependency mocked finishes in under a second, which no
+ * defect this codebase can produce would fail. The other built three local
+ * closures that called `withDatabaseLock` directly and then asserted the spy had
+ * recorded three calls — a mock asserting a mock, with no production code in the
+ * path at all.
+ *
+ * **The mocks here were a dead contract.** They resolved the three fetchers to
+ * plain arrays, which `beerApi` stopped returning in 02 Phase 3. Every test in
+ * this file that read as a success-path test was in fact driving all three
+ * sources down the failure path and asserting only call counts and ordering,
+ * which happen to look identical either way. They now use the shared
+ * `fetchOutcomeFixtures` builders.
  */
 
 import { databaseLockManager } from '../../database/DatabaseLockManager';
 
-// Import after mocking
 import {
   sequentialRefreshAllData,
   manualRefreshAllData,
   refreshAllDataFromAPI,
+  fetchAndUpdateAllBeers,
+  resetLastManualRefreshTime,
+  resetInFlightSequentialRefresh,
+  dropInFlightTaplistFetch,
 } from '../dataUpdateService';
 import { getPreference, setPreference, areApiUrlsConfigured } from '../../database/preferences';
 import { fetchBeersFromAPI, fetchMyBeersFromAPI, fetchRewardsFromAPI } from '../../api/beerApi';
+import { beerRepository } from '../../database/repositories/BeerRepository';
+import { fetchedRows } from '../../api/__tests__/helpers/fetchOutcomeFixtures';
 
-// Mock database operations
 jest.mock('../../database/db', () => ({
   getPreference: jest.fn(),
   setPreference: jest.fn(),
 }));
 
-// Mock preferences module
 jest.mock('../../database/preferences', () => ({
   getPreference: jest.fn(),
+
   setPreference: jest.fn(),
   areApiUrlsConfigured: jest.fn(),
 }));
 
-// Mock API functions
 jest.mock('../../api/beerApi', () => ({
   fetchBeersFromAPI: jest.fn(),
   fetchMyBeersFromAPI: jest.fn(),
   fetchRewardsFromAPI: jest.fn(),
 }));
 
-// Mock repositories
 jest.mock('../../database/repositories/BeerRepository', () => ({
   beerRepository: {
+    count: jest.fn(async () => 12),
     insertMany: jest.fn(),
     insertManyUnsafe: jest.fn(),
   },
@@ -54,24 +75,56 @@ jest.mock('../../database/repositories/MyBeersRepository', () => ({
   myBeersRepository: {
     insertMany: jest.fn(),
     insertManyUnsafe: jest.fn(),
+    replaceAllWithEmptyUnsafe: jest.fn(),
   },
 }));
 
 jest.mock('../../database/repositories/RewardsRepository', () => ({
   rewardsRepository: {
+    replaceAllWithEmpty: jest.fn(async () => {}),
+    replaceAllWithEmptyUnsafe: jest.fn(async () => {}),
     insertMany: jest.fn(),
     insertManyUnsafe: jest.fn(),
   },
 }));
 
+const ALL_BEERS = [{ id: '1', brew_name: 'Test Beer', brewer: 'Test Brewery' }];
+const MY_BEERS = [
+  { id: '2', brew_name: 'Tasted Beer', brewer: 'Test Brewery', tasted_date: '2026-01-01' },
+];
+const REWARDS = [{ reward_id: '3', reward_type: 'badge' }];
+
+/**
+ * Drain microtasks until `predicate` holds, or give up after `ticks`.
+ *
+ * The suite inherits global fake timers, so this deliberately advances nothing
+ * — it only lets already-scheduled continuations run. The bound exists so a
+ * predicate that never becomes true fails the assertion that follows rather
+ * than spinning to the test timeout.
+ */
+const flushUntil = async (predicate: () => boolean, ticks = 50): Promise<void> => {
+  for (let i = 0; i < ticks && !predicate(); i++) {
+    await Promise.resolve();
+  }
+};
+
+/** Log the call, then answer with the real `FetchedSource` shape. */
+const logsAndResolves = (mock: jest.Mock, label: string, rows: readonly unknown[], log: string[]) =>
+  mock.mockImplementation(async () => {
+    log.push(`${label}-start`);
+    await Promise.resolve();
+    log.push(`${label}-end`);
+    return fetchedRows(rows);
+  });
+
 describe('Sequential Refresh Coordination', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-
-    // Reset all lock state before each test
     databaseLockManager.resetForTesting();
+    resetInFlightSequentialRefresh();
+    dropInFlightTaplistFetch();
+    resetLastManualRefreshTime();
 
-    // Set default mock implementations
     (getPreference as jest.Mock).mockImplementation(async (key: string) => {
       if (key === 'all_beers_api_url') return 'http://api.example.com/all';
       if (key === 'my_beers_api_url') return 'http://api.example.com/my';
@@ -79,294 +132,291 @@ describe('Sequential Refresh Coordination', () => {
     });
     (setPreference as jest.Mock).mockResolvedValue(undefined);
     (areApiUrlsConfigured as jest.Mock).mockResolvedValue(true);
-    (fetchBeersFromAPI as jest.Mock).mockResolvedValue([
-      { id: '1', brew_name: 'Test Beer', brewer: 'Test Brewery' },
-    ]);
-    (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue([
-      { id: '2', brew_name: 'Tasted Beer', brewer: 'Test Brewery' },
-    ]);
-    (fetchRewardsFromAPI as jest.Mock).mockResolvedValue([{ id: 3, name: 'Test Reward' }]);
+    (fetchBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(ALL_BEERS));
+    (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(MY_BEERS));
+    (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(fetchedRows(REWARDS));
   });
 
   afterEach(() => {
-    // Reset lock state to prevent test interference
+    // In an `afterEach`, not at the end of each test body. A spy on
+    // `withDatabaseLock` that a failing test leaves installed is picked up by
+    // the NEXT test as its `originalWithLock`, which then wraps itself and dies
+    // with "Maximum call stack size exceeded" — reporting the second test as
+    // broken when the first one is. That is exactly how this file behaved
+    // before the rewrite.
+    jest.restoreAllMocks();
     databaseLockManager.resetForTesting();
   });
 
+  describe('taplist fetch de-duplication', () => {
+    it('serves one taplist fetch to concurrent callers', async () => {
+      // `sequentialRefreshAllData` de-duplicates itself, but two production
+      // readers bypass that entirely: `checkAndRefreshOnAppOpen` — fired by
+      // `useFocusEffect` on three tab screens, behind a five-minute throttle its
+      // own comment concedes "is a throttle rather than a mutex" — and
+      // `refreshAllDataFromAPI` via `autoLogin`. Either can start a second full
+      // taplist download while the first is in flight, on exactly the weak links
+      // this plan exists to cope with.
+      // A real store URL: de-duplication is keyed by `sid`, and a URL without
+      // one is a wildcard that deliberately does not join.
+      (getPreference as jest.Mock).mockImplementation(async (key: string) => {
+        if (key === 'all_beers_api_url') {
+          return 'https://fsbs.beerknurd.com/bk-store-json.php?sid=13879';
+        }
+        if (key === 'my_beers_api_url') return 'http://api.example.com/my';
+        return null;
+      });
+
+      const results = await Promise.all([fetchAndUpdateAllBeers(), fetchAndUpdateAllBeers()]);
+
+      expect(fetchBeersFromAPI).toHaveBeenCalledTimes(1);
+      // Both callers must be SERVED, not merely both succeed: asserting only
+      // `success` passes when the joiner is handed an empty result, which is the
+      // mutant this test exists to catch.
+      expect(results[0]).toEqual(results[1]);
+      expect(results[0].success).toBe(true);
+      expect(results[0].dataUpdated).toBe(true);
+      expect(results[0].itemCount).toBe(ALL_BEERS.length);
+    });
+
+    it('does not serve the manual-refresh escape hatch from a fetch that predates it', async () => {
+      // `join: false` exists because a running refresh has already read the old
+      // ETag, so handing back its result makes the escape hatch a silent no-op —
+      // `SequentialRefreshOptions.join` says exactly that. The taplist-level
+      // join is a SECOND join point that `settleInFlightRefresh` knows nothing
+      // about, so `join: false` cannot reach it. A user double-pulling on a slow
+      // link is precisely how you arrive here.
+      // Identified store, so the join is actually available to be defeated.
+      (getPreference as jest.Mock).mockImplementation(async (key: string) => {
+        if (key === 'all_beers_api_url') {
+          return 'https://fsbs.beerknurd.com/bk-store-json.php?sid=13879';
+        }
+        if (key === 'my_beers_api_url') return 'http://api.example.com/my';
+        return null;
+      });
+
+      await manualRefreshAllData();
+      const callsBefore = (fetchBeersFromAPI as jest.Mock).mock.calls.length;
+
+      let releaseInFlight: () => void = () => {};
+      let reachedFetch: () => void = () => {};
+      const inFlightRegistered = new Promise<void>(resolve => {
+        reachedFetch = resolve;
+      });
+      (fetchBeersFromAPI as jest.Mock).mockImplementationOnce(async () => {
+        reachedFetch();
+        await new Promise<void>(resolve => {
+          releaseInFlight = resolve;
+        });
+        return fetchedRows(ALL_BEERS);
+      });
+
+      const focusRefresh = fetchAndUpdateAllBeers();
+      // Wait for the fetch to actually be in flight. A bare microtask tick is
+      // not enough — `fetchAndUpdateAllBeers` awaits several preference reads
+      // first, and without this the forced refresh starts before there is
+      // anything to join, which makes the test pass for the wrong reason.
+      await inFlightRegistered;
+
+      const forced = manualRefreshAllData();
+      // Wait for the forced refresh to start its OWN taplist fetch while the
+      // first is still in flight. That is the whole claim, and it is only
+      // observable BEFORE the release — which is why the count is captured
+      // here and asserted after, rather than measured at the end.
+      //
+      // This replaces a fixed 50-tick loop, which was fail-OPEN. Exceeding that
+      // budget did not fail the test: the forced refresh simply arrived after
+      // the in-flight entry had already been cleared by the release, started
+      // its own fetch for that reason instead of the intended one, and the
+      // final count came out identical. Mutation-testing it confirmed the
+      // consequence — removing `dropInFlightTaplistFetch` from
+      // `manualRefreshAllData` with 60 extra microtasks upstream left this test
+      // green. One extra `await` on the path to the join was all it took to
+      // retire the test permanently without it ever going red.
+      //
+      // Reading the count before the release inverts that. A forced refresh
+      // that joins, and one that arrives too late to have tried, are now both
+      // failures rather than both passes. The budget can therefore be generous:
+      // overshooting it costs a slow test, not a false green.
+      await flushUntil(
+        () => (fetchBeersFromAPI as jest.Mock).mock.calls.length > callsBefore + 1,
+        500
+      );
+      const callsWhileFirstInFlight = (fetchBeersFromAPI as jest.Mock).mock.calls.length;
+
+      releaseInFlight();
+      await Promise.all([focusRefresh, forced]);
+
+      // Three fetches by this point: the priming refresh, the in-flight one, and
+      // the forced one. Joining would give two, and the user's forced refresh
+      // would return a result computed from the ETag they just cleared.
+      expect(callsWhileFirstInFlight).toBeGreaterThan(callsBefore + 1);
+    });
+
+    it('does not let a different store join an in-flight fetch', async () => {
+      // Keyed by store, not a bare flag. Joining across stores would serve one
+      // location's taplist to a request for another — the only way this
+      // optimisation could produce wrong rows rather than merely save bytes.
+      // Real store URLs: the key is the `sid`, and a URL without one yields a
+      // null storeId that legitimately joins.
+      const storeUrl = (sid: string) => `https://fsbs.beerknurd.com/bk-store-json.php?sid=${sid}`;
+      (getPreference as jest.Mock).mockImplementation(async (key: string) => {
+        if (key === 'all_beers_api_url') return storeUrl('13879');
+        if (key === 'my_beers_api_url') return 'http://api.example.com/my';
+        return null;
+      });
+
+      let releaseFirst: () => void = () => {};
+      (fetchBeersFromAPI as jest.Mock).mockImplementationOnce(async () => {
+        await new Promise<void>(resolve => {
+          releaseFirst = resolve;
+        });
+        return fetchedRows(ALL_BEERS);
+      });
+
+      const first = fetchAndUpdateAllBeers();
+      // Wait until the first fetch is genuinely in flight, rather than for a
+      // fixed number of microtask ticks. `await Promise.resolve()` happened to
+      // be enough when this was written, so `releaseFirst` was assigned by the
+      // time it was called; one extra `await` anywhere upstream — the taplist
+      // write now reads the store configuration through a helper — left it as
+      // the no-op initialiser and the test hung for the full 30s timeout
+      // instead of failing. The condition is what this step actually needs.
+      await flushUntil(() => (fetchBeersFromAPI as jest.Mock).mock.calls.length > 0);
+
+      (getPreference as jest.Mock).mockImplementation(async (key: string) => {
+        if (key === 'all_beers_api_url') return storeUrl('13880');
+        if (key === 'my_beers_api_url') return 'http://api.example.com/my';
+        return null;
+      });
+      const second = fetchAndUpdateAllBeers();
+      // Measured while the first fetch is still in flight, for the same reason
+      // as the escape-hatch test above: counting at the end cannot tell "refused
+      // to join a different store" from "arrived after the in-flight entry had
+      // already been released and had nothing to join". Both give two.
+      //
+      // Confirmed by mutation: dropping `storeId` from the join condition
+      // entirely, with 40 extra microtasks upstream of the join, left the
+      // end-of-test count at two and this test green.
+      await flushUntil(() => (fetchBeersFromAPI as jest.Mock).mock.calls.length > 1, 500);
+      const callsWhileFirstInFlight = (fetchBeersFromAPI as jest.Mock).mock.calls.length;
+
+      releaseFirst();
+      await Promise.all([first, second]);
+
+      expect(callsWhileFirstInFlight).toBe(2);
+    });
+  });
+
   describe('sequentialRefreshAllData', () => {
-    /**
-     * Test 1: Sequential execution prevents lock contention
-     *
-     * REQUIREMENT: Operations must execute one at a time, not simultaneously
-     * IMPLEMENTATION: Lines 542-677 - sequential execution with await
-     * STATUS: ✅ This test verifies Step 5c implementation (sequential refresh coordination)
-     */
-    it('should execute refresh operations sequentially, not in parallel', async () => {
-      // Track when each operation starts and finishes
+    it('fetches each source in turn rather than all at once', async () => {
       const executionLog: string[] = [];
-
-      (fetchBeersFromAPI as jest.Mock).mockImplementation(async () => {
-        executionLog.push('allBeers-start');
-        await Promise.resolve();
-        executionLog.push('allBeers-end');
-        return [{ id: '1', brew_name: 'Test Beer', brewer: 'Test Brewery' }];
-      });
-
-      (fetchMyBeersFromAPI as jest.Mock).mockImplementation(async () => {
-        executionLog.push('myBeers-start');
-        await Promise.resolve();
-        executionLog.push('myBeers-end');
-        return [{ id: '2', brew_name: 'Tasted Beer', brewer: 'Test Brewery' }];
-      });
-
-      (fetchRewardsFromAPI as jest.Mock).mockImplementation(async () => {
-        executionLog.push('rewards-start');
-        await Promise.resolve();
-        executionLog.push('rewards-end');
-        return [{ id: 3, name: 'Test Reward' }];
-      });
+      logsAndResolves(fetchBeersFromAPI as jest.Mock, 'allBeers', ALL_BEERS, executionLog);
+      logsAndResolves(fetchMyBeersFromAPI as jest.Mock, 'myBeers', MY_BEERS, executionLog);
+      logsAndResolves(fetchRewardsFromAPI as jest.Mock, 'rewards', REWARDS, executionLog);
 
       await sequentialRefreshAllData();
 
-      // Verify sequential execution: each operation must COMPLETE before next starts
+      // Still sequential after the lock split, and deliberately so. Firing all
+      // three at once would triple the peak demand on the connection this plan
+      // exists to cope with, and the reason for sequencing them was never the
+      // lock.
       expect(executionLog).toEqual([
         'allBeers-start',
-        'allBeers-end', // All beers must finish before my beers starts
+        'allBeers-end',
         'myBeers-start',
-        'myBeers-end', // My beers must finish before rewards starts
+        'myBeers-end',
         'rewards-start',
         'rewards-end',
       ]);
+    });
 
-      // Also verify all three were called
+    it('takes the database lock exactly once', async () => {
+      const lockAcquisitions: string[] = [];
+      const originalWithLock = databaseLockManager.withDatabaseLock.bind(databaseLockManager);
+      jest
+        .spyOn(databaseLockManager, 'withDatabaseLock')
+        .mockImplementation(async (operation: string, task: () => Promise<unknown>) => {
+          lockAcquisitions.push(operation);
+          return originalWithLock(operation, task);
+        });
+
+      await sequentialRefreshAllData();
+
+      // One acquisition, not one per source: the repositories are called
+      // through their `…Unsafe` variants precisely so they do not each take a
+      // nested lock of their own.
+      expect(lockAcquisitions).toEqual(['refresh-all-data-write']);
+    });
+
+    it('serves one set of fetches to concurrent callers instead of repeating them', async () => {
+      const results = await Promise.all([
+        sequentialRefreshAllData(),
+        sequentialRefreshAllData(),
+        sequentialRefreshAllData(),
+      ]);
+
+      // The original asserted three fetches per source here, queued behind the
+      // master lock. That was the behaviour, and it was the bug: three full
+      // taplist downloads to answer one question.
       expect(fetchBeersFromAPI).toHaveBeenCalledTimes(1);
       expect(fetchMyBeersFromAPI).toHaveBeenCalledTimes(1);
       expect(fetchRewardsFromAPI).toHaveBeenCalledTimes(1);
+      expect(results[1]).toBe(results[0]);
+      expect(results[2]).toBe(results[0]);
     });
 
-    /**
-     * Test 2: Master lock coordinates all operations
-     *
-     * REQUIREMENT: Single lock acquired once for entire sequence
-     * IMPLEMENTATION: Line 546 - acquireLock('refresh-all-data-sequential')
-     * STATUS: ✅ This test verifies Step 5c implementation (sequential refresh coordination)
-     */
-    it('should use a master lock to coordinate all operations', async () => {
-      const lockAcquisitionLog: string[] = [];
-
-      // Spy on lock acquisitions
-      const originalAcquire = databaseLockManager.acquireLock.bind(databaseLockManager);
-      const acquireSpy = jest
-        .spyOn(databaseLockManager, 'acquireLock')
-        .mockImplementation(async (operation: string) => {
-          lockAcquisitionLog.push(`acquire-${operation}`);
-          return originalAcquire(operation);
-        });
-
-      await sequentialRefreshAllData();
-
-      // Verify only ONE lock acquisition for the entire sequence
-      // Not 3 separate lock acquisitions (which causes contention)
-      expect(lockAcquisitionLog).toHaveLength(1);
-      expect(lockAcquisitionLog[0]).toMatch(/acquire.*refresh.*all/i);
-
-      acquireSpy.mockRestore();
-    });
-
-    /**
-     * Test 3: Parallel operations are properly serialized
-     *
-     * REQUIREMENT: If multiple refresh requests arrive, they must queue properly
-     * IMPLEMENTATION: Lock manager queues requests when lock is held
-     * STATUS: ✅ This test verifies Step 5c implementation (sequential refresh coordination)
-     */
-    it('should properly queue multiple simultaneous refresh requests', async () => {
-      const completionOrder: number[] = [];
-
-      // Start 3 simultaneous refresh requests
-      const refresh1 = sequentialRefreshAllData().then(() => completionOrder.push(1));
-      const refresh2 = sequentialRefreshAllData().then(() => completionOrder.push(2));
-      const refresh3 = sequentialRefreshAllData().then(() => completionOrder.push(3));
-
-      await Promise.all([refresh1, refresh2, refresh3]);
-
-      // All three should complete in order (queued, not parallel)
-      expect(completionOrder).toEqual([1, 2, 3]);
-
-      // Each refresh calls all three functions once
-      expect(fetchBeersFromAPI).toHaveBeenCalledTimes(3);
-      expect(fetchMyBeersFromAPI).toHaveBeenCalledTimes(3);
-      expect(fetchRewardsFromAPI).toHaveBeenCalledTimes(3);
-    });
-
-    /**
-     * Test 4: Lock is released even if operation fails
-     *
-     * REQUIREMENT: Lock must be released in finally block to prevent deadlock
-     * IMPLEMENTATION: Line 673-676 - finally block releases lock
-     * STATUS: ✅ This test verifies Step 5c implementation (sequential refresh coordination)
-     */
-    it('should release master lock even if an operation fails', async () => {
-      (fetchBeersFromAPI as jest.Mock).mockResolvedValue([
-        { id: '1', brew_name: 'Test Beer', brewer: 'Test Brewery' },
-      ]);
-      (fetchMyBeersFromAPI as jest.Mock).mockRejectedValue(new Error('Network error')); // Simulate failure
-      (fetchRewardsFromAPI as jest.Mock).mockResolvedValue([{ id: 3, name: 'Test Reward' }]);
+    it('releases the lock when a source fails', async () => {
+      (fetchMyBeersFromAPI as jest.Mock).mockRejectedValue(new Error('Network error'));
 
       const result = await sequentialRefreshAllData();
 
-      // Should have error but not throw
       expect(result.hasErrors).toBe(true);
       expect(result.myBeersResult.success).toBe(false);
 
-      // Lock should be released - verify we can acquire it again
-      const lockAcquired = await databaseLockManager.acquireLock('test-operation');
-      expect(lockAcquired).toBe(true);
-      await databaseLockManager.releaseLock();
+      // Asserts the lock is genuinely free, not merely that the wrapper
+      // returned: the manager here is the real one.
+      const token = await databaseLockManager.acquire('test-operation');
+      expect(databaseLockManager.isLocked()).toBe(true);
+      databaseLockManager.release(token);
     });
 
-    /**
-     * Test 5: Sequential execution is faster than parallel with lock contention
-     *
-     * REQUIREMENT: Sequential with one lock should be faster than parallel with lock contention
-     * IMPLEMENTATION: No queueing overhead with master lock approach
-     * STATUS: ✅ This test verifies Step 5c implementation (sequential refresh coordination)
-     */
-    it('should complete faster than parallel execution with lock contention', async () => {
-      const startTime = Date.now();
-      await sequentialRefreshAllData();
-      const endTime = Date.now();
-      const executionTime = endTime - startTime;
-
-      // Sequential execution should complete quickly without lock contention
-      // The key is that it completes successfully, not the exact timing
-      expect(executionTime).toBeLessThan(1000); // Should be very fast with mocks
-    });
-
-    /**
-     * Test 6: Uses unsafe repository methods to avoid nested locks
-     *
-     * REQUIREMENT: Must use insertManyUnsafe() to avoid acquiring locks inside master lock
-     * IMPLEMENTATION: Lines 571, 608, 632 - insertManyUnsafe() calls
-     * STATUS: ✅ This test verifies Step 5c implementation (sequential refresh coordination)
-     */
-    it('should use unsafe repository methods to avoid nested lock acquisition', async () => {
-      // Track lock acquisitions
-      const lockOperations: string[] = [];
-      const acquireSpy = jest
-        .spyOn(databaseLockManager, 'acquireLock')
-        .mockImplementation(async (operation: string) => {
-          lockOperations.push(operation);
-          return true; // Just return success, don't call through
+    it('never acquires the lock when every source fails', async () => {
+      // Asserted through the ACQUISITION LOG, not through `isLocked()`. The
+      // earlier version checked only that the lock was free afterwards, which
+      // is equally true of "took it and released it" — so forcing `needsLock`
+      // to true left it green, and it could not fail at the thing its name
+      // claimed.
+      const lockAcquisitions: string[] = [];
+      const originalWithLock = databaseLockManager.withDatabaseLock.bind(databaseLockManager);
+      jest
+        .spyOn(databaseLockManager, 'withDatabaseLock')
+        .mockImplementation(async (operation: string, task: () => Promise<unknown>) => {
+          lockAcquisitions.push(operation);
+          return originalWithLock(operation, task);
         });
 
-      const releaseSpy = jest.spyOn(databaseLockManager, 'releaseLock').mockImplementation(() => {
-        // Just track, don't call through
-      });
+      (fetchBeersFromAPI as jest.Mock).mockRejectedValue(new Error('Network error'));
+      (fetchMyBeersFromAPI as jest.Mock).mockRejectedValue(new Error('Network error'));
+      (fetchRewardsFromAPI as jest.Mock).mockRejectedValue(new Error('Network error'));
 
-      await sequentialRefreshAllData();
+      const result = await sequentialRefreshAllData();
 
-      // Should only see ONE lock acquisition (the master lock)
-      // NOT multiple locks from insertMany() calls
-      expect(lockOperations).toHaveLength(1);
-      expect(lockOperations[0]).toMatch(/refresh/i);
-
-      // Cleanup spies
-      acquireSpy.mockRestore();
-      releaseSpy.mockRestore();
+      expect(result.hasErrors).toBe(true);
+      expect(lockAcquisitions).toEqual([]);
+      expect(databaseLockManager.isLocked()).toBe(false);
     });
   });
 
-  describe('Comparison: Parallel vs Sequential', () => {
-    /**
-     * Test 7: Document current parallel behavior for comparison
-     *
-     * This test demonstrates the CURRENT behavior with lock contention
-     * It should PASS to establish baseline, then we'll see improvement with sequential
-     */
-    it('demonstrates current parallel execution causes lock queueing', async () => {
-      const lockQueue: string[] = [];
-
-      // Track when operations acquire locks
-      const acquireSpy = jest
-        .spyOn(databaseLockManager, 'acquireLock')
-        .mockImplementation(async (operation: string) => {
-          lockQueue.push(`${operation}-waiting`);
-          lockQueue.push(`${operation}-acquired`);
-          return true; // Just return success without actual locking
-        });
-
-      const releaseSpy = jest.spyOn(databaseLockManager, 'releaseLock').mockImplementation(() => {
-        // Just track, don't call through
-      });
-
-      const mockOp1 = async () => {
-        await databaseLockManager.acquireLock('allBeers');
-        await Promise.resolve();
-        databaseLockManager.releaseLock();
-      };
-
-      const mockOp2 = async () => {
-        await databaseLockManager.acquireLock('myBeers');
-        await Promise.resolve();
-        databaseLockManager.releaseLock();
-      };
-
-      const mockOp3 = async () => {
-        await databaseLockManager.acquireLock('rewards');
-        await Promise.resolve();
-        databaseLockManager.releaseLock();
-      };
-
-      // Simulate current parallel execution
-      await Promise.allSettled([mockOp1(), mockOp2(), mockOp3()]);
-
-      // With parallel execution, operations QUEUE for locks
-      // We should see 3 operations each acquiring a lock
-      expect(lockQueue.filter(log => log.includes('waiting')).length).toBe(3);
-      expect(lockQueue.filter(log => log.includes('acquired')).length).toBe(3);
-
-      // Cleanup spies
-      acquireSpy.mockRestore();
-      releaseSpy.mockRestore();
-    });
-  });
-
-  describe('Production Integration Tests (CI-4)', () => {
-    /**
-     * Test 8: manualRefreshAllData() should delegate to sequentialRefreshAllData()
-     *
-     * REQUIREMENT: Production code must use the sequential implementation
-     * IMPLEMENTATION: Line 715 - delegates to sequentialRefreshAllData()
-     * STATUS: ✅ This test verifies CI-4 fix (manual refresh uses sequential pattern)
-     */
-    it('manualRefreshAllData should use sequential execution pattern', async () => {
+  describe('manualRefreshAllData', () => {
+    it('delegates to the sequential refresh', async () => {
       const executionLog: string[] = [];
-
-      (fetchBeersFromAPI as jest.Mock).mockImplementation(async () => {
-        executionLog.push('allBeers-start');
-        await Promise.resolve();
-        executionLog.push('allBeers-end');
-        return [{ id: '1', brew_name: 'Test Beer', brewer: 'Test Brewery' }];
-      });
-
-      (fetchMyBeersFromAPI as jest.Mock).mockImplementation(async () => {
-        executionLog.push('myBeers-start');
-        await Promise.resolve();
-        executionLog.push('myBeers-end');
-        return [{ id: '2', brew_name: 'Tasted Beer', brewer: 'Test Brewery' }];
-      });
-
-      (fetchRewardsFromAPI as jest.Mock).mockImplementation(async () => {
-        executionLog.push('rewards-start');
-        await Promise.resolve();
-        executionLog.push('rewards-end');
-        return [{ id: 3, name: 'Test Reward' }];
-      });
+      logsAndResolves(fetchBeersFromAPI as jest.Mock, 'allBeers', ALL_BEERS, executionLog);
+      logsAndResolves(fetchMyBeersFromAPI as jest.Mock, 'myBeers', MY_BEERS, executionLog);
+      logsAndResolves(fetchRewardsFromAPI as jest.Mock, 'rewards', REWARDS, executionLog);
 
       await manualRefreshAllData();
 
-      // Verify sequential execution (not parallel)
       expect(executionLog).toEqual([
         'allBeers-start',
         'allBeers-end',
@@ -375,96 +425,158 @@ describe('Sequential Refresh Coordination', () => {
         'rewards-start',
         'rewards-end',
       ]);
+      expect(beerRepository.insertManyUnsafe).toHaveBeenCalled();
     });
 
-    /**
-     * Test 9: manualRefreshAllData() should use master lock (not multiple locks)
-     *
-     * REQUIREMENT: Only ONE lock acquisition for entire manual refresh
-     * IMPLEMENTATION: Delegates to sequentialRefreshAllData() which has master lock
-     * STATUS: ✅ This test verifies CI-4 fix (manual refresh uses sequential pattern)
-     */
-    it('manualRefreshAllData should use only one master lock', async () => {
-      const lockAcquisitionLog: string[] = [];
-
-      const originalAcquire = databaseLockManager.acquireLock.bind(databaseLockManager);
-      const acquireSpy = jest
-        .spyOn(databaseLockManager, 'acquireLock')
-        .mockImplementation(async (operation: string) => {
-          lockAcquisitionLog.push(`acquire-${operation}`);
-          return originalAcquire(operation);
+    it('takes the database lock exactly once', async () => {
+      const lockAcquisitions: string[] = [];
+      const originalWithLock = databaseLockManager.withDatabaseLock.bind(databaseLockManager);
+      jest
+        .spyOn(databaseLockManager, 'withDatabaseLock')
+        .mockImplementation(async (operation: string, task: () => Promise<unknown>) => {
+          lockAcquisitions.push(operation);
+          return originalWithLock(operation, task);
         });
 
       await manualRefreshAllData();
 
-      // Should only see ONE lock acquisition (the master lock)
-      expect(lockAcquisitionLog).toHaveLength(1);
-      expect(lockAcquisitionLog[0]).toMatch(/acquire.*refresh.*all.*sequential/i);
-
-      acquireSpy.mockRestore();
+      expect(lockAcquisitions).toEqual(['refresh-all-data-write']);
     });
 
-    /**
-     * Test 10: manualRefreshAllData() should not cause lock contention
-     *
-     * REQUIREMENT: Multiple simultaneous manual refresh calls should queue properly
-     * IMPLEMENTATION: Uses master lock via sequentialRefreshAllData()
-     * STATUS: ✅ This test verifies CI-4 fix (manual refresh uses sequential pattern)
-     */
-    it('manualRefreshAllData should handle multiple simultaneous calls without lock contention', async () => {
-      const completionOrder: number[] = [];
+    it('waits out an in-flight refresh and then runs its own', async () => {
+      // INVERTED. This asserted one fetch and one shared result — the
+      // de-duplication applying to explicit refreshes too. That is wrong for
+      // this entry point specifically: manualRefreshAllData exists to
+      // invalidate state and force a full fetch, and a run already in flight
+      // read the old state. Joining made the second tap a silent no-op.
+      //
+      // Two serialised downloads for two explicit taps is what shipped before
+      // 5.4, so this is not a regression against released behaviour. The
+      // automatic refreshes de-duplication was added for still join.
+      const results = await Promise.all([manualRefreshAllData(), manualRefreshAllData()]);
 
-      // Start 2 simultaneous manual refresh requests
-      const refresh1 = manualRefreshAllData().then(() => completionOrder.push(1));
-      const refresh2 = manualRefreshAllData().then(() => completionOrder.push(2));
-
-      await Promise.all([refresh1, refresh2]);
-
-      // Both should complete in order (queued via master lock)
-      expect(completionOrder).toEqual([1, 2]);
-
-      // Each refresh should call all three functions once
       expect(fetchBeersFromAPI).toHaveBeenCalledTimes(2);
-      expect(fetchMyBeersFromAPI).toHaveBeenCalledTimes(2);
-      expect(fetchRewardsFromAPI).toHaveBeenCalledTimes(2);
+      expect(results[1]).not.toBe(results[0]);
+    });
+
+    it('clears the ETag only after the refresh it is overtaking has written', async () => {
+      // The rapid-double-refresh escape hatch, and the ONLY arrangement that
+      // tests it: the second call must arrive while the first is still running.
+      // With both calls awaited in turn there is never an in-flight refresh, the
+      // wait is a no-op, and deleting it entirely leaves the test green — which
+      // is exactly what the first version of this test did.
+      //
+      // If the clear lands mid-run, the running refresh's write burst stamps its
+      // own ETag over it and the next request 304s again, so the user's "refresh
+      // again, it still looks wrong" does nothing — twice.
+      const order: string[] = [];
+      (setPreference as jest.Mock).mockImplementation(async (key: string, value: string) => {
+        order.push(value === '' ? `clear:${key}` : `set:${key}`);
+      });
+      (beerRepository.insertManyUnsafe as jest.Mock).mockImplementation(async () => {
+        order.push('write:allBeers');
+      });
+
+      // Hold the FIRST refresh open at its rewards fetch, so the second call
+      // arrives mid-run rather than after it.
+      let releaseFirstRun: () => void = () => {};
+      const firstRunReachedRewards = new Promise<void>(resolve => {
+        (fetchRewardsFromAPI as jest.Mock).mockImplementationOnce(async () => {
+          resolve();
+          await new Promise<void>(release => {
+            releaseFirstRun = release;
+          });
+          return fetchedRows(REWARDS);
+        });
+      });
+
+      const first = manualRefreshAllData();
+      await firstRunReachedRewards;
+
+      // The first run is parked at its rewards fetch and appends nothing more
+      // until released, so anything recorded from here until the release came
+      // from the overtaking call — and the overtaking call recording ANY write
+      // while the run it is overtaking is still in flight is the defect.
+      const entriesWhileFirstParked = order.length;
+
+      const second = manualRefreshAllData();
+      // Drain until the second call records something, or until the budget is
+      // spent. This replaces a two-tick wait that was fail-OPEN: it gave the
+      // second call exactly two microtasks to misbehave, so the moment anything
+      // upstream needed a third the test passed without observing the thing it
+      // names. Mutation confirmed it — deleting `settleInFlightRefresh` from
+      // this function with 60 extra microtasks in front of it left this test
+      // green. Here a longer drain can only make the assertion stricter.
+      await flushUntil(() => order.length > entriesWhileFirstParked, 500);
+      expect(order.slice(entriesWhileFirstParked)).toEqual([]);
+
+      releaseFirstRun();
+      await Promise.all([first, second]);
+
+      expect(order).toContain('write:allBeers');
+
+      // The escape-hatch clear must be identified, not just found. Every write
+      // burst now also clears the ETag before replacing the rows it describes,
+      // so `indexOf('clear:all_beers_etag')` finds that invalidation rather than
+      // this function's forced clear. The forced one is the clear immediately
+      // preceding the timestamp clears, which nothing but `manualRefreshAllData`
+      // emits.
+      // Both calls clear the timestamps unconditionally, so the first occurrence
+      // is the overtaking call's own opening clear at index 0. The SECOND is the
+      // one that had to wait for the in-flight run, and only the second call is
+      // inside the rapid window, so only it precedes its timestamps with an ETag
+      // clear.
+      const timestampClears = order.reduce<number[]>(
+        (indices, entry, index) =>
+          entry === 'clear:all_beers_last_update' ? [...indices, index] : indices,
+        []
+      );
+      // Deliberately not `toHaveLength(2)` and not positional adjacency. Pinning
+      // the exact count and the exact neighbour encodes a call sequence rather
+      // than the property, and this file has already been broken once by a
+      // legitimate change that added an ETag clear. What matters is that the
+      // LAST timestamp clear — the overtaking call's — lands after the overtaken
+      // run's write, with its ETag clear somewhere in that same burst.
+      const lastTimestampClear = timestampClears[timestampClears.length - 1];
+      const writeIndex = order.indexOf('write:allBeers');
+      expect(timestampClears.length).toBeGreaterThan(0);
+      expect(lastTimestampClear).toBeGreaterThan(writeIndex);
+      // Adjacency, restored. Dropping the hard-coded count of two was right;
+      // dropping adjacency with it was not — searching the whole span between
+      // the write and the timestamps is satisfied by the write burst's OWN
+      // post-commit clear, so the assertion survived moving the escape-hatch
+      // clear to before `settleInFlightRefresh`, which is precisely the mid-run
+      // clear this test exists to forbid. The escape-hatch clear is the one
+      // immediately preceding the timestamps it was written alongside.
+      expect(order[lastTimestampClear - 1]).toBe('clear:all_beers_etag');
+    });
+
+    it('re-stamps the timestamps it cleared', async () => {
+      // Joining a run that had already stamped left these at '' with fresh data
+      // in the table, and `shouldRefreshData` treats a missing timestamp as
+      // "never checked" — so the next app open paid for a full refresh it did
+      // not need.
+      const written = new Map<string, string>();
+      (setPreference as jest.Mock).mockImplementation(async (key: string, value: string) => {
+        written.set(key, value);
+      });
+
+      await manualRefreshAllData();
+
+      expect(written.get('all_beers_last_check')).not.toBe('');
+      expect(written.get('my_beers_last_check')).not.toBe('');
     });
   });
 
-  describe('Production Integration Tests (CI-5)', () => {
-    /**
-     * Test 11: refreshAllDataFromAPI() should use sequential execution
-     *
-     * REQUIREMENT: refreshAllDataFromAPI() must avoid lock contention
-     * IMPLEMENTATION: Lines 839-891 - sequential execution with master lock
-     * STATUS: ✅ This test verifies CI-5 fix (refreshAllDataFromAPI uses sequential pattern)
-     */
-    it('refreshAllDataFromAPI should use sequential execution pattern', async () => {
+  describe('refreshAllDataFromAPI', () => {
+    it('fetches each source in turn', async () => {
       const executionLog: string[] = [];
-
-      (fetchBeersFromAPI as jest.Mock).mockImplementation(async () => {
-        executionLog.push('allBeers-start');
-        await Promise.resolve();
-        executionLog.push('allBeers-end');
-        return [{ id: '1', brew_name: 'Test Beer', brewer: 'Test Brewery' }];
-      });
-
-      (fetchMyBeersFromAPI as jest.Mock).mockImplementation(async () => {
-        executionLog.push('myBeers-start');
-        await Promise.resolve();
-        executionLog.push('myBeers-end');
-        return [{ id: '2', brew_name: 'Tasted Beer', brewer: 'Test Brewery' }];
-      });
-
-      (fetchRewardsFromAPI as jest.Mock).mockImplementation(async () => {
-        executionLog.push('rewards-start');
-        await Promise.resolve();
-        executionLog.push('rewards-end');
-        return [{ id: 3, name: 'Test Reward' }];
-      });
+      logsAndResolves(fetchBeersFromAPI as jest.Mock, 'allBeers', ALL_BEERS, executionLog);
+      logsAndResolves(fetchMyBeersFromAPI as jest.Mock, 'myBeers', MY_BEERS, executionLog);
+      logsAndResolves(fetchRewardsFromAPI as jest.Mock, 'rewards', REWARDS, executionLog);
 
       await refreshAllDataFromAPI();
 
-      // Verify sequential execution (not parallel)
       expect(executionLog).toEqual([
         'allBeers-start',
         'allBeers-end',
@@ -475,31 +587,22 @@ describe('Sequential Refresh Coordination', () => {
       ]);
     });
 
-    /**
-     * Test 12: refreshAllDataFromAPI() should use master lock
-     *
-     * REQUIREMENT: Only ONE lock acquisition for entire refresh
-     * IMPLEMENTATION: Line 840 - acquireLock('refresh-all-from-api')
-     * STATUS: ✅ This test verifies CI-5 fix (refreshAllDataFromAPI uses sequential pattern)
-     */
-    it('refreshAllDataFromAPI should use only one master lock', async () => {
-      const lockAcquisitionLog: string[] = [];
-
-      const originalAcquire = databaseLockManager.acquireLock.bind(databaseLockManager);
-      const acquireSpy = jest
-        .spyOn(databaseLockManager, 'acquireLock')
-        .mockImplementation(async (operation: string) => {
-          lockAcquisitionLog.push(`acquire-${operation}`);
-          return originalAcquire(operation);
+    it('takes the database lock exactly once, for the write burst', async () => {
+      // Was 'still holds one lock across its whole body, pending Phase 5.5',
+      // asserting the pre-5.5 shape on purpose so this file would go red and
+      // name the property when 5.5 landed. It did exactly that.
+      const lockAcquisitions: string[] = [];
+      const originalWithLock = databaseLockManager.withDatabaseLock.bind(databaseLockManager);
+      jest
+        .spyOn(databaseLockManager, 'withDatabaseLock')
+        .mockImplementation(async (operation: string, task: () => Promise<unknown>) => {
+          lockAcquisitions.push(operation);
+          return originalWithLock(operation, task);
         });
 
       await refreshAllDataFromAPI();
 
-      // Should only see ONE lock acquisition (the master lock)
-      expect(lockAcquisitionLog).toHaveLength(1);
-      expect(lockAcquisitionLog[0]).toMatch(/acquire.*refresh/i);
-
-      acquireSpy.mockRestore();
+      expect(lockAcquisitions).toEqual(['refresh-all-from-api-write']);
     });
   });
 });

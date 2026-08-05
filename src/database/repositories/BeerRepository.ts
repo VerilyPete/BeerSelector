@@ -5,11 +5,16 @@
  * Manages all database operations related to the allbeers table.
  */
 
+import { Platform } from 'react-native';
 import { getDatabase } from '../connection';
 import { BeerWithContainerType } from '../../types/beer';
+import type { NonEmptyArray } from '../../api/fetchOutcome';
 import { databaseLockManager } from '../locks';
+import { toContentionError, withContentionMapping } from '../errors';
+import { withAtomicWrite } from '../transactions';
 import { isAllBeersRow, allBeersRowToBeerWithContainerType, AllBeersRow } from '../schemaTypes';
 import { EnrichmentUpdate } from '../../types/enrichment';
+import { logError } from '../../utils/errorLogger';
 
 /**
  * Repository class for Beer entity operations
@@ -24,24 +29,17 @@ export class BeerRepository {
   /**
    * Insert multiple beers into the database
    *
-   * Clears existing data and inserts fresh records in batches of 50.
-   * Skips beers without valid IDs.
+   * Clears existing data and inserts fresh records in ONE exclusive
+   * transaction — the batch loop paces progress logging only, and is no longer
+   * a durability boundary. Skips beers without valid IDs.
    * Uses database lock to prevent concurrent operations.
    *
    * @param beers - Array of BeerWithContainerType objects to insert
    */
-  async insertMany(beers: BeerWithContainerType[]): Promise<void> {
-    // Acquire database lock to prevent concurrent operations
-    if (!(await databaseLockManager.acquireLock('BeerRepository'))) {
-      throw new Error('Could not acquire database lock for beer insertion');
-    }
-
-    try {
-      await this._insertManyInternal(beers);
-    } finally {
-      // Always release the lock
-      databaseLockManager.releaseLock('BeerRepository');
-    }
+  async insertMany(beers: NonEmptyArray<BeerWithContainerType>): Promise<void> {
+    await databaseLockManager.withDatabaseLock('BeerRepository.insertMany', () =>
+      withContentionMapping('allbeers import', () => this._insertManyInternal(beers))
+    );
   }
 
   /**
@@ -52,8 +50,8 @@ export class BeerRepository {
    *
    * @param beers - Array of BeerWithContainerType objects to insert
    */
-  async insertManyUnsafe(beers: BeerWithContainerType[]): Promise<void> {
-    await this._insertManyInternal(beers);
+  async insertManyUnsafe(beers: NonEmptyArray<BeerWithContainerType>): Promise<void> {
+    await withContentionMapping('allbeers import', () => this._insertManyInternal(beers));
   }
 
   /**
@@ -61,40 +59,55 @@ export class BeerRepository {
    *
    * @param beers - Array of BeerWithContainerType objects to insert
    */
-  private async _insertManyInternal(beers: BeerWithContainerType[]): Promise<void> {
-    const database = await getDatabase();
+  private async _insertManyInternal(beers: NonEmptyArray<BeerWithContainerType>): Promise<void> {
+    // Belt and braces with the NonEmptyArray signature. The type stops this at
+    // compile time, but this is the destructive path — a caller that casts past
+    // the type would otherwise run the DELETE and insert nothing, wiping the
+    // taplist. Unlike the tasted table there is no legitimate empty state here,
+    // so there is no replaceAllWithEmpty to redirect to.
+    if (beers.length === 0) {
+      throw new Error('Refusing to replace the taplist with an empty beer list');
+    }
 
-    // Always refresh the allbeers table with the latest data
-    // Clear existing data first, then insert fresh records in batches
-    await database.withTransactionAsync(async () => {
-      const before = await database.getFirstAsync<{ count: number }>(
-        'SELECT COUNT(*) as count FROM allbeers'
-      );
-      await database.runAsync('DELETE FROM allbeers');
-      console.log(`Cleared allbeers table (removed ${before?.count ?? 0} rows)`);
-    });
+    const database = await getDatabase();
 
     console.log(`Starting import of ${beers.length} beers...`);
 
-    // Process in larger batches using transactions
+    // Paces progress logging ONLY. This is deliberately not a durability
+    // boundary any more: the delete and every insert publish at a single
+    // commit below, so no reader can observe a cleared or half-built table.
     const batchSize = 50;
 
-    for (let i = 0; i < beers.length; i += batchSize) {
-      const batch = beers.slice(i, i + batchSize);
+    // Every query in this body must go through `txn`. Reads that escape onto
+    // the `database` handle do not throw — they silently return the
+    // pre-transaction snapshot — so the body is kept write-only, which makes a
+    // misrouted call fail loudly instead of quietly.
+    await withAtomicWrite(database, Platform.OS === 'web' ? 'web' : 'native', async txn => {
+      const cleared = await txn.runAsync('DELETE FROM allbeers');
+      console.log(`Cleared allbeers table (removed ${cleared.changes} rows)`);
 
-      // Use withTransactionAsync for each batch
-      await database.withTransactionAsync(async () => {
-        for (const beer of batch) {
-          if (!beer.id) continue; // Skip entries without an ID
+      // Compiled ONCE and reused for every row. The whole import runs inside a
+      // single exclusive transaction whose entire span is covered by the 15s
+      // lock hold timeout, and blowing that timeout abandons the grant and
+      // blocks every other writer until this import finishes. Recompiling the
+      // same INSERT ~1200 times is the avoidable part of that budget.
+      const insert = await txn.prepareAsync(
+        `INSERT OR REPLACE INTO allbeers (
+          id, added_date, brew_name, brewer, brewer_loc,
+          brew_style, brew_container, review_count, review_rating,
+          brew_description, container_type, abv,
+          enrichment_confidence, enrichment_source
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      );
 
-          await database.runAsync(
-            `INSERT OR REPLACE INTO allbeers (
-              id, added_date, brew_name, brewer, brewer_loc,
-              brew_style, brew_container, review_count, review_rating,
-              brew_description, container_type, abv,
-              enrichment_confidence, enrichment_source
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [
+      try {
+        for (let i = 0; i < beers.length; i += batchSize) {
+          const batch = beers.slice(i, i + batchSize);
+
+          for (const beer of batch) {
+            if (!beer.id) continue; // Skip entries without an ID
+
+            await insert.executeAsync([
               beer.id,
               beer.added_date || '',
               beer.brew_name || '',
@@ -109,20 +122,36 @@ export class BeerRepository {
               beer.abv ?? null,
               beer.enrichment_confidence ?? null,
               beer.enrichment_source ?? null,
-            ]
-          );
+            ]);
+          }
+
+          // Log progress for larger batches
+          if ((i + batchSize) % 200 === 0 || i + batchSize >= beers.length) {
+            console.log(
+              `Imported ${Math.min(i + batchSize, beers.length)} of ${beers.length} beers...`
+            );
+          }
         }
-      });
-
-      // Log progress for larger batches
-      if ((i + batchSize) % 200 === 0 || i + batchSize >= beers.length) {
-        console.log(
-          `Imported ${Math.min(i + batchSize, beers.length)} of ${beers.length} beers...`
-        );
+      } finally {
+        // Runs on the failure path too: a statement left unfinalized inside a
+        // rolled-back transaction leaks a native handle.
+        //
+        // Its own failure must never propagate. If the body threw A and this
+        // threw B, JS discards A and B wins — so a `database is locked` abort
+        // would reach withContentionMapping as a finalize error instead,
+        // fail the `database is locked` substring test, and be reported to the
+        // user as a hard UNKNOWN_ERROR. That is exactly the misclassification
+        // the typed contention error exists to prevent.
+        try {
+          await insert.finalizeAsync();
+        } catch (finalizeError) {
+          console.error('[BeerRepository] failed to finalize the insert statement', finalizeError);
+        }
       }
-    }
+    });
 
-    // Verify final row count
+    // Verify final row count — deliberately outside the transaction, on the
+    // database handle, so it reports what was actually committed.
     try {
       const after = await database.getFirstAsync<{ count: number }>(
         'SELECT COUNT(*) as count FROM allbeers'
@@ -130,6 +159,37 @@ export class BeerRepository {
       console.log(`Beer import complete! allbeers now has ${after?.count ?? 0} rows`);
     } catch (e) {
       console.log('Beer import complete! (row count query failed)');
+    }
+  }
+
+  /**
+   * How many beers the table currently holds.
+   *
+   * Exists for the conditional-request backstop: a 304 asserts the client
+   * already has the data, and against an empty table that assertion is false.
+   * Counting is the cheap way to check without materialising every row.
+   *
+   * `null` means "cannot tell", which is deliberately NOT the same as zero. An
+   * earlier version returned 0 on failure and called that "wasteful, never
+   * wrong" — it was neither. The caller responds to a zero by DISCARDING the
+   * stored ETag and reporting a failure, so an unreadable count against a full
+   * table threw away a valid validator and raised an error blaming the server.
+   * Callers must trust a 304 when the count is unknown; only a known zero
+   * contradicts it.
+   *
+   * @returns The row count, or null if it cannot be read
+   */
+  async count(): Promise<number | null> {
+    const database = await getDatabase();
+
+    try {
+      const row = await database.getFirstAsync<{ count: number }>(
+        'SELECT COUNT(*) as count FROM allbeers'
+      );
+      return row?.count ?? null;
+    } catch (error) {
+      logError(error, { operation: 'count', component: 'BeerRepository' });
+      return null;
     }
   }
 
@@ -329,45 +389,43 @@ export class BeerRepository {
     const ids = Object.keys(enrichments);
     if (ids.length === 0) return 0;
 
-    if (!(await databaseLockManager.acquireLock('BeerRepository'))) {
-      throw new Error('Could not acquire database lock for enrichment update');
-    }
+    return databaseLockManager.withDatabaseLock('BeerRepository.updateEnrichmentData', async () => {
+      try {
+        const database = await getDatabase();
+        let updatedCount = 0;
 
-    try {
-      const database = await getDatabase();
-      let updatedCount = 0;
+        await database.withTransactionAsync(async () => {
+          const stmt = await database.prepareAsync(
+            `UPDATE allbeers SET
+                abv = COALESCE(?, abv),
+                enrichment_confidence = ?,
+                enrichment_source = ?,
+                brew_description = COALESCE(?, brew_description)
+               WHERE id = ?`
+          );
 
-      await database.withTransactionAsync(async () => {
-        const stmt = await database.prepareAsync(
-          `UPDATE allbeers SET
-            abv = COALESCE(?, abv),
-            enrichment_confidence = ?,
-            enrichment_source = ?,
-            brew_description = COALESCE(?, brew_description)
-           WHERE id = ?`
-        );
-
-        try {
-          for (const [id, data] of Object.entries(enrichments)) {
-            const result = await stmt.executeAsync([
-              data.enriched_abv,
-              data.enrichment_confidence ?? null,
-              data.enrichment_source ?? null,
-              data.brew_description ?? null,
-              id,
-            ]);
-            if (result.changes > 0) updatedCount++;
+          try {
+            for (const [id, data] of Object.entries(enrichments)) {
+              const result = await stmt.executeAsync([
+                data.enriched_abv,
+                data.enrichment_confidence ?? null,
+                data.enrichment_source ?? null,
+                data.brew_description ?? null,
+                id,
+              ]);
+              if (result.changes > 0) updatedCount++;
+            }
+          } finally {
+            await stmt.finalizeAsync();
           }
-        } finally {
-          await stmt.finalizeAsync();
-        }
-      });
+        });
 
-      console.log(`[BeerRepository] Updated enrichment for ${updatedCount} beers`);
-      return updatedCount;
-    } finally {
-      databaseLockManager.releaseLock('BeerRepository');
-    }
+        console.log(`[BeerRepository] Updated enrichment for ${updatedCount} beers`);
+        return updatedCount;
+      } catch (error) {
+        throw toContentionError('allbeers enrichment update', error);
+      }
+    });
   }
 
   /**
@@ -393,7 +451,7 @@ export class BeerRepository {
       });
     } catch (error) {
       console.error('Error clearing all beers:', error);
-      throw error;
+      throw toContentionError('allbeers clear', error);
     }
   }
 }

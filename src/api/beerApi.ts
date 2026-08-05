@@ -3,11 +3,15 @@ import { isBeer } from '../types/beer';
 import { Reward } from '../types/database';
 import { getPreference } from '../database/preferences';
 import { config } from '../config';
+import { HttpError, MalformedResponseError, toNonEmpty } from './fetchOutcome';
+import { createErrorResponse } from '../utils/notificationUtils';
+import type { FetchOutcome, UnavailableReason, UnconditionalSource } from './fetchOutcome';
 
 /**
- * Helper function to retry fetch operations with exponential backoff
+ * Fetch with exponential backoff, bounded as a whole.
+ *
  * @param url - The URL to fetch
- * @param retries - Number of retry attempts (default: 3)
+ * @param retries - Maximum attempts, including the first (default: 3)
  * @param delay - Initial delay between retries in ms (default from config)
  * @returns Promise with the JSON response
  */
@@ -16,46 +20,283 @@ export const fetchWithRetry = async (
   retries = 3,
   delay = config.network.retryDelay
 ): Promise<unknown> => {
-  // Special handling for none:// protocol which is used as a placeholder in visitor mode
-  if (url.startsWith('none://')) {
-    console.log(
-      `Detected none:// protocol URL: ${url}. Returning empty data instead of making network request.`
-    );
-    // Return an empty array structure that matches the expected format
-    return [null, { tasted_brew_current_round: [] }];
-  }
+  // The none:// synthesis that used to live here is GONE. It fabricated
+  // `[null, { tasted_brew_current_round: [] }]` — a server response that never
+  // existed — which every downstream parser then read as a legitimate empty
+  // round. Callers now reject none:// URLs before calling, and return
+  // `unavailable/not-applicable` instead.
+
+  // The deadline is computed ONCE, here, and then spent by however many attempts
+  // follow. Phase 5.0 armed a fresh `config.network.timeout` per attempt, which
+  // bounds an attempt and not the operation: three stalled attempts plus backoff
+  // came to ≈47.5s against a 15s master-lock hold, so the bound whose stated
+  // purpose was to keep a refresh inside that hold missed it by 3x. A caller
+  // asking for a 15s timeout is asking about the call it made, not about an
+  // implementation detail of how many times that call is repeated internally.
+  return attemptFetch(url, retries, delay, Date.now() + config.network.timeout);
+};
+
+/**
+ * One attempt against a chain-wide deadline, recursing until it succeeds, runs
+ * out of attempts, or runs out of budget.
+ *
+ * Separate from `fetchWithRetry` so `deadline` is a required parameter rather
+ * than an optional one. An optional deadline defaulting to "now + timeout" reads
+ * identically at the call site and silently renews the budget on every recursion
+ * — reintroducing the per-attempt bound this exists to remove, in a way no
+ * caller could see.
+ */
+const attemptFetch = async (
+  url: string,
+  retries: number,
+  delay: number,
+  deadline: number,
+  earlierFailure?: unknown
+): Promise<unknown> => {
+  // An unbounded request here can be an unbounded database lock hold: the full
+  // refresh paths call this while holding the master lock, and past the lock's
+  // hold timeout the grant is abandoned and every later writer blocks until this
+  // returns. It was the one network await in the codebase with no bound — the
+  // apiClient and enrichment paths all have their own AbortController.
+  //
+  // (Plan 05 Phase 5.4/5.5 hoists the fetches out of the lock, which weakens the
+  // lock-hold argument but not the bound itself — a request that never settles
+  // is worth failing either way.)
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), deadline - Date.now());
 
   try {
-    const response = await fetch(url);
+    const response = await fetch(url, { signal: controller.signal });
 
     if (!response.ok) {
-      throw new Error(`Failed to fetch: ${response.status} ${response.statusText}`);
+      throw new HttpError(response.status, response.statusText);
     }
 
-    return await response.json();
+    try {
+      return await response.json();
+    } catch (parseError) {
+      // Typed, for the same reason `HttpError` is: a raw SyntaxError has
+      // nothing `createErrorResponse` recognises, so it fell through to
+      // UNKNOWN_ERROR — which returns `error.message` verbatim and puts
+      // "Unexpected token < in JSON at position 0" in a user-facing alert.
+      // `MalformedResponseError` has copy written to suppress precisely that.
+      throw new MalformedResponseError(
+        `Response body could not be parsed as JSON: ${
+          parseError instanceof Error ? parseError.message : String(parseError)
+        }`
+      );
+    }
   } catch (error) {
+    // A timeout is NOT retried. The request already spent the full deadline, and
+    // three more rounds of backoff on top of that is the opposite of what a weak
+    // link needs — it is what turns one stalled request into a multi-minute
+    // hold. Transient failures below still retry; this exit is only for the
+    // deadline.
+    //
+    // Asks the controller rather than inspecting the error. `error.name ===
+    // 'AbortError'` was wrong in both directions: any error so named from any
+    // source would exit here, and an abort that is not an `Error` instance would
+    // not — React Native's whatwg-fetch polyfill raises its own DOMException,
+    // which would have fallen through and been retried three times, defeating
+    // the whole point. The controller knows the answer without inferring it,
+    // which is the same argument notificationUtils makes for classifying by type
+    // rather than by message.
+    if (controller.signal.aborted) {
+      // The deadline is how we stopped waiting; it is not what went wrong. If
+      // an earlier attempt produced a real answer — a 500, a refused
+      // connection — that is the fault worth reporting, and the abort is an
+      // implementation detail of giving up on it.
+      //
+      // Without this the chain reports an AbortError, which
+      // `createErrorResponse` maps to NETWORK_ERROR, which sets
+      // `allNetworkErrors`, which picks the "check your internet connection"
+      // alert. A server that answered 500 twice and then stalled would tell
+      // the user to check a connection that demonstrably worked. That is the
+      // same defect 30f9d90's review found at the fetcher layer, and the
+      // per-chain deadline reintroduced it one layer down: shortening the
+      // budget makes a late attempt likelier to abort, so the more often the
+      // deadline does its job, the more often the real error was discarded.
+      throw earlierFailure ?? error;
+    }
+
+    // A 4xx is the server reading the request and rejecting it on its merits.
+    // Repeating it verbatim asks the same question and gets the same answer, so
+    // the retry buys nothing and costs 4.75s of a weak link's refresh budget.
+    // `createErrorResponse` already concedes the point — it maps 4xx to
+    // VALIDATION_ERROR and 5xx to SERVER_ERROR — and until now this loop
+    // contradicted it. 5xx keeps its retries: a 502 from a load balancer is the
+    // transient fault backoff is for.
+    //
+    // Keyed on the status rather than on "it threw", because a transport failure
+    // carries no status and must keep retrying — that is the case this whole
+    // plan exists for.
+    if (error instanceof HttpError && error.status < 500) {
+      throw error;
+    }
+
+    // A body that will not parse will not parse the second time either. Same
+    // argument as the 4xx above, applied to the response instead of the
+    // request: a captive-portal login page served with 200 OK costs three
+    // requests and 2.5s of backoff to learn the same thing three times.
+    if (error instanceof MalformedResponseError) {
+      throw error;
+    }
+
     if (retries <= 1) {
+      throw error;
+    }
+
+    // Sleeping past our own deadline buys nothing: the attempt it schedules is
+    // born already aborted, so the wait converts a real error into an AbortError
+    // that describes nothing that happened. Report what actually failed instead.
+    if (Date.now() + delay >= deadline) {
       throw error;
     }
 
     console.log(`Fetch failed, retrying in ${delay}ms... (${retries - 1} retries left)`);
     await new Promise(resolve => setTimeout(resolve, delay));
-    return fetchWithRetry(url, retries - 1, delay * 1.5);
+    // This attempt's error is carried forward as the one to report if the
+    // chain later runs out of budget. Most recent rather than first: it is the
+    // freshest evidence of what the server is doing.
+    return attemptFetch(url, retries - 1, delay * 1.5, deadline, error);
+  } finally {
+    // Runs on the retry path too: `return attemptFetch(...)` in the catch
+    // evaluates the call, then this clears THIS invocation's timer before the
+    // promise is handed back. Each recursion arms and disarms its own.
+    clearTimeout(timeoutId);
   }
 };
+
+/**
+ * Build an `unavailable` outcome.
+ *
+ * These are the conditions that used to collapse into a bare `[]` — the whole
+ * reason a caller could not tell "we never asked" from "the server said none".
+ */
+const unavailable = <T>(
+  code: UnavailableReason['code'],
+  detail: string
+): UnconditionalSource<FetchOutcome<T>> => ({ status: 'unavailable', reason: { code, detail } });
+
+/**
+ * A usable member API URL, or the reason there is not one.
+ */
+type MemberApiUrl =
+  | { readonly ok: true; readonly url: string }
+  | { readonly ok: false; readonly reason: UnavailableReason };
+
+/**
+ * Resolve `my_beers_api_url` for a member-only source, or say why there is none.
+ *
+ * My-beers and rewards read the **same** preference and must reject the same
+ * three conditions before making a request. They did not: 02 Phase 3 added the
+ * `none://` rejection to my-beers only, and rewards kept sending the placeholder
+ * to `fetch()` — three retries at 1s / 1.5s / 2.25s for a URL that was never
+ * valid, on exactly the weak links this work targets.
+ *
+ * The omission was invisible because the duplication made it read as a
+ * difference between the two functions rather than a gap in one. Sharing the
+ * preamble is what makes the next such omission impossible rather than merely
+ * fixed.
+ *
+ * @param subject - Names the source in log lines and detail strings
+ */
+const resolveMemberApiUrl = async (subject: string): Promise<MemberApiUrl> => {
+  if ((await getPreference('is_visitor_mode')) === 'true') {
+    console.log(`DB: In visitor mode - ${subject} is not applicable`);
+    return {
+      ok: false,
+      reason: { code: 'not-applicable', detail: `visitor mode has no ${subject}` },
+    };
+  }
+
+  const url = await getPreference('my_beers_api_url');
+  if (!url) {
+    console.log(`DB: My beers API URL not found in preferences (${subject})`);
+    return {
+      ok: false,
+      reason: { code: 'not-configured', detail: 'my_beers_api_url is not set' },
+    };
+  }
+
+  if (url.startsWith('none://')) {
+    // Rejected HERE, before any request. fetchWithRetry no longer synthesises a
+    // fake empty response for none://, so without this the URL falls through to
+    // fetch() and burns three retries with backoff.
+    console.log(`DB: none:// placeholder in my_beers_api_url - ${subject} not applicable`);
+    return {
+      ok: false,
+      reason: { code: 'not-applicable', detail: 'my_beers_api_url is a none:// placeholder' },
+    };
+  }
+
+  return { ok: true, url };
+};
+
+/**
+ * Classify a parsed array into `data` or `confirmed-empty`.
+ *
+ * `confirmed-empty` means the server genuinely reported none — a well-formed
+ * body that says zero. Whether zero is an acceptable answer is the caller's
+ * question, not this one's: an empty rewards list is a normal member state, and
+ * an empty taplist is rejected as a VALIDATION_ERROR by both of the taplist
+ * writers that can see it — `fetchAndUpdateAllBeers` and `prepareAllBeers`.
+ * Both, now: this said "downstream" while only the direct path classified it,
+ * and the sequential/manual path still threw a plain Error that reached the
+ * user as UNKNOWN_ERROR. `errorClassificationParity.test.ts` is what holds the
+ * two together, and is the thing to check before trusting this sentence again.
+ * Neither case is a fact about the body being unusable.
+ *
+ * This used to return `malformed` for an empty array, contradicting the line
+ * above and every other classifier in this file. Only the `brewInStock` caller
+ * could reach it — the other two check `length > 0` first — and there it turned
+ * a working server's honest "nothing on tap" into a thrown plain Error that
+ * surfaced as UNKNOWN_ERROR. There is no malformed case left here, which is why
+ * the detail string this took as a second argument is gone rather than unused.
+ */
+const fromArray = <T>(items: readonly T[]): UnconditionalSource<FetchOutcome<T>> => {
+  const nonEmpty = toNonEmpty(items);
+  return fetched(
+    nonEmpty === null ? { kind: 'confirmed-empty' } : { kind: 'data', items: nonEmpty }
+  );
+};
+
+/**
+ * Build a `failed` outcome from a thrown transport error, classified by type.
+ *
+ * Every transport failure leaves through here rather than through a `throw`, so
+ * callers learn what happened from a value they must destructure rather than
+ * from a message they would have to re-parse.
+ */
+const failed = <T>(error: unknown): UnconditionalSource<FetchOutcome<T>> => ({
+  status: 'failed',
+  error: createErrorResponse(error),
+});
+
+/**
+ * Wrap a payload outcome as a completed request.
+ *
+ * `etag: null` because only the all-beers proxy path carries ETags, and it
+ * handles them separately — these three functions never produce one.
+ */
+const fetched = <T>(data: FetchOutcome<T>): UnconditionalSource<FetchOutcome<T>> => ({
+  status: 'fetched',
+  data,
+  etag: null,
+});
 
 /**
  * Fetch all beers from the Flying Saucer API
  * @returns Promise with array of Beer objects
  */
-export const fetchBeersFromAPI = async (): Promise<Beer[]> => {
+export const fetchBeersFromAPI = async (): Promise<UnconditionalSource<FetchOutcome<Beer>>> => {
   try {
     // Get the API endpoint from preferences
     const apiUrl = await getPreference('all_beers_api_url');
 
     if (!apiUrl) {
       console.log('All beers API URL not found in preferences');
-      return []; // Return empty array instead of throwing an error
+      return unavailable('not-configured', 'all_beers_api_url is not set');
     }
 
     console.log('Fetching beers from API URL:', apiUrl);
@@ -73,7 +314,7 @@ export const fetchBeersFromAPI = async (): Promise<Beer[]> => {
       console.log(
         `Found regular format with brewInStock array (${data[1].brewInStock.length} beers)`
       );
-      return data[1].brewInStock;
+      return fromArray(data[1].brewInStock);
     }
 
     // 2. Visitor API format: may have different structure
@@ -124,15 +365,21 @@ export const fetchBeersFromAPI = async (): Promise<Beer[]> => {
 
       const beersArray = findBeersArray(data);
       if (beersArray && beersArray.length > 0) {
-        return beersArray;
+        return fromArray(beersArray);
       }
     }
 
     console.error('Could not find beer data in API response');
-    throw new Error('Invalid response format from API');
+    // A body ARRIVED and could not be used — a fact about the body, not the
+    // request, so `malformed` rather than `failed`. Also not retryable: the same
+    // request returns the same unusable body.
+    return fetched({
+      kind: 'malformed',
+      detail: 'response contained no recognisable beer array',
+    });
   } catch (error) {
     console.error('Error fetching beers from API:', error);
-    throw error;
+    return failed(error);
   }
 };
 
@@ -151,34 +398,17 @@ export const fetchBeersFromAPI = async (): Promise<Beer[]> => {
  *
  * @returns Promise with array of Beerfinder (tasted beer) objects
  */
-export const fetchMyBeersFromAPI = async (): Promise<Beerfinder[]> => {
+export const fetchMyBeersFromAPI = async (): Promise<
+  UnconditionalSource<FetchOutcome<Beerfinder>>
+> => {
   try {
-    // First check if in visitor mode to immediately return empty array
-    const isVisitorMode = (await getPreference('is_visitor_mode')) === 'true';
-    if (isVisitorMode) {
-      console.log(
-        'DB: In visitor mode - fetchMyBeersFromAPI returning empty array without making network request'
-      );
-      return [];
-    }
-
-    // Get the API endpoint from preferences
-    const apiUrl = await getPreference('my_beers_api_url');
-    console.log('DB: Fetching My Beers from API URL:', apiUrl);
-
-    if (!apiUrl) {
-      console.log('DB: My beers API URL not found in preferences');
-      return []; // Return empty array instead of throwing an error
-    }
-
-    // Special handling for none:// protocol to avoid network errors
-    if (apiUrl.startsWith('none://')) {
-      console.log('DB: Detected none:// protocol in my_beers_api_url, returning empty array');
-      return [];
+    const resolved = await resolveMemberApiUrl('tasted beers');
+    if (!resolved.ok) {
+      return { status: 'unavailable', reason: resolved.reason };
     }
 
     console.log('DB: Making API request to fetch My Beers data...');
-    const data = await fetchWithRetry(apiUrl);
+    const data = await fetchWithRetry(resolved.url);
     console.log('DB: Received response from My Beers API');
 
     // Log the structure of the response
@@ -215,7 +445,9 @@ export const fetchMyBeersFromAPI = async (): Promise<Beerfinder[]> => {
         console.log(
           'DB: Empty tasted beers array - user has no tasted beers in current round (new user or round rollover at 200 beers)'
         );
-        return [];
+        // The server genuinely reported none. This is the ONLY case in which
+        // clearing the local tasted table is correct.
+        return fetched({ kind: 'confirmed-empty' });
       }
 
       // Validate the beers array - check for missing IDs
@@ -248,22 +480,28 @@ export const fetchMyBeersFromAPI = async (): Promise<Beerfinder[]> => {
         });
       }
 
-      // Return valid beers (could be empty if all beers are invalid)
       if (validBeers.length > 0) {
-        return validBeers;
-      } else {
-        console.log(
-          'DB: No valid beers with IDs found in response, but returning empty array instead of error'
-        );
-        return [];
+        return fromArray(validBeers);
       }
+
+      // Rows arrived and none carried an id: MALFORMED, not an empty round.
+      // Phase 2 bridged this with a throw because there was no way to say it in
+      // the return type; `malformed` is that way, and it lets each caller
+      // decide instead of forcing all of them to catch.
+      return fetched({
+        kind: 'malformed',
+        detail: `${invalidBeers.length} rows returned and none carried an id`,
+      });
     }
 
     console.error('DB: Invalid response format from My Beers API');
-    throw new Error('Invalid response format from My Beers API');
+    return fetched({
+      kind: 'malformed',
+      detail: 'response contained no tasted_brew_current_round array',
+    });
   } catch (error) {
     console.error('DB: Error fetching My Beers from API:', error);
-    throw error;
+    return failed(error);
   }
 };
 
@@ -271,33 +509,33 @@ export const fetchMyBeersFromAPI = async (): Promise<Beerfinder[]> => {
  * Fetch user's rewards from the Flying Saucer API
  * @returns Promise with array of Reward objects
  */
-export const fetchRewardsFromAPI = async (): Promise<Reward[]> => {
+export const fetchRewardsFromAPI = async (): Promise<UnconditionalSource<FetchOutcome<Reward>>> => {
   try {
-    // Check if in visitor mode first
-    const isVisitorMode = (await getPreference('is_visitor_mode')) === 'true';
-    if (isVisitorMode) {
-      console.log('In visitor mode - rewards not available, returning empty array');
-      return [];
+    const resolved = await resolveMemberApiUrl('rewards');
+    if (!resolved.ok) {
+      return { status: 'unavailable', reason: resolved.reason };
     }
 
-    // Get the API endpoint from preferences
-    const apiUrl = await getPreference('my_beers_api_url');
-
-    if (!apiUrl) {
-      console.log('My beers API URL not found in preferences');
-      return []; // Return empty array instead of throwing an error
-    }
-
-    const data = await fetchWithRetry(apiUrl);
+    const data = await fetchWithRetry(resolved.url);
 
     // Extract the reward array from the response
     if (data && Array.isArray(data) && data.length >= 3 && data[2] && data[2].reward) {
-      return data[2].reward;
+      // An empty reward list is a real state — a member with none earned yet —
+      // so it is confirmed-empty rather than malformed.
+      const rewards = data[2].reward as Reward[];
+      return fetched(
+        rewards.length === 0
+          ? { kind: 'confirmed-empty' }
+          : { kind: 'data', items: toNonEmpty(rewards)! }
+      );
     }
 
-    throw new Error('Invalid response format from Rewards API');
+    return fetched({
+      kind: 'malformed',
+      detail: 'response contained no reward array',
+    });
   } catch (error) {
     console.error('Error fetching Rewards from API:', error);
-    throw error;
+    return failed(error);
   }
 };

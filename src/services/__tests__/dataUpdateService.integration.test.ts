@@ -6,22 +6,31 @@ import { fetchBeersFromAPI } from '../../api/beerApi';
 import { config } from '@/src/config';
 import * as fs from 'fs';
 import * as path from 'path';
+import { fetchedRows } from '../../api/__tests__/helpers/fetchOutcomeFixtures';
 
 // Mock dependencies
 jest.mock('../../database/preferences', () => ({
   getPreference: jest.fn(),
+
   setPreference: jest.fn(),
 }));
 
 jest.mock('../../database/repositories/BeerRepository', () => ({
   beerRepository: {
+    count: jest.fn(async () => 12),
     insertMany: jest.fn(),
+    // Plan 04 Phase 2 / 05 Phase 5.6: fetchAndUpdateAllBeers now takes its own
+    // lock around the rows AND the ETag they imply, so it calls the unlocked
+    // variant. A mock without it makes the whole path fail as an undefined call.
+    insertManyUnsafe: jest.fn(),
   },
 }));
 
 jest.mock('../../database/repositories/MyBeersRepository', () => ({
   myBeersRepository: {
     insertMany: jest.fn(),
+    replaceAllWithEmpty: jest.fn(),
+    replaceAllWithEmptyUnsafe: jest.fn(),
   },
 }));
 
@@ -76,7 +85,7 @@ describe('dataUpdateService integration tests', () => {
     (setPreference as jest.Mock).mockResolvedValue(undefined);
 
     // Default mock for repository insertMany methods
-    (beerRepository.insertMany as jest.Mock).mockResolvedValue(undefined);
+    (beerRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
     (myBeersRepository.insertMany as jest.Mock).mockResolvedValue(undefined);
   });
 
@@ -99,7 +108,7 @@ describe('dataUpdateService integration tests', () => {
       const rawBeers = allBeersData[1].brewInStock;
 
       // Mock fetchBeersFromAPI to return the raw beers (already extracted from API response)
-      (fetchBeersFromAPI as jest.Mock).mockResolvedValue(rawBeers);
+      (fetchBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(rawBeers));
 
       // Call the function
       const result = await fetchAndUpdateAllBeers();
@@ -112,11 +121,11 @@ describe('dataUpdateService integration tests', () => {
       // Verify that fetchBeersFromAPI was called
       expect(fetchBeersFromAPI).toHaveBeenCalledTimes(1);
 
-      // Verify that beerRepository.insertMany was called with the correct data
-      expect(beerRepository.insertMany).toHaveBeenCalledTimes(1);
+      // Verify that beerRepository.insertManyUnsafe was called with the correct data
+      expect(beerRepository.insertManyUnsafe).toHaveBeenCalledTimes(1);
 
       // Verify that the data passed to beerRepository.insertMany is valid
-      const beersPassedToPopulate = (beerRepository.insertMany as jest.Mock).mock.calls[0][0];
+      const beersPassedToPopulate = (beerRepository.insertManyUnsafe as jest.Mock).mock.calls[0][0];
       expect(Array.isArray(beersPassedToPopulate)).toBe(true);
 
       // Verify that valid beers were passed (service filters out beers without required fields)
@@ -160,7 +169,7 @@ describe('dataUpdateService integration tests', () => {
 
     it('should handle missing API URL by returning empty from fetchBeersFromAPI', async () => {
       // fetchBeersFromAPI returns [] when API URL is not configured
-      (fetchBeersFromAPI as jest.Mock).mockResolvedValue([]);
+      (fetchBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows([]));
 
       // Call the function
       const result = await fetchAndUpdateAllBeers();
@@ -169,8 +178,8 @@ describe('dataUpdateService integration tests', () => {
       expect(result.success).toBe(false);
       expect(result.dataUpdated).toBe(false);
 
-      // Verify that beerRepository.insertMany was not called
-      expect(beerRepository.insertMany).not.toHaveBeenCalled();
+      // Verify that beerRepository.insertManyUnsafe was not called
+      expect(beerRepository.insertManyUnsafe).not.toHaveBeenCalled();
     });
 
     it('should handle fetchBeersFromAPI throwing an error', async () => {
@@ -186,8 +195,8 @@ describe('dataUpdateService integration tests', () => {
       expect(result.success).toBe(false);
       expect(result.dataUpdated).toBe(false);
 
-      // Verify that beerRepository.insertMany was not called
-      expect(beerRepository.insertMany).not.toHaveBeenCalled();
+      // Verify that beerRepository.insertManyUnsafe was not called
+      expect(beerRepository.insertManyUnsafe).not.toHaveBeenCalled();
 
       // Verify that setPreference was not called
       expect(setPreference).not.toHaveBeenCalled();
@@ -195,7 +204,7 @@ describe('dataUpdateService integration tests', () => {
 
     it('should handle invalid data format from fetchBeersFromAPI', async () => {
       // fetchBeersFromAPI returns [] when response format is invalid
-      (fetchBeersFromAPI as jest.Mock).mockResolvedValue([]);
+      (fetchBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows([]));
 
       // Call the function
       const result = await fetchAndUpdateAllBeers();
@@ -204,8 +213,8 @@ describe('dataUpdateService integration tests', () => {
       expect(result.success).toBe(false);
       expect(result.dataUpdated).toBe(false);
 
-      // Verify that beerRepository.insertMany was not called
-      expect(beerRepository.insertMany).not.toHaveBeenCalled();
+      // Verify that beerRepository.insertManyUnsafe was not called
+      expect(beerRepository.insertManyUnsafe).not.toHaveBeenCalled();
 
       // Verify that setPreference was not called
       expect(setPreference).not.toHaveBeenCalled();
@@ -222,8 +231,8 @@ describe('dataUpdateService integration tests', () => {
       expect(result.success).toBe(false);
       expect(result.dataUpdated).toBe(false);
 
-      // Verify that beerRepository.insertMany was not called
-      expect(beerRepository.insertMany).not.toHaveBeenCalled();
+      // Verify that beerRepository.insertManyUnsafe was not called
+      expect(beerRepository.insertManyUnsafe).not.toHaveBeenCalled();
 
       // Verify that setPreference was not called
       expect(setPreference).not.toHaveBeenCalled();
@@ -375,8 +384,10 @@ describe('dataUpdateService integration tests', () => {
       // Verify that fetch was called
       expect(global.fetch).toHaveBeenCalled();
 
-      // Verify that myBeersRepository.insertMany was called with empty array
-      expect(myBeersRepository.insertMany).toHaveBeenCalledWith([]);
+      // INVERTED by plan 02 Phase 2: a genuine empty round is now stated
+      // explicitly rather than inferred from an empty array.
+      expect(myBeersRepository.replaceAllWithEmpty).toHaveBeenCalled();
+      expect(myBeersRepository.insertMany).not.toHaveBeenCalled();
 
       // Verify that setPreference was called to update timestamps
       expect(setPreference).toHaveBeenCalledWith('my_beers_last_update', expect.any(String));
@@ -405,20 +416,25 @@ describe('dataUpdateService integration tests', () => {
       // Call the function
       const result = await fetchAndUpdateMyBeers();
 
-      // Verify the result - should now succeed with 0 items
-      expect(result.success).toBe(true);
-      expect(result.dataUpdated).toBe(true);
+      // INVERTED by plan 02 Phase 2. Rows that all lack an id are MALFORMED,
+      // not an empty round — the old behaviour wiped a populated tasted list
+      // and reported success.
+      expect(result.success).toBe(false);
+      expect(result.dataUpdated).toBe(false);
       expect(result.itemCount).toBe(0);
 
       // Verify that fetch was called
       expect(global.fetch).toHaveBeenCalled();
 
-      // Verify that myBeersRepository.insertMany was called with empty array
-      expect(myBeersRepository.insertMany).toHaveBeenCalledWith([]);
+      // Nothing was written, in either shape
+      expect(myBeersRepository.insertMany).not.toHaveBeenCalled();
+      expect(myBeersRepository.replaceAllWithEmpty).not.toHaveBeenCalled();
 
       // Verify that setPreference was called to update timestamps
-      expect(setPreference).toHaveBeenCalledWith('my_beers_last_update', expect.any(String));
-      expect(setPreference).toHaveBeenCalledWith('my_beers_last_check', expect.any(String));
+      // And crucially NOT stamped: stamping the timestamps after a malformed
+      // response is what hid the wiped list for the next 12 hours.
+      expect(setPreference).not.toHaveBeenCalledWith('my_beers_last_update', expect.any(String));
+      expect(setPreference).not.toHaveBeenCalledWith('my_beers_last_check', expect.any(String));
     });
 
     it('should handle fetch throwing an exception', async () => {
@@ -449,7 +465,9 @@ describe('dataUpdateService integration tests', () => {
         config.setEnvironment('production');
 
         // fetchBeersFromAPI is mocked - it handles URL resolution internally
-        (fetchBeersFromAPI as jest.Mock).mockResolvedValue([{ id: '1', brew_name: 'Test' }]);
+        (fetchBeersFromAPI as jest.Mock).mockResolvedValue(
+          fetchedRows([{ id: '1', brew_name: 'Test' }])
+        );
 
         const result = await fetchAndUpdateAllBeers();
 
@@ -460,7 +478,9 @@ describe('dataUpdateService integration tests', () => {
       it('should use custom config when set', async () => {
         config.setCustomApiUrl('http://localhost:3000');
 
-        (fetchBeersFromAPI as jest.Mock).mockResolvedValue([{ id: '1', brew_name: 'Test' }]);
+        (fetchBeersFromAPI as jest.Mock).mockResolvedValue(
+          fetchedRows([{ id: '1', brew_name: 'Test' }])
+        );
 
         const result = await fetchAndUpdateAllBeers();
 
@@ -485,7 +505,9 @@ describe('dataUpdateService integration tests', () => {
 
     describe('Multiple Concurrent Requests', () => {
       it('should handle multiple all beers fetch requests', async () => {
-        (fetchBeersFromAPI as jest.Mock).mockResolvedValue([{ id: '1', brew_name: 'Test' }]);
+        (fetchBeersFromAPI as jest.Mock).mockResolvedValue(
+          fetchedRows([{ id: '1', brew_name: 'Test' }])
+        );
 
         // Start two concurrent updates
         const promise1 = fetchAndUpdateAllBeers();
@@ -544,7 +566,9 @@ describe('dataUpdateService integration tests', () => {
         // Should not have double slashes
         expect(constructedUrl).not.toContain('//api');
 
-        (fetchBeersFromAPI as jest.Mock).mockResolvedValue([{ id: '1', brew_name: 'Test' }]);
+        (fetchBeersFromAPI as jest.Mock).mockResolvedValue(
+          fetchedRows([{ id: '1', brew_name: 'Test' }])
+        );
 
         const result = await fetchAndUpdateAllBeers();
         expect(result.success).toBe(true);
@@ -557,7 +581,9 @@ describe('dataUpdateService integration tests', () => {
         expect(config.api.baseUrl).toBeDefined();
         expect(typeof config.api.baseUrl).toBe('string');
 
-        (fetchBeersFromAPI as jest.Mock).mockResolvedValue([{ id: '1', brew_name: 'Test' }]);
+        (fetchBeersFromAPI as jest.Mock).mockResolvedValue(
+          fetchedRows([{ id: '1', brew_name: 'Test' }])
+        );
 
         const result = await fetchAndUpdateAllBeers();
 

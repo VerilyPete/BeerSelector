@@ -371,4 +371,65 @@ describe('ApiClient', () => {
       });
     });
   });
+
+  // ==========================================================================
+  // Check-in response diagnostics (plan 02 Phase 7.1)
+  //
+  // Two places in this codebase make contradictory claims about what a
+  // successful check-in looks like: apiClient treats an EMPTY body as success
+  // (:262-271), while useOptimisticCheckIn treats a SyntaxError on a NON-EMPTY
+  // unparseable body as success (:162-183). Both cannot be right, and neither
+  // has ever been checked against a real response.
+  //
+  // Logging only — this confirms the empty-body rule, which affects every
+  // endpoint, not just check-in. It is not a gate on Phase 7.2.
+  // ==========================================================================
+
+  describe('check-in response diagnostics', () => {
+    it('request logs response diagnostics for addToQueue only', async () => {
+      const { apiClient } = createApiTestContext();
+      const logSpy = jest.spyOn(console, 'log').mockImplementation();
+
+      await apiClient.get(config.api.endpoints.addToQueue);
+
+      const logged = logSpy.mock.calls.map(call => call.join(' ')).join('\n');
+      expect(logged).toContain('[check-in diagnostics]');
+      expect(logged).toContain('status=200');
+      expect(logged).toContain('content-type=');
+
+      logSpy.mockClear();
+      await apiClient.get('/some-other-endpoint');
+
+      const otherLogged = logSpy.mock.calls.map(call => call.join(' ')).join('\n');
+      expect(otherLogged).not.toContain('[check-in diagnostics]');
+
+      logSpy.mockRestore();
+    });
+
+    it('logs the resolved response url and redirect flag for captive-portal detection', async () => {
+      const { apiClient } = createApiTestContext();
+      // A differing origin means something intercepted the request — a captive
+      // portal or carrier proxy — which is indistinguishable from success once
+      // the body has been swallowed. RN populates `url` reliably but
+      // `redirected` inconsistently, so Phase 7.2 needs to see both.
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        status: 200,
+        url: 'http://captive.example.net/login',
+        redirected: true,
+        headers: { get: jest.fn().mockReturnValue('text/html') },
+        text: jest.fn().mockResolvedValue('<html>Sign in to continue</html>'),
+      });
+      const logSpy = jest.spyOn(console, 'log').mockImplementation();
+
+      await apiClient.get(config.api.endpoints.addToQueue);
+
+      const logged = logSpy.mock.calls.map(call => call.join(' ')).join('\n');
+      expect(logged).toContain('http://captive.example.net/login');
+      expect(logged).toContain('redirected=true');
+      expect(logged).toContain('Sign in to continue');
+
+      logSpy.mockRestore();
+    });
+  });
 });

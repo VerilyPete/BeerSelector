@@ -351,8 +351,25 @@ export const Rewards = () => {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
       if (!session.isVisitor) {
-        const freshRewards = await fetchRewardsFromAPI();
-        await rewardsRepository.insertMany(freshRewards);
+        const source = await fetchRewardsFromAPI();
+
+        // `unavailable` is an ERROR state, not an empty list — the old bare []
+        // rendered "no rewards" for a member whose request never happened.
+        if (source.status !== 'fetched') {
+          throw new Error(
+            source.status === 'unavailable'
+              ? `Rewards unavailable (${source.reason.code}): ${source.reason.detail}`
+              : `Rewards could not be fetched (${source.status})`
+          );
+        }
+        if (source.data.kind === 'malformed') {
+          throw new Error(`Rewards malformed: ${source.data.detail}`);
+        }
+        // confirmed-empty is a real state — a member with none earned yet — so
+        // it renders the empty state rather than writing or erroring.
+        if (source.data.kind === 'data') {
+          await rewardsRepository.insertMany([...source.data.items]);
+        }
         await refreshBeerData();
         console.log('Rewards refreshed and AppContext synced');
       }

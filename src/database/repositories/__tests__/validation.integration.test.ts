@@ -46,7 +46,7 @@ describe('Repository Validation Integration', () => {
         { id: '1', brew_name: 'Valid Beer' },
         { id: '2' }, // Missing brew_name
         { brew_name: 'Missing ID' }, // Missing id
-        { id: '3', brew_name: 'Another Valid Beer' }
+        { id: '3', brew_name: 'Another Valid Beer' },
       ]);
 
       const result = await repository.getAll();
@@ -91,7 +91,7 @@ describe('Repository Validation Integration', () => {
         { id: '1', brew_name: 'Valid Beer' },
         { id: 123, brew_name: 'ID is number' }, // Schema accepts number IDs
         { id: '3', brew_name: 456 }, // brew_name as number should be rejected
-        { id: '4', brew_name: 'Another Valid Beer' }
+        { id: '4', brew_name: 'Another Valid Beer' },
       ]);
 
       const result = await repository.getAll();
@@ -109,7 +109,7 @@ describe('Repository Validation Integration', () => {
         { id: '1', brew_name: 'Valid Beer' },
         { id: null, brew_name: 'Null ID' },
         { id: '3', brew_name: null },
-        { id: '4', brew_name: 'Valid Beer 2' }
+        { id: '4', brew_name: 'Valid Beer 2' },
       ]);
 
       const result = await repository.getAll();
@@ -120,9 +120,7 @@ describe('Repository Validation Integration', () => {
     it('should convert numeric IDs to strings', async () => {
       const mockDatabase = createMockDatabase();
       const repository = new BeerRepository();
-      mockDatabase.getAllAsync.mockResolvedValue([
-        { id: 123, brew_name: 'Beer with numeric ID' }
-      ]);
+      mockDatabase.getAllAsync.mockResolvedValue([{ id: 123, brew_name: 'Beer with numeric ID' }]);
 
       const result = await repository.getAll();
 
@@ -169,7 +167,7 @@ describe('Repository Validation Integration', () => {
       const repository = new BeerRepository();
       mockDatabase.getFirstAsync.mockResolvedValue({
         id: 123, // Should be string
-        brew_name: 456 // Should be string
+        brew_name: 456, // Should be string
       });
 
       const result = await repository.getById('123');
@@ -183,7 +181,7 @@ describe('Repository Validation Integration', () => {
       mockDatabase.getAllAsync.mockResolvedValue([
         { id: '1', brew_name: 'Valid Beer' },
         { id: '2' }, // Invalid
-        { id: '3', brew_name: 'Another Valid Beer' }
+        { id: '3', brew_name: 'Another Valid Beer' },
       ]);
 
       const result = await repository.search('Test');
@@ -203,7 +201,7 @@ describe('Repository Validation Integration', () => {
         { id: '1', brew_name: 'Valid Tasted Beer' },
         { id: '2' }, // Missing brew_name
         { brew_name: 'Missing ID' }, // Missing id
-        { id: '3', brew_name: 'Another Valid Beer' }
+        { id: '3', brew_name: 'Another Valid Beer' },
       ]);
 
       const result = await repository.getAll();
@@ -226,7 +224,7 @@ describe('Repository Validation Integration', () => {
       mockDatabase.getAllAsync.mockResolvedValue([
         { id: '1', brew_name: 'Valid Beer' },
         { id: 123, brew_name: 'Invalid - numeric ID' },
-        { id: '3', brew_name: 'Valid Beer 2' }
+        { id: '3', brew_name: 'Valid Beer 2' },
       ]);
 
       const result = await repository.getAll();
@@ -262,7 +260,7 @@ describe('Repository Validation Integration', () => {
       mockDatabase.getAllAsync.mockResolvedValue([
         { reward_id: '1', redeemed: 'true', reward_type: 'plate' },
         { redeemed: 'true', reward_type: 'plate' }, // Missing reward_id
-        { reward_id: '3', redeemed: 'false', reward_type: 'cup' }
+        { reward_id: '3', redeemed: 'false', reward_type: 'cup' },
       ]);
 
       const result = await repository.getAll();
@@ -288,7 +286,7 @@ describe('Repository Validation Integration', () => {
         { reward_id: '1', redeemed: 'true', reward_type: 'plate' },
         { reward_id: 123, redeemed: 'true', reward_type: 'plate' }, // reward_id should be string
         { reward_id: '3', redeemed: true, reward_type: 'cup' }, // redeemed should be string
-        { reward_id: '4', redeemed: 'false', reward_type: 'plate' }
+        { reward_id: '4', redeemed: 'false', reward_type: 'plate' },
       ]);
 
       const result = await repository.getAll();
@@ -315,7 +313,7 @@ describe('Repository Validation Integration', () => {
       mockDatabase.getAllAsync.mockResolvedValue([
         { reward_id: '1', redeemed: 'true', reward_type: 'plate' },
         { reward_id: 123, redeemed: 'true' }, // Invalid
-        { reward_id: '3', redeemed: 'false', reward_type: 'plate' }
+        { reward_id: '3', redeemed: 'false', reward_type: 'plate' },
       ]);
 
       const result = await repository.getByType('plate');
@@ -329,7 +327,7 @@ describe('Repository Validation Integration', () => {
       mockDatabase.getAllAsync.mockResolvedValue([
         { reward_id: '1', redeemed: 'true', reward_type: 'plate' },
         { redeemed: 'true' }, // Invalid - missing reward_id
-        { reward_id: '3', redeemed: 'true', reward_type: 'cup' }
+        { reward_id: '3', redeemed: 'true', reward_type: 'cup' },
       ]);
 
       const result = await repository.getRedeemed();
@@ -343,7 +341,7 @@ describe('Repository Validation Integration', () => {
       mockDatabase.getAllAsync.mockResolvedValue([
         { reward_id: '1', redeemed: '0', reward_type: 'plate' },
         { reward_type: 'plate' }, // Invalid - missing reward_id
-        { reward_id: '3', redeemed: 'false', reward_type: 'cup' }
+        { reward_id: '3', redeemed: 'false', reward_type: 'cup' },
       ]);
 
       const result = await repository.getUnredeemed();
@@ -422,7 +420,7 @@ describe('Repository Validation Integration', () => {
       const mockDatabase = createMockDatabase();
       const repository = new BeerRepository();
       const invalidData = Array.from({ length: 10000 }, (_, i) => ({
-        id: String(i)
+        id: String(i),
         // All missing brew_name
       }));
 

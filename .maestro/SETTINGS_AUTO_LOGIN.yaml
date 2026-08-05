@@ -273,10 +273,13 @@ name: "Settings - Auto-Login & Advanced Features"
       # Note: Alert may have message about clearing credentials
 
       # Tap OK to dismiss alert (if shown)
-      - tapOn: "OK"
-        optional: true
+      # Same sibling-key fault as 15-config-validation: `optional` belongs
+      # inside the mapping. Kept on the tap, which can genuinely find no
+      # alert; dropped from waitForAnimationToEnd, which does not fail.
+      - tapOn:
+          text: "OK"
+          optional: true
       - waitForAnimationToEnd
-        optional: true
 
 # ========================================
 # TEST 7: Navigation - Back Button
@@ -748,7 +751,7 @@ name: "Settings - Auto-Login & Advanced Features"
     text: "All Beer"
 
 # Verify app is fully functional
-- tapOn: "All Beer"
+- tapOn: "All Beers"
 - waitForAnimationToEnd
 
 # Verify beer list loads

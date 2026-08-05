@@ -39,6 +39,67 @@ export type DatabaseOperationResult<T = unknown> = {
 export type DatabaseOperation<T = DatabaseOperationResult> = (db: SQLiteDatabase) => Promise<T>;
 
 /**
+ * The subset of the transaction handle that write bodies actually use.
+ *
+ * Narrow on purpose: it lets the web branch of `withAtomicWrite` pass the
+ * database itself without a type assertion.
+ */
+export type TransactionLike = Pick<SQLiteDatabase, 'runAsync' | 'getFirstAsync' | 'prepareAsync'>;
+
+/**
+ * Run a write inside an exclusive transaction where the platform supports one.
+ *
+ * `withTransactionAsync` is documented as non-exclusive and interruptible by
+ * other async queries, which means a concurrent write can be absorbed into the
+ * transaction and rolled back with it. `withExclusiveTransactionAsync` opens on
+ * a separate native connection instead, so a competing writer aborts with
+ * `database is locked` rather than corrupting the write — see
+ * `src/database/errors.ts` for how that surfaces.
+ *
+ * ⚠️ Every query inside `task` must go through the `txn` argument. A call on the
+ * enclosing `database` handle executes outside the transaction: a write aborts
+ * loudly, but a **read succeeds and silently returns the pre-transaction
+ * snapshot**. Prefer removing a read from a transaction body over carrying it
+ * correctly.
+ *
+ * The platform is a parameter rather than a `Platform.OS` read so both branches
+ * are unit-testable. The web branch is load-bearing, not a nicety:
+ * `withExclusiveTransactionAsync` hard-throws on web as its first statement, so
+ * calling it unguarded there would break every import.
+ *
+ * ⚠️ **Web is not equivalent to the pre-exclusive behaviour, and is in one
+ * respect worse.** Before this helper existed the import ran ~25 short
+ * transactions (the delete, then one per 50-row batch). Web now runs ONE
+ * non-exclusive transaction spanning the delete and every insert — which is
+ * exactly the shape review round 1 rejected for native, because a concurrent
+ * write gets absorbed into the transaction and rolled back with it while its
+ * caller has already been told it succeeded. Exclusivity closes that on native;
+ * web gets the widened window without the fix. Judged acceptable only because
+ * web is Expo scaffolding rather than a shipped target (CLAUDE.md pins iOS
+ * 17.6+), and stated here rather than papered over as "today's semantics".
+ *
+ * @param database - The SQLite database instance
+ * @param platform - `'web'` for the non-exclusive fallback, `'native'` otherwise
+ * @param task - The write to run, using the supplied transaction handle
+ */
+export async function withAtomicWrite(
+  database: SQLiteDatabase,
+  platform: 'web' | 'native',
+  task: (txn: TransactionLike) => Promise<void>
+): Promise<void> {
+  if (platform === 'web') {
+    await database.withTransactionAsync(async () => {
+      await task(database);
+    });
+    return;
+  }
+
+  await database.withExclusiveTransactionAsync(async txn => {
+    await task(txn);
+  });
+}
+
+/**
  * Wraps a database operation in a transaction with automatic rollback on error.
  *
  * Uses expo-sqlite's withTransactionAsync() which automatically:
@@ -109,4 +170,3 @@ export async function withDatabaseTransaction<T = DatabaseOperationResult>(
     throw error;
   }
 }
-

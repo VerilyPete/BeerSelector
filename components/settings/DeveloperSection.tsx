@@ -7,8 +7,10 @@ import { beerRepository } from '@/src/database/repositories/BeerRepository';
 import { myBeersRepository } from '@/src/database/repositories/MyBeersRepository';
 import { rewardsRepository } from '@/src/database/repositories/RewardsRepository';
 import { getPreference, setPreference } from '@/src/database/preferences';
+import { commitTaplistWrite } from '@/src/services/taplistEtag';
 import { createMockSession } from '@/src/api/mockSession';
 import { clearSessionData } from '@/src/api/sessionManager';
+import { databaseLockManager } from '@/src/database/DatabaseLockManager';
 import SettingsSection from './SettingsSection';
 import SettingsItem from './SettingsItem';
 
@@ -159,6 +161,18 @@ Tasted Beers: ${lastMyBeersRefresh ? new Date(parseInt(lastMyBeersRefresh)).toLo
             try {
               console.log('Starting application reset...');
 
+              // Before the rows, not after. Emptying `allbeers` first left a
+              // window — app death, or a throw in the three awaits that used to
+              // sit between — where the table is empty but the ETag is still
+              // live. Every 304 path then trusts that ETag and returns without
+              // rows. (The fourth await, clearing `all_beers_api_url`, closed
+              // the window itself: `prepareAllBeers` then gets a null storeId
+              // and never issues a conditional request at all.) Clearing the
+              // ETag first inverts the failure into a harmless extra full fetch,
+              // and `setPreference` retries contention where the
+              // `beerRepository.clear()` below does not.
+              await commitTaplistWrite({ kind: 'cleared' });
+
               await beerRepository.clear();
               console.log('Cleared all beers');
 
@@ -171,8 +185,24 @@ Tasted Beers: ${lastMyBeersRefresh ? new Date(parseInt(lastMyBeersRefresh)).toLo
               await clearSessionData();
               console.log('Cleared session data');
 
-              await setPreference('all_beers_api_url', '', 'API endpoint for fetching all beers');
-              await setPreference('all_beers_etag', '', 'Cached ETag for all beers taplist');
+              // Locked, like the login's gate-close write. The previous comment
+              // here argued the opposite — that writing '' rather than a real
+              // store URL made the lock unnecessary, because the guard treats ''
+              // as "changed" and abandons. That reasoning only covers a '' that
+              // lands BEFORE a writer's guard read. One landing after the guard
+              // and before the commit leaves the old store's rows and validator
+              // committed under a configuration that no longer names them, which
+              // is the same bad commit the login-path fix closes.
+              // UNTESTED, and untestable as things stand: there is no test file
+              // anywhere in this repo referencing DeveloperSection. Removing
+              // this lock leaves the entire suite at baseline, so nothing
+              // protects it from being undone. Recorded rather than left
+              // silent — the two sibling sites in LoginWebView each have a test
+              // that stages the interleaving and goes red without the lock, and
+              // this one only has the argument.
+              await databaseLockManager.withDatabaseLock('developer-reset-config', async () => {
+                await setPreference('all_beers_api_url', '', 'API endpoint for fetching all beers');
+              });
               await setPreference(
                 'my_beers_api_url',
                 '',

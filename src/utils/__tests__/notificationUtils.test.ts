@@ -16,6 +16,8 @@ import {
   ApiErrorType,
 } from '../notificationUtils';
 import type { ErrorResponse } from '../notificationUtils';
+import { DatabaseContentionError } from '../../database/errors';
+import { HttpError, MalformedResponseError } from '../../api/fetchOutcome';
 
 jest.mock('react-native', () => ({
   Alert: {
@@ -258,6 +260,74 @@ describe('notificationUtils', () => {
       expect(result.type).toBe(ApiErrorType.UNKNOWN_ERROR);
       expect(result.message).toBe('An unknown error occurred');
     });
+
+    // ----------------------------------------------------------
+    // Database contention (plan 02 Phase 0)
+    //
+    // Exclusive transactions abort a competing writer with
+    // `database is locked`. That condition is transient and
+    // self-resolving, so it must not be presented as a hard
+    // failure. Classification is by type, never by message.
+    // ----------------------------------------------------------
+
+    it('createErrorResponse classifies a MalformedResponseError', () => {
+      const result = createErrorResponse(
+        new MalformedResponseError('My Beers response contained 2 rows and all lack an id')
+      );
+
+      expect(result.type).toBe(ApiErrorType.MALFORMED_RESPONSE_ERROR);
+      // Not retryable: the same request will return the same unusable body.
+      expect(result.retryable).toBeUndefined();
+    });
+
+    it('createErrorResponse classifies a 5xx HttpError as SERVER_ERROR', () => {
+      const result = createErrorResponse(new HttpError(500, 'Internal Server Error'));
+
+      expect(result.type).toBe(ApiErrorType.SERVER_ERROR);
+      expect(result.statusCode).toBe(500);
+    });
+
+    it('createErrorResponse classifies a 4xx HttpError as VALIDATION_ERROR', () => {
+      // Matches this same function's rule for a plain object carrying
+      // `statusCode` (tested above): 4xx is a client fault, 5xx is a server
+      // fault. Classifying every non-2xx as SERVER_ERROR would tell a user whose
+      // request was rejected on its merits that "the server encountered an
+      // error", and would contradict the sibling rule 60 lines below.
+      const result = createErrorResponse(new HttpError(404, 'Not Found'));
+
+      expect(result.type).toBe(ApiErrorType.VALIDATION_ERROR);
+      expect(result.statusCode).toBe(404);
+    });
+
+    it('createErrorResponse does not read an HttpError by its message', () => {
+      // The whole point of the type. A message-classified 500 used to match the
+      // 'Failed to fetch' network rule and tell the user to check their
+      // connection — the one thing they could do nothing about.
+      const result = createErrorResponse(new HttpError(503, 'Service Unavailable'));
+
+      expect(result.type).not.toBe(ApiErrorType.NETWORK_ERROR);
+    });
+
+    it('createErrorResponse classifies a DatabaseContentionError as CONTENTION_ERROR', () => {
+      const result = createErrorResponse(
+        new DatabaseContentionError('allbeers write aborted: database is locked')
+      );
+
+      expect(result.type).toBe(ApiErrorType.CONTENTION_ERROR);
+    });
+
+    it('createErrorResponse marks a contention error as retryable', () => {
+      const result = createErrorResponse(new DatabaseContentionError('write aborted'));
+
+      expect(result.retryable).toBe(true);
+    });
+
+    it('createErrorResponse does not classify an arbitrary error mentioning "locked" as contention', () => {
+      const result = createErrorResponse(new Error('The account is locked'));
+
+      expect(result.type).toBe(ApiErrorType.UNKNOWN_ERROR);
+      expect(result.retryable).toBeUndefined();
+    });
   });
 
   // ============================================================
@@ -290,12 +360,38 @@ describe('notificationUtils', () => {
       expect(result).toBe('The server encountered an error. Please try again later.');
     });
 
+    it('describes a malformed response without leaking the developer message', () => {
+      // Reachable and user-facing: Settings pull-to-refresh -> manualRefreshAllData
+      // -> sequentialRefreshAllData -> the malformed branch. Untyped, its raw
+      // text lands in the refresh alert as
+      // "Beerfinder data: My Beers response contained 2 rows and all lack an id".
+      const result = getUserFriendlyErrorMessage(
+        makeError(
+          ApiErrorType.MALFORMED_RESPONSE_ERROR,
+          'My Beers response contained 2 rows and all lack an id'
+        )
+      );
+
+      expect(result).toBe(
+        'The server sent data this app could not read. Your existing data has been kept.'
+      );
+    });
+
+    it('describes CONTENTION_ERROR as transient without leaking the SQLite message', () => {
+      const result = getUserFriendlyErrorMessage(
+        makeError(
+          ApiErrorType.CONTENTION_ERROR,
+          'allbeers write aborted: database is locked by another writer'
+        )
+      );
+
+      expect(result).toBe('The app was busy updating. Please try again in a moment.');
+    });
+
     it('should return parse error message for PARSE_ERROR', () => {
       const result = getUserFriendlyErrorMessage(makeError(ApiErrorType.PARSE_ERROR));
 
-      expect(result).toBe(
-        'There was a problem processing the server response. Please try again.'
-      );
+      expect(result).toBe('There was a problem processing the server response. Please try again.');
     });
 
     it('should return the custom message for VALIDATION_ERROR when set', () => {

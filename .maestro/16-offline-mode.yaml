@@ -1,4 +1,4 @@
-appId: com.yourcompany.beerselector
+appId: org.verily.FSbeerselector
 name: Offline Mode - Network State Detection
 tags:
   - offline
@@ -26,15 +26,30 @@ tags:
 
 # Go to All Beers tab (if not already there)
 - tapOn:
-    text: "All Beer"
+    text: "All Beers"
     retryTapIfNoChange: false
 
 # Verify we can see beer list when online
 - waitForAnimationToEnd
+# `matching: contains` was here and is not a Maestro property. Maestro
+# validates every flow in the directory before running any of them, so this one
+# line aborted the entire suite with zero tests executed. Verified against the
+# pinned CLI by reproducing it — see "How Maestro validates this suite", point
+# 1, in README.md.
+#
+# Earlier revisions of this comment also claimed the abort happened "on both
+# platforms" and "about twelve seconds in". Neither was ever observed: the
+# Android jobs are known-red for an unrelated reason and never got this far,
+# and no timing was recorded. The platform claim is a plausible inference —
+# validation precedes any device work, so it should behave the same — but it is
+# an inference, and it was being stated as an observation next to the admission
+# that CI never reached this point.
+#
+# The line was also redundant: `text: ".*"` already matches anything, so
+# removing it changes nothing this step asserts.
 - scrollUntilVisible:
     element:
       text: ".*"
-      matching: contains
     direction: DOWN
 
 # Enable airplane mode to simulate offline
@@ -71,7 +86,7 @@ tags:
 - assertVisible: "No Internet Connection"
 
 # Go back to All Beer
-- tapOn: "All Beer"
+- tapOn: "All Beers"
 - waitForAnimationToEnd
 
 # Disable airplane mode to go back online
@@ -94,7 +109,11 @@ tags:
       - waitForAnimationToEnd
 
 # Wait for network to reconnect
-- waitForAnimationToEnd: 5000
+# Was `waitForAnimationToEnd: 5000`. The scalar form is not valid — the
+# duration goes in a `timeout` key — and it produced the opaque "List is
+# empty" parse error that was sitting behind the `matching` one above.
+- waitForAnimationToEnd:
+    timeout: 5000
 
 # Verify offline indicator disappears (or becomes hidden)
 # Note: May need to check that it's NOT visible

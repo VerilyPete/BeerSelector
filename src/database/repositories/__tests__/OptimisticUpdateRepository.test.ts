@@ -165,7 +165,12 @@ describe('OptimisticUpdateRepository', () => {
           type: 'CHECK_IN_BEER',
           status: 'pending',
           timestamp: 1700000002000,
-          rollback_data: JSON.stringify({ type: 'CHECK_IN_BEER', wasInAllBeers: true, wasInTastedBeers: false, beer: { id: 'b2', brew_name: 'Newer Beer' } }),
+          rollback_data: JSON.stringify({
+            type: 'CHECK_IN_BEER',
+            wasInAllBeers: true,
+            wasInTastedBeers: false,
+            beer: { id: 'b2', brew_name: 'Newer Beer' },
+          }),
           error_message: undefined,
           operation_id: undefined,
         },
@@ -174,7 +179,12 @@ describe('OptimisticUpdateRepository', () => {
           type: 'CHECK_IN_BEER',
           status: 'success',
           timestamp: 1700000001000,
-          rollback_data: JSON.stringify({ type: 'CHECK_IN_BEER', wasInAllBeers: true, wasInTastedBeers: false, beer: { id: 'b1', brew_name: 'Older Beer' } }),
+          rollback_data: JSON.stringify({
+            type: 'CHECK_IN_BEER',
+            wasInAllBeers: true,
+            wasInTastedBeers: false,
+            beer: { id: 'b1', brew_name: 'Older Beer' },
+          }),
           error_message: undefined,
           operation_id: undefined,
         },
@@ -194,7 +204,12 @@ describe('OptimisticUpdateRepository', () => {
     it('should deserialize rollbackData from JSON string', async () => {
       const mockDatabase = createMockDatabase();
       (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
-      const rollback = { type: 'CHECK_IN_BEER', wasInAllBeers: true, wasInTastedBeers: false, beer: { id: 'b1', brew_name: 'Test' } };
+      const rollback = {
+        type: 'CHECK_IN_BEER',
+        wasInAllBeers: true,
+        wasInTastedBeers: false,
+        beer: { id: 'b1', brew_name: 'Test' },
+      };
       mockDatabase.getAllAsync.mockResolvedValue([
         {
           id: 'update-1',
@@ -233,7 +248,12 @@ describe('OptimisticUpdateRepository', () => {
     it('should return update when found', async () => {
       const mockDatabase = createMockDatabase();
       (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
-      const rollback = { type: 'CHECK_IN_BEER', wasInAllBeers: true, wasInTastedBeers: false, beer: { id: 'b1', brew_name: 'Test' } };
+      const rollback = {
+        type: 'CHECK_IN_BEER',
+        wasInAllBeers: true,
+        wasInTastedBeers: false,
+        beer: { id: 'b1', brew_name: 'Test' },
+      };
       mockDatabase.getFirstAsync.mockResolvedValue({
         id: 'update-1',
         type: 'CHECK_IN_BEER',
@@ -288,7 +308,12 @@ describe('OptimisticUpdateRepository', () => {
     it('should return updates matching the given status', async () => {
       const mockDatabase = createMockDatabase();
       (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
-      const rollback = { type: 'CHECK_IN_BEER', wasInAllBeers: true, wasInTastedBeers: false, beer: { id: 'b1', brew_name: 'Test' } };
+      const rollback = {
+        type: 'CHECK_IN_BEER',
+        wasInAllBeers: true,
+        wasInTastedBeers: false,
+        beer: { id: 'b1', brew_name: 'Test' },
+      };
       mockDatabase.getAllAsync.mockResolvedValue([
         {
           id: 'update-1',
@@ -323,9 +348,9 @@ describe('OptimisticUpdateRepository', () => {
       (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       mockDatabase.getAllAsync.mockRejectedValueOnce(new Error('Query failed'));
 
-      await expect(optimisticUpdateRepository.getByStatus(OptimisticUpdateStatus.PENDING)).rejects.toThrow(
-        'Query failed'
-      );
+      await expect(
+        optimisticUpdateRepository.getByStatus(OptimisticUpdateStatus.PENDING)
+      ).rejects.toThrow('Query failed');
     });
   });
 
@@ -333,7 +358,12 @@ describe('OptimisticUpdateRepository', () => {
     it('should return updates with PENDING or SYNCING status', async () => {
       const mockDatabase = createMockDatabase();
       (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
-      const rollback = { type: 'CHECK_IN_BEER', wasInAllBeers: true, wasInTastedBeers: false, beer: { id: 'b1', brew_name: 'Test' } };
+      const rollback = {
+        type: 'CHECK_IN_BEER',
+        wasInAllBeers: true,
+        wasInTastedBeers: false,
+        beer: { id: 'b1', brew_name: 'Test' },
+      };
       mockDatabase.getAllAsync.mockResolvedValue([
         {
           id: 'update-1',
@@ -396,7 +426,12 @@ describe('OptimisticUpdateRepository', () => {
     it('should return update matching the operation ID', async () => {
       const mockDatabase = createMockDatabase();
       (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
-      const rollback = { type: 'CHECK_IN_BEER', wasInAllBeers: true, wasInTastedBeers: false, beer: { id: 'b1', brew_name: 'Test' } };
+      const rollback = {
+        type: 'CHECK_IN_BEER',
+        wasInAllBeers: true,
+        wasInTastedBeers: false,
+        beer: { id: 'b1', brew_name: 'Test' },
+      };
       mockDatabase.getFirstAsync.mockResolvedValue({
         id: 'update-1',
         type: 'CHECK_IN_BEER',
@@ -431,7 +466,9 @@ describe('OptimisticUpdateRepository', () => {
       (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       mockDatabase.getFirstAsync.mockRejectedValueOnce(new Error('Query failed'));
 
-      await expect(optimisticUpdateRepository.getByOperationId('op-xyz')).rejects.toThrow('Query failed');
+      await expect(optimisticUpdateRepository.getByOperationId('op-xyz')).rejects.toThrow(
+        'Query failed'
+      );
     });
   });
 
@@ -454,12 +491,17 @@ describe('OptimisticUpdateRepository', () => {
       (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       mockDatabase.runAsync.mockResolvedValue(undefined);
 
-      await optimisticUpdateRepository.updateStatus('update-1', OptimisticUpdateStatus.FAILED, 'Server error');
-
-      expect(mockDatabase.runAsync).toHaveBeenCalledWith(
-        expect.any(String),
-        [OptimisticUpdateStatus.FAILED, 'Server error', 'update-1']
+      await optimisticUpdateRepository.updateStatus(
+        'update-1',
+        OptimisticUpdateStatus.FAILED,
+        'Server error'
       );
+
+      expect(mockDatabase.runAsync).toHaveBeenCalledWith(expect.any(String), [
+        OptimisticUpdateStatus.FAILED,
+        'Server error',
+        'update-1',
+      ]);
     });
 
     it('should use null for error message when not provided', async () => {
@@ -506,7 +548,9 @@ describe('OptimisticUpdateRepository', () => {
       (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       mockDatabase.runAsync.mockRejectedValueOnce(new Error('Update failed'));
 
-      await expect(optimisticUpdateRepository.linkOperation('update-1', 'op-abc')).rejects.toThrow('Update failed');
+      await expect(optimisticUpdateRepository.linkOperation('update-1', 'op-abc')).rejects.toThrow(
+        'Update failed'
+      );
     });
   });
 
@@ -610,7 +654,12 @@ describe('OptimisticUpdateRepository', () => {
           type: 'CHECK_IN_BEER',
           status: 'pending',
           timestamp: 1700000000000,
-          rollback_data: JSON.stringify({ type: 'CHECK_IN_BEER', wasInAllBeers: true, wasInTastedBeers: false, beer: { id: 'b1', brew_name: 'Valid Beer' } }),
+          rollback_data: JSON.stringify({
+            type: 'CHECK_IN_BEER',
+            wasInAllBeers: true,
+            wasInTastedBeers: false,
+            beer: { id: 'b1', brew_name: 'Valid Beer' },
+          }),
         },
         {
           id: 'update-corrupt',
@@ -636,7 +685,12 @@ describe('OptimisticUpdateRepository', () => {
           type: 'CHECK_IN_BEER',
           status: 'pending',
           timestamp: 1700000000000,
-          rollback_data: JSON.stringify({ type: 'CHECK_IN_BEER', wasInAllBeers: true, wasInTastedBeers: false, beer: { id: 'b1', brew_name: 'Valid Beer' } }),
+          rollback_data: JSON.stringify({
+            type: 'CHECK_IN_BEER',
+            wasInAllBeers: true,
+            wasInTastedBeers: false,
+            beer: { id: 'b1', brew_name: 'Valid Beer' },
+          }),
         },
         {
           id: 'update-bad-shape',
@@ -662,7 +716,12 @@ describe('OptimisticUpdateRepository', () => {
           type: 'CHECK_IN_BEER',
           status: 'pending',
           timestamp: 1700000000000,
-          rollback_data: JSON.stringify({ type: 'CHECK_IN_BEER', wasInAllBeers: true, wasInTastedBeers: false, beer: { id: 'b1', brew_name: 'Valid Beer' } }),
+          rollback_data: JSON.stringify({
+            type: 'CHECK_IN_BEER',
+            wasInAllBeers: true,
+            wasInTastedBeers: false,
+            beer: { id: 'b1', brew_name: 'Valid Beer' },
+          }),
         },
         {
           id: 'update-corrupt',
@@ -688,7 +747,12 @@ describe('OptimisticUpdateRepository', () => {
           type: 'CHECK_IN_BEER',
           status: 'pending',
           timestamp: 1700000000000,
-          rollback_data: JSON.stringify({ type: 'CHECK_IN_BEER', wasInAllBeers: true, wasInTastedBeers: false, beer: { id: 'b1', brew_name: 'Valid Beer' } }),
+          rollback_data: JSON.stringify({
+            type: 'CHECK_IN_BEER',
+            wasInAllBeers: true,
+            wasInTastedBeers: false,
+            beer: { id: 'b1', brew_name: 'Valid Beer' },
+          }),
         },
         {
           id: 'update-corrupt',
@@ -746,9 +810,9 @@ describe('OptimisticUpdateRepository', () => {
       (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       mockDatabase.getFirstAsync.mockRejectedValueOnce(new Error('Query failed'));
 
-      await expect(optimisticUpdateRepository.countByStatus(OptimisticUpdateStatus.PENDING)).rejects.toThrow(
-        'Query failed'
-      );
+      await expect(
+        optimisticUpdateRepository.countByStatus(OptimisticUpdateStatus.PENDING)
+      ).rejects.toThrow('Query failed');
     });
   });
 });

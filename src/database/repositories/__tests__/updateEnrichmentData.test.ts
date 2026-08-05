@@ -19,12 +19,26 @@ import { EnrichmentUpdate } from '../../../types/enrichment';
 
 // Mock dependencies
 jest.mock('../../connection');
-jest.mock('../../locks', () => ({
-  databaseLockManager: {
-    acquireLock: jest.fn(),
-    releaseLock: jest.fn(),
-  },
-}));
+// Delegates to a REAL DatabaseLockManager. A `jest.fn((_name, task) => task())`
+// stand-in has no release to observe, so "released the lock" assertions against
+// it pass even with withDatabaseLock's finally deleted.
+jest.mock('../../locks', () => {
+  const actual = jest.requireActual('../../DatabaseLockManager');
+  const real = new actual.DatabaseLockManager();
+  const delegate = (name: string, task: () => Promise<unknown>) =>
+    real.withDatabaseLock(name, task);
+  return {
+    databaseLockManager: {
+      withDatabaseLock: jest.fn(delegate),
+      // Exposed so setupLocks can restore delegation after a test overrides
+      // the implementation (e.g. to simulate an acquisition failure).
+      __delegate: delegate,
+      isLocked: () => real.isLocked(),
+      getQueueLength: () => real.getQueueLength(),
+      resetForTesting: () => real.resetForTesting(),
+    },
+  };
+});
 
 type MockStatement = {
   executeAsync: jest.Mock;
@@ -57,8 +71,13 @@ function createMockDatabase(mockStatement: MockStatement): MockDatabase {
 }
 
 function setupLocks(): void {
-  (databaseLockManager.acquireLock as jest.Mock).mockResolvedValue(true);
-  (databaseLockManager.releaseLock as jest.Mock).mockImplementation(() => {});
+  const mocked = databaseLockManager as unknown as {
+    __delegate: (name: string, task: () => Promise<unknown>) => Promise<unknown>;
+  };
+  // Restores delegation to the real lock manager, undoing any per-test
+  // override. Not a plain task-runner: isLocked() has to mean something.
+  (databaseLockManager.withDatabaseLock as jest.Mock).mockImplementation(mocked.__delegate);
+  databaseLockManager.resetForTesting();
 }
 
 describe('BeerRepository.updateEnrichmentData', () => {
@@ -73,7 +92,7 @@ describe('BeerRepository.updateEnrichmentData', () => {
       (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       (connection.getDatabase as jest.Mock).mockClear();
       setupLocks();
-      (databaseLockManager.acquireLock as jest.Mock).mockClear();
+      (databaseLockManager.withDatabaseLock as jest.Mock).mockClear();
       const repository = new BeerRepository();
 
       const result = await repository.updateEnrichmentData({});
@@ -81,7 +100,7 @@ describe('BeerRepository.updateEnrichmentData', () => {
       expect(result).toBe(0);
 
       // Should not acquire lock or interact with database
-      expect(databaseLockManager.acquireLock).not.toHaveBeenCalled();
+      expect(databaseLockManager.withDatabaseLock).not.toHaveBeenCalled();
       expect(connection.getDatabase).not.toHaveBeenCalled();
     });
   });
@@ -110,7 +129,11 @@ describe('BeerRepository.updateEnrichmentData', () => {
 
       await repository.updateEnrichmentData(enrichments);
 
-      expect(databaseLockManager.acquireLock).toHaveBeenCalledWith('BeerRepository');
+      expect(databaseLockManager.withDatabaseLock).toHaveBeenCalledWith(
+        'BeerRepository.updateEnrichmentData',
+        expect.any(Function)
+      );
+      expect(databaseLockManager.isLocked()).toBe(false);
     });
 
     test('should release BeerRepository lock after successful operation', async () => {
@@ -132,7 +155,11 @@ describe('BeerRepository.updateEnrichmentData', () => {
 
       await repository.updateEnrichmentData(enrichments);
 
-      expect(databaseLockManager.releaseLock).toHaveBeenCalledWith('BeerRepository');
+      expect(databaseLockManager.withDatabaseLock).toHaveBeenCalledWith(
+        'BeerRepository.updateEnrichmentData',
+        expect.any(Function)
+      );
+      expect(databaseLockManager.isLocked()).toBe(false);
     });
 
     test('should release lock even when database operation fails', async () => {
@@ -155,16 +182,24 @@ describe('BeerRepository.updateEnrichmentData', () => {
       await expect(repository.updateEnrichmentData(enrichments)).rejects.toThrow('Database error');
 
       // Lock should still be released
-      expect(databaseLockManager.releaseLock).toHaveBeenCalledWith('BeerRepository');
+      expect(databaseLockManager.withDatabaseLock).toHaveBeenCalledWith(
+        'BeerRepository.updateEnrichmentData',
+        expect.any(Function)
+      );
+      expect(databaseLockManager.isLocked()).toBe(false);
     });
 
-    test('should throw error when lock cannot be acquired', async () => {
+    test('should propagate an acquisition failure without touching the database', async () => {
       const mockStatement = createMockStatement();
       const mockDatabase = createMockDatabase(mockStatement);
       (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       (connection.getDatabase as jest.Mock).mockClear();
       setupLocks();
-      (databaseLockManager.acquireLock as jest.Mock).mockResolvedValue(false);
+      // withDatabaseLock has no "returned false" mode — acquisition either
+      // succeeds or rejects (timeout / shutdown). That dead branch is gone.
+      (databaseLockManager.withDatabaseLock as jest.Mock).mockRejectedValue(
+        new Error('Lock acquisition timeout for enrichment update after 30000ms')
+      );
       const repository = new BeerRepository();
       const enrichments: Record<string, EnrichmentUpdate> = {
         'beer-1': {
@@ -176,7 +211,7 @@ describe('BeerRepository.updateEnrichmentData', () => {
       };
 
       await expect(repository.updateEnrichmentData(enrichments)).rejects.toThrow(
-        'Could not acquire database lock for enrichment update'
+        /Lock acquisition timeout/
       );
 
       // Should not attempt database operations
@@ -469,13 +504,13 @@ describe('MyBeersRepository.updateEnrichmentData', () => {
       const mockDatabase = createMockDatabase(mockStatement);
       (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       setupLocks();
-      (databaseLockManager.acquireLock as jest.Mock).mockClear();
+      (databaseLockManager.withDatabaseLock as jest.Mock).mockClear();
       const repository = new MyBeersRepository();
 
       const result = await repository.updateEnrichmentData({});
 
       expect(result).toBe(0);
-      expect(databaseLockManager.acquireLock).not.toHaveBeenCalled();
+      expect(databaseLockManager.withDatabaseLock).not.toHaveBeenCalled();
     });
   });
 
@@ -499,7 +534,11 @@ describe('MyBeersRepository.updateEnrichmentData', () => {
 
       await repository.updateEnrichmentData(enrichments);
 
-      expect(databaseLockManager.acquireLock).toHaveBeenCalledWith('MyBeersRepository');
+      expect(databaseLockManager.withDatabaseLock).toHaveBeenCalledWith(
+        'MyBeersRepository.updateEnrichmentData',
+        expect.any(Function)
+      );
+      expect(databaseLockManager.isLocked()).toBe(false);
     });
 
     test('should release MyBeersRepository lock after operation', async () => {
@@ -521,15 +560,23 @@ describe('MyBeersRepository.updateEnrichmentData', () => {
 
       await repository.updateEnrichmentData(enrichments);
 
-      expect(databaseLockManager.releaseLock).toHaveBeenCalledWith('MyBeersRepository');
+      expect(databaseLockManager.withDatabaseLock).toHaveBeenCalledWith(
+        'MyBeersRepository.updateEnrichmentData',
+        expect.any(Function)
+      );
+      expect(databaseLockManager.isLocked()).toBe(false);
     });
 
-    test('should throw when lock cannot be acquired', async () => {
+    test('should propagate an acquisition failure', async () => {
       const mockStatement = createMockStatement();
       const mockDatabase = createMockDatabase(mockStatement);
       (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       setupLocks();
-      (databaseLockManager.acquireLock as jest.Mock).mockResolvedValue(false);
+      // withDatabaseLock has no "returned false" mode — acquisition either
+      // succeeds or rejects (timeout / shutdown). That dead branch is gone.
+      (databaseLockManager.withDatabaseLock as jest.Mock).mockRejectedValue(
+        new Error('Lock acquisition timeout for enrichment update after 30000ms')
+      );
       const repository = new MyBeersRepository();
       const enrichments: Record<string, EnrichmentUpdate> = {
         'beer-1': {
@@ -541,7 +588,7 @@ describe('MyBeersRepository.updateEnrichmentData', () => {
       };
 
       await expect(repository.updateEnrichmentData(enrichments)).rejects.toThrow(
-        'Could not acquire database lock for enrichment update'
+        /Lock acquisition timeout/
       );
     });
   });
@@ -652,7 +699,11 @@ describe('MyBeersRepository.updateEnrichmentData', () => {
 
       await expect(repository.updateEnrichmentData(enrichments)).rejects.toThrow('Database error');
 
-      expect(databaseLockManager.releaseLock).toHaveBeenCalledWith('MyBeersRepository');
+      expect(databaseLockManager.withDatabaseLock).toHaveBeenCalledWith(
+        'MyBeersRepository.updateEnrichmentData',
+        expect.any(Function)
+      );
+      expect(databaseLockManager.isLocked()).toBe(false);
     });
   });
 });

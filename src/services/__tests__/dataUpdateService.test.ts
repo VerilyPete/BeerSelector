@@ -25,6 +25,15 @@ import { rewardsRepository } from '../../database/repositories/RewardsRepository
 import { databaseLockManager } from '../../database/DatabaseLockManager';
 import { fetchBeersFromAPI, fetchMyBeersFromAPI, fetchRewardsFromAPI } from '../../api/beerApi';
 import {
+  fetchedRows,
+  confirmedEmpty,
+  malformed,
+  unavailable,
+  failed,
+} from '../../api/__tests__/helpers/fetchOutcomeFixtures';
+import { ApiErrorType, getUserFriendlyErrorMessage } from '../../utils/notificationUtils';
+import { logError, logWarning } from '../../utils/errorLogger';
+import {
   fetchBeersFromProxy,
   fetchEnrichmentBatchWithMissing,
   syncBeersToWorker,
@@ -42,6 +51,7 @@ async function flushPromises(iterations = 10): Promise<void> {
 // Mock database preferences
 jest.mock('../../database/preferences', () => ({
   getPreference: jest.fn(),
+
   setPreference: jest.fn(),
   areApiUrlsConfigured: jest.fn(),
 }));
@@ -49,6 +59,7 @@ jest.mock('../../database/preferences', () => ({
 // Mock repositories
 jest.mock('../../database/repositories/BeerRepository', () => ({
   beerRepository: {
+    count: jest.fn(async () => 12),
     insertMany: jest.fn(),
     insertManyUnsafe: jest.fn(),
     updateEnrichmentData: jest.fn().mockResolvedValue(0),
@@ -57,6 +68,8 @@ jest.mock('../../database/repositories/BeerRepository', () => ({
 
 jest.mock('../../database/repositories/MyBeersRepository', () => ({
   myBeersRepository: {
+    replaceAllWithEmpty: jest.fn(),
+    replaceAllWithEmptyUnsafe: jest.fn(),
     insertMany: jest.fn(),
     insertManyUnsafe: jest.fn(),
     updateEnrichmentData: jest.fn().mockResolvedValue(0),
@@ -65,17 +78,33 @@ jest.mock('../../database/repositories/MyBeersRepository', () => ({
 
 jest.mock('../../database/repositories/RewardsRepository', () => ({
   rewardsRepository: {
+    replaceAllWithEmpty: jest.fn(async () => {}),
+    replaceAllWithEmptyUnsafe: jest.fn(async () => {}),
     insertMany: jest.fn(),
     insertManyUnsafe: jest.fn(),
   },
 }));
 
-jest.mock('../../database/DatabaseLockManager', () => ({
-  databaseLockManager: {
-    acquireLock: jest.fn().mockResolvedValue(undefined),
-    releaseLock: jest.fn(),
-  },
-}));
+// Delegates to a REAL DatabaseLockManager rather than faking the lock away.
+// A mock of the shape `jest.fn((_name, task) => task())` has no release to
+// observe, so a test asserting "the lock was released" against it passes even
+// when withDatabaseLock's finally is deleted. Keeping a spy on top preserves
+// the call-name assertions while isLocked() reports genuine state.
+jest.mock('../../database/DatabaseLockManager', () => {
+  const actual = jest.requireActual('../../database/DatabaseLockManager');
+  const real = new actual.DatabaseLockManager();
+  return {
+    databaseLockManager: {
+      withDatabaseLock: jest.fn((name: string, task: () => Promise<unknown>) =>
+        real.withDatabaseLock(name, task)
+      ),
+      isLocked: () => real.isLocked(),
+      getQueueLength: () => real.getQueueLength(),
+      hasAbandonedHolder: () => real.hasAbandonedHolder(),
+      resetForTesting: () => real.resetForTesting(),
+    },
+  };
+});
 
 jest.mock('../../api/beerApi', () => ({
   fetchBeersFromAPI: jest.fn(),
@@ -126,6 +155,32 @@ describe('dataUpdateService', () => {
   const testAllBeersUrl = `${config.api.baseUrl}/api/all-beers`;
   const testMyBeersUrl = `${config.api.baseUrl}/api/my-beers`;
 
+  /**
+   * Answer `all_beers_api_url` with `url` consistently, for every read.
+   *
+   * `mockResolvedValueOnce` is wrong for any test that reaches the taplist
+   * write, because the write re-reads this preference under the lock to check
+   * the store has not changed mid-refresh. A one-shot mock answers the URL and
+   * then `undefined`, which the guard correctly reads as "the store switched"
+   * and abandons the write. Preferences are durable storage: a second read of
+   * an unwritten key returns the same value, and the fixture has to say so.
+   *
+   * Takes the URL rather than assuming `testAllBeersUrl`: the Config
+   * Integration tests below each exist to show a particular URL shape works, so
+   * substituting a different one would delete the thing they test.
+   *
+   * At `describe('dataUpdateService')` scope rather than inside
+   * `fetchAndUpdateAllBeers`, because it was scoped there when it was written
+   * and the five Config Integration tests that needed it could not see it. They
+   * silently took the abandon path for it instead — asserting only that a fetch
+   * happened, and passing against a taplist write that inserted nothing.
+   */
+  const taplistUrlIsStable = (url: string = testAllBeersUrl): void => {
+    (getPreference as jest.Mock).mockImplementation(async (key: string) =>
+      key === 'all_beers_api_url' ? url : null
+    );
+  };
+
   beforeEach(() => {
     jest.clearAllMocks();
 
@@ -174,7 +229,7 @@ describe('dataUpdateService', () => {
 
     it('should return failure result when fetchBeersFromAPI returns empty array', async () => {
       (getPreference as jest.Mock).mockResolvedValueOnce(testAllBeersUrl);
-      (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce([]);
+      (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce(fetchedRows([]));
 
       const result = await fetchAndUpdateAllBeers();
 
@@ -185,9 +240,9 @@ describe('dataUpdateService', () => {
 
     it('should return failure result when all beers are invalid', async () => {
       (getPreference as jest.Mock).mockResolvedValueOnce(testAllBeersUrl);
-      (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce([
-        { brew_name: 'No ID Beer', brewer: 'Brewery 1' },
-      ]);
+      (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce(
+        fetchedRows([{ brew_name: 'No ID Beer', brewer: 'Brewery 1' }])
+      );
 
       const result = await fetchAndUpdateAllBeers();
 
@@ -197,14 +252,14 @@ describe('dataUpdateService', () => {
     });
 
     it('should successfully update all beers', async () => {
-      (getPreference as jest.Mock).mockResolvedValueOnce(testAllBeersUrl);
+      taplistUrlIsStable();
 
       const mockBeers: Beer[] = [
         { id: 'beer-1', brew_name: 'Test Beer 1', brewer: 'Brewery 1' },
         { id: 'beer-2', brew_name: 'Test Beer 2', brewer: 'Brewery 2' },
       ];
 
-      (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce(mockBeers);
+      (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce(fetchedRows(mockBeers));
       (beerRepository.insertMany as jest.Mock).mockResolvedValueOnce(undefined);
       (setPreference as jest.Mock).mockResolvedValue(undefined);
 
@@ -213,7 +268,10 @@ describe('dataUpdateService', () => {
       expect(result.success).toBe(true);
       expect(result.dataUpdated).toBe(true);
       expect(result.itemCount).toBe(mockBeers.length);
-      expect(beerRepository.insertMany).toHaveBeenCalledWith([
+      // insertManyUnsafe, not insertMany: the rows and the ETag they imply now
+      // sit in one critical section this function opens itself, so a nested
+      // lock acquisition would be the contention the master lock removed.
+      expect(beerRepository.insertManyUnsafe).toHaveBeenCalledWith([
         {
           id: 'beer-1',
           brew_name: 'Test Beer 1',
@@ -250,9 +308,11 @@ describe('dataUpdateService', () => {
 
     it('should categorize AbortError as NETWORK_ERROR via createErrorResponse', async () => {
       (getPreference as jest.Mock).mockResolvedValueOnce(testAllBeersUrl);
-      const abortError = new Error('The operation was aborted');
-      abortError.name = 'AbortError';
-      (fetchBeersFromAPI as jest.Mock).mockRejectedValueOnce(abortError);
+      // An abort is classified inside beerApi now and arrives as `failed`;
+      // see beerApi.timeout.test.ts for the abort itself.
+      (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce(
+        failed(ApiErrorType.NETWORK_ERROR, 'Network connection error: request timed out')
+      );
 
       const result = await fetchAndUpdateAllBeers();
 
@@ -264,7 +324,9 @@ describe('dataUpdateService', () => {
 
     it('should delegate to fetchBeersFromAPI for fetching', async () => {
       (getPreference as jest.Mock).mockResolvedValueOnce(testAllBeersUrl);
-      (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce([{ id: '1', brew_name: 'Test' }]);
+      (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce(
+        fetchedRows([{ id: '1', brew_name: 'Test' }])
+      );
       (beerRepository.insertMany as jest.Mock).mockResolvedValueOnce(undefined);
       (setPreference as jest.Mock).mockResolvedValue(undefined);
 
@@ -274,7 +336,7 @@ describe('dataUpdateService', () => {
     });
 
     it('should filter out invalid beers without IDs', async () => {
-      (getPreference as jest.Mock).mockResolvedValueOnce(testAllBeersUrl);
+      taplistUrlIsStable();
 
       const mockBeers = [
         { id: 'beer-1', brew_name: 'Valid Beer 1', brewer: 'Brewery 1' },
@@ -282,7 +344,7 @@ describe('dataUpdateService', () => {
         { id: 'beer-3', brew_name: 'Valid Beer 2', brewer: 'Brewery 3' },
       ];
 
-      (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce(mockBeers);
+      (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce(fetchedRows(mockBeers));
       (beerRepository.insertMany as jest.Mock).mockResolvedValueOnce(undefined);
       (setPreference as jest.Mock).mockResolvedValue(undefined);
 
@@ -399,9 +461,16 @@ describe('dataUpdateService', () => {
 
       const result = await fetchAndUpdateMyBeers();
 
-      expect(result.success).toBe(true);
-      expect(result.dataUpdated).toBe(true);
+      // INVERTED by plan 02 Phase 2. Previously asserted success with 0 items,
+      // and wrote an empty table on the way. Rows that all lack an id are
+      // MALFORMED, not an empty round — writing wiped a populated tasted list
+      // and stamping the timestamps hid it for 12 hours.
+      expect(result.success).toBe(false);
+      expect(result.dataUpdated).toBe(false);
       expect(result.itemCount).toBe(0);
+      expect(myBeersRepository.insertMany).not.toHaveBeenCalled();
+      expect(myBeersRepository.replaceAllWithEmpty).not.toHaveBeenCalled();
+      expect(setPreference).not.toHaveBeenCalledWith('my_beers_last_update', expect.anything());
     });
 
     it('should successfully update my beers', async () => {
@@ -506,10 +575,14 @@ describe('dataUpdateService', () => {
 
       const result = await fetchAndUpdateMyBeers();
 
+      // Still a success — the server genuinely reported zero tasted beers, which
+      // is a real state (new user, or the round rollover at 200). It just says
+      // so explicitly now instead of inferring it from an empty array.
       expect(result.success).toBe(true);
       expect(result.dataUpdated).toBe(true);
       expect(result.itemCount).toBe(0);
-      expect(myBeersRepository.insertMany).toHaveBeenCalledWith([]);
+      expect(myBeersRepository.replaceAllWithEmpty).toHaveBeenCalled();
+      expect(myBeersRepository.insertMany).not.toHaveBeenCalled();
     });
 
     it('should handle fetch timeout with AbortError', async () => {
@@ -630,45 +703,64 @@ describe('dataUpdateService', () => {
 
   describe('Config Integration', () => {
     describe('Environment Configuration', () => {
+      // Each of these asserts the rows LANDED, not merely that a fetch was
+      // attempted. `success: true` alone is satisfied by
+      // `abandonedAfterStoreSwitch`, which is what these five did for a while:
+      // the one-shot preference mock made the write's own guard read "the store
+      // switched", so every one of them passed against a taplist write that
+      // inserted nothing. `dataUpdated` and the insert are what make the name of
+      // the test its actual subject.
       it('should work with production config base URL', async () => {
         const productionUrl = `${config.api.baseUrl}/visitor`;
-        (getPreference as jest.Mock).mockResolvedValueOnce(productionUrl);
-        (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce([{ id: '1', brew_name: 'Test' }]);
-        (beerRepository.insertMany as jest.Mock).mockResolvedValueOnce(undefined);
+        taplistUrlIsStable(productionUrl);
+        (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce(
+          fetchedRows([{ id: '1', brew_name: 'Test' }])
+        );
         (setPreference as jest.Mock).mockResolvedValue(undefined);
 
         const result = await fetchAndUpdateAllBeers();
 
         expect(result.success).toBe(true);
+        expect(result.dataUpdated).toBe(true);
         expect(fetchBeersFromAPI).toHaveBeenCalled();
+        expect(beerRepository.insertManyUnsafe).toHaveBeenCalled();
       });
 
       it('should work with custom API URL', async () => {
         const customBaseUrl = 'https://staging.flyingsaucer.com';
         const customUrl = `${customBaseUrl}/api/beers`;
 
-        (getPreference as jest.Mock).mockResolvedValueOnce(customUrl);
-        (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce([{ id: '1', brew_name: 'Test' }]);
-        (beerRepository.insertMany as jest.Mock).mockResolvedValueOnce(undefined);
+        taplistUrlIsStable(customUrl);
+        (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce(
+          fetchedRows([{ id: '1', brew_name: 'Test' }])
+        );
         (setPreference as jest.Mock).mockResolvedValue(undefined);
 
         const result = await fetchAndUpdateAllBeers();
 
         expect(result.success).toBe(true);
+        expect(result.dataUpdated).toBe(true);
         expect(fetchBeersFromAPI).toHaveBeenCalled();
+        expect(beerRepository.insertManyUnsafe).toHaveBeenCalled();
       });
     });
 
     describe('Network Timeout Configuration', () => {
       it('should delegate fetch to fetchBeersFromAPI which handles timeouts', async () => {
-        (getPreference as jest.Mock).mockResolvedValueOnce(testAllBeersUrl);
-        (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce([{ id: '1', brew_name: 'Test' }]);
-        (beerRepository.insertMany as jest.Mock).mockResolvedValueOnce(undefined);
+        // Same fixture as the five above, for the same reason. "Delegates the
+        // fetch" is technically satisfied by a refresh that fetches and then
+        // abandons the write, so this would have stayed green while doing half
+        // of what it describes.
+        taplistUrlIsStable();
+        (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce(
+          fetchedRows([{ id: '1', brew_name: 'Test' }])
+        );
         (setPreference as jest.Mock).mockResolvedValue(undefined);
 
-        await fetchAndUpdateAllBeers();
+        const result = await fetchAndUpdateAllBeers();
 
         expect(fetchBeersFromAPI).toHaveBeenCalled();
+        expect(result.dataUpdated).toBe(true);
       });
 
       it('should handle timeout gracefully', async () => {
@@ -696,28 +788,34 @@ describe('dataUpdateService', () => {
 
       it('should accept HTTPS URLs', async () => {
         const httpsUrl = 'https://secure.api.com/beers';
-        (getPreference as jest.Mock).mockResolvedValueOnce(httpsUrl);
-        (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce([{ id: '1', brew_name: 'Test' }]);
-        (beerRepository.insertMany as jest.Mock).mockResolvedValueOnce(undefined);
+        taplistUrlIsStable(httpsUrl);
+        (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce(
+          fetchedRows([{ id: '1', brew_name: 'Test' }])
+        );
         (setPreference as jest.Mock).mockResolvedValue(undefined);
 
         const result = await fetchAndUpdateAllBeers();
 
         expect(result.success).toBe(true);
+        expect(result.dataUpdated).toBe(true);
         expect(fetchBeersFromAPI).toHaveBeenCalled();
+        expect(beerRepository.insertManyUnsafe).toHaveBeenCalled();
       });
 
       it('should accept HTTP URLs', async () => {
         const httpUrl = 'http://localhost:3000/api/beers';
-        (getPreference as jest.Mock).mockResolvedValueOnce(httpUrl);
-        (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce([{ id: '1', brew_name: 'Test' }]);
-        (beerRepository.insertMany as jest.Mock).mockResolvedValueOnce(undefined);
+        taplistUrlIsStable(httpUrl);
+        (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce(
+          fetchedRows([{ id: '1', brew_name: 'Test' }])
+        );
         (setPreference as jest.Mock).mockResolvedValue(undefined);
 
         const result = await fetchAndUpdateAllBeers();
 
         expect(result.success).toBe(true);
+        expect(result.dataUpdated).toBe(true);
         expect(fetchBeersFromAPI).toHaveBeenCalled();
+        expect(beerRepository.insertManyUnsafe).toHaveBeenCalled();
       });
     });
 
@@ -727,15 +825,18 @@ describe('dataUpdateService', () => {
         expect(typeof config.api.baseUrl).toBe('string');
 
         const configBasedUrl = `${config.api.baseUrl}/custom/endpoint`;
-        (getPreference as jest.Mock).mockResolvedValueOnce(configBasedUrl);
-        (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce([{ id: '1', brew_name: 'Test' }]);
-        (beerRepository.insertMany as jest.Mock).mockResolvedValueOnce(undefined);
+        taplistUrlIsStable(configBasedUrl);
+        (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce(
+          fetchedRows([{ id: '1', brew_name: 'Test' }])
+        );
         (setPreference as jest.Mock).mockResolvedValue(undefined);
 
         const result = await fetchAndUpdateAllBeers();
 
         expect(result.success).toBe(true);
+        expect(result.dataUpdated).toBe(true);
         expect(fetchBeersFromAPI).toHaveBeenCalled();
+        expect(beerRepository.insertManyUnsafe).toHaveBeenCalled();
       });
 
       it('should respect config network settings for timeout handling', async () => {
@@ -750,9 +851,14 @@ describe('dataUpdateService', () => {
 
     describe('Error Handling with Config', () => {
       it('should properly categorize network errors', async () => {
+        // Drives the REAL contract. Post-5.3 the fetchers cannot reject for a
+        // transport failure — their whole body is inside a try — so a rejecting
+        // mock tests a path production can no longer take. That is why the
+        // classification regression this test appears to guard stayed green:
+        // the mock preserved the old contract the code had already left.
         (getPreference as jest.Mock).mockResolvedValueOnce(testAllBeersUrl);
-        (fetchBeersFromAPI as jest.Mock).mockRejectedValueOnce(
-          new TypeError('Network request failed')
+        (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce(
+          failed(ApiErrorType.NETWORK_ERROR, 'Network connection error')
         );
 
         const result = await fetchAndUpdateAllBeers();
@@ -785,7 +891,7 @@ describe('dataUpdateService', () => {
 
       it('should properly categorize empty response as validation error', async () => {
         (getPreference as jest.Mock).mockResolvedValueOnce(testAllBeersUrl);
-        (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce([]);
+        (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce(fetchedRows([]));
 
         const result = await fetchAndUpdateAllBeers();
 
@@ -856,7 +962,7 @@ describe('dataUpdateService', () => {
     it('returns success with data when rewards are fetched successfully', async () => {
       const mockRewards = [{ id: 'reward-1', name: 'Free Beer' }];
       (getPreference as jest.Mock).mockResolvedValue('false');
-      (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(mockRewards);
+      (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockRewards));
       (rewardsRepository.insertMany as jest.Mock).mockResolvedValue(undefined);
 
       const result = await fetchAndUpdateRewards();
@@ -891,13 +997,439 @@ describe('dataUpdateService', () => {
     it('returns failure when rewardsRepository.insertMany throws', async () => {
       const mockRewards = [{ id: 'reward-1', name: 'Free Beer' }];
       (getPreference as jest.Mock).mockResolvedValue('false');
-      (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(mockRewards);
+      (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockRewards));
       (rewardsRepository.insertMany as jest.Mock).mockRejectedValue(new Error('DB write error'));
 
       const result = await fetchAndUpdateRewards();
 
       expect(result.success).toBe(false);
       expect(result.dataUpdated).toBe(false);
+    });
+  });
+
+  // Plan 05 Phase 5.3, review remediation.
+  //
+  // `decideRewards` forwards `source.error` intact, but the all-beers path went
+  // through `requireRows`, which threw `new Error(\`${label} failed: ${msg}\`)`.
+  // The enclosing catch then re-ran createErrorResponse on that plain Error,
+  // whose message matches none of the substring rules — so a typed SERVER_ERROR
+  // became UNKNOWN_ERROR, and UNKNOWN_ERROR returns error.message verbatim,
+  // putting "All beers failed: HTTP 500 Internal Server Error" in a user-facing
+  // alert. The classification was discarded one frame after it was built, on the
+  // very path the fix was written for.
+  describe('all-beers preserves the typed fetch error', () => {
+    beforeEach(() => {
+      (getPreference as jest.Mock).mockImplementation(async (key: string) =>
+        key === 'all_beers_api_url' ? 'https://example.com/all.json?sid=13884' : null
+      );
+    });
+
+    it('reports a 5xx as SERVER_ERROR rather than UNKNOWN_ERROR', async () => {
+      (fetchBeersFromAPI as jest.Mock).mockResolvedValue(
+        failed(ApiErrorType.SERVER_ERROR, 'HTTP 500 Internal Server Error')
+      );
+
+      const result = await fetchAndUpdateAllBeers();
+
+      expect(result.success).toBe(false);
+      expect(result.error?.type).toBe(ApiErrorType.SERVER_ERROR);
+    });
+
+    it('reports an offline fetch as NETWORK_ERROR', async () => {
+      // The other half: allNetworkErrors selects the softer "check your
+      // connection" alert, and it can only do that if the type survives.
+      (fetchBeersFromAPI as jest.Mock).mockResolvedValue(
+        failed(ApiErrorType.NETWORK_ERROR, 'Network connection error')
+      );
+
+      const result = await fetchAndUpdateAllBeers();
+
+      expect(result.error?.type).toBe(ApiErrorType.NETWORK_ERROR);
+    });
+
+    it('keeps allNetworkErrors true when every source is offline', async () => {
+      // THE regression this remediation exists for. Before 5.3 the fetchers threw
+      // a TypeError('Network request failed'), which createErrorResponse read as
+      // NETWORK_ERROR, so allNetworkErrors was true and the user saw ONE clean
+      // "check your internet connection" alert. Returning `failed` routed the
+      // error through requireRows and the my-beers switches, which stringified
+      // it into UNKNOWN_ERROR — flipping allNetworkErrors to false and putting
+      // "All beers failed: Network connection error" in the alert body.
+      //
+      // Making the fetch layer honest must not make the UI dishonest.
+      const offline = () => failed(ApiErrorType.NETWORK_ERROR, 'Network connection error');
+      (fetchBeersFromAPI as jest.Mock).mockResolvedValue(offline());
+      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(offline());
+      (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(offline());
+
+      const result = await sequentialRefreshAllData();
+
+      expect(result.hasErrors).toBe(true);
+      expect(result.allNetworkErrors).toBe(true);
+      expect(result.allBeersResult.error?.type).toBe(ApiErrorType.NETWORK_ERROR);
+      expect(result.myBeersResult.error?.type).toBe(ApiErrorType.NETWORK_ERROR);
+    });
+
+    it('does not leak the developer message into the user-facing channel', () => {
+      // UNKNOWN_ERROR and VALIDATION_ERROR return error.message verbatim;
+      // SERVER_ERROR has dedicated copy. This is what the type buys.
+      expect(
+        getUserFriendlyErrorMessage({
+          type: ApiErrorType.SERVER_ERROR,
+          message: 'All beers failed: HTTP 500 Internal Server Error',
+        })
+      ).not.toContain('HTTP 500');
+    });
+  });
+
+  // Plan 05 Phase 5.1.
+  //
+  // `rowsOrNone` flattened unavailable / failed / unchanged to `[]`, and every
+  // caller then reported `success: true, dataUpdated: true, itemCount: 0`. So
+  // "no rewards URL configured" and "the rewards fetch failed" both surfaced as
+  // a successful refresh that found zero rewards. That is the same defect class
+  // plan 02 exists to remove — a non-answer laundered into an answer —
+  // reintroduced one layer above the one 02 fixed.
+  //
+  // The mapping these tests pin, and why it is not "every non-data case fails":
+  //   data            → success, rows written
+  //   confirmed-empty → success; the server really did report none
+  //   not-applicable  → success, dataUpdated FALSE; visitor mode and a none://
+  //                     placeholder are normal states, and reporting them as
+  //                     errors drives a user-facing alert via hasErrors
+  //   not-configured  → failure; matches how the all-beers path already treats a
+  //                     missing URL. A deliberate departure from
+  //                     UnavailableReason's doc comment, which groups both codes
+  //                     as non-errors — that grouping is about the transport
+  //                     layer, not about what each consumer should do
+  //   failed          → failure, carrying the transport error
+  //   malformed       → failure; a body arrived and was unusable
+  describe('rewards outcome handling', () => {
+    beforeEach(() => {
+      (getPreference as jest.Mock).mockResolvedValue('false');
+      (rewardsRepository.insertMany as jest.Mock).mockResolvedValue(undefined);
+      (rewardsRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
+    });
+
+    describe('fetchAndUpdateRewards', () => {
+      it('reports failure when the rewards source is not configured', async () => {
+        (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(unavailable('not-configured'));
+
+        const result = await fetchAndUpdateRewards();
+
+        expect(result.success).toBe(false);
+        expect(result.dataUpdated).toBe(false);
+        // The TYPE is the assertion that matters, not merely that it failed:
+        // it decides which copy the user sees. Without this, swapping in
+        // UNKNOWN_ERROR passes, and UNKNOWN_ERROR returns error.message verbatim
+        // (notificationUtils.ts:222-224).
+        expect(result.error?.type).toBe(ApiErrorType.VALIDATION_ERROR);
+        expect(rewardsRepository.insertMany).not.toHaveBeenCalled();
+      });
+
+      it('reports failure when the rewards fetch fails', async () => {
+        (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(failed());
+
+        const result = await fetchAndUpdateRewards();
+
+        expect(result.success).toBe(false);
+        expect(result.dataUpdated).toBe(false);
+        expect(result.error?.type).toBe(ApiErrorType.NETWORK_ERROR);
+        expect(rewardsRepository.insertMany).not.toHaveBeenCalled();
+      });
+
+      it('forwards the transport error unchanged rather than re-deriving one', async () => {
+        // The previous test cannot distinguish forwarding from re-deriving,
+        // because the `failed()` fixture defaults to NETWORK_ERROR — the same
+        // type a hardcoded fallback would use. A non-default type and a specific
+        // message are what pin the passthrough, and the passthrough is the whole
+        // reason FetchedSource.failed carries a typed error.
+        (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(
+          failed(ApiErrorType.SERVER_ERROR, 'HTTP 503 from rewards')
+        );
+
+        const result = await fetchAndUpdateRewards();
+
+        expect(result.error?.type).toBe(ApiErrorType.SERVER_ERROR);
+        expect(result.error?.message).toBe('HTTP 503 from rewards');
+      });
+
+      it('reports failure when the rewards body is malformed', async () => {
+        (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(malformed());
+
+        const result = await fetchAndUpdateRewards();
+
+        expect(result.success).toBe(false);
+        // MALFORMED_RESPONSE_ERROR is the one type here with dedicated user copy
+        // that deliberately SUPPRESSES the developer message
+        // (notificationUtils.ts:208-210). Getting the type wrong leaks
+        // "Rewards response was unusable: …" to the user.
+        expect(result.error?.type).toBe(ApiErrorType.MALFORMED_RESPONSE_ERROR);
+        expect(rewardsRepository.insertMany).not.toHaveBeenCalled();
+      });
+
+      it('reports success without an update when rewards are not applicable', async () => {
+        (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(unavailable('not-applicable'));
+
+        const result = await fetchAndUpdateRewards();
+
+        // Not an error — but not an update either. Reporting dataUpdated here is
+        // what marked stale rewards fresh.
+        expect(result.success).toBe(true);
+        expect(result.dataUpdated).toBe(false);
+        expect(rewardsRepository.insertMany).not.toHaveBeenCalled();
+      });
+
+      it('clears the table and reports an update when the server confirms zero rewards', async () => {
+        (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(confirmedEmpty());
+
+        const result = await fetchAndUpdateRewards();
+
+        // The one case where nothing to write is still a real answer.
+        expect(result.success).toBe(true);
+        expect(result.dataUpdated).toBe(true);
+        expect(result.itemCount).toBe(0);
+
+        // The clear is the half this test used to miss. It asserted the three
+        // values above and nothing about the table, so `insertMany([])` — which
+        // early-returns without clearing — satisfied it completely: the server
+        // said "you have no rewards", the stale rewards stayed, and the refresh
+        // reported a successful update. Pinning the reporting without pinning
+        // the write is what kept that invisible.
+        expect(rewardsRepository.replaceAllWithEmpty).toHaveBeenCalled();
+        expect(rewardsRepository.insertMany).not.toHaveBeenCalled();
+      });
+
+      // GUARD — passes before and after. Over-correction protection: the fix
+      // must not make the ordinary path stop writing.
+      it('writes rows and reports success when rewards arrive', async () => {
+        const rewards = [{ id: 'reward-1', name: 'Free Beer' }];
+        (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(fetchedRows(rewards));
+
+        const result = await fetchAndUpdateRewards();
+
+        expect(result.success).toBe(true);
+        expect(result.dataUpdated).toBe(true);
+        expect(rewardsRepository.insertMany).toHaveBeenCalledWith(rewards);
+      });
+    });
+
+    // Three call sites, three tests. Fixing two of three is indistinguishable
+    // from fixing none — the same reasoning plan 04 Phase 2 gives for its own
+    // triplicated ETag write.
+    describe('sequentialRefreshAllData', () => {
+      beforeEach(() => {
+        (fetchBeersFromAPI as jest.Mock).mockResolvedValue(
+          fetchedRows([{ id: 'beer-1', brew_name: 'Test IPA', brewer: 'Brewery 1' }])
+        );
+        (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(
+          fetchedRows([{ id: 'beer-1', brew_name: 'Test IPA', tasted_date: '2023-01-01' }])
+        );
+        (beerRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
+        (myBeersRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
+      });
+
+      it('reports rewards failure when the rewards fetch fails', async () => {
+        (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(failed());
+
+        const result = await sequentialRefreshAllData();
+
+        expect(result.rewardsResult.success).toBe(false);
+        expect(result.hasErrors).toBe(true);
+        // `allNetworkErrors` picks the softer "check your connection" alert over
+        // the generic one (useDataRefresh.ts:127). Nothing in this repo asserted
+        // it before these two tests, so threading a typed error through
+        // decideRewards was unverified end to end — telling "you're offline"
+        // from "something's misconfigured" is the point of doing it at all.
+        expect(result.allNetworkErrors).toBe(true);
+        expect(rewardsRepository.insertManyUnsafe).not.toHaveBeenCalled();
+      });
+
+      it('reports rewards failure when the rewards source is not configured', async () => {
+        (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(unavailable('not-configured'));
+
+        const result = await sequentialRefreshAllData();
+
+        expect(result.rewardsResult.success).toBe(false);
+        expect(result.rewardsResult.error?.type).toBe(ApiErrorType.VALIDATION_ERROR);
+        // A misconfiguration is NOT a network error — the other half of the pair.
+        expect(result.allNetworkErrors).toBe(false);
+        expect(rewardsRepository.insertManyUnsafe).not.toHaveBeenCalled();
+      });
+
+      /**
+       * A real visitor: BOTH member sources report not-applicable.
+       *
+       * The earlier version of these tests mocked `fetchMyBeersFromAPI` to return
+       * tasted-beer ROWS while calling itself a visitor test — a combination no
+       * visitor can produce. It asserted `hasErrors === false` and passed only
+       * because my-beers had succeeded, so it documented a property the system
+       * does not have.
+       */
+      const arrangeRealVisitor = (): void => {
+        (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(unavailable('not-applicable'));
+        (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(unavailable('not-applicable'));
+      };
+
+      describe('a real visitor refresh', () => {
+        it('does not report a rewards error for a visitor', async () => {
+          arrangeRealVisitor();
+
+          const result = await sequentialRefreshAllData();
+
+          // The property this phase actually controls.
+          expect(result.rewardsResult.success).toBe(true);
+          expect(result.rewardsResult.dataUpdated).toBe(false);
+        });
+
+        it('does not report a my-beers error for a visitor', async () => {
+          arrangeRealVisitor();
+
+          const result = await sequentialRefreshAllData();
+
+          // `not-applicable` means "this source does not apply to you", which is
+          // what visitor mode IS. Treating it as a failure put developer prose —
+          // "My beers unavailable (not-applicable): …" — into a user-facing Alert,
+          // because UNKNOWN_ERROR returns error.message verbatim.
+          expect(result.myBeersResult.success).toBe(true);
+          expect(result.myBeersResult.dataUpdated).toBe(false);
+        });
+
+        it('leaves the tasted table alone for a visitor', async () => {
+          arrangeRealVisitor();
+
+          await sequentialRefreshAllData();
+
+          // The distinction that must survive: `not-applicable` is not
+          // `confirmed-empty`. A visitor has no tasted list to clear, and clearing
+          // is correct ONLY when the server actually reported zero.
+          expect(myBeersRepository.replaceAllWithEmptyUnsafe).not.toHaveBeenCalled();
+          expect(myBeersRepository.insertManyUnsafe).not.toHaveBeenCalled();
+        });
+
+        it('raises no error alert at all for a visitor refresh', async () => {
+          arrangeRealVisitor();
+
+          const result = await sequentialRefreshAllData();
+
+          // The property plan 05 Phase 5.1's rationale is built on. It was only
+          // half true when 5.1 landed — rewards stopped raising an alert, my-beers
+          // still did — so this is the assertion that makes the rationale real.
+          expect(result.hasErrors).toBe(false);
+        });
+      });
+    });
+
+    describe('refreshAllDataFromAPI', () => {
+      beforeEach(() => {
+        (areApiUrlsConfigured as jest.Mock).mockResolvedValue(true);
+        (fetchBeersFromAPI as jest.Mock).mockResolvedValue(
+          fetchedRows([{ id: 'beer-1', brew_name: 'Test IPA', brewer: 'Brewery 1' }])
+        );
+        (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(
+          fetchedRows([{ id: 'beer-1', brew_name: 'Test IPA', tasted_date: '2023-01-01' }])
+        );
+        (beerRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
+        (myBeersRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
+      });
+
+      it('does not write rewards when the rewards fetch fails', async () => {
+        (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(failed());
+
+        const result = await refreshAllDataFromAPI();
+
+        // This entry point has no per-source success channel, so the only thing
+        // it can get wrong is writing on a non-answer. It must not.
+        expect(rewardsRepository.insertManyUnsafe).not.toHaveBeenCalled();
+        expect(result.rewards).toEqual([]);
+      });
+
+      it('does not let a failed rewards outcome escape refreshAllDataFromAPI', async () => {
+        (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(failed());
+
+        // Renamed from 'still writes the other sources when rewards fail', which
+        // could not fail for the reason its comment gave: rewards is the LAST
+        // source, so the beer and my-beers writes have already landed before it
+        // is even fetched. No rewards behaviour can un-write them. The property
+        // genuinely at risk is the new `throw` on a failed outcome escaping its
+        // own catch, which is what this asserts.
+        await expect(refreshAllDataFromAPI()).resolves.toBeDefined();
+
+        expect(beerRepository.insertManyUnsafe).toHaveBeenCalled();
+        expect(myBeersRepository.insertManyUnsafe).toHaveBeenCalled();
+      });
+
+      it('treats a not-applicable my-beers source as a skip, not a failure', async () => {
+        (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(unavailable('not-applicable'));
+
+        const result = await refreshAllDataFromAPI();
+
+        expect(myBeersRepository.insertManyUnsafe).not.toHaveBeenCalled();
+        expect(result.myBeers).toEqual([]);
+        // This is the autoLogin -> checkInBeer path, so throwing here logged an
+        // error on every visitor login. Same assertion shape as the rewards case:
+        // skip and fail are otherwise indistinguishable at a site with no success
+        // channel.
+        expect(logError).not.toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({ operation: 'refreshAllDataFromAPI - my beers' })
+        );
+      });
+
+      it('labels its failures with its own entry point, not the sequential one', async () => {
+        (fetchBeersFromAPI as jest.Mock).mockRejectedValue(new Error('network fail'));
+
+        await refreshAllDataFromAPI();
+
+        // The `prepare*` phase is shared with sequentialRefreshAllData, and the
+        // operation label is the only thing that tells a reader which entry
+        // point a failure came from. `RefreshOperation` stops an INVALID label
+        // being passed; nothing stopped the wrong VALID one — swapping
+        // REFRESH_FROM_API for SEQUENTIAL_REFRESH here left every test green,
+        // on the path whose only output channel is the log.
+        expect(logError).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({ operation: 'refreshAllDataFromAPI - all beers' })
+        );
+      });
+
+      it('logs a rewards failure on a path that has nowhere else to report it', async () => {
+        (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(failed());
+
+        await refreshAllDataFromAPI();
+
+        // This entry point returns rows and has NO per-source success channel,
+        // so `rewards: []` is indistinguishable from "you have no rewards" to
+        // every caller. The log is therefore the only trace a rewards fetch
+        // failed at all — which is why the old inline block carried a dedicated
+        // logWarning, and why routing this path through the shared
+        // prepareRewards silently deleted the only signal there was.
+        //
+        // logWarning, not logError, so that skip and fail stay distinguishable
+        // exactly as the two tests below assert: skip logs nothing.
+        expect(logWarning).toHaveBeenCalledWith(
+          expect.stringContaining('Rewards refresh failed'),
+          expect.objectContaining({ operation: 'refreshAllDataFromAPI - rewards' })
+        );
+      });
+
+      it('treats a not-applicable rewards source as a skip, not a failure', async () => {
+        (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(unavailable('not-applicable'));
+
+        const result = await refreshAllDataFromAPI();
+
+        expect(rewardsRepository.insertManyUnsafe).not.toHaveBeenCalled();
+        expect(result.rewards).toEqual([]);
+        // The only assertion that can tell skip from fail at a site with no
+        // success channel: both leave `rewards` empty and write nothing, and
+        // differ ONLY in whether the error path was taken. This is the
+        // autoLogin -> checkInBeer path, so a visitor or a none:// placeholder
+        // would otherwise silently log an error on every check-in.
+        expect(logError).not.toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({ operation: 'refreshAllDataFromAPI - rewards' })
+        );
+      });
     });
   });
 
@@ -908,9 +1440,9 @@ describe('dataUpdateService', () => {
 
     it('acquires lock and releases it on success', async () => {
       (getPreference as jest.Mock).mockResolvedValue(null);
-      (fetchBeersFromAPI as jest.Mock).mockResolvedValue(mockAllBeers);
-      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(mockMyBeers);
-      (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(mockRewards);
+      (fetchBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockAllBeers));
+      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockMyBeers));
+      (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockRewards));
       (beerRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
       (myBeersRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
       (rewardsRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
@@ -918,29 +1450,43 @@ describe('dataUpdateService', () => {
 
       await sequentialRefreshAllData();
 
-      expect(databaseLockManager.acquireLock).toHaveBeenCalledWith('refresh-all-data-sequential');
-      expect(databaseLockManager.releaseLock).toHaveBeenCalledWith('refresh-all-data-sequential');
+      // Renamed from 'refresh-all-data-sequential' by plan 05 Phase 5.4. The
+      // lock no longer spans the sequence — the fetches run outside it — so a
+      // name claiming it does would misdescribe every log line and every
+      // contention report it appears in.
+      expect(databaseLockManager.withDatabaseLock).toHaveBeenCalledWith(
+        'refresh-all-data-write',
+        expect.any(Function)
+      );
     });
 
     it('releases lock even when an operation fails', async () => {
       (getPreference as jest.Mock).mockResolvedValue(null);
       (fetchBeersFromAPI as jest.Mock).mockRejectedValue(new Error('network fail'));
-      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(mockMyBeers);
-      (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(mockRewards);
+      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockMyBeers));
+      (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockRewards));
       (myBeersRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
       (rewardsRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
       (setPreference as jest.Mock).mockResolvedValue(undefined);
 
       await sequentialRefreshAllData();
 
-      expect(databaseLockManager.releaseLock).toHaveBeenCalledWith('refresh-all-data-sequential');
+      // Asserts the lock is actually free, not merely that the wrapper was
+      // called. The manager behind this mock is real, so deleting the finally
+      // from withDatabaseLock fails this.
+      expect(databaseLockManager.withDatabaseLock).toHaveBeenCalledWith(
+        'refresh-all-data-write',
+        expect.any(Function)
+      );
+      expect(databaseLockManager.isLocked()).toBe(false);
+      expect(databaseLockManager.getQueueLength()).toBe(0);
     });
 
     it('returns hasErrors=false when all operations succeed', async () => {
       (getPreference as jest.Mock).mockResolvedValue(null);
-      (fetchBeersFromAPI as jest.Mock).mockResolvedValue(mockAllBeers);
-      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(mockMyBeers);
-      (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(mockRewards);
+      (fetchBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockAllBeers));
+      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockMyBeers));
+      (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockRewards));
       (beerRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
       (myBeersRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
       (rewardsRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
@@ -957,8 +1503,8 @@ describe('dataUpdateService', () => {
     it('reports error in allBeersResult when all beers fetch fails', async () => {
       (getPreference as jest.Mock).mockResolvedValue(null);
       (fetchBeersFromAPI as jest.Mock).mockRejectedValue(new Error('fetch fail'));
-      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(mockMyBeers);
-      (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(mockRewards);
+      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockMyBeers));
+      (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockRewards));
       (myBeersRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
       (rewardsRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
       (setPreference as jest.Mock).mockResolvedValue(undefined);
@@ -973,8 +1519,8 @@ describe('dataUpdateService', () => {
 
     it('reports error in rewardsResult when rewards fetch fails', async () => {
       (getPreference as jest.Mock).mockResolvedValue(null);
-      (fetchBeersFromAPI as jest.Mock).mockResolvedValue(mockAllBeers);
-      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(mockMyBeers);
+      (fetchBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockAllBeers));
+      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockMyBeers));
       (fetchRewardsFromAPI as jest.Mock).mockRejectedValue(new Error('rewards fail'));
       (beerRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
       (myBeersRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
@@ -1004,8 +1550,8 @@ describe('dataUpdateService', () => {
         ],
         cached: false,
       });
-      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(mockMyBeers);
-      (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(mockRewards);
+      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockMyBeers));
+      (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockRewards));
       (beerRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
       (myBeersRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
       (rewardsRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
@@ -1022,9 +1568,9 @@ describe('dataUpdateService', () => {
       (getPreference as jest.Mock).mockResolvedValue(storeUrl);
       (config.enrichment.isConfigured as jest.Mock).mockReturnValue(true);
       (fetchBeersFromProxy as jest.Mock).mockRejectedValue(new Error('proxy down'));
-      (fetchBeersFromAPI as jest.Mock).mockResolvedValue(mockAllBeers);
-      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(mockMyBeers);
-      (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(mockRewards);
+      (fetchBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockAllBeers));
+      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockMyBeers));
+      (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockRewards));
       (beerRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
       (myBeersRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
       (rewardsRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
@@ -1037,10 +1583,17 @@ describe('dataUpdateService', () => {
     });
 
     it('sets last_update and last_check preferences on success', async () => {
-      (getPreference as jest.Mock).mockResolvedValue(null);
-      (fetchBeersFromAPI as jest.Mock).mockResolvedValue(mockAllBeers);
-      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(mockMyBeers);
-      (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(mockRewards);
+      // A configured taplist URL, not null. `fetchBeersFromAPI` below returns rows,
+      // and in production that is only possible when this key is set — an absent URL
+      // makes it return `unavailable('not-configured')`. With null the pair is an
+      // impossible state, and the all-beers write is now correctly refused, because
+      // rows that cannot be attributed to a store must not be committed.
+      (getPreference as jest.Mock).mockImplementation(async (key: string) =>
+        key === 'all_beers_api_url' ? 'https://example.com/allbeers.json' : null
+      );
+      (fetchBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockAllBeers));
+      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockMyBeers));
+      (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockRewards));
       (beerRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
       (myBeersRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
       (rewardsRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
@@ -1069,35 +1622,55 @@ describe('dataUpdateService', () => {
     it('acquires lock and releases it on success', async () => {
       (areApiUrlsConfigured as jest.Mock).mockResolvedValue(true);
       (getPreference as jest.Mock).mockResolvedValue(null);
-      (fetchBeersFromAPI as jest.Mock).mockResolvedValue(mockAllBeers);
-      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(mockMyBeers);
-      (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(mockRewards);
+      (fetchBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockAllBeers));
+      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockMyBeers));
+      (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockRewards));
       (beerRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
       (myBeersRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
       (rewardsRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
 
       await refreshAllDataFromAPI();
 
-      expect(databaseLockManager.acquireLock).toHaveBeenCalledWith('refresh-all-from-api');
-      expect(databaseLockManager.releaseLock).toHaveBeenCalledWith('refresh-all-from-api');
+      // Renamed from 'refresh-all-from-api' by plan 05 Phase 5.5: the lock no
+      // longer spans the sequence, only the write burst.
+      expect(databaseLockManager.withDatabaseLock).toHaveBeenCalledWith(
+        'refresh-all-from-api-write',
+        expect.any(Function)
+      );
     });
 
     it('releases lock when fetch throws', async () => {
       (areApiUrlsConfigured as jest.Mock).mockResolvedValue(true);
       (getPreference as jest.Mock).mockResolvedValue(null);
       (fetchBeersFromAPI as jest.Mock).mockRejectedValue(new Error('network fail'));
+      // Now reachable: the other sources run even when all-beers fails.
+      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows([]));
+      (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(fetchedRows([]));
 
-      await expect(refreshAllDataFromAPI()).rejects.toThrow();
+      // INVERTED by plan 02 Phase 2.5 — a failing source no longer aborts the
+      // function. INVERTED AGAIN by 05 Phase 5.5: with all-beers failing and
+      // the other two sources confirmed-empty, my-beers clears and rewards
+      // writes nothing, so the lock IS still taken — but for the write burst
+      // alone, after every fetch has finished.
+      await refreshAllDataFromAPI();
 
-      expect(databaseLockManager.releaseLock).toHaveBeenCalledWith('refresh-all-from-api');
+      expect(databaseLockManager.withDatabaseLock).toHaveBeenCalledWith(
+        'refresh-all-from-api-write',
+        expect.any(Function)
+      );
+      // Asserts the lock is actually free, not merely that the wrapper was
+      // called. The manager behind this mock is real, so deleting the finally
+      // from withDatabaseLock fails this.
+      expect(databaseLockManager.isLocked()).toBe(false);
+      expect(databaseLockManager.getQueueLength()).toBe(0);
     });
 
     it('returns all beers, my beers, and rewards on success', async () => {
       (areApiUrlsConfigured as jest.Mock).mockResolvedValue(true);
       (getPreference as jest.Mock).mockResolvedValue(null);
-      (fetchBeersFromAPI as jest.Mock).mockResolvedValue(mockAllBeers);
-      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(mockMyBeers);
-      (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(mockRewards);
+      (fetchBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockAllBeers));
+      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockMyBeers));
+      (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockRewards));
       (beerRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
       (myBeersRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
       (rewardsRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
@@ -1112,9 +1685,13 @@ describe('dataUpdateService', () => {
     it('throws when all beers response is empty', async () => {
       (areApiUrlsConfigured as jest.Mock).mockResolvedValue(true);
       (getPreference as jest.Mock).mockResolvedValue(null);
-      (fetchBeersFromAPI as jest.Mock).mockResolvedValue([]);
+      (fetchBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows([]));
 
-      await expect(refreshAllDataFromAPI()).rejects.toThrow('No valid all beers found');
+      // INVERTED by plan 02 Phase 2.5: an empty taplist still fails ITS source
+      // and writes nothing for it, but no longer aborts my-beers and rewards.
+      await expect(refreshAllDataFromAPI()).resolves.toBeDefined();
+
+      expect(beerRepository.insertManyUnsafe).not.toHaveBeenCalled();
     });
 
     it('uses proxy for all beers when enrichment is configured', async () => {
@@ -1135,8 +1712,8 @@ describe('dataUpdateService', () => {
         ],
         cached: false,
       });
-      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(mockMyBeers);
-      (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(mockRewards);
+      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockMyBeers));
+      (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockRewards));
       (beerRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
       (myBeersRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
       (rewardsRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
@@ -1153,9 +1730,9 @@ describe('dataUpdateService', () => {
       (getPreference as jest.Mock).mockResolvedValue(storeUrl);
       (config.enrichment.isConfigured as jest.Mock).mockReturnValue(true);
       (fetchBeersFromProxy as jest.Mock).mockRejectedValue(new Error('proxy down'));
-      (fetchBeersFromAPI as jest.Mock).mockResolvedValue(mockAllBeers);
-      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(mockMyBeers);
-      (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(mockRewards);
+      (fetchBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockAllBeers));
+      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockMyBeers));
+      (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockRewards));
       (beerRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
       (myBeersRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
       (rewardsRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
@@ -1170,9 +1747,9 @@ describe('dataUpdateService', () => {
       (areApiUrlsConfigured as jest.Mock).mockResolvedValue(true);
       (getPreference as jest.Mock).mockResolvedValue(null);
       (config.enrichment.isConfigured as jest.Mock).mockReturnValue(true);
-      (fetchBeersFromAPI as jest.Mock).mockResolvedValue(mockAllBeers);
-      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(mockMyBeers);
-      (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(mockRewards);
+      (fetchBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockAllBeers));
+      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockMyBeers));
+      (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockRewards));
       (fetchEnrichmentBatchWithMissing as jest.Mock).mockResolvedValue({
         enrichments: { 'beer-1': { enriched_abv: 5.5 } },
         missing: [],
@@ -1370,9 +1947,9 @@ describe('dataUpdateService', () => {
         const { config: mockConfig } = require('@/src/config');
         mockConfig.enrichment.isConfigured.mockReturnValue(false);
 
-        (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce([
-          { id: '1', brew_name: 'Test', brewer: 'Brewer' },
-        ]);
+        (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce(
+          fetchedRows([{ id: '1', brew_name: 'Test', brewer: 'Brewer' }])
+        );
 
         const result = await fetchTaplistFromProxyOrDirect('13879');
 
@@ -1457,10 +2034,19 @@ describe('dataUpdateService', () => {
 
         await fetchAndUpdateAllBeers();
 
-        expect(setPreference).toHaveBeenCalledWith('all_beers_etag', '"new-etag"');
+        expect(setPreference).toHaveBeenCalledWith(
+          'all_beers_etag',
+          '"new-etag"',
+          expect.any(String)
+        );
       });
 
-      it('should NOT store ETag after 200 from proxy with no ETag header', async () => {
+      // INVERTED by plan 04 Phase 2. "should NOT store" was accurate under the
+      // old design, where not-storing and not-clearing were the same act. Under
+      // the invariant they are opposites: a 200 carrying no ETag cannot be
+      // revalidated later, so leaving the previous one in place names data the
+      // table no longer holds.
+      it('clears the stored ETag after a 200 from the proxy with no ETag header', async () => {
         const { config: mockConfig } = require('@/src/config');
         mockConfig.enrichment.isConfigured.mockReturnValue(true);
 
@@ -1484,10 +2070,12 @@ describe('dataUpdateService', () => {
 
         await fetchAndUpdateAllBeers();
 
-        expect(setPreference).not.toHaveBeenCalledWith('all_beers_etag', expect.anything());
+        expect(setPreference).toHaveBeenCalledWith('all_beers_etag', '', expect.any(String));
       });
 
-      it('should NOT store ETag after 200 from direct Flying Saucer fetch', async () => {
+      // INVERTED by plan 04 Phase 2, same reasoning: a fallback write must
+      // actively invalidate the ETag rather than merely decline to set one.
+      it('clears the stored ETag after a 200 from the direct Flying Saucer fetch', async () => {
         const { config: mockConfig } = require('@/src/config');
         mockConfig.enrichment.isConfigured.mockReturnValue(false);
 
@@ -1497,17 +2085,88 @@ describe('dataUpdateService', () => {
           return Promise.resolve(null);
         });
 
-        (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce([
-          { id: '1', brew_name: 'Test IPA', brewer: 'Test Brewery' },
-        ]);
+        (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce(
+          fetchedRows([{ id: '1', brew_name: 'Test IPA', brewer: 'Test Brewery' }])
+        );
 
         (beerRepository.insertMany as jest.Mock).mockResolvedValueOnce(undefined);
         (setPreference as jest.Mock).mockResolvedValue(undefined);
 
         await fetchAndUpdateAllBeers();
 
-        expect(setPreference).not.toHaveBeenCalledWith('all_beers_etag', expect.anything());
+        expect(setPreference).toHaveBeenCalledWith('all_beers_etag', '', expect.any(String));
       });
     });
+  });
+});
+
+describe('refreshAllDataFromAPI per-source isolation', () => {
+  const mockAllBeers: Beer[] = [{ id: 'beer-1', brew_name: 'Test IPA', brewer: 'Brewery 1' }];
+  const mockMyBeers = [{ id: 'beer-1', brew_name: 'Test IPA', tasted_date: '2023-01-01' }];
+  const mockRewards = [{ id: 'reward-1', name: 'Free Beer' }];
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (areApiUrlsConfigured as jest.Mock).mockResolvedValue(true);
+    // A configured taplist URL, not null. `fetchBeersFromAPI` below returns rows,
+    // and in production that is only possible when this key is set — an absent URL
+    // makes it return `unavailable('not-configured')`. With null the pair is an
+    // impossible state, and the all-beers write is now correctly refused, because
+    // rows that cannot be attributed to a store must not be committed.
+    (getPreference as jest.Mock).mockImplementation(async (key: string) =>
+      key === 'all_beers_api_url' ? 'https://example.com/allbeers.json' : null
+    );
+    (setPreference as jest.Mock).mockResolvedValue(undefined);
+  });
+
+  // The live scenario: CHECK IN with an expired session on a weak link.
+  // checkInBeer -> autoLogin -> refreshAllDataFromAPI. The taplist write
+  // succeeds, then the my-beers fetch throws, and the throw escapes past BOTH
+  // the my-beers write and the rewards write. autoLogin logs and returns
+  // success, the check-in proceeds, and the user is left with a fresh taplist,
+  // a stale tasted list, and stale rewards — a wrong-high Beerfinder count.
+  it('still writes rewards when the my-beers fetch fails', async () => {
+    (fetchBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockAllBeers));
+    (fetchMyBeersFromAPI as jest.Mock).mockRejectedValue(new Error('network timeout'));
+    (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockRewards));
+
+    await refreshAllDataFromAPI();
+
+    expect(rewardsRepository.insertManyUnsafe).toHaveBeenCalled();
+  });
+
+  it('preserves the all-beers write when the my-beers fetch fails', async () => {
+    (fetchBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockAllBeers));
+    (fetchMyBeersFromAPI as jest.Mock).mockRejectedValue(new Error('network timeout'));
+    (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockRewards));
+
+    await expect(refreshAllDataFromAPI()).resolves.toBeDefined();
+
+    expect(beerRepository.insertManyUnsafe).toHaveBeenCalled();
+  });
+
+  it('still writes the taplist and rewards when the rewards fetch fails', async () => {
+    (fetchBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockAllBeers));
+    (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockMyBeers));
+    (fetchRewardsFromAPI as jest.Mock).mockRejectedValue(new Error('network timeout'));
+
+    await refreshAllDataFromAPI();
+
+    expect(beerRepository.insertManyUnsafe).toHaveBeenCalled();
+    expect(myBeersRepository.insertManyUnsafe).toHaveBeenCalled();
+  });
+
+  // GUARD — passes today via the existing finally. Not this phase's RED.
+  it('releases the master lock when a source fails', async () => {
+    (fetchBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockAllBeers));
+    (fetchMyBeersFromAPI as jest.Mock).mockRejectedValue(new Error('network timeout'));
+    (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockRewards));
+
+    // Tolerates the rejection deliberately: this must pass BOTH today (where
+    // the function still rejects) and after the fix (where it does not), or it
+    // is not a guard — it would just be another RED wearing a GUARD label.
+    await refreshAllDataFromAPI().catch(() => undefined);
+
+    expect(databaseLockManager.isLocked()).toBe(false);
   });
 });

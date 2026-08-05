@@ -19,8 +19,14 @@ appId: org.verily.FSbeerselector
 # ==============================================================================
 # TEST 1: Queue Operation When Offline
 # ==============================================================================
+# ASSUMPTION, not a correction. This referenced `./login-flow.yaml`, which does
+# not exist and is not in the git history — so this step has never run and there
+# is no previous behaviour to restore. `06-login-flow-member.yaml` is the
+# inferred intent: the queue operations below require an authenticated member,
+# and the visitor flow cannot check in a beer. If that inference is wrong, this
+# is the line to change.
 - runFlow:
-    file: ./login-flow.yaml
+    file: ./06-login-flow-member.yaml
     when:
       visible: "Settings"
 
@@ -28,7 +34,7 @@ appId: org.verily.FSbeerselector
 - assertVisible: "Beerfinder"
 
 # Simulate going offline
-- setAirplaneMode: true
+- setAirplaneMode: enabled
 - waitForAnimationToEnd
 
 # Try to check in a beer
@@ -67,11 +73,17 @@ appId: org.verily.FSbeerselector
 # TEST 3: Auto-Retry When Connection Restored
 # ==============================================================================
 # Go back online
-- setAirplaneMode: false
+- setAirplaneMode: disabled
 - waitForAnimationToEnd
 
 # Wait for auto-retry (2 second debounce + execution time)
-- wait: 5000
+# `wait: 5000` was here, and it aborted the whole suite: Maestro has no `wait`
+# command, and one invalid command anywhere in this directory stops every flow
+# in it from running. See "How Maestro validates this suite", points 1-2, in
+# README.md. `waitForAnimationToEnd` is a ceiling, not a fixed sleep — it
+# returns as soon as animations settle, so this is not what was written.
+- waitForAnimationToEnd:
+    timeout: 5000
 
 # Queued operations indicator should disappear or show success
 # Note: This depends on whether the check-in succeeds
@@ -81,7 +93,7 @@ appId: org.verily.FSbeerselector
 # TEST 4: Manual Retry of Operation
 # ==============================================================================
 # Go offline again
-- setAirplaneMode: true
+- setAirplaneMode: enabled
 - waitForAnimationToEnd
 
 # Queue another operation
@@ -102,7 +114,8 @@ appId: org.verily.FSbeerselector
     text: "Retry"
     index: 0
 
-- wait: 2000
+- waitForAnimationToEnd:
+    timeout: 2000
 
 # Should still show as pending or failed
 - assertVisible:
@@ -123,7 +136,8 @@ appId: org.verily.FSbeerselector
     index: 0
 
 # Should remove from list
-- wait: 1000
+- waitForAnimationToEnd:
+    timeout: 1000
 
 # ==============================================================================
 # TEST 6: Clear All Queued Operations
@@ -138,7 +152,8 @@ appId: org.verily.FSbeerselector
 - tapOn: "Clear All"
 
 # Modal should close
-- wait: 1000
+- waitForAnimationToEnd:
+    timeout: 1000
 
 # Indicator should disappear
 - assertNotVisible:
@@ -147,5 +162,5 @@ appId: org.verily.FSbeerselector
 # ==============================================================================
 # CLEANUP: Restore Network
 # ==============================================================================
-- setAirplaneMode: false
+- setAirplaneMode: disabled
 - waitForAnimationToEnd

@@ -3,9 +3,14 @@
  */
 
 import { DatabaseLockManager, databaseLockManager } from '../locks';
+import { nameKeyedLock, NameKeyedLock } from './helpers/nameKeyedLock';
 
-function createLockManager(): DatabaseLockManager {
-  return new DatabaseLockManager();
+// These suites identify operations by name, which is what they assert about.
+// The shim maps names to tokens; ownership is covered in
+// DatabaseLockManager.ownership.test.ts against the real API.
+function createLockManager(): DatabaseLockManager & NameKeyedLock {
+  const manager = new DatabaseLockManager();
+  return Object.assign(manager, nameKeyedLock(manager));
 }
 
 describe('DatabaseLockManager', () => {
@@ -65,8 +70,11 @@ describe('DatabaseLockManager', () => {
       expect(result).toBe(true);
     });
 
-    it('should log lock release', () => {
+    it('should log lock release', async () => {
       const lockManager = createLockManager();
+      // Acquires first: releasing a lock this caller never held is now a no-op
+      // by design, so the old version of this test pinned the wrong behaviour.
+      await lockManager.acquireLock('test-operation');
       const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
 
       lockManager.releaseLock('test-operation');
@@ -232,7 +240,7 @@ describe('DatabaseLockManager', () => {
       const promises = [
         lockManager.acquireLock('operation2'),
         lockManager.acquireLock('operation3'),
-        lockManager.acquireLock('operation4')
+        lockManager.acquireLock('operation4'),
       ];
 
       expect(lockManager.getQueueLength()).toBe(3);
@@ -274,12 +282,14 @@ describe('DatabaseLockManager', () => {
     });
 
     it('should maintain state in singleton instance', async () => {
-      await databaseLockManager.acquireLock('singleton-test');
+      // Uses the real token API rather than the shim — this is the exported
+      // singleton, and production reaches it the same way.
+      const token = await databaseLockManager.acquire('singleton-test');
 
       expect(databaseLockManager.isLocked()).toBe(true);
       expect(databaseLockManager.getCurrentOperation()).toBe('singleton-test');
 
-      databaseLockManager.releaseLock('singleton-test');
+      databaseLockManager.release(token);
 
       expect(databaseLockManager.isLocked()).toBe(false);
     });
@@ -398,7 +408,9 @@ describe('DatabaseLockManager', () => {
 
       await lockManager.acquireLock('debug-test');
 
-      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('[LockManager] Lock acquired immediately for: debug-test'));
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[LockManager] Lock acquired immediately for: debug-test')
+      );
 
       lockManager.releaseLock('debug-test');
       lockManager.setDebugLogging(false);
@@ -417,7 +429,9 @@ describe('DatabaseLockManager', () => {
       lockManager.releaseLock('operation1');
       await promise2;
 
-      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringMatching(/\[LockManager\] Lock acquired for: operation2 \(waited \d+ms\)/));
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringMatching(/\[LockManager\] Lock acquired for: operation2 \(waited \d+ms\)/)
+      );
 
       lockManager.releaseLock('operation2');
       lockManager.setDebugLogging(false);
@@ -439,7 +453,9 @@ describe('DatabaseLockManager', () => {
       }
 
       // Should have warned on the 5th queued operation
-      expect(consoleWarnSpy).toHaveBeenCalledWith(expect.stringContaining('Queue length is 5, exceeding threshold of 5'));
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Queue length is 5, exceeding threshold of 5')
+      );
 
       // Cleanup
       lockManager.releaseLock('operation1');

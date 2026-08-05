@@ -5,7 +5,9 @@
  * tasted beers, and rewards from the Flying Saucer API.
  */
 
-// Speed up retry tests by setting shorter delay BEFORE config is loaded
+// NOTE: this assignment runs AFTER the hoisted imports, so config has already
+// been frozen at its default. Retry tests pass an explicit delay instead; this
+// line is inert and kept only because removing it is a separate change.
 import {
   fetchWithRetry,
   fetchBeersFromAPI,
@@ -14,6 +16,7 @@ import {
 } from '../beerApi';
 import * as preferences from '../../database/preferences';
 import { config } from '@/src/config';
+import type { FetchOutcome, FetchedSource } from '../fetchOutcome';
 
 process.env.EXPO_PUBLIC_API_RETRY_DELAY = '10';
 
@@ -22,6 +25,19 @@ jest.mock('../../database/preferences');
 
 // Mock global fetch
 global.fetch = jest.fn();
+
+/**
+ * Assert a request completed and return its payload outcome.
+ *
+ * The three fetchers return `FetchedSource<FetchOutcome<T>>`: the outer union
+ * says what happened to the REQUEST, the inner what the BODY contained.
+ */
+function payload<T>(source: FetchedSource<FetchOutcome<T>>): FetchOutcome<T> {
+  if (source.status !== 'fetched') {
+    throw new Error(`expected a fetched source, got "${source.status}"`);
+  }
+  return source.data;
+}
 
 describe('Beer API', () => {
   beforeEach(() => {
@@ -51,17 +67,31 @@ describe('Beer API', () => {
       const resultPromise = fetchWithRetry(config.api.baseUrl);
       const result = await resultPromise;
 
-      expect(global.fetch).toHaveBeenCalledWith(config.api.baseUrl);
+      // The signal arrived with plan 05 Phase 5.0; the timeout behaviour it
+      // carries is pinned in beerApi.timeout.test.ts. Asserted here only so this
+      // test keeps describing the real call.
+      expect(global.fetch).toHaveBeenCalledWith(config.api.baseUrl, {
+        signal: expect.any(AbortSignal),
+      });
       expect(result).toEqual(mockData);
     });
 
-    it('should handle none:// protocol URLs by returning empty data', async () => {
-      const resultPromise = fetchWithRetry('none://placeholder');
-      const result = await resultPromise;
-
-      expect(global.fetch).not.toHaveBeenCalled();
-      expect(result).toEqual([null, { tasted_brew_current_round: [] }]);
-    });
+    // DELETED, not skipped: 'should handle none:// protocol URLs by returning
+    // empty data'. It asserted the synthesised `[null, {
+    // tasted_brew_current_round: [] }]` that plan 02 Phase 3 removed, so it
+    // could never be un-skipped — its body described behaviour that no longer
+    // exists, and leaving it in place invited someone to "repair" the suite by
+    // restoring the fabrication.
+    //
+    // It was kept skipped on the grounds that deleting it would leave the
+    // removal unpinned. That no longer holds: `integration.mockServer.test.ts`
+    // now hands a none:// URL straight to `fetchWithRetry` and requires a
+    // rejection, and mutation testing confirms it is the ONLY test in the suite
+    // that dies when the synthesis is restored — 241 tests across all 14
+    // `src/api/__tests__` suites stay green, this one does not.
+    //
+    // The replacement behaviour — callers rejecting none:// before the request
+    // — stays pinned by 'reports not-applicable for a none:// URL' below.
 
     it('should retry on fetch failure', async () => {
       const mockData = { brewInStock: [] };
@@ -129,7 +159,9 @@ describe('Beer API', () => {
 
       const resultPromise = fetchWithRetry(config.api.baseUrl, 1, 10);
 
-      await expect(resultPromise).rejects.toThrow('Failed to fetch: 404 Not Found');
+      // HttpError, so createErrorResponse classifies by type rather than reading
+      // 'Failed to fetch' out of the message and calling it a network error.
+      await expect(resultPromise).rejects.toThrow('HTTP 404 Not Found');
     });
   });
 
@@ -139,7 +171,8 @@ describe('Beer API', () => {
 
       const result = await fetchBeersFromAPI();
 
-      expect(result).toEqual([]);
+      // Was []. Now says WHY there is nothing, which is the whole point.
+      expect(result.status).toBe('unavailable');
       expect(global.fetch).not.toHaveBeenCalled();
     });
 
@@ -158,7 +191,9 @@ describe('Beer API', () => {
 
       const result = await fetchBeersFromAPI();
 
-      expect(result).toEqual(mockBeers);
+      const body = payload(result);
+      expect(body.kind).toBe('data');
+      if (body.kind === 'data') expect(body.items).toEqual(mockBeers);
       expect(preferences.getPreference).toHaveBeenCalledWith('all_beers_api_url');
     });
 
@@ -178,10 +213,29 @@ describe('Beer API', () => {
 
       const result = await fetchBeersFromAPI();
 
-      expect(result).toEqual(mockBeers);
+      const body = payload(result);
+      expect(body.kind).toBe('data');
+      if (body.kind === 'data') expect(body.items).toEqual(mockBeers);
     });
 
-    it('should throw error when no beer data found in response', async () => {
+    it('reports confirmed-empty when brewInStock is present but empty', async () => {
+      // A store that genuinely has nothing on tap answers with a well-formed
+      // body and a zero-length array. That is the server reporting none, which
+      // the outcome model calls `confirmed-empty` — not a fact about the body
+      // being unusable. Classifying it `malformed` sent a plain Error up
+      // `requireRows` and the user saw UNKNOWN_ERROR for a working server.
+      const mockResponse = [{}, { brewInStock: [] }];
+
+      (preferences.getPreference as jest.Mock).mockResolvedValue(config.api.baseUrl);
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockResponse,
+      });
+
+      expect(payload(await fetchBeersFromAPI()).kind).toBe('confirmed-empty');
+    });
+
+    it('reports malformed when no beer data is found in the response', async () => {
       const mockResponse = { someOtherData: 'value' };
 
       (preferences.getPreference as jest.Mock).mockResolvedValue(config.api.baseUrl);
@@ -190,17 +244,20 @@ describe('Beer API', () => {
         json: async () => mockResponse,
       });
 
-      await expect(fetchBeersFromAPI()).rejects.toThrow('Invalid response format from API');
+      // INVERTED by plan 05 Phase 5.3. A body arrived and was unusable, which is
+      // `fetched` + `malformed` — a fact about the body, not the request.
+      expect(payload(await fetchBeersFromAPI()).kind).toBe('malformed');
     });
 
-    it('should propagate fetch errors', async () => {
+    it('reports failed when the fetch rejects', async () => {
       (preferences.getPreference as jest.Mock).mockResolvedValue(config.api.baseUrl);
       // Mock fetch to always reject
       (global.fetch as jest.Mock).mockImplementation(() =>
         Promise.reject(new Error('Network error'))
       );
 
-      await expect(fetchBeersFromAPI()).rejects.toThrow('Network error');
+      // INVERTED by plan 05 Phase 5.3: transport failures arrive as `failed`.
+      expect((await fetchBeersFromAPI()).status).toBe('failed');
     });
   });
 
@@ -213,7 +270,8 @@ describe('Beer API', () => {
 
       const result = await fetchMyBeersFromAPI();
 
-      expect(result).toEqual([]);
+      // Was []. Each of these conditions now names itself.
+      expect(result.status).toBe('unavailable');
       expect(global.fetch).not.toHaveBeenCalled();
     });
 
@@ -226,7 +284,8 @@ describe('Beer API', () => {
 
       const result = await fetchMyBeersFromAPI();
 
-      expect(result).toEqual([]);
+      // Was []. Each of these conditions now names itself.
+      expect(result.status).toBe('unavailable');
       expect(global.fetch).not.toHaveBeenCalled();
     });
 
@@ -239,8 +298,42 @@ describe('Beer API', () => {
 
       const result = await fetchMyBeersFromAPI();
 
-      expect(result).toEqual([]);
+      // Was []. Each of these conditions now names itself.
+      expect(result.status).toBe('unavailable');
       expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    // SUPERSEDED by plan 02 Phase 3. Phase 2 bridged this with a throw because
+    // the return type had no way to say "a body arrived and was unusable".
+    // `malformed` is that way, so the caller decides instead of being forced to
+    // catch. The MalformedResponseError type is retired with it.
+    it('reports malformed rather than [] when every row lacks an id', async () => {
+      (preferences.getPreference as jest.Mock).mockImplementation((key: string) => {
+        if (key === 'is_visitor_mode') return Promise.resolve('false');
+        if (key === 'my_beers_api_url') return Promise.resolve('https://example.com/my.json');
+        return Promise.resolve(null);
+      });
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => [
+          {},
+          { tasted_brew_current_round: [{ brew_name: 'no id' }, { brew_name: 'nor here' }] },
+        ],
+      });
+
+      // This is where the distinguishing information was destroyed. Returning
+      // [] here made a malformed response indistinguishable from a genuine
+      // empty round for EVERY caller downstream — so no caller-side length
+      // check could tell them apart, and both callers wiped the tasted table.
+      //
+      // Asserts the TYPE, not just the message: an untyped Error carries the
+      // same text but falls through createErrorResponse to UNKNOWN_ERROR, and
+      // the developer prose then reaches the user's refresh alert verbatim.
+      const outcome = await fetchMyBeersFromAPI();
+
+      const body = payload(outcome);
+      expect(body.kind).toBe('malformed');
+      if (body.kind === 'malformed') expect(body.detail).toMatch(/none carried an id/i);
     });
 
     it('should fetch and return tasted beers', async () => {
@@ -263,7 +356,9 @@ describe('Beer API', () => {
 
       const result = await fetchMyBeersFromAPI();
 
-      expect(result).toEqual(mockBeers);
+      const body = payload(result);
+      expect(body.kind).toBe('data');
+      if (body.kind === 'data') expect(body.items).toEqual(mockBeers);
       expect(preferences.getPreference).toHaveBeenCalledWith('my_beers_api_url');
     });
 
@@ -283,7 +378,11 @@ describe('Beer API', () => {
 
       const result = await fetchMyBeersFromAPI();
 
-      expect(result).toEqual([]);
+      // Was []. Each of these conditions now names itself.
+      // A genuinely empty round is confirmed-empty, not unavailable: the
+      // server answered, and the answer was zero. That distinction is the
+      // one that decides whether clearing the local table is correct.
+      expect(payload(result).kind).toBe('confirmed-empty');
     });
 
     it('should filter out beers without IDs', async () => {
@@ -307,12 +406,15 @@ describe('Beer API', () => {
 
       const result = await fetchMyBeersFromAPI();
 
-      expect(result).toHaveLength(2);
-      expect(result[0].id).toBe('1');
-      expect(result[1].id).toBe('2');
+      const filtered = payload(result);
+      expect(filtered.kind).toBe('data');
+      if (filtered.kind !== 'data') throw new Error('expected data');
+      expect(filtered.items).toHaveLength(2);
+      expect(filtered.items[0].id).toBe('1');
+      expect(filtered.items[1].id).toBe('2');
     });
 
-    it('should throw error on invalid response format', async () => {
+    it('reports malformed on an invalid response format', async () => {
       const mockResponse = { someOtherData: 'value' };
 
       (preferences.getPreference as jest.Mock).mockImplementation((key: string) => {
@@ -326,12 +428,11 @@ describe('Beer API', () => {
         json: async () => mockResponse,
       });
 
-      await expect(fetchMyBeersFromAPI()).rejects.toThrow(
-        'Invalid response format from My Beers API'
-      );
+      // INVERTED by plan 05 Phase 5.3.
+      expect(payload(await fetchMyBeersFromAPI()).kind).toBe('malformed');
     });
 
-    it('should propagate fetch errors', async () => {
+    it('reports failed when the fetch rejects', async () => {
       (preferences.getPreference as jest.Mock).mockImplementation((key: string) => {
         if (key === 'is_visitor_mode') return Promise.resolve('false');
         if (key === 'my_beers_api_url')
@@ -343,7 +444,8 @@ describe('Beer API', () => {
         Promise.reject(new Error('Network error'))
       );
 
-      await expect(fetchMyBeersFromAPI()).rejects.toThrow('Network error');
+      // INVERTED by plan 05 Phase 5.3.
+      expect((await fetchMyBeersFromAPI()).status).toBe('failed');
     });
   });
 
@@ -356,7 +458,7 @@ describe('Beer API', () => {
 
       const result = await fetchRewardsFromAPI();
 
-      expect(result).toEqual([]);
+      expect(result.status).toBe('unavailable');
       expect(global.fetch).not.toHaveBeenCalled();
     });
 
@@ -369,7 +471,7 @@ describe('Beer API', () => {
 
       const result = await fetchRewardsFromAPI();
 
-      expect(result).toEqual([]);
+      expect(result.status).toBe('unavailable');
       expect(global.fetch).not.toHaveBeenCalled();
     });
 
@@ -393,11 +495,13 @@ describe('Beer API', () => {
 
       const result = await fetchRewardsFromAPI();
 
-      expect(result).toEqual(mockRewards);
+      const rewardsBody = payload(result);
+      expect(rewardsBody.kind).toBe('data');
+      if (rewardsBody.kind === 'data') expect(rewardsBody.items).toEqual(mockRewards);
       expect(preferences.getPreference).toHaveBeenCalledWith('my_beers_api_url');
     });
 
-    it('should throw error on invalid response format', async () => {
+    it('reports malformed on an invalid response format', async () => {
       const mockResponse = { someOtherData: 'value' };
 
       (preferences.getPreference as jest.Mock).mockImplementation((key: string) => {
@@ -411,12 +515,11 @@ describe('Beer API', () => {
         json: async () => mockResponse,
       });
 
-      await expect(fetchRewardsFromAPI()).rejects.toThrow(
-        'Invalid response format from Rewards API'
-      );
+      // INVERTED by plan 05 Phase 5.3.
+      expect(payload(await fetchRewardsFromAPI()).kind).toBe('malformed');
     });
 
-    it('should propagate fetch errors', async () => {
+    it('reports failed when the fetch rejects', async () => {
       (preferences.getPreference as jest.Mock).mockImplementation((key: string) => {
         if (key === 'is_visitor_mode') return Promise.resolve('false');
         if (key === 'my_beers_api_url')
@@ -428,7 +531,8 @@ describe('Beer API', () => {
         Promise.reject(new Error('Network error'))
       );
 
-      await expect(fetchRewardsFromAPI()).rejects.toThrow('Network error');
+      // INVERTED by plan 05 Phase 5.3.
+      expect((await fetchRewardsFromAPI()).status).toBe('failed');
     });
   });
 
@@ -447,7 +551,9 @@ describe('Beer API', () => {
         await fetchBeersFromAPI();
 
         // Verify fetch was called with config URL
-        expect(global.fetch).toHaveBeenCalledWith(config.api.baseUrl);
+        expect(global.fetch).toHaveBeenCalledWith(config.api.baseUrl, {
+          signal: expect.any(AbortSignal),
+        });
       });
 
       it('should use config endpoint URLs for different API calls', async () => {
@@ -468,7 +574,9 @@ describe('Beer API', () => {
         await fetchMyBeersFromAPI();
 
         // Verify fetch was called with config-constructed URL
-        expect(global.fetch).toHaveBeenCalledWith(config.api.getFullUrl('memberDashboard'));
+        expect(global.fetch).toHaveBeenCalledWith(config.api.getFullUrl('memberDashboard'), {
+          signal: expect.any(AbortSignal),
+        });
       });
     });
 
@@ -633,5 +741,174 @@ describe('Beer API', () => {
         expect(config.network.retryDelay).toBeLessThanOrEqual(5000); // Max 5s initial delay
       });
     });
+  });
+});
+
+describe('FetchOutcome semantics (plan 02 Phase 3)', () => {
+  // This block is a sibling of `describe('Beer API')`, so it does NOT inherit
+  // that block's cleanup — without this, `global.fetch` accumulates calls across
+  // every test here. The `not.toHaveBeenCalled()` assertions are the ones that
+  // care: the my-beers none:// test in this block passed only because it happened to
+  // run before any test that fetches. A test that cannot fail is worth less than
+  // no test, so pin the isolation rather than the ordering.
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  // Every assertion here is on `kind`, never on array length. Length is what
+  // made six distinct conditions indistinguishable in the first place.
+  const memberPrefs = (urlKey: string, url: string | null) => (key: string) => {
+    if (key === 'is_visitor_mode') return Promise.resolve('false');
+    if (key === urlKey) return Promise.resolve(url);
+    return Promise.resolve(null);
+  };
+
+  describe('fetchMyBeersFromAPI', () => {
+    it('reports unavailable/not-configured when my_beers_api_url is absent', async () => {
+      (preferences.getPreference as jest.Mock).mockImplementation(
+        memberPrefs('my_beers_api_url', null)
+      );
+
+      const outcome = await fetchMyBeersFromAPI();
+
+      expect(outcome.status).toBe('unavailable');
+      if (outcome.status === 'unavailable') {
+        expect(outcome.reason.code).toBe('not-configured');
+      }
+    });
+
+    it('reports unavailable/not-applicable in visitor mode', async () => {
+      (preferences.getPreference as jest.Mock).mockImplementation((key: string) =>
+        Promise.resolve(key === 'is_visitor_mode' ? 'true' : null)
+      );
+
+      const outcome = await fetchMyBeersFromAPI();
+
+      expect(outcome.status).toBe('unavailable');
+      if (outcome.status === 'unavailable') {
+        expect(outcome.reason.code).toBe('not-applicable');
+      }
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it('reports not-applicable for a none:// URL without calling fetch', async () => {
+      (preferences.getPreference as jest.Mock).mockImplementation(
+        memberPrefs('my_beers_api_url', 'none://placeholder')
+      );
+
+      const outcome = await fetchMyBeersFromAPI();
+
+      expect(outcome.status).toBe('unavailable');
+      if (outcome.status === 'unavailable') {
+        expect(outcome.reason.code).toBe('not-applicable');
+      }
+      // Pins the REPLACEMENT behaviour, not just the removal: once
+      // fetchWithRetry stops synthesising a fake response for none://, the URL
+      // must be rejected BEFORE the request or it falls through to fetch() and
+      // burns three retries with backoff.
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it('reports confirmed-empty when the server returns an empty round', async () => {
+      (preferences.getPreference as jest.Mock).mockImplementation(
+        memberPrefs('my_beers_api_url', 'https://example.com/my.json')
+      );
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => [{}, { tasted_brew_current_round: [] }],
+      });
+
+      const outcome = await fetchMyBeersFromAPI();
+
+      // A real state — new user, or the rollover at 200 — and the ONLY case in
+      // which clearing the local table is correct.
+      expect(payload(outcome).kind).toBe('confirmed-empty');
+    });
+
+    it('reports malformed when every entry lacks an id', async () => {
+      (preferences.getPreference as jest.Mock).mockImplementation(
+        memberPrefs('my_beers_api_url', 'https://example.com/my.json')
+      );
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => [
+          {},
+          { tasted_brew_current_round: [{ brew_name: 'no id' }, { brew_name: 'nor here' }] },
+        ],
+      });
+
+      const outcome = await fetchMyBeersFromAPI();
+
+      // Replaces the MalformedResponseError bridge added in Phase 2 — the
+      // caller decides now, instead of being forced to catch.
+      expect(payload(outcome).kind).toBe('malformed');
+    });
+
+    it('reports data when the server returns beers', async () => {
+      (preferences.getPreference as jest.Mock).mockImplementation(
+        memberPrefs('my_beers_api_url', 'https://example.com/my.json')
+      );
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => [
+          {},
+          { tasted_brew_current_round: [{ id: '1', brew_name: 'Tasted', brewer: 'X' }] },
+        ],
+      });
+
+      const outcome = await fetchMyBeersFromAPI();
+
+      const body = payload(outcome);
+      expect(body.kind).toBe('data');
+      if (body.kind === 'data') {
+        expect(body.items).toHaveLength(1);
+      }
+    });
+  });
+
+  it('fetchBeersFromAPI reports unavailable/not-configured when all_beers_api_url is absent', async () => {
+    (preferences.getPreference as jest.Mock).mockImplementation(
+      memberPrefs('all_beers_api_url', null)
+    );
+
+    const outcome = await fetchBeersFromAPI();
+
+    expect(outcome.status).toBe('unavailable');
+    if (outcome.status === 'unavailable') {
+      expect(outcome.reason.code).toBe('not-configured');
+    }
+  });
+
+  it('fetchRewardsFromAPI reports unavailable rather than an empty list in visitor mode', async () => {
+    (preferences.getPreference as jest.Mock).mockImplementation((key: string) =>
+      Promise.resolve(key === 'is_visitor_mode' ? 'true' : null)
+    );
+
+    const outcome = await fetchRewardsFromAPI();
+
+    expect(outcome.status).toBe('unavailable');
+    if (outcome.status === 'unavailable') {
+      expect(outcome.reason.code).toBe('not-applicable');
+    }
+  });
+
+  it('fetchRewardsFromAPI reports not-applicable for a none:// URL without calling fetch', async () => {
+    // Plan 05 Phase 5.2. Rewards reads the SAME preference as my-beers
+    // (`my_beers_api_url`), so it inherited the same placeholder exposure and
+    // none of the guard: 02 Phase 3 added the rejection at one of the two call
+    // sites. Without it the placeholder reaches fetch() and burns three retries
+    // at 1s / 1.5s / 2.25s — 4.75s of a refresh budget, on the weak links this
+    // plan exists to fix, for a URL that was never valid.
+    (preferences.getPreference as jest.Mock).mockImplementation(
+      memberPrefs('my_beers_api_url', 'none://placeholder')
+    );
+
+    const outcome = await fetchRewardsFromAPI();
+
+    expect(outcome.status).toBe('unavailable');
+    if (outcome.status === 'unavailable') {
+      expect(outcome.reason.code).toBe('not-applicable');
+    }
+    expect(global.fetch).not.toHaveBeenCalled();
   });
 });

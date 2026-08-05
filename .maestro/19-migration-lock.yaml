@@ -1,0 +1,175 @@
+appId: org.verily.FSbeerselector
+name: "Migration Lock - Schema Migrations Release the Master Lock"
+---
+# Test Flow: Schema migration lock lifetime
+#
+# Plan 01 Phase 3. The five schema migrations moved from hand-written
+# acquireLock/try/finally pairs onto databaseLockManager.withDatabaseLock().
+# A dropped release is the likeliest defect in that migration, and Jest can
+# only prove it against a mocked database.
+#
+# On a real device a leaked migration lock does not surface as an error. It
+# surfaces as a hang: setupDatabase() runs the migrations in app/_layout.tsx
+# before the app renders, and every later database WRITE then queues behind a
+# lock nobody holds until the 30s acquisition timeout rejects it.
+#
+# ⚠️ WHAT THIS FLOW DOES NOT CATCH — READ BEFORE TRUSTING A PASS.
+#
+# It does NOT catch a leaked migration lock, which is the defect it was
+# originally written for. Two earlier versions of this file claimed otherwise
+# and both were wrong; this is the honest statement of its scope.
+#
+# The probe is right: pull-to-refresh genuinely takes the master lock, via
+# sequentialRefreshAllData -> withDatabaseLock('refresh-all-data-sequential').
+# Reads do not qualify (repository getAll()/getFirst() are lock-free by design)
+# and neither do preference writes (src/database/preferences.ts never touches
+# the lock manager). So the ACTION exercises the lock.
+#
+# The problem is that nothing on screen changes when the refresh completes:
+#   - refresh completes, upstream unchanged -> beer-count unchanged
+#   - refresh wedged behind a leaked lock   -> beer-count unchanged
+# Indistinguishable. components/AllBeers.tsx exposes exactly five testIDs
+# (all-beers-container, error-container, error-message, try-again-button,
+# beer-count), the RefreshControl at :187 has none, and nothing renders the
+# all_beers_last_update timestamp even though the preference exists. No
+# rearrangement of assertions can close this — it needs a UI signal that only
+# becomes true once a refresh COMPLETES. Either put a testID on the refresh
+# indicator and assertNotVisible after the swipe, or render
+# all_beers_last_update with a testID and require it to change.
+#
+# WHAT IT DOES CATCH, and why it is still worth running: a half-applied or
+# corrupt write that moves the count, an empty list after a successful refresh,
+# and a migration that hangs at splash (Test 1). Those are real regressions.
+#
+# ⚠️ NOT YET RUN ON A DEVICE. The selectors are copied from
+# 09-refresh-functionality.yaml (beer-list, beer-count) and 15/16, but this
+# flow has not been executed. Validate it on device before trusting a pass.
+#
+# Prerequisites:
+# - Run against a build whose schema version is BELOW the current one to
+#   exercise a real migration. On an already-migrated install this still
+#   passes, but proves only that startup and refresh are not wedged.
+# - Logged in, so a refresh has something to fetch.
+
+# ========================================
+# Test 1: Cold start completes past migrations
+# ========================================
+
+# Launch with cleared state so setupDatabase runs the migrations
+- launchApp:
+    clearState: true
+
+- waitForAnimationToEnd
+
+# Dismiss Expo dev menu if present
+- runFlow:
+    when:
+      visible: "Reload"
+    commands:
+      - pressKey: Escape
+      - waitForAnimationToEnd
+
+# The app must get past splash/initialisation. A migration that never returns
+# hangs here rather than erroring.
+# `assertVisible` takes no `timeout` — the selector mapping rejects it and the
+# whole flow failed to parse, so this migration test has never run. Waiting with
+# a deadline is `extendedWaitUntil`, which is what the 30s was asking for.
+- extendedWaitUntil:
+    visible:
+      text: "Settings"
+    timeout: 30000
+
+# ========================================
+# Test 2: A lock-taking WRITE succeeds after migrations
+# ========================================
+#
+# Reaching the UI only proves the migration finished. This drives a write that
+# takes the master lock, which is the right ACTION — but see the header for why
+# the assertions after it cannot distinguish a completed refresh from a wedged
+# one. Kept because the write itself still exercises the lock path on device.
+
+- tapOn: "All Beers"
+- waitForAnimationToEnd
+
+- assertVisible:
+    id: "beer-list"
+
+# Capture the count before and compare after. NOTE what this can and cannot
+# prove: an unchanged count is consistent BOTH with a completed refresh against
+# unchanged upstream AND with a refresh that never ran. So equality is evidence
+# of "nothing was corrupted", not of "the refresh completed". Stated plainly
+# because the previous version of this file claimed the latter.
+- evalScript: |
+      output.beforeCount = await maestro.getText({id: 'beer-count'})
+
+# Pull to refresh -> sequentialRefreshAllData -> withDatabaseLock
+- swipe:
+    direction: DOWN
+    from:
+      id: "beer-list"
+    duration: 800
+
+- waitForAnimationToEnd
+
+# Read it back.
+- evalScript: |
+      output.afterCount = await maestro.getText({id: 'beer-count'})
+
+# The list must not have been emptied. This catches a destructive write that
+# cleared the table without repopulating it — the symptom this plan exists to
+# fix — but it does NOT prove the refresh ran.
+- assertTrue: ${output.afterCount != null && output.afterCount != ''}
+
+# The count must not have moved against an unchanged upstream. This catches a
+# half-applied or partially-rolled-back write. It does NOT distinguish a
+# completed refresh from a wedged one; see the header.
+- assertTrue: ${output.afterCount == output.beforeCount}
+
+# ========================================
+# Test 3: The write actually persisted across a relaunch
+# ========================================
+#
+# A refresh that appears to complete but rolled back would still leave the
+# count rendered. Relaunching and re-reading is what distinguishes a committed
+# write from a discarded one.
+
+- launchApp:
+    clearState: false
+- waitForAnimationToEnd
+
+- runFlow:
+    when:
+      visible: "Reload"
+    commands:
+      - pressKey: Escape
+      - waitForAnimationToEnd
+
+- tapOn: "All Beers"
+- waitForAnimationToEnd
+
+- assertVisible:
+    id: "beer-list"
+
+# Data written by Test 2's refresh must still be here. Same reasoning as above:
+# read the value rather than asserting the element exists, and require it to
+# match what Test 2 observed. An empty list after a successful refresh is the
+# symptom this whole plan exists to fix, and only a value comparison catches it.
+- evalScript: |
+      output.relaunchCount = await maestro.getText({id: 'beer-count'})
+
+- assertTrue: ${output.relaunchCount == output.afterCount}
+
+# And the lock must still be grantable on the already-migrated path, which
+# takes a different branch through setupDatabase than Test 1 did.
+- swipe:
+    direction: DOWN
+    from:
+      id: "beer-list"
+    duration: 800
+
+- waitForAnimationToEnd
+
+- evalScript: |
+      output.secondRefreshCount = await maestro.getText({id: 'beer-count'})
+
+- assertTrue: ${output.secondRefreshCount == output.relaunchCount}

@@ -139,8 +139,13 @@ name: "Config Validation - URL Configuration and Validation"
 
 # Step 22: Navigate back to settings
 - scroll
-- tapOn: "Settings"
-  optional: true
+# `optional` has to live inside the command mapping. As a sibling key it made
+# the list item a two-key map, which Maestro rejects as "Invalid Command
+# Format: tapOn" — so this flow has never parsed, and the `optional` it was
+# asking for was never in effect either.
+- tapOn:
+    text: "Settings"
+    optional: true
 - waitForAnimationToEnd
 
 # Step 23: Verify settings still accessible
@@ -217,8 +222,10 @@ name: "Config Validation - URL Configuration and Validation"
 - waitForAnimationToEnd
 
 # Step 35: Return to settings multiple times
+# `scroll` takes no arguments, and the stray `optional` under it was never
+# parsed. Dropped rather than relocated: a scroll does not fail in the way
+# `optional` exists to tolerate.
 - scroll
-    optional: true
 - tapOn: "Settings"
 - waitForAnimationToEnd
 

@@ -6,31 +6,122 @@
 import { BeerRepository } from '../BeerRepository';
 import { Beer, BeerWithContainerType } from '../../../types/beer';
 import * as connection from '../../connection';
+import { toNonEmpty } from '../../../api/fetchOutcome';
+import type { NonEmptyArray } from '../../../api/fetchOutcome';
+import { databaseLockManager } from '../../locks';
 
 // Mock the database connection module
 jest.mock('../../connection');
 
+type MockStatement = {
+  executeAsync: jest.Mock;
+  finalizeAsync: jest.Mock;
+};
+
 type MockDatabase = {
   withTransactionAsync: jest.Mock;
+  withExclusiveTransactionAsync: jest.Mock;
   runAsync: jest.Mock;
+  prepareAsync: jest.Mock;
   getAllAsync: jest.Mock;
   getFirstAsync: jest.Mock;
+  /** The statement prepareAsync hands back — the import's inserts land here. */
+  statement: MockStatement;
 };
 
 function createMockDatabase(): MockDatabase {
-  return {
+  const statement: MockStatement = {
+    executeAsync: jest.fn().mockResolvedValue({ changes: 1, lastInsertRowId: 1 }),
+    finalizeAsync: jest.fn().mockResolvedValue(undefined),
+  };
+
+  const mockDatabase: MockDatabase = {
     withTransactionAsync: jest.fn(async (callback: () => Promise<void>) => await callback()),
-    runAsync: jest.fn(),
+    withExclusiveTransactionAsync: jest.fn(),
+    // The real runAsync always resolves an SQLiteRunResult; the allbeers import
+    // reads `changes` from the DELETE to log the cleared row count.
+    runAsync: jest.fn().mockResolvedValue({ changes: 0, lastInsertRowId: 0 }),
+    // The import compiles its INSERT once and reuses it, so the per-row
+    // assertions below look at statement.executeAsync rather than runAsync.
+    prepareAsync: jest.fn().mockResolvedValue(statement),
     getAllAsync: jest.fn(),
     getFirstAsync: jest.fn(),
+    statement,
   };
+
+  // Hands the body a `txn` that forwards to the same mock, so assertions on
+  // runAsync still see the transaction's queries. This mock does NOT model
+  // rollback or contention — see BeerRepository.atomicity.test.ts for a fake
+  // that does.
+  mockDatabase.withExclusiveTransactionAsync.mockImplementation(
+    async (task: (txn: MockDatabase) => Promise<void>) => await task(mockDatabase)
+  );
+
+  return mockDatabase;
 }
 
 function createRepository(): BeerRepository {
   return new BeerRepository();
 }
 
+/**
+ * Narrow a literal fixture array for the NonEmptyArray-typed repository
+ * signatures. Throws rather than asserting, so a fixture that is accidentally
+ * empty fails loudly instead of lying to the type system.
+ */
+function nel<T>(items: readonly T[]): NonEmptyArray<T> {
+  const narrowed = toNonEmpty(items);
+  if (narrowed === null) throw new Error('fixture array was unexpectedly empty');
+  return narrowed;
+}
+
 describe('BeerRepository', () => {
+  describe('count', () => {
+    // The 304 backstop reads this to decide whether to believe the server. It
+    // had no direct coverage at all — every reference in the service tests is a
+    // mock — so the SQL, the result shape and the failure path were all
+    // unverified while three call sites depended on them.
+    it('reports how many rows the table holds', async () => {
+      const mockDatabase = createMockDatabase();
+      mockDatabase.getFirstAsync.mockResolvedValue({ count: 1200 });
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+
+      await expect(createRepository().count()).resolves.toBe(1200);
+      expect(mockDatabase.getFirstAsync).toHaveBeenCalledWith(
+        'SELECT COUNT(*) as count FROM allbeers'
+      );
+    });
+
+    it('reports zero when the table is genuinely empty', async () => {
+      const mockDatabase = createMockDatabase();
+      mockDatabase.getFirstAsync.mockResolvedValue({ count: 0 });
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+
+      await expect(createRepository().count()).resolves.toBe(0);
+    });
+
+    it('reports null rather than zero when the count cannot be read', async () => {
+      // The distinction the callers depend on. Returning 0 here would be a
+      // factual claim that the table is empty, and the caller answers that by
+      // DISCARDING the stored ETag and reporting a failure — so an unreadable
+      // count against a full table used to throw away a valid validator and
+      // raise an error blaming the server.
+      const mockDatabase = createMockDatabase();
+      mockDatabase.getFirstAsync.mockRejectedValue(new Error('database is locked'));
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+
+      await expect(createRepository().count()).resolves.toBeNull();
+    });
+
+    it('reports null when the query returns no row at all', async () => {
+      const mockDatabase = createMockDatabase();
+      mockDatabase.getFirstAsync.mockResolvedValue(null);
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+
+      await expect(createRepository().count()).resolves.toBeNull();
+    });
+  });
+
   describe('insertMany', () => {
     it('should insert multiple beers in batches', async () => {
       const mockDatabase = createMockDatabase();
@@ -61,7 +152,7 @@ describe('BeerRepository', () => {
 
       mockDatabase.getFirstAsync.mockResolvedValue({ count: 0 });
 
-      await repository.insertMany(beers);
+      await repository.insertMany(nel(beers));
 
       // Should call getDatabase
       expect(connection.getDatabase).toHaveBeenCalled();
@@ -69,9 +160,11 @@ describe('BeerRepository', () => {
       // Should clear existing beers first
       expect(mockDatabase.runAsync).toHaveBeenCalledWith('DELETE FROM allbeers');
 
-      // Should insert all beers
-      expect(mockDatabase.runAsync).toHaveBeenCalledWith(
-        expect.stringContaining('INSERT OR REPLACE INTO allbeers'),
+      // Should compile the insert once and execute it per row
+      expect(mockDatabase.prepareAsync).toHaveBeenCalledWith(
+        expect.stringContaining('INSERT OR REPLACE INTO allbeers')
+      );
+      expect(mockDatabase.statement.executeAsync).toHaveBeenCalledWith(
         expect.arrayContaining(['1', '2024-01-01', 'Test IPA', 'Test Brewery'])
       );
     });
@@ -109,16 +202,14 @@ describe('BeerRepository', () => {
 
       mockDatabase.getFirstAsync.mockResolvedValue({ count: 0 });
 
-      await repository.insertMany(beers);
+      await repository.insertMany(nel(beers));
 
       // Should only insert the valid beers (2 beers)
-      const insertCalls = mockDatabase.runAsync.mock.calls.filter((call: unknown[]) =>
-        (call[0] as string).includes('INSERT OR REPLACE')
-      );
+      const insertCalls = mockDatabase.statement.executeAsync.mock.calls;
 
       expect(insertCalls).toHaveLength(2);
-      expect(insertCalls[0][1]).toContain('1');
-      expect(insertCalls[1][1]).toContain('2');
+      expect(insertCalls[0][0]).toContain('1');
+      expect(insertCalls[1][0]).toContain('2');
     });
 
     it('should process beers in batches of 50', async () => {
@@ -136,35 +227,31 @@ describe('BeerRepository', () => {
 
       mockDatabase.getFirstAsync.mockResolvedValue({ count: 0 });
 
-      await repository.insertMany(beers);
+      await repository.insertMany(nel(beers));
 
-      // Should use transactions for batching (120 beers = 3 batches of 50, 50, 20)
-      expect(mockDatabase.withTransactionAsync).toHaveBeenCalled();
+      // The batch loop now paces progress logging only — the whole import runs
+      // in ONE exclusive transaction, so there is no per-batch commit seam.
+      expect(mockDatabase.withExclusiveTransactionAsync).toHaveBeenCalledTimes(1);
+      expect(mockDatabase.withTransactionAsync).not.toHaveBeenCalled();
 
-      // Should insert all 120 beers
-      const insertCalls = mockDatabase.runAsync.mock.calls.filter((call: unknown[]) =>
-        (call[0] as string).includes('INSERT OR REPLACE')
-      );
-      expect(insertCalls).toHaveLength(120);
+      // Should insert all 120 beers, from a single compiled statement
+      expect(mockDatabase.prepareAsync).toHaveBeenCalledTimes(1);
+      expect(mockDatabase.statement.executeAsync).toHaveBeenCalledTimes(120);
     });
 
-    it('should handle empty beer array', async () => {
+    // INVERTED by plan 02 Phase 2. Previously asserted that insertMany([])
+    // clears the taplist and inserts nothing. A store with zero beers is not a
+    // real state, so unlike MyBeersRepository there is deliberately no
+    // replaceAllWithEmpty here — the empty case is simply not expressible.
+    it('cannot be called with an empty beer array', async () => {
       const mockDatabase = createMockDatabase();
       (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
 
-      mockDatabase.getFirstAsync.mockResolvedValue({ count: 0 });
+      // @ts-expect-error an empty array is not a NonEmptyArray
+      await expect(repository.insertMany([])).rejects.toThrow();
 
-      await repository.insertMany([]);
-
-      // Should still clear the table
-      expect(mockDatabase.runAsync).toHaveBeenCalledWith('DELETE FROM allbeers');
-
-      // Should not insert any beers
-      const insertCalls = mockDatabase.runAsync.mock.calls.filter((call: unknown[]) =>
-        (call[0] as string).includes('INSERT OR REPLACE')
-      );
-      expect(insertCalls).toHaveLength(0);
+      expect(mockDatabase.runAsync).not.toHaveBeenCalledWith('DELETE FROM allbeers');
     });
 
     it('should handle beers with optional fields missing', async () => {
@@ -184,11 +271,10 @@ describe('BeerRepository', () => {
 
       mockDatabase.getFirstAsync.mockResolvedValue({ count: 0 });
 
-      await repository.insertMany(beers);
+      await repository.insertMany(nel(beers));
 
       // Should insert beer with empty strings for missing fields and container_type
-      expect(mockDatabase.runAsync).toHaveBeenCalledWith(
-        expect.stringContaining('INSERT OR REPLACE INTO allbeers'),
+      expect(mockDatabase.statement.executeAsync).toHaveBeenCalledWith(
         expect.arrayContaining(['1', '', 'Minimal Beer', '', '', '', '', '', '', '', 'pint'])
       );
     });
@@ -210,9 +296,8 @@ describe('BeerRepository', () => {
 
       mockDatabase.runAsync.mockRejectedValueOnce(new Error('Database error'));
 
-      await expect(repository.insertMany(beers)).rejects.toThrow('Database error');
+      await expect(repository.insertMany(nel(beers))).rejects.toThrow('Database error');
     });
-
   });
 
   describe('getAll', () => {
@@ -831,6 +916,59 @@ describe('BeerRepository', () => {
       mockDatabase.getAllAsync.mockRejectedValueOnce(new Error('Database error'));
 
       await expect(repository.getUntasted()).rejects.toThrow('Database error');
+    });
+  });
+  // ==========================================================================
+  // Lock lifetime (plan 01 Phase 3)
+  //
+  // These suites use the REAL databaseLockManager, so isLocked() asserts
+  // genuine lock state. This is the guard for the likeliest defect in the
+  // migration to withDatabaseLock: a dropped release, which on a device shows
+  // up as a permanent hang at splash rather than a test failure.
+  // ==========================================================================
+
+  describe('lock lifetime', () => {
+    it('does not leave the lock held when the write throws', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      const repository = createRepository();
+      const beers: BeerWithContainerType[] = [
+        {
+          id: '1',
+          brew_name: 'Test IPA',
+          brewer: 'Test Brewery',
+          container_type: 'pint',
+          enrichment_confidence: null,
+          enrichment_source: null,
+        },
+      ];
+
+      mockDatabase.runAsync.mockRejectedValue(new Error('Database error'));
+
+      await expect(repository.insertMany(nel(beers))).rejects.toThrow();
+
+      expect(databaseLockManager.isLocked()).toBe(false);
+      expect(databaseLockManager.getQueueLength()).toBe(0);
+    });
+
+    it('does not leave the lock held on a successful write', async () => {
+      const mockDatabase = createMockDatabase();
+      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      const repository = createRepository();
+      const beers: BeerWithContainerType[] = [
+        {
+          id: '1',
+          brew_name: 'Test IPA',
+          brewer: 'Test Brewery',
+          container_type: 'pint',
+          enrichment_confidence: null,
+          enrichment_source: null,
+        },
+      ];
+
+      await repository.insertMany(nel(beers));
+
+      expect(databaseLockManager.isLocked()).toBe(false);
     });
   });
 });

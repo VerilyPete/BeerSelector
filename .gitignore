@@ -99,3 +99,6 @@ junit.xml
 # Data files (test data, personal data)
 mybeers.json
 allbeers.json
+
+# Planning documents — working notes, not repo content
+plans/

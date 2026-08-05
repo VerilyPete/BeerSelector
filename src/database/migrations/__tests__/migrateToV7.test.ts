@@ -2,12 +2,9 @@ import { migrateToVersion7 } from '../migrateToV7';
 import { databaseLockManager } from '../../DatabaseLockManager';
 import { recordMigration } from '../../schemaVersion';
 
-jest.mock('../../DatabaseLockManager', () => ({
-  databaseLockManager: {
-    acquireLock: jest.fn().mockResolvedValue(true),
-    releaseLock: jest.fn(),
-  },
-}));
+// The lock manager is deliberately NOT mocked. With the database mocked but
+// the real manager, isLocked() asserts genuine lock state, which is what
+// catches a dropped release — a mock asserting a mock cannot.
 
 jest.mock('../../schemaVersion', () => ({
   recordMigration: jest.fn().mockResolvedValue(undefined),
@@ -21,8 +18,8 @@ type MockDb = {
 };
 
 function createMockMigrationDb(): MockDb {
-  (databaseLockManager.acquireLock as jest.Mock).mockClear();
-  (databaseLockManager.releaseLock as jest.Mock).mockClear();
+  databaseLockManager.resetForTesting();
+  jest.restoreAllMocks();
   (recordMigration as jest.Mock).mockClear();
   return {
     getAllAsync: jest.fn(),
@@ -33,12 +30,7 @@ function createMockMigrationDb(): MockDb {
 }
 
 function columnsWithoutEnrichment(): { name: string }[] {
-  return [
-    { name: 'id' },
-    { name: 'brew_name' },
-    { name: 'brewer' },
-    { name: 'abv' },
-  ];
+  return [{ name: 'id' }, { name: 'brew_name' }, { name: 'brewer' }, { name: 'abv' }];
 }
 
 function columnsWithEnrichment(): { name: string }[] {
@@ -56,12 +48,13 @@ describe('migrateToVersion7', () => {
   describe('happy path: columns do not exist', () => {
     it('acquires and releases the migration lock', async () => {
       const db = createMockMigrationDb();
+      const lockSpy = jest.spyOn(databaseLockManager, 'withDatabaseLock');
       db.getAllAsync.mockResolvedValue(columnsWithoutEnrichment());
 
       await migrateToVersion7(db as never);
 
-      expect(databaseLockManager.acquireLock).toHaveBeenCalledWith('schema-migration-v7');
-      expect(databaseLockManager.releaseLock).toHaveBeenCalledWith('schema-migration-v7');
+      expect(lockSpy).toHaveBeenCalledWith('schema-migration-v7', expect.any(Function));
+      expect(databaseLockManager.isLocked()).toBe(false);
     });
 
     it('adds enrichment_confidence and enrichment_source columns to allbeers', async () => {
@@ -71,8 +64,16 @@ describe('migrateToVersion7', () => {
       await migrateToVersion7(db as never);
 
       const execCalls = (db.execAsync as jest.Mock).mock.calls.map((c: string[]) => c[0]);
-      expect(execCalls.some((sql: string) => sql.includes('enrichment_confidence') && sql.includes('allbeers'))).toBe(true);
-      expect(execCalls.some((sql: string) => sql.includes('enrichment_source') && sql.includes('allbeers'))).toBe(true);
+      expect(
+        execCalls.some(
+          (sql: string) => sql.includes('enrichment_confidence') && sql.includes('allbeers')
+        )
+      ).toBe(true);
+      expect(
+        execCalls.some(
+          (sql: string) => sql.includes('enrichment_source') && sql.includes('allbeers')
+        )
+      ).toBe(true);
     });
 
     it('adds enrichment_confidence and enrichment_source columns to tasted_brew_current_round', async () => {
@@ -82,8 +83,18 @@ describe('migrateToVersion7', () => {
       await migrateToVersion7(db as never);
 
       const execCalls = (db.execAsync as jest.Mock).mock.calls.map((c: string[]) => c[0]);
-      expect(execCalls.some((sql: string) => sql.includes('enrichment_confidence') && sql.includes('tasted_brew_current_round'))).toBe(true);
-      expect(execCalls.some((sql: string) => sql.includes('enrichment_source') && sql.includes('tasted_brew_current_round'))).toBe(true);
+      expect(
+        execCalls.some(
+          (sql: string) =>
+            sql.includes('enrichment_confidence') && sql.includes('tasted_brew_current_round')
+        )
+      ).toBe(true);
+      expect(
+        execCalls.some(
+          (sql: string) =>
+            sql.includes('enrichment_source') && sql.includes('tasted_brew_current_round')
+        )
+      ).toBe(true);
     });
 
     it('records migration version 7', async () => {
@@ -122,7 +133,9 @@ describe('migrateToVersion7', () => {
 
       const pragmaCalls = (db.getAllAsync as jest.Mock).mock.calls.map((c: string[]) => c[0]);
       expect(pragmaCalls.some((sql: string) => sql.includes('allbeers'))).toBe(true);
-      expect(pragmaCalls.some((sql: string) => sql.includes('tasted_brew_current_round'))).toBe(true);
+      expect(pragmaCalls.some((sql: string) => sql.includes('tasted_brew_current_round'))).toBe(
+        true
+      );
     });
   });
 
@@ -135,7 +148,9 @@ describe('migrateToVersion7', () => {
 
       const execCalls = (db.execAsync as jest.Mock).mock.calls.map((c: string[]) => c[0]);
       const allbeersAlterCalls = execCalls.filter(
-        (sql: string) => sql.includes('ALTER TABLE allbeers') && (sql.includes('enrichment_confidence') || sql.includes('enrichment_source'))
+        (sql: string) =>
+          sql.includes('ALTER TABLE allbeers') &&
+          (sql.includes('enrichment_confidence') || sql.includes('enrichment_source'))
       );
       expect(allbeersAlterCalls).toHaveLength(0);
     });
@@ -148,7 +163,9 @@ describe('migrateToVersion7', () => {
 
       const execCalls = (db.execAsync as jest.Mock).mock.calls.map((c: string[]) => c[0]);
       const tastedAlterCalls = execCalls.filter(
-        (sql: string) => sql.includes('ALTER TABLE tasted_brew_current_round') && (sql.includes('enrichment_confidence') || sql.includes('enrichment_source'))
+        (sql: string) =>
+          sql.includes('ALTER TABLE tasted_brew_current_round') &&
+          (sql.includes('enrichment_confidence') || sql.includes('enrichment_source'))
       );
       expect(tastedAlterCalls).toHaveLength(0);
     });
@@ -171,7 +188,7 @@ describe('migrateToVersion7', () => {
 
       await expect(migrateToVersion7(db as never)).rejects.toThrow('Transaction failed');
 
-      expect(databaseLockManager.releaseLock).toHaveBeenCalledWith('schema-migration-v7');
+      expect(databaseLockManager.isLocked()).toBe(false);
     });
 
     it('releases the lock when PRAGMA query throws', async () => {
@@ -180,7 +197,7 @@ describe('migrateToVersion7', () => {
 
       await expect(migrateToVersion7(db as never)).rejects.toThrow('PRAGMA failed');
 
-      expect(databaseLockManager.releaseLock).toHaveBeenCalledWith('schema-migration-v7');
+      expect(databaseLockManager.isLocked()).toBe(false);
     });
   });
 });

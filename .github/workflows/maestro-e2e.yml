@@ -23,12 +23,12 @@ env:
   EXPO_PUBLIC_USE_MOCK_SERVER: 'true'
   EXPO_PUBLIC_API_TIMEOUT: '30000'
   NODE_VERSION: '20'
-  MAESTRO_VERSION: 'latest'
+  MAESTRO_VERSION: '2.4.0'
 
 jobs:
   maestro-ios:
     name: Maestro E2E Tests (iOS)
-    runs-on: macos-13  # macos-13 or later for iOS simulator support
+    runs-on: macos-latest
     timeout-minutes: 45
 
     steps:
@@ -61,6 +61,10 @@ jobs:
       - name: Install Maestro CLI
         run: |
           # Install Maestro with verbose output
+          # Pinned. Why, and the caveat that this does NOT by itself make a
+          # local run predict CI (nothing pins your machine): see "How Maestro
+          # validates this suite", point 4, in .maestro/README.md.
+          export MAESTRO_VERSION=2.4.0
           curl -fsSL https://get.maestro.mobile.dev | bash
 
           # Verify installation directory exists
@@ -85,19 +89,65 @@ jobs:
           # Add to PATH for future steps
           echo "$HOME/.maestro/bin" >> $GITHUB_PATH
 
-          # Verify installation works
-          maestro --version
+          # Assert the pin actually took. The checks above catch an installer
+          # that failed outright; they say nothing about which VERSION landed.
+          # `MAESTRO_VERSION` is read by the installer script, not enforced by
+          # it — a corrupt or partial download, an installer that silently
+          # ignores an unset/misread env var, or an upstream change to how the
+          # version is selected could all still produce a working `maestro`
+          # binary that passes the checks above while being the wrong
+          # version. The pin's entire purpose — a fixed, reproducible CLI —
+          # depends on this being asserted, not merely printed.
+          #
+          # CANONICAL: the other four copies of this step point here rather
+          # than restating the argument.
+          # `tail -1`, and analytics silenced, because `maestro --version`
+          # does NOT print only a version. On a fresh runner it emits
+          # "Anonymous analytics enabled. To opt out, set
+          # MAESTRO_CLI_NO_ANALYTICS..." FIRST, and the bare `$(...)` captured
+          # that banner as the version. The comparison below then failed
+          # against every possible pin, so this step exited 1 on every job on
+          # every run — which is why the whole E2E suite was red, on both
+          # workflows, before any simulator or flow was involved.
+          # The env var suppresses the banner; `tail -1` is the belt to its
+          # braces, so a future notice printed on stdout cannot resurrect this.
+          ACTUAL_VERSION=$(MAESTRO_CLI_NO_ANALYTICS=true maestro --version | tail -1)
+          if [ "$ACTUAL_VERSION" != "$MAESTRO_VERSION" ]; then
+            echo "Error: installed Maestro is '$ACTUAL_VERSION', expected '$MAESTRO_VERSION'"
+            exit 1
+          fi
+          echo "Maestro $ACTUAL_VERSION installed (pinned)"
 
       - name: Setup iOS Simulator
         run: |
           # List available simulators
           xcrun simctl list devices available
 
-          # Boot iPhone 16 Pro simulator (available on GitHub Actions runners)
-          xcrun simctl boot "iPhone 16 Pro" || true
-
-          # Wait for simulator to fully boot
-          xcrun simctl bootstatus "iPhone 16 Pro" -b || true
+          # Pick whatever iPhone the runner image actually provides, rather
+          # than naming one. These steps hardcoded specific models (16 Pro, 14
+          # Pro, and a 15-then-14 fallback), commented "available on GitHub
+          # Actions runners" — true when written, false by Xcode 26.5.
+          # Selecting from what is present cannot go stale.
+          #
+          # `|| true` on `boot` only, not on `bootstatus`. An already-booted
+          # device makes `simctl boot` exit non-zero for a benign reason —
+          # common on a fresh runner — and that alone used to be swallowed
+          # right along with a real failure, surfacing two steps later as an
+          # opaque `simctl install`/xcodebuild destination error instead of
+          # here. `bootstatus` is the actual gate: it blocks until the
+          # device reaches Booted, and is what must fail loudly if it never
+          # does.
+          UDID=$(xcrun simctl list devices available -j \
+            | jq -r '[.devices[][] | select(.isAvailable)] | map(select(.name | test("^iPhone"))) | last | .udid')
+          if [ -z "$UDID" ] || [ "$UDID" = "null" ]; then
+            echo "No iPhone simulator available on this runner image:"
+            xcrun simctl list devices
+            exit 1
+          fi
+          echo "Booting $(xcrun simctl list devices -j | jq -r --arg u "$UDID" '[.devices[][]|select(.udid==$u)]|first|.name') ($UDID)"
+          echo "SIMULATOR_UDID=$UDID" >> "$GITHUB_ENV"
+          xcrun simctl boot "$UDID" || true
+          xcrun simctl bootstatus "$UDID" -b
 
       - name: Setup test environment
         run: |
@@ -127,7 +177,7 @@ jobs:
             -configuration Debug \
             -sdk iphonesimulator \
             -derivedDataPath build \
-            -destination 'platform=iOS Simulator,name=iPhone 16 Pro' \
+            -destination 'generic/platform=iOS Simulator' \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             build
@@ -138,8 +188,14 @@ jobs:
           APP_PATH=$(find ios/build -name "*.app" -type d | head -n 1)
           echo "App path: $APP_PATH"
 
-          # Get booted simulator UDID
-          SIMULATOR_UDID=$(xcrun simctl list devices booted | grep -m 1 iPhone | sed 's/.*(\([^)]*\)).*/\1/')
+          # $SIMULATOR_UDID: exported to $GITHUB_ENV by "Setup iOS Simulator"
+          # above, and available here as a normal env var for that reason.
+          # Re-deriving it here via `grep -m 1 iPhone` — the previous version
+          # of this step — silently reintroduces the exact ambiguity that
+          # step exists to remove: on a runner with more than one iPhone
+          # simulator (available, not necessarily booted), `grep -m 1` picks
+          # whichever `simctl` happens to list first, which is not
+          # guaranteed to be the one just booted and about to run the tests.
           echo "Simulator UDID: $SIMULATOR_UDID"
 
           # Install on simulator
@@ -154,8 +210,6 @@ jobs:
           sleep 5  # Wait for server to start
 
       - name: Run Maestro E2E Tests
-        env:
-          APP_ID: org.verily.FSbeerselector
         run: |
           maestro test .maestro/ \
             --format junit \
@@ -197,7 +251,7 @@ jobs:
 
   maestro-ios-critical:
     name: Maestro Critical Tests (iOS) - Fast
-    runs-on: macos-13
+    runs-on: macos-latest
     timeout-minutes: 20
 
     steps:
@@ -221,11 +275,77 @@ jobs:
 
       - name: Install Maestro CLI
         run: |
+          # Pinned. Why, and the caveat that this does NOT by itself make a
+          # local run predict CI (nothing pins your machine): see "How Maestro
+          # validates this suite", point 4, in .maestro/README.md.
+          #
+          # This step used to be three lines: install, add to PATH, done — no
+          # `-d`/`-f` guard on the install succeeding, no pin assertion. Every
+          # other job's "Install Maestro CLI" step already has both; this one
+          # had neither, so a corrupt/partial download or a silently-ignored
+          # `MAESTRO_VERSION` would surface here as an unrelated Maestro
+          # failure two steps later instead of a clear installer error.
+          export MAESTRO_VERSION=2.4.0
           curl -fsSL https://get.maestro.mobile.dev | bash
+
+          # Verify installation directory exists
+          if [ ! -d "$HOME/.maestro/bin" ]; then
+            echo "Error: Maestro installation directory not found"
+            exit 1
+          fi
+
+          # Verify maestro binary exists
+          if [ ! -f "$HOME/.maestro/bin/maestro" ]; then
+            echo "Error: Maestro binary not found"
+            ls -la "$HOME/.maestro/bin" || true
+            exit 1
+          fi
+
+          # Make sure it's executable
+          chmod +x "$HOME/.maestro/bin/maestro"
+
+          # Add to PATH for this step
+          export PATH="$HOME/.maestro/bin:$PATH"
+
+          # Add to PATH for future steps
           echo "$HOME/.maestro/bin" >> $GITHUB_PATH
 
+          # Assert the pin actually took — see the comment on this pattern in
+          # the "maestro-ios" job's "Install Maestro CLI" step.
+          ACTUAL_VERSION=$(MAESTRO_CLI_NO_ANALYTICS=true maestro --version | tail -1)
+          if [ "$ACTUAL_VERSION" != "$MAESTRO_VERSION" ]; then
+            echo "Error: installed Maestro is '$ACTUAL_VERSION', expected '$MAESTRO_VERSION'"
+            exit 1
+          fi
+          echo "Maestro $ACTUAL_VERSION installed (pinned)"
+
       - name: Setup iOS Simulator
-        run: xcrun simctl boot "iPhone 16 Pro" || true
+        run: |
+          # Pick whatever iPhone the runner image actually provides, rather
+          # than naming one. These steps hardcoded specific models (16 Pro, 14
+          # Pro, and a 15-then-14 fallback), commented "available on GitHub
+          # Actions runners" — true when written, false by Xcode 26.5.
+          # Selecting from what is present cannot go stale.
+          #
+          # `|| true` on `boot` only, not on `bootstatus`. An already-booted
+          # device makes `simctl boot` exit non-zero for a benign reason —
+          # common on a fresh runner — and that alone used to be swallowed
+          # right along with a real failure, surfacing two steps later as an
+          # opaque `simctl install`/xcodebuild destination error instead of
+          # here. `bootstatus` is the actual gate: it blocks until the
+          # device reaches Booted, and is what must fail loudly if it never
+          # does.
+          UDID=$(xcrun simctl list devices available -j \
+            | jq -r '[.devices[][] | select(.isAvailable)] | map(select(.name | test("^iPhone"))) | last | .udid')
+          if [ -z "$UDID" ] || [ "$UDID" = "null" ]; then
+            echo "No iPhone simulator available on this runner image:"
+            xcrun simctl list devices
+            exit 1
+          fi
+          echo "Booting $(xcrun simctl list devices -j | jq -r --arg u "$UDID" '[.devices[][]|select(.udid==$u)]|first|.name') ($UDID)"
+          echo "SIMULATOR_UDID=$UDID" >> "$GITHUB_ENV"
+          xcrun simctl boot "$UDID" || true
+          xcrun simctl bootstatus "$UDID" -b
 
       - name: Prebuild and Build iOS app
         run: |
@@ -236,13 +356,15 @@ jobs:
       - name: Install app on simulator
         run: |
           APP_PATH=$(find ios/build -name "*.app" -type d | head -n 1)
-          xcrun simctl install booted "$APP_PATH"
+          # $SIMULATOR_UDID, not `booted` — exported to $GITHUB_ENV by
+          # "Setup iOS Simulator" above. Bare `booted` silently picks
+          # whichever simulator simctl considers "the" booted one, which is
+          # exactly the ambiguity that step's UDID selection exists to
+          # remove, and reopens it if more than one simulator is running.
+          xcrun simctl install "$SIMULATOR_UDID" "$APP_PATH"
 
       - name: Run Critical P0 Tests Only
-        env:
-          APP_ID: org.verily.FSbeerselector
         run: |
-          # Run only critical tests for fast feedback
           maestro test .maestro/01-beer-list-rendering.yaml
           maestro test .maestro/06-login-flow-member.yaml
           maestro test .maestro/07-login-flow-visitor.yaml
@@ -257,7 +379,7 @@ jobs:
 
   maestro-ios-parallel:
     name: Maestro iOS Tests (Parallel - ${{ matrix.test-group.name }})
-    runs-on: macos-13
+    runs-on: macos-latest
     timeout-minutes: 25
     if: github.event_name == 'pull_request'  # Only on PRs for speed
 
@@ -333,6 +455,10 @@ jobs:
       - name: Install Maestro CLI
         run: |
           # Install Maestro with verbose output
+          # Pinned. Why, and the caveat that this does NOT by itself make a
+          # local run predict CI (nothing pins your machine): see "How Maestro
+          # validates this suite", point 4, in .maestro/README.md.
+          export MAESTRO_VERSION=2.4.0
           curl -fsSL https://get.maestro.mobile.dev | bash
 
           # Verify installation directory exists
@@ -357,14 +483,43 @@ jobs:
           # Add to PATH for future steps
           echo "$HOME/.maestro/bin" >> $GITHUB_PATH
 
-          # Verify installation works
-          maestro --version
+          # Assert the pin actually took — the checks above prove only that
+          # SOME maestro installed, not which version. Full argument at the
+          # canonical copy of this step in .github/workflows/maestro-e2e.yml.
+          ACTUAL_VERSION=$(MAESTRO_CLI_NO_ANALYTICS=true maestro --version | tail -1)
+          if [ "$ACTUAL_VERSION" != "$MAESTRO_VERSION" ]; then
+            echo "Error: installed Maestro is '$ACTUAL_VERSION', expected '$MAESTRO_VERSION'"
+            exit 1
+          fi
+          echo "Maestro $ACTUAL_VERSION installed (pinned)"
 
       - name: Setup iOS Simulator
         run: |
-          # Boot iPhone 15 Pro simulator
-          xcrun simctl boot "iPhone 15 Pro" || xcrun simctl boot "iPhone 14 Pro" || true
-          xcrun simctl bootstatus "iPhone 15 Pro" -b || xcrun simctl bootstatus "iPhone 14 Pro" -b || true
+          # Pick whatever iPhone the runner image actually provides, rather
+          # than naming one. These steps hardcoded specific models (16 Pro, 14
+          # Pro, and a 15-then-14 fallback), commented "available on GitHub
+          # Actions runners" — true when written, false by Xcode 26.5.
+          # Selecting from what is present cannot go stale.
+          #
+          # `|| true` on `boot` only, not on `bootstatus`. An already-booted
+          # device makes `simctl boot` exit non-zero for a benign reason —
+          # common on a fresh runner — and that alone used to be swallowed
+          # right along with a real failure, surfacing two steps later as an
+          # opaque `simctl install`/xcodebuild destination error instead of
+          # here. `bootstatus` is the actual gate: it blocks until the
+          # device reaches Booted, and is what must fail loudly if it never
+          # does.
+          UDID=$(xcrun simctl list devices available -j \
+            | jq -r '[.devices[][] | select(.isAvailable)] | map(select(.name | test("^iPhone"))) | last | .udid')
+          if [ -z "$UDID" ] || [ "$UDID" = "null" ]; then
+            echo "No iPhone simulator available on this runner image:"
+            xcrun simctl list devices
+            exit 1
+          fi
+          echo "Booting $(xcrun simctl list devices -j | jq -r --arg u "$UDID" '[.devices[][]|select(.udid==$u)]|first|.name') ($UDID)"
+          echo "SIMULATOR_UDID=$UDID" >> "$GITHUB_ENV"
+          xcrun simctl boot "$UDID" || true
+          xcrun simctl bootstatus "$UDID" -b
 
       - name: Setup test environment
         run: |
@@ -393,7 +548,7 @@ jobs:
             -configuration Debug \
             -sdk iphonesimulator \
             -derivedDataPath build \
-            -destination 'platform=iOS Simulator,name=iPhone 16 Pro' \
+            -destination 'generic/platform=iOS Simulator' \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             build
@@ -402,7 +557,10 @@ jobs:
         run: |
           APP_PATH=$(find ios/build -name "*.app" -type d | head -n 1)
           echo "App path: $APP_PATH"
-          SIMULATOR_UDID=$(xcrun simctl list devices booted | grep -m 1 iPhone | sed 's/.*(\([^)]*\)).*/\1/')
+          # $SIMULATOR_UDID: exported to $GITHUB_ENV by "Setup iOS Simulator"
+          # above — see the comment on this pattern in the "maestro-ios" job's
+          # "Install app on simulator" step. Re-deriving it here via
+          # `grep -m 1 iPhone` reopens the same ambiguity.
           echo "Simulator UDID: $SIMULATOR_UDID"
           xcrun simctl install "$SIMULATOR_UDID" "$APP_PATH"
 
@@ -414,18 +572,25 @@ jobs:
           sleep 5
 
       - name: Run ${{ matrix.test-group.name }} tests
-        env:
-          APP_ID: org.verily.FSbeerselector
         run: |
           echo "Running ${{ matrix.test-group.description }}"
 
-          # Run each test in the group
+          # `|| true` per test, not on the loop: every test in the group must
+          # still run even after an earlier one fails — that's the point of
+          # grouping them — but the step as a whole must not silently swallow
+          # every failure it sees. `group_failed` is what closes that gap: it
+          # is what `test-summary` (via `needs.maestro-ios-parallel.result`)
+          # now actually depends on to report this job's true outcome, instead
+          # of a directory-existence check that was true whether or not any
+          # test here passed.
+          group_failed=0
           for test in ${{ matrix.test-group.tests }}; do
             echo "Running test: $test"
             maestro test "$test" \
               --format junit \
-              --output "maestro-results-${{ matrix.test-group.name }}-$(basename $test .yaml).xml" || true
+              --output "maestro-results-${{ matrix.test-group.name }}-$(basename $test .yaml).xml" || group_failed=1
           done
+          exit $group_failed
 
       - name: Stop mock server
         if: always() && env.EXPO_PUBLIC_USE_MOCK_SERVER == 'true'
@@ -458,13 +623,28 @@ jobs:
           name: Maestro E2E Tests (iOS - ${{ matrix.test-group.name }})
           path: maestro-results-*.xml
           reporter: java-junit
-          fail-on-error: false  # Don't fail the job, let summary handle overall status
+          # Not this step's job to fail the build — the "Run tests" step above
+          # already does that for real (`exit $group_failed`), and
+          # `test-summary` reads that outcome via `needs.*.result`. This
+          # annotation is presentation only: per-test pass/fail detail on the
+          # PR, not the signal anything downstream depends on.
+          fail-on-error: false
           fail-on-empty: false
 
   maestro-android:
     name: Maestro E2E Tests (Android)
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    # Known-red, non-blocking. Every flow's `appId:` hardcodes
+    # org.verily.FSbeerselector — the iOS bundle — by design; Android is not
+    # a supported target right now. This job WILL fail at launchApp, every
+    # time, and that is expected rather than a regression to chase.
+    # `continue-on-error` keeps it from blocking merges while `test-summary`
+    # still reports its real (red) result rather than hiding it — see the
+    # comment there. Kept, not deleted, so re-enabling Android later is a
+    # config change (parameterise appId again, drop this line) rather than a
+    # rebuild.
+    continue-on-error: true
 
     steps:
       - name: Checkout code
@@ -498,6 +678,10 @@ jobs:
       - name: Install Maestro CLI
         run: |
           # Install Maestro with verbose output
+          # Pinned. Why, and the caveat that this does NOT by itself make a
+          # local run predict CI (nothing pins your machine): see "How Maestro
+          # validates this suite", point 4, in .maestro/README.md.
+          export MAESTRO_VERSION=2.4.0
           curl -fsSL https://get.maestro.mobile.dev | bash
 
           # Verify installation directory exists
@@ -522,8 +706,15 @@ jobs:
           # Add to PATH for future steps
           echo "$HOME/.maestro/bin" >> $GITHUB_PATH
 
-          # Verify installation works
-          maestro --version
+          # Assert the pin actually took — the checks above prove only that
+          # SOME maestro installed, not which version. Full argument at the
+          # canonical copy of this step in .github/workflows/maestro-e2e.yml.
+          ACTUAL_VERSION=$(MAESTRO_CLI_NO_ANALYTICS=true maestro --version | tail -1)
+          if [ "$ACTUAL_VERSION" != "$MAESTRO_VERSION" ]; then
+            echo "Error: installed Maestro is '$ACTUAL_VERSION', expected '$MAESTRO_VERSION'"
+            exit 1
+          fi
+          echo "Maestro $ACTUAL_VERSION installed (pinned)"
 
       - name: Setup test environment
         run: |
@@ -574,7 +765,11 @@ jobs:
               sleep 5
             fi
 
-            # Run Maestro tests
+            # Run Maestro tests. Every flow hardcodes the iOS bundle ID
+            # (org.verily.FSbeerselector) — see the note on this job above.
+            # This will fail at launchApp against the Android build
+            # (org.verily.FSBeerselector, per app.json) every time; that is
+            # the known, accepted state, not a bug in this step.
             maestro test .maestro/ \
               --format junit \
               --output maestro-results-android.xml
@@ -611,7 +806,14 @@ jobs:
   test-summary:
     name: Test Summary
     runs-on: ubuntu-latest
-    needs: [maestro-ios, maestro-ios-parallel, maestro-android]
+    # `maestro-ios-critical` was in neither this list nor the body below, so the
+    # summary could print all-✅ while the critical-path job was red. It fails
+    # the workflow on its own — no `continue-on-error` — so nothing shipped past
+    # a red P0; but the artefact a human reads said the opposite of the run.
+    # Included here rather than inspecting its XML because, unlike
+    # `maestro-android`, it carries no `continue-on-error`, which is exactly the
+    # condition that makes `needs.<job>.result` trustworthy.
+    needs: [maestro-ios, maestro-ios-critical, maestro-ios-parallel, maestro-android]
     if: always()
 
     steps:
@@ -621,68 +823,172 @@ jobs:
           path: test-results
 
       - name: Generate test summary
+        env:
+          # `needs.<job>.result` is GitHub's own tracked outcome for each job
+          # — "success", "failure", "cancelled", or "skipped" — not a proxy
+          # for it. The directory-existence checks this replaced
+          # (`[ -d test-results/maestro-test-results-ios ]`) were never a
+          # reliable proxy either: every upload step in every Maestro job
+          # runs with `if: always()`, specifically so a failed run still
+          # leaves screenshots and logs behind for debugging. That means the
+          # directory this used to check for was present whether the tests
+          # passed OR failed — it could report PASSED, but had no way to ever
+          # report FAILED, which is the one outcome a test summary exists to
+          # catch.
+          IOS_RESULT: ${{ needs.maestro-ios.result }}
+          IOS_CRITICAL_RESULT: ${{ needs.maestro-ios-critical.result }}
+          IOS_PARALLEL_RESULT: ${{ needs.maestro-ios-parallel.result }}
         run: |
-          echo "## 🧪 Maestro E2E Test Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Date:** $(date +'%Y-%m-%d %H:%M:%S')" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 🧪 Maestro E2E Test Summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Date:** $(date +'%Y-%m-%d %H:%M:%S')" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
 
-          # iOS sequential results
-          if [ -d "test-results/maestro-test-results-ios" ]; then
-            echo "### ✅ iOS Tests (Sequential) - PASSED" >> $GITHUB_STEP_SUMMARY
-            echo "All iOS Maestro E2E tests completed successfully." >> $GITHUB_STEP_SUMMARY
-          else
-            echo "### ❌ iOS Tests (Sequential) - FAILED" >> $GITHUB_STEP_SUMMARY
-            echo "iOS Maestro tests encountered failures. Check artifacts for details." >> $GITHUB_STEP_SUMMARY
-          fi
-          echo "" >> $GITHUB_STEP_SUMMARY
+          overall_fail=0
 
-          # iOS parallel results (if PR)
+          # $1 = human label, $2 = needs.<job>.result value.
+          report_platform() {
+            case "$2" in
+              success)
+                echo "### ✅ $1 - PASSED" >> "$GITHUB_STEP_SUMMARY"
+                echo "All $1 tests completed successfully." >> "$GITHUB_STEP_SUMMARY"
+                ;;
+              skipped)
+                echo "### ⏭️ $1 - SKIPPED" >> "$GITHUB_STEP_SUMMARY"
+                ;;
+              *)
+                echo "### ❌ $1 - FAILED" >> "$GITHUB_STEP_SUMMARY"
+                echo "$1 tests encountered failures (job result: $2). Check artifacts for details." >> "$GITHUB_STEP_SUMMARY"
+                overall_fail=1
+                ;;
+            esac
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+          }
+
+          report_platform "iOS Tests (Sequential)" "$IOS_RESULT"
+
+          # Reported first among equals in importance: this is the P0 set, it
+          # runs on every event, and it is the one job whose failure most
+          # obviously should not be printable as a green summary.
+          report_platform "iOS Critical Path (P0)" "$IOS_CRITICAL_RESULT"
+
+          # iOS parallel results (if PR). $IOS_PARALLEL_RESULT is ONE
+          # aggregated result for the whole matrix — GitHub reports "failure"
+          # here if any single test group failed — so it is what decides
+          # PASSED/FAILED. The per-group breakdown below is presentation
+          # only: it inspects each group's actual JUnit XML for a `<failure`
+          # element, which is real signal (unlike the artifact directory,
+          # which is uploaded via `if: always()` regardless of outcome), but
+          # is not itself what this step fails on.
           if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
-            echo "### iOS Tests (Parallel) - Test Group Results" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
+            report_platform "iOS Tests (Parallel)" "$IOS_PARALLEL_RESULT"
 
-            # Check each test group
+            echo "**Test Group Detail:**" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
             for group in login-flows settings beer-features offline-network error-handling; do
-              if [ -d "test-results/maestro-parallel-results-$group" ]; then
-                echo "- ✅ **$group**: PASSED" >> $GITHUB_STEP_SUMMARY
+              dir="test-results/maestro-parallel-results-$group"
+              # "XML present" before content: see the Android block below. The
+              # `<error` alternation there is inert against Maestro 2.4.0 and
+              # kept only as insurance; the XML-presence arm is the real fix.
+              if [ ! -d "$dir" ]; then
+                echo "- ❔ **$group**: no results uploaded" >> "$GITHUB_STEP_SUMMARY"
+              elif ! find "$dir" -name '*.xml' -type f 2>/dev/null | grep -q .; then
+                echo "- ❔ **$group**: INCONCLUSIVE (artifact uploaded, no JUnit XML)" >> "$GITHUB_STEP_SUMMARY"
+              elif grep -rlq '<failure\|<error' "$dir" 2>/dev/null; then
+                echo "- ❌ **$group**: FAILED" >> "$GITHUB_STEP_SUMMARY"
               else
-                echo "- ❌ **$group**: FAILED" >> $GITHUB_STEP_SUMMARY
+                echo "- ✅ **$group**: PASSED" >> "$GITHUB_STEP_SUMMARY"
               fi
             done
-            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "" >> "$GITHUB_STEP_SUMMARY"
           fi
 
-          # Android results
-          if [ -d "test-results/maestro-test-results-android" ]; then
-            echo "### ✅ Android Tests - PASSED" >> $GITHUB_STEP_SUMMARY
-            echo "All Android Maestro E2E tests completed successfully." >> $GITHUB_STEP_SUMMARY
+          # Android is known-red and non-blocking (`continue-on-error: true`
+          # on the `maestro-android` job — see the comment there and in
+          # .maestro/config.yaml). That setting makes
+          # `needs.maestro-android.result` UNRELIABLE for reporting here:
+          # GitHub Actions reports "success" in the `needs` context for a
+          # continue-on-error job even when its steps genuinely failed, which
+          # would make this section claim PASSED unconditionally — the exact
+          # "green that means nothing" this whole job exists to stop
+          # printing. Inspecting the uploaded JUnit XML directly (same
+          # technique as the parallel per-group detail above) reports what
+          # actually happened instead. Deliberately not fed into
+          # `overall_fail`: Android isn't a supported target right now, so
+          # gating the PR check on it would be a failure nobody can act on.
+          android_dir="test-results/maestro-test-results-android"
+          #
+          # WHY THIS IS NOT `grep '<failure'` ALONE — corrected, because the
+          # reason first given here was false.
+          #
+          # The original claim was that a launch failure is JUnit `<error>`
+          # rather than `<failure>`, so the old grep printed PASSED for the
+          # known-red Android job. That is WRONG. Maestro 2.4.0's own reporter
+          # (`JUnitTestSuiteReporter`, verified against the installed jar with
+          # javap) has a `Failure` class and no `Error` class: `TestCase` holds
+          # `status: FlowStatus` plus an optional `failure`, and `TestSuite`
+          # holds `failures` with no `errors`. A launch failure is emitted as
+          # `<testcase status="ERROR"><failure>…</failure></testcase>` — ERROR
+          # is an attribute VALUE, never an element. So the old grep DID catch
+          # that job, and the `\|<error` half of this pattern is inert against
+          # any XML Maestro 2.4.0 can produce. It is kept as cheap insurance
+          # against a future reporter change, not because it fixes anything.
+          #
+          # THE REAL DEFECT IS THE ARM BELOW IT. A directory holding logs but
+          # no JUnit XML fell through to PASSED — silence reported as success.
+          # That one is genuine and is reproduced against fixtures.
+          #
+          # Note also that the artifact directory is NOT guaranteed to exist:
+          # `if: always()` guarantees the upload STEP runs, but
+          # `actions/upload-artifact@v4` defaults to `if-no-files-found: warn`,
+          # so a job dying before maestro writes anything produces no artifact
+          # and no directory, and the `[ ! -d ]` arm fires instead.
+          if [ ! -d "$android_dir" ]; then
+            echo "### ❔ Android Tests - NO RESULTS" >> "$GITHUB_STEP_SUMMARY"
+            echo "Known-red, non-blocking — Android is not a supported target right now (see .maestro/config.yaml). No results were uploaded." >> "$GITHUB_STEP_SUMMARY"
+          elif ! find "$android_dir" -name '*.xml' -type f 2>/dev/null | grep -q .; then
+            echo "### ❔ Android Tests - INCONCLUSIVE" >> "$GITHUB_STEP_SUMMARY"
+            echo "An artifact was uploaded but contains no JUnit XML, so nothing can be concluded from it. Known-red, non-blocking (see .maestro/config.yaml)." >> "$GITHUB_STEP_SUMMARY"
+          elif grep -rlq '<failure\|<error' "$android_dir" 2>/dev/null; then
+            echo "### ❌ Android Tests - FAILED" >> "$GITHUB_STEP_SUMMARY"
+            echo "Known-red, non-blocking — Android is not a supported target right now (see .maestro/config.yaml)." >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "### ❌ Android Tests - FAILED" >> $GITHUB_STEP_SUMMARY
-            echo "Android Maestro tests encountered failures. Check artifacts for details." >> $GITHUB_STEP_SUMMARY
+            echo "### ✅ Android Tests - PASSED" >> "$GITHUB_STEP_SUMMARY"
           fi
-          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "" >> "$GITHUB_STEP_SUMMARY"
 
           # Test artifacts
-          echo "### 📦 Test Artifacts" >> $GITHUB_STEP_SUMMARY
-          echo "- Test results: JUnit XML format" >> $GITHUB_STEP_SUMMARY
-          echo "- Screenshots: Available for failed tests" >> $GITHUB_STEP_SUMMARY
-          echo "- Test recordings: Available in Maestro logs" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 Test Artifacts" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Test results: JUnit XML format" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Screenshots: Available for failed tests" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Test recordings: Available in Maestro logs" >> "$GITHUB_STEP_SUMMARY"
           if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
-            echo "- Parallel test results: Grouped by test category" >> $GITHUB_STEP_SUMMARY
+            echo "- Parallel test results: Grouped by test category" >> "$GITHUB_STEP_SUMMARY"
           fi
-          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "" >> "$GITHUB_STEP_SUMMARY"
 
           # Execution mode info
           if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
-            echo "### ⚡ Parallel Execution Mode" >> $GITHUB_STEP_SUMMARY
-            echo "This PR used parallel test execution for faster feedback (~15min vs 45min sequential)." >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### ⚡ Parallel Execution Mode" >> "$GITHUB_STEP_SUMMARY"
+            echo "This PR used parallel test execution for faster feedback (~15min vs 45min sequential)." >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
           fi
 
           # Next steps
-          echo "### 📋 Next Steps" >> $GITHUB_STEP_SUMMARY
-          echo "1. Review test results in the artifacts section" >> $GITHUB_STEP_SUMMARY
-          echo "2. Check screenshots for visual issues" >> $GITHUB_STEP_SUMMARY
-          echo "3. Review Maestro logs for detailed error messages" >> $GITHUB_STEP_SUMMARY
-          echo "4. Fix any failing tests before merging" >> $GITHUB_STEP_SUMMARY
+          echo "### 📋 Next Steps" >> "$GITHUB_STEP_SUMMARY"
+          echo "1. Review test results in the artifacts section" >> "$GITHUB_STEP_SUMMARY"
+          echo "2. Check screenshots for visual issues" >> "$GITHUB_STEP_SUMMARY"
+          echo "3. Review Maestro logs for detailed error messages" >> "$GITHUB_STEP_SUMMARY"
+          echo "4. Fix any failing tests before merging" >> "$GITHUB_STEP_SUMMARY"
+
+          # The point of this whole job: previously nothing here ever ran
+          # `exit 1`, so "Test Summary" showed green on every PR regardless
+          # of what the markdown above said — including when every upstream
+          # Maestro job failed outright. `overall_fail` is set above from the
+          # same `needs.*.result` values the summary reports; failing on it
+          # is what makes this job's own status (and therefore the PR check)
+          # agree with what a human reading the summary would conclude.
+          if [ "$overall_fail" -ne 0 ]; then
+            echo "One or more Maestro test jobs did not succeed — see the summary above." >&2
+            exit 1
+          fi

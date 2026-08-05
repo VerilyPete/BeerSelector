@@ -6,9 +6,17 @@
  */
 
 import { DatabaseLockManager } from '../DatabaseLockManager';
+import { DatabaseContentionError } from '../errors';
+import { nameKeyedLock, NameKeyedLock } from './helpers/nameKeyedLock';
 
-function createLockManager(): DatabaseLockManager {
-  return new DatabaseLockManager();
+// These suites identify operations by name, which is what they assert about.
+// The shim maps names to tokens; ownership is covered in
+// DatabaseLockManager.ownership.test.ts against the real API.
+function createLockManager(
+  options: ConstructorParameters<typeof DatabaseLockManager>[0] = {}
+): DatabaseLockManager & NameKeyedLock {
+  const manager = new DatabaseLockManager(options);
+  return Object.assign(manager, nameKeyedLock(manager));
 }
 
 describe('DatabaseLockManager', () => {
@@ -175,33 +183,33 @@ describe('DatabaseLockManager', () => {
     });
 
     it('should log warning when lock is forcibly released', async () => {
-      const lockManager = createLockManager();
-      const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
+      // Repointed from console.warn to the injected error reporter: a forced
+      // release abandons a grant and is reported as an incident, not chatter.
+      const reportError = jest.fn();
+      const lockManager = createLockManager({ reportError });
 
       await lockManager.acquireLock('timeout-test');
 
       // Trigger timeout
       jest.advanceTimersByTime(15000);
 
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('forcibly released')
+      expect(reportError).toHaveBeenCalledWith(
+        expect.objectContaining({ message: expect.stringContaining('forcibly released') }),
+        expect.anything()
       );
-
-      consoleSpy.mockRestore();
     });
 
     it('should clear timeout when lock is released normally', async () => {
-      const lockManager = createLockManager();
-      const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
+      const reportError = jest.fn();
+      const lockManager = createLockManager({ reportError });
 
       await lockManager.acquireLock('normal-operation');
       lockManager.releaseLock('normal-operation');
 
-      // Advance time - should not trigger warning since timeout was cleared
+      // Advance time - should not report anything since the timeout was cleared
       jest.advanceTimersByTime(15000);
 
-      expect(consoleSpy).not.toHaveBeenCalled();
-      consoleSpy.mockRestore();
+      expect(reportError).not.toHaveBeenCalled();
     });
   });
 
@@ -348,9 +356,7 @@ describe('DatabaseLockManager', () => {
       // Second operation should log waiting message (immediately on queue entry)
       const secondPromise = lockManager.acquireLock('waiting-operation');
 
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('waiting for lock')
-      );
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('waiting for lock'));
 
       lockManager.releaseLock('blocking-operation');
       await secondPromise;
@@ -391,6 +397,26 @@ describe('DatabaseLockManager', () => {
 
       // Promise should reject with timeout error
       await expect(acquirePromise).rejects.toThrow(/timeout.*5000ms/i);
+
+      lockManager.releaseLock('blocking-operation');
+    });
+
+    it('rejects with a typed contention error, not a bare Error', async () => {
+      // A bare Error meant `createErrorResponse` fell through to its substring
+      // rules, where `message.includes('timeout')` classified a purely local
+      // lock problem as NETWORK_ERROR — so the user was told to check their
+      // internet connection about a database that was merely busy, often after
+      // the network fetch had already succeeded. `DatabaseContentionError` is
+      // classified by TYPE and carries `retryable`, which is what this
+      // condition actually is.
+      const lockManager = createLockManager();
+      await lockManager.acquireLock('blocking-operation');
+
+      const acquirePromise = lockManager.acquireLock('timeout-operation', 5000);
+      jest.advanceTimersByTime(5000);
+
+      await expect(acquirePromise).rejects.toBeInstanceOf(DatabaseContentionError);
+      await expect(acquirePromise).rejects.toMatchObject({ retryable: true });
 
       lockManager.releaseLock('blocking-operation');
     });
@@ -569,7 +595,7 @@ describe('DatabaseLockManager', () => {
       await lockManager.acquireLock('operation-1');
 
       // Queue 3 operations with different timeouts
-      const promise2 = lockManager.acquireLock('operation-2', 5000);  // 5s
+      const promise2 = lockManager.acquireLock('operation-2', 5000); // 5s
       const promise3 = lockManager.acquireLock('operation-3', 10000); // 10s
       const promise4 = lockManager.acquireLock('operation-4', 15000); // 15s
 
@@ -770,9 +796,7 @@ describe('DatabaseLockManager', () => {
 
       await lockManager.prepareForShutdown(5000);
 
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        expect.stringMatching(/preparing.*shutdown/i)
-      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringMatching(/preparing.*shutdown/i));
 
       consoleLogSpy.mockRestore();
     });

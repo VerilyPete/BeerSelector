@@ -24,11 +24,8 @@ export async function migrateToVersion5(
 ): Promise<void> {
   console.log('Starting migration to schema version 5...');
 
-  // Acquire master lock to prevent concurrent data operations
-  const lockId = 'schema-migration-v5';
-  await databaseLockManager.acquireLock(lockId);
-
-  try {
+  // Hold the master lock for the whole migration
+  await databaseLockManager.withDatabaseLock('schema-migration-v5', async () => {
     await database.withTransactionAsync(async () => {
       console.log('Recalculating container types for flight beers...');
 
@@ -41,9 +38,7 @@ export async function migrateToVersion5(
 
       console.log('Migration to version 5 complete');
     });
-  } finally {
-    databaseLockManager.releaseLock(lockId);
-  }
+  });
 }
 
 /**

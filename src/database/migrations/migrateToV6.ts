@@ -23,11 +23,8 @@ export async function migrateToVersion6(
 ): Promise<void> {
   console.log('Starting migration to schema version 6...');
 
-  // Acquire master lock to prevent concurrent data operations
-  const lockId = 'schema-migration-v6';
-  await databaseLockManager.acquireLock(lockId);
-
-  try {
+  // Hold the master lock for the whole migration
+  await databaseLockManager.withDatabaseLock('schema-migration-v6', async () => {
     await database.withTransactionAsync(async () => {
       console.log('Adding abv column to allbeers and tasted_brew_current_round tables...');
 
@@ -48,9 +45,7 @@ export async function migrateToVersion6(
 
       console.log('Migration to version 6 complete');
     });
-  } finally {
-    databaseLockManager.releaseLock(lockId);
-  }
+  });
 }
 
 /**

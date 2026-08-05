@@ -12,6 +12,7 @@ import {
   FlyingSaucerResponses,
   RequestRecord,
 } from '../../__tests__/utils/mockServer';
+import { ApiErrorType } from '../../utils/notificationUtils';
 import {
   fetchBeersFromAPI,
   fetchMyBeersFromAPI,
@@ -19,6 +20,7 @@ import {
   fetchWithRetry,
 } from '../beerApi';
 import * as preferences from '@/src/database/preferences';
+import type { FetchOutcome, FetchedSource } from '../fetchOutcome';
 
 process.env.EXPO_PUBLIC_API_RETRY_DELAY = '100';
 
@@ -28,6 +30,18 @@ jest.mock('@/src/database/preferences');
 // IMPORTANT: Do NOT mock fetch - we need real HTTP calls to the mock server
 // Save the real fetch before jest.setup.js mocks it
 const realFetch = global.fetch;
+
+/**
+ * Unwrap a fetch result to its rows for this suite's assertions.
+ *
+ * This suite exercises the mock-server plumbing — retries, timeouts, malformed
+ * transports — not the FetchOutcome semantics, which beerApi.test.ts covers
+ * directly. Flattening every non-data case to [] keeps these tests asserting
+ * what they were written to assert.
+ */
+function rowsOf<T>(source: FetchedSource<FetchOutcome<T>>): T[] {
+  return source.status === 'fetched' && source.data.kind === 'data' ? [...source.data.items] : [];
+}
 
 describe('API Integration with Mock Server', () => {
   let mockServer: any;
@@ -92,7 +106,7 @@ describe('API Integration with Mock Server', () => {
 
       mockServer.setResponse('/visitor.php', FlyingSaucerResponses.beers(mockBeers));
 
-      const beers = await fetchBeersFromAPI();
+      const beers = rowsOf(await fetchBeersFromAPI());
 
       expect(beers).toEqual(mockBeers);
       expect(mockServer.getRequestsForPath('/visitor.php')).toHaveLength(1);
@@ -122,7 +136,7 @@ describe('API Integration with Mock Server', () => {
 
       mockServer.setResponse('/mybeers.php', FlyingSaucerResponses.myBeers(mockTastedBeers));
 
-      const tastedBeers = await fetchMyBeersFromAPI();
+      const tastedBeers = rowsOf(await fetchMyBeersFromAPI());
 
       expect(tastedBeers).toEqual(mockTastedBeers);
       expect(mockServer.getRequestsForPath('/mybeers.php')).toHaveLength(1);
@@ -157,7 +171,7 @@ describe('API Integration with Mock Server', () => {
         body: [null, null, { reward: mockRewards }],
       });
 
-      const rewards = await fetchRewardsFromAPI();
+      const rewards = rowsOf(await fetchRewardsFromAPI());
 
       expect(rewards).toEqual(mockRewards);
       expect(mockServer.getRequestsForPath('/rewards.php')).toHaveLength(1);
@@ -168,7 +182,18 @@ describe('API Integration with Mock Server', () => {
 
       mockServer.setResponse('/visitor.php', FlyingSaucerResponses.serverError());
 
-      await expect(fetchBeersFromAPI()).rejects.toThrow();
+      // INVERTED by plan 05 Phase 5.3: transport failures arrive as `failed`
+      // rather than being thrown, and a 5xx is now typed SERVER_ERROR rather
+      // than being read as a network error out of its message.
+      const outcome = await fetchBeersFromAPI();
+      expect(outcome.status).toBe('failed');
+      if (outcome.status === 'failed') {
+        // This suite is the only place a real HTTP status crosses a socket, so
+        // it is the right home for the classification assertion. A 5xx must not
+        // be read as a network error — that told the user to check the one thing
+        // they could do nothing about.
+        expect(outcome.error.type).toBe(ApiErrorType.SERVER_ERROR);
+      }
     });
 
     it('should handle 404 not found error', async () => {
@@ -176,7 +201,22 @@ describe('API Integration with Mock Server', () => {
 
       mockServer.setResponse('/notfound.php', FlyingSaucerResponses.notFound());
 
-      await expect(fetchBeersFromAPI()).rejects.toThrow();
+      // INVERTED by plan 05 Phase 5.3. A 4xx is a client fault, so it classifies
+      // as VALIDATION_ERROR rather than SERVER_ERROR — the split has no other
+      // real-socket coverage.
+      const notFound = await fetchBeersFromAPI();
+      expect(notFound.status).toBe('failed');
+      if (notFound.status === 'failed') {
+        expect(notFound.error.type).toBe(ApiErrorType.VALIDATION_ERROR);
+        expect(notFound.error.statusCode).toBe(404);
+      }
+
+      // Plan 05 Phase 5.4a: a 4xx is not retried. Asserted here because this is
+      // the only suite with a real server counting real requests — the Jest
+      // coverage of this policy counts calls to a `fetch` mock, which cannot
+      // show that the server was left alone. Written without being run: this
+      // suite needs a socket listen and fails with EPERM in the sandbox.
+      expect(mockServer.getRequestsForPath('/notfound.php').length).toBe(1);
     });
 
     it('should timeout on slow response', async () => {
@@ -211,7 +251,7 @@ describe('API Integration with Mock Server', () => {
         body: [null, { brewInStock: [] }],
       });
 
-      const beers = await fetchBeersFromAPI();
+      const beers = rowsOf(await fetchBeersFromAPI());
 
       expect(beers).toEqual([]);
     });
@@ -243,7 +283,7 @@ describe('API Integration with Mock Server', () => {
         };
       });
 
-      const beers = await fetchBeersFromAPI();
+      const beers = rowsOf(await fetchBeersFromAPI());
 
       expect(beers).toHaveLength(1);
       expect(beers[0].brew_name).toBe('Success After Retry');
@@ -323,7 +363,7 @@ describe('API Integration with Mock Server', () => {
       });
 
       // Should work without authentication
-      const beers = await fetchBeersFromAPI();
+      const beers = rowsOf(await fetchBeersFromAPI());
 
       expect(beers).toHaveLength(1);
       expect(beers[0].brew_name).toBe('Public Beer');
@@ -455,8 +495,13 @@ describe('API Integration with Mock Server', () => {
         body: { unexpected: 'format' },
       });
 
-      // Should throw error on invalid format
-      await expect(fetchBeersFromAPI()).rejects.toThrow('Invalid response format from API');
+      // INVERTED by plan 05 Phase 5.3: a body that arrived and could not be used
+      // is `fetched` + `malformed`, not a throw and not `failed`.
+      const outcome = await fetchBeersFromAPI();
+      expect(outcome.status).toBe('fetched');
+      if (outcome.status === 'fetched') {
+        expect(outcome.data.kind).toBe('malformed');
+      }
     });
 
     it('should handle partial data corruption', async () => {
@@ -474,7 +519,7 @@ describe('API Integration with Mock Server', () => {
         body: [null, { brewInStock: mixedBeers }],
       });
 
-      const beers = await fetchBeersFromAPI();
+      const beers = rowsOf(await fetchBeersFromAPI());
 
       // Should return all beers (filtering happens in repository layer)
       expect(beers).toHaveLength(3);
@@ -498,7 +543,7 @@ describe('API Integration with Mock Server', () => {
         ],
       });
 
-      const beers = await fetchBeersFromAPI();
+      const beers = rowsOf(await fetchBeersFromAPI());
 
       expect(beers).toHaveLength(1);
       expect(mockServer.getRequestsForPath('/custom-endpoint.php')).toHaveLength(1);
@@ -523,12 +568,12 @@ describe('API Integration with Mock Server', () => {
 
       // Test dev environment
       mockGetPreference.mockResolvedValue(devUrl);
-      const devBeers = await fetchBeersFromAPI();
+      const devBeers = rowsOf(await fetchBeersFromAPI());
       expect(devBeers[0].brew_name).toBe('Dev Beer');
 
       // Switch to prod environment
       mockGetPreference.mockResolvedValue(prodUrl);
-      const prodBeers = await fetchBeersFromAPI();
+      const prodBeers = rowsOf(await fetchBeersFromAPI());
       expect(prodBeers[0].brew_name).toBe('Prod Beer');
     });
 
@@ -573,13 +618,29 @@ describe('API Integration with Mock Server', () => {
       expect(Array.isArray(result)).toBe(true);
     }, 10000);
 
-    it('should handle none:// protocol URLs for visitor mode', async () => {
+    // INVERTED by plan 02 Phase 3, which this file was missed by: the assertion
+    // here still demanded the synthesised `[null, { tasted_brew_current_round:
+    // [] }]` that Phase 3 deleted, and had been failing ever since. Its sibling
+    // in beerApi.test.ts:84 was skipped at the time; this one is re-aimed
+    // instead, because skipping both would leave the removal itself unpinned.
+    //
+    // The caller-side tests (beerApi.test.ts:790, :891) pin that none:// is
+    // rejected BEFORE a request. They cannot pin that fetchWithRetry stopped
+    // fabricating, because they never reach it — restore the synthesis and they
+    // stay green. This is the test that dies for that mutant: it hands the
+    // placeholder straight to fetchWithRetry, so a fabricated body resolves
+    // where a rejection is required.
+    //
+    // `retries = 1` because an unsupported protocol is not a transient fault
+    // and there is nothing to wait for; the default 3 would spend backoff
+    // proving that twice more.
+    it('rejects a none:// URL rather than synthesising an empty round', async () => {
       const noneUrl = 'none://placeholder';
 
-      const result = await fetchWithRetry(noneUrl);
+      await expect(fetchWithRetry(noneUrl, 1, 10)).rejects.toThrow();
 
-      // Should return empty data without making network request
-      expect(result).toEqual([null, { tasted_brew_current_round: [] }]);
+      // The URL never became a request against the real server behind this
+      // suite — which is the half of the old assertion that stayed true.
       expect(mockServer.getRequests()).toHaveLength(0);
     });
 
@@ -650,7 +711,7 @@ describe('API Integration with Mock Server', () => {
         body: [null, { brewInStock: mockBeers }],
       });
 
-      const beers = await fetchBeersFromAPI();
+      const beers = rowsOf(await fetchBeersFromAPI());
 
       expect(beers).toEqual(mockBeers);
       expect(beers).toHaveLength(2);
@@ -674,7 +735,7 @@ describe('API Integration with Mock Server', () => {
         body: [null, { tasted_brew_current_round: mockTastedBeers }],
       });
 
-      const beers = await fetchMyBeersFromAPI();
+      const beers = rowsOf(await fetchMyBeersFromAPI());
 
       expect(beers).toEqual(mockTastedBeers);
     });
@@ -706,7 +767,7 @@ describe('API Integration with Mock Server', () => {
         body: [null, null, { reward: mockRewards }],
       });
 
-      const rewards = await fetchRewardsFromAPI();
+      const rewards = rowsOf(await fetchRewardsFromAPI());
 
       expect(rewards).toEqual(mockRewards);
     });
@@ -720,7 +781,7 @@ describe('API Integration with Mock Server', () => {
         body: [null, { brewInStock: [{ id: '1', brew_name: 'Test' }] }],
       });
 
-      const beers = await fetchBeersFromAPI();
+      const beers = rowsOf(await fetchBeersFromAPI());
 
       expect(beers).toHaveLength(1);
       expect(beers[0].id).toBe('1');

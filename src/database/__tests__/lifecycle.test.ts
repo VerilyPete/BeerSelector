@@ -94,7 +94,9 @@ describe('Database Lifecycle Management', () => {
 
       await getDatabase();
 
-      expect(consoleWarnSpy).toHaveBeenCalledWith('Failed to enable WAL mode, using delete instead');
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        'Failed to enable WAL mode, using delete instead'
+      );
       consoleWarnSpy.mockRestore();
     });
 
@@ -107,7 +109,9 @@ describe('Database Lifecycle Management', () => {
 
       await getDatabase();
 
-      expect(consoleWarnSpy).toHaveBeenCalledWith('Failed to enable WAL mode, using unknown instead');
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        'Failed to enable WAL mode, using unknown instead'
+      );
 
       consoleWarnSpy.mockRestore();
     });
@@ -251,7 +255,6 @@ describe('Database Lifecycle Management', () => {
 
       expect(mockDb.closeAsync).toHaveBeenCalledTimes(1);
     });
-
   });
 
   describe('Database State Validation', () => {
@@ -278,9 +281,7 @@ describe('Database Lifecycle Management', () => {
       const promises = [];
 
       for (let i = 0; i < 5; i++) {
-        promises.push(
-          getDatabase().then(() => closeDatabaseConnection())
-        );
+        promises.push(getDatabase().then(() => closeDatabaseConnection()));
       }
 
       await Promise.all(promises);
@@ -344,11 +345,11 @@ describe('Database Lifecycle Management', () => {
       expect(reopenedDb).toBeDefined();
 
       // Should be able to acquire lock again (this would fail without resetShutdownState)
-      const acquired = await databaseLockManager.acquireLock('post-reopen-operation');
-      expect(acquired).toBe(true);
+      const token = await databaseLockManager.acquire('post-reopen-operation');
+      expect(databaseLockManager.isLocked()).toBe(true);
 
       // Clean up
-      databaseLockManager.releaseLock('post-reopen-operation');
+      databaseLockManager.release(token);
     });
 
     it('should reset shutdown state when getDatabase is called after close', async () => {
@@ -362,9 +363,9 @@ describe('Database Lifecycle Management', () => {
       await getDatabase();
 
       // Verify shutdown state was reset by being able to acquire a lock
-      const acquired = await databaseLockManager.acquireLock('post-reopen-lock-check');
-      expect(acquired).toBe(true);
-      databaseLockManager.releaseLock('post-reopen-lock-check');
+      const token = await databaseLockManager.acquire('post-reopen-lock-check');
+      expect(databaseLockManager.isLocked()).toBe(true);
+      databaseLockManager.release(token);
     });
 
     it('should handle multiple background/foreground cycles without lock issues', async () => {
@@ -377,11 +378,11 @@ describe('Database Lifecycle Management', () => {
         expect(db).toBeDefined();
 
         // Acquire a lock to simulate an operation
-        const acquired = await databaseLockManager.acquireLock(`cycle-${i}-operation`);
-        expect(acquired).toBe(true);
+        const token = await databaseLockManager.acquire(`cycle-${i}-operation`);
+        expect(databaseLockManager.isLocked()).toBe(true);
 
         // Release the lock
-        databaseLockManager.releaseLock(`cycle-${i}-operation`);
+        databaseLockManager.release(token);
 
         // Close database (background)
         await closeDatabaseConnection();
@@ -391,9 +392,9 @@ describe('Database Lifecycle Management', () => {
 
       // Final verification - should still be able to acquire lock
       await getDatabase();
-      const finalAcquired = await databaseLockManager.acquireLock('final-operation');
-      expect(finalAcquired).toBe(true);
-      databaseLockManager.releaseLock('final-operation');
+      const finalToken = await databaseLockManager.acquire('final-operation');
+      expect(databaseLockManager.isLocked()).toBe(true);
+      databaseLockManager.release(finalToken);
     });
   });
 });

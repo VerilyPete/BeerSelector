@@ -5,6 +5,7 @@
  */
 
 import { operationQueueRepository } from '../OperationQueueRepository';
+import { DatabaseContentionError } from '../../errors';
 import {
   QueuedOperation,
   OperationType,
@@ -195,10 +196,9 @@ describe('OperationQueueRepository', () => {
 
       const operations = await operationQueueRepository.getPendingOperations();
 
-      expect(mockDb.getAllAsync).toHaveBeenCalledWith(
-        expect.stringContaining('WHERE status = ?'),
-        [OperationStatus.PENDING]
-      );
+      expect(mockDb.getAllAsync).toHaveBeenCalledWith(expect.stringContaining('WHERE status = ?'), [
+        OperationStatus.PENDING,
+      ]);
       expect(operations).toHaveLength(1);
       expect(operations[0].id).toBe('op-1');
       expect(operations[0].status).toBe(OperationStatus.PENDING);
@@ -244,10 +244,7 @@ describe('OperationQueueRepository', () => {
 
   describe('updateStatus', () => {
     it('should update operation status', async () => {
-      await operationQueueRepository.updateStatus(
-        'op-1',
-        OperationStatus.SUCCESS
-      );
+      await operationQueueRepository.updateStatus('op-1', OperationStatus.SUCCESS);
 
       expect(mockDb.runAsync).toHaveBeenCalledWith(
         expect.stringContaining('UPDATE operation_queue SET status = ?'),
@@ -258,11 +255,7 @@ describe('OperationQueueRepository', () => {
     it('should update status with error message', async () => {
       const errorMessage = 'Network error';
 
-      await operationQueueRepository.updateStatus(
-        'op-1',
-        OperationStatus.FAILED,
-        errorMessage
-      );
+      await operationQueueRepository.updateStatus('op-1', OperationStatus.FAILED, errorMessage);
 
       expect(mockDb.runAsync).toHaveBeenCalledWith(
         expect.stringContaining('UPDATE operation_queue SET status = ?'),
@@ -293,12 +286,7 @@ describe('OperationQueueRepository', () => {
 
       expect(mockDb.runAsync).toHaveBeenCalledWith(
         expect.stringContaining('retry_count = retry_count + 1'),
-        expect.arrayContaining([
-          expect.any(Number),
-          errorMessage,
-          OperationStatus.PENDING,
-          'op-1',
-        ])
+        expect.arrayContaining([expect.any(Number), errorMessage, OperationStatus.PENDING, 'op-1'])
       );
     });
   });
@@ -318,9 +306,7 @@ describe('OperationQueueRepository', () => {
     it('should delete all operations', async () => {
       await operationQueueRepository.clearAll();
 
-      expect(mockDb.runAsync).toHaveBeenCalledWith(
-        'DELETE FROM operation_queue'
-      );
+      expect(mockDb.runAsync).toHaveBeenCalledWith('DELETE FROM operation_queue');
     });
   });
 
@@ -328,9 +314,7 @@ describe('OperationQueueRepository', () => {
     it('should return count of operations with given status', async () => {
       mockDb.getFirstAsync.mockResolvedValue({ count: 5 });
 
-      const count = await operationQueueRepository.getCountByStatus(
-        OperationStatus.PENDING
-      );
+      const count = await operationQueueRepository.getCountByStatus(OperationStatus.PENDING);
 
       expect(count).toBe(5);
       expect(mockDb.getFirstAsync).toHaveBeenCalledWith(
@@ -342,9 +326,7 @@ describe('OperationQueueRepository', () => {
     it('should return 0 if no operations found', async () => {
       mockDb.getFirstAsync.mockResolvedValue({ count: 0 });
 
-      const count = await operationQueueRepository.getCountByStatus(
-        OperationStatus.SUCCESS
-      );
+      const count = await operationQueueRepository.getCountByStatus(OperationStatus.SUCCESS);
 
       expect(count).toBe(0);
     });
@@ -352,9 +334,7 @@ describe('OperationQueueRepository', () => {
     it('should return 0 on error', async () => {
       mockDb.getFirstAsync.mockRejectedValue(new Error('Database error'));
 
-      const count = await operationQueueRepository.getCountByStatus(
-        OperationStatus.PENDING
-      );
+      const count = await operationQueueRepository.getCountByStatus(OperationStatus.PENDING);
 
       expect(count).toBe(0);
     });
@@ -428,5 +408,58 @@ describe('OperationQueueRepository', () => {
         [OperationStatus.SUCCESS]
       );
     });
+  });
+});
+
+describe('OperationQueueRepository under database contention', () => {
+  // Global fake timers (jest.setup.js:141) would stall the retry backoff.
+  beforeEach(() => {
+    jest.useRealTimers();
+  });
+
+  afterEach(() => {
+    jest.useFakeTimers();
+  });
+
+  it('maps a lock abort on addOperation to DatabaseContentionError', async () => {
+    mockDb.runAsync.mockRejectedValue(new Error('database is locked'));
+
+    // The live case: OperationQueueContext schedules retryAll() when the
+    // network is restored, which is exactly when a taplist refresh runs. Since
+    // the import moved to an exclusive transaction on a second connection, this
+    // unlocked write now aborts for the duration of that import.
+    await expect(
+      operationQueueRepository.addOperation({
+        id: 'op-1',
+        type: 'CHECK_IN',
+        payload: { beerId: 'b-1' },
+        status: 'pending',
+        retryCount: 0,
+        createdAt: 1,
+        updatedAt: 1,
+      } as never)
+    ).rejects.toBeInstanceOf(DatabaseContentionError);
+    // Retried before giving up.
+    expect(mockDb.runAsync.mock.calls.length).toBeGreaterThan(1);
+  });
+
+  it('recovers when the contending import finishes mid-retry', async () => {
+    mockDb.runAsync
+      .mockRejectedValueOnce(new Error('database is locked'))
+      .mockResolvedValueOnce(undefined);
+
+    // The realistic case: the taplist import commits and the queued write
+    // succeeds on the next attempt instead of being lost.
+    await expect(
+      operationQueueRepository.addOperation({
+        id: 'op-2',
+        type: 'CHECK_IN',
+        payload: { beerId: 'b-2' },
+        status: 'pending',
+        retryCount: 0,
+        createdAt: 1,
+        updatedAt: 1,
+      } as never)
+    ).resolves.toBeUndefined();
   });
 });

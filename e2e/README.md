@@ -25,6 +25,7 @@ The BeerSelector app uses two complementary E2E testing tools:
 2. **Flashlight** - Performance testing and profiling
 
 Together, they provide comprehensive coverage of:
+
 - User interactions and workflows
 - UI rendering and behavior
 - Scroll performance and FPS
@@ -61,6 +62,7 @@ e2e/
 ### Test Coverage
 
 #### BeerList Component (HIGH PRIORITY)
+
 - ✅ Full list rendering with 100+ items
 - ✅ Scrolling behavior (up, down, fast, slow)
 - ✅ Item expansion/collapse
@@ -69,6 +71,7 @@ e2e/
 - ✅ Loading states
 
 #### Search Functionality
+
 - ✅ Search input responsiveness
 - ✅ Search filtering logic
 - ✅ Clear search button
@@ -76,6 +79,7 @@ e2e/
 - ✅ Special characters handling
 
 #### Filter Functionality
+
 - ✅ Draft filter toggle
 - ✅ Heavies filter toggle
 - ✅ IPA filter toggle
@@ -83,16 +87,19 @@ e2e/
 - ✅ Filter state persistence
 
 #### Sort Functionality
+
 - ✅ Sort by Date
 - ✅ Sort by Name
 - ✅ Sort toggle persistence
 
 #### Navigation
+
 - ✅ Tab switching (All Beer, Beerfinder, Tasted Brews)
 - ✅ State persistence across tabs
 - ✅ Navigation during loading
 
 #### Performance
+
 - ✅ List scroll FPS (target: 55+ FPS)
 - ✅ Search response time (< 300ms)
 - ✅ Filter application (< 200ms)
@@ -134,17 +141,20 @@ npx expo run:android
 Maestro is the primary E2E testing tool.
 
 #### On macOS (recommended):
+
 ```bash
 curl -fsSL https://get.maestro.mobile.dev | bash
 ```
 
 #### On Windows:
+
 ```bash
 # Using PowerShell
 iwr https://get.maestro.mobile.dev | iex
 ```
 
 #### Verify installation:
+
 ```bash
 maestro --version
 ```
@@ -158,6 +168,7 @@ npm install -g @shopify/flashlight
 ```
 
 #### Verify installation:
+
 ```bash
 flashlight --version
 ```
@@ -174,39 +185,37 @@ npm install
 ### Maestro Tests (Functional)
 
 #### Run all test flows:
+
 ```bash
 npm run test:e2e
 ```
 
 Or directly with Maestro:
+
 ```bash
 maestro test .maestro/
 ```
 
 #### Run specific test flow:
+
 ```bash
 maestro test .maestro/01-beer-list-rendering.yaml
 ```
 
 #### Run on specific device:
+
 ```bash
-# iOS
 maestro test --device "iPhone 14 Pro" .maestro/
-
-# Android
-maestro test --device "emulator-5554" .maestro/
 ```
 
-#### Run with environment variables:
-```bash
-# iOS
-APP_ID=org.verily.FSbeerselector maestro test .maestro/
-
-# Android
-APP_ID=com.yourcompany.beerselector maestro test .maestro/
-```
+Android is not currently supported: every flow's `appId:` header hardcodes
+`org.verily.FSbeerselector` (the iOS bundle ID) directly, by decision, not
+oversight. Running Maestro against an Android build (package
+`org.verily.FSBeerselector`, per `app.json` — capital B, genuinely a
+different string) fails at `launchApp` immediately.
 
 #### Generate test report:
+
 ```bash
 maestro test .maestro/ --format junit --output test-results/maestro.xml
 ```
@@ -214,21 +223,25 @@ maestro test .maestro/ --format junit --output test-results/maestro.xml
 ### Flashlight Tests (Performance)
 
 #### Run all performance tests:
+
 ```bash
 npm run test:performance
 ```
 
 Or directly with Flashlight:
+
 ```bash
 flashlight test --config .flashlight/performance-tests.yaml
 ```
 
 #### Run specific performance test:
+
 ```bash
 flashlight test --config .flashlight/performance-tests.yaml --test "Beer List Scroll Performance"
 ```
 
 #### Generate performance report:
+
 ```bash
 flashlight test --config .flashlight/performance-tests.yaml --report
 flashlight report .flashlight/reports/latest.json
@@ -241,6 +254,7 @@ flashlight report .flashlight/reports/latest.json
 **File**: `.maestro/01-beer-list-rendering.yaml`
 
 **Tests**:
+
 - App launch and initialization
 - Beer list container visibility
 - Search bar presence
@@ -253,6 +267,7 @@ flashlight report .flashlight/reports/latest.json
 **Duration**: ~45 seconds
 
 **Run**:
+
 ```bash
 maestro test .maestro/01-beer-list-rendering.yaml
 ```
@@ -262,6 +277,7 @@ maestro test .maestro/01-beer-list-rendering.yaml
 **File**: `.maestro/02-search-and-filter.yaml`
 
 **Tests**:
+
 - Search input interaction
 - Search filtering ("IPA", "Stout")
 - Clear search button
@@ -275,6 +291,7 @@ maestro test .maestro/01-beer-list-rendering.yaml
 **Duration**: ~60 seconds
 
 **Run**:
+
 ```bash
 maestro test .maestro/02-search-and-filter.yaml
 ```
@@ -284,6 +301,7 @@ maestro test .maestro/02-search-and-filter.yaml
 **File**: `.maestro/03-beer-item-expansion.yaml`
 
 **Tests**:
+
 - Single item tap to expand
 - Single item tap to collapse
 - Multiple item expansion (only one expanded at a time)
@@ -294,6 +312,7 @@ maestro test .maestro/02-search-and-filter.yaml
 **Duration**: ~50 seconds
 
 **Run**:
+
 ```bash
 maestro test .maestro/03-beer-item-expansion.yaml
 ```
@@ -303,6 +322,7 @@ maestro test .maestro/03-beer-item-expansion.yaml
 **File**: `.maestro/04-empty-states.yaml`
 
 **Tests**:
+
 - Empty search results
 - Empty filter results
 - Search + filter combination leading to empty
@@ -315,6 +335,7 @@ maestro test .maestro/03-beer-item-expansion.yaml
 **Duration**: ~55 seconds
 
 **Run**:
+
 ```bash
 maestro test .maestro/04-empty-states.yaml
 ```
@@ -324,6 +345,7 @@ maestro test .maestro/04-empty-states.yaml
 **File**: `.maestro/05-navigation-and-tabs.yaml`
 
 **Tests**:
+
 - Basic tab navigation
 - State persistence during navigation
 - Search filter persistence
@@ -334,6 +356,7 @@ maestro test .maestro/04-empty-states.yaml
 **Duration**: ~70 seconds
 
 **Run**:
+
 ```bash
 maestro test .maestro/05-navigation-and-tabs.yaml
 ```
@@ -354,14 +377,14 @@ flashlight report .flashlight/reports/latest.json
 
 ### Performance Thresholds
 
-| Metric | Target | Acceptable |
-|--------|--------|------------|
-| Scroll FPS | 60 | 55 |
-| Search Response | 100ms | 300ms |
-| Filter Application | 150ms | 200ms |
-| Item Expansion | 100ms | 200ms |
-| Cold Start | 2s | 3s |
-| Warm Start | 500ms | 1s |
+| Metric             | Target | Acceptable |
+| ------------------ | ------ | ---------- |
+| Scroll FPS         | 60     | 55         |
+| Search Response    | 100ms  | 300ms      |
+| Filter Application | 150ms  | 200ms      |
+| Item Expansion     | 100ms  | 200ms      |
+| Cold Start         | 2s     | 3s         |
+| Warm Start         | 500ms  | 1s         |
 
 ## Continuous Integration
 
@@ -443,8 +466,8 @@ jobs:
 ### Maestro Test Structure
 
 ```yaml
-appId: ${APP_ID}
-name: "Your Test Name"
+appId: org.verily.FSbeerselector
+name: 'Your Test Name'
 ---
 # Test Flow Description
 
@@ -454,7 +477,7 @@ name: "Your Test Name"
 
 # Step 2: Another step
 - assertVisible:
-    id: "element-testid"
+    id: 'element-testid'
 ```
 
 ### Best Practices for Test IDs
@@ -484,25 +507,25 @@ When adding new components, include `testID` props:
 
 ```yaml
 # Navigation
-- tapOn: "Button Text"
+- tapOn: 'Button Text'
 - tapOn:
-    id: "element-testid"
+    id: 'element-testid'
 
 # Assertions
 - assertVisible:
-    id: "element-testid"
+    id: 'element-testid'
 - assertNotVisible:
-    text: "Some Text"
+    text: 'Some Text'
 
 # Input
-- inputText: "Search term"
+- inputText: 'Search term'
 
 # Scrolling
 - scroll:
     direction: DOWN
 - scrollUntilVisible:
     element:
-      id: "target-element"
+      id: 'target-element'
 
 # Waiting
 - waitForAnimationToEnd:
@@ -512,7 +535,7 @@ When adding new components, include `testID` props:
 - swipe:
     direction: DOWN
     from:
-      id: "list-element"
+      id: 'list-element'
 ```
 
 ## Troubleshooting
@@ -524,6 +547,7 @@ When adding new components, include `testID` props:
 **Cause**: Element not yet rendered or testID missing
 
 **Solutions**:
+
 - Add `waitForAnimationToEnd` before assertions
 - Verify testID is set on component
 - Check if element is conditionally rendered
@@ -534,6 +558,7 @@ When adding new components, include `testID` props:
 **Cause**: Race conditions or timing issues
 
 **Solutions**:
+
 - Increase timeout values
 - Add explicit waits: `waitForAnimationToEnd`
 - Use `assertVisible` with timeout parameter
@@ -544,6 +569,7 @@ When adding new components, include `testID` props:
 **Cause**: Performance thresholds too strict or device-specific
 
 **Solutions**:
+
 - Check device performance profile
 - Adjust thresholds in `.flashlight/performance-tests.yaml`
 - Test on target devices (not just dev machines)
@@ -554,8 +580,9 @@ When adding new components, include `testID` props:
 **Cause**: Build issues or incorrect app ID
 
 **Solutions**:
-- Verify app is built: `npx expo run:ios` or `npx expo run:android`
-- Check APP_ID in `.maestro/config.yaml`
+
+- Verify app is built: `npx expo run:ios` (Android is not currently
+  supported — every flow's `appId:` hardcodes the iOS bundle ID)
 - Ensure simulator/emulator is running
 - Check Maestro can see device: `maestro devices`
 
@@ -564,6 +591,7 @@ When adding new components, include `testID` props:
 **Cause**: App launched too quickly
 
 **Solutions**:
+
 - Increase initial wait time
 - Add `waitForAnimationToEnd: timeout: 10000` after launch
 - Use `clearState: false` in launchApp to preserve data
@@ -643,15 +671,18 @@ maestro studio
 ## Resources
 
 ### Maestro
+
 - [Official Documentation](https://maestro.mobile.dev/docs)
 - [Command Reference](https://maestro.mobile.dev/reference)
 - [Best Practices](https://maestro.mobile.dev/best-practices)
 
 ### Flashlight
+
 - [GitHub Repository](https://github.com/bamlab/flashlight)
 - [Performance Guide](https://reactnative.dev/docs/performance)
 
 ### React Native Testing
+
 - [Testing Overview](https://reactnative.dev/docs/testing-overview)
 - [FlatList Optimization](https://reactnative.dev/docs/optimizing-flatlist-configuration)
 
@@ -669,6 +700,7 @@ When contributing new tests:
 ## Questions?
 
 For questions or issues with E2E testing:
+
 1. Check this documentation
 2. Review [TEST_FIXES_SUMMARY.md](../TEST_FIXES_SUMMARY.md)
 3. Check Maestro/Flashlight docs
