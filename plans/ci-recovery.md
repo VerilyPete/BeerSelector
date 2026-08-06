@@ -435,11 +435,19 @@ reads as one.
       reproduced by two reviewers. Deliberately a **new** workflow file, not a
       job in either existing one, so 6.1's decision cannot delete unit coverage
       as a side effect.
-- [ ] 5.2 Observe it green on `ubuntu-latest` and record the number **before**
-      requiring it. **Still open — nothing has run in CI yet.** Record
-      wall-clock as well as the count: `timeout-minutes: 15` is currently
-      justified by a *local* measurement (~57s user CPU, ~8s wall) extrapolated
-      to a 4-vCPU runner, not by observation.
+- [x] 5.2 Observe it green on `ubuntu-latest` and record the number **before**
+      requiring it. **Answered, and it did not pass first time — which is the
+      entire reason this item exists.**
+      - Run 1 (PR #10, `de19d388`): **RED**. `ran=2257 failed=4` against a floor
+        of 2272. See 5.13 — three separate review rounds and three local
+        measurements had all missed it, and only a clean checkout could.
+      - Run 2 (`96a99d36`), after the fix: **GREEN**. 96 suites, **2272 passed**,
+        `passed=2272 ran=2272 failed=0 skipped=0`. So the count *is* reproducible
+        across macOS and Linux once the suite is portable, and MIN_PASSED=2272 is
+        correct.
+      - **Wall clock: 77s** of the 900s timeout — `timeout-minutes: 15` has ~11x
+        margin, so the local extrapolation (~57s user CPU) was sound.
+      - Both artifacts uploaded non-empty, with the per-attempt names.
 - [ ] 5.3 `jest-junit.config.js` is dead config — jest-junit reads
       `package.json#jest-junit` or `JEST_JUNIT_*`, not that file. `junit.xml` is
       written to the repo root. An upload pointed at `reports/junit/` produces
@@ -532,6 +540,34 @@ reads as one.
       - Note the ordering trap this creates with 5.6: making a check *required*
         while it can decline to run on a valid PR leaves that PR permanently
         pending and unmergeable. Fix the trigger before requiring the check.
+- [x] 5.13 **NEW, and the single most valuable thing CI found: the test suite
+      was not portable.** `allbeers.json` and `mybeers.json` are gitignored and
+      untracked, and **nine test files reference them**. On a clean checkout
+      they do not exist:
+      - `dataRefresh.integration.test.ts` failed to **load**, taking 15 tests
+        with it;
+      - two tests in `dataUpdateService.integration.test.ts` failed with ENOENT.
+      So the honest number on a clean checkout was **2257 with 2 failing**, and
+      "2272 tests pass" was only ever true on a machine holding two untracked
+      data files. Every local measurement in this plan — including the three
+      used to set the floor — silently had them. **No amount of local
+      verification or code review could have found this; only a clean checkout
+      could**, which is exactly what 5.2 was written to force.
+      Fixed by committing both under `src/services/__tests__/fixtures/` and
+      pointing the two on-disk readers there, resolved from `__dirname` rather
+      than `process.cwd()`. The other seven files only use
+      `https://example.com/allbeers.json` as a mock URL string and never touch
+      disk. Verified by reproducing CI's condition locally — with the untracked
+      root copies moved away, the full suite is 96 suites / 2272 / exit 0.
+      - Gotcha worth keeping: the `.gitignore` entries are **bare patterns**, so
+        they match at any depth. The committed fixtures were silently ignored
+        until re-included with `!` negations.
+      - The fixtures are in `.prettierignore`: they are captured API responses,
+        and keeping them byte-identical means a real change to the payload shape
+        shows up as a diff instead of hiding behind reformatting.
+      - Note this says nothing good about the *other* eight quarantined or
+        fixture-dependent paths. It is the first time this suite has ever run
+        anywhere but a developer's machine.
 - [ ] 5.11 **NEW, then DOWNGRADED on review: nothing prevents a committed
       `.only`.** `.eslintrc.js` extends `expo`; `eslint-plugin-jest` is not
       installed, so there is no `no-focused-tests` rule, and `.husky/pre-commit`
