@@ -2,9 +2,20 @@ name: E2E Tests
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main]
+  # Deliberately NO `branches:` filter. On `pull_request` it filters the BASE
+  # branch, so `[main, develop]` meant a PR opened against any other branch
+  # displayed no check at all — not red, not pending, nothing. Silence is worse
+  # than a red X, and it is the failure mode this repo has spent twelve review
+  # rounds learning to distrust.
+  #
+  # Note this costs nothing for PRs into main, which behave exactly as before.
+  # The only new runs are PRs based on other branches, which currently get no
+  # coverage whatsoever.
+  #
+  # `develop` was removed from `push:` as well: no such branch exists in this
+  # repo, locally or on origin. It was dead config.
   pull_request:
-    branches: [main, develop]
   workflow_dispatch:  # Allow manual trigger
 
 jobs:
