@@ -1,7 +1,7 @@
 # Maestro E2E Test Workflow
 #
 # This workflow runs Maestro E2E tests in multiple modes:
-# 1. maestro-ios: Full sequential test suite (on main/develop push)
+# 1. maestro-ios: Full sequential test suite (on push to main, and on PRs)
 # 2. maestro-ios-parallel: Parallel test execution (on PRs for speed)
 # 3. maestro-ios-critical: Fast P0 tests only (on all events)
 # 4. maestro-android: Android test suite
@@ -12,10 +12,19 @@
 name: Maestro E2E Tests
 
 on:
+  # Deliberately NO `branches:` filter. On `pull_request` it filters the BASE
+  # branch, so `[main, develop]` meant a PR opened against any other branch
+  # displayed no check at all — not red, not pending, nothing. Silence is worse
+  # than a red X.
+  #
+  # This costs nothing for PRs into main, which behave exactly as before. The
+  # only new runs are PRs based on other branches, which get no coverage today.
+  #
+  # `develop` was removed from `push:` as well: no such branch exists in this
+  # repo, locally or on origin. It was dead config.
   pull_request:
-    branches: [main, develop]
   push:
-    branches: [main, develop]
+    branches: [main]
   workflow_dispatch:  # Allow manual trigger
 
 env:
