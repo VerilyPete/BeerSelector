@@ -482,11 +482,27 @@ reads as one.
       assertions while the floor holds. Also assert `<skipped>` does not rise, or
       gate on *passed* rather than *tests*. Fail closed on a missing or
       unparseable `junit.xml`.
-      **Done — gates on `passed`, not `tests=`.** Note a detail this item got
-      slightly wrong: the root `<testsuites>` element carries **no `skipped`
-      attribute at all**; only the child `<testsuite>` elements do, so the check
-      must sum the children. Written as "assert `<skipped>` does not rise" and
-      read off the root, it would have asserted nothing.
+      **Done — but NOT by gating on `passed`, which is what this item asked for
+      and what an earlier revision of this line claimed had shipped.** The
+      merged workflow computes `ran = tests - skipped` and gates the floor on
+      `ran`, with **separate** assertions for failures and for skips. `passed`
+      is computed and printed for diagnosis, and never asserted on.
+      **Known naming wart, recorded rather than quietly left:** the env var is
+      still called `MIN_PASSED` although it is now compared against `ran`. The
+      value and the behaviour are both right, but the name says the thing the
+      code stopped doing — the exact defect class this plan keeps catching. Fold
+      the rename into the next commit that touches `tests.yml`; do not raise a
+      PR solely for it.
+      Why the change: failures are counted inside root `tests=`, so gating the
+      floor on `passed` made an **intact** suite with N genuine failures report
+      "the suite shrank" and invite someone to lower the floor when nothing had
+      been removed. Gating on `ran` fixes that at the source — see the
+      corresponding retraction below, which this line used to contradict.
+      Note a second detail this item got wrong: the root `<testsuites>` element
+      carries **no `skipped` attribute at all**; only the child `<testsuite>`
+      elements do, so the check must sum the children. Written as "assert
+      `<skipped>` does not rise" and read off the root, it would have asserted
+      nothing.
       Verified against ten cases before commit, each observed to fail or pass as
       required: real 2272 suite passes; suite grown to 2300 passes; missing file
       fails closed; unparseable file fails closed; `tests="0"` fails; failures
