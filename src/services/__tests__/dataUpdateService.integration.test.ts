@@ -95,8 +95,11 @@ describe('dataUpdateService integration tests', () => {
   });
 
   // Helper function to load test data from files
+  // Resolved from __dirname, not process.cwd(). These fixtures are committed
+  // under ./fixtures/; previously this read from the working directory, which
+  // only worked on machines holding the untracked root copies.
   const loadTestData = (filename: string) => {
-    const filePath = path.resolve(process.cwd(), filename);
+    const filePath = path.join(__dirname, 'fixtures', filename);
     const fileContent = fs.readFileSync(filePath, 'utf-8');
     return JSON.parse(fileContent);
   };

@@ -1,0 +1,269 @@
+name: Unit Tests
+
+# Jest has never run in CI. Until this file existed, this repo's unit suite was
+# verified by nothing: the two workflows in .github/workflows/ run Maestro E2E
+# and Flashlight performance, neither of them runs jest, and .husky/pre-commit
+# is lint-staged (eslint + prettier) only.
+#
+# Deliberately a separate workflow rather than a job inside e2e-tests.yml or
+# maestro-e2e.yml. Those two duplicate each other, and plans/ci-recovery.md item
+# 6.1 holds an open decision about deleting e2e-tests.yml's iOS job. Keeping
+# jest in its own file means that decision cannot take unit-test coverage with
+# it as a side effect.
+
+on:
+  push:
+    branches: [main]
+  # Deliberately NO `branches:` filter. On `pull_request` it filters the BASE
+  # branch, and this repo routinely carries several long-lived non-`main`
+  # branches on origin. A PR stacked on any of them would show no check at all
+  # — silence, which is worse than a red X. (Specific branch names are omitted
+  # on purpose: they churn, and a comment naming them goes stale faster than
+  # the argument does.)
+  #
+  # The first draft of this file copied `[main, develop]` from e2e-tests.yml:4.
+  # There is no `develop` branch in this repo, local or remote; that filter is
+  # dead config inherited from a workflow that still has it.
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: unit-tests-${{ github.ref }}
+  # Supersede stale PR runs. Evaluates false on push, so an already-running
+  # post-merge run on main is not cancelled by the next push to main. (GitHub
+  # independently cancels a still-*pending* run in the same group; this setting
+  # only governs runs that have already started.)
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  jest:
+    # Check context names must be unique across ALL workflows in the repo.
+    # e2e-tests.yml and maestro-e2e.yml already collide with each other on three
+    # names — "Test Summary", "Maestro E2E Tests (iOS)" and "Maestro E2E Tests
+    # (Android)" — which is how a green job and a red job come to share a single
+    # check name. Do not rename this job to anything either of those files uses.
+    # See plans/ci-recovery.md item 5.7.
+    name: Jest Unit Tests
+    runs-on: ubuntu-latest
+    # Measured basis: ~57s user CPU locally, so roughly 20-40s wall on a 4-vCPU
+    # runner; npm ci on a cold cache dominates at 1-3 min. Realistic total is
+    # 2-5 min. Item 5.2 records observed wall-clock on the first green run.
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          # .nvmrc, not a bare '20' — this suite is verified against 20.19.1
+          # and CI should not silently drift to a different minor.
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        id: jest
+        # `rm -f` first so the floor step below can only ever read a report
+        # this run produced. Today that is belt-and-braces — the runner is
+        # ephemeral and checkout's default `clean: true` runs `git clean -ffdx`,
+        # whose `-x` removes ignored files like junit.xml. It stops being
+        # belt-and-braces the moment anyone moves to a self-hosted runner, sets
+        # `clean: false`, or caches the workspace, at which point a stale report
+        # would be validated in silence.
+        env:
+          # jest-junit's `reportTestSuiteErrors` defaults to the string 'false',
+          # and this repo sets no jest-junit options anywhere — so by default
+          # buildJsonResults returns early for any suite that produced NO
+          # results, and a suite that fails to LOAD (import error, syntax error)
+          # contributes nothing at all to the report: no error count, no test
+          # count. Root `errors` would then be permanently "0", and a blown-up
+          # suite would reach the gate below looking exactly like a deliberately
+          # deleted one. Env options have top precedence in jest-junit's merge.
+          JEST_JUNIT_REPORT_TEST_SUITE_ERRORS: 'true'
+        run: |
+          rm -f junit.xml
+          npm run test:ci
+
+      # Items 5.4 / 5.4a — the floor. Without this, the job certifies only that
+      # "jest exited 0", not that the suite actually ran. Appending one path to
+      # testPathIgnorePatterns (jest.config.js) shrinks the suite and keeps this
+      # check green. That list is not hypothetical maintenance debt: four of its
+      # eight explicit entries already point at files that no longer exist, and
+      # its own comment records that one quarantine was false and hid 14 real
+      # assertions.
+      #
+      # Gates on the number of cases that RAN (`tests=` minus skipped), not on
+      # `tests=` itself. `tests=` counts skipped/pending cases, so a floor read
+      # straight off it would hold while `it.skip`/`xit` quietly disabled the
+      # assertions inside — item 5.4a. Fails closed on a missing or unparseable
+      # report.
+      #
+      # `it.todo` is excluded from `tests=` altogether (jest counts todo
+      # separately from pending), so converting a real test to todo lowers the
+      # floor count and is caught. Note jest-junit still WRITES a <testcase>
+      # element for a todo case — so do not be tempted to "harden" this by
+      # comparing `tests=` against the number of <testcase> elements. They
+      # legitimately differ, and that check would go red on any repo using
+      # `it.todo`.
+      #
+      # This step deliberately RUNS EVEN WHEN JEST FAILED, and asserts
+      # failures==0 itself, rather than gating on `steps.jest.outcome ==
+      # 'success'`. Gating on success looks tidier and is a trapdoor: adding
+      # `continue-on-error: true` to the "Run tests" step above — the usual
+      # "unblock the branch, fix the flake later" move — makes jest's outcome
+      # 'failure' but its conclusion 'success', which would SKIP this gate
+      # entirely and let the job report green over failing tests with the one
+      # guard against a hollow suite never executed. All three post-test steps
+      # therefore share one positive-match condition on `outcome`.
+      # For the record, since it is the obvious "simplification" to reach for:
+      # `conclusion != 'skipped'` is NOT broken — the runner does complete a
+      # skipped step as Skipped and does populate the context for any step with
+      # an `id:`. It is rejected because mixing `outcome` and `conclusion`
+      # across these steps is what makes the trapdoor above reachable.
+      #
+      # Skipped tests are fatal, not a warning. The suite has zero today, so
+      # this costs nothing to adopt and permanently closes the quarantine hole:
+      # without it, every test added from here widens the gap between the floor
+      # and reality, and that gap is exactly how many tests can be `it.skip`'d
+      # out while the check stays green.
+      #
+      # RAISING MIN_PASSED is expected when tests are added. LOWERING it, or
+      # raising MAX_SKIPPED, must be a deliberate edit reviewed in the same PR.
+      - name: Assert the suite has not shrunk
+        if: ${{ always() && (steps.jest.outcome == 'success' || steps.jest.outcome == 'failure') }}
+        env:
+          MIN_PASSED: '2272'
+          MAX_SKIPPED: '0'
+        run: |
+          python3 - <<'PY'
+          import os, sys, xml.etree.ElementTree as ET
+
+          floor = int(os.environ['MIN_PASSED'])
+          max_skipped = int(os.environ['MAX_SKIPPED'])
+          # int() parsing lives inside the try as well: an attribute present but
+          # empty (tests="") raises ValueError, and outside the handler that
+          # exits with a bare traceback and no ::error:: annotation - failing
+          # closed, but invisibly in the checks UI.
+          try:
+              root = ET.parse('junit.xml').getroot()
+              total = int(root.get('tests', 0))
+              attr_failed = int(root.get('failures', 0)) + int(root.get('errors', 0))
+              # The root <testsuites> element carries no `skipped` attribute;
+              # only the child <testsuite> elements do. Summing them is required.
+              skipped = sum(int(ts.get('skipped', 0)) for ts in root.iter('testsuite'))
+          except Exception as exc:
+              sys.exit(f'::error::junit.xml missing or unparseable ({exc}) - failing closed.')
+
+          # Attribute counts alone miss a real failure: a suite where every test
+          # PASSED but a late hook (afterAll) threw. Verified against jest
+          # 29.7.0 - jest-junit records that as a synthetic <testcase><failure>
+          # in the body and never increments failures/errors at either the suite
+          # or root level, so the root reads tests="1" failures="0" errors="0".
+          # jest's own exit code catches it today, which is exactly the
+          # guarantee continue-on-error would remove. Count the body too.
+          body_failed = len(root.findall('.//testcase/failure')) + \
+                        len(root.findall('.//testcase/error'))
+          failed = max(attr_failed, body_failed)
+          ran = total - skipped
+          passed = ran - failed
+
+          print(f'passed={passed} ran={ran} total={total} failed={failed} '
+                f'(attr={attr_failed} body={body_failed}) skipped={skipped} '
+                f'floor={floor} max_skipped={max_skipped}')
+
+          problems = []
+          if failed:
+              problems.append(
+                  f'{failed} failure(s)/error(s) reported - see the "Run tests" step '
+                  'above for detail. (A count here can represent a whole suite that '
+                  'failed to load, not just one test.) Asserted independently so this '
+                  'gate cannot be disarmed by adding continue-on-error to that step.'
+              )
+          if skipped > max_skipped:
+              problems.append(
+                  f'{skipped} test(s) skipped, above MAX_SKIPPED ({max_skipped}). '
+                  'Skipped tests assert nothing. Quarantine deliberately by raising '
+                  'MAX_SKIPPED in this same PR, with a reason.'
+              )
+          # Checked unconditionally. Root `tests=` includes failing tests, so
+          # `ran` does NOT shrink when tests merely fail - a fully intact suite
+          # with N failures still reports ran == floor and trips nothing here.
+          # That means there is no reason to suppress this on red runs, and
+          # suppressing it would hide a PR that both breaks one test and deletes
+          # five hundred.
+          if ran < floor:
+              problems.append(
+                  f'{ran} test(s) ran, below the committed floor ({floor}). '
+                  'If this is the first run on a new platform, confirm which tests '
+                  'did not run before touching the floor - lowering MIN_PASSED is '
+                  'the correct fix ONLY when tests were deliberately removed.'
+              )
+          for p in problems:
+              print(f'::error::{p}')
+          sys.exit(1 if problems else 0)
+          PY
+
+      # jest-junit writes junit.xml to the REPO ROOT, not to reports/junit/.
+      # jest-junit.config.js is dead config: jest-junit reads options only from
+      # inline reporter options, package.json#jest-junit, and JEST_JUNIT_* env
+      # vars — this repo sets none of the three — so package defaults apply.
+      # See plans/ci-recovery.md item 5.3.
+      #
+      # Same condition as the floor step — see its comment for why all three
+      # post-test steps must share one. Here it additionally means an `npm ci`
+      # failure does not end the job with two further red steps complaining
+      # about missing artifacts and pointing away from the real cause, and a
+      # run cancelled before or during jest (outcome 'cancelled') emits none.
+      # A cancel landing after jest finished leaves outcome 'success', so these
+      # steps do run — but the artifacts exist by then, so they still pass.
+      #
+      # `always()` must stay: an `if:` with no status-check function is
+      # evaluated with an implicit `success() &&`, which would suppress these
+      # uploads on exactly the red runs whose evidence is most wanted.
+      - name: Upload JUnit results
+        if: ${{ always() && (steps.jest.outcome == 'success' || steps.jest.outcome == 'failure') }}
+        uses: actions/upload-artifact@v4
+        with:
+          # Suffixed by attempt, NOT `overwrite: true`. v4 rejects a duplicate
+          # artifact name within a run, so "Re-run failed jobs" would 409 and
+          # report a passing retry as red. `overwrite` fixes that by DELETING
+          # the previous attempt's artifact — which is the one naming the flaky
+          # test, discarded at the exact moment someone is re-running to
+          # identify it. Unique names disambiguate instead, and both survive.
+          # Caveat if this job ever gains a matrix: run_attempt is unique per
+          # ATTEMPT, not per job, so two matrix legs would collide within one
+          # attempt and the 409 returns. Add the matrix dimension to the name.
+          name: jest-junit-results-attempt-${{ github.run_attempt }}
+          path: junit.xml
+          # Fail rather than warn on a missing result file. The default
+          # ('warn') is what let this repo's E2E uploads point at unresolvable
+          # paths for the life of a branch (item 2.2b).
+          #
+          # Note what this does and does not buy: it checks EXISTENCE only, so
+          # an empty junit.xml would upload happily. What actually guards a
+          # hollow run is jest's exit code (jest exits 1 when no tests match,
+          # and test:ci passes no --passWithNoTests) plus the floor step above.
+          if-no-files-found: error
+
+      - name: Upload coverage report
+        if: ${{ always() && (steps.jest.outcome == 'success' || steps.jest.outcome == 'failure') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: jest-coverage-attempt-${{ github.run_attempt }}
+          path: coverage/
+          # Also `error`, though coverage gates nothing here (there is no
+          # coverageThreshold — item 5.5). jest.config.js sets collectCoverage
+          # globally, so absent coverage means jest did not finish normally.
+          # Revisit if 5.5 makes coverage output conditional.
+          if-no-files-found: error
+          # v4.4+ omits hidden files by default, which would drop the dot-prefixed
+          # entries the HTML report links to (on a clean checkout, `.expo`) and
+          # leave dead links in it.
+          include-hidden-files: true
