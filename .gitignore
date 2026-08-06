@@ -97,8 +97,19 @@ test-results/
 junit.xml
 
 # Data files (test data, personal data)
+# NOTE: these are bare patterns, so they match at ANY depth, not just the repo
+# root. The committed test fixtures below must therefore be re-included
+# explicitly or git will silently ignore them.
 mybeers.json
 allbeers.json
+
+# Committed test fixtures. Nine test files reference these two datasets and two
+# of them read from disk; before this, both lived only as untracked files at the
+# repo root, so the suite passed on developer machines that happened to have
+# them and failed anywhere else. CI's first run lost a whole suite (15 tests) to
+# ENOENT because of it.
+!src/services/__tests__/fixtures/mybeers.json
+!src/services/__tests__/fixtures/allbeers.json
 
 # Planning documents — working notes, not repo content
 plans/

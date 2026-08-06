@@ -14,12 +14,14 @@ import fs from 'fs';
 import path from 'path';
 import { fetchedRows } from '../../api/__tests__/helpers/fetchOutcomeFixtures';
 
-// Load real JSON fixtures
+// Load real JSON fixtures. These live in ./fixtures/ and are committed —
+// they used to be read from the repo root, where both files are gitignored
+// and untracked, so this suite failed to load entirely on any clean checkout.
 const allBeersFixture = JSON.parse(
-  fs.readFileSync(path.join(__dirname, '../../../allbeers.json'), 'utf-8')
+  fs.readFileSync(path.join(__dirname, 'fixtures/allbeers.json'), 'utf-8')
 );
 const myBeersFixture = JSON.parse(
-  fs.readFileSync(path.join(__dirname, '../../../mybeers.json'), 'utf-8')
+  fs.readFileSync(path.join(__dirname, 'fixtures/mybeers.json'), 'utf-8')
 );
 
 // Mock the modules

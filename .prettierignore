@@ -12,3 +12,9 @@ yarn.lock
 .DS_Store
 android
 ios
+
+# Captured API responses used as test fixtures. Kept byte-identical to what the
+# Flying Saucer API actually returned; reformatting them would obscure any real
+# future change to the payload shape behind a whitespace diff.
+src/services/__tests__/fixtures/allbeers.json
+src/services/__tests__/fixtures/mybeers.json
