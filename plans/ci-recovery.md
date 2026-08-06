@@ -427,23 +427,84 @@ reads as one.
 
 ## Phase 5 — run the tests that exist
 
-- [ ] 5.1 Add a jest job: `npm run test:ci` on `ubuntu-latest`, PR and push.
+- [x] 5.1 Add a jest job: `npm run test:ci` on `ubuntu-latest`, PR and push.
       2272 tests pass on developer machines and are verified by nothing.
+      **Done** — `.github/workflows/tests.yml`, job name `Jest Unit Tests`.
+      The 2272 figure is confirmed: 96 suites / 2272 passed / 0 failed / exit 0,
+      measured on node v26 **and** on `.nvmrc`'s 20.19.1, and independently
+      reproduced by two reviewers. Deliberately a **new** workflow file, not a
+      job in either existing one, so 6.1's decision cannot delete unit coverage
+      as a side effect.
 - [ ] 5.2 Observe it green on `ubuntu-latest` and record the number **before**
-      requiring it.
+      requiring it. **Still open — nothing has run in CI yet.** Record
+      wall-clock as well as the count: `timeout-minutes: 15` is currently
+      justified by a *local* measurement (~57s user CPU, ~8s wall) extrapolated
+      to a 4-vCPU runner, not by observation.
 - [ ] 5.3 `jest-junit.config.js` is dead config — jest-junit reads
       `package.json#jest-junit` or `JEST_JUNIT_*`, not that file. `junit.xml` is
       written to the repo root. An upload pointed at `reports/junit/` produces
       nothing and warns into the void — the same defect 2.2 exists to fix.
-- [ ] 5.4 Gate on `tests=` in `junit.xml` not dropping below a committed
+      **Confirmed at source** in `node_modules/jest-junit/utils/getOptions.js`:
+      options merge in the order defaults → inline reporter options →
+      `package.json#jest-junit` → `JEST_JUNIT_*`. No `.config.js` file is ever
+      read. This item's enumeration omitted **inline reporter options**, which
+      is the channel a future reader is most likely to reach for; the conclusion
+      is unaffected, since `jest.config.js:61` passes the reporter as a bare
+      string. `reports/` does not exist on disk. `tests.yml` uploads from the
+      repo root accordingly. **Still open:** the inert `jest-junit.config.js`
+      file itself is on disk (as is `jest.config.updated.js`, per 5.8).
+- [x] 5.4 Gate on `tests=` in `junit.xml` not dropping below a committed
       baseline. `testPathIgnorePatterns` (`jest.config.js:31-64`) already
       quarantines 8 files, and its own comment records that one quarantine was
       false and hid 14 real assertions. Without a floor, the cheapest way to
       green a required check is to add a line there.
-- [ ] 5.4a `tests=` counts **skipped and todo** cases, so `it.skip`/`xit` disables
+      **Landed WITH 5.1 rather than after it — a deliberate departure from this
+      plan's own sequencing.** Two reviewers independently named its absence the
+      single most important gap, on the grounds that 5.1 alone certifies "jest
+      exited 0", not "the suite ran", and that Phase 5's exit criterion is
+      literally "a jest check that cannot go green by shrinking". Sequencing it
+      after 5.2 was meant to avoid baking in an unobserved number; that risk is
+      lower than it looked, because the count is deterministic and was measured
+      three times. If ubuntu disagrees, the first run fails **loudly**, which is
+      the information 5.2 wanted anyway.
+      **New evidence that this list rots unaudited: four of its eight explicit
+      entries point at files that no longer exist** (all four
+      `__tests__/performance/*` paths).
+- [x] 5.4a `tests=` counts **skipped and todo** cases, so `it.skip`/`xit` disables
       assertions while the floor holds. Also assert `<skipped>` does not rise, or
       gate on *passed* rather than *tests*. Fail closed on a missing or
       unparseable `junit.xml`.
+      **Done — gates on `passed`, not `tests=`.** Note a detail this item got
+      slightly wrong: the root `<testsuites>` element carries **no `skipped`
+      attribute at all**; only the child `<testsuite>` elements do, so the check
+      must sum the children. Written as "assert `<skipped>` does not rise" and
+      read off the root, it would have asserted nothing.
+      Verified against ten cases before commit, each observed to fail or pass as
+      required: real 2272 suite passes; suite grown to 2300 passes; missing file
+      fails closed; unparseable file fails closed; `tests="0"` fails; failures
+      fail; errors fail; skipped fail; three simultaneous problems all report
+      rather than short-circuiting; and a real end-to-end mutant — appending one
+      path to `testPathIgnorePatterns` — where **jest exits 0 with 2210 tests**
+      and the floor is what turns it red. Baseline re-measured under `.nvmrc`'s
+      node 20.19.1 specifically, not just the machine default.
+      **Three hardenings added in review round 3, two of them fixing defects I
+      had just introduced:**
+      - The gate must not key on `steps.jest.outcome == 'success'`. Adding
+        `continue-on-error: true` to the test step — the ordinary "unblock the
+        branch" move — makes jest's outcome `failure` but its conclusion
+        `success`, which would **skip this gate entirely and let the job report
+        green over failing tests**. All post-test steps now share one
+        positive-match condition, and the script asserts `failures == 0` itself
+        rather than being purely downstream of jest's exit code.
+      - `overwrite: true` on the artifact uploads (added to fix a v4 duplicate-
+        name 409 on "Re-run failed jobs") **deletes the failed attempt's report**
+        — the one naming the flaky test, discarded exactly when someone is
+        re-running to identify it. Names are now suffixed per attempt instead,
+        so both survive.
+      - `skipped` is fatal, not a warning. The floor is a constant with no
+        ratchet, so every test added widens the gap between it and reality, and
+        that gap is precisely how many tests can be `it.skip`'d out while the
+        check stays green. Zero skipped today, so this cost nothing to adopt.
 - [ ] 5.5 `--coverage` gates nothing — there is no `coverageThreshold`. Note
       `jest.config.js:5` sets `collectCoverage: true` **globally**, so adding a
       threshold also fails developers' local watch runs, and "drop the flag" does
@@ -454,17 +515,69 @@ reads as one.
       of them in `dataUpdateService.ts`. That number exists nowhere else in the
       repo, and v2 dropped it — which is how a measured fact becomes unknown
       again. Non-blocking, but gate on "no increase over 141".
+- [ ] 5.10 **NEW, found reviewing 5.1: `develop` does not exist, and the
+      `branches:` filter on `pull_request:` produces silence rather than a red
+      check.** Both existing workflows trigger on `branches: [main, develop]`
+      (`e2e-tests.yml:4-7`, `maestro-e2e.yml:17`). There is no `develop` branch
+      in this repo, local or on origin — that half is simply dead config. The
+      live half is worse: on `pull_request`, `branches:` filters the **base**
+      branch, and `git ls-remote --heads origin` shows four non-`main` branches
+      today. A PR stacked on any of them changes source code and displays **no
+      check at all** — not red, not pending, nothing. (Branch names deliberately
+      not listed: checking during this review found local tracking refs were
+      already stale against origin, which is the same decay this plan keeps
+      catching in comments.)
+      `tests.yml` drops the filter on `pull_request:` for this reason; the two
+      E2E workflows still have it.
+      - Note the ordering trap this creates with 5.6: making a check *required*
+        while it can decline to run on a valid PR leaves that PR permanently
+        pending and unmergeable. Fix the trigger before requiring the check.
+- [ ] 5.11 **NEW, then DOWNGRADED on review: nothing prevents a committed
+      `.only`.** `.eslintrc.js` extends `expo`; `eslint-plugin-jest` is not
+      installed, so there is no `no-focused-tests` rule, and `.husky/pre-commit`
+      lints staged files only. Zero instances today.
+      **Why this is now low priority rather than a gap:** `it.only`/
+      `describe.only` marks the *other* tests in that file pending, jest-junit
+      records those in the suite's `skipped` attribute, and 5.4's gate treats
+      any `skipped > 0` as fatal. So a committed `.only` goes red today, and
+      `.only` cannot skip tests in other files. A dedicated lint rule would be
+      belt-and-braces, not the guard.
+- [ ] 5.12 **NEW: `jest.setup.js` replaces `console.*` with `jest.fn()` for
+      every suite**, so the `junit.xml` this job uploads carries none of the
+      diagnostics a failing test printed. Worth knowing before anyone relies on
+      that artifact to debug a CI-only failure. Pre-existing; not introduced by
+      5.1.
 - [ ] 5.6 Making a check required is **branch protection**, not a file edit.
       Name who does it. First establish what is required *today* — nothing in the
       repo records it, and if nothing is required then every finding here is
       advisory for merge purposes.
-- [ ] 5.7 **No two check contexts may share a name.** Two jobs are called
-      `Test Summary`, and PR #9 right now carries **two** checks both named
-      exactly `Maestro E2E Tests (iOS)` — one per workflow. Phase 0 adds a third
-      with that name via dorny's `name:` input. After Phase 3 lands in one
-      workflow and not the other — and they have already drifted — one will be
-      **green and one red under the same name**. That is a green-over-red neither
-      review round found, and it is really an argument for doing 6.1.
+      **This is the load-bearing assumption under 5.4's floor, and it is
+      currently false.** The floor's guarantee is "no shrunken suite reaches a
+      mergeable commit", and the proof of that runs: a shrink makes the step
+      exit 1 → job red → merge blocked. The last arrow does not exist here.
+      `main` has no branch protection and no rulesets, so a red `Jest Unit Tests`
+      blocks nothing, and neither would 2272 failing tests. The gate is a
+      trustworthy *signal* today and an *enforcement* mechanism only after this
+      item is closed. Do not describe it as the latter until then.
+      **Ordering constraint:** a status check cannot be marked required until
+      GitHub has seen the context at least once, so this cannot be done first.
+      The sequence is: land the workflow → let it run → *then* add the rule
+      naming `Jest Unit Tests`. And per 5.10, fix the trigger before requiring
+      it — a required check that declines to run on a valid PR leaves that PR
+      permanently pending and unmergeable.
+- [ ] 5.7 **No two check contexts may share a name.** **Corrected: this
+      inventory was short by one.** *Three* names collide across the two
+      workflows, not two — `Test Summary` (`e2e-tests.yml:411`,
+      `maestro-e2e.yml:807`), `Maestro E2E Tests (iOS)` (`:12`, `:30`) **and
+      `Maestro E2E Tests (Android)`** (`e2e-tests.yml:155`,
+      `maestro-e2e.yml:635`), which no version of this plan mentioned. Phase 0
+      adds a third source for each of the two Maestro names via dorny's `name:`
+      input. After Phase 3 lands in one workflow and not the other — and they
+      have already drifted — one will be **green and one red under the same
+      name**. That is a green-over-red neither review round found, and it is
+      really an argument for doing 6.1.
+      The new `Jest Unit Tests` job was checked against a full inventory of both
+      workflows and collides with nothing.
 - [ ] 5.8 Delete or wire up `jest.config.updated.js`, unused beside the real config.
 - **Exit:** a jest check that cannot go green by shrinking. Note the *required*
   half cannot be closed by the implementer — branch protection does not exist and
@@ -518,9 +631,86 @@ Round-8 convention: retractions get boxes, not prose, so they can be tracked.
 - [x] v2: the stale-JS-bundle scenario — `alwaysOutOfDate = 1` refutes it.
 - [x] v2: "19 unregistered flows" — 18, and three of them do run.
 - [x] v2: Phase 0's exit condition — vacuously true before and after.
+- [x] v3: 5.7's inventory — **three** names collide, not two. `Maestro E2E Tests
+      (Android)` is duplicated across both workflows and no version of this plan
+      noticed.
+- [x] v3: 5.4a's "assert `<skipped>` does not rise" — the root `<testsuites>`
+      element has no `skipped` attribute, so read literally off the root this
+      asserts nothing. Must sum the child `<testsuite>` elements.
+- [x] v3: "2272 tests pass on developer machines" was stated without a
+      measurement anywhere in the repo. It is true — but it was inherited, not
+      verified, until 5.1 measured it three times.
+- [x] v3/5.4a: "`tests=` counts skipped **and todo**" — todo is excluded from
+      `tests=` entirely (jest tracks `numTodoTests` separately and jest-junit
+      sums only failing+passing+pending). Gating on `passed` is still right, but
+      for a different reason than the one recorded.
+- [x] v3 implementation: gating the count check on `steps.jest.outcome ==
+      'success'` — looked tidy, was a trapdoor. See 5.4.
+- [x] v3 implementation: `overwrite: true` on the uploads — fixed a real 409 by
+      destroying the evidence it existed to preserve. See 5.4.
+- [x] v3 implementation: comparing the floor against `passed` — failures
+      subtract from `passed`, so an **intact** suite with 5 genuine failures
+      reported "the suite shrank" and invited someone to lower the floor when
+      nothing had been removed. The shrink check now uses the count that
+      *executed* and is suppressed entirely when tests failed. Worst part: this
+      was visible in my own verification output and I read past it, because the
+      case exited 1 as expected and I checked the exit code rather than the
+      message.
+- [x] v3 implementation: relying on jest-junit's root `errors`. With
+      `reportTestSuiteErrors` at its default, a suite that fails to **load**
+      contributes nothing to the report — no error count, no test count — so
+      root `errors` is structurally always `"0"` and a blown-up suite reached
+      the gate looking exactly like a deliberately deleted one. Now switched on
+      via `JEST_JUNIT_REPORT_TEST_SUITE_ERRORS` on the test step.
+- [x] v3 implementation: suppressing the shrink check when tests failed. The
+      stated reason — "failures subtract from the executed count" — was false
+      for the metric it guarded: root `tests=` **includes** failing tests, so an
+      intact suite with N failures never trips the floor anyway. The guard did
+      nothing except hide genuine shrinkage on red runs. Removed.
+- [x] v3 implementation: reading failures from XML **attributes only**. A suite
+      where every test passes but a late hook (`afterAll`) throws is recorded by
+      jest-junit as a synthetic `<testcase><failure>` in the body, with
+      `failures`/`errors` left at 0 at both suite and root level — verified
+      against jest 29.7.0, root reads `tests="1" failures="0" errors="0"`. The
+      gate saw nothing wrong. Harmless today because jest's own exit code
+      catches it, which is **exactly the guarantee `continue-on-error` removes**
+      — so the defence against that trapdoor had a hole in the same shape as the
+      trapdoor. The gate now also counts `<failure>`/`<error>` elements in the
+      body and takes the larger.
+- [x] v3 review: a proposal to harden the gate by comparing `tests=` against the
+      number of `<testcase>` elements. Declined, and the decline was then proven
+      right by measurement: 2 passing + 1 `it.skip` + 2 `it.todo` yields
+      `tests="3"` and **five** `<testcase>` elements, because jest-junit writes
+      testcases for todo cases while excluding them from `tests=`. That check
+      would have gone red on any repo using `it.todo`. Recorded here because the
+      workflow comment now warns against re-proposing it.
 
-Every one of these is mine. Two rounds of review produced thirteen; the diagnosis
-survived both.
+Every one of these is mine. Three rounds of review have now produced twenty-five;
+the diagnosis survived all three.
+
+**The pattern worth naming, because it recurred three times:** every fix I made
+in response to a review round introduced a defect the next round caught —
+`overwrite: true` destroying the evidence it was added to preserve, the
+`outcome == 'success'` gate that a one-line `continue-on-error` could disarm,
+and a shrink check that cried "tests were removed" on every ordinary failure.
+None was careless in isolation; each was a locally sensible response to a real
+finding, with a second-order effect the finding did not mention. The lesson is
+not "review more" but "re-derive the failure case after each fix" — which is
+also how the last one was found, in my own verification output, by reading the
+message instead of the exit code.
+
+**One reviewer contradiction, settled rather than split.** Round 3 produced
+directly opposed advice on the count-check's condition. One reviewer read the
+GitHub runner source (`StepsRunner.cs`, `ExecutionContext.cs`) and proved a
+step whose `if` evaluates false is completed as `Skipped` **and** populates
+`steps.<id>.conclusion` — refuting the other reviewer's premise that it would
+dereference to the empty string. But it then recommended gating the check on
+`outcome == 'success'` so the check *skips* on failure, which is exactly the
+`continue-on-error` trapdoor the other reviewer found. Both were partly right:
+the ambiguity is settled (it is `'skipped'`), and the negative test would have
+worked — but the positive, uniform condition is what closes the trapdoor. The
+tie-breaker was which formulation is red in *both* scenarios, not which
+reviewer had the better source.
 
 ## Standing caution
 
