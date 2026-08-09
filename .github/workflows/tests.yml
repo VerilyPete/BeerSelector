@@ -55,10 +55,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           # .nvmrc, not a bare '20' — this suite is verified against 20.19.1
           # and CI should not silently drift to a different minor.
@@ -134,18 +134,24 @@ jobs:
       # and reality, and that gap is exactly how many tests can be `it.skip`'d
       # out while the check stays green.
       #
-      # RAISING MIN_PASSED is expected when tests are added. LOWERING it, or
+      # RAISING MIN_TESTS_RUN is expected when tests are added. LOWERING it, or
       # raising MAX_SKIPPED, must be a deliberate edit reviewed in the same PR.
+      #
+      # The name is MIN_TESTS_RUN, not MIN_PASSED, because it is compared
+      # against `ran` — cases that executed, pass or fail. A floor on *passing*
+      # tests would be a second, weaker failure check (a broken test would trip
+      # both this and the failure branch, with the shrink message pointing at
+      # the wrong cause); the failure count is asserted separately below.
       - name: Assert the suite has not shrunk
         if: ${{ always() && (steps.jest.outcome == 'success' || steps.jest.outcome == 'failure') }}
         env:
-          MIN_PASSED: '2272'
+          MIN_TESTS_RUN: '2272'
           MAX_SKIPPED: '0'
         run: |
           python3 - <<'PY'
           import os, sys, xml.etree.ElementTree as ET
 
-          floor = int(os.environ['MIN_PASSED'])
+          floor = int(os.environ['MIN_TESTS_RUN'])
           max_skipped = int(os.environ['MAX_SKIPPED'])
           # int() parsing lives inside the try as well: an attribute present but
           # empty (tests="") raises ValueError, and outside the handler that
@@ -202,7 +208,7 @@ jobs:
               problems.append(
                   f'{ran} test(s) ran, below the committed floor ({floor}). '
                   'If this is the first run on a new platform, confirm which tests '
-                  'did not run before touching the floor - lowering MIN_PASSED is '
+                  'did not run before touching the floor - lowering MIN_TESTS_RUN is '
                   'the correct fix ONLY when tests were deliberately removed.'
               )
           for p in problems:
@@ -229,7 +235,7 @@ jobs:
       # uploads on exactly the red runs whose evidence is most wanted.
       - name: Upload JUnit results
         if: ${{ always() && (steps.jest.outcome == 'success' || steps.jest.outcome == 'failure') }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           # Suffixed by attempt, NOT `overwrite: true`. v4 rejects a duplicate
           # artifact name within a run, so "Re-run failed jobs" would 409 and
@@ -254,7 +260,7 @@ jobs:
 
       - name: Upload coverage report
         if: ${{ always() && (steps.jest.outcome == 'success' || steps.jest.outcome == 'failure') }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: jest-coverage-attempt-${{ github.run_attempt }}
           path: coverage/
