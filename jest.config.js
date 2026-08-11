@@ -53,8 +53,15 @@ module.exports = {
     // paths, and two tests asserting a success alert that fd18c05 deleted in the
     // same commit that wrote them. Quarantining it hid all of that, and it is
     // where the login/ETag guards from plan 05 live.
-    'components/__tests__/Beerfinder.loading.test.tsx',
-    'components/__tests__/AllBeers.loading.test.tsx',
+    //
+    // AllBeers.loading and Beerfinder.loading are NOT here any more either. They
+    // were not hanging: both run in ~1s. They were 54 assertions asserting
+    // nothing, because MP-4 Step 2 moved both components onto AppContext and
+    // neither suite was updated. AllBeers threw "useAppContext must be used
+    // within an AppProvider" on all 26; Beerfinder's 28 additionally drove every
+    // state through beerRepository.getUntasted() and fetchMyBeersFromAPI(), which
+    // that component no longer calls at all. Both now render inside a real
+    // AppProvider and drive state through the repositories it loads from.
   ],
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
   verbose: true,

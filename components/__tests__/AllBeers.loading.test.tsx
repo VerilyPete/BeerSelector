@@ -1,8 +1,14 @@
 /**
- * MP-3 Step 3a: Integration Tests for AllBeers Loading States (TDD Approach)
+ * Integration tests for AllBeers loading states.
  *
- * Purpose: Define expected loading state behavior for AllBeers component BEFORE implementation.
- * These tests will FAIL initially - that's correct for TDD!
+ * AllBeers reads its beer data, loading flag and error message from AppContext
+ * (MP-4 Step 2), so these render against a real AppProvider rather than a stub:
+ * the assertions below are about what the user sees for a given context state,
+ * and a hand-rolled context value would let the component and the provider drift
+ * apart again without any test noticing.
+ *
+ * Both the provider and AllBeers itself load from beerRepository.getAll() on
+ * mount, so that single mock drives the whole tree.
  *
  * Loading State Requirements:
  * - Show SkeletonLoader during initial data fetch
@@ -13,14 +19,23 @@
  */
 
 import React from 'react';
-import { render, waitFor } from '@testing-library/react-native';
+import { fireEvent, render, waitFor } from '@testing-library/react-native';
 import { AllBeers } from '../AllBeers';
+import { AppProvider } from '@/context/AppContext';
 import { beerRepository } from '@/src/database/repositories/BeerRepository';
+import { myBeersRepository } from '@/src/database/repositories/MyBeersRepository';
+import { rewardsRepository } from '@/src/database/repositories/RewardsRepository';
+import { getSessionData } from '@/src/api/sessionManager';
+import { isVisitorMode } from '@/src/api/authService';
 import { useBeerFilters } from '@/hooks/useBeerFilters';
 import { useDataRefresh } from '@/hooks/useDataRefresh';
 
 // Mock dependencies
 jest.mock('@/src/database/repositories/BeerRepository');
+jest.mock('@/src/database/repositories/MyBeersRepository');
+jest.mock('@/src/database/repositories/RewardsRepository');
+jest.mock('@/src/api/sessionManager');
+jest.mock('@/src/api/authService');
 jest.mock('@/hooks/useBeerFilters');
 jest.mock('@/hooks/useDataRefresh');
 jest.mock('@/hooks/useDebounce', () => ({
@@ -30,7 +45,7 @@ jest.mock('@/hooks/useColorScheme', () => ({
   useColorScheme: jest.fn(() => 'light'),
 }));
 
-// Mock SkeletonLoader (will be implemented in Step 3b)
+// Stub SkeletonLoader so the skeleton is addressable by testID
 jest.mock('../beer/SkeletonLoader', () => ({
   SkeletonLoader: ({ count }: any) => {
     const React = require('react');
@@ -73,25 +88,39 @@ describe('AllBeers Loading States (MP-3 Step 3a)', () => {
     },
   ];
 
+  // AllBeers reads context state, so every render needs a real provider around it.
+  const renderAllBeers = () => render(<AllBeers />, { wrapper: AppProvider });
+
   beforeEach(() => {
     jest.clearAllMocks();
 
-    // Mock useBeerFilters hook
+    // AppProvider loads session and all three repositories on mount. Only
+    // beerRepository.getAll() is driven per-test; the rest just need to settle.
+    (getSessionData as jest.Mock).mockResolvedValue(null);
+    (isVisitorMode as jest.Mock).mockResolvedValue(false);
+    (myBeersRepository.getAll as jest.Mock).mockResolvedValue([]);
+    (rewardsRepository.getAll as jest.Mock).mockResolvedValue([]);
+
+    // Mock useBeerFilters hook — shape must track the real hook's return value
     (useBeerFilters as jest.Mock).mockImplementation((beers: any) => ({
-      filteredBeers: beers,
-      filters: { isDraft: false, isHeavies: false, isIpa: false },
+      filteredBeers: beers ?? [],
+      containerFilter: null,
       sortBy: 'date',
+      sortDirection: 'desc',
       searchText: '',
       expandedId: null,
       setSearchText: jest.fn(),
-      toggleFilter: jest.fn(),
-      toggleSort: jest.fn(),
+      cycleContainerFilter: jest.fn(),
+      cycleSort: jest.fn(),
+      toggleSortDirection: jest.fn(),
       toggleExpand: jest.fn(),
+      setExpandedId: jest.fn(),
     }));
 
     // Mock useDataRefresh hook
     (useDataRefresh as jest.Mock).mockReturnValue({
       refreshing: false,
+      error: null,
       handleRefresh: jest.fn(),
     });
   });
@@ -103,7 +132,7 @@ describe('AllBeers Loading States (MP-3 Step 3a)', () => {
         () => new Promise(resolve => setTimeout(() => resolve(mockBeers), 1000))
       );
 
-      const { getByTestId, queryByTestId } = render(<AllBeers />);
+      const { getByTestId, queryByTestId } = renderAllBeers();
 
       // Should show skeleton immediately during loading
       expect(getByTestId('skeleton-loader')).toBeDefined();
@@ -117,7 +146,7 @@ describe('AllBeers Loading States (MP-3 Step 3a)', () => {
         () => new Promise(resolve => setTimeout(() => resolve(mockBeers), 500))
       );
 
-      const { queryByTestId } = render(<AllBeers />);
+      const { queryByTestId } = renderAllBeers();
 
       // Should not show error during loading
       expect(queryByTestId('error-container')).toBeNull();
@@ -128,7 +157,7 @@ describe('AllBeers Loading States (MP-3 Step 3a)', () => {
         () => new Promise(resolve => setTimeout(() => resolve(mockBeers), 500))
       );
 
-      const { getByTestId } = render(<AllBeers />);
+      const { getByTestId } = renderAllBeers();
 
       const skeleton = getByTestId('skeleton-loader');
 
@@ -143,14 +172,14 @@ describe('AllBeers Loading States (MP-3 Step 3a)', () => {
         () => new Promise(resolve => setTimeout(() => resolve(mockBeers), 500))
       );
 
-      const { getByTestId } = render(<AllBeers />);
+      const { getByTestId } = renderAllBeers();
 
       // Skeleton should be shown
       expect(getByTestId('skeleton-loader')).toBeDefined();
 
-      // Search bar should be available for better UX
-      // (User can start typing while data loads)
-      // Note: This is a UX decision - implementation may vary
+      // Search bar stays mounted alongside it so the user can start typing
+      // while data loads.
+      expect(getByTestId('search-bar')).toBeDefined();
     });
   });
 
@@ -158,10 +187,10 @@ describe('AllBeers Loading States (MP-3 Step 3a)', () => {
     it('should hide skeleton and show beer list when data loads', async () => {
       (beerRepository.getAll as jest.Mock).mockResolvedValue(mockBeers);
 
-      const { queryByTestId, getByTestId } = render(<AllBeers />);
+      const { queryByTestId, getByTestId } = renderAllBeers();
 
       // Initially shows skeleton
-      expect(queryByTestId('skeleton-loader')).toBeDefined();
+      expect(queryByTestId('skeleton-loader')).not.toBeNull();
 
       // Wait for data to load
       await waitFor(() => {
@@ -175,7 +204,7 @@ describe('AllBeers Loading States (MP-3 Step 3a)', () => {
     it('should show beer count when data loads', async () => {
       (beerRepository.getAll as jest.Mock).mockResolvedValue(mockBeers);
 
-      const { getByTestId } = render(<AllBeers />);
+      const { getByTestId } = renderAllBeers();
 
       await waitFor(() => {
         expect(getByTestId('beer-count')).toBeDefined();
@@ -185,21 +214,21 @@ describe('AllBeers Loading States (MP-3 Step 3a)', () => {
     it('should show filters when data loads', async () => {
       (beerRepository.getAll as jest.Mock).mockResolvedValue(mockBeers);
 
-      const { getByTestId } = render(<AllBeers />);
+      const { getByTestId } = renderAllBeers();
 
       await waitFor(() => {
         // Filter UI should be visible
-        expect(getByTestId('beer-list')).toBeDefined();
+        expect(getByTestId('filter-bar')).toBeDefined();
       });
     });
 
     it('should transition smoothly from skeleton to beer list', async () => {
       (beerRepository.getAll as jest.Mock).mockResolvedValue(mockBeers);
 
-      const { queryByTestId, getByTestId } = render(<AllBeers />);
+      const { queryByTestId, getByTestId } = renderAllBeers();
 
       // Skeleton visible initially
-      expect(queryByTestId('skeleton-loader')).toBeDefined();
+      expect(queryByTestId('skeleton-loader')).not.toBeNull();
 
       // Data loads
       await waitFor(() => {
@@ -218,7 +247,7 @@ describe('AllBeers Loading States (MP-3 Step 3a)', () => {
     it('should show empty message when no beers found (not skeleton)', async () => {
       (beerRepository.getAll as jest.Mock).mockResolvedValue([]);
 
-      const { queryByTestId, getByTestId } = render(<AllBeers />);
+      const { queryByTestId, getByTestId } = renderAllBeers();
 
       await waitFor(() => {
         // Should not show skeleton after load
@@ -232,7 +261,7 @@ describe('AllBeers Loading States (MP-3 Step 3a)', () => {
     it('should not show skeleton for empty state', async () => {
       (beerRepository.getAll as jest.Mock).mockResolvedValue([]);
 
-      const { queryByTestId } = render(<AllBeers />);
+      const { queryByTestId } = renderAllBeers();
 
       await waitFor(() => {
         // Empty state, not loading state
@@ -247,7 +276,7 @@ describe('AllBeers Loading States (MP-3 Step 3a)', () => {
         new Error('Database connection failed')
       );
 
-      const { queryByTestId, getByTestId } = render(<AllBeers />);
+      const { queryByTestId, getByTestId } = renderAllBeers();
 
       // Wait for error
       await waitFor(() => {
@@ -259,7 +288,7 @@ describe('AllBeers Loading States (MP-3 Step 3a)', () => {
     it('should show error message text', async () => {
       (beerRepository.getAll as jest.Mock).mockRejectedValue(new Error('Network error'));
 
-      const { getByTestId } = render(<AllBeers />);
+      const { getByTestId } = renderAllBeers();
 
       await waitFor(() => {
         const errorMessage = getByTestId('error-message');
@@ -271,7 +300,7 @@ describe('AllBeers Loading States (MP-3 Step 3a)', () => {
     it('should show try again button on error', async () => {
       (beerRepository.getAll as jest.Mock).mockRejectedValue(new Error('Database error'));
 
-      const { getByTestId } = render(<AllBeers />);
+      const { getByTestId } = renderAllBeers();
 
       await waitFor(() => {
         expect(getByTestId('try-again-button')).toBeDefined();
@@ -281,7 +310,7 @@ describe('AllBeers Loading States (MP-3 Step 3a)', () => {
     it('should not show beer list on error', async () => {
       (beerRepository.getAll as jest.Mock).mockRejectedValue(new Error('Failed'));
 
-      const { queryByTestId } = render(<AllBeers />);
+      const { queryByTestId } = renderAllBeers();
 
       await waitFor(() => {
         expect(queryByTestId('beer-list')).toBeNull();
@@ -299,7 +328,7 @@ describe('AllBeers Loading States (MP-3 Step 3a)', () => {
         handleRefresh: jest.fn(),
       });
 
-      const { queryByTestId, getByTestId } = render(<AllBeers />);
+      const { queryByTestId, getByTestId } = renderAllBeers();
 
       await waitFor(() => {
         expect(getByTestId('beer-list')).toBeDefined();
@@ -320,7 +349,7 @@ describe('AllBeers Loading States (MP-3 Step 3a)', () => {
         handleRefresh: jest.fn(),
       });
 
-      const { getByTestId } = render(<AllBeers />);
+      const { getByTestId } = renderAllBeers();
 
       await waitFor(() => {
         // BeerList has RefreshControl built-in
@@ -332,7 +361,7 @@ describe('AllBeers Loading States (MP-3 Step 3a)', () => {
     it('should maintain scroll position during refresh', async () => {
       (beerRepository.getAll as jest.Mock).mockResolvedValue(mockBeers);
 
-      const { getByTestId } = render(<AllBeers />);
+      const { getByTestId } = renderAllBeers();
 
       await waitFor(() => {
         expect(getByTestId('beer-list')).toBeDefined();
@@ -356,10 +385,10 @@ describe('AllBeers Loading States (MP-3 Step 3a)', () => {
       // Initial load
       mockGetAll.mockResolvedValue(mockBeers);
 
-      const { queryByTestId, getByTestId, rerender } = render(<AllBeers />);
+      const { queryByTestId, getByTestId, rerender } = renderAllBeers();
 
       // State 1: Loading (skeleton)
-      expect(queryByTestId('skeleton-loader')).toBeDefined();
+      expect(queryByTestId('skeleton-loader')).not.toBeNull();
 
       // State 2: Loaded (beer list)
       await waitFor(() => {
@@ -393,13 +422,15 @@ describe('AllBeers Loading States (MP-3 Step 3a)', () => {
     it('should transition: loading → error → retry → loading → loaded', async () => {
       const mockGetAll = beerRepository.getAll as jest.Mock;
 
-      // Initial load fails
-      mockGetAll.mockRejectedValueOnce(new Error('Network error'));
+      // Initial load fails. Rejects for every call, not just the first: the
+      // provider and AllBeers each load on mount, so a `...Once` rejection would
+      // be absorbed by one of them and the other would quietly succeed.
+      mockGetAll.mockRejectedValue(new Error('Network error'));
 
-      const { queryByTestId, getByTestId } = render(<AllBeers />);
+      const { queryByTestId, getByTestId } = renderAllBeers();
 
       // State 1: Loading (skeleton)
-      expect(queryByTestId('skeleton-loader')).toBeDefined();
+      expect(queryByTestId('skeleton-loader')).not.toBeNull();
 
       // State 2: Error
       await waitFor(() => {
@@ -407,9 +438,17 @@ describe('AllBeers Loading States (MP-3 Step 3a)', () => {
         expect(queryByTestId('skeleton-loader')).toBeNull();
       });
 
-      // Retry should show loading again (if user taps try again)
-      // Note: This would require simulating button press
-      // For now, we verify error state doesn't show skeleton
+      // State 3: Retry — the database recovers, user taps Try Again
+      mockGetAll.mockResolvedValue(mockBeers);
+
+      fireEvent.press(getByTestId('try-again-button'));
+
+      // State 4: Loaded — error cleared and the list replaces it
+      await waitFor(() => {
+        expect(getByTestId('beer-list')).toBeDefined();
+      });
+
+      expect(queryByTestId('error-container')).toBeNull();
       expect(queryByTestId('skeleton-loader')).toBeNull();
     });
   });
@@ -422,7 +461,7 @@ describe('AllBeers Loading States (MP-3 Step 3a)', () => {
 
       const start = performance.now();
 
-      const { getByTestId } = render(<AllBeers />);
+      const { getByTestId } = renderAllBeers();
 
       const skeleton = getByTestId('skeleton-loader');
       const duration = performance.now() - start;
@@ -436,7 +475,7 @@ describe('AllBeers Loading States (MP-3 Step 3a)', () => {
         () => new Promise(resolve => setTimeout(() => resolve(mockBeers), 500))
       );
 
-      const { getByTestId } = render(<AllBeers />);
+      const { getByTestId } = renderAllBeers();
 
       // Skeleton appears immediately (non-blocking)
       expect(getByTestId('skeleton-loader')).toBeDefined();
@@ -452,7 +491,7 @@ describe('AllBeers Loading States (MP-3 Step 3a)', () => {
         .mockResolvedValueOnce(mockBeers)
         .mockResolvedValueOnce([...mockBeers, { ...mockBeers[0], id: '3' }]);
 
-      const { getByTestId, queryByTestId } = render(<AllBeers />);
+      const { getByTestId, queryByTestId } = renderAllBeers();
 
       await waitFor(() => {
         expect(getByTestId('beer-list')).toBeDefined();
@@ -471,7 +510,7 @@ describe('AllBeers Loading States (MP-3 Step 3a)', () => {
 
       (beerRepository.getAll as jest.Mock).mockResolvedValue(beersWithEmpty);
 
-      const { getByTestId } = render(<AllBeers />);
+      const { getByTestId } = renderAllBeers();
 
       await waitFor(() => {
         expect(getByTestId('beer-list')).toBeDefined();
@@ -483,7 +522,7 @@ describe('AllBeers Loading States (MP-3 Step 3a)', () => {
     it('should handle loading state when repository returns null', async () => {
       (beerRepository.getAll as jest.Mock).mockResolvedValue(null as any);
 
-      const { queryByTestId } = render(<AllBeers />);
+      const { queryByTestId } = renderAllBeers();
 
       // Should handle gracefully (either error or empty state)
       await waitFor(() => {
@@ -498,7 +537,7 @@ describe('AllBeers Loading States (MP-3 Step 3a)', () => {
         () => new Promise(resolve => setTimeout(() => resolve(mockBeers), 500))
       );
 
-      const { getByTestId } = render(<AllBeers />);
+      const { getByTestId } = renderAllBeers();
 
       // Skeleton should be in consistent layout with filters
       expect(getByTestId('skeleton-loader')).toBeDefined();
@@ -508,7 +547,7 @@ describe('AllBeers Loading States (MP-3 Step 3a)', () => {
     it('should maintain layout structure between loading and loaded states', async () => {
       (beerRepository.getAll as jest.Mock).mockResolvedValue(mockBeers);
 
-      const { getByTestId, queryByTestId } = render(<AllBeers />);
+      const { getByTestId, queryByTestId } = renderAllBeers();
 
       // Both states should use same container
       const containerDuringLoad = queryByTestId('all-beers-container');
