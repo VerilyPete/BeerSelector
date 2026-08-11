@@ -547,7 +547,7 @@ reads as one.
       of them in `dataUpdateService.ts`. That number exists nowhere else in the
       repo, and v2 dropped it — which is how a measured fact becomes unknown
       again. Non-blocking, but gate on "no increase over 141".
-- [ ] 5.10 **NEW, found reviewing 5.1: `develop` does not exist, and the
+- [x] 5.10 **NEW, found reviewing 5.1: `develop` does not exist, and the
       `branches:` filter on `pull_request:` produces silence rather than a red
       check.** Both existing workflows trigger on `branches: [main, develop]`
       (`e2e-tests.yml:4-7`, `maestro-e2e.yml:17`). There is no `develop` branch
@@ -564,6 +564,12 @@ reads as one.
       - Note the ordering trap this creates with 5.6: making a check *required*
         while it can decline to run on a valid PR leaves that PR permanently
         pending and unmergeable. Fix the trigger before requiring the check.
+      **Done** — PR #11, `f0fad18b`. Both E2E workflows now trigger on
+      `push: branches: [main]` plus an unfiltered `pull_request:`. The paragraph
+      above is preserved as written, so read "the two E2E workflows still have
+      it" as the state at the time of the finding, not now.
+      The ordering trap was honoured: this landed *before* 5.6 made a check
+      required, which was the whole reason it jumped the queue.
 - [x] 5.13 **NEW, and the single most valuable thing CI found: the test suite
       was not portable.** `allbeers.json` and `mybeers.json` are gitignored and
       untracked, and **nine test files reference them**. On a clean checkout
@@ -731,10 +737,18 @@ times and keep them in sync by hand".
       `maestro-e2e.yml`'s, which already has the critical and parallel matrices.
 - [ ] 6.2 Cache CocoaPods — `prebuild --clean` regenerates from scratch in all
       five macOS jobs with no cache.
-- [ ] 6.3 `actions/cache@v3` → `@v4`. **6.2 and 6.3 are hygiene, not recovery.**
+- [x] 6.3 `actions/cache@v3` → `@v4`. **6.2 and 6.3 are hygiene, not recovery.**
       Do them in one ten-minute commit this week or move them out of this plan —
       leaving them as unticked boxes in a recovery plan is how the plan stops
       being trusted.
+      **Done, overshot, and the item was wrong about why it mattered** — 5.14 /
+      PR #12 took `cache` to **v6**, not v4, as part of a first-party sweep.
+      Filed here as hygiene; it was not. v3 targets the cache service GitHub
+      retired, so those five steps could not have been caching anything. The
+      correct severity was "broken", and it read as "tidy up" because the only
+      workflow using it has been red since March.
+      Ticked one commit late, which is precisely the decay this item warns
+      about — the sweep landed in #12 without closing the box it satisfied.
 - [ ] 6.4 `maestro-ios-critical` runs four `maestro test` calls in one `bash -e`
       block, so a first failure skips the other three and the job reports P0 on
       one flow. Use the `|| group_failed=1` pattern the parallel job already has.
