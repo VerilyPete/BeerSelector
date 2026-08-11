@@ -18,6 +18,7 @@
     "test:performance:report": "flashlight test --config .flashlight/performance-tests.yaml --report && flashlight report .flashlight/reports/latest.json",
     "mock-server": "node mock-server.js",
     "lint": "expo lint",
+    "typecheck": "tsc --noEmit",
     "prepare": "husky"
   },
   "dependencies": {

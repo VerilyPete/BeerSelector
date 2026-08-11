@@ -1,0 +1,265 @@
+name: Static Analysis
+
+# Neither lint nor typecheck has ever run in CI, and no typecheck script existed
+# at all — `package.json` had `lint` (never invoked by any workflow) and nothing
+# resembling `tsc --noEmit`. `.husky/pre-commit` is lint-staged, which runs
+# eslint over STAGED FILES ONLY, so a type error in a file you did not touch has
+# never been caught by anything in this repo.
+#
+# That matters more here than in a typical TS project: Metro and Babel strip
+# types without checking them, and jest runs through babel-jest, so a type error
+# reaches `main` through every gate this repo has — including the now-required
+# `Jest Unit Tests`. Plan item 5.9.
+#
+# Separate workflow file for the same reason tests.yml is separate: item 6.1
+# holds an open decision about deleting e2e-tests.yml's iOS job, and no such
+# decision should be able to take static analysis with it as a side effect.
+
+on:
+  push:
+    branches: [main]
+  # No `branches:` filter, deliberately — on `pull_request` it filters the BASE
+  # branch, and a PR stacked on a non-`main` branch would show no check at all.
+  # Silence is worse than a red X. See tests.yml and plan item 5.10.
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: static-analysis-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  # Check context names must be unique across ALL workflows in this repo —
+  # e2e-tests.yml and maestro-e2e.yml already collide with each other on three
+  # names, which is how a green job and a red job come to share one check. Do
+  # not reuse "Test Summary", "E2E Tests", "Jest Unit Tests", or any
+  # "Maestro ..." name here. See plan item 5.7.
+  eslint:
+    name: ESLint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # eslint exits 0 on warnings, and this repo has 364 of them and 0 errors.
+      # Without --max-warnings this job would be green no matter how many new
+      # warnings a PR added — a check that cannot fail, which is the exact
+      # species of false comfort this whole plan exists to remove.
+      #
+      # So the number is a ratchet, not a target. RAISING it must be a
+      # deliberate edit reviewed in the same PR; lowering it is free and
+      # encouraged as warnings get fixed.
+      #
+      # Measured on `main` at the commit that added this file: 364 problems,
+      # 0 errors, 364 warnings. The dominant rules are
+      # @typescript-eslint/no-require-imports and no-unused-vars.
+      #
+      # Note this is `npm run lint --` (i.e. `expo lint`), not a bare `eslint`
+      # invocation: expo lint resolves this project's .eslintrc.js and
+      # .eslintignore the same way a developer running `npm run lint` does.
+      # Verified locally that the flag passes through and sets the exit code —
+      # `--max-warnings 5` exits 1, `--max-warnings 364` exits 0.
+      - name: Lint
+        env:
+          MAX_WARNINGS: '364'
+        run: npm run lint -- --max-warnings "$MAX_WARNINGS"
+
+  typescript:
+    name: TypeScript
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # `--listFiles` so the gate below can check the type SURFACE as well as
+      # the error count, from a single compile — two invocations could disagree
+      # with each other and there would be no way to tell which was right.
+      #
+      # Output goes to a file rather than the step log because --listFiles emits
+      # ~1300 lines (mostly node_modules .d.ts). The gate step prints the ~141
+      # lines anyone actually wants, and the full log is uploaded as an artifact.
+      #
+      # Deliberately NOT `npm run typecheck`, though that script now exists for
+      # humans. The gate below needs --listFiles and --pretty false, and baking
+      # those into the script would make the command developers run locally
+      # print 1300 lines of node_modules paths. Same compiler, same tsconfig,
+      # different output shape for a different reader.
+      #
+      # `|| code=$?` because the default shell is `bash -e` and tsc exits
+      # non-zero whenever it reports anything. Do NOT let this step fail on its
+      # own — the gate step must be the thing that decides, for the same reason
+      # tests.yml's floor asserts failures itself: a step that fails here could
+      # be silenced with continue-on-error, which would skip the gate entirely.
+      - name: Typecheck
+        id: tsc
+        run: |
+          npx tsc --noEmit --pretty false --listFiles > tsc.log 2>&1 && code=0 || code=$?
+          echo "tsc_exit=$code" >> "$GITHUB_OUTPUT"
+          echo "tsc exited with $code"
+
+      # The ratchet. This repo has 141 pre-existing type errors, so a gate on
+      # zero would be permanently red and would be deleted within a week. Item
+      # 5.9 says: gate on no INCREASE over the measured baseline.
+      #
+      # HOW THE BASELINES WERE MEASURED, because this is where the last two
+      # surprises in this plan came from:
+      #
+      # `tsconfig.json` includes `.expo/types/**/*.ts` and `expo-env.d.ts`.
+      # BOTH are gitignored and untracked — generated by expo, present on a
+      # developer machine, absent on a clean checkout. That is item 5.13's
+      # portability trap in a second location, and it is why the file floor is
+      # 241 and not the 243 a local run reports. The numbers below come from a
+      # local run with both generated files temporarily moved aside, which is
+      # the closest local approximation of what CI sees.
+      #
+      # The error count was 141 in ALL THREE configurations (both files present,
+      # one absent, both absent), so 141 is robust to their absence. If CI
+      # reports anything else, that difference is itself the finding — record it
+      # here rather than quietly editing the number to match.
+      #
+      # WHY A FILE FLOOR AND NOT JUST AN ERROR CEILING: the cheapest way to
+      # green an error ceiling is to stop checking the files that error, by
+      # adding an `exclude` to tsconfig.json. That lowers the error count and
+      # looks like progress. It is the same hole tests.yml's MIN_TESTS_RUN
+      # closes for jest, and it needs closing here for the same reason.
+      #
+      # A DECREASE in errors does not fail — it prints a notice asking you to
+      # lower the ceiling. Deliberate: item 5.9 specifies no-increase, and
+      # failing on improvement would mean every type fix turns CI red until the
+      # workflow is edited in the same PR. The cost of that choice is that the
+      # ceiling drifts upward from reality unless someone acts on the notice;
+      # the file floor is what stops the drift from hiding a shrinking surface.
+      - name: Assert type errors have not increased
+        if: ${{ always() && (steps.tsc.outcome == 'success' || steps.tsc.outcome == 'failure') }}
+        env:
+          MAX_TYPE_ERRORS: '141'
+          MIN_TS_FILES: '241'
+          TSC_EXIT: ${{ steps.tsc.outputs.tsc_exit }}
+        run: |
+          python3 - <<'PY'
+          import os, re, sys
+
+          ceiling = int(os.environ['MAX_TYPE_ERRORS'])
+          floor = int(os.environ['MIN_TS_FILES'])
+          # Empty when the tsc step was cancelled before writing its output.
+          tsc_exit = os.environ.get('TSC_EXIT') or ''
+
+          try:
+              with open('tsc.log', encoding='utf-8', errors='replace') as fh:
+                  lines = fh.read().splitlines()
+          except Exception as exc:
+              sys.exit(f'::error::tsc.log missing or unreadable ({exc}) - failing closed.')
+
+          # `error TSnnnn:` rather than a substring match. Config errors arrive
+          # with NO file prefix ("error TS5083: Cannot read file ..."), so a
+          # pattern anchored on a leading space would miss exactly the lines
+          # that must fail closed.
+          err_re = re.compile(r'error TS(\d+):')
+          errors = [l for l in lines if err_re.search(l)]
+          # --pretty false still emits indented continuation lines for
+          # multi-line diagnostics, and --listFiles emits absolute paths.
+          # Anchoring on '/' is what separates the two; counting "lines that
+          # are not errors" would silently include those continuations.
+          files = [l for l in lines if l.startswith('/') and '/node_modules/' not in l]
+
+          # TS5xxx is the command-line/config range and TS18003 is "no inputs
+          # were found". Either means tsc never type-checked anything, and each
+          # would otherwise read as a single error - comfortably under the
+          # ceiling, and green. Not folded into the count: fail closed, loudly.
+          # Note TS6xxx is NOT in this list; TS6133 ("declared but never read")
+          # is a real diagnostic this repo has by the dozen.
+          config_errors = [l for l in errors
+                           if re.search(r'error TS(5\d{3}|18003):', l)]
+
+          n_err, n_files = len(errors), len(files)
+          print(f'type_errors={n_err} ceiling={ceiling} '
+                f'checked_files={n_files} floor={floor} tsc_exit={tsc_exit}')
+          print()
+          for l in errors:
+              print(l)
+          print()
+
+          problems = []
+          if config_errors:
+              problems.append(
+                  'tsc reported a CONFIGURATION error, so nothing was actually '
+                  'type-checked: ' + config_errors[0].strip() + ' - this is not '
+                  'a type error and is deliberately not counted against the '
+                  'ceiling, because one config error would pass it.'
+              )
+          # Exit code is checked for CONSISTENCY, not used as the verdict.
+          # Measured: tsc exits 2 (not 1) with --noEmit and diagnostics present.
+          # Hard-coding the value would be brittle; "non-zero implies at least
+          # one parsed diagnostic" is the invariant that actually matters, and
+          # it catches a crash or OOM that produced no parseable output.
+          if tsc_exit not in ('', '0') and not errors:
+              problems.append(
+                  f'tsc exited {tsc_exit} but no diagnostics could be parsed from '
+                  'its output - it probably crashed or ran out of memory. Failing '
+                  'closed: an unparseable run must never read as zero errors.'
+              )
+          if n_files < floor:
+              problems.append(
+                  f'{n_files} file(s) type-checked, below the committed floor '
+                  f'({floor}). The type surface shrank - check tsconfig.json for a '
+                  'new exclude, or a moved/deleted source directory. Lowering '
+                  'MIN_TS_FILES is correct ONLY when files were deliberately removed.'
+              )
+          if n_err > ceiling:
+              problems.append(
+                  f'{n_err} type error(s), above the committed ceiling ({ceiling}). '
+                  'This PR introduced new type errors - the offending lines are '
+                  'printed above. Raising MAX_TYPE_ERRORS must be a deliberate '
+                  'edit reviewed in this same PR, with a reason.'
+              )
+          # Only congratulate a run that is otherwise sound. Caught by testing
+          # this script against a synthetic crashed run before it shipped: a
+          # tsc that produces no output parses as "0 errors", and an unguarded
+          # notice told the reader to lower the ceiling to 0 — advice that would
+          # have hard-failed the next honest run — right beside the errors
+          # saying the compile never happened. The job failed either way; the
+          # advice was the bug.
+          if not problems and n_err < ceiling:
+              print(
+                  f'::notice::{n_err} type errors, down from {ceiling}. Lower '
+                  f'MAX_TYPE_ERRORS to {n_err} in this PR to lock the improvement '
+                  'in - otherwise the ceiling silently re-admits the errors you '
+                  'just fixed.'
+              )
+          for p in problems:
+              print(f'::error::{p}')
+          sys.exit(1 if problems else 0)
+          PY
+
+      - name: Upload tsc output
+        if: ${{ always() && (steps.tsc.outcome == 'success' || steps.tsc.outcome == 'failure') }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: tsc-log-attempt-${{ github.run_attempt }}
+          path: tsc.log
+          if-no-files-found: error
