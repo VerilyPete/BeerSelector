@@ -448,6 +448,14 @@ reads as one.
       - **Wall clock: 77s** of the 900s timeout — `timeout-minutes: 15` has ~11x
         margin, so the local extrapolation (~57s user CPU) was sound.
       - Both artifacts uploaded non-empty, with the per-attempt names.
+      - Run 3 (`a572ee27`, `workflow_dispatch`): **GREEN**, same numbers, 69s.
+        Its only purpose was to close a gap in the record: a GitHub Actions
+        `major_outage` meant the merges of #11 and #9 dispatched no run at all —
+        not queued, not cancelled — so `main` sat two commits ahead of anything
+        CI had ever seen. Runs missed during an outage are not replayed when it
+        ends; someone has to ask. Reasoning that neither commit touched test
+        code was correct but is not evidence, and this item is specifically
+        about preferring the measurement.
 - [ ] 5.3 `jest-junit.config.js` is dead config — jest-junit reads
       `package.json#jest-junit` or `JEST_JUNIT_*`, not that file. `junit.xml` is
       written to the repo root. An upload pointed at `reports/junit/` produces
@@ -599,7 +607,7 @@ reads as one.
       diagnostics a failing test printed. Worth knowing before anyone relies on
       that artifact to debug a CI-only failure. Pre-existing; not introduced by
       5.1.
-- [ ] 5.6 Making a check required is **branch protection**, not a file edit.
+- [x] 5.6 Making a check required is **branch protection**, not a file edit.
       Name who does it. First establish what is required *today* — nothing in the
       repo records it, and if nothing is required then every finding here is
       advisory for merge purposes.
@@ -617,6 +625,35 @@ reads as one.
       naming `Jest Unit Tests`. And per 5.10, fix the trigger before requiring
       it — a required check that declines to run on a valid PR leaves that PR
       permanently pending and unmergeable.
+      **Done.** Classic branch protection on `main`, applied by the repo owner
+      (`admin: true`; the answer to "name who does it" is that there is exactly
+      one person who can). Settings, as read back from the API rather than as
+      requested:
+      `checks: [{app_id: 15368, context: "Jest Unit Tests"}]`, `strict: false`,
+      `enforce_admins: true`, `required_pull_request_reviews: null`,
+      `allow_force_pushes: false`, `allow_deletions: false`.
+      - `app_id` was pinned by GitHub, not asked for, and it narrows 5.7: the
+        required context is satisfiable only by a check run from the Actions
+        app, so a same-named status from any other source cannot green it.
+        5.7's collision problem is unchanged *within* Actions.
+      - `enforce_admins: true` is deliberate and, on a one-maintainer repo, is
+        the whole of the enforcement — with it false there would be no one the
+        rule applied to. It also blocks direct pushes to `main` that have not
+        passed. The escape hatch is disabling the rule, which is visible in the
+        audit log; that is the intended cost.
+      - `strict: false`: a PR merges on a green check against its own head, not
+        against the latest `main`. Accepted risk, stated plainly — two PRs that
+        are each green alone can still land a red `main` between them. The
+        post-merge push run on `main` is what catches that, after the fact.
+      - `required_pull_request_reviews: null` because a solo maintainer cannot
+        approve their own PR; requiring one review would make `main` unmergeable
+        rather than protected.
+      **What this closes, precisely:** the missing last arrow above now exists,
+      so 5.4's floor is an enforcement mechanism and may be described as one.
+      **What it does not close:** the rule was verified by reading the API, and
+      by the ordering constraint being satisfied (the context existed). It has
+      not yet been observed *blocking* anything. First PR to carry a red
+      `Jest Unit Tests` is the real proof.
 - [ ] 5.7 **No two check contexts may share a name.** **Corrected: this
       inventory was short by one.** *Three* names collide across the two
       workflows, not two — `Test Summary` (`e2e-tests.yml:411`,
@@ -631,9 +668,55 @@ reads as one.
       The new `Jest Unit Tests` job was checked against a full inventory of both
       workflows and collides with nothing.
 - [ ] 5.8 Delete or wire up `jest.config.updated.js`, unused beside the real config.
+- [x] 5.14 **NEW, found by the first green run's annotations: every `actions/*`
+      pin in this repo was on a Node 20 runtime being force-run on Node 24.**
+      The warning is emitted per run and is easy to read as cosmetic. Two things
+      made it worth acting on rather than filing:
+      - `actions/cache@v3` (5 uses, all in `maestro-e2e.yml`) is not merely
+        deprecated. v3 targets the cache service GitHub retired; it is not a
+        version behind, it is a version that cannot work. Nobody noticed because
+        the workflow containing it has failed on every push since March, so its
+        cache steps have no audience.
+      - The pins were four to five majors stale, not one — `checkout@v4` against
+        `v7`, `upload-artifact@v4` against `v7`, `download-artifact@v4` against
+        `v8`. Left alone this compounds: whoever eventually fixes Phase 3/4 gets
+        the version sweep as unavoidable extra scope, mixed into a diff where a
+        real regression could hide in it.
+      **Done**, first-party actions only, across all three workflow files:
+      `checkout` v4→v7, `setup-node` v4→v7, `upload-artifact` v4→v7,
+      `download-artifact` v4→v8, `cache` v3→v6, `setup-java` v4→v5.
+      Breaking changes were read, not assumed, and two would have bitten:
+      - `setup-node` **v5** auto-enables caching when `package.json` has a
+        `packageManager` field, and **v6** narrows that to npm. Inert here:
+        there is no `packageManager` field, and all eight call sites already
+        pass `cache: 'npm'` explicitly. Had either been otherwise, caching
+        behaviour would have changed silently on upgrade.
+      - `download-artifact` **v8** changes digest-mismatch handling from a
+        logged warning to a hard error by default. That is a *good* default and
+        is left at it, but it means a corrupted download now fails the job
+        instead of proceeding quietly — worth knowing before blaming the bump.
+      - `upload-artifact` v7 keeps `if-no-files-found` and
+        `include-hidden-files`, and `download-artifact` v8 keeps the inputs in
+        use; verified against each action's `action.yml` at the pinned tag
+        rather than from memory.
+      **Deliberately NOT bumped:** the third-party actions —
+      `expo/expo-github-action@v8` (v9 exists), `dorny/test-reporter@v1` (v3),
+      `android-actions/setup-android@v3` (v4),
+      `reactivecircus/android-emulator-runner@v2`. All four live only in the two
+      permanently-red workflows, none appeared in the deprecation annotation,
+      and their majors carry behavioural changes that cannot be verified while
+      those workflows fail for unrelated reasons. Bumping them blind would add
+      unverifiable churn to the exact diff Phase 3 needs to read cleanly.
+      **Verification asymmetry, stated plainly:** the `tests.yml` bump is proven
+      by the required check going green on this PR. The `e2e-tests.yml` and
+      `maestro-e2e.yml` bumps are **not verified by anything** — those workflows
+      were already red before the change and are red after it. They are a
+      strictly-better-than-`cache@v3` guess, not a tested change, and Phase 3
+      should treat them as untested config.
 - **Exit:** a jest check that cannot go green by shrinking. Note the *required*
   half cannot be closed by the implementer — branch protection does not exist and
-  is not a file edit; 5.6 gates this phase's exit.
+  is not a file edit; 5.6 gates this phase's exit. **5.6 is now closed**, so this
+  phase's exit condition is met.
 
 ## Phase 6 — stop paying twice
 
