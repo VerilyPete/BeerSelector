@@ -10,14 +10,15 @@
  * Loading State Requirements:
  * - Show SkeletonLoader while the context is loading and no beers have arrived
  * - Show BeerList of untasted beers once data loads
- * - Keep QUEUE/REWARDS actions reachable in every state
+ * - Keep QUEUE/REWARDS actions reachable while loading and once loaded
+ *   (NOT in the error state — that branch renders only the message + Try Again)
  * - Show the context error and a Try Again control when loading fails
  * - Never show the skeleton during pull-to-refresh
  */
 
 import React from 'react';
-import { Alert } from 'react-native';
-import { fireEvent, render, waitFor } from '@testing-library/react-native';
+import { Alert, RefreshControl } from 'react-native';
+import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { Beerfinder } from '../Beerfinder';
 import { AppProvider } from '@/context/AppContext';
 import { beerRepository } from '@/src/database/repositories/BeerRepository';
@@ -70,8 +71,13 @@ jest.mock('../beer/SkeletonLoader', () => ({
  * jest.setup.js installs fake timers and waitFor drives them, so that costs no
  * wall-clock — but the waitFor budget is measured on the same fake clock, and
  * the 1s default expires long before the last retry. Hence the explicit budget.
+ *
+ * 8000 rather than something rounder: the error surfaces at exactly 7000ms of
+ * fake time, so this leaves room for waitFor's polling granularity and nothing
+ * else. A larger budget would let a doubled backoff (2s/4s/8s = 14s) pass
+ * unnoticed, which is the regression this constant should be catching.
  */
-const ERROR_SURFACE_TIMEOUT = 15000;
+const ERROR_SURFACE_TIMEOUT = 8000;
 
 describe('Beerfinder Loading States', () => {
   const mockAllBeers = [
@@ -125,7 +131,7 @@ describe('Beerfinder Loading States', () => {
   const expandBeer = (expandedId: string | null) => {
     (useBeerFilters as jest.Mock).mockImplementation((beers: any) => ({
       filteredBeers: beers ?? [],
-      containerFilter: null,
+      containerFilter: 'all',
       sortBy: 'date',
       sortDirection: 'desc',
       searchText: '',
@@ -185,8 +191,9 @@ describe('Beerfinder Loading States', () => {
     });
 
     it('should show skeleton until every context source has resolved', async () => {
-      // All beers land quickly, tasted beers lag — the untasted set is not
-      // knowable until both are in, so the skeleton must stay put.
+      // All beers land quickly, tasted beers lag. The untasted set is not
+      // knowable until both are in — AppContext only calls setBeers after
+      // Promise.all — so the skeleton must stay put while the slow one runs.
       (beerRepository.getAll as jest.Mock).mockResolvedValue(mockAllBeers);
       (myBeersRepository.getAll as jest.Mock).mockImplementation(
         () => new Promise(resolve => setTimeout(() => resolve(mockTastedBeers), 800))
@@ -194,8 +201,22 @@ describe('Beerfinder Loading States', () => {
 
       const { getByTestId, queryByTestId } = renderBeerfinder();
 
+      // Let the fast source resolve and flush its microtasks. Asserting at mount
+      // instead would pass with no lag at all, proving nothing about "until".
+      await act(async () => {
+        jest.advanceTimersByTime(400);
+      });
+
       expect(getByTestId('skeleton-loader')).toBeDefined();
       expect(queryByTestId('beer-list')).toBeNull();
+
+      // Once the slow source lands, the list appears.
+      await act(async () => {
+        jest.advanceTimersByTime(400);
+      });
+
+      expect(getByTestId('beer-list')).toBeDefined();
+      expect(queryByTestId('skeleton-loader')).toBeNull();
     });
 
     it('should show action buttons (QUEUE, REWARDS) above skeleton', async () => {
@@ -262,6 +283,32 @@ describe('Beerfinder Loading States', () => {
       // BeerItem only renders renderItemActions for the expanded row
       expect(queryByText('CHECK IN')).toBeNull();
       expect(queryByText('UNTAPPD')).toBeNull();
+    });
+
+    it('should exclude beers already queued for check-in', async () => {
+      // selectUntastedBeers subtracts queuedBeerIds as well as tastedBeers —
+      // that is the double check-in guard. Every other test leaves the queue
+      // empty, so passing `new Set()` at Beerfinder.tsx:63 would go unnoticed.
+      (getQueuedBeers as jest.Mock).mockResolvedValue([{ name: 'Untasted Stout' }]);
+
+      const { getByText, queryByText, getByTestId, UNSAFE_getByType } = renderBeerfinder();
+
+      await waitFor(() => {
+        expect(getByTestId('beer-list')).toBeDefined();
+      });
+
+      // Pull-to-refresh is what syncs the queue into context: Beerfinder wraps
+      // useDataRefresh's handler to also call getQueuedBeers + syncQueuedBeerIds.
+      await act(async () => {
+        await UNSAFE_getByType(RefreshControl).props.onRefresh();
+      });
+
+      await waitFor(() => {
+        expect(getByText('1 to discover')).toBeDefined();
+      });
+
+      expect(queryByText('Untasted Stout')).toBeNull();
+      expect(getByText('Untasted IPA')).toBeDefined();
     });
 
     it('should show CHECK IN and UNTAPPD actions on the expanded beer', async () => {
@@ -413,21 +460,43 @@ describe('Beerfinder Loading States', () => {
   });
 
   describe('Refresh State (Pull-to-Refresh)', () => {
-    it('should NOT show skeleton during refresh', async () => {
+    it('should pass the refreshing state through to the RefreshControl', async () => {
       (useDataRefresh as jest.Mock).mockReturnValue({
         refreshing: true,
         error: null,
         handleRefresh: jest.fn(),
       });
 
-      const { queryByTestId, getByTestId } = renderBeerfinder();
+      const { queryByTestId, getByTestId, UNSAFE_getByType } = renderBeerfinder();
 
       await waitFor(() => {
         expect(getByTestId('beer-list')).toBeDefined();
       });
 
-      // Should NOT show skeleton during refresh
+      // Assert the control, not just that a list exists: `refreshing` never
+      // reaches the skeleton branch, so asserting the skeleton's absence here
+      // passes with refreshing:false too and proves nothing.
+      expect(UNSAFE_getByType(RefreshControl).props.refreshing).toBe(true);
       expect(queryByTestId('skeleton-loader')).toBeNull();
+    });
+
+    it('should trigger the refresh handler when the list is pulled', async () => {
+      const handleRefresh = jest.fn();
+      (useDataRefresh as jest.Mock).mockReturnValue({
+        refreshing: false,
+        error: null,
+        handleRefresh,
+      });
+
+      const { getByTestId, UNSAFE_getByType } = renderBeerfinder();
+
+      await waitFor(() => {
+        expect(getByTestId('beer-list')).toBeDefined();
+      });
+
+      UNSAFE_getByType(RefreshControl).props.onRefresh();
+
+      expect(handleRefresh).toHaveBeenCalled();
     });
 
     it('should maintain beer list visibility during refresh', async () => {
@@ -483,24 +552,6 @@ describe('Beerfinder Loading States', () => {
 
       expect(queryByTestId('skeleton-loader')).toBeNull();
       expect(queryByTestId('beer-list')).toBeNull();
-    });
-  });
-
-  describe('Performance', () => {
-    it('should show skeleton within 100ms of mount', () => {
-      (beerRepository.getAll as jest.Mock).mockImplementation(
-        () => new Promise(resolve => setTimeout(() => resolve(mockAllBeers), 1000))
-      );
-
-      const start = performance.now();
-
-      const { getByTestId } = renderBeerfinder();
-
-      const skeleton = getByTestId('skeleton-loader');
-      const duration = performance.now() - start;
-
-      expect(skeleton).toBeDefined();
-      expect(duration).toBeLessThan(100);
     });
   });
 

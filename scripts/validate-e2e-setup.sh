@@ -181,7 +181,6 @@ echo "7️⃣  Checking npm Scripts"
 echo "-------------------------"
 check_npm_script "test:e2e"
 check_npm_script "test:e2e:ios"
-check_npm_script "test:e2e:android"
 check_npm_script "test:e2e:single"
 check_npm_script "test:performance"
 check_npm_script "test:performance:report"
@@ -189,8 +188,10 @@ echo ""
 
 echo "8️⃣  Checking CI/CD Configuration"
 echo "----------------------------------"
-check_directory ".github/workflows"
-check_file ".github/workflows/e2e-tests.yml"
+# E2E deliberately does not run in CI. e2e-tests.yml and maestro-e2e.yml were
+# deleted on 2026-08-11 after 143 runs with zero passes; Maestro is run by hand.
+# See .maestro/README.md. Do not re-add a check for those files here.
+echo "  ℹ️  E2E runs locally only — no CI workflow expected"
 echo ""
 
 echo "9️⃣  Checking .gitignore"

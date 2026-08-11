@@ -208,18 +208,23 @@ The suite is **iOS-only** — all 39 flows hardcode `org.verily.FSbeerselector`.
 There is no Android path; `test:e2e:android` was removed because it ran the iOS
 suite against an Android build and could only mislead.
 
-Local runs do not hit the bug that killed CI: a local Xcode build bundles the
-JavaScript, so the app under test is a real app.
+**A local Debug build has no JS bundle either** — `ios/BeerSelector.xcodeproj/project.pbxproj:334`
+sets `SKIP_BUNDLING=1` whenever `$CONFIGURATION` contains `Debug`, and no
+`.xcode.env.updates` exists to unset it. That is the same hole CI fell into.
+
+What makes local work is **Metro**, not the build: `npm run ios` leaves the
+bundler serving JS to the app. So Metro must stay running in its own terminal
+for the whole Maestro run. Kill it and you are testing CI's bundle-less app.
 
 ```bash
-# 1. Build and install onto a booted simulator (Xcode, not EAS — see CLAUDE.md)
+# 1. Terminal A — build, install, and LEAVE METRO RUNNING. Do not Ctrl-C it.
 npm run ios
 
-# 2. Registered suite — the 21 flows listed in config.yaml (~15 min)
+# 2. Terminal B — registered suite, the 21 flows listed in config.yaml (~15 min)
 npm run test:e2e
 
-# 3. A single flow — much the faster loop while iterating, and the only way
-#    to run one of the 18 unregistered files (see "Test Suite Overview")
+# 3. Terminal B — a single flow. Much the faster loop while iterating, and the
+#    only way to run one of the 18 unregistered files (see "Test Suite Overview")
 npm run test:e2e:single .maestro/20-loading-all-beers.yaml
 ```
 
@@ -428,13 +433,23 @@ brew install maestro
 # Start simulator
 xcrun simctl boot "iPhone 15 Pro"
 
-# Build and install app
+# Build and install app.
+#
+# NOTE: -configuration Debug sets SKIP_BUNDLING=1 (project.pbxproj:334), so the
+# resulting .app contains NO JavaScript. Running Maestro against it reproduces
+# the exact failure that made CI return 21/21 failed for 143 runs. Two ways out:
+#
+#   (a) Debug + Metro — build as below, then keep `npx expo start` running in
+#       another terminal for the whole Maestro run. This is what `npm run ios`
+#       does for you, and is the normal loop.
+#   (b) Release — embeds the bundle, so no Metro needed. Slower to build.
+#
 npx expo prebuild --platform ios
 cd ios
-xcodebuild -workspace BeerSelector.xcworkspace -scheme BeerSelector -configuration Debug -sdk iphonesimulator build
+xcodebuild -workspace BeerSelector.xcworkspace -scheme BeerSelector -configuration Release -sdk iphonesimulator build
 cd ..
 
-# Run tests
+# Run tests (Metro running too, if you built Debug)
 maestro test .maestro/
 ```
 
@@ -571,7 +586,7 @@ appId: org.verily.FSbeerselector
 
 ### Related Files
 
-- **GitHub Workflow:** none — these flows are run by hand, see "Running in CI/CD"
+- **GitHub Workflow:** none — these flows are run by hand, see "Running these tests"
 - **Config File:** `.maestro/config.yaml`
 - **Environment Example:** `.env.example`
 - **Mock Server Patterns:** `docs/MOCK_SERVER_PATTERNS.md` (if exists)
