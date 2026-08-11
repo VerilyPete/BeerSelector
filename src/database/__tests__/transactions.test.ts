@@ -4,14 +4,22 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 // Mock expo-sqlite
 jest.mock('expo-sqlite');
 
+// `runAsync` is REQUIRED, and createMockDatabase always supplies it. It used to
+// be optional, with every call site written `db.runAsync(...)` — which meant a
+// test that forgot to assign it would run its "write" as a silent no-op and
+// still pass, because the operation's return value is what gets asserted. Every
+// test in this file happened to assign it, so nothing was vacuous; the trapdoor
+// was that nothing stopped the next one from being. Making it required moves
+// that from luck to a compile error.
 type MockDatabase = {
   withTransactionAsync: jest.Mock;
-  runAsync?: jest.Mock;
+  runAsync: jest.Mock;
 };
 
 function createMockDatabase(): MockDatabase {
   return {
     withTransactionAsync: jest.fn(),
+    runAsync: jest.fn(),
   };
 }
 
@@ -20,6 +28,13 @@ function createMockDatabase(): MockDatabase {
  * implements only the handful of methods withDatabaseTransaction actually
  * uses (`withTransactionAsync`, and `runAsync` for call-count assertions),
  * matching the convention in BeerRepository.atomicity.test.ts.
+ *
+ * Worth being honest about what this suite does and does not prove: it verifies
+ * that withDatabaseTransaction calls through, propagates results, and lets
+ * errors escape. It does NOT exercise SQLite transaction semantics — nothing
+ * here rolls anything back, because the "database" is two jest.fn()s. A test
+ * named "should rollback all operations if any operation fails" is asserting
+ * that the error propagates, not that a rollback occurred.
  */
 function asDatabase(mock: MockDatabase): SQLiteDatabase {
   return mock as unknown as SQLiteDatabase;
@@ -91,10 +106,10 @@ describe('Database Transactions', () => {
 
       const mockOperation = jest.fn(async (db: SQLiteDatabase) => {
         // Simulate multiple database operations
-        await db.runAsync?.('INSERT INTO table1...');
+        await db.runAsync('INSERT INTO table1...');
         insertCalled = true;
 
-        await db.runAsync?.('UPDATE table2...');
+        await db.runAsync('UPDATE table2...');
         updateCalled = true;
 
         return { success: true, recordsAffected: 2 };
@@ -120,7 +135,7 @@ describe('Database Transactions', () => {
       const mockDatabase = createMockDatabase();
       const mockOperation = jest.fn(async (db: SQLiteDatabase) => {
         // First operation succeeds
-        await db.runAsync?.('INSERT INTO table1...');
+        await db.runAsync('INSERT INTO table1...');
 
         // Second operation fails; step 3 (a further runAsync call) is never reached
         throw new Error('Second operation failed');
@@ -280,7 +295,7 @@ describe('Database Transactions', () => {
         let recordsInserted = 0;
 
         for (const beer of beers) {
-          await db.runAsync?.('INSERT INTO allbeers (id, brew_name) VALUES (?, ?)', [
+          await db.runAsync('INSERT INTO allbeers (id, brew_name) VALUES (?, ?)', [
             beer.id,
             beer.brew_name,
           ]);
@@ -315,7 +330,7 @@ describe('Database Transactions', () => {
 
       const mockOperation = jest.fn(async (db: SQLiteDatabase) => {
         for (const beer of beers) {
-          await db.runAsync?.('INSERT INTO allbeers (id, brew_name) VALUES (?, ?)', [
+          await db.runAsync('INSERT INTO allbeers (id, brew_name) VALUES (?, ?)', [
             beer.id,
             beer.brew_name,
           ]);
@@ -353,16 +368,16 @@ describe('Database Transactions', () => {
       const mockDatabase = createMockDatabase();
       const mockOperation = jest.fn(async (db: SQLiteDatabase) => {
         // Update beers table
-        await db.runAsync?.('UPDATE allbeers SET style = ? WHERE id = ?', ['IPA', 1]);
+        await db.runAsync('UPDATE allbeers SET style = ? WHERE id = ?', ['IPA', 1]);
 
         // Update tasted_brew table
-        await db.runAsync?.(
+        await db.runAsync(
           'INSERT INTO tasted_brew_current_round (beer_id, tasted_date) VALUES (?, ?)',
           [1, Date.now()]
         );
 
         // Update preferences
-        await db.runAsync?.('UPDATE preferences SET value = ? WHERE key = ?', [
+        await db.runAsync('UPDATE preferences SET value = ? WHERE key = ?', [
           Date.now().toString(),
           'last_update',
         ]);
@@ -393,11 +408,11 @@ describe('Database Transactions', () => {
 
       const mockOperation = jest.fn(async (db: SQLiteDatabase) => {
         // Delete old data
-        await db.runAsync?.('DELETE FROM allbeers');
+        await db.runAsync('DELETE FROM allbeers');
 
         // Insert new data
         for (const beer of newBeers) {
-          await db.runAsync?.('INSERT INTO allbeers (id, brew_name) VALUES (?, ?)', [
+          await db.runAsync('INSERT INTO allbeers (id, brew_name) VALUES (?, ?)', [
             beer.id,
             beer.brew_name,
           ]);
@@ -425,7 +440,7 @@ describe('Database Transactions', () => {
       const mockDatabase = createMockDatabase();
       const mockOperation = jest.fn(async (db: SQLiteDatabase) => {
         // Step 1: Clear old data
-        await db.runAsync?.('DELETE FROM allbeers');
+        await db.runAsync('DELETE FROM allbeers');
 
         // Step 2: Insert new data (this fails)
         throw new Error('Network error during data fetch');
