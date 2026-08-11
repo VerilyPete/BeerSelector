@@ -12,7 +12,6 @@
     "test:ci": "jest --config=jest.config.js --ci --coverage --reporters=default --reporters=jest-junit",
     "test:e2e": "maestro test .maestro/",
     "test:e2e:ios": "maestro test .maestro/",
-    "test:e2e:android": "maestro test .maestro/",
     "test:e2e:single": "maestro test",
     "test:performance": "flashlight test --config .flashlight/performance-tests.yaml",
     "test:performance:report": "flashlight test --config .flashlight/performance-tests.yaml --report && flashlight report .flashlight/reports/latest.json",

@@ -10,13 +10,15 @@
 # an `env:` block here, an exported shell var, and `--config` pointing at this
 # file are all ignored by flow-header substitution regardless).
 #
-# The two Android CI jobs (`maestro-android` / `maestro-tests-android`) still
-# run — kept, not deleted — but are marked `continue-on-error: true` and
-# known-red in their own comments: they launch the iOS bundle ID against an
-# Android build and fail at that step every time. If Android becomes a
-# supported target again, that plumbing has to be rebuilt; the reference
-# values below are the two real bundle IDs to use, for whoever does that,
-# not something currently read by anything:
+# The two Android CI jobs (`maestro-android` / `maestro-tests-android`) are
+# gone: both E2E workflows were deleted on 2026-08-11 (see .maestro/README.md).
+# They had been known-red anyway — they launched the iOS bundle ID against an
+# Android build and failed at that step every time. The `test:e2e:android` npm
+# script was removed in the same change for the same reason: it ran the iOS
+# suite and could only ever mislead. If Android becomes a supported target
+# again, that plumbing has to be rebuilt; the reference values below are the
+# two real bundle IDs to use, for whoever does that, not something currently
+# read by anything:
 #   iOS:     org.verily.FSbeerselector
 #   Android: org.verily.FSBeerselector   (capital B — matches app.json's
 #            android.package; iOS does not capitalise it)

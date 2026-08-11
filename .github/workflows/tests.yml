@@ -5,11 +5,13 @@ name: Unit Tests
 # and Flashlight performance, neither of them runs jest, and .husky/pre-commit
 # is lint-staged (eslint + prettier) only.
 #
-# Deliberately a separate workflow rather than a job inside e2e-tests.yml or
-# maestro-e2e.yml. Those two duplicate each other, and plans/ci-recovery.md item
-# 6.1 holds an open decision about deleting e2e-tests.yml's iOS job. Keeping
-# jest in its own file means that decision cannot take unit-test coverage with
-# it as a side effect.
+# Deliberately a separate workflow rather than a job inside the E2E workflows.
+# That paid off on 2026-08-11: ci-recovery.md item 6.1's open question was
+# settled by deleting e2e-tests.yml and maestro-e2e.yml outright (143 runs, zero
+# passes), and because jest lived in its own file the deletion could not take
+# unit-test coverage with it. E2E now runs locally only — see .maestro/README.md.
+#
+# With those two gone, this and static-analysis.yml are the whole of CI.
 
 on:
   push:
@@ -21,9 +23,9 @@ on:
   # on purpose: they churn, and a comment naming them goes stale faster than
   # the argument does.)
   #
-  # The first draft of this file copied `[main, develop]` from e2e-tests.yml:4.
-  # There is no `develop` branch in this repo, local or remote; that filter is
-  # dead config inherited from a workflow that still has it.
+  # The first draft of this file copied `[main, develop]` from the old
+  # e2e-tests.yml. There is no `develop` branch in this repo, local or remote;
+  # that filter was dead config, and the workflow it came from is now deleted.
   pull_request:
   workflow_dispatch:
 
@@ -40,12 +42,13 @@ permissions:
 
 jobs:
   jest:
-    # Check context names must be unique across ALL workflows in the repo.
-    # e2e-tests.yml and maestro-e2e.yml already collide with each other on three
-    # names — "Test Summary", "Maestro E2E Tests (iOS)" and "Maestro E2E Tests
-    # (Android)" — which is how a green job and a red job come to share a single
-    # check name. Do not rename this job to anything either of those files uses.
-    # See plans/ci-recovery.md item 5.7.
+    # Check context names must be unique across ALL workflows in the repo. This
+    # bit hard when e2e-tests.yml and maestro-e2e.yml collided on three names —
+    # "Test Summary", "Maestro E2E Tests (iOS)" and "Maestro E2E Tests (Android)"
+    # — which is how a green job and a red job came to share a single check.
+    # Both are deleted now, so only static-analysis.yml remains to collide with.
+    # "Jest Unit Tests" is also the sole required check on main: renaming this
+    # job makes every PR unmergeable. See plans/ci-recovery.md item 5.7.
     name: Jest Unit Tests
     runs-on: ubuntu-latest
     # Measured basis: ~57s user CPU locally, so roughly 20-40s wall on a 4-vCPU

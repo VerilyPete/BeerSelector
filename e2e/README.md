@@ -388,78 +388,15 @@ flashlight report .flashlight/reports/latest.json
 
 ## Continuous Integration
 
-### GitHub Actions
+**There is none, deliberately.** `e2e-tests.yml` and `maestro-e2e.yml` were
+deleted on 2026-08-11 after 143 runs with zero passes — the `.app` under test
+was built with `SKIP_BUNDLING` and contained no JavaScript, so all 21 flows
+failed on their opening assertion every time.
 
-Add to `.github/workflows/e2e-tests.yml`:
-
-```yaml
-name: E2E Tests
-
-on:
-  push:
-    branches: [main, develop]
-  pull_request:
-    branches: [main, develop]
-
-jobs:
-  maestro-tests:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Setup Node
-        uses: actions/setup-node@v3
-        with:
-          node-version: 18
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Install Maestro
-        run: curl -fsSL https://get.maestro.mobile.dev | bash
-
-      - name: Build iOS app
-        run: npx expo run:ios --configuration Release
-
-      - name: Run Maestro tests
-        run: maestro test .maestro/
-
-      - name: Upload test results
-        if: always()
-        uses: actions/upload-artifact@v3
-        with:
-          name: maestro-results
-          path: test-results/
-
-  performance-tests:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Setup Node
-        uses: actions/setup-node@v3
-        with:
-          node-version: 18
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Install Flashlight
-        run: npm install -g @shopify/flashlight
-
-      - name: Build iOS app
-        run: npx expo run:ios --configuration Release
-
-      - name: Run performance tests
-        run: flashlight test --config .flashlight/performance-tests.yaml --ci
-
-      - name: Upload performance report
-        if: always()
-        uses: actions/upload-artifact@v3
-        with:
-          name: performance-report
-          path: .flashlight/reports/
-```
+E2E is run locally only. **`.maestro/README.md` is the canonical guide** — it
+has the current commands, the iOS-only constraint, the CLI version pin, and the
+credentials. This file is older and its directory contains no tests; prefer
+`.maestro/README.md` wherever the two disagree.
 
 ## Writing New Tests
 

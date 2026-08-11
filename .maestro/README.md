@@ -186,22 +186,59 @@ alternatives if it does not hold.
 
 ---
 
-## Running in CI/CD
+## Running these tests
 
-### Quick Setup
+**These flows do not run in CI. They are run by hand.**
 
-1. Copy `.github/workflows/maestro-e2e.yml` to your workflows directory
-2. Configure environment variables in GitHub Settings → Secrets
-3. Push to trigger the workflow
+`e2e-tests.yml` and `maestro-e2e.yml` were deleted on 2026-08-11. Between them
+they ran 143 times and **never once passed**. Every run failed the same way —
+21/21 flows dying on their opening assertion — because the `.app` under test was
+built with `SKIP_BUNDLING enabled; skipping.` and therefore contained no
+JavaScript. The two workflows also duplicated each other on push and PR, both on
+`macos-latest` (billed at 10×), at ~46 minutes per iOS job: 23 minutes building a
+bundle-less app and 14 minutes running flows against it that could not pass.
 
-### Required Secrets
+Nothing about the flows themselves was established to be wrong — they were never
+given a working build to run against. If you want them back in CI, fix the
+bundling first and get one green run locally before spending runner time on it.
 
-Configure these in your CI/CD platform:
+### Running locally
+
+The suite is **iOS-only** — all 39 flows hardcode `org.verily.FSbeerselector`.
+There is no Android path; `test:e2e:android` was removed because it ran the iOS
+suite against an Android build and could only mislead.
+
+Local runs do not hit the bug that killed CI: a local Xcode build bundles the
+JavaScript, so the app under test is a real app.
 
 ```bash
-EXPO_TOKEN              # Expo authentication token (optional)
+# 1. Build and install onto a booted simulator (Xcode, not EAS — see CLAUDE.md)
+npm run ios
+
+# 2. Registered suite — the 21 flows listed in config.yaml (~15 min)
+npm run test:e2e
+
+# 3. A single flow — much the faster loop while iterating, and the only way
+#    to run one of the 18 unregistered files (see "Test Suite Overview")
+npm run test:e2e:single .maestro/20-loading-all-beers.yaml
+```
+
+Check `maestro --version` prints **2.4.0** first — see "How Maestro validates
+this suite", point 4. Nothing enforces your local version now that CI is gone,
+and a mismatched CLI is how this suite rotted the first time.
+
+Set the environment variables below in your shell or a local `.env` first; they
+were previously supplied as GitHub secrets. Flows that exercise login need
+`TEST_UFO_EMAIL` / `TEST_UFO_PASSWORD` and will fail without them.
+
+### Credentials
+
+Export these in your shell or a local `.env` — **never commit them**:
+
+```bash
 TEST_UFO_EMAIL          # Test account email (for authenticated tests)
 TEST_UFO_PASSWORD       # Test account password
+EXPO_TOKEN              # Expo authentication token (optional)
 ```
 
 ### Environment Variables
@@ -209,92 +246,8 @@ TEST_UFO_PASSWORD       # Test account password
 ```bash
 EXPO_PUBLIC_USE_MOCK_SERVER=true      # Use mock API server
 EXPO_PUBLIC_API_BASE_URL=http://localhost:3000
-EXPO_PUBLIC_API_TIMEOUT=30000         # 30 second timeout for CI
+EXPO_PUBLIC_API_TIMEOUT=30000         # generous timeout for E2E runs
 ```
-
-### GitHub Actions Example
-
-```yaml
-- name: Install Maestro
-  run: |
-    curl -fsSL https://get.maestro.mobile.dev | bash
-    echo "$HOME/.maestro/bin" >> $GITHUB_PATH
-
-- name: Run Maestro Tests
-  run: |
-    maestro test .maestro/ \
-      --format junit \
-      --output maestro-results.xml
-```
-
-### CI Test Strategy
-
-**Pull Request Validation (Fast - ~15 min with parallel execution)**
-
-```bash
-# Run only critical P0 tests
-maestro test .maestro/01-beer-list-rendering.yaml
-maestro test .maestro/06-login-flow-member.yaml
-maestro test .maestro/07-login-flow-visitor.yaml
-```
-
-**Nightly Builds (Comprehensive - ~45 min)**
-
-```bash
-# Run full test suite
-maestro test .maestro/
-```
-
-**Release Candidates (Exhaustive)**
-
-```bash
-# Run all tests on both platforms
-npm run test:e2e:ios
-npm run test:e2e:android
-```
-
-### Parallel Test Execution
-
-**GitHub Actions automatically runs tests in parallel on pull requests**, reducing feedback time from 45 minutes to ~15 minutes. Tests are organized into logical groups that run concurrently:
-
-**Test Groups:**
-
-1. **login-flows** (3 tests) - Authentication and login flows
-2. **settings** (3 tests) - Settings and configuration
-3. **beer-features** (5 tests) - Beer list features and navigation
-4. **offline-network** (4 tests) - Offline support and network handling
-5. **error-handling** (3 tests) - Error handling and edge cases
-
-**Run Parallel Tests Locally:**
-
-```bash
-# Using background jobs (simple approach)
-maestro test .maestro/06-login-flow-member.yaml &
-maestro test .maestro/07-login-flow-visitor.yaml &
-maestro test .maestro/10-settings-configuration.yaml &
-maestro test .maestro/01-beer-list-rendering.yaml &
-wait  # Wait for all background jobs to complete
-```
-
-```bash
-# Using GNU parallel (advanced - requires gnu-parallel installation)
-# Run all tests in parallel with 4 concurrent jobs
-parallel -j 4 maestro test ::: .maestro/*.yaml
-```
-
-**Benefits of Parallel Execution:**
-
-- 3x faster test execution (45min sequential → 15min parallel)
-- Faster PR feedback loop
-- Better CI resource utilization
-- Isolated test failures (easier debugging)
-
-**Trade-offs:**
-
-- Requires more CI minutes/runner instances
-- May require more simulator/emulator resources locally
-- Test failures may be harder to debug without sequential context
-- Potential simulator resource contention on macOS
 
 ---
 
@@ -618,7 +571,7 @@ appId: org.verily.FSbeerselector
 
 ### Related Files
 
-- **GitHub Workflow:** `.github/workflows/maestro-e2e.yml`
+- **GitHub Workflow:** none — these flows are run by hand, see "Running in CI/CD"
 - **Config File:** `.maestro/config.yaml`
 - **Environment Example:** `.env.example`
 - **Mock Server Patterns:** `docs/MOCK_SERVER_PATTERNS.md` (if exists)
