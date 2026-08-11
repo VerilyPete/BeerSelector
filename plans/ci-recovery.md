@@ -602,6 +602,16 @@ reads as one.
       errors saying the compile never happened. The job failed correctly either
       way — the *advice* was wrong, and acting on it would have hard-failed the
       next honest run. Notice now prints only when nothing else failed.
+      **Observed in CI on the first run** (PR #14), recorded here before either
+      check is required, per 5.2's rule about measuring rather than reasoning:
+      `type_errors=141 ceiling=141 checked_files=241 floor=241 tsc_exit=2`, and
+      `364 problems (0 errors, 364 warnings)`. Both green, first attempt.
+      The predicted **241** is the number that matters: a local run reports 243,
+      so a floor taken from a developer machine would have gone red immediately
+      — the simulation is what prevented a repeat of 5.2's run 1.
+      Note both ratchets sit at **zero headroom** by construction: one new
+      warning or one new type error turns the relevant check red. That is the
+      intent, and it is also the thing most likely to feel obstructive first.
       **Not yet required**, and per 5.6's ordering constraint it cannot be until
       GitHub has seen both contexts at least once. That is a follow-up decision,
       not an oversight.
