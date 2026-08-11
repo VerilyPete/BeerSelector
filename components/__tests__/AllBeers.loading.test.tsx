@@ -334,11 +334,19 @@ describe('AllBeers Loading States (MP-3 Step 3a)', () => {
     it('should not show beer list on error', async () => {
       (beerRepository.getAll as jest.Mock).mockRejectedValue(new Error('Failed'));
 
-      const { queryByTestId } = renderAllBeers();
+      const { getByTestId, queryByTestId } = renderAllBeers();
 
+      // Wait for the error state FIRST. Asserting `beer-list` is null inside the
+      // waitFor instead resolves on its very first evaluation — under fake
+      // timers waitFor checks once before advancing anything, and at mount the
+      // skeleton is up so `beer-list` is already null. The error state is then
+      // never observed at all: rendering a <View testID="beer-list" /> inside
+      // error-container left this test green.
       await waitFor(() => {
-        expect(queryByTestId('beer-list')).toBeNull();
+        expect(getByTestId('error-container')).toBeDefined();
       });
+
+      expect(queryByTestId('beer-list')).toBeNull();
     });
   });
 

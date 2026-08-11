@@ -34,16 +34,15 @@ module.exports = {
     '/reports/',
     '/__mocks__/',
 
-    // === Performance Tests - Pending Flashlight Migration ===
-    // These performance tests require full RN environment for accurate profiling
-    // TODO: Migrate to Flashlight for E2E performance testing
-    '__tests__/performance/BeerList.performance.test.tsx',
-    '__tests__/performance/ComponentReRenders.test.tsx',
-    '__tests__/performance/FlatListPerformance.test.tsx',
-    '__tests__/performance/useBeerFilters.performance.test.ts',
+    // The four `__tests__/performance/*` entries that used to sit here named
+    // files that do not exist — there is no `__tests__/` directory in this repo.
+    // Dead config carrying a live-looking TODO. Removed rather than left to
+    // imply there is a Flashlight migration pending on something real.
+    //
+    // BeerList.virtualization is genuinely red (17 pass, 9 fail), so it stays.
+    // Its stated reason was wrong though: it does not hang, and no WebView,
+    // Alert or RN context is involved. It is quarantined because it fails.
     'components/beer/__tests__/BeerList.virtualization.test.tsx',
-    // Optimization test uses renderHook() with RN context - causes Jest hangs
-    'hooks/__tests__/useBeerFilters.optimization.test.ts',
     // Component tests that use WebView, Alert, or RN context - migrate to Maestro
     //
     // LoginWebView.test.tsx is NOT here any more. The stated reason for the
@@ -62,6 +61,13 @@ module.exports = {
     // state through beerRepository.getUntasted() and fetchMyBeersFromAPI(), which
     // that component no longer calls at all. Both now render inside a real
     // AppProvider and drive state through the repositories it loads from.
+    //
+    // useBeerFilters.optimization.test.ts is NOT here any more, for the third
+    // time in the same pattern. Its stated reason — "uses renderHook() with RN
+    // context - causes Jest hangs" — is false: 23 tests, all green, 0.2s. It
+    // was 23 tests of real coverage excluded from CI on a premise nobody
+    // rechecked. If you are about to add a line to this list, run the file
+    // first and write down what it actually does.
   ],
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
   verbose: true,

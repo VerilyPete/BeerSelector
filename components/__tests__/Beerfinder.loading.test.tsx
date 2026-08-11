@@ -480,6 +480,50 @@ describe('Beerfinder Loading States', () => {
       expect(queryByTestId('skeleton-loader')).toBeNull();
     });
 
+    it('should keep the loaded list on screen while a refresh reloads it', async () => {
+      // The one requirement in this file's header that nothing was checking.
+      //
+      // Beerfinder passes refreshBeerData as onDataReloaded, and that sets
+      // isLoadingBeers=true while allBeers is still populated. The skeleton
+      // gate is `isLoadingBeers && allBeers.length === 0` — drop the second
+      // clause and every pull-to-refresh blanks the list and paints 20
+      // skeletons over it. Both suites passed with that clause deleted.
+      //
+      // `refreshing` from useDataRefresh cannot reach the skeleton branch at
+      // all, so no amount of toggling it exercises this. Driving the context
+      // through the captured callback is what reaches the state.
+      const { getByTestId, queryByTestId, getByText } = renderBeerfinder();
+
+      await waitFor(() => {
+        expect(getByTestId('beer-list')).toBeDefined();
+      });
+
+      const { onDataReloaded } = (useDataRefresh as jest.Mock).mock.calls[0][0];
+
+      // Hold the reload open so the in-flight state is observable.
+      let releaseReload: (value: unknown) => void = () => {};
+      (beerRepository.getAll as jest.Mock).mockImplementation(
+        () => new Promise(resolve => (releaseReload = resolve))
+      );
+
+      let reload: Promise<void>;
+      await act(async () => {
+        reload = onDataReloaded();
+      });
+
+      // Mid-refresh: loading is true but we already have beers to show.
+      expect(queryByTestId('skeleton-loader')).toBeNull();
+      expect(getByTestId('beer-list')).toBeDefined();
+      expect(getByText('2 to discover')).toBeDefined();
+
+      await act(async () => {
+        releaseReload(mockAllBeers);
+        await reload;
+      });
+
+      expect(queryByTestId('skeleton-loader')).toBeNull();
+    });
+
     it('should trigger the refresh handler when the list is pulled', async () => {
       const handleRefresh = jest.fn();
       (useDataRefresh as jest.Mock).mockReturnValue({
