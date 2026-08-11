@@ -303,7 +303,7 @@ describe('Database Lifecycle Management', () => {
 
       try {
         await closeDatabaseConnection();
-      } catch (error) {
+      } catch {
         // Expected to fail
       }
 

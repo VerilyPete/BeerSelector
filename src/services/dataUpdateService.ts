@@ -26,7 +26,7 @@ import type {
   UnavailableReason,
   UnconditionalSource,
 } from '../api/fetchOutcome';
-import { validateBrewInStockResponse, validateBeerArray } from '../api/validators';
+import { validateBeerArray } from '../api/validators';
 import { logError, logWarning } from '../utils/errorLogger';
 import { calculateContainerTypes } from '../database/utils/glassTypeCalculator';
 import { config } from '@/src/config';
@@ -239,10 +239,17 @@ type RewardsWrite =
 
 /**
  * Beers the Worker has never seen, to be handed to it once the writes are done.
+ *
+ * `Beer[]`, not `BeerWithContainerType[]`: these are captured before container
+ * types are calculated (`prepareMyBeers` builds this from `validationResult.
+ * validBeers`), and the only consumer, `syncMissingBeersInBackground`, only
+ * ever reads `id`/`brew_name`/`brewer`/`brew_description` — fields `Beer`
+ * already has. Requiring `container_type` here described data this type never
+ * actually carries.
  */
 type PendingWorkerSync = {
   readonly missingIds: string[];
-  readonly beers: BeerWithContainerType[];
+  readonly beers: Beer[];
 };
 
 /**
@@ -295,7 +302,7 @@ export type DataUpdateResult = {
  */
 async function syncMissingBeersInBackground(
   missingIds: string[],
-  allBeers: BeerWithContainerType[],
+  allBeers: Beer[],
   operation: string
 ): Promise<void> {
   if (missingIds.length === 0) return;
@@ -368,8 +375,11 @@ function mapEnrichedBeerToAppBeer(beer: EnrichedBeerResponse): Beer {
     brewer_loc: beer.brewer_loc,
     brew_style: beer.brew_style,
     brew_container: beer.brew_container,
-    review_count: beer.review_count,
-    review_rating: beer.review_rating,
+    // `EnrichedBeerResponse` allows `null` here (`z.string().nullish()`);
+    // `Beer` only allows `undefined`. Normalize at this boundary rather than
+    // widening `Beer`'s type for the sake of one producer.
+    review_count: beer.review_count ?? undefined,
+    review_rating: beer.review_rating ?? undefined,
     brew_description: beer.brew_description,
     added_date: beer.added_date,
     // Use enriched ABV from Worker

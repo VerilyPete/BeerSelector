@@ -16,6 +16,9 @@ import { render, waitFor } from '@testing-library/react-native';
 import { Beerfinder } from '../Beerfinder';
 import { beerRepository } from '@/src/database/repositories/BeerRepository';
 import { myBeersRepository } from '@/src/database/repositories/MyBeersRepository';
+import { fetchMyBeersFromAPI } from '@/src/api/beerApi';
+import { useBeerFilters } from '@/hooks/useBeerFilters';
+import { useDataRefresh } from '@/hooks/useDataRefresh';
 
 // Mock dependencies
 jest.mock('@/src/database/repositories/BeerRepository');
@@ -88,8 +91,7 @@ describe('Beerfinder Loading States (MP-3 Step 3a)', () => {
     jest.clearAllMocks();
 
     // Mock useBeerFilters hook
-    const useBeerFilters = require('@/hooks/useBeerFilters').useBeerFilters;
-    useBeerFilters.mockImplementation((beers: any) => ({
+    (useBeerFilters as jest.Mock).mockImplementation((beers: any) => ({
       filteredBeers: beers,
       filters: { isDraft: false, isHeavies: false, isIpa: false },
       sortBy: 'date',
@@ -102,15 +104,13 @@ describe('Beerfinder Loading States (MP-3 Step 3a)', () => {
     }));
 
     // Mock useDataRefresh hook
-    const useDataRefresh = require('@/hooks/useDataRefresh').useDataRefresh;
-    useDataRefresh.mockReturnValue({
+    (useDataRefresh as jest.Mock).mockReturnValue({
       refreshing: false,
       handleRefresh: jest.fn(),
     });
 
     // Mock My Beers API
-    const { fetchMyBeersFromAPI } = require('@/src/api/beerApi');
-    fetchMyBeersFromAPI.mockResolvedValue(mockMyBeers);
+    (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(mockMyBeers);
 
     // Mock My Beers repository
     (myBeersRepository.insertMany as jest.Mock).mockResolvedValue(undefined);
@@ -136,8 +136,7 @@ describe('Beerfinder Loading States (MP-3 Step 3a)', () => {
         () => new Promise(resolve => setTimeout(() => resolve(mockUntastedBeers), 500))
       );
 
-      const { fetchMyBeersFromAPI } = require('@/src/api/beerApi');
-      fetchMyBeersFromAPI.mockImplementation(
+      (fetchMyBeersFromAPI as jest.Mock).mockImplementation(
         () => new Promise(resolve => setTimeout(() => resolve(mockMyBeers), 800))
       );
 
@@ -229,8 +228,7 @@ describe('Beerfinder Loading States (MP-3 Step 3a)', () => {
     it('should attempt to fetch My Beers data during load', async () => {
       (beerRepository.getUntasted as jest.Mock).mockResolvedValue(mockUntastedBeers);
 
-      const { fetchMyBeersFromAPI } = require('@/src/api/beerApi');
-      fetchMyBeersFromAPI.mockResolvedValue(mockMyBeers);
+      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(mockMyBeers);
 
       render(<Beerfinder />);
 
@@ -242,8 +240,7 @@ describe('Beerfinder Loading States (MP-3 Step 3a)', () => {
     it('should populate My Beers repository after fetch', async () => {
       (beerRepository.getUntasted as jest.Mock).mockResolvedValue(mockUntastedBeers);
 
-      const { fetchMyBeersFromAPI } = require('@/src/api/beerApi');
-      fetchMyBeersFromAPI.mockResolvedValue(mockMyBeers);
+      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(mockMyBeers);
 
       render(<Beerfinder />);
 
@@ -255,8 +252,7 @@ describe('Beerfinder Loading States (MP-3 Step 3a)', () => {
     it('should continue loading if My Beers fetch fails', async () => {
       (beerRepository.getUntasted as jest.Mock).mockResolvedValue(mockUntastedBeers);
 
-      const { fetchMyBeersFromAPI } = require('@/src/api/beerApi');
-      fetchMyBeersFromAPI.mockRejectedValue(new Error('Network error'));
+      (fetchMyBeersFromAPI as jest.Mock).mockRejectedValue(new Error('Network error'));
 
       const { getByTestId } = render(<Beerfinder />);
 
@@ -328,8 +324,7 @@ describe('Beerfinder Loading States (MP-3 Step 3a)', () => {
     it('should NOT show skeleton during refresh', async () => {
       (beerRepository.getUntasted as jest.Mock).mockResolvedValue(mockUntastedBeers);
 
-      const useDataRefresh = require('@/hooks/useDataRefresh').useDataRefresh;
-      useDataRefresh.mockReturnValue({
+      (useDataRefresh as jest.Mock).mockReturnValue({
         refreshing: true,
         handleRefresh: jest.fn(),
       });
@@ -354,8 +349,7 @@ describe('Beerfinder Loading States (MP-3 Step 3a)', () => {
       });
 
       // Refresh state
-      const useDataRefresh = require('@/hooks/useDataRefresh').useDataRefresh;
-      useDataRefresh.mockReturnValue({
+      (useDataRefresh as jest.Mock).mockReturnValue({
         refreshing: true,
         handleRefresh: jest.fn(),
       });
@@ -494,8 +488,7 @@ describe('Beerfinder Loading States (MP-3 Step 3a)', () => {
     it('should handle My Beers fetch timeout gracefully', async () => {
       (beerRepository.getUntasted as jest.Mock).mockResolvedValue(mockUntastedBeers);
 
-      const { fetchMyBeersFromAPI } = require('@/src/api/beerApi');
-      fetchMyBeersFromAPI.mockImplementation(
+      (fetchMyBeersFromAPI as jest.Mock).mockImplementation(
         () => new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 5000))
       );
 
@@ -513,8 +506,7 @@ describe('Beerfinder Loading States (MP-3 Step 3a)', () => {
     it('should handle concurrent fetches (untasted + My Beers)', async () => {
       (beerRepository.getUntasted as jest.Mock).mockResolvedValue(mockUntastedBeers);
 
-      const { fetchMyBeersFromAPI } = require('@/src/api/beerApi');
-      fetchMyBeersFromAPI.mockResolvedValue(mockMyBeers);
+      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(mockMyBeers);
 
       const { getByTestId } = render(<Beerfinder />);
 

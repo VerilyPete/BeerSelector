@@ -13,7 +13,7 @@ import {
 import * as connection from '../../connection';
 
 // Silence expected console.error calls from rowToUpdate validation
-const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+jest.spyOn(console, 'error').mockImplementation(() => undefined);
 
 jest.mock('../../connection');
 

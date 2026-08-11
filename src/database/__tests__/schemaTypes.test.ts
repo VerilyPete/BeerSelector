@@ -9,10 +9,6 @@
 
 import { describe, it, expect } from '@jest/globals';
 import {
-  AllBeersRow,
-  TastedBrewRow,
-  RewardRow,
-  PreferenceRow,
   allBeersRowSchema,
   tastedBrewRowSchema,
   rewardRowSchema,

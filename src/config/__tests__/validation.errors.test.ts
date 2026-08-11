@@ -18,7 +18,7 @@
  */
 
 import { config } from '../config';
-import { InvalidUrlError, InvalidNetworkConfigError, InvalidEnvironmentError } from '../errors';
+import { InvalidUrlError, InvalidEnvironmentError } from '../errors';
 
 function assertError(value: unknown): asserts value is Error {
   if (!(value instanceof Error)) throw new Error(`Expected Error, got ${typeof value}`);
@@ -312,7 +312,7 @@ describe('Config Validation Error Tests', () => {
       const { config: freshConfig, InvalidNetworkConfigError: ErrorClass } = require('../config');
 
       try {
-        freshConfig.network;
+        void freshConfig.network;
         fail('Should have thrown InvalidNetworkConfigError');
       } catch (error: unknown) {
         assertError(error);
@@ -328,7 +328,7 @@ describe('Config Validation Error Tests', () => {
       const { config: freshConfig, InvalidNetworkConfigError: ErrorClass } = require('../config');
 
       try {
-        freshConfig.network;
+        void freshConfig.network;
         fail('Should have thrown InvalidNetworkConfigError');
       } catch (error: unknown) {
         assertError(error);
@@ -344,7 +344,7 @@ describe('Config Validation Error Tests', () => {
       const { config: freshConfig, InvalidNetworkConfigError: ErrorClass } = require('../config');
 
       try {
-        freshConfig.network;
+        void freshConfig.network;
         fail('Should have thrown InvalidNetworkConfigError');
       } catch (error: unknown) {
         assertError(error);
@@ -360,7 +360,7 @@ describe('Config Validation Error Tests', () => {
       const { config: freshConfig, InvalidNetworkConfigError: ErrorClass } = require('../config');
 
       try {
-        freshConfig.network;
+        void freshConfig.network;
         fail('Should have thrown InvalidNetworkConfigError');
       } catch (error: unknown) {
         assertError(error);
@@ -408,7 +408,7 @@ describe('Config Validation Error Tests', () => {
       const { config: freshConfig, InvalidNetworkConfigError: ErrorClass } = require('../config');
 
       try {
-        freshConfig.network;
+        void freshConfig.network;
         fail('Should have thrown InvalidNetworkConfigError');
       } catch (error: unknown) {
         assertError(error);
@@ -424,7 +424,7 @@ describe('Config Validation Error Tests', () => {
       const { config: freshConfig, InvalidNetworkConfigError: ErrorClass } = require('../config');
 
       try {
-        freshConfig.network;
+        void freshConfig.network;
         fail('Should have thrown InvalidNetworkConfigError');
       } catch (error: unknown) {
         assertError(error);
@@ -440,7 +440,7 @@ describe('Config Validation Error Tests', () => {
       const { config: freshConfig, InvalidNetworkConfigError: ErrorClass } = require('../config');
 
       try {
-        freshConfig.network;
+        void freshConfig.network;
         fail('Should have thrown InvalidNetworkConfigError');
       } catch (error: unknown) {
         assertError(error);
@@ -482,7 +482,7 @@ describe('Config Validation Error Tests', () => {
       const { config: freshConfig, InvalidNetworkConfigError: ErrorClass } = require('../config');
 
       try {
-        freshConfig.network;
+        void freshConfig.network;
         fail('Should have thrown InvalidNetworkConfigError');
       } catch (error: unknown) {
         assertError(error);
@@ -498,7 +498,7 @@ describe('Config Validation Error Tests', () => {
       const { config: freshConfig, InvalidNetworkConfigError: ErrorClass } = require('../config');
 
       try {
-        freshConfig.network;
+        void freshConfig.network;
         fail('Should have thrown InvalidNetworkConfigError');
       } catch (error: unknown) {
         assertError(error);
@@ -514,7 +514,7 @@ describe('Config Validation Error Tests', () => {
       const { config: freshConfig, InvalidNetworkConfigError: ErrorClass } = require('../config');
 
       try {
-        freshConfig.network;
+        void freshConfig.network;
         fail('Should have thrown InvalidNetworkConfigError');
       } catch (error: unknown) {
         assertError(error);
@@ -530,7 +530,7 @@ describe('Config Validation Error Tests', () => {
       const { config: freshConfig, InvalidNetworkConfigError: ErrorClass } = require('../config');
 
       try {
-        freshConfig.network;
+        void freshConfig.network;
         fail('Should have thrown InvalidNetworkConfigError');
       } catch (error: unknown) {
         assertError(error);
@@ -674,7 +674,7 @@ describe('Config Validation Error Tests', () => {
         jest.resetModules();
         try {
           const { config: freshConfig } = require('../config');
-          freshConfig.network.timeout;
+          void freshConfig.network.timeout;
           fail('Should have thrown');
         } catch (error: unknown) {
           assertError(error);
@@ -687,7 +687,7 @@ describe('Config Validation Error Tests', () => {
         jest.resetModules();
         try {
           const { config: freshConfig } = require('../config');
-          freshConfig.network.timeout;
+          void freshConfig.network.timeout;
           fail('Should have thrown');
         } catch (error: unknown) {
           assertError(error);
@@ -701,7 +701,7 @@ describe('Config Validation Error Tests', () => {
         jest.resetModules();
         try {
           const { config: freshConfig } = require('../config');
-          freshConfig.network.timeout;
+          void freshConfig.network.timeout;
           fail('Should have thrown');
         } catch (error: unknown) {
           assertError(error);
@@ -714,7 +714,7 @@ describe('Config Validation Error Tests', () => {
         jest.resetModules();
         try {
           const { config: freshConfig } = require('../config');
-          freshConfig.network.retries;
+          void freshConfig.network.retries;
           fail('Should have thrown');
         } catch (error: unknown) {
           assertError(error);
@@ -729,7 +729,7 @@ describe('Config Validation Error Tests', () => {
         jest.resetModules();
         try {
           const { config: freshConfig } = require('../config');
-          freshConfig.network.retryDelay;
+          void freshConfig.network.retryDelay;
           fail('Should have thrown');
         } catch (error: unknown) {
           assertError(error);
@@ -789,7 +789,7 @@ describe('Config Validation Error Tests', () => {
       const { config: freshConfig, InvalidNetworkConfigError: ErrorClass } = require('../config');
 
       try {
-        freshConfig.network.timeout;
+        void freshConfig.network.timeout;
         fail('Should have thrown');
       } catch (error: unknown) {
         assertError(error);
@@ -804,7 +804,7 @@ describe('Config Validation Error Tests', () => {
       const { config: freshConfig, InvalidNetworkConfigError: ErrorClass } = require('../config');
 
       try {
-        freshConfig.network.retries;
+        void freshConfig.network.retries;
         fail('Should have thrown');
       } catch (error: unknown) {
         assertError(error);
@@ -834,7 +834,7 @@ describe('Config Validation Error Tests', () => {
       jest.resetModules();
       try {
         const { config: freshConfig } = require('../config');
-        freshConfig.network.timeout;
+        void freshConfig.network.timeout;
         fail('Should have thrown');
       } catch (error: unknown) {
         assertError(error);
@@ -907,7 +907,7 @@ describe('Config Validation Error Tests', () => {
 
       // Should fail on first validation check (timeout)
       try {
-        freshConfig.network.timeout;
+        void freshConfig.network.timeout;
         fail('Should have thrown');
       } catch (error: unknown) {
         assertError(error);
@@ -1029,7 +1029,7 @@ describe('Config Validation Error Tests', () => {
 
       try {
         const { config: freshConfig } = require('../config');
-        freshConfig.network.timeout;
+        void freshConfig.network.timeout;
         fail('Should have thrown');
       } catch (error: unknown) {
         assertError(error);

@@ -1863,8 +1863,7 @@ describe('dataUpdateService', () => {
   describe('ETag / 304 handling', () => {
     describe('fetchTaplistFromProxyOrDirect', () => {
       it('should return notModified true when proxy returns 304', async () => {
-        const { config: mockConfig } = require('@/src/config');
-        mockConfig.enrichment.isConfigured.mockReturnValue(true);
+        (config.enrichment.isConfigured as jest.Mock).mockReturnValue(true);
 
         (fetchBeersFromProxy as jest.Mock).mockResolvedValueOnce({
           beers: [],
@@ -1883,8 +1882,7 @@ describe('dataUpdateService', () => {
       });
 
       it('should pass stored ETag to fetchBeersFromProxy when preference exists', async () => {
-        const { config: mockConfig } = require('@/src/config');
-        mockConfig.enrichment.isConfigured.mockReturnValue(true);
+        (config.enrichment.isConfigured as jest.Mock).mockReturnValue(true);
 
         (getPreference as jest.Mock).mockImplementation((key: string) => {
           if (key === 'all_beers_etag') return Promise.resolve('"stored-etag"');
@@ -1905,8 +1903,7 @@ describe('dataUpdateService', () => {
       });
 
       it('should NOT pass ETag to fetchBeersFromProxy when no preference exists', async () => {
-        const { config: mockConfig } = require('@/src/config');
-        mockConfig.enrichment.isConfigured.mockReturnValue(true);
+        (config.enrichment.isConfigured as jest.Mock).mockReturnValue(true);
 
         (getPreference as jest.Mock).mockResolvedValue(null);
 
@@ -1924,8 +1921,7 @@ describe('dataUpdateService', () => {
       });
 
       it('should default notModified to false on normal 200 proxy response', async () => {
-        const { config: mockConfig } = require('@/src/config');
-        mockConfig.enrichment.isConfigured.mockReturnValue(true);
+        (config.enrichment.isConfigured as jest.Mock).mockReturnValue(true);
 
         (getPreference as jest.Mock).mockResolvedValue(null);
 
@@ -1944,8 +1940,7 @@ describe('dataUpdateService', () => {
       });
 
       it('should default notModified to false on direct Flying Saucer fallback', async () => {
-        const { config: mockConfig } = require('@/src/config');
-        mockConfig.enrichment.isConfigured.mockReturnValue(false);
+        (config.enrichment.isConfigured as jest.Mock).mockReturnValue(false);
 
         (fetchBeersFromAPI as jest.Mock).mockResolvedValueOnce(
           fetchedRows([{ id: '1', brew_name: 'Test', brewer: 'Brewer' }])
@@ -1960,8 +1955,7 @@ describe('dataUpdateService', () => {
 
     describe('fetchAndUpdateAllBeers with 304', () => {
       it('should skip DB writes on 304 and return dataUpdated false', async () => {
-        const { config: mockConfig } = require('@/src/config');
-        mockConfig.enrichment.isConfigured.mockReturnValue(true);
+        (config.enrichment.isConfigured as jest.Mock).mockReturnValue(true);
 
         (getPreference as jest.Mock).mockImplementation((key: string) => {
           if (key === 'all_beers_api_url')
@@ -1987,8 +1981,7 @@ describe('dataUpdateService', () => {
       });
 
       it('should update all_beers_last_check on 304', async () => {
-        const { config: mockConfig } = require('@/src/config');
-        mockConfig.enrichment.isConfigured.mockReturnValue(true);
+        (config.enrichment.isConfigured as jest.Mock).mockReturnValue(true);
 
         (getPreference as jest.Mock).mockImplementation((key: string) => {
           if (key === 'all_beers_api_url')
@@ -2011,8 +2004,7 @@ describe('dataUpdateService', () => {
       });
 
       it('should store ETag after successful 200 from proxy with ETag header', async () => {
-        const { config: mockConfig } = require('@/src/config');
-        mockConfig.enrichment.isConfigured.mockReturnValue(true);
+        (config.enrichment.isConfigured as jest.Mock).mockReturnValue(true);
 
         (getPreference as jest.Mock).mockImplementation((key: string) => {
           if (key === 'all_beers_api_url')
@@ -2047,8 +2039,7 @@ describe('dataUpdateService', () => {
       // revalidated later, so leaving the previous one in place names data the
       // table no longer holds.
       it('clears the stored ETag after a 200 from the proxy with no ETag header', async () => {
-        const { config: mockConfig } = require('@/src/config');
-        mockConfig.enrichment.isConfigured.mockReturnValue(true);
+        (config.enrichment.isConfigured as jest.Mock).mockReturnValue(true);
 
         (getPreference as jest.Mock).mockImplementation((key: string) => {
           if (key === 'all_beers_api_url')
@@ -2076,8 +2067,7 @@ describe('dataUpdateService', () => {
       // INVERTED by plan 04 Phase 2, same reasoning: a fallback write must
       // actively invalidate the ETag rather than merely decline to set one.
       it('clears the stored ETag after a 200 from the direct Flying Saucer fetch', async () => {
-        const { config: mockConfig } = require('@/src/config');
-        mockConfig.enrichment.isConfigured.mockReturnValue(false);
+        (config.enrichment.isConfigured as jest.Mock).mockReturnValue(false);
 
         (getPreference as jest.Mock).mockImplementation((key: string) => {
           if (key === 'all_beers_api_url')

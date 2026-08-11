@@ -23,6 +23,8 @@ import { Reward } from '@/src/types/database';
 import { AllBeersRow, TastedBrewRow, RewardRow } from '../../schemaTypes';
 import { toNonEmpty } from '../../../api/fetchOutcome';
 import type { NonEmptyArray } from '../../../api/fetchOutcome';
+import { getDatabase } from '../../connection';
+import type { ContainerType } from '@/src/utils/beerGlassType';
 
 // Mock the database connection
 jest.mock('../../connection', () => ({
@@ -36,6 +38,10 @@ jest.mock('../../locks', () => ({
   },
 }));
 
+// getDatabase is replaced by the jest.mock factory above; cast it back to a
+// mock so tests can configure its resolved value.
+const mockedGetDatabase = getDatabase as jest.Mock;
+
 /**
  * Narrow a literal fixture array for the NonEmptyArray-typed repository
  * signatures. Throws rather than asserting, so a fixture that is accidentally
@@ -46,6 +52,15 @@ function nel<T>(items: readonly T[]): NonEmptyArray<T> {
   if (narrowed === null) throw new Error('fixture array was unexpectedly empty');
   return narrowed;
 }
+
+/**
+ * Compile-time-only helper: checks that `value`'s type is assignable to T
+ * without introducing an unused local variable. The parameter is never read
+ * at runtime — TypeScript's noUnusedParameters and eslint's no-unused-vars
+ * (configured with `args: 'none'`) both exempt unused parameters, so this
+ * expresses a type-level assertion without a lint or type-check escape hatch.
+ */
+function assertType<T>(_value: T): void {}
 
 describe('Repository Type Safety', () => {
   describe('BeerRepository Type Safety', () => {
@@ -73,8 +88,7 @@ describe('Repository Type Safety', () => {
         ]),
       };
 
-      const { getDatabase } = require('../../connection');
-      getDatabase.mockResolvedValue(mockDb);
+      mockedGetDatabase.mockResolvedValue(mockDb);
 
       const result = await repository.getAll();
 
@@ -84,8 +98,8 @@ describe('Repository Type Safety', () => {
       expect(beer.brew_name).toBe('Test Beer');
 
       // This should work - Beer has these properties
-      const _name: string = beer.brew_name;
-      const _id: string | number | undefined = beer.id;
+      assertType<string>(beer.brew_name);
+      assertType<string | number | undefined>(beer.id);
     });
 
     it('getById() should return Promise<Beer | null>', async () => {
@@ -105,8 +119,7 @@ describe('Repository Type Safety', () => {
         } as AllBeersRow),
       };
 
-      const { getDatabase } = require('../../connection');
-      getDatabase.mockResolvedValue(mockDb);
+      mockedGetDatabase.mockResolvedValue(mockDb);
 
       const result = await repository.getById('1');
 
@@ -123,8 +136,7 @@ describe('Repository Type Safety', () => {
         getAllAsync: jest.fn().mockResolvedValue([]),
       };
 
-      const { getDatabase } = require('../../connection');
-      getDatabase.mockResolvedValue(mockDb);
+      mockedGetDatabase.mockResolvedValue(mockDb);
 
       const result = await repository.search('IPA');
 
@@ -150,8 +162,7 @@ describe('Repository Type Safety', () => {
         }),
       };
 
-      const { getDatabase } = require('../../connection');
-      getDatabase.mockResolvedValue(mockDb);
+      mockedGetDatabase.mockResolvedValue(mockDb);
 
       const validBeers: BeerWithContainerType[] = [
         {
@@ -169,8 +180,9 @@ describe('Repository Type Safety', () => {
 
       await repository.insertMany(nel(validBeers));
 
-      // TypeScript should prevent passing wrong type
-      // @ts-expect-error - Should not allow Beerfinder[]
+      // TypeScript should prevent passing wrong type (not exercised at
+      // runtime — this is a documented example, not a live assertion)
+      // Should not allow Beerfinder[]:
       // await repository.insertMany([{ id: '1', brew_name: 'Test', tasted_date: '2025-01-01' }]);
     });
   });
@@ -203,8 +215,7 @@ describe('Repository Type Safety', () => {
         ]),
       };
 
-      const { getDatabase } = require('../../connection');
-      getDatabase.mockResolvedValue(mockDb);
+      mockedGetDatabase.mockResolvedValue(mockDb);
 
       const result = await repository.getAll();
 
@@ -215,9 +226,9 @@ describe('Repository Type Safety', () => {
       expect(beerfinder.container_type).toBe('pint');
 
       // This should work - BeerfinderWithContainerType has these properties
-      const _tastedDate: string | undefined = beerfinder.tasted_date;
-      const _chitCode: string | undefined = beerfinder.chit_code;
-      const _containerType: 'pint' | 'tulip' | 'can' | 'bottle' | null = beerfinder.container_type;
+      assertType<string | undefined>(beerfinder.tasted_date);
+      assertType<string | undefined>(beerfinder.chit_code);
+      assertType<ContainerType>(beerfinder.container_type);
     });
 
     it('getById() should return Promise<Beerfinder | null>', async () => {
@@ -226,8 +237,7 @@ describe('Repository Type Safety', () => {
         getFirstAsync: jest.fn().mockResolvedValue(null),
       };
 
-      const { getDatabase } = require('../../connection');
-      getDatabase.mockResolvedValue(mockDb);
+      mockedGetDatabase.mockResolvedValue(mockDb);
 
       const result = await repository.getById('1');
 
@@ -242,8 +252,7 @@ describe('Repository Type Safety', () => {
         getFirstAsync: jest.fn().mockResolvedValue({ count: 42 }),
       };
 
-      const { getDatabase } = require('../../connection');
-      getDatabase.mockResolvedValue(mockDb);
+      mockedGetDatabase.mockResolvedValue(mockDb);
 
       const result = await repository.getCount();
 
@@ -262,8 +271,7 @@ describe('Repository Type Safety', () => {
         runAsync: jest.fn(),
       };
 
-      const { getDatabase } = require('../../connection');
-      getDatabase.mockResolvedValue(mockDb);
+      mockedGetDatabase.mockResolvedValue(mockDb);
 
       const validBeerfinders: BeerfinderWithContainerType[] = [
         {
@@ -281,8 +289,9 @@ describe('Repository Type Safety', () => {
 
       await repository.insertMany(nel(validBeerfinders));
 
-      // TypeScript should prevent passing wrong type
-      // @ts-expect-error - Should not allow Beer[] (missing tasted_date, roh_lap, etc.)
+      // TypeScript should prevent passing wrong type (not exercised at
+      // runtime — this is a documented example, not a live assertion)
+      // Should not allow Beer[] (missing tasted_date, roh_lap, etc.):
       // await repository.insertMany([{ id: '1', brew_name: 'Test', added_date: '2025-01-01' }]);
     });
   });
@@ -305,8 +314,7 @@ describe('Repository Type Safety', () => {
         ]),
       };
 
-      const { getDatabase } = require('../../connection');
-      getDatabase.mockResolvedValue(mockDb);
+      mockedGetDatabase.mockResolvedValue(mockDb);
 
       const result = await repository.getAll();
 
@@ -316,8 +324,8 @@ describe('Repository Type Safety', () => {
       expect(reward.reward_type).toBe('plate');
 
       // This should work - Reward has these properties
-      const _id: string = reward.reward_id;
-      const _type: string = reward.reward_type;
+      assertType<string>(reward.reward_id);
+      assertType<string>(reward.reward_type);
     });
 
     it('getById() should return Promise<Reward | null>', async () => {
@@ -330,8 +338,7 @@ describe('Repository Type Safety', () => {
         } as RewardRow),
       };
 
-      const { getDatabase } = require('../../connection');
-      getDatabase.mockResolvedValue(mockDb);
+      mockedGetDatabase.mockResolvedValue(mockDb);
 
       const result = await repository.getById('PLATE_1');
 
@@ -348,8 +355,7 @@ describe('Repository Type Safety', () => {
         getAllAsync: jest.fn().mockResolvedValue([]),
       };
 
-      const { getDatabase } = require('../../connection');
-      getDatabase.mockResolvedValue(mockDb);
+      mockedGetDatabase.mockResolvedValue(mockDb);
 
       const result = await repository.getByType('plate');
 
@@ -364,8 +370,7 @@ describe('Repository Type Safety', () => {
         getFirstAsync: jest.fn().mockResolvedValue({ count: 5 }),
       };
 
-      const { getDatabase } = require('../../connection');
-      getDatabase.mockResolvedValue(mockDb);
+      mockedGetDatabase.mockResolvedValue(mockDb);
 
       const result = await repository.getCount();
 
@@ -383,8 +388,7 @@ describe('Repository Type Safety', () => {
         runAsync: jest.fn(),
       };
 
-      const { getDatabase } = require('../../connection');
-      getDatabase.mockResolvedValue(mockDb);
+      mockedGetDatabase.mockResolvedValue(mockDb);
 
       const validRewards: Reward[] = [
         {
@@ -396,8 +400,9 @@ describe('Repository Type Safety', () => {
 
       await repository.insertMany(validRewards);
 
-      // TypeScript should prevent passing wrong type
-      // @ts-expect-error - Should not allow Beer[]
+      // TypeScript should prevent passing wrong type (not exercised at
+      // runtime — this is a documented example, not a live assertion)
+      // Should not allow Beer[]:
       // await repository.insertMany([{ id: '1', brew_name: 'Test' }]);
     });
   });
@@ -425,8 +430,7 @@ describe('Repository Type Safety', () => {
         ]),
       };
 
-      const { getDatabase } = require('../../connection');
-      getDatabase.mockResolvedValue(mockDb);
+      mockedGetDatabase.mockResolvedValue(mockDb);
 
       const result = await repository.getAll();
 
@@ -451,9 +455,9 @@ describe('Repository Type Safety', () => {
       type RewardsRepoGetAll = ReturnType<typeof rewardsRepo.getAll>;
 
       // These type assertions should pass at compile time
-      const _beerPromise: Promise<Beer[]> = beerRepo.getAll();
-      const _beerfinderPromise: Promise<BeerfinderWithContainerType[]> = myBeersRepo.getAll();
-      const _rewardPromise: Promise<Reward[]> = rewardsRepo.getAll();
+      assertType<Promise<Beer[]>>(beerRepo.getAll());
+      assertType<Promise<BeerfinderWithContainerType[]>>(myBeersRepo.getAll());
+      assertType<Promise<Reward[]>>(rewardsRepo.getAll());
 
       // Type-level assertions (compile-time only)
       type AssertBeerType = BeerRepoGetAll extends Promise<Beer[]> ? true : false;
@@ -461,9 +465,9 @@ describe('Repository Type Safety', () => {
         MyBeersRepoGetAll extends Promise<BeerfinderWithContainerType[]> ? true : false;
       type AssertRewardType = RewardsRepoGetAll extends Promise<Reward[]> ? true : false;
 
-      const _assert1: AssertBeerType = true;
-      const _assert2: AssertBeerfinderType = true;
-      const _assert3: AssertRewardType = true;
+      assertType<AssertBeerType>(true);
+      assertType<AssertBeerfinderType>(true);
+      assertType<AssertRewardType>(true);
     });
 
     it('should prevent assigning wrong entity types', () => {

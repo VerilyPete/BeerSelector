@@ -11,6 +11,8 @@ import {
   createConditionalResponse,
   networkErrorResponse,
   timeoutResponse,
+  setupMockServer,
+  FlyingSaucerResponses,
 } from './mockServer';
 import { config } from '@/src/config';
 
@@ -685,7 +687,6 @@ describe('setupMockServer helper', () => {
   });
 
   it('should start server and configure API URL', async () => {
-    const { setupMockServer } = require('./mockServer');
     const result = await setupMockServer();
     cleanup = result.cleanup;
 
@@ -699,7 +700,6 @@ describe('setupMockServer helper', () => {
   });
 
   it('should start on specific port when provided', async () => {
-    const { setupMockServer } = require('./mockServer');
     const testPort = 3458;
     const result = await setupMockServer(testPort);
     cleanup = result.cleanup;
@@ -708,7 +708,6 @@ describe('setupMockServer helper', () => {
   });
 
   it('should restore environment on cleanup', async () => {
-    const { setupMockServer } = require('./mockServer');
     const originalEnv = config.getEnvironment();
 
     const result = await setupMockServer();
@@ -719,7 +718,6 @@ describe('setupMockServer helper', () => {
   });
 
   it('should work with setResponse and fetch', async () => {
-    const { setupMockServer } = require('./mockServer');
     const result = await setupMockServer();
     cleanup = result.cleanup;
 
@@ -762,7 +760,6 @@ describe('FlyingSaucerResponses presets', () => {
 
   describe('beers()', () => {
     it('should create proper Flying Saucer beers response', async () => {
-      const { FlyingSaucerResponses } = require('./mockServer');
       const testBeers = [
         { id: 1, name: 'IPA', brewery: 'Local' },
         { id: 2, name: 'Stout', brewery: 'Craft' },
@@ -778,8 +775,6 @@ describe('FlyingSaucerResponses presets', () => {
     });
 
     it('should handle empty beers array', async () => {
-      const { FlyingSaucerResponses } = require('./mockServer');
-
       mockServer.setResponse('/memberQueues.php', FlyingSaucerResponses.beers([]));
 
       const response = await fetch(`${mockServer.getUrl()}/memberQueues.php`);
@@ -791,7 +786,6 @@ describe('FlyingSaucerResponses presets', () => {
 
   describe('myBeers()', () => {
     it('should create proper tasted beers response', async () => {
-      const { FlyingSaucerResponses } = require('./mockServer');
       const tastedBeers = [{ id: 1, name: 'Tasted IPA', tasted: true }];
 
       mockServer.setResponse('/myBeers.php', FlyingSaucerResponses.myBeers(tastedBeers));
@@ -806,7 +800,6 @@ describe('FlyingSaucerResponses presets', () => {
 
   describe('rewards()', () => {
     it('should create proper rewards response', async () => {
-      const { FlyingSaucerResponses } = require('./mockServer');
       const rewardsList = [{ id: 1, name: 'Plate 1', earned: true }];
 
       mockServer.setResponse('/rewards.php', FlyingSaucerResponses.rewards(rewardsList));
@@ -821,8 +814,6 @@ describe('FlyingSaucerResponses presets', () => {
 
   describe('empty()', () => {
     it('should create empty brewInStock response', async () => {
-      const { FlyingSaucerResponses } = require('./mockServer');
-
       mockServer.setResponse('/api/empty', FlyingSaucerResponses.empty());
 
       const response = await fetch(`${mockServer.getUrl()}/api/empty`);
@@ -835,8 +826,6 @@ describe('FlyingSaucerResponses presets', () => {
 
   describe('error responses', () => {
     it('should create 500 server error response', async () => {
-      const { FlyingSaucerResponses } = require('./mockServer');
-
       mockServer.setResponse('/api/error', FlyingSaucerResponses.serverError());
 
       const response = await fetch(`${mockServer.getUrl()}/api/error`);
@@ -847,8 +836,6 @@ describe('FlyingSaucerResponses presets', () => {
     });
 
     it('should create 401 not authenticated response', async () => {
-      const { FlyingSaucerResponses } = require('./mockServer');
-
       mockServer.setResponse('/api/auth', FlyingSaucerResponses.notAuthenticated());
 
       const response = await fetch(`${mockServer.getUrl()}/api/auth`);
@@ -859,8 +846,6 @@ describe('FlyingSaucerResponses presets', () => {
     });
 
     it('should create 404 not found response', async () => {
-      const { FlyingSaucerResponses } = require('./mockServer');
-
       mockServer.setResponse('/api/missing', FlyingSaucerResponses.notFound());
 
       const response = await fetch(`${mockServer.getUrl()}/api/missing`);
@@ -869,8 +854,6 @@ describe('FlyingSaucerResponses presets', () => {
     });
 
     it('should create 429 rate limited response', async () => {
-      const { FlyingSaucerResponses } = require('./mockServer');
-
       mockServer.setResponse('/api/limited', FlyingSaucerResponses.rateLimited());
 
       const response = await fetch(`${mockServer.getUrl()}/api/limited`);

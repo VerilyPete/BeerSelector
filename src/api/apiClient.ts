@@ -303,7 +303,7 @@ export class ApiClient {
           success: true,
           statusCode: response.status,
         };
-      } catch (jsonError) {
+      } catch {
         // If JSON parsing fails, return as failure — caller expects T, not raw text
         return {
           data: null,

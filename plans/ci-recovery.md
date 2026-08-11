@@ -787,6 +787,71 @@ reads as one.
       were already red before the change and are red after it. They are a
       strictly-better-than-`cache@v3` guess, not a tested change, and Phase 3
       should treat them as untested config.
+- [x] 5.15 **NEW: fix what 5.9 measured.** 141 type errors → **0**, 364 eslint
+      warnings → **152**, 2272 tests unchanged and still passing. Ten agents in
+      parallel, each owning a disjoint set of files; source/test pairs kept in
+      the same group so no agent edited a source file whose test another was
+      rewriting. Suppression was forbidden outright — no `@ts-ignore`,
+      `@ts-expect-error`, `eslint-disable`, and no edits to `tsconfig.json`,
+      `.eslintrc.js`, `jest.config.js` or the workflows. A sweep that is allowed
+      to move the gate proves nothing about the code.
+      **The headline finding vindicates 5.9 entirely.**
+      `type-inference.test.ts` exists so that "if these tests compile, the
+      repositories are type-safe". **It had not compiled since the v4 schema
+      migration.** That migration made the repositories return
+      `BeerWithContainerType`/`BeerfinderWithContainerType`; the assertions still
+      named `Beer`/`Beerfinder`. All 10 of its jest tests passed throughout,
+      because jest runs through babel-jest, which strips types without checking
+      them. A compile-time type-safety suite was silently dead, and nothing in
+      the repo could notice until something ran `tsc`. This is the same class of
+      defect as 5.13 (a suite that only passed on machines holding untracked
+      data) and 5.4's false quarantine: **the tests were not wrong, they were
+      not running.**
+      **Corroborated finding, from two agents in two files independently:** the
+      "should prevent assigning wrong entity types" assertions in both
+      `type-inference.test.ts` and `type-safety.test.ts` have never asserted
+      anything. `BeerfinderWithContainerType` adds only *optional* fields over
+      `BeerWithContainerType`, so TypeScript accepts the cross-assignment in
+      both directions. The `@ts-expect-error` directives were riding on an
+      unrelated "declared but never read" error on the same line — make the
+      variable used, and TS reports the directive as unused. Both agents hit
+      this, both reverted rather than force it, both reported it. The real fix
+      needs a discriminant or brand on the type in `src/types/beer.ts`; that is
+      a type-design change and is **still open**.
+      **Two dead props found and left alone deliberately:**
+      `SettingsItem.tsx`'s `iconBackgroundColor` (no caller passes it, the
+      component never applies it) and `LoginWebView.tsx`'s `onRefreshData`.
+      The second was worth verifying rather than believing: the refresh is real
+      but is wired through `useLoginFlow` (called at `useLoginFlow.ts:241` from
+      `handleLoginSuccess`, which arrives as the `onLoginSuccess` prop), so the
+      prop on `LoginWebView` is a redundant second copy that has always been
+      ignored. Nothing is broken; removing it from `LoginWebViewProps` is the
+      real cleanup and touches ~100 call sites in its test file.
+      **One regression, caught by the gate it was written to satisfy.** Removing
+      `onRefreshData` from a `useCallback` dep array (correct — the callback
+      never referenced it) left the destructured prop unused, putting a *new*
+      TS6133 into a file that had zero errors. Fixed by underscore-prefixing to
+      match `loading: _externalLoading` in the same destructuring. Worth stating
+      plainly: a 45-file sweep introduced exactly one new error and the
+      typecheck caught it before review.
+      **What remains, and why it is not a backlog of easy wins:**
+      146 `no-require-imports` + 6 `no-unused-vars`. 123 of the 146 are
+      `jest.resetModules()` + `require('../config')` in four config suites,
+      where a static import hoists above the env mutation the test exists to
+      exercise; the rest are inside `jest.mock(...)` factories, where
+      babel-plugin-jest-hoist forbids closing over module-scope imports.
+      Multiple agents independently tried converting them and reverted. The 6
+      unused-vars are the `_wrong1..4` bindings from the finding above. The
+      honest lever if 152 becomes obstructive is a **scoped** eslint override
+      for `**/__tests__/**`, as a reviewed decision about where a rule does not
+      fit — not a raised ceiling.
+      **Process notes for the next sweep:**
+      - Three agents finished without sending a report and had to be asked.
+        Verify from the diff, not from silence.
+      - The local sandbox blocks `listen()`, so any suite starting a real
+        server (`mockServer.test.ts`) fails with `EPERM` for reasons unrelated
+        to the code. Full-suite verification must bypass the sandbox. This
+        nearly caused 59 environmental failures to be attributed to an agent.
 - **Exit:** a jest check that cannot go green by shrinking. Note the *required*
   half cannot be closed by the implementer — branch protection does not exist and
   is not a file edit; 5.6 gates this phase's exit. **5.6 is now closed**, so this

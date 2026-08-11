@@ -767,6 +767,13 @@ describe('liveActivityService', () => {
         updateActivity: mockUpdateActivity,
         endActivity: mockEndActivity,
         endAllActivities: mockEndAllActivities,
+        restartActivity: mockRestartActivity,
+        getAllActivityIds: mockGetAllActivityIds,
+        endActivitiesOlderThan: mockEndActivitiesOlderThan,
+        endAllActivitiesSync: mockEndAllActivitiesSync,
+        scheduleCleanupTask: mockScheduleCleanupTask,
+        cancelCleanupTask: mockCancelCleanupTask,
+        getActivityStaleDate: mockGetActivityStaleDate,
       };
 
       // First, clear any existing activity by calling endAllLiveActivities

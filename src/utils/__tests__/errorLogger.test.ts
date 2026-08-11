@@ -1,9 +1,4 @@
-import { logError, logWarning, logInfo, ErrorContext, LogLevel } from '../errorLogger';
-
-// Mock console methods
-const originalConsoleError = console.error;
-const originalConsoleWarn = console.warn;
-const originalConsoleLog = console.log;
+import { logError, logWarning, logInfo, ErrorContext } from '../errorLogger';
 
 describe('Error Logger', () => {
   let consoleErrorSpy: jest.SpyInstance;

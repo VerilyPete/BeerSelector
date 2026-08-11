@@ -197,7 +197,7 @@ export class MyBeersRepository {
             console.log(
               `DB: My Beers import complete! tasted_brew_current_round now has ${after?.count ?? 0} rows`
             );
-          } catch (e) {
+          } catch {
             console.log('DB: My Beers import complete! (row count query failed)');
           }
         } catch (error) {
@@ -362,7 +362,7 @@ export class MyBeersRepository {
           console.log(
             `DB: My Beers import complete! tasted_brew_current_round now has ${after?.count ?? 0} rows`
           );
-        } catch (e) {
+        } catch {
           console.log('DB: My Beers import complete! (row count query failed)');
         }
       } catch (error) {

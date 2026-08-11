@@ -156,7 +156,7 @@ export const QueuedOperationsModal: React.FC<QueuedOperationsModalProps> = ({
           try {
             await clearQueue();
             onClose();
-          } catch (error) {
+          } catch {
             Alert.alert('Error', 'Failed to clear queue. Please try again.');
           }
         },
@@ -244,9 +244,7 @@ export const QueuedOperationsModal: React.FC<QueuedOperationsModalProps> = ({
                         style={[styles.actionButton, { borderColor: colors.tint }]}
                         disabled={isRetrying}
                       >
-                        <Text style={[styles.actionButtonText, { color: colors.tint }]}>
-                          RETRY
-                        </Text>
+                        <Text style={[styles.actionButtonText, { color: colors.tint }]}>RETRY</Text>
                       </TouchableOpacity>
                     )}
                     {operation.status === OperationStatus.RETRYING && (
@@ -257,9 +255,7 @@ export const QueuedOperationsModal: React.FC<QueuedOperationsModalProps> = ({
                       style={[styles.actionButton, { borderColor: colors.error }]}
                       disabled={isRetrying}
                     >
-                      <Text style={[styles.actionButtonText, { color: colors.error }]}>
-                        DELETE
-                      </Text>
+                      <Text style={[styles.actionButtonText, { color: colors.error }]}>DELETE</Text>
                     </TouchableOpacity>
                   </View>
                 </View>

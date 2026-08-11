@@ -73,7 +73,7 @@ export const setupDatabase = async (): Promise<void> => {
   // Transition to INITIALIZING state
   try {
     databaseInitializer.setInitializing();
-  } catch (error) {
+  } catch {
     // If we can't transition to INITIALIZING (e.g., already READY), return
     console.log('Cannot transition to INITIALIZING, database may already be ready');
     return;

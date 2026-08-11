@@ -1,12 +1,25 @@
 import React from 'react';
 import { render } from '@testing-library/react-native';
-import { Text, View } from 'react-native';
+import { Text } from 'react-native';
 import { ChromeShell } from '../ChromeShell';
 
 jest.mock('expo-linear-gradient', () => ({
-  LinearGradient: ({ children, testID, ...props }: { children?: React.ReactNode; testID?: string; colors?: readonly string[]; style?: object }) => {
+  LinearGradient: ({
+    children,
+    testID,
+    ...props
+  }: {
+    children?: React.ReactNode;
+    testID?: string;
+    colors?: readonly string[];
+    style?: object;
+  }) => {
     const { View } = require('react-native');
-    return <View testID={testID} {...props}>{children}</View>;
+    return (
+      <View testID={testID} {...props}>
+        {children}
+      </View>
+    );
   },
 }));
 
@@ -24,9 +37,7 @@ describe('ChromeShell', () => {
   });
 
   it('applies custom borderRadius and padding', () => {
-    const { getByTestId } = render(
-      <ChromeShell {...createProps({ borderRadius: 20, padding: 5 })} testID="shell" />
-    );
+    render(<ChromeShell {...createProps({ borderRadius: 20, padding: 5 })} testID="shell" />);
     // Component should pass style props through
     // This test verifies the component accepts these props without error
   });
@@ -37,17 +48,13 @@ describe('ChromeShell', () => {
   });
 
   it('applies custom style prop', () => {
-    const { getByText } = render(
-      <ChromeShell {...createProps({ style: { width: 200 } })} />
-    );
+    const { getByText } = render(<ChromeShell {...createProps({ style: { width: 200 } })} />);
     expect(getByText('Test Content')).toBeTruthy();
   });
 
   it('accepts custom colors prop', () => {
     const customColors = ['#FF0000', '#00FF00', '#0000FF'] as const;
-    const { getByText } = render(
-      <ChromeShell {...createProps({ colors: customColors })} />
-    );
+    const { getByText } = render(<ChromeShell {...createProps({ colors: customColors })} />);
     expect(getByText('Test Content')).toBeTruthy();
   });
 });

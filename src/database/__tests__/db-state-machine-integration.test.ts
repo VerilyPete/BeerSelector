@@ -3,6 +3,7 @@
  * Verifies HP-2 Step 2c completion
  */
 
+import type { SQLiteDatabase } from 'expo-sqlite';
 import { setupDatabase, resetDatabaseState } from '../db';
 import { databaseInitializer, DatabaseInitializationState } from '../initializationState';
 import * as connection from '../connection';
@@ -12,7 +13,9 @@ import * as schema from '../schema';
 jest.mock('../connection');
 jest.mock('../schema');
 
-const mockGetDatabase = connection.getDatabase as jest.MockedFunction<typeof connection.getDatabase>;
+const mockGetDatabase = connection.getDatabase as jest.MockedFunction<
+  typeof connection.getDatabase
+>;
 const mockSetupTables = schema.setupTables as jest.MockedFunction<typeof schema.setupTables>;
 
 type MockDatabase = {
@@ -37,7 +40,10 @@ describe('Database State Machine Integration', () => {
       getFirstAsync: jest.fn().mockResolvedValue(null),
     };
 
-    mockGetDatabase.mockResolvedValue(mockDatabase);
+    // MockDatabase only stubs the methods this suite exercises; the real
+    // SQLiteDatabase class has a much larger surface (readonly fields,
+    // native handles) that a mock has no need to implement.
+    mockGetDatabase.mockResolvedValue(mockDatabase as unknown as SQLiteDatabase);
     mockSetupTables.mockResolvedValue(undefined);
 
     // Use real timers for event-based waiting tests
@@ -239,7 +245,7 @@ describe('Database State Machine Integration', () => {
       mockSetupTables.mockImplementation(() => new Promise(() => {})); // Never resolves
 
       // Start first initialization
-      const firstSetup = setupDatabase();
+      void setupDatabase();
 
       // Wait for it to enter INITIALIZING state
       await new Promise(resolve => setTimeout(resolve, 50));
@@ -304,7 +310,9 @@ describe('Database State Machine Integration', () => {
       expect(firstError).toBeInstanceOf(Error);
       expect(firstError.message).toContain('Setup failed during initialization');
       expect(secondError).toBeInstanceOf(Error);
-      expect(secondError.message).toContain('Database setup failed: Setup failed during initialization');
+      expect(secondError.message).toContain(
+        'Database setup failed: Setup failed during initialization'
+      );
       expect(databaseInitializer.isError()).toBe(true);
     });
   });

@@ -234,7 +234,7 @@ describe('API Integration with Mock Server', () => {
       const start = Date.now();
       try {
         await fetchWithRetry(slowUrl, 1, 100);
-      } catch (error) {
+      } catch {
         // May timeout, which is fine
       }
       const duration = Date.now() - start;
@@ -675,7 +675,7 @@ describe('API Integration with Mock Server', () => {
             'User-Agent': 'BeerSelector/1.0',
           },
         });
-      } catch (error) {
+      } catch {
         // Expected to fail
       }
 

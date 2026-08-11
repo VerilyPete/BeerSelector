@@ -23,6 +23,9 @@ import {
   isTastedBrewRow,
   isRewardRow,
   isPreferenceRow,
+  allBeersRowToBeer,
+  rewardRowToReward,
+  preferenceRowToPreference,
 } from '../schemaTypes';
 
 describe('AllBeersRow Schema - Edge Cases', () => {
@@ -749,7 +752,6 @@ describe('Array Schema Validation - Edge Cases', () => {
 describe('Conversion Function Edge Cases', () => {
   describe('allBeersRowToBeer', () => {
     it('should convert numeric id to string', () => {
-      const { allBeersRowToBeer } = require('../schemaTypes');
       const row = {
         id: 123, // Numeric ID
         brew_name: 'Test Beer',
@@ -762,7 +764,6 @@ describe('Conversion Function Edge Cases', () => {
     });
 
     it('should preserve optional undefined fields', () => {
-      const { allBeersRowToBeer } = require('../schemaTypes');
       const row = {
         id: '123',
         brew_name: 'Test Beer',
@@ -779,7 +780,6 @@ describe('Conversion Function Edge Cases', () => {
 
   describe('rewardRowToReward', () => {
     it('should convert undefined redeemed to "0"', () => {
-      const { rewardRowToReward } = require('../schemaTypes');
       const row = {
         reward_id: '123',
         // redeemed is undefined
@@ -791,7 +791,6 @@ describe('Conversion Function Edge Cases', () => {
     });
 
     it('should convert undefined reward_type to empty string', () => {
-      const { rewardRowToReward } = require('../schemaTypes');
       const row = {
         reward_id: '123',
         // reward_type is undefined
@@ -805,7 +804,6 @@ describe('Conversion Function Edge Cases', () => {
 
   describe('preferenceRowToPreference', () => {
     it('should convert undefined description to empty string', () => {
-      const { preferenceRowToPreference } = require('../schemaTypes');
       const row = {
         key: 'test_key',
         value: 'test_value',

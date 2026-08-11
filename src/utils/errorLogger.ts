@@ -89,7 +89,7 @@ function sanitizeData(data: unknown): unknown {
     } else if (typeof value === 'object' && value !== null) {
       try {
         sanitized[key] = sanitizeData(value);
-      } catch (error) {
+      } catch {
         // Handle circular references
         sanitized[key] = '[Circular Reference]';
       }
