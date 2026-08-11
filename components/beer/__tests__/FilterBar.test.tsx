@@ -1,5 +1,6 @@
 import React from 'react';
 import { render, fireEvent } from '@testing-library/react-native';
+import * as Haptics from 'expo-haptics';
 
 import { FilterBar } from '../FilterBar';
 
@@ -8,9 +9,22 @@ jest.mock('@/hooks/useColorScheme', () => ({
 }));
 
 jest.mock('expo-linear-gradient', () => ({
-  LinearGradient: ({ children, testID, ...props }: { children?: React.ReactNode; testID?: string; colors?: readonly string[]; style?: object }) => {
+  LinearGradient: ({
+    children,
+    testID,
+    ...props
+  }: {
+    children?: React.ReactNode;
+    testID?: string;
+    colors?: readonly string[];
+    style?: object;
+  }) => {
     const { View } = require('react-native');
-    return <View testID={testID} {...props}>{children}</View>;
+    return (
+      <View testID={testID} {...props}>
+        {children}
+      </View>
+    );
   },
 }));
 
@@ -30,9 +44,10 @@ jest.mock('@/components/ui/ChromeShell', () => ({
 
 jest.mock('@/components/icons/BeerIcon', () => {
   const { View } = require('react-native');
-  return ({ name, testID }: { name: string; testID?: string }) => (
-    <View testID={testID || `beericon-${name}`} />
-  );
+  function BeerIcon({ name, testID }: { name: string; testID?: string }) {
+    return <View testID={testID || `beericon-${name}`} />;
+  }
+  return BeerIcon;
 });
 
 jest.mock('expo-haptics', () => ({
@@ -184,8 +199,6 @@ describe('FilterBar', () => {
   });
 
   describe('Haptics feedback', () => {
-    const Haptics = require('expo-haptics');
-
     test('triggers haptics when container filter button is pressed', () => {
       const props = createDefaultProps();
       const { getByTestId } = render(<FilterBar {...props} />);
@@ -243,9 +256,7 @@ describe('FilterBar', () => {
 
     test('direction label for date/asc shows contextual labels', () => {
       const props = createDefaultProps();
-      const { getByTestId } = render(
-        <FilterBar {...props} sortBy="date" sortDirection="asc" />
-      );
+      const { getByTestId } = render(<FilterBar {...props} sortBy="date" sortDirection="asc" />);
       expect(getByTestId('sort-direction-button').props.accessibilityLabel).toBe(
         'Sort: OLD. Double tap for NEW.'
       );
@@ -253,9 +264,7 @@ describe('FilterBar', () => {
 
     test('direction label for date/desc shows contextual labels', () => {
       const props = createDefaultProps();
-      const { getByTestId } = render(
-        <FilterBar {...props} sortBy="date" sortDirection="desc" />
-      );
+      const { getByTestId } = render(<FilterBar {...props} sortBy="date" sortDirection="desc" />);
       expect(getByTestId('sort-direction-button').props.accessibilityLabel).toBe(
         'Sort: NEW. Double tap for OLD.'
       );
@@ -263,9 +272,7 @@ describe('FilterBar', () => {
 
     test('direction label for name/asc shows contextual labels', () => {
       const props = createDefaultProps();
-      const { getByTestId } = render(
-        <FilterBar {...props} sortBy="name" sortDirection="asc" />
-      );
+      const { getByTestId } = render(<FilterBar {...props} sortBy="name" sortDirection="asc" />);
       expect(getByTestId('sort-direction-button').props.accessibilityLabel).toBe(
         'Sort: A-Z. Double tap for Z-A.'
       );
@@ -273,9 +280,7 @@ describe('FilterBar', () => {
 
     test('direction label for abv/desc shows contextual labels', () => {
       const props = createDefaultProps();
-      const { getByTestId } = render(
-        <FilterBar {...props} sortBy="abv" sortDirection="desc" />
-      );
+      const { getByTestId } = render(<FilterBar {...props} sortBy="abv" sortDirection="desc" />);
       expect(getByTestId('sort-direction-button').props.accessibilityLabel).toBe(
         'Sort: HIGH. Double tap for LOW.'
       );

@@ -9,8 +9,14 @@
 import { BeerRepository } from '../BeerRepository';
 import { MyBeersRepository } from '../MyBeersRepository';
 import { RewardsRepository } from '../RewardsRepository';
-import { Beer, Beerfinder } from '@/src/types/beer';
+import {
+  Beer,
+  Beerfinder,
+  BeerWithContainerType,
+  BeerfinderWithContainerType,
+} from '@/src/types/beer';
 import { Reward } from '@/src/types/database';
+import type { NonEmptyArray } from '@/src/api/fetchOutcome';
 
 /**
  * Type-level test helpers
@@ -23,23 +29,23 @@ type Equal<X, Y> =
 describe('Repository Type Inference', () => {
   describe('BeerRepository', () => {
     it('should infer correct types without explicit annotations', () => {
-      const repo = new BeerRepository();
-
       // Type inference tests - these verify compile-time behavior
-      type GetAllReturn = ReturnType<typeof repo.getAll>;
-      type GetByIdReturn = ReturnType<typeof repo.getById>;
-      type SearchReturn = ReturnType<typeof repo.search>;
-      type GetByStyleReturn = ReturnType<typeof repo.getByStyle>;
-      type GetByBrewerReturn = ReturnType<typeof repo.getByBrewer>;
-      type GetUntastedReturn = ReturnType<typeof repo.getUntasted>;
+      type GetAllReturn = ReturnType<BeerRepository['getAll']>;
+      type GetByIdReturn = ReturnType<BeerRepository['getById']>;
+      type SearchReturn = ReturnType<BeerRepository['search']>;
+      type GetByStyleReturn = ReturnType<BeerRepository['getByStyle']>;
+      type GetByBrewerReturn = ReturnType<BeerRepository['getByBrewer']>;
+      type GetUntastedReturn = ReturnType<BeerRepository['getUntasted']>;
 
       // Verify all return types are correctly inferred
-      type Test1 = Expect<Equal<GetAllReturn, Promise<Beer[]>>>;
-      type Test2 = Expect<Equal<GetByIdReturn, Promise<Beer | null>>>;
-      type Test3 = Expect<Equal<SearchReturn, Promise<Beer[]>>>;
-      type Test4 = Expect<Equal<GetByStyleReturn, Promise<Beer[]>>>;
-      type Test5 = Expect<Equal<GetByBrewerReturn, Promise<Beer[]>>>;
-      type Test6 = Expect<Equal<GetUntastedReturn, Promise<Beer[]>>>;
+      // (BeerRepository returns BeerWithContainerType since the v4 schema migration
+      // added container_type; see src/types/beer.ts)
+      type Test1 = Expect<Equal<GetAllReturn, Promise<BeerWithContainerType[]>>>;
+      type Test2 = Expect<Equal<GetByIdReturn, Promise<BeerWithContainerType | null>>>;
+      type Test3 = Expect<Equal<SearchReturn, Promise<BeerWithContainerType[]>>>;
+      type Test4 = Expect<Equal<GetByStyleReturn, Promise<BeerWithContainerType[]>>>;
+      type Test5 = Expect<Equal<GetByBrewerReturn, Promise<BeerWithContainerType[]>>>;
+      type Test6 = Expect<Equal<GetUntastedReturn, Promise<BeerWithContainerType[]>>>;
 
       const _test1: Test1 = true;
       const _test2: Test2 = true;
@@ -47,19 +53,19 @@ describe('Repository Type Inference', () => {
       const _test4: Test4 = true;
       const _test5: Test5 = true;
       const _test6: Test6 = true;
+      void [_test1, _test2, _test3, _test4, _test5, _test6];
     });
 
     it('should accept correct parameter types', () => {
-      const repo = new BeerRepository();
-
       // Verify parameter types are correctly inferred
-      type InsertManyParam = Parameters<typeof repo.insertMany>[0];
-      type InsertManyUnsafeParam = Parameters<typeof repo.insertManyUnsafe>[0];
-      type GetByIdParam = Parameters<typeof repo.getById>[0];
-      type SearchParam = Parameters<typeof repo.search>[0];
+      type InsertManyParam = Parameters<BeerRepository['insertMany']>[0];
+      type InsertManyUnsafeParam = Parameters<BeerRepository['insertManyUnsafe']>[0];
+      type GetByIdParam = Parameters<BeerRepository['getById']>[0];
+      type SearchParam = Parameters<BeerRepository['search']>[0];
 
-      type Test1 = Expect<Equal<InsertManyParam, Beer[]>>;
-      type Test2 = Expect<Equal<InsertManyUnsafeParam, Beer[]>>;
+      // insertMany/insertManyUnsafe require a NonEmptyArray<BeerWithContainerType>
+      type Test1 = Expect<Equal<InsertManyParam, NonEmptyArray<BeerWithContainerType>>>;
+      type Test2 = Expect<Equal<InsertManyUnsafeParam, NonEmptyArray<BeerWithContainerType>>>;
       type Test3 = Expect<Equal<GetByIdParam, string>>;
       type Test4 = Expect<Equal<SearchParam, string>>;
 
@@ -67,22 +73,23 @@ describe('Repository Type Inference', () => {
       const _test2: Test2 = true;
       const _test3: Test3 = true;
       const _test4: Test4 = true;
+      void [_test1, _test2, _test3, _test4];
     });
   });
 
   describe('MyBeersRepository', () => {
     it('should infer correct types without explicit annotations', () => {
-      const repo = new MyBeersRepository();
-
       // Type inference tests
-      type GetAllReturn = ReturnType<typeof repo.getAll>;
-      type GetByIdReturn = ReturnType<typeof repo.getById>;
-      type GetCountReturn = ReturnType<typeof repo.getCount>;
-      type ClearReturn = ReturnType<typeof repo.clear>;
+      type GetAllReturn = ReturnType<MyBeersRepository['getAll']>;
+      type GetByIdReturn = ReturnType<MyBeersRepository['getById']>;
+      type GetCountReturn = ReturnType<MyBeersRepository['getCount']>;
+      type ClearReturn = ReturnType<MyBeersRepository['clear']>;
 
       // Verify all return types are correctly inferred
-      type Test1 = Expect<Equal<GetAllReturn, Promise<Beerfinder[]>>>;
-      type Test2 = Expect<Equal<GetByIdReturn, Promise<Beerfinder | null>>>;
+      // (MyBeersRepository returns BeerfinderWithContainerType since the v4 schema
+      // migration added container_type; see src/types/beer.ts)
+      type Test1 = Expect<Equal<GetAllReturn, Promise<BeerfinderWithContainerType[]>>>;
+      type Test2 = Expect<Equal<GetByIdReturn, Promise<BeerfinderWithContainerType | null>>>;
       type Test3 = Expect<Equal<GetCountReturn, Promise<number>>>;
       type Test4 = Expect<Equal<ClearReturn, Promise<void>>>;
 
@@ -90,38 +97,37 @@ describe('Repository Type Inference', () => {
       const _test2: Test2 = true;
       const _test3: Test3 = true;
       const _test4: Test4 = true;
+      void [_test1, _test2, _test3, _test4];
     });
 
     it('should accept correct parameter types', () => {
-      const repo = new MyBeersRepository();
-
       // Verify parameter types are correctly inferred
-      type InsertManyParam = Parameters<typeof repo.insertMany>[0];
-      type InsertManyUnsafeParam = Parameters<typeof repo.insertManyUnsafe>[0];
-      type GetByIdParam = Parameters<typeof repo.getById>[0];
+      type InsertManyParam = Parameters<MyBeersRepository['insertMany']>[0];
+      type InsertManyUnsafeParam = Parameters<MyBeersRepository['insertManyUnsafe']>[0];
+      type GetByIdParam = Parameters<MyBeersRepository['getById']>[0];
 
-      type Test1 = Expect<Equal<InsertManyParam, Beerfinder[]>>;
-      type Test2 = Expect<Equal<InsertManyUnsafeParam, Beerfinder[]>>;
+      // insertMany/insertManyUnsafe require a NonEmptyArray<BeerfinderWithContainerType>
+      type Test1 = Expect<Equal<InsertManyParam, NonEmptyArray<BeerfinderWithContainerType>>>;
+      type Test2 = Expect<Equal<InsertManyUnsafeParam, NonEmptyArray<BeerfinderWithContainerType>>>;
       type Test3 = Expect<Equal<GetByIdParam, string>>;
 
       const _test1: Test1 = true;
       const _test2: Test2 = true;
       const _test3: Test3 = true;
+      void [_test1, _test2, _test3];
     });
   });
 
   describe('RewardsRepository', () => {
     it('should infer correct types without explicit annotations', () => {
-      const repo = new RewardsRepository();
-
       // Type inference tests
-      type GetAllReturn = ReturnType<typeof repo.getAll>;
-      type GetByIdReturn = ReturnType<typeof repo.getById>;
-      type GetByTypeReturn = ReturnType<typeof repo.getByType>;
-      type GetRedeemedReturn = ReturnType<typeof repo.getRedeemed>;
-      type GetUnredeemedReturn = ReturnType<typeof repo.getUnredeemed>;
-      type GetCountReturn = ReturnType<typeof repo.getCount>;
-      type ClearReturn = ReturnType<typeof repo.clear>;
+      type GetAllReturn = ReturnType<RewardsRepository['getAll']>;
+      type GetByIdReturn = ReturnType<RewardsRepository['getById']>;
+      type GetByTypeReturn = ReturnType<RewardsRepository['getByType']>;
+      type GetRedeemedReturn = ReturnType<RewardsRepository['getRedeemed']>;
+      type GetUnredeemedReturn = ReturnType<RewardsRepository['getUnredeemed']>;
+      type GetCountReturn = ReturnType<RewardsRepository['getCount']>;
+      type ClearReturn = ReturnType<RewardsRepository['clear']>;
 
       // Verify all return types are correctly inferred
       type Test1 = Expect<Equal<GetAllReturn, Promise<Reward[]>>>;
@@ -139,16 +145,15 @@ describe('Repository Type Inference', () => {
       const _test5: Test5 = true;
       const _test6: Test6 = true;
       const _test7: Test7 = true;
+      void [_test1, _test2, _test3, _test4, _test5, _test6, _test7];
     });
 
     it('should accept correct parameter types', () => {
-      const repo = new RewardsRepository();
-
       // Verify parameter types are correctly inferred
-      type InsertManyParam = Parameters<typeof repo.insertMany>[0];
-      type InsertManyUnsafeParam = Parameters<typeof repo.insertManyUnsafe>[0];
-      type GetByIdParam = Parameters<typeof repo.getById>[0];
-      type GetByTypeParam = Parameters<typeof repo.getByType>[0];
+      type InsertManyParam = Parameters<RewardsRepository['insertMany']>[0];
+      type InsertManyUnsafeParam = Parameters<RewardsRepository['insertManyUnsafe']>[0];
+      type GetByIdParam = Parameters<RewardsRepository['getById']>[0];
+      type GetByTypeParam = Parameters<RewardsRepository['getByType']>[0];
 
       type Test1 = Expect<Equal<InsertManyParam, Reward[]>>;
       type Test2 = Expect<Equal<InsertManyUnsafeParam, Reward[]>>;
@@ -159,19 +164,16 @@ describe('Repository Type Inference', () => {
       const _test2: Test2 = true;
       const _test3: Test3 = true;
       const _test4: Test4 = true;
+      void [_test1, _test2, _test3, _test4];
     });
   });
 
   describe('Cross-Repository Type Safety', () => {
     it('should prevent mixing entity types between repositories', () => {
-      const beerRepo = new BeerRepository();
-      const myBeersRepo = new MyBeersRepository();
-      const rewardsRepo = new RewardsRepository();
-
       // These should all be different types
-      type BeerGetAll = ReturnType<typeof beerRepo.getAll>;
-      type BeerfinderGetAll = ReturnType<typeof myBeersRepo.getAll>;
-      type RewardGetAll = ReturnType<typeof rewardsRepo.getAll>;
+      type BeerGetAll = ReturnType<BeerRepository['getAll']>;
+      type BeerfinderGetAll = ReturnType<MyBeersRepository['getAll']>;
+      type RewardGetAll = ReturnType<RewardsRepository['getAll']>;
 
       // Verify they are NOT equal (compile-time check)
       type NotEqual1 = Equal<BeerGetAll, BeerfinderGetAll> extends true ? false : true;
@@ -181,6 +183,7 @@ describe('Repository Type Inference', () => {
       const _notEqual1: NotEqual1 = true;
       const _notEqual2: NotEqual2 = true;
       const _notEqual3: NotEqual3 = true;
+      void [_notEqual1, _notEqual2, _notEqual3];
     });
 
     it('should prevent assigning results to wrong entity types', () => {
@@ -205,8 +208,6 @@ describe('Repository Type Inference', () => {
 
   describe('Const Assertions and Readonly', () => {
     it('should handle const assertions correctly', () => {
-      const repo = new BeerRepository();
-
       // Test with const assertions
       const beers = [
         { id: '1', brew_name: 'Test Beer' },
@@ -216,6 +217,7 @@ describe('Repository Type Inference', () => {
       // TypeScript should allow this (const assertion makes it readonly but compatible with Beer[])
       // Note: This will actually fail at runtime due to missing properties, but we're testing type safety
       const typedBeers: Beer[] = beers as unknown as Beer[];
+      void typedBeers;
     });
   });
 
@@ -235,6 +237,7 @@ describe('Repository Type Inference', () => {
 
         // @ts-expect-error - Cannot access property on potentially null value
         const _name: string = beer?.brew_name || '';
+        void _name;
 
         return null;
       }

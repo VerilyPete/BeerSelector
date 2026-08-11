@@ -14,12 +14,7 @@ import { IconSymbol } from '@/components/ui/IconSymbol';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { Colors } from '@/constants/Colors';
 
-type AccessoryType =
-  | 'chevron'
-  | 'switch'
-  | 'value'
-  | 'loading'
-  | 'none';
+type AccessoryType = 'chevron' | 'switch' | 'value' | 'loading' | 'none';
 
 type SettingsItemProps = {
   icon?: SymbolViewProps['name'];
@@ -41,7 +36,6 @@ type SettingsItemProps = {
 
 export default function SettingsItem({
   icon,
-  iconBackgroundColor,
   iconColor,
   title,
   subtitle,
@@ -107,9 +101,7 @@ export default function SettingsItem({
       case 'value':
         return (
           <View style={styles.valueContainer}>
-            <Text style={[styles.valueText, { color: colors.textSecondary }]}>
-              {value}
-            </Text>
+            <Text style={[styles.valueText, { color: colors.textSecondary }]}>{value}</Text>
             <IconSymbol
               name="chevron.right"
               size={14}

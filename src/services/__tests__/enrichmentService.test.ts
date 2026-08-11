@@ -24,14 +24,9 @@ import {
   pollForEnrichmentUpdates,
   getClientId,
   EnrichmentData,
-  EnrichmentBatchResult,
 } from '../enrichmentService';
-import {
-  Beer,
-  Beerfinder,
-  BeerWithContainerType,
-  BeerfinderWithContainerType,
-} from '@/src/types/beer';
+import { Beerfinder, BeerWithContainerType, BeerfinderWithContainerType } from '@/src/types/beer';
+import { getPreference, setPreference } from '@/src/database/preferences';
 
 // Mock the config module
 jest.mock('@/src/config', () => ({
@@ -547,8 +542,8 @@ describe('enrichmentService', () => {
   });
 
   describe('API Functions', () => {
-    const mockGetPreference = require('@/src/database/preferences').getPreference;
-    const mockSetPreference = require('@/src/database/preferences').setPreference;
+    const mockGetPreference = getPreference as jest.Mock;
+    const mockSetPreference = setPreference as jest.Mock;
 
     beforeEach(() => {
       // Setup mock for client ID - cached value is used
@@ -587,7 +582,6 @@ describe('enrichmentService', () => {
       });
 
       it('should throw when rate limited', async () => {
-        const { config } = require('@/src/config');
         // Fill up rate limit by making many requests
         // The config mock has rateLimitMaxRequests: 10, so we need to exhaust it
         const mockSuccessResponse = {
@@ -1111,7 +1105,7 @@ describe('enrichmentService', () => {
   });
 
   describe('syncBeersToWorker', () => {
-    const mockGetPreference = require('@/src/database/preferences').getPreference;
+    const mockGetPreference = getPreference as jest.Mock;
 
     beforeEach(() => {
       mockGetPreference.mockResolvedValue('test-client-id');
@@ -1271,7 +1265,7 @@ describe('enrichmentService', () => {
   });
 
   describe('fetchEnrichmentBatchWithMissing', () => {
-    const mockGetPreference = require('@/src/database/preferences').getPreference;
+    const mockGetPreference = getPreference as jest.Mock;
 
     beforeEach(() => {
       mockGetPreference.mockResolvedValue('test-client-id');
@@ -1408,7 +1402,7 @@ describe('enrichmentService', () => {
   });
 
   describe('pollForEnrichmentUpdates', () => {
-    const mockGetPreference = require('@/src/database/preferences').getPreference;
+    const mockGetPreference = getPreference as jest.Mock;
 
     beforeEach(() => {
       jest.useFakeTimers();
@@ -1625,7 +1619,7 @@ describe('enrichmentService', () => {
 
   describe('fetchBeersFromProxy response validation', () => {
     beforeEach(() => {
-      const mockGetPreference = require('@/src/database/preferences').getPreference;
+      const mockGetPreference = getPreference as jest.Mock;
       mockGetPreference.mockResolvedValue('test-client-id');
     });
 
@@ -1742,7 +1736,7 @@ describe('enrichmentService', () => {
 
   describe('fetchEnrichmentBatch response validation', () => {
     beforeEach(() => {
-      const mockGetPreference = require('@/src/database/preferences').getPreference;
+      const mockGetPreference = getPreference as jest.Mock;
       mockGetPreference.mockResolvedValue('test-client-id');
     });
 
@@ -1761,7 +1755,7 @@ describe('enrichmentService', () => {
 
   describe('syncBeersToWorker response validation', () => {
     beforeEach(() => {
-      const mockGetPreference = require('@/src/database/preferences').getPreference;
+      const mockGetPreference = getPreference as jest.Mock;
       mockGetPreference.mockResolvedValue('test-client-id');
     });
 

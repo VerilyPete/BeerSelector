@@ -118,7 +118,7 @@ describe('DatabaseLockManager', () => {
       try {
         // Simulate an error happening during locked operation
         throw new Error('Operation failed');
-      } catch (error) {
+      } catch {
         // Release lock in finally block (typical pattern)
         lockManager.releaseLock('operation1');
       }

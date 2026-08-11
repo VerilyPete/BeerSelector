@@ -55,18 +55,34 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # eslint exits 0 on warnings, and this repo has 364 of them and 0 errors.
-      # Without --max-warnings this job would be green no matter how many new
-      # warnings a PR added — a check that cannot fail, which is the exact
-      # species of false comfort this whole plan exists to remove.
+      # eslint exits 0 on warnings, so without --max-warnings this job would be
+      # green no matter how many new warnings a PR added — a check that cannot
+      # fail, which is the exact species of false comfort this plan exists to
+      # remove.
       #
       # So the number is a ratchet, not a target. RAISING it must be a
       # deliberate edit reviewed in the same PR; lowering it is free and
       # encouraged as warnings get fixed.
       #
-      # Measured on `main` at the commit that added this file: 364 problems,
-      # 0 errors, 364 warnings. The dominant rules are
-      # @typescript-eslint/no-require-imports and no-unused-vars.
+      # 364 when this file was added; 152 after the sweep that fixed them.
+      # What remains is not a backlog of easy wins — every one was examined and
+      # argued for:
+      #   146  @typescript-eslint/no-require-imports
+      #     6  @typescript-eslint/no-unused-vars
+      # 123 of the 146 are `jest.resetModules()` + `require('../config')` in
+      # four config test suites, where a static import is hoisted above the
+      # env-var mutation the test exists to exercise and would silently defeat
+      # the reset. The rest sit inside `jest.mock(...)` factories, where
+      # babel-plugin-jest-hoist forbids closing over module-scope imports.
+      # Converting either class breaks the suite; they are load-bearing.
+      #
+      # The 6 unused-vars are the `_wrong1..4` bindings in two type-assertion
+      # suites, and they are deliberately still here — see the note on
+      # MAX_TYPE_ERRORS below and plan item 5.15.
+      #
+      # If this number becomes obstructive, the honest lever is a SCOPED eslint
+      # override for `no-require-imports` under `**/__tests__/**` — a reviewed
+      # decision about where the rule does not fit, not a raised ceiling.
       #
       # Note this is `npm run lint --` (i.e. `expo lint`), not a bare `eslint`
       # invocation: expo lint resolves this project's .eslintrc.js and
@@ -75,7 +91,7 @@ jobs:
       # `--max-warnings 5` exits 1, `--max-warnings 364` exits 0.
       - name: Lint
         env:
-          MAX_WARNINGS: '364'
+          MAX_WARNINGS: '152'
         run: npm run lint -- --max-warnings "$MAX_WARNINGS"
 
   typescript:
@@ -122,9 +138,17 @@ jobs:
           echo "tsc_exit=$code" >> "$GITHUB_OUTPUT"
           echo "tsc exited with $code"
 
-      # The ratchet. This repo has 141 pre-existing type errors, so a gate on
-      # zero would be permanently red and would be deleted within a week. Item
-      # 5.9 says: gate on no INCREASE over the measured baseline.
+      # The ratchet, now at ZERO. It was 141 when this job was added — item 5.9
+      # said gate on no increase over the measured baseline, because a gate on
+      # zero would have been permanently red and deleted within a week. The
+      # sweep in plan item 5.15 fixed all 141, so the ceiling is 0 and this is
+      # now an absolute gate: any new type error is red.
+      #
+      # Keep the ceiling mechanism rather than replacing it with a bare
+      # `tsc --noEmit` exit-code check. The surface floor below still needs the
+      # same parse, the config-error and crash guards still matter, and if a
+      # future migration ever needs a temporary non-zero ceiling, raising it is
+      # a visible reviewed edit rather than a rewrite of this step.
       #
       # HOW THE BASELINES WERE MEASURED, because this is where the last two
       # surprises in this plan came from:
@@ -157,7 +181,7 @@ jobs:
       - name: Assert type errors have not increased
         if: ${{ always() && (steps.tsc.outcome == 'success' || steps.tsc.outcome == 'failure') }}
         env:
-          MAX_TYPE_ERRORS: '141'
+          MAX_TYPE_ERRORS: '0'
           MIN_TS_FILES: '241'
           TSC_EXIT: ${{ steps.tsc.outputs.tsc_exit }}
         run: |

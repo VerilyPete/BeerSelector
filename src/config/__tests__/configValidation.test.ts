@@ -182,7 +182,7 @@ describe('Configuration Validation', () => {
 
         try {
           const { config: freshConfig } = require('../config');
-          freshConfig.network; // Access to trigger validation
+          void freshConfig.network; // Access to trigger validation
           fail('Should have thrown InvalidNetworkConfigError');
         } catch (error: unknown) {
           assertError(error);
@@ -196,7 +196,7 @@ describe('Configuration Validation', () => {
 
         try {
           const { config: freshConfig } = require('../config');
-          freshConfig.network; // Access to trigger validation
+          void freshConfig.network; // Access to trigger validation
           fail('Should have thrown InvalidNetworkConfigError');
         } catch (error: unknown) {
           assertError(error);
@@ -210,7 +210,7 @@ describe('Configuration Validation', () => {
 
         try {
           const { config: freshConfig } = require('../config');
-          freshConfig.network; // Access to trigger validation
+          void freshConfig.network; // Access to trigger validation
           fail('Should have thrown InvalidNetworkConfigError');
         } catch (error: unknown) {
           assertError(error);
@@ -223,7 +223,7 @@ describe('Configuration Validation', () => {
         process.env.EXPO_PUBLIC_API_TIMEOUT = '-5000';
         try {
           const { config: freshConfig } = require('../config');
-          freshConfig.network; // Access to trigger validation
+          void freshConfig.network; // Access to trigger validation
           fail('Should have thrown InvalidNetworkConfigError');
         } catch (error: unknown) {
           assertError(error);
@@ -253,7 +253,7 @@ describe('Configuration Validation', () => {
 
         try {
           const { config: freshConfig } = require('../config');
-          freshConfig.network; // Access to trigger validation
+          void freshConfig.network; // Access to trigger validation
           fail('Should have thrown InvalidNetworkConfigError');
         } catch (error: unknown) {
           assertError(error);
@@ -267,7 +267,7 @@ describe('Configuration Validation', () => {
 
         try {
           const { config: freshConfig } = require('../config');
-          freshConfig.network; // Access to trigger validation
+          void freshConfig.network; // Access to trigger validation
           fail('Should have thrown InvalidNetworkConfigError');
         } catch (error: unknown) {
           assertError(error);
@@ -280,7 +280,7 @@ describe('Configuration Validation', () => {
         process.env.EXPO_PUBLIC_API_RETRIES = '20';
         try {
           const { config: freshConfig } = require('../config');
-          freshConfig.network; // Access to trigger validation
+          void freshConfig.network; // Access to trigger validation
           fail('Should have thrown InvalidNetworkConfigError');
         } catch (error: unknown) {
           assertError(error);
@@ -304,7 +304,7 @@ describe('Configuration Validation', () => {
 
         try {
           const { config: freshConfig } = require('../config');
-          freshConfig.network; // Access to trigger validation
+          void freshConfig.network; // Access to trigger validation
           fail('Should have thrown InvalidNetworkConfigError');
         } catch (error: unknown) {
           assertError(error);
@@ -318,7 +318,7 @@ describe('Configuration Validation', () => {
 
         try {
           const { config: freshConfig } = require('../config');
-          freshConfig.network; // Access to trigger validation
+          void freshConfig.network; // Access to trigger validation
           fail('Should have thrown InvalidNetworkConfigError');
         } catch (error: unknown) {
           assertError(error);
@@ -332,7 +332,7 @@ describe('Configuration Validation', () => {
 
         try {
           const { config: freshConfig } = require('../config');
-          freshConfig.network; // Access to trigger validation
+          void freshConfig.network; // Access to trigger validation
           fail('Should have thrown InvalidNetworkConfigError');
         } catch (error: unknown) {
           assertError(error);
@@ -345,7 +345,7 @@ describe('Configuration Validation', () => {
         process.env.EXPO_PUBLIC_API_RETRY_DELAY = '-1000';
         try {
           const { config: freshConfig } = require('../config');
-          freshConfig.network; // Access to trigger validation
+          void freshConfig.network; // Access to trigger validation
           fail('Should have thrown InvalidNetworkConfigError');
         } catch (error: unknown) {
           assertError(error);
@@ -510,7 +510,7 @@ describe('Configuration Validation', () => {
 
       try {
         const { config: freshConfig } = require('../config');
-        freshConfig.network; // Access to trigger validation
+        void freshConfig.network; // Access to trigger validation
         fail('Should have thrown InvalidNetworkConfigError');
       } catch (error: unknown) {
         assertError(error);
@@ -544,7 +544,7 @@ describe('Configuration Validation', () => {
       process.env.EXPO_PUBLIC_API_TIMEOUT = '-1000';
       try {
         const { config: freshConfig } = require('../config');
-        freshConfig.network.timeout;
+        void freshConfig.network.timeout;
       } catch (error: unknown) {
         assertError(error);
         expect(error.message).toContain('EXPO_PUBLIC_API_TIMEOUT');
@@ -567,7 +567,7 @@ describe('Configuration Validation', () => {
     it('should not significantly slow down config access', () => {
       const start = Date.now();
       for (let i = 0; i < 1000; i++) {
-        config.api.baseUrl;
+        void config.api.baseUrl;
       }
       const duration = Date.now() - start;
 

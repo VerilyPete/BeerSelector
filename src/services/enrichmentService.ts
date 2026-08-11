@@ -374,7 +374,7 @@ export async function getClientId(): Promise<string> {
 
     cachedClientId = clientId;
     return clientId;
-  } catch (error) {
+  } catch {
     logWarning('Failed to get/create client ID, using fallback', {
       operation: 'getClientId',
       component: 'enrichmentService',

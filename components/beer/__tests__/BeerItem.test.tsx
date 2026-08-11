@@ -1,4 +1,5 @@
 import React from 'react';
+import { View } from 'react-native';
 import { render, fireEvent } from '@testing-library/react-native';
 
 import { BeerItem } from '../BeerItem';
@@ -152,7 +153,6 @@ describe('BeerItem', () => {
   // Test 8: Renders custom actions when provided
   test('renders custom actions when expanded and provided', () => {
     const mockOnToggle = jest.fn();
-    const { View } = require('react-native');
     const renderActions = () => {
       return <View testID="custom-action" />;
     };

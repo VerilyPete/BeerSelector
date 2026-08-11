@@ -15,9 +15,10 @@
  * - Environment switching with env vars
  */
 
-// Note: config is imported dynamically in tests via require() to test different env configurations
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { config } from '../config';
+// Note: config is imported dynamically in each test via require() (after jest.resetModules())
+// so that the module's top-level environment state is re-initialized against the env vars
+// set for that test. A static import here would share one cached module instance across
+// every test in this file, defeating that isolation.
 
 describe('Environment Variable Loading', () => {
   const originalEnv = process.env;

@@ -11,6 +11,7 @@
 import * as http from 'http';
 import { IncomingMessage, ServerResponse } from 'http';
 import { URL } from 'url';
+import { config } from '@/src/config';
 
 /**
  * Request record for tracking HTTP requests
@@ -367,7 +368,7 @@ export class MockServer {
           } else {
             resolve(body);
           }
-        } catch (error) {
+        } catch {
           resolve(body);
         }
       });
@@ -485,9 +486,6 @@ export async function setupMockServer(port?: number): Promise<{
   mockServer: MockServer;
   cleanup: () => Promise<void>;
 }> {
-  // Import at runtime to allow tests to configure mocks first
-  const { config } = require('@/src/config');
-
   const mockServer = new MockServer();
   const originalEnv = config.getEnvironment();
 

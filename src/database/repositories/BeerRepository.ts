@@ -157,7 +157,7 @@ export class BeerRepository {
         'SELECT COUNT(*) as count FROM allbeers'
       );
       console.log(`Beer import complete! allbeers now has ${after?.count ?? 0} rows`);
-    } catch (e) {
+    } catch {
       console.log('Beer import complete! (row count query failed)');
     }
   }

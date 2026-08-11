@@ -85,14 +85,21 @@ export default function LoginWebView({
   visible,
   onLoginSuccess,
   onLoginCancel,
-  onRefreshData,
+  // Accepted and ignored, deliberately. `app/settings.tsx` passes this prop AND
+  // passes the same callback to `useLoginFlow`, which is what actually invokes
+  // it (useLoginFlow.ts:241, from `handleLoginSuccess` — the `onLoginSuccess`
+  // prop below). So the refresh does happen; this copy has never been wired to
+  // anything. Underscore-prefixed to match `loading` on the next line rather
+  // than dropped from the props type, which would be an API change for every
+  // caller. Removing it from `LoginWebViewProps` is the real cleanup.
+  onRefreshData: _onRefreshData,
   loading: _externalLoading,
 }: LoginWebViewProps) {
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme() ?? 'dark';
   const colors = Colors[colorScheme];
 
-  const [_internalLoading, setInternalLoading] = useState(false);
+  const [, setInternalLoading] = useState(false);
   const webViewRef = useRef<WebView>(null);
   const processedUrlsRef = useRef<Set<string>>(new Set());
   const lastLoggedUrlRef = useRef<{ url: string; timestamp: number }>({ url: '', timestamp: 0 });
@@ -605,7 +612,7 @@ export default function LoginWebView({
         onLoginCancel();
       }
     },
-    [injectPageSpecificJavaScript, onRefreshData, onLoginSuccess, onLoginCancel, handleClose]
+    [injectPageSpecificJavaScript, onLoginSuccess, onLoginCancel, handleClose]
   );
 
   return (

@@ -5,13 +5,11 @@ import {
   Text,
   TouchableOpacity,
   Alert,
-  ActivityIndicator,
   Modal,
   FlatList,
   Platform,
 } from 'react-native';
 import { ChromeShell } from '@/components/ui/ChromeShell';
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { Colors } from '@/constants/Colors';
 import { useBreakpoint } from '@/hooks/useBreakpoint';

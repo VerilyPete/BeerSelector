@@ -4,7 +4,7 @@
  */
 
 import { BeerRepository } from '../BeerRepository';
-import { Beer, BeerWithContainerType } from '../../../types/beer';
+import { BeerWithContainerType } from '../../../types/beer';
 import * as connection from '../../connection';
 import { toNonEmpty } from '../../../api/fetchOutcome';
 import type { NonEmptyArray } from '../../../api/fetchOutcome';

@@ -30,9 +30,21 @@ function TerminalTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
   const { session } = useAppContext();
 
+  // `descriptors` is typed with react-navigation's own `BottomTabNavigationOptions`,
+  // which has no `href` field. Expo Router extends that type with `href` for
+  // `Tabs.Screen` (see `TabsProps` in expo-router/build/layouts/TabsClient.d.ts),
+  // and that's the shape actually present here at runtime — `filterVisibleRoutes`
+  // relies on reading it. Narrow to just the field it needs, typed to match.
+  const descriptorHrefs: Record<string, { options: { href?: string | null } }> = Object.fromEntries(
+    Object.keys(descriptors).map(key => [
+      key,
+      { options: { href: (descriptors[key].options as { href?: string | null }).href } },
+    ])
+  );
+
   const visibleRoutes = filterVisibleRoutes(
     state.routes,
-    descriptors,
+    descriptorHrefs,
     session.isVisitor,
     TAB_CONFIGS
   );

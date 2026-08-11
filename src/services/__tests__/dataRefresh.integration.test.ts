@@ -465,7 +465,7 @@ describe('Data Refresh Integration Tests', () => {
       const beers = allBeersFixture[1].brewInStock;
 
       // Check that fixture data is valid
-      beers.forEach((beer: any, index: number) => {
+      beers.forEach((beer: any) => {
         expect(beer).toHaveProperty('id');
         expect(beer).toHaveProperty('brew_name');
         expect(typeof beer.id).toBe('string');

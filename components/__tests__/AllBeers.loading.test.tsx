@@ -16,6 +16,8 @@ import React from 'react';
 import { render, waitFor } from '@testing-library/react-native';
 import { AllBeers } from '../AllBeers';
 import { beerRepository } from '@/src/database/repositories/BeerRepository';
+import { useBeerFilters } from '@/hooks/useBeerFilters';
+import { useDataRefresh } from '@/hooks/useDataRefresh';
 
 // Mock dependencies
 jest.mock('@/src/database/repositories/BeerRepository');
@@ -75,8 +77,7 @@ describe('AllBeers Loading States (MP-3 Step 3a)', () => {
     jest.clearAllMocks();
 
     // Mock useBeerFilters hook
-    const useBeerFilters = require('@/hooks/useBeerFilters').useBeerFilters;
-    useBeerFilters.mockImplementation((beers: any) => ({
+    (useBeerFilters as jest.Mock).mockImplementation((beers: any) => ({
       filteredBeers: beers,
       filters: { isDraft: false, isHeavies: false, isIpa: false },
       sortBy: 'date',
@@ -89,8 +90,7 @@ describe('AllBeers Loading States (MP-3 Step 3a)', () => {
     }));
 
     // Mock useDataRefresh hook
-    const useDataRefresh = require('@/hooks/useDataRefresh').useDataRefresh;
-    useDataRefresh.mockReturnValue({
+    (useDataRefresh as jest.Mock).mockReturnValue({
       refreshing: false,
       handleRefresh: jest.fn(),
     });
@@ -294,8 +294,7 @@ describe('AllBeers Loading States (MP-3 Step 3a)', () => {
       (beerRepository.getAll as jest.Mock).mockResolvedValue(mockBeers);
 
       // Mock refreshing state
-      const useDataRefresh = require('@/hooks/useDataRefresh').useDataRefresh;
-      useDataRefresh.mockReturnValue({
+      (useDataRefresh as jest.Mock).mockReturnValue({
         refreshing: true, // Simulating refresh
         handleRefresh: jest.fn(),
       });
@@ -316,8 +315,7 @@ describe('AllBeers Loading States (MP-3 Step 3a)', () => {
     it('should use RefreshControl for refresh indication', async () => {
       (beerRepository.getAll as jest.Mock).mockResolvedValue(mockBeers);
 
-      const useDataRefresh = require('@/hooks/useDataRefresh').useDataRefresh;
-      useDataRefresh.mockReturnValue({
+      (useDataRefresh as jest.Mock).mockReturnValue({
         refreshing: true,
         handleRefresh: jest.fn(),
       });
@@ -341,8 +339,7 @@ describe('AllBeers Loading States (MP-3 Step 3a)', () => {
       });
 
       // Refreshing should not reset scroll or show skeleton
-      const useDataRefresh = require('@/hooks/useDataRefresh').useDataRefresh;
-      useDataRefresh.mockReturnValue({
+      (useDataRefresh as jest.Mock).mockReturnValue({
         refreshing: true,
         handleRefresh: jest.fn(),
       });
@@ -371,8 +368,7 @@ describe('AllBeers Loading States (MP-3 Step 3a)', () => {
       });
 
       // State 3: Refreshing (beer list + RefreshControl, no skeleton)
-      const useDataRefresh = require('@/hooks/useDataRefresh').useDataRefresh;
-      useDataRefresh.mockReturnValue({
+      (useDataRefresh as jest.Mock).mockReturnValue({
         refreshing: true,
         handleRefresh: jest.fn(),
       });
@@ -383,7 +379,7 @@ describe('AllBeers Loading States (MP-3 Step 3a)', () => {
       expect(queryByTestId('skeleton-loader')).toBeNull();
 
       // State 4: Loaded again (beer list)
-      useDataRefresh.mockReturnValue({
+      (useDataRefresh as jest.Mock).mockReturnValue({
         refreshing: false,
         handleRefresh: jest.fn(),
       });

@@ -115,7 +115,12 @@ describe('useBeerFilters - Optimization (Bottleneck #3)', () => {
 
       result.forEach(beer => {
         expect(beer.brew_name.includes('Beer')).toBe(true);
-        expect(beer.brew_container.toLowerCase()).toMatch(/draft|draught/);
+        // `brew_container` is optional on `Beer`, but every filtered beer here
+        // came from `createMockBeers`, which always sets it — assert that
+        // rather than asserting away the type, so a future mock or filter
+        // change that lets an undefined container through fails loudly here.
+        expect(beer.brew_container).toBeDefined();
+        expect(beer.brew_container?.toLowerCase()).toMatch(/draft|draught/);
       });
     });
 
