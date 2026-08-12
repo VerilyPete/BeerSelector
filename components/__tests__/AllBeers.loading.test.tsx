@@ -569,24 +569,33 @@ describe('AllBeers Loading States (MP-3 Step 3a)', () => {
       expect(queryByTestId('skeleton-loader')).toBeNull();
     });
 
-    it('should keep the loaded list on screen when re-entering the tab', async () => {
+    it('should keep the loaded list on screen on first mount over loaded data', async () => {
       // Guards the `&& beers.allBeers.length === 0` clause at AllBeers.tsx:133.
       //
-      // An earlier version of this PR claimed AllBeers could not reach
-      // `isLoadingBeers === true` with `allBeers` populated, on the grounds that
-      // its `onDataReloaded` never touches the loading flag. That was true of
-      // that one handler and wrong about the component: `loadBeers`
-      // (AllBeers.tsx:58-70) calls the context's `setLoadingBeers(true)`
-      // unconditionally, and the mount effect runs it with no guard on whether
-      // context already holds data. `allBeers` lives in the provider above the
-      // tab, so it survives AllBeers unmounting.
+      // `loadBeers` (AllBeers.tsx:58-70) calls the context's
+      // `setLoadingBeers(true)` unconditionally, and the mount effect at :82-84
+      // runs it with no guard on whether context already holds data. So the
+      // component only needs to mount while `allBeers` is already populated.
       //
-      // Hence: leave the BEERS tab and come back, and the flag goes true while
-      // the list is still populated. Drop the clause and re-entering the tab
-      // blanks the list behind 20 skeletons until getAll() resolves.
+      // That is the ORDINARY path, and it needs no remount: AppProvider's own
+      // effect populates `beers.allBeers` at app start, tabs are lazy and
+      // `index` is the initial route, so AllBeers is not mounted until BEERS is
+      // first focused — by which time the provider has already filled context.
+      // Its mount effect then raises the flag over a non-empty list.
       //
-      // The provider must mount ONCE and outlive the AllBeers unmount, which is
-      // why this builds its own harness instead of using renderAllBeers().
+      // NOT via leaving and re-entering the tab: app/(tabs)/_layout.tsx:177
+      // sets `freezeOnBlur: true`, which suspends the subtree rather than
+      // unmounting it, and bottom-tabs v7 has no `unmountOnBlur`. Tab re-entry
+      // never re-runs the mount effect. An earlier version of this comment said
+      // it did; that was wrong, and it mattered because it described a
+      // lifecycle the navigator never produces.
+      //
+      // The second live route needs no mount at all: `isLoadingBeers` is
+      // provider-global, so `refreshBeerData` from settings, Rewards,
+      // TastedBrewList or Beerfinder raises it while AllBeers sits frozen.
+      //
+      // The provider must therefore mount BEFORE AllBeers and outlive it, which
+      // is why this builds its own harness rather than using renderAllBeers().
       const Harness = ({ showList }: { showList: boolean }) => (
         <AppProvider>{showList ? <AllBeers /> : null}</AppProvider>
       );
@@ -601,12 +610,13 @@ describe('AllBeers Loading States (MP-3 Step 3a)', () => {
         expect(getByTestId('beer-list')).toBeDefined();
       });
 
-      // Leave the tab. Context keeps the beers; only AllBeers unmounts.
+      // Unmount AllBeers, keeping the provider and its beers. This models the
+      // provider-populated-first ordering above, not a tab switch.
       await act(async () => {
         rerender(<Harness showList={false} />);
       });
 
-      // Hold the remount's load open so the in-flight state is observable.
+      // Hold the next mount's load open so the in-flight state is observable.
       let releaseReload: (value: unknown) => void = () => {};
       (beerRepository.getAll as jest.Mock).mockImplementation(
         () => new Promise(resolve => (releaseReload = resolve))

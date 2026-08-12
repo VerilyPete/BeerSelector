@@ -3,7 +3,16 @@
 # E2E Testing Setup Validation Script
 # This script validates that all E2E testing infrastructure is properly set up
 
-set -e
+# Deliberately NOT `set -e`. This script accumulates PASSED/FAILED and prints a
+# summary; aborting on the first non-zero status contradicts that design, and
+# every check here is a bare call whose failure status propagates. It aborted in
+# section 5 on a clean checkout, so sections 6-9 and the summary were dead code.
+#
+# `set -e` also made this behave differently per machine, which is worse than
+# either behaviour alone: bash 3.2 (macOS /bin/bash, and this file's shebang)
+# exempts arithmetic commands like `((PASSED++))` from it, bash >= 4 does not.
+# So the same script exited at a different line on a developer's Mac than on a
+# Linux runner.
 
 echo "🔍 Validating E2E Testing Setup for BeerSelector"
 echo "=================================================="
@@ -136,9 +145,11 @@ echo "5️⃣  Checking Documentation"
 echo "---------------------------"
 check_directory "e2e"
 check_file "e2e/README.md"
-check_file "E2E_QUICKSTART.md"
-check_file "E2E_IMPLEMENTATION_SUMMARY.md"
-check_file "E2E_TESTING_COMPLETE.md"
+# E2E_QUICKSTART.md, E2E_IMPLEMENTATION_SUMMARY.md and E2E_TESTING_COMPLETE.md
+# were checked here until they were deliberately untracked in fb2dd619. They
+# cannot exist on a clean checkout, so these were three guaranteed failures
+# naming files that are not supposed to be there — the same dead-config defect
+# this PR removed from testPathIgnorePatterns, and what aborted the run.
 echo ""
 
 echo "6️⃣  Checking Component testIDs"
@@ -239,7 +250,7 @@ else
     echo -e "${YELLOW}⚠️  E2E Testing Setup has $FAILED issue(s)${NC}"
     echo ""
     echo "Please address the failed checks above."
-    echo "See E2E_QUICKSTART.md for setup instructions."
+    echo "See .maestro/README.md for setup instructions."
     echo ""
     exit 1
 fi
