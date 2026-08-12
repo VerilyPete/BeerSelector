@@ -22,6 +22,8 @@ import React from 'react';
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { RefreshControl } from 'react-native';
 import { AllBeers } from '../AllBeers';
+import { BeerList } from '../beer/BeerList';
+import { UntappdWebView } from '../UntappdWebView';
 import { AppProvider } from '@/context/AppContext';
 import { beerRepository } from '@/src/database/repositories/BeerRepository';
 import { myBeersRepository } from '@/src/database/repositories/MyBeersRepository';
@@ -114,6 +116,38 @@ describe('AllBeers Loading States (MP-3 Step 3a)', () => {
       toggleExpand: jest.fn(),
       setExpandedId: jest.fn(),
     }));
+  };
+
+  /**
+   * Filter-hook mock with STABLE spies and an overridable filtered list.
+   *
+   * `expandBeer` above is a pass-through: it builds fresh `jest.fn()`s on every
+   * render, so nothing can be asserted about what the component called, and its
+   * `filteredBeers` is always the full input — which makes any count assertion
+   * pass whether the component reads `filteredBeers` or `beers.allBeers`. Both
+   * of those gaps hid live mutants. Use this where the point of the test is
+   * what the component does WITH the hook.
+   */
+  const mockFilters = (overrides: Record<string, unknown> = {}) => {
+    const spies = {
+      setSearchText: jest.fn(),
+      cycleContainerFilter: jest.fn(),
+      cycleSort: jest.fn(),
+      toggleSortDirection: jest.fn(),
+      toggleExpand: jest.fn(),
+      setExpandedId: jest.fn(),
+    };
+    (useBeerFilters as jest.Mock).mockImplementation((beers: any) => ({
+      filteredBeers: beers ?? [],
+      containerFilter: 'all',
+      sortBy: 'date',
+      sortDirection: 'desc',
+      searchText: '',
+      expandedId: null,
+      ...spies,
+      ...overrides,
+    }));
+    return spies;
   };
 
   beforeEach(() => {
@@ -559,7 +593,9 @@ describe('AllBeers Loading States (MP-3 Step 3a)', () => {
 
       (beerRepository.getAll as jest.Mock).mockResolvedValue(mockBeers);
 
-      const { rerender, getByTestId, queryByTestId } = render(<Harness showList={true} />);
+      const { rerender, getByTestId, queryByTestId, UNSAFE_getByType } = render(
+        <Harness showList={true} />
+      );
 
       await waitFor(() => {
         expect(getByTestId('beer-list')).toBeDefined();
@@ -581,6 +617,15 @@ describe('AllBeers Loading States (MP-3 Step 3a)', () => {
         rerender(<Harness showList={true} />);
       });
 
+      // Pin the precondition before asserting on it. Without this the test
+      // rests on an unasserted assumption: delete `setLoadingBeers(true)` from
+      // AllBeers.tsx:60 and loading never goes true, so the skeleton is absent
+      // for the wrong reason, every assertion below is trivially satisfied —
+      // and the guard mutant this test exists to kill survives too. Both
+      // survived 29/29 until this line existed. Same defect the Beerfinder
+      // refresh test was fixed for; it needed mirroring here.
+      expect(UNSAFE_getByType(BeerList).props.loading).toBe(true);
+
       // Mid-load, with beers already in context: show the stale list, not a
       // screen of skeletons.
       expect(queryByTestId('skeleton-loader')).toBeNull();
@@ -592,6 +637,80 @@ describe('AllBeers Loading States (MP-3 Step 3a)', () => {
 
       expect(queryByTestId('skeleton-loader')).toBeNull();
       expect(getByTestId('beer-list')).toBeDefined();
+
+      // Restore a resolving implementation: clearAllMocks() resets calls, not
+      // implementations, so leaving the never-resolving one installed makes it
+      // the base behaviour for whichever test runs next.
+      (beerRepository.getAll as jest.Mock).mockResolvedValue(mockBeers);
+    });
+  });
+
+  /**
+   * These press the controls rather than asserting that their labels render.
+   *
+   * Every mutant below survived the suite before these tests existed: the row
+   * UNTAPPD action bound to a no-op, the search box wired to nothing, and the
+   * header count reading the unfiltered total. Nothing else covers them now
+   * that the E2E workflows are gone.
+   */
+  describe('Row Actions and Filter Wiring', () => {
+    it('should open the Untappd lookup for the pressed beer', async () => {
+      (beerRepository.getAll as jest.Mock).mockResolvedValue(mockBeers);
+      mockFilters({ expandedId: '1' });
+
+      const { getByText, getByTestId, UNSAFE_getByType } = renderAllBeers();
+
+      await waitFor(() => {
+        expect(getByTestId('beer-list')).toBeDefined();
+      });
+
+      // Closed before the press, so the assertion after it cannot be satisfied
+      // by a modal that was already open.
+      expect(UNSAFE_getByType(UntappdWebView).props.visible).toBe(false);
+
+      fireEvent.press(getByText('UNTAPPD'));
+
+      // The beer name matters as much as the visibility: passing the wrong
+      // item would open a lookup for a beer the user did not tap.
+      expect(UNSAFE_getByType(UntappdWebView).props.visible).toBe(true);
+      expect(UNSAFE_getByType(UntappdWebView).props.beerName).toBe('Test IPA');
+    });
+
+    it('should feed typed search text to the filter hook', async () => {
+      (beerRepository.getAll as jest.Mock).mockResolvedValue(mockBeers);
+      const spies = mockFilters();
+
+      const { getByTestId } = renderAllBeers();
+
+      await waitFor(() => {
+        expect(getByTestId('beer-list')).toBeDefined();
+      });
+
+      fireEvent.changeText(getByTestId('search-input'), 'IPA');
+
+      // useDebounce is mocked to identity, so the debounced value is the typed
+      // one. Replacing the effect's argument with '' at AllBeers.tsx:52 — the
+      // search box types but filters nothing — passed until this assertion.
+      await waitFor(() => {
+        expect(spies.setSearchText).toHaveBeenCalledWith('IPA');
+      });
+    });
+
+    it('should count the filtered beers, not the whole taplist', async () => {
+      (beerRepository.getAll as jest.Mock).mockResolvedValue(mockBeers);
+
+      // The filtered list must differ from allBeers or the assertion cannot
+      // tell the two apart — which is exactly why the pass-through mock let
+      // `filteredBeers.length` degrade to `beers.allBeers.length` unnoticed.
+      mockFilters({ filteredBeers: [mockBeers[0]] });
+
+      const { getByTestId } = renderAllBeers();
+
+      await waitFor(() => {
+        expect(getByTestId('beer-list')).toBeDefined();
+      });
+
+      expect(getByTestId('beer-count').props.children).toEqual([1, ' beers on tap']);
     });
   });
 

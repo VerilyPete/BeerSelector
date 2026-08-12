@@ -21,6 +21,7 @@ import { Alert, RefreshControl } from 'react-native';
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { Beerfinder } from '../Beerfinder';
 import { BeerList } from '../beer/BeerList';
+import { UntappdWebView } from '../UntappdWebView';
 import { AppProvider } from '@/context/AppContext';
 import { beerRepository } from '@/src/database/repositories/BeerRepository';
 import { myBeersRepository } from '@/src/database/repositories/MyBeersRepository';
@@ -28,6 +29,7 @@ import { rewardsRepository } from '@/src/database/repositories/RewardsRepository
 import { getSessionData } from '@/src/api/sessionManager';
 import { isVisitorMode } from '@/src/api/authService';
 import { getQueuedBeers } from '@/src/api/queueService';
+import { router } from 'expo-router';
 import { useBeerFilters } from '@/hooks/useBeerFilters';
 import { useDataRefresh } from '@/hooks/useDataRefresh';
 import { useQueuedCheckIn } from '@/hooks/useQueuedCheckIn';
@@ -144,6 +146,37 @@ describe('Beerfinder Loading States', () => {
       toggleExpand: jest.fn(),
       setExpandedId: jest.fn(),
     }));
+  };
+
+  /**
+   * Filter-hook mock with STABLE spies and an overridable filtered list.
+   *
+   * `expandBeer` is a pass-through: fresh `jest.fn()`s on every render, so
+   * nothing can be asserted about what the component called, and its
+   * `filteredBeers` is always the full input — so a count assertion cannot
+   * distinguish `filteredBeers.length` from the unfiltered source. Both gaps
+   * hid live mutants.
+   */
+  const mockFilters = (overrides: Record<string, unknown> = {}) => {
+    const spies = {
+      setSearchText: jest.fn(),
+      cycleContainerFilter: jest.fn(),
+      cycleSort: jest.fn(),
+      toggleSortDirection: jest.fn(),
+      toggleExpand: jest.fn(),
+      setExpandedId: jest.fn(),
+    };
+    (useBeerFilters as jest.Mock).mockImplementation((beers: any) => ({
+      filteredBeers: beers ?? [],
+      containerFilter: 'all',
+      sortBy: 'date',
+      sortDirection: 'desc',
+      searchText: '',
+      expandedId: null,
+      ...spies,
+      ...overrides,
+    }));
+    return spies;
   };
 
   beforeEach(() => {
@@ -613,6 +646,162 @@ describe('Beerfinder Loading States', () => {
 
       expect(queryByTestId('skeleton-loader')).toBeNull();
       expect(queryByTestId('beer-list')).toBeNull();
+    });
+  });
+
+  /**
+   * These press the controls instead of asserting that their labels render.
+   *
+   * Every mutant named below survived the suite before these tests existed —
+   * including CHECK IN, the app's primary action, bound to a no-op. QUEUE and
+   * REWARDS exist in BOTH the loading and loaded branches, so each is pressed
+   * in both: covering one branch leaves the other free to rot.
+   */
+  describe('Actions and Filter Wiring', () => {
+    it('should check in the pressed beer', async () => {
+      const queuedCheckIn = jest.fn();
+      (useQueuedCheckIn as jest.Mock).mockReturnValue({ queuedCheckIn, isLoading: false });
+      mockFilters({ expandedId: '1' });
+
+      const { getByText, getByTestId } = renderBeerfinder();
+
+      await waitFor(() => {
+        expect(getByTestId('beer-list')).toBeDefined();
+      });
+
+      fireEvent.press(getByText('CHECK IN'));
+
+      // Asserting the argument too: checking in the wrong beer is a worse bug
+      // than checking in nothing, and `toHaveBeenCalled()` cannot see it.
+      expect(queuedCheckIn).toHaveBeenCalledWith(
+        expect.objectContaining({ id: '1', brew_name: 'Untasted IPA' })
+      );
+    });
+
+    it('should open the Untappd lookup for the pressed beer', async () => {
+      mockFilters({ expandedId: '1' });
+
+      const { getByText, getByTestId, UNSAFE_getByType } = renderBeerfinder();
+
+      await waitFor(() => {
+        expect(getByTestId('beer-list')).toBeDefined();
+      });
+
+      expect(UNSAFE_getByType(UntappdWebView).props.visible).toBe(false);
+
+      fireEvent.press(getByText('UNTAPPD'));
+
+      expect(UNSAFE_getByType(UntappdWebView).props.visible).toBe(true);
+      expect(UNSAFE_getByType(UntappdWebView).props.beerName).toBe('Untasted IPA');
+    });
+
+    it('should open the queue modal when QUEUE is pressed', async () => {
+      const { getByText, queryByText, getByTestId } = renderBeerfinder();
+
+      await waitFor(() => {
+        expect(getByTestId('beer-list')).toBeDefined();
+      });
+
+      expect(queryByText('Queued Brews')).toBeNull();
+
+      await act(async () => {
+        fireEvent.press(getByText('QUEUE'));
+      });
+
+      // Both halves matter: viewQueues can fetch and still never open the
+      // modal (dropping setQueueModalVisible(true) survived the suite), and it
+      // can open a modal it never populated.
+      expect(getQueuedBeers).toHaveBeenCalled();
+      expect(getByText('Queued Brews')).toBeDefined();
+    });
+
+    it('should drop queued beers from the list when the queue is opened', async () => {
+      // viewQueues carries its OWN copy of the two-way name match
+      // (Beerfinder.tsx:143-146), byte-identical to the one in handleRefresh.
+      // The refresh path's copy is covered by 'should exclude beers already
+      // queued for check-in'; this one had nothing, so the two could silently
+      // diverge. Same " (Bottle)" suffix, for the same reason: the queue API
+      // returns "Beer Name (Draft)", so an exact-match implementation finds
+      // nothing and the double check-in guard quietly stops working.
+      (getQueuedBeers as jest.Mock).mockResolvedValue([{ name: 'Untasted Stout (Bottle)' }]);
+
+      const { getByText, getByTestId } = renderBeerfinder();
+
+      await waitFor(() => {
+        expect(getByTestId('beer-list')).toBeDefined();
+      });
+
+      expect(getByText('2 to discover')).toBeDefined();
+
+      await act(async () => {
+        fireEvent.press(getByText('QUEUE'));
+      });
+
+      // The queued beer is now subtracted from the untasted set.
+      expect(getByText('1 to discover')).toBeDefined();
+    });
+
+    it('should navigate to rewards when REWARDS is pressed', async () => {
+      const { getByText, getByTestId } = renderBeerfinder();
+
+      await waitFor(() => {
+        expect(getByTestId('beer-list')).toBeDefined();
+      });
+
+      fireEvent.press(getByText('REWARDS'));
+
+      expect(router.push).toHaveBeenCalledWith('/screens/rewards');
+    });
+
+    it('should keep QUEUE and REWARDS working while the skeleton is up', async () => {
+      // The loading branch renders its own copies of both buttons. They were
+      // asserted to exist and never pressed, so both could be bound to nothing.
+      (beerRepository.getAll as jest.Mock).mockImplementation(
+        () => new Promise(resolve => setTimeout(() => resolve(mockAllBeers), 1000))
+      );
+
+      const { getByText, getByTestId } = renderBeerfinder();
+
+      expect(getByTestId('skeleton-loader')).toBeDefined();
+
+      fireEvent.press(getByText('REWARDS'));
+      expect(router.push).toHaveBeenCalledWith('/screens/rewards');
+
+      await act(async () => {
+        fireEvent.press(getByText('QUEUE'));
+      });
+
+      expect(getQueuedBeers).toHaveBeenCalled();
+    });
+
+    it('should feed typed search text to the filter hook', async () => {
+      const spies = mockFilters();
+
+      const { getByTestId } = renderBeerfinder();
+
+      await waitFor(() => {
+        expect(getByTestId('beer-list')).toBeDefined();
+      });
+
+      fireEvent.changeText(getByTestId('search-input'), 'Stout');
+
+      await waitFor(() => {
+        expect(spies.setSearchText).toHaveBeenCalledWith('Stout');
+      });
+    });
+
+    it('should count the filtered beers, not every untasted beer', async () => {
+      // Must differ from the untasted total (2) or the assertion cannot tell
+      // `filteredBeers.length` from `untastedBeers.length`.
+      mockFilters({ filteredBeers: [mockAllBeers[0]] });
+
+      const { getByText, getByTestId } = renderBeerfinder();
+
+      await waitFor(() => {
+        expect(getByTestId('beer-list')).toBeDefined();
+      });
+
+      expect(getByText('1 to discover')).toBeDefined();
     });
   });
 
