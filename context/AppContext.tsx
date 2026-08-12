@@ -426,6 +426,24 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     }
   }, [createEmptySession, createSessionFromData]);
 
+  /**
+   * True once any load has committed data to context. The mount effect's retry
+   * chain outlives the load that started it — a transient fault can have the
+   * chain still running while a manual refresh succeeds — and its final-failure
+   * branch would otherwise raise a fatal error over a fully populated list.
+   *
+   * A plain latch rather than a request-generation counter, because
+   * `loadBeerDataFromDatabase` is a `useCallback([])` and the effect that owns
+   * the retry chain therefore runs once per provider: "any load has committed"
+   * and "a load newer than this chain committed" are the same predicate here.
+   *
+   * It never resets, which is why that equivalence is load-bearing rather than
+   * incidental. Give that effect a real dependency, or add a flow that re-arms
+   * the retry chain, and the latch silently disarms the fatal-error branch
+   * forever. That is the point at which this must become a counter.
+   */
+  const hasLoadedBeerData = useRef(false);
+
   // ============================================================================
   // SHARED DATABASE LOADING FUNCTION
   // ============================================================================
@@ -435,14 +453,6 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
    * Used by both mount effect and refreshBeerData()
    * Avoids code duplication and ensures consistent loading behavior
    */
-  /**
-   * True once any load has committed data to context. The mount effect's retry
-   * chain outlives the load that started it — a transient fault can have the
-   * chain still running while a manual refresh succeeds — and its final-failure
-   * branch would otherwise raise a fatal error over a fully populated list.
-   */
-  const hasLoadedBeerData = useRef(false);
-
   const loadBeerDataFromDatabase = useCallback(async () => {
     // Load all data in parallel for better performance
     const [allBeersData, tastedBeersData, rewardsData] = await Promise.all([

@@ -2,8 +2,8 @@
  * Behaviour tests for AppContext, driven through a probe consumer.
  *
  * Deliberately NOT `renderHook`: TESTING.md bans it for React Native hooks, and
- * `AppProvider` imports `Alert` from react-native (AppContext.tsx:38), which is
- * exactly the class of component that rule exists for. A probe that renders
+ * `AppProvider` imports `Alert` from react-native, which is exactly the class
+ * of component that rule exists for. A probe that renders
  * state into `<Text testID>` and exposes actions via `<Pressable>` asserts the
  * same things through the public surface a real consumer uses.
  *
@@ -53,8 +53,8 @@ describe('AppContext', () => {
   ];
 
   /**
-   * Renders the two pieces of state this file cares about and exposes the one
-   * action that drives them. `beerError` is rendered as the literal string
+   * Renders the three pieces of state this file cares about and exposes the
+   * one action that drives them. `beerError` is rendered as the literal string
    * 'none' when null so the assertion distinguishes "cleared" from "component
    * rendered nothing at all".
    */
@@ -147,9 +147,9 @@ describe('AppContext', () => {
       // THE motivating scenario, and the one the other tests miss. They both
       // seed the error through refreshBeerData's own catch, which says
       // "Failed to REFRESH beer data from database". The bug users actually
-      // hit starts from the mount effect's message — "Failed to LOAD beer data
-      // from database" (AppContext.tsx:504) — raised after 3 retries, with a
-      // "restart the app" alert. An implementation that only cleared the error
+      // hit starts from the message the mount effect raises after its 3 retries
+      // — "Failed to LOAD beer data from database" — alongside a "restart the
+      // app" alert. An implementation that only cleared the error
       // it set itself would pass every other test here while leaving the
       // headline bug completely unfixed.
       let dbHealthy = false;
@@ -188,7 +188,7 @@ describe('AppContext', () => {
     });
 
     it('should stop showing the loading flag once a refresh settles', async () => {
-      // The `finally` at AppContext.tsx:585-587 is the only thing that lowers
+      // `refreshBeerData`'s `finally` is the only thing that lowers
       // isLoadingBeers. Emptying it left every consumer's skeleton up forever
       // and the whole suite green — the set half is pinned by Beerfinder's
       // refresh test, the clear half was naked.
