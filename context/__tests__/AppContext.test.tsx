@@ -53,12 +53,13 @@ describe('AppContext', () => {
    * rendered nothing at all".
    */
   const Probe = () => {
-    const { beers, errors, refreshBeerData } = useAppContext();
+    const { beers, errors, loading, refreshBeerData } = useAppContext();
 
     return (
       <>
         <Text testID="beer-error">{errors.beerError ?? 'none'}</Text>
         <Text testID="beer-count">{String(beers.allBeers.length)}</Text>
+        <Text testID="beer-loading">{String(loading.isLoadingBeers)}</Text>
         <Pressable
           testID="refresh"
           onPress={() => {
@@ -136,6 +137,71 @@ describe('AppContext', () => {
       expect(getByTestId('beer-count').props.children).toBe('2');
     });
 
+    it('should clear the error the mount retries raised, not just its own', async () => {
+      // THE motivating scenario, and the one the other tests miss. They both
+      // seed the error through refreshBeerData's own catch, which says
+      // "Failed to REFRESH beer data from database". The bug users actually
+      // hit starts from the mount effect's message — "Failed to LOAD beer data
+      // from database" (AppContext.tsx:504) — raised after 3 retries, with a
+      // "restart the app" alert. An implementation that only cleared the error
+      // it set itself would pass every other test here while leaving the
+      // headline bug completely unfixed.
+      let dbHealthy = false;
+      (beerRepository.getAll as jest.Mock).mockImplementation(() =>
+        dbHealthy ? Promise.resolve(mockBeers) : Promise.reject(new Error('db down'))
+      );
+
+      const { getByTestId } = renderProbe();
+
+      // Let the mount effect exhaust its 1s/2s/4s chain. Pumped, because each
+      // retry is only scheduled once the previous rejection settles.
+      for (let i = 0; i < 6; i++) {
+        await act(async () => {
+          jest.advanceTimersByTime(5000);
+        });
+      }
+
+      expect(getByTestId('beer-error').props.children).toBe(
+        'Failed to load beer data from database'
+      );
+
+      // The database comes back and the user presses Try Again.
+      dbHealthy = true;
+      await act(async () => {
+        fireEvent.press(getByTestId('refresh'));
+      });
+
+      expect(getByTestId('beer-error').props.children).toBe('none');
+      expect(getByTestId('beer-count').props.children).toBe('1');
+    });
+
+    it('should stop showing the loading flag once a refresh settles', async () => {
+      // The `finally` at AppContext.tsx:585-587 is the only thing that lowers
+      // isLoadingBeers. Emptying it left every consumer's skeleton up forever
+      // and the whole suite green — the set half is pinned by Beerfinder's
+      // refresh test, the clear half was naked.
+      const { getByTestId } = renderProbe();
+
+      await waitFor(() => {
+        expect(getByTestId('beer-count').props.children).toBe('1');
+      });
+
+      await act(async () => {
+        fireEvent.press(getByTestId('refresh'));
+      });
+
+      expect(getByTestId('beer-loading').props.children).toBe('false');
+
+      // And after a failing refresh, which takes the catch instead.
+      (beerRepository.getAll as jest.Mock).mockRejectedValue(new Error('db down'));
+
+      await act(async () => {
+        fireEvent.press(getByTestId('refresh'));
+      });
+
+      expect(getByTestId('beer-loading').props.children).toBe('false');
+    });
+
     it('should not re-raise the error after a later load has already succeeded', async () => {
       // The mount effect retries a failed load 3x at 1s/2s/4s and then sets
       // beerError unconditionally, knowing nothing about loads that happened
@@ -196,6 +262,12 @@ describe('AppContext', () => {
       expect(getByTestId('beer-error').props.children).toBe(
         'Failed to refresh beer data from database'
       );
+
+      // The rows the user already had must survive a failed refresh. Adding a
+      // `setBeers({ allBeers: [] })` beside the catch's setBeerError left the
+      // whole suite green: pull-to-refresh with the database down emptied the
+      // list behind the error screen, and nothing noticed.
+      expect(getByTestId('beer-count').props.children).toBe('1');
     });
   });
 });
