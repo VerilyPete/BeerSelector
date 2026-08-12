@@ -11,9 +11,10 @@ name: Static Analysis
 # reaches `main` through every gate this repo has — including the now-required
 # `Jest Unit Tests`. Plan item 5.9.
 #
-# Separate workflow file for the same reason tests.yml is separate: item 6.1
-# holds an open decision about deleting e2e-tests.yml's iOS job, and no such
-# decision should be able to take static analysis with it as a side effect.
+# Separate workflow file for the same reason tests.yml is separate: keeping
+# static analysis independent meant that deleting the E2E workflows (2026-08-11)
+# could not take it down as a side effect. That separation paid off exactly once
+# and was worth it.
 
 on:
   push:
@@ -32,11 +33,11 @@ permissions:
   contents: read
 
 jobs:
-  # Check context names must be unique across ALL workflows in this repo —
-  # e2e-tests.yml and maestro-e2e.yml already collide with each other on three
-  # names, which is how a green job and a red job come to share one check. Do
-  # not reuse "Test Summary", "E2E Tests", "Jest Unit Tests", or any
-  # "Maestro ..." name here. See plan item 5.7.
+  # Check context names must be unique across ALL workflows in this repo. This
+  # mattered when e2e-tests.yml and maestro-e2e.yml collided with each other on
+  # three names — a green job and a red job sharing one check. Both are now
+  # deleted, so only tests.yml remains to collide with: do not reuse
+  # "Jest Unit Tests". See plan item 5.7.
   eslint:
     name: ESLint
     runs-on: ubuntu-latest

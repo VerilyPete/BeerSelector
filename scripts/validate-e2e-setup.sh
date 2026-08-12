@@ -3,7 +3,16 @@
 # E2E Testing Setup Validation Script
 # This script validates that all E2E testing infrastructure is properly set up
 
-set -e
+# Deliberately NOT `set -e`. This script accumulates PASSED/FAILED and prints a
+# summary; aborting on the first non-zero status contradicts that design, and
+# every check here is a bare call whose failure status propagates. It aborted in
+# section 5 on a clean checkout, so sections 6-9 and the summary were dead code.
+#
+# `set -e` also made this behave differently per machine, which is worse than
+# either behaviour alone: bash 3.2 (macOS /bin/bash, and this file's shebang)
+# exempts arithmetic commands like `((PASSED++))` from it, bash >= 4 does not.
+# So the same script exited at a different line on a developer's Mac than on a
+# Linux runner.
 
 echo "🔍 Validating E2E Testing Setup for BeerSelector"
 echo "=================================================="
@@ -23,12 +32,12 @@ FAILED=0
 check_command() {
     if command -v "$1" &> /dev/null; then
         echo -e "${GREEN}✓${NC} $1 is installed"
-        ((PASSED++))
+        PASSED=$((PASSED + 1))
         return 0
     else
         echo -e "${RED}✗${NC} $1 is not installed"
         echo "   Install with: $2"
-        ((FAILED++))
+        FAILED=$((FAILED + 1))
         return 1
     fi
 }
@@ -37,11 +46,11 @@ check_command() {
 check_file() {
     if [ -f "$1" ]; then
         echo -e "${GREEN}✓${NC} $1 exists"
-        ((PASSED++))
+        PASSED=$((PASSED + 1))
         return 0
     else
         echo -e "${RED}✗${NC} $1 is missing"
-        ((FAILED++))
+        FAILED=$((FAILED + 1))
         return 1
     fi
 }
@@ -50,11 +59,11 @@ check_file() {
 check_directory() {
     if [ -d "$1" ]; then
         echo -e "${GREEN}✓${NC} $1 exists"
-        ((PASSED++))
+        PASSED=$((PASSED + 1))
         return 0
     else
         echo -e "${RED}✗${NC} $1 is missing"
-        ((FAILED++))
+        FAILED=$((FAILED + 1))
         return 1
     fi
 }
@@ -63,24 +72,36 @@ check_directory() {
 check_npm_script() {
     if grep -q "\"$1\"" package.json; then
         echo -e "${GREEN}✓${NC} npm script '$1' exists"
-        ((PASSED++))
+        PASSED=$((PASSED + 1))
         return 0
     else
         echo -e "${RED}✗${NC} npm script '$1' is missing"
-        ((FAILED++))
+        FAILED=$((FAILED + 1))
         return 1
     fi
 }
 
 # Function to validate YAML file
 validate_yaml() {
+    # A missing file used to land in the else branch below and be counted as a
+    # PASS with a yellow warning: `grep -q` exits 2 when it cannot open the
+    # file, which is indistinguishable from "pattern not found" to an if. That
+    # made deleting a flow file a passing check.
+    if [ ! -f "$1" ]; then
+        echo -e "${RED}✗${NC} $1 not found"
+        FAILED=$((FAILED + 1))
+        return 1
+    fi
+
     if grep -q "^---$" "$1"; then
         echo -e "${GREEN}✓${NC} $1 is valid Maestro flow"
-        ((PASSED++))
+        PASSED=$((PASSED + 1))
         return 0
     else
+        # Deliberately still a pass: the file exists, it just lacks the leading
+        # `---`, which Maestro tolerates. Only its absence is a failure.
         echo -e "${YELLOW}⚠${NC} $1 may have format issues"
-        ((PASSED++))
+        PASSED=$((PASSED + 1))
         return 0
     fi
 }
@@ -124,9 +145,11 @@ echo "5️⃣  Checking Documentation"
 echo "---------------------------"
 check_directory "e2e"
 check_file "e2e/README.md"
-check_file "E2E_QUICKSTART.md"
-check_file "E2E_IMPLEMENTATION_SUMMARY.md"
-check_file "E2E_TESTING_COMPLETE.md"
+# E2E_QUICKSTART.md, E2E_IMPLEMENTATION_SUMMARY.md and E2E_TESTING_COMPLETE.md
+# were checked here until they were deliberately untracked in fb2dd619. They
+# cannot exist on a clean checkout, so these were three guaranteed failures
+# naming files that are not supposed to be there — the same dead-config defect
+# this PR removed from testPathIgnorePatterns, and what aborted the run.
 echo ""
 
 echo "6️⃣  Checking Component testIDs"
@@ -134,46 +157,46 @@ echo "--------------------------------"
 echo "Checking components/beer/BeerList.tsx..."
 if grep -q 'testID="beer-list"' components/beer/BeerList.tsx; then
     echo -e "${GREEN}✓${NC} BeerList has testIDs ($(grep -c 'testID' components/beer/BeerList.tsx) found)"
-    ((PASSED++))
+    PASSED=$((PASSED + 1))
 else
     echo -e "${RED}✗${NC} BeerList missing testIDs"
-    ((FAILED++))
+    FAILED=$((FAILED + 1))
 fi
 
 echo "Checking components/beer/BeerItem.tsx..."
 if grep -q 'testID=' components/beer/BeerItem.tsx; then
     echo -e "${GREEN}✓${NC} BeerItem has testIDs ($(grep -c 'testID' components/beer/BeerItem.tsx) found)"
-    ((PASSED++))
+    PASSED=$((PASSED + 1))
 else
     echo -e "${RED}✗${NC} BeerItem missing testIDs"
-    ((FAILED++))
+    FAILED=$((FAILED + 1))
 fi
 
 echo "Checking components/beer/FilterBar.tsx..."
 if grep -q 'testID=' components/beer/FilterBar.tsx; then
     echo -e "${GREEN}✓${NC} FilterBar has testIDs ($(grep -c 'testID' components/beer/FilterBar.tsx) found)"
-    ((PASSED++))
+    PASSED=$((PASSED + 1))
 else
     echo -e "${RED}✗${NC} FilterBar missing testIDs"
-    ((FAILED++))
+    FAILED=$((FAILED + 1))
 fi
 
 echo "Checking components/SearchBar.tsx..."
 if grep -q 'testID=' components/SearchBar.tsx; then
     echo -e "${GREEN}✓${NC} SearchBar has testIDs ($(grep -c 'testID' components/SearchBar.tsx) found)"
-    ((PASSED++))
+    PASSED=$((PASSED + 1))
 else
     echo -e "${RED}✗${NC} SearchBar missing testIDs"
-    ((FAILED++))
+    FAILED=$((FAILED + 1))
 fi
 
 echo "Checking components/AllBeers.tsx..."
 if grep -q 'testID=' components/AllBeers.tsx; then
     echo -e "${GREEN}✓${NC} AllBeers has testIDs ($(grep -c 'testID' components/AllBeers.tsx) found)"
-    ((PASSED++))
+    PASSED=$((PASSED + 1))
 else
     echo -e "${RED}✗${NC} AllBeers missing testIDs"
-    ((FAILED++))
+    FAILED=$((FAILED + 1))
 fi
 echo ""
 
@@ -181,7 +204,6 @@ echo "7️⃣  Checking npm Scripts"
 echo "-------------------------"
 check_npm_script "test:e2e"
 check_npm_script "test:e2e:ios"
-check_npm_script "test:e2e:android"
 check_npm_script "test:e2e:single"
 check_npm_script "test:performance"
 check_npm_script "test:performance:report"
@@ -189,18 +211,20 @@ echo ""
 
 echo "8️⃣  Checking CI/CD Configuration"
 echo "----------------------------------"
-check_directory ".github/workflows"
-check_file ".github/workflows/e2e-tests.yml"
+# E2E deliberately does not run in CI. e2e-tests.yml and maestro-e2e.yml were
+# deleted on 2026-08-11 after 143 runs with zero passes; Maestro is run by hand.
+# See .maestro/README.md. Do not re-add a check for those files here.
+echo "  ℹ️  E2E runs locally only — no CI workflow expected"
 echo ""
 
 echo "9️⃣  Checking .gitignore"
 echo "------------------------"
 if grep -q "test-results/" .gitignore; then
     echo -e "${GREEN}✓${NC} E2E artifacts added to .gitignore"
-    ((PASSED++))
+    PASSED=$((PASSED + 1))
 else
     echo -e "${RED}✗${NC} E2E artifacts not in .gitignore"
-    ((FAILED++))
+    FAILED=$((FAILED + 1))
 fi
 echo ""
 
@@ -226,7 +250,7 @@ else
     echo -e "${YELLOW}⚠️  E2E Testing Setup has $FAILED issue(s)${NC}"
     echo ""
     echo "Please address the failed checks above."
-    echo "See E2E_QUICKSTART.md for setup instructions."
+    echo "See .maestro/README.md for setup instructions."
     echo ""
     exit 1
 fi
