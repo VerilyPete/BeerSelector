@@ -577,6 +577,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     try {
       setLoading(prev => ({ ...prev, isLoadingBeers: true }));
       await loadBeerDataFromDatabase();
+      setBeerError(null); // Clear error on success — mirrors the mount effect
       console.log('[AppContext] Refreshed beer data from database');
     } catch (error) {
       console.error('[AppContext] Error refreshing beer data:', error);
