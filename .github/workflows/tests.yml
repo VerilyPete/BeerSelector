@@ -97,10 +97,13 @@ jobs:
       # Items 5.4 / 5.4a — the floor. Without this, the job certifies only that
       # "jest exited 0", not that the suite actually ran. Appending one path to
       # testPathIgnorePatterns (jest.config.js) shrinks the suite and keeps this
-      # check green. That list is not hypothetical maintenance debt: four of its
-      # eight explicit entries already point at files that no longer exist, and
-      # its own comment records that one quarantine was false and hid 14 real
-      # assertions.
+      # check green. That list is not hypothetical maintenance debt, on this
+      # repo's own evidence: it held eight explicit entries and seven of them
+      # were removed in one PR (2026-08-11) — four naming files that never
+      # existed, two quarantining suites that were 100% red underneath, and one
+      # excluded for a Jest hang the file does not cause. Every one of those
+      # kept this check green while shrinking what it certified. A single
+      # explicit entry remains.
       #
       # Gates on the number of cases that RAN (`tests=` minus skipped), not on
       # `tests=` itself. `tests=` counts skipped/pending cases, so a floor read
@@ -148,7 +151,7 @@ jobs:
       - name: Assert the suite has not shrunk
         if: ${{ always() && (steps.jest.outcome == 'success' || steps.jest.outcome == 'failure') }}
         env:
-          MIN_TESTS_RUN: '2346'
+          MIN_TESTS_RUN: '2347'
           MAX_SKIPPED: '0'
         run: |
           python3 - <<'PY'

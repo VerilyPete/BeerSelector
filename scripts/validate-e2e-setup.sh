@@ -23,12 +23,12 @@ FAILED=0
 check_command() {
     if command -v "$1" &> /dev/null; then
         echo -e "${GREEN}✓${NC} $1 is installed"
-        ((PASSED++))
+        PASSED=$((PASSED + 1))
         return 0
     else
         echo -e "${RED}✗${NC} $1 is not installed"
         echo "   Install with: $2"
-        ((FAILED++))
+        FAILED=$((FAILED + 1))
         return 1
     fi
 }
@@ -37,11 +37,11 @@ check_command() {
 check_file() {
     if [ -f "$1" ]; then
         echo -e "${GREEN}✓${NC} $1 exists"
-        ((PASSED++))
+        PASSED=$((PASSED + 1))
         return 0
     else
         echo -e "${RED}✗${NC} $1 is missing"
-        ((FAILED++))
+        FAILED=$((FAILED + 1))
         return 1
     fi
 }
@@ -50,11 +50,11 @@ check_file() {
 check_directory() {
     if [ -d "$1" ]; then
         echo -e "${GREEN}✓${NC} $1 exists"
-        ((PASSED++))
+        PASSED=$((PASSED + 1))
         return 0
     else
         echo -e "${RED}✗${NC} $1 is missing"
-        ((FAILED++))
+        FAILED=$((FAILED + 1))
         return 1
     fi
 }
@@ -63,24 +63,36 @@ check_directory() {
 check_npm_script() {
     if grep -q "\"$1\"" package.json; then
         echo -e "${GREEN}✓${NC} npm script '$1' exists"
-        ((PASSED++))
+        PASSED=$((PASSED + 1))
         return 0
     else
         echo -e "${RED}✗${NC} npm script '$1' is missing"
-        ((FAILED++))
+        FAILED=$((FAILED + 1))
         return 1
     fi
 }
 
 # Function to validate YAML file
 validate_yaml() {
+    # A missing file used to land in the else branch below and be counted as a
+    # PASS with a yellow warning: `grep -q` exits 2 when it cannot open the
+    # file, which is indistinguishable from "pattern not found" to an if. That
+    # made deleting a flow file a passing check.
+    if [ ! -f "$1" ]; then
+        echo -e "${RED}✗${NC} $1 not found"
+        FAILED=$((FAILED + 1))
+        return 1
+    fi
+
     if grep -q "^---$" "$1"; then
         echo -e "${GREEN}✓${NC} $1 is valid Maestro flow"
-        ((PASSED++))
+        PASSED=$((PASSED + 1))
         return 0
     else
+        # Deliberately still a pass: the file exists, it just lacks the leading
+        # `---`, which Maestro tolerates. Only its absence is a failure.
         echo -e "${YELLOW}⚠${NC} $1 may have format issues"
-        ((PASSED++))
+        PASSED=$((PASSED + 1))
         return 0
     fi
 }
@@ -134,46 +146,46 @@ echo "--------------------------------"
 echo "Checking components/beer/BeerList.tsx..."
 if grep -q 'testID="beer-list"' components/beer/BeerList.tsx; then
     echo -e "${GREEN}✓${NC} BeerList has testIDs ($(grep -c 'testID' components/beer/BeerList.tsx) found)"
-    ((PASSED++))
+    PASSED=$((PASSED + 1))
 else
     echo -e "${RED}✗${NC} BeerList missing testIDs"
-    ((FAILED++))
+    FAILED=$((FAILED + 1))
 fi
 
 echo "Checking components/beer/BeerItem.tsx..."
 if grep -q 'testID=' components/beer/BeerItem.tsx; then
     echo -e "${GREEN}✓${NC} BeerItem has testIDs ($(grep -c 'testID' components/beer/BeerItem.tsx) found)"
-    ((PASSED++))
+    PASSED=$((PASSED + 1))
 else
     echo -e "${RED}✗${NC} BeerItem missing testIDs"
-    ((FAILED++))
+    FAILED=$((FAILED + 1))
 fi
 
 echo "Checking components/beer/FilterBar.tsx..."
 if grep -q 'testID=' components/beer/FilterBar.tsx; then
     echo -e "${GREEN}✓${NC} FilterBar has testIDs ($(grep -c 'testID' components/beer/FilterBar.tsx) found)"
-    ((PASSED++))
+    PASSED=$((PASSED + 1))
 else
     echo -e "${RED}✗${NC} FilterBar missing testIDs"
-    ((FAILED++))
+    FAILED=$((FAILED + 1))
 fi
 
 echo "Checking components/SearchBar.tsx..."
 if grep -q 'testID=' components/SearchBar.tsx; then
     echo -e "${GREEN}✓${NC} SearchBar has testIDs ($(grep -c 'testID' components/SearchBar.tsx) found)"
-    ((PASSED++))
+    PASSED=$((PASSED + 1))
 else
     echo -e "${RED}✗${NC} SearchBar missing testIDs"
-    ((FAILED++))
+    FAILED=$((FAILED + 1))
 fi
 
 echo "Checking components/AllBeers.tsx..."
 if grep -q 'testID=' components/AllBeers.tsx; then
     echo -e "${GREEN}✓${NC} AllBeers has testIDs ($(grep -c 'testID' components/AllBeers.tsx) found)"
-    ((PASSED++))
+    PASSED=$((PASSED + 1))
 else
     echo -e "${RED}✗${NC} AllBeers missing testIDs"
-    ((FAILED++))
+    FAILED=$((FAILED + 1))
 fi
 echo ""
 
@@ -198,10 +210,10 @@ echo "9️⃣  Checking .gitignore"
 echo "------------------------"
 if grep -q "test-results/" .gitignore; then
     echo -e "${GREEN}✓${NC} E2E artifacts added to .gitignore"
-    ((PASSED++))
+    PASSED=$((PASSED + 1))
 else
     echo -e "${RED}✗${NC} E2E artifacts not in .gitignore"
-    ((FAILED++))
+    FAILED=$((FAILED + 1))
 fi
 echo ""
 

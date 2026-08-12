@@ -518,13 +518,80 @@ describe('AllBeers Loading States (MP-3 Step 3a)', () => {
       // Synchronous, before any timer advance: only the press can explain this.
       expect(mockGetAll.mock.calls.length).toBe(callsBeforePress + 1);
 
-      // State 4: Loaded — error cleared and the list replaces it
+      // State 4: Loaded — and the recovery must be the PRESS's doing.
+      //
+      // `waitFor` pumps the fake clock, which lets AppProvider's own background
+      // retries (1s/2s/4s) fire and clear the error by themselves. Asserting
+      // through a waitFor here therefore proves nothing about loadBeers:
+      // deleting `setBeerError(null)` from AllBeers.tsx:63 passed this test.
+      //
+      // Flushing microtasks without advancing the clock keeps the provider's
+      // timers unfired, so the only thing that can have cleared the error is
+      // loadBeers itself.
+      await act(async () => {});
+
+      expect(queryByTestId('error-container')).toBeNull();
+      expect(getByTestId('beer-list')).toBeDefined();
+      expect(queryByTestId('skeleton-loader')).toBeNull();
+    });
+
+    it('should keep the loaded list on screen when re-entering the tab', async () => {
+      // Guards the `&& beers.allBeers.length === 0` clause at AllBeers.tsx:133.
+      //
+      // An earlier version of this PR claimed AllBeers could not reach
+      // `isLoadingBeers === true` with `allBeers` populated, on the grounds that
+      // its `onDataReloaded` never touches the loading flag. That was true of
+      // that one handler and wrong about the component: `loadBeers`
+      // (AllBeers.tsx:58-70) calls the context's `setLoadingBeers(true)`
+      // unconditionally, and the mount effect runs it with no guard on whether
+      // context already holds data. `allBeers` lives in the provider above the
+      // tab, so it survives AllBeers unmounting.
+      //
+      // Hence: leave the BEERS tab and come back, and the flag goes true while
+      // the list is still populated. Drop the clause and re-entering the tab
+      // blanks the list behind 20 skeletons until getAll() resolves.
+      //
+      // The provider must mount ONCE and outlive the AllBeers unmount, which is
+      // why this builds its own harness instead of using renderAllBeers().
+      const Harness = ({ showList }: { showList: boolean }) => (
+        <AppProvider>{showList ? <AllBeers /> : null}</AppProvider>
+      );
+
+      (beerRepository.getAll as jest.Mock).mockResolvedValue(mockBeers);
+
+      const { rerender, getByTestId, queryByTestId } = render(<Harness showList={true} />);
+
       await waitFor(() => {
         expect(getByTestId('beer-list')).toBeDefined();
       });
 
-      expect(queryByTestId('error-container')).toBeNull();
+      // Leave the tab. Context keeps the beers; only AllBeers unmounts.
+      await act(async () => {
+        rerender(<Harness showList={false} />);
+      });
+
+      // Hold the remount's load open so the in-flight state is observable.
+      let releaseReload: (value: unknown) => void = () => {};
+      (beerRepository.getAll as jest.Mock).mockImplementation(
+        () => new Promise(resolve => (releaseReload = resolve))
+      );
+
+      // Re-enter the tab: loadBeers sets isLoadingBeers=true immediately.
+      await act(async () => {
+        rerender(<Harness showList={true} />);
+      });
+
+      // Mid-load, with beers already in context: show the stale list, not a
+      // screen of skeletons.
       expect(queryByTestId('skeleton-loader')).toBeNull();
+      expect(getByTestId('beer-list')).toBeDefined();
+
+      await act(async () => {
+        releaseReload(mockBeers);
+      });
+
+      expect(queryByTestId('skeleton-loader')).toBeNull();
+      expect(getByTestId('beer-list')).toBeDefined();
     });
   });
 

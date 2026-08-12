@@ -20,6 +20,7 @@ import React from 'react';
 import { Alert, RefreshControl } from 'react-native';
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { Beerfinder } from '../Beerfinder';
+import { BeerList } from '../beer/BeerList';
 import { AppProvider } from '@/context/AppContext';
 import { beerRepository } from '@/src/database/repositories/BeerRepository';
 import { myBeersRepository } from '@/src/database/repositories/MyBeersRepository';
@@ -289,7 +290,14 @@ describe('Beerfinder Loading States', () => {
       // selectUntastedBeers subtracts queuedBeerIds as well as tastedBeers —
       // that is the double check-in guard. Every other test leaves the queue
       // empty, so passing `new Set()` at Beerfinder.tsx:63 would go unnoticed.
-      (getQueuedBeers as jest.Mock).mockResolvedValue([{ name: 'Untasted Stout' }]);
+      //
+      // The name carries a " (Bottle)" suffix on purpose. The queue API returns
+      // names like "Beer Name (Draft)" (see Beerfinder.tsx:139), which is why
+      // the match at Beerfinder.tsx:98-101 is a two-way `includes` rather than
+      // equality. An exact-match fixture let that degrade to `===` unnoticed:
+      // against real data the strict version matches nothing, the queue never
+      // syncs, queued beers reappear here and the user double-checks-in.
+      (getQueuedBeers as jest.Mock).mockResolvedValue([{ name: 'Untasted Stout (Bottle)' }]);
 
       const { getByText, queryByText, getByTestId, UNSAFE_getByType } = renderBeerfinder();
 
@@ -492,7 +500,7 @@ describe('Beerfinder Loading States', () => {
       // `refreshing` from useDataRefresh cannot reach the skeleton branch at
       // all, so no amount of toggling it exercises this. Driving the context
       // through the captured callback is what reaches the state.
-      const { getByTestId, queryByTestId, getByText } = renderBeerfinder();
+      const { getByTestId, queryByTestId, getByText, UNSAFE_getByType } = renderBeerfinder();
 
       await waitFor(() => {
         expect(getByTestId('beer-list')).toBeDefined();
@@ -510,6 +518,15 @@ describe('Beerfinder Loading States', () => {
       await act(async () => {
         reload = onDataReloaded();
       });
+
+      // Pin the precondition before asserting on it. Without this, a refactor
+      // that stopped refreshBeerData setting isLoadingBeers=true would leave
+      // all three assertions below trivially satisfied — loading never becomes
+      // true, so of course no skeleton — and this test would go on passing
+      // while silently ceasing to guard the gate it was written for. Verified:
+      // removing that setLoading from AppContext.tsx:578 survived 51/51 until
+      // this line existed.
+      expect(UNSAFE_getByType(BeerList).props.loading).toBe(true);
 
       // Mid-refresh: loading is true but we already have beers to show.
       expect(queryByTestId('skeleton-loader')).toBeNull();
