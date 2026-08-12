@@ -7,10 +7,16 @@
  * state into `<Text testID>` and exposes actions via `<Pressable>` asserts the
  * same things through the public surface a real consumer uses.
  *
- * Everything here is driven through `refreshBeerData` rather than the mount
- * effect, so no test needs to advance a timer: the mount effect swallows a
- * failure into 3 retries at 1s/2s/4s before it surfaces anything, while
- * `refreshBeerData` sets and clears its error synchronously with the load.
+ * Where a test can drive its state through `refreshBeerData`, it does — that
+ * path sets and clears its error synchronously with the load, so no timers are
+ * involved. The mount effect is different: it swallows a failure into 3 retries
+ * at 1s/2s/4s before surfacing anything, so the two tests that need the
+ * mount-flavoured error pump fake timers to get there.
+ *
+ * Pumping means advance-then-flush in a loop, not one large advance. Each retry
+ * is only scheduled once the previous rejection settles in a microtask, so a
+ * single `advanceTimersByTime` fires the first timer and stops — which makes a
+ * race silently un-reproducible and the test pass for the wrong reason.
  */
 
 import React from 'react';
@@ -165,6 +171,12 @@ describe('AppContext', () => {
         'Failed to load beer data from database'
       );
 
+      // A genuine unrecoverable launch failure must still tell the user. This
+      // pairs with the `not.toHaveBeenCalled()` in the race test below: that
+      // one alone would be satisfied by an implementation that never alerts at
+      // all, so the two together pin both edges of the alert.
+      expect(Alert.alert).toHaveBeenCalled();
+
       // The database comes back and the user presses Try Again.
       dbHealthy = true;
       await act(async () => {
@@ -242,6 +254,12 @@ describe('AppContext', () => {
 
       expect(getByTestId('beer-count').props.children).toBe('1');
       expect(getByTestId('beer-error').props.children).toBe('none');
+
+      // The alert is guarded too, not just the error state. Suppressing the
+      // error string while still firing "check your connection and restart the
+      // app" over a complete list is the same harm in a modal, and it survived
+      // until this assertion existed.
+      expect(Alert.alert).not.toHaveBeenCalled();
     });
 
     it('should surface an error when the refresh itself fails', async () => {
