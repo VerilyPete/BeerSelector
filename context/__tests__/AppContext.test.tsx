@@ -112,16 +112,70 @@ describe('AppContext', () => {
       );
 
       // The database recovers and the user presses Try Again.
-      (beerRepository.getAll as jest.Mock).mockResolvedValue(mockBeers);
+      //
+      // The recovered list is deliberately a DIFFERENT length from the one the
+      // mount loaded. Recovering to the same 1-element fixture makes the row
+      // count '1' at every point in this test — before the failure, during it
+      // (the throw happens inside Promise.all, before setBeers) and after — so
+      // the assertion would hold whether or not anything was actually
+      // reloaded. An implementation that cleared the error and skipped the
+      // reload passed with the identical fixture.
+      (beerRepository.getAll as jest.Mock).mockResolvedValue([
+        ...mockBeers,
+        { ...mockBeers[0], id: '2', brew_name: 'Recovered Stout' },
+      ]);
 
       await act(async () => {
         fireEvent.press(getByTestId('refresh'));
       });
 
-      // Both assertions matter. Without the row count, a bare clearErrors()
-      // that never reloaded anything would satisfy this test.
+      // Both assertions matter, and the second only earns its place because
+      // the recovered list differs: it fails on an implementation that clears
+      // the error without committing fresh rows.
+      expect(getByTestId('beer-error').props.children).toBe('none');
+      expect(getByTestId('beer-count').props.children).toBe('2');
+    });
+
+    it('should not re-raise the error after a later load has already succeeded', async () => {
+      // The mount effect retries a failed load 3x at 1s/2s/4s and then sets
+      // beerError unconditionally, knowing nothing about loads that happened
+      // meanwhile. A transient failure (SQLITE_BUSY under DatabaseLockManager
+      // contention at launch is exactly this) therefore ends with the retry
+      // chain painting a full-screen error and a "restart the app" alert over
+      // a complete, freshly-loaded list.
+      let dbHealthy = false;
+      (beerRepository.getAll as jest.Mock).mockImplementation(() =>
+        dbHealthy ? Promise.resolve(mockBeers) : Promise.reject(new Error('SQLITE_BUSY'))
+      );
+
+      const { getByTestId } = renderProbe();
+
+      // First mount attempt fails and schedules a retry.
+      await act(async () => {});
+
+      // Inside the retry window the database answers and the user refreshes.
+      dbHealthy = true;
+      await act(async () => {
+        fireEvent.press(getByTestId('refresh'));
+      });
+
       expect(getByTestId('beer-error').props.children).toBe('none');
       expect(getByTestId('beer-count').props.children).toBe('1');
+
+      // The transient fault returns, and the background retries exhaust
+      // against it. They must not overwrite the good state already on screen.
+      dbHealthy = false;
+      // Each retry is only *scheduled* once the previous rejection settles in a
+      // microtask, so one large advance fires only the first timer. Pump
+      // advance-then-flush repeatedly to walk the whole 1s/2s/4s chain.
+      for (let i = 0; i < 6; i++) {
+        await act(async () => {
+          jest.advanceTimersByTime(5000);
+        });
+      }
+
+      expect(getByTestId('beer-count').props.children).toBe('1');
+      expect(getByTestId('beer-error').props.children).toBe('none');
     });
 
     it('should surface an error when the refresh itself fails', async () => {

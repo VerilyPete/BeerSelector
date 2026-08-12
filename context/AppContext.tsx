@@ -33,6 +33,7 @@ import React, {
   useEffect,
   useCallback,
   useMemo,
+  useRef,
   ReactNode,
 } from 'react';
 import { Alert } from 'react-native';
@@ -434,6 +435,14 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
    * Used by both mount effect and refreshBeerData()
    * Avoids code duplication and ensures consistent loading behavior
    */
+  /**
+   * True once any load has committed data to context. The mount effect's retry
+   * chain outlives the load that started it — a transient fault can have the
+   * chain still running while a manual refresh succeeds — and its final-failure
+   * branch would otherwise raise a fatal error over a fully populated list.
+   */
+  const hasLoadedBeerData = useRef(false);
+
   const loadBeerDataFromDatabase = useCallback(async () => {
     // Load all data in parallel for better performance
     const [allBeersData, tastedBeersData, rewardsData] = await Promise.all([
@@ -449,6 +458,8 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       rewards: rewardsData,
       queuedBeerIds: prev.queuedBeerIds,
     }));
+
+    hasLoadedBeerData.current = true;
 
     console.log(
       `[AppContext] Loaded beer data: ${allBeersData.length} all beers, ${tastedBeersData.length} tasted beers, ${rewardsData.length} rewards`
@@ -500,6 +511,20 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
           }, delay);
           timers.add(timer);
         } else if (!isCancelled) {
+          // A load that started before this chain gave up may have succeeded
+          // meanwhile — a manual refresh inside the 7s retry window is the
+          // ordinary case, and SQLITE_BUSY contention at launch makes it a
+          // transient fault, not a permanent one. Raising the fatal error here
+          // would paint a full-screen failure and a "restart the app" alert
+          // over a complete, freshly loaded list. The data on screen is good;
+          // say nothing.
+          if (hasLoadedBeerData.current) {
+            console.log(
+              '[AppContext] Retries exhausted, but a later load already succeeded - keeping data'
+            );
+            return;
+          }
+
           // Final failure after all retries
           const errorMessage = 'Failed to load beer data from database';
           setBeerError(errorMessage);
