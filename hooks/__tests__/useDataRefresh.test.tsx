@@ -96,9 +96,40 @@ describe('useDataRefresh', () => {
 
     expect(Alert.alert).toHaveBeenCalledTimes(1);
 
-    // And the one alert must not claim the refresh worked.
     const [, body] = (Alert.alert as jest.Mock).mock.calls[0];
+    // The one alert must not claim the refresh worked...
     expect(body).not.toMatch(/^Refreshed/);
+    // ...and must still carry the second fact. Asserting only the call count
+    // let the merged warning be deleted outright: the user would be told the
+    // connection failed with no hint that the list in front of them is stale,
+    // which is the silent half restored.
+    expect(body).toContain('could not be reloaded either');
+  });
+
+  it('should name each failed source when only some of them failed', async () => {
+    // The partial-error branch was deletable with the entire 103-suite run
+    // green. Nothing anywhere drove `hasErrors` with `allNetworkErrors: false`
+    // against this hook — `refreshErrorMessages` is tested as a pure builder,
+    // never as something a user is shown.
+    (manualRefreshAllData as jest.Mock).mockResolvedValue({
+      hasErrors: true,
+      allNetworkErrors: false,
+      allBeersResult: { success: false, error: { type: 'TIMEOUT_ERROR', message: 'timed out' } },
+      myBeersResult: { success: true },
+      rewardsResult: { success: true },
+    });
+    const onDataReloaded = jest.fn().mockResolvedValue(undefined);
+
+    await pressRefresh(onDataReloaded);
+
+    expect(Alert.alert).toHaveBeenCalledTimes(1);
+    const [title, body] = (Alert.alert as jest.Mock).mock.calls[0];
+    expect(title).toBe('Data Refresh Error');
+    // The source that failed is named, and the ones that did not are absent —
+    // an empty-bodied "There were problems" dialog is what this branch used to
+    // produce when a source was left out of the builder.
+    expect(body).toContain('All Beer data');
+    expect(body).not.toContain('Rewards data');
   });
 
   it('should tell the user when reloading local data fails', async () => {

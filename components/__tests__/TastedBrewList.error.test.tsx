@@ -39,13 +39,13 @@ jest.mock('@/hooks/useBeerFilters');
 jest.mock('@/hooks/useDataRefresh');
 jest.mock('@/hooks/useOptimisticCheckIn');
 jest.mock('@/hooks/useDebounce', () => ({
-  useDebounce: (value: any) => value,
+  useDebounce: <T,>(value: T) => value,
 }));
 jest.mock('@/hooks/useColorScheme', () => ({
   useColorScheme: jest.fn(() => 'light'),
 }));
 jest.mock('../beer/SkeletonLoader', () => ({
-  SkeletonLoader: ({ count }: any) => {
+  SkeletonLoader: ({ count }: { count: number }) => {
     const React = require('react');
     const { View, Text } = require('react-native');
     return (
@@ -94,7 +94,7 @@ describe('TastedBrewList error recovery', () => {
     (myBeersRepository.getAll as jest.Mock).mockResolvedValue(mockTastedBeers);
     (rewardsRepository.getAll as jest.Mock).mockResolvedValue([]);
 
-    (useBeerFilters as jest.Mock).mockImplementation((beers: any) => ({
+    (useBeerFilters as jest.Mock).mockImplementation((beers: unknown[] | undefined) => ({
       filteredBeers: beers ?? [],
       containerFilter: 'all',
       sortBy: 'date',

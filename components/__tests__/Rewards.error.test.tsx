@@ -125,13 +125,17 @@ describe('Rewards error state', () => {
     // must not appear as the empty state underneath a load failure either.
     (rewardsRepository.getAll as jest.Mock).mockRejectedValue(new Error('rewards table gone'));
 
-    const { getByText, queryByText } = renderRewards();
+    const { getByText, getByTestId, queryByText } = renderRewards();
 
     await waitFor(() => {
       expect(getByText('Failed to load rewards from database')).toBeDefined();
     });
 
     expect(queryByText('No Rewards Yet')).toBeNull();
+    // The list still exists — this is suppression of the empty state, not the
+    // old full-screen takeover, which also hid "No Rewards Yet" and would
+    // otherwise satisfy the assertion above.
+    expect(getByTestId('rewards-list')).toBeDefined();
   });
 
   it('should re-read the database, not the network, when try again is pressed', async () => {
@@ -183,6 +187,79 @@ describe('Rewards error state', () => {
       getByTestId('rewards-list').props.refreshControl.props.onRefresh();
     });
 
-    expect(Alert.alert).toHaveBeenCalled();
+    // The message pair, not merely "an alert fired" — a mutant that swapped
+    // this for Alert.alert('Rewards Updated', 'Your rewards are up to date.')
+    // kept the suite green, in the test named for a failure.
+    expect(Alert.alert).toHaveBeenCalledWith(
+      'Rewards Refresh Failed',
+      'Could not refresh your rewards. Please try again.'
+    );
+  });
+
+  it('should not report a failure the user did not ask for after a queued reward', async () => {
+    // `queueReward` reuses the pull-to-refresh handler as a post-write sync.
+    // Once that handler learned to alert, a reward the server accepted (HTTP
+    // 200, "added to your queue!") could be followed by a second modal on top
+    // saying the refresh failed — inviting the user to retry an operation that
+    // already went through. One user action, two alerts, the worse one last:
+    // exactly the shape this PR removed from useDataRefresh.
+    // Driven through the real path — tap the reward, confirm the dialog — so
+    // the test cannot pass by way of a seam production does not have.
+    (getSessionData as jest.Mock).mockResolvedValue({
+      memberId: 'm1',
+      storeId: 's1',
+      storeName: 'Test Saucer',
+      sessionId: 'sess',
+      username: 'tester',
+      firstName: 'Test',
+      lastName: 'User',
+      email: 'test@example.com',
+      cardNum: '1',
+    });
+    // The queue itself succeeds: HTTP 200 with an empty body is the branch the
+    // server actually takes.
+    global.fetch = jest.fn().mockResolvedValue({ ok: true, text: async () => '' }) as jest.Mock;
+    // ...and the sync that follows it fails.
+    (fetchRewardsFromAPI as jest.Mock).mockResolvedValue({
+      status: 'unavailable',
+      reason: { code: 'NETWORK_ERROR', detail: 'offline' },
+    });
+
+    const { getByText } = renderRewards();
+
+    await waitFor(() => {
+      expect(getByText('Free Plate')).toBeDefined();
+    });
+
+    await act(async () => {
+      fireEvent.press(getByText('Free Plate'));
+    });
+
+    // Confirm the "Queue Reward" dialog by invoking the button the component
+    // handed to Alert.alert.
+    const confirm = (Alert.alert as jest.Mock).mock.calls
+      .flatMap(([, , buttons]) => buttons ?? [])
+      .find((button: { text?: string }) => button?.text === 'Queue It!');
+    expect(confirm).toBeDefined();
+
+    await act(async () => {
+      await confirm.onPress();
+    });
+
+    expect(Alert.alert).toHaveBeenCalledWith('Success', expect.stringContaining('queue'));
+    expect(Alert.alert).not.toHaveBeenCalledWith('Rewards Refresh Failed', expect.anything());
+  });
+
+  it('should not show the failure banner when nothing has failed', async () => {
+    // The banner lives in the list header now, so "render it unconditionally"
+    // is a live mutant: an empty bordered error box with a working TRY AGAIN
+    // button, permanently mounted above every healthy member's reward log.
+    const { getByText, queryByTestId } = renderRewards();
+
+    await waitFor(() => {
+      expect(getByText('Free Plate')).toBeDefined();
+    });
+
+    expect(queryByTestId('reward-error-banner')).toBeNull();
   });
 });

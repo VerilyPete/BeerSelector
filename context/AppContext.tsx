@@ -466,14 +466,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
    * Used by both mount effect and refreshBeerData()
    * Avoids code duplication and ensures consistent loading behavior
    */
-  const loadBeerDataFromDatabase = useCallback(async () => {
-    // Claim a generation before reading. Loads overlap — the mount retry chain
-    // runs for up to 7s while pull-to-refresh, Try Again and the settings login
-    // flow all call in — and a slow one that settles late must not commit its
-    // stale answer over a newer one that already finished. Reads are not
-    // cancellable, so the guard is at the write.
-    const generation = ++loadGeneration.current;
-
+  const loadBeerDataFromDatabase = useCallback(async (generation: number) => {
     // Load all data in parallel for better performance.
     //
     // The rewards read is caught separately rather than sharing the others'
@@ -498,21 +491,30 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       ),
     ]);
 
-    // A newer load started while this one was in flight, so its answer is the
-    // current truth and ours is history. Commit nothing — not the rows, not the
-    // rewards error, not the latch. Without this, a mount load whose rewards
-    // query sat on a lock for ten seconds would surface a full-screen rewards
-    // error over data a manual refresh had already loaded correctly, and there
-    // is no retry chain behind `rewardError` to undo it.
+    // A newer load has claimed a generation since this one started, so this
+    // result is history. Commit nothing — not the rows, not the rewards error,
+    // not the latch. Without this, a mount load whose rewards query sat on a
+    // lock for ten seconds would surface a full-screen rewards error over data
+    // a manual refresh had already loaded correctly, and there is no retry
+    // chain behind `rewardError` to undo it.
+    //
+    // "Claimed", not "committed": the newer load may still be in flight, or may
+    // yet fail. Either way it owns the outcome, and the caller must treat this
+    // return as no outcome at all rather than as a success — see the callers.
     if (generation !== loadGeneration.current) {
-      console.log('[AppContext] Discarding a superseded load; a newer one already committed');
+      console.log('[AppContext] Discarding a superseded load; a newer one has started');
       return { superseded: true as const };
     }
 
     // Update state with all data at once, preserving queuedBeerIds — and, when
-    // the rewards read failed, the rewards already in context. Writing [] there
-    // would put "No Rewards Yet" under the failure banner on Rewards.tsx, which
-    // is the same lie the swallowed repository error used to tell.
+    // the rewards read failed, the rewards already in context.
+    //
+    // Writing [] would blank rewards the user may be reading, replacing them
+    // with nothing beside a banner that says only that the last read failed.
+    // (It would NOT produce "No Rewards Yet": Rewards.tsx suppresses its empty
+    // state while `rewardError` is set. An earlier version of this comment
+    // claimed that, and the two changes ended up justifying each other in a
+    // circle — the reason to keep the rows is the rows, not the caption.)
     setBeers(prev => ({
       allBeers: allBeersData,
       tastedBeers: tastedBeersData,
@@ -559,9 +561,23 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     const loadBeerData = async (): Promise<void> => {
       if (isCancelled) return;
 
+      // Claimed here, not inside the read, because ownership has to span this
+      // whole try/catch/finally. A load that loses the race must not clear the
+      // winner's error, must not raise its own, and must not lower the loading
+      // flag out from under the load still running.
+      const generation = ++loadGeneration.current;
+
       try {
         setLoading(prev => ({ ...prev, isLoadingBeers: true }));
-        await loadBeerDataFromDatabase();
+        const outcome = await loadBeerDataFromDatabase(generation);
+
+        // Superseded is not success. Returning here without clearing the error
+        // is the point: a newer load owns the outcome, and if that newer load
+        // FAILED, its error is the one the user should still be looking at.
+        // Treating this as a success cleared it and exited the retry chain,
+        // leaving no data, no error and nothing pending.
+        if (outcome.superseded) return;
+
         setBeerError(null); // Clear error on success
         console.log('[AppContext] Beer data loaded successfully');
       } catch (error) {
@@ -569,6 +585,15 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
           `[AppContext] Error loading beer data (attempt ${retryCount + 1}/${maxRetries + 1}):`,
           error
         );
+
+        // A stale rejection is history too. The generation check inside the
+        // read is skipped when the read throws, so without this a load that
+        // lost the race would still retry and still raise a fatal error over
+        // whatever the winner committed.
+        if (generation !== loadGeneration.current) {
+          console.log('[AppContext] Ignoring a superseded load failure; a newer load has started');
+          return;
+        }
 
         if (retryCount < maxRetries && !isCancelled) {
           retryCount++;
@@ -612,7 +637,12 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         }
       } finally {
         if (isCancelled) return;
-        setLoading(prev => ({ ...prev, isLoadingBeers: false }));
+        // Only the newest load lowers the flag. A superseded load doing it
+        // retracts the skeleton while the load that actually owns the screen is
+        // still reading.
+        if (generation === loadGeneration.current) {
+          setLoading(prev => ({ ...prev, isLoadingBeers: false }));
+        }
       }
     };
 
@@ -671,16 +701,34 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
    * Uses shared loading function to avoid code duplication
    */
   const refreshBeerData = useCallback(async () => {
+    // Same ownership rule as the mount effect: this refresh owns the error and
+    // the loading flag only for as long as no newer load has been claimed. Two
+    // overlapping refreshes are ordinary — Rewards' Try Again beside its own
+    // pull-to-refresh, FINDER's pull-to-refresh beside AllBeers' Try Again.
+    const generation = ++loadGeneration.current;
+
     try {
       setLoading(prev => ({ ...prev, isLoadingBeers: true }));
-      await loadBeerDataFromDatabase();
+      const outcome = await loadBeerDataFromDatabase(generation);
+      if (outcome.superseded) return;
+
       setBeerError(null); // Clear error on success — mirrors the mount effect
       console.log('[AppContext] Refreshed beer data from database');
     } catch (error) {
       console.error('[AppContext] Error refreshing beer data:', error);
+
+      // A rejection that lost the race is history: raising it here would paint
+      // a full-screen error over rows a newer refresh had just committed.
+      if (generation !== loadGeneration.current) {
+        console.log('[AppContext] Ignoring a superseded refresh failure');
+        return;
+      }
+
       setBeerError('Failed to refresh beer data from database');
     } finally {
-      setLoading(prev => ({ ...prev, isLoadingBeers: false }));
+      if (generation === loadGeneration.current) {
+        setLoading(prev => ({ ...prev, isLoadingBeers: false }));
+      }
     }
   }, [loadBeerDataFromDatabase]);
 

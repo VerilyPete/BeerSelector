@@ -333,16 +333,16 @@ describe('AppContext', () => {
     });
 
     it('should keep the rewards it already had', async () => {
-      // Same rule the beer list gets from the refresh-failure test below it:
-      // a failed re-read must not empty what is already on screen. Writing []
-      // beside the error puts "No Rewards Yet" under the failure banner on
-      // Rewards.tsx — the same lie the swallowed repository error used to tell.
+      // Same rule the beer list gets from the refresh-failure test below it: a
+      // failed re-read must not empty what is already on screen. Rewards.tsx
+      // reports the failure as a banner above the list, so these rows stay
+      // readable next to it; writing [] would take them away and leave the
+      // banner explaining nothing.
       //
-      // An earlier version of this comment claimed that outcome while the
-      // screen could not produce it: `rewardError` took the whole screen over,
-      // so neither the rewards nor the empty state rendered at all, and this
-      // preservation was unobservable. Rewards.tsx now reports the failure in
-      // place, which is what makes the rows worth keeping.
+      // This preservation was unobservable when it was written — `rewardError`
+      // took the whole screen over, so neither the rows nor any empty state
+      // rendered. The sibling change to Rewards.tsx is what gives it a
+      // consequence a user can see.
       (rewardsRepository.getAll as jest.Mock).mockResolvedValue(mockRewards);
 
       const { getByTestId } = renderProbe();
@@ -404,6 +404,104 @@ describe('AppContext', () => {
 
       expect(getByTestId('reward-error').props.children).toBe('none');
       expect(getByTestId('reward-count').props.children).toBe('1');
+    });
+
+    it('should not clear a newer failure when a stale load finishes', async () => {
+      // The mirror image of the two tests around this one, and a defect the
+      // first version of the generation guard introduced: it stopped the stale
+      // load COMMITTING, but the stale load still returned normally, so its
+      // caller ran the success tail and cleared an error a newer load had
+      // legitimately raised.
+      //
+      // This is the lock-contention case the guard exists for, with the roles
+      // reversed: the mount read parks on the lock, the refresh the user
+      // triggers fails fast *because* the mount read holds it, and then the
+      // mount read answers. Result before the fix: the error screen vanished
+      // seconds after a refresh genuinely failed, leaving no data, no error,
+      // no spinner and no retry — the retry chain having exited as a success.
+      let releaseMountRead: ((rows: typeof mockBeers) => void) | undefined;
+      (beerRepository.getAll as jest.Mock).mockImplementationOnce(
+        () =>
+          new Promise(resolve => {
+            releaseMountRead = resolve;
+          })
+      );
+
+      const { getByTestId } = renderProbe();
+
+      // Checked, not assumed: if the parked implementation were never consumed
+      // the release below would be a silent no-op and this test would pass
+      // having exercised nothing.
+      expect(releaseMountRead).toBeDefined();
+
+      (beerRepository.getAll as jest.Mock).mockRejectedValue(new Error('SQLITE_BUSY'));
+
+      await act(async () => {
+        fireEvent.press(getByTestId('refresh'));
+      });
+
+      expect(getByTestId('beer-error').props.children).toBe(
+        'Failed to refresh beer data from database'
+      );
+
+      // The parked mount read finally answers, with good rows and a dead
+      // generation. It owns nothing now.
+      await act(async () => {
+        releaseMountRead?.(mockBeers);
+      });
+
+      expect(getByTestId('beer-error').props.children).toBe(
+        'Failed to refresh beer data from database'
+      );
+    });
+
+    it('should not raise an error from a stale rejection over newer good data', async () => {
+      // The other half of the same hole. The generation check sat AFTER the
+      // await, so it was skipped entirely when the read rejected: a stale
+      // rejection still ran its caller's catch and painted a full-screen error
+      // over data a newer load had just committed correctly.
+      //
+      // Two overlapping refreshes are ordinary — Rewards TRY AGAIN plus its own
+      // pull-to-refresh, or FINDER pull-to-refresh plus AllBeers Try Again.
+      const { getByTestId } = renderProbe();
+
+      await waitFor(() => {
+        expect(getByTestId('beer-count').props.children).toBe('1');
+      });
+
+      let failStaleRefresh: (() => void) | undefined;
+      (beerRepository.getAll as jest.Mock).mockImplementationOnce(
+        () =>
+          new Promise((_resolve, reject) => {
+            failStaleRefresh = () => reject(new Error('db gone'));
+          })
+      );
+
+      await act(async () => {
+        fireEvent.press(getByTestId('refresh'));
+      });
+
+      expect(failStaleRefresh).toBeDefined();
+
+      // A newer refresh overtakes it and succeeds.
+      (beerRepository.getAll as jest.Mock).mockResolvedValue([
+        ...mockBeers,
+        { ...mockBeers[0], id: '2', brew_name: 'Newer Stout' },
+      ]);
+
+      await act(async () => {
+        fireEvent.press(getByTestId('refresh'));
+      });
+
+      expect(getByTestId('beer-count').props.children).toBe('2');
+
+      // The overtaken refresh now fails. Its failure is history.
+      await act(async () => {
+        failStaleRefresh?.();
+      });
+
+      expect(getByTestId('beer-error').props.children).toBe('none');
+      expect(getByTestId('beer-count').props.children).toBe('2');
     });
 
     it('should not let a stale load overwrite newer rows', async () => {
