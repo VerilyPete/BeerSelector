@@ -454,28 +454,57 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
    * Avoids code duplication and ensures consistent loading behavior
    */
   const loadBeerDataFromDatabase = useCallback(async () => {
-    // Load all data in parallel for better performance
-    const [allBeersData, tastedBeersData, rewardsData] = await Promise.all([
+    // Load all data in parallel for better performance.
+    //
+    // The rewards read is caught separately rather than sharing the others'
+    // rejection. Rewards are the least load-bearing of the three — nothing in
+    // the 200 Beer Challenge depends on them — so an unreadable rewards table
+    // must not blank the catalog and the tasted list, which is what one
+    // Promise.all did: the whole load failed, the mount effect spent 7s
+    // retrying, and the user was told "Failed to load beer data from database",
+    // naming the wrong subsystem and offering nothing to act on.
+    //
+    // It goes to `rewardError` instead, which `Rewards.tsx` already renders and
+    // which nothing in the app had ever written.
+    const [allBeersData, tastedBeersData, rewardsOutcome] = await Promise.all([
       beerRepository.getAll(),
       myBeersRepository.getAll(),
-      rewardsRepository.getAll(),
+      rewardsRepository.getAll().then(
+        rewards => ({ loaded: true as const, rewards }),
+        (error: unknown) => {
+          console.error('[AppContext] Error loading rewards from database:', error);
+          return { loaded: false as const };
+        }
+      ),
     ]);
 
-    // Update state with all data at once, preserving queuedBeerIds
+    // Update state with all data at once, preserving queuedBeerIds — and, when
+    // the rewards read failed, the rewards already in context. Writing [] there
+    // would render "no rewards earned" underneath "rewards could not be
+    // loaded", which is the same lie the swallowed error used to tell.
     setBeers(prev => ({
       allBeers: allBeersData,
       tastedBeers: tastedBeersData,
-      rewards: rewardsData,
+      rewards: rewardsOutcome.loaded ? rewardsOutcome.rewards : prev.rewards,
       queuedBeerIds: prev.queuedBeerIds,
     }));
+
+    // Called, not listed in the dependency array below — the same way the
+    // retry chain and `refreshBeerData` already use `setBeerError`. Both are
+    // `useCallback([])`, so their identities never change and listing them
+    // would be inert; keeping this callback's dependencies empty is what makes
+    // the `hasLoadedBeerData` latch above sound, so the omission is deliberate
+    // rather than an oversight for a later `--fix` to tidy up.
+    setRewardError(rewardsOutcome.loaded ? null : 'Failed to load rewards from database');
 
     hasLoadedBeerData.current = true;
 
     console.log(
-      `[AppContext] Loaded beer data: ${allBeersData.length} all beers, ${tastedBeersData.length} tasted beers, ${rewardsData.length} rewards`
+      `[AppContext] Loaded beer data: ${allBeersData.length} all beers, ${tastedBeersData.length} tasted beers, ` +
+        (rewardsOutcome.loaded ? `${rewardsOutcome.rewards.length} rewards` : 'rewards unreadable')
     );
 
-    return { allBeersData, tastedBeersData, rewardsData };
+    return { allBeersData, tastedBeersData, rewardsOutcome };
   }, []);
 
   /**

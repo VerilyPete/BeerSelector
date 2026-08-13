@@ -293,29 +293,40 @@ describe('RewardsRepository', () => {
       expect(result).toEqual([]);
     });
 
-    it('should return empty array on database error', async () => {
+    it('should throw error on database failure', async () => {
+      // This asserted the opposite until 2026-08-13: a failed query was
+      // swallowed and reported as an empty reward list. Every sibling on this
+      // repository (getByType, getRedeemed, getUnredeemed) and the same method
+      // on BeerRepository and MyBeersRepository rethrow — getAll was the lone
+      // outlier, and it is the one the app actually calls on every load.
+      //
+      // The cost of the swallow was not a lost console line. "Your rewards
+      // table is unreadable" and "you have earned no rewards" render
+      // identically to a member, and the second is a plausible thing to see, so
+      // there was nothing to notice. Rewards.tsx has an error branch; nothing
+      // could reach it.
       const mockDatabase = createMockDatabase();
       (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
       jest.spyOn(console, 'error').mockImplementation();
       mockDatabase.getAllAsync.mockRejectedValueOnce(new Error('Database error'));
 
-      const result = await repository.getAll();
-
-      expect(result).toEqual([]);
+      await expect(repository.getAll()).rejects.toThrow('Database error');
     });
 
-    it('should handle database returning null', async () => {
+    it('should throw when the database hands back a null row set', async () => {
+      // getAllAsync should never return null. If it does, `rows.filter` raises
+      // a TypeError, and that now propagates like any other read failure
+      // instead of being laundered into an empty list — the same thing
+      // BeerRepository.getAll does with the same input.
       const mockDatabase = createMockDatabase();
       (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
+      jest.spyOn(console, 'error').mockImplementation();
 
       mockDatabase.getAllAsync.mockResolvedValue(null);
 
-      const result = await repository.getAll();
-
-      // getAllAsync should never return null, but if it does, the code returns it as-is
-      expect(result).toEqual([]); // When getAllAsync returns null, catch block returns []
+      await expect(repository.getAll()).rejects.toThrow(TypeError);
     });
   });
 

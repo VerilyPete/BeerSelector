@@ -66,6 +66,8 @@ describe('AppContext', () => {
         <Text testID="beer-error">{errors.beerError ?? 'none'}</Text>
         <Text testID="beer-count">{String(beers.allBeers.length)}</Text>
         <Text testID="beer-loading">{String(loading.isLoadingBeers)}</Text>
+        <Text testID="reward-error">{errors.rewardError ?? 'none'}</Text>
+        <Text testID="reward-count">{String(beers.rewards.length)}</Text>
         <Pressable
           testID="refresh"
           onPress={() => {
@@ -286,6 +288,97 @@ describe('AppContext', () => {
       // whole suite green: pull-to-refresh with the database down emptied the
       // list behind the error screen, and nothing noticed.
       expect(getByTestId('beer-count').props.children).toBe('1');
+    });
+  });
+
+  describe('a failing rewards read', () => {
+    const mockRewards = [{ reward_id: 'r1', redeemed: '0', reward_type: 'plate' }];
+
+    it('should not take the beer list down with it', async () => {
+      // All three repositories shared one Promise.all, so an unreadable rewards
+      // table failed the whole load: the catalog and the tasted list went with
+      // it, the user got a full-screen "Failed to load beer data from
+      // database" naming the wrong subsystem, and the mount effect spent 7s
+      // retrying a read that was never going to succeed.
+      //
+      // Rewards are the least load-bearing of the three — the 200 Beer
+      // Challenge does not depend on them — so they must not be able to blank
+      // the two that are.
+      (rewardsRepository.getAll as jest.Mock).mockRejectedValue(new Error('rewards table gone'));
+
+      const { getByTestId } = renderProbe();
+
+      await waitFor(() => {
+        expect(getByTestId('beer-count').props.children).toBe('1');
+      });
+
+      expect(getByTestId('beer-error').props.children).toBe('none');
+    });
+
+    it('should tell the user the rewards failed', async () => {
+      // `setRewardError` existed and had no caller anywhere in the app, so
+      // `errors.rewardError` was read by Rewards.tsx's error branch and written
+      // by nothing: a rewards failure could not reach the user by any path.
+      // Before this, the repository swallowed the error and returned [], and
+      // the screen said "no rewards" to a member who had earned them.
+      (rewardsRepository.getAll as jest.Mock).mockRejectedValue(new Error('rewards table gone'));
+
+      const { getByTestId } = renderProbe();
+
+      await waitFor(() => {
+        expect(getByTestId('reward-error').props.children).toBe(
+          'Failed to load rewards from database'
+        );
+      });
+    });
+
+    it('should keep the rewards it already had', async () => {
+      // Same rule the beer list gets from the refresh-failure test below it:
+      // a failed re-read must not empty what is already on screen. Writing []
+      // beside the error would show "no rewards earned" underneath "rewards
+      // could not be loaded".
+      (rewardsRepository.getAll as jest.Mock).mockResolvedValue(mockRewards);
+
+      const { getByTestId } = renderProbe();
+
+      await waitFor(() => {
+        expect(getByTestId('reward-count').props.children).toBe('1');
+      });
+
+      (rewardsRepository.getAll as jest.Mock).mockRejectedValue(new Error('rewards table gone'));
+
+      await act(async () => {
+        fireEvent.press(getByTestId('refresh'));
+      });
+
+      expect(getByTestId('reward-error').props.children).toBe(
+        'Failed to load rewards from database'
+      );
+      expect(getByTestId('reward-count').props.children).toBe('1');
+    });
+
+    it('should clear the rewards error once a later read succeeds', async () => {
+      // The exit. This is the bug #17 fixed for `beerError` — set on failure,
+      // never cleared on success, so the error screen outlived the failure —
+      // and there is no reason for `rewardError` to repeat it.
+      (rewardsRepository.getAll as jest.Mock).mockRejectedValue(new Error('rewards table gone'));
+
+      const { getByTestId } = renderProbe();
+
+      await waitFor(() => {
+        expect(getByTestId('reward-error').props.children).toBe(
+          'Failed to load rewards from database'
+        );
+      });
+
+      (rewardsRepository.getAll as jest.Mock).mockResolvedValue(mockRewards);
+
+      await act(async () => {
+        fireEvent.press(getByTestId('refresh'));
+      });
+
+      expect(getByTestId('reward-error').props.children).toBe('none');
+      expect(getByTestId('reward-count').props.children).toBe('1');
     });
   });
 });

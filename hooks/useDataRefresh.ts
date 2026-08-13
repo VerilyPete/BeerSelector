@@ -30,11 +30,6 @@ export type UseDataRefreshResult = {
   refreshing: boolean;
 
   /**
-   * Error message from the last refresh operation, if any
-   */
-  error: string | null;
-
-  /**
    * Function to trigger a manual refresh of all data types
    * Handles API URL configuration check, network errors, and partial errors
    */
@@ -57,13 +52,18 @@ export type UseDataRefreshResult = {
  * 5. Reloads local data from database (even on partial success)
  * 6. Updates component state via onDataReloaded callback
  *
+ * Every failure it can see is alerted. It used to return an `error` string as
+ * well, which no caller ever destructured — so the one failure reported only
+ * that way (a local re-read that throws after a successful fetch) reached
+ * nobody at all. The alert is now the whole contract; there is no second,
+ * silent channel to forget to read.
+ *
  * @example
  * ```tsx
- * const { refreshing, handleRefresh, error } = useDataRefresh({
+ * const { refreshing, handleRefresh } = useDataRefresh({
  *   onDataReloaded: async () => {
  *     const beers = await getAllBeers();
  *     setAllBeers(beers);
- *     setError(null);
  *   },
  *   componentName: 'AllBeers'
  * });
@@ -84,7 +84,6 @@ export const useDataRefresh = ({
   componentName = 'Component',
 }: UseDataRefreshParams): UseDataRefreshResult => {
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   /**
    * Handle manual refresh triggered by user pull-to-refresh gesture
@@ -154,12 +153,19 @@ export const useDataRefresh = ({
           console.log(`All data refreshed successfully from ${componentName} tab`);
         }
       } catch (localError: unknown) {
+        // Alerted, not just recorded. This branch wrote to an `error` state
+        // that no consumer of this hook destructures, so a refresh that fetched
+        // fine and then failed to re-read the database was indistinguishable
+        // from one with nothing new to show: spinner retracts, stale rows stay,
+        // user told nothing.
         console.error('Error loading local beer data after refresh:', localError);
-        setError('Failed to load beer data from local storage.');
+        Alert.alert(
+          'Error',
+          'Refreshed, but the updated data could not be loaded from this device. What you see may be out of date.'
+        );
       }
     } catch (error: unknown) {
       console.error(`Error in unified refresh from ${componentName}:`, error);
-      setError('Failed to refresh beer data. Please try again later.');
       Alert.alert('Error', 'Failed to refresh beer data. Please try again later.');
     } finally {
       setRefreshing(false);
@@ -168,7 +174,6 @@ export const useDataRefresh = ({
 
   return {
     refreshing,
-    error,
     handleRefresh,
   };
 };
