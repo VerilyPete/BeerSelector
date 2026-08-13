@@ -344,6 +344,8 @@ export const Rewards = () => {
   const refreshInFlight = useRef(false);
   /** Whether the refresh in flight owes anyone a failure report. */
   const notifyOnFailureRef = useRef(false);
+  /** Whether someone asked for a refresh while one was already running. */
+  const rerunRequested = useRef(false);
   const [queueingRewards, setQueueingRewards] = useState<Record<string, boolean>>({});
 
   const colorScheme = useColorScheme() ?? 'dark';
@@ -375,52 +377,70 @@ export const Rewards = () => {
         // look exactly like a refresh that worked. Whoever asked to be told
         // gets told.
         notifyOnFailureRef.current = notifyOnFailureRef.current || notifyOnFailure;
+        // And the WORK is deferred, not dropped. The in-flight fetch may have
+        // started before whatever prompted this call — a reward queued a moment
+        // ago — so its snapshot can be older than the change this call exists
+        // to pick up. Dropping it left a just-queued reward showing as
+        // AVAILABLE with nothing wrong anywhere.
+        rerunRequested.current = true;
         console.log('[Rewards] Refresh already in progress, joining it');
         return;
       }
       refreshInFlight.current = true;
       notifyOnFailureRef.current = notifyOnFailure;
+      rerunRequested.current = false;
 
-      // Outside the try, and not awaited: haptics failing is not a refresh
-      // failing. Inside, it was the one thing in a visitor's code path that
-      // could reject, which would have reported "could not refresh your
-      // rewards" for a refresh that never attempted anything.
+      // Not awaited, here or anywhere else on this screen: haptics failing is
+      // not the operation failing. Awaited inside a try, it reported "could not
+      // refresh your rewards" for a refresh that never attempted anything — and
+      // worse, as the first statement of `queueReward`'s CATCH it jumped past
+      // the `Alert.alert` beneath it, so a failed check-in told the user
+      // nothing at all and the rejection escaped an onPress handler. Feedback
+      // about a failure must not depend on the vibration motor.
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
 
       try {
         setRefreshing(true);
 
-        if (!session.isVisitor) {
-          const source = await fetchRewardsFromAPI();
+        // Runs again for any request absorbed while this one was in flight. The
+        // flag is cleared before each pass, so a request arriving mid-pass buys
+        // exactly one more and no further; a failure exits the loop rather than
+        // hammering an endpoint that just refused.
+        do {
+          rerunRequested.current = false;
 
-          // `unavailable` is an ERROR state, not an empty list — the old bare []
-          // rendered "no rewards" for a member whose request never happened.
-          if (source.status !== 'fetched') {
-            throw new Error(
-              source.status === 'unavailable'
-                ? `Rewards unavailable (${source.reason.code}): ${source.reason.detail}`
-                : `Rewards could not be fetched (${source.status})`
-            );
+          if (!session.isVisitor) {
+            const source = await fetchRewardsFromAPI();
+
+            // `unavailable` is an ERROR state, not an empty list — the old bare []
+            // rendered "no rewards" for a member whose request never happened.
+            if (source.status !== 'fetched') {
+              throw new Error(
+                source.status === 'unavailable'
+                  ? `Rewards unavailable (${source.reason.code}): ${source.reason.detail}`
+                  : `Rewards could not be fetched (${source.status})`
+              );
+            }
+            if (source.data.kind === 'malformed') {
+              throw new Error(`Rewards malformed: ${source.data.detail}`);
+            }
+            // confirmed-empty is a real state — a member with none earned yet — so
+            // it renders the empty state rather than writing or erroring.
+            if (source.data.kind === 'data') {
+              await rewardsRepository.insertMany([...source.data.items]);
+            }
+            // The fetch working is not the refresh working. `refreshBeerData`
+            // swallows its own read failures into `beerError`, which this screen
+            // does not render — so without this the sync could fail, the log
+            // would still say "synced", the spinner would retract and nothing
+            // would be said. Rethrow into the one place that reports.
+            const synced = await refreshBeerData();
+            if (!synced) {
+              throw new Error('Rewards fetched, but the local database sync failed');
+            }
+            console.log('Rewards refreshed and AppContext synced');
           }
-          if (source.data.kind === 'malformed') {
-            throw new Error(`Rewards malformed: ${source.data.detail}`);
-          }
-          // confirmed-empty is a real state — a member with none earned yet — so
-          // it renders the empty state rather than writing or erroring.
-          if (source.data.kind === 'data') {
-            await rewardsRepository.insertMany([...source.data.items]);
-          }
-          // The fetch working is not the refresh working. `refreshBeerData`
-          // swallows its own read failures into `beerError`, which this screen
-          // does not render — so without this the sync could fail, the log
-          // would still say "synced", the spinner would retract and nothing
-          // would be said. Rethrow into the one place that reports.
-          const synced = await refreshBeerData();
-          if (!synced) {
-            throw new Error('Rewards fetched, but the local database sync failed');
-          }
-          console.log('Rewards refreshed and AppContext synced');
-        }
+        } while (rerunRequested.current);
       } catch (error) {
         // Told, not just logged. This caught its own failure into a console line
         // and changed no state: the spinner retracted, the screen was identical,
@@ -469,7 +489,7 @@ export const Rewards = () => {
     async (rewardId: string, rewardType: string) => {
       try {
         setQueueingRewards(prev => ({ ...prev, [rewardId]: true }));
-        await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
 
         const sessionData = await getSessionData();
 
@@ -533,7 +553,7 @@ export const Rewards = () => {
         console.log('API Response:', responseText);
 
         if (response.ok) {
-          await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
 
           if (!responseText || responseText.trim().length < 2) {
             console.log('Empty response received from server, considering reward queue successful');
@@ -555,12 +575,12 @@ export const Rewards = () => {
 
           void refreshRewards({ notifyOnFailure: false });
         } else {
-          await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+          void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
           console.error('Failed to queue reward:', responseText);
           Alert.alert('Error', `Failed to queue the reward. Status: ${response.status}`);
         }
       } catch (err: unknown) {
-        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
         console.error('Error queuing reward:', err);
         Alert.alert(
           'Error',
@@ -575,7 +595,7 @@ export const Rewards = () => {
 
   const handleRewardPress = useCallback(
     async (item: Reward) => {
-      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
       const isRedeemed = item.redeemed === '1';
 
       if (isRedeemed) {

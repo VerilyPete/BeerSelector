@@ -658,9 +658,13 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         }
       } finally {
         if (isCancelled) return;
-        // Only the newest load lowers the flag. A superseded load doing it
-        // retracts the skeleton while the load that actually owns the screen is
-        // still reading.
+        // Only the newest load THROUGH THIS PROVIDER lowers the flag. A
+        // superseded load doing it retracts the skeleton while the load that
+        // actually owns the screen is still reading.
+        //
+        // Scoped deliberately: `AllBeers.loadBeers` also writes this flag, and
+        // `beerError`, and the rows, with no generation at all. Until task 2.1
+        // deletes it the ownership rule holds for this file, not for the app.
         if (generation === loadGeneration.current) {
           setLoading(prev => ({ ...prev, isLoadingBeers: false }));
         }

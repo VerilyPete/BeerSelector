@@ -16,6 +16,7 @@
 import React from 'react';
 import { Alert, Pressable, Text } from 'react-native';
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
+import * as Haptics from 'expo-haptics';
 import { Rewards } from '../Rewards';
 import { AppProvider, useAppContext } from '@/context/AppContext';
 import { beerRepository } from '@/src/database/repositories/BeerRepository';
@@ -384,6 +385,89 @@ describe('Rewards error state', () => {
       'Rewards Refresh Failed',
       'Could not refresh your rewards. Please try again.'
     );
+  });
+
+  it('should still say the queue failed when the haptics buzz also fails', async () => {
+    // `queueReward`'s catch opens with `await Haptics.notificationAsync(...)`.
+    // A rejection there — haptics is unavailable on web, and simulators are
+    // inconsistent — jumps past the `Alert.alert` beneath it, so the failure is
+    // reported to nobody and the rejection escapes an `onPress`. The user gets
+    // a card that quietly unlocks and no message at all. Feedback about a
+    // failure must not depend on the vibration motor.
+    (getSessionData as jest.Mock).mockResolvedValue({
+      memberId: 'm1',
+      storeId: 's1',
+      storeName: 'Test Saucer',
+      sessionId: 'sess',
+      username: 'tester',
+      firstName: 'Test',
+      lastName: 'User',
+      email: 'test@example.com',
+      cardNum: '1',
+    });
+    global.fetch = jest.fn().mockRejectedValue(new Error('network down')) as jest.Mock;
+    (Haptics.notificationAsync as jest.Mock).mockRejectedValue(new Error('no haptics'));
+
+    const { getByText } = renderRewards();
+
+    await waitFor(() => {
+      expect(getByText('Free Plate')).toBeDefined();
+    });
+
+    await act(async () => {
+      fireEvent.press(getByText('Free Plate'));
+    });
+    const confirm = (Alert.alert as jest.Mock).mock.calls
+      .flatMap(([, , buttons]) => buttons ?? [])
+      .find((button: { text?: string }) => button?.text === 'Queue It!');
+
+    await act(async () => {
+      await confirm.onPress();
+    });
+
+    expect(Alert.alert).toHaveBeenCalledWith('Error', expect.stringContaining('Failed to queue'));
+  });
+
+  it('should re-run once when a refresh is requested during another', async () => {
+    // Dropping the second caller silently is wrong in this direction too. If a
+    // pull-to-refresh is in flight when the user queues a reward, the post-queue
+    // sync is dropped — and the in-flight fetch STARTED BEFORE the queue, so it
+    // publishes a pre-queue snapshot and the correction that would have fixed
+    // it never runs. The reward stays "AVAILABLE" with no error anywhere, which
+    // is the same staleness the guard was added to prevent, reached from the
+    // other ordering.
+    let releaseFirstFetch: ((value: unknown) => void) | undefined;
+    (fetchRewardsFromAPI as jest.Mock).mockImplementationOnce(
+      () =>
+        new Promise(resolve => {
+          releaseFirstFetch = resolve;
+        })
+    );
+
+    const { getByTestId } = renderRewards();
+
+    await waitFor(() => {
+      expect(getByTestId('rewards-list')).toBeDefined();
+    });
+
+    await act(async () => {
+      getByTestId('rewards-list').props.refreshControl.props.onRefresh();
+    });
+    expect(releaseFirstFetch).toBeDefined();
+
+    // A second request arrives while the first is parked.
+    await act(async () => {
+      getByTestId('rewards-list').props.refreshControl.props.onRefresh();
+    });
+    expect(fetchRewardsFromAPI).toHaveBeenCalledTimes(1);
+
+    // When the first finishes, the request it absorbed is honoured rather than
+    // discarded.
+    await act(async () => {
+      releaseFirstFetch?.({ status: 'fetched', data: { kind: 'data', items: mockRewards } });
+    });
+
+    expect(fetchRewardsFromAPI).toHaveBeenCalledTimes(2);
   });
 
   it('should not show the failure banner when nothing has failed', async () => {
