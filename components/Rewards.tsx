@@ -346,6 +346,14 @@ export const Rewards = () => {
   const notifyOnFailureRef = useRef(false);
   /** Whether someone asked for a refresh while one was already running. */
   const rerunRequested = useRef(false);
+  /**
+   * Whether the re-run those requests earned owes anyone a failure report.
+   * Tracked separately from `notifyOnFailureRef` because intent belongs to the
+   * PASS, not to the loop: a user's pull and a silent post-queue sync can be
+   * coalesced, and the extra pass that exists only for the sync must not alert
+   * a user whose own refresh already succeeded.
+   */
+  const rerunNotify = useRef(false);
   const [queueingRewards, setQueueingRewards] = useState<Record<string, boolean>>({});
 
   const colorScheme = useColorScheme() ?? 'dark';
@@ -383,12 +391,14 @@ export const Rewards = () => {
         // to pick up. Dropping it left a just-queued reward showing as
         // AVAILABLE with nothing wrong anywhere.
         rerunRequested.current = true;
+        rerunNotify.current = rerunNotify.current || notifyOnFailure;
         console.log('[Rewards] Refresh already in progress, joining it');
         return;
       }
       refreshInFlight.current = true;
       notifyOnFailureRef.current = notifyOnFailure;
       rerunRequested.current = false;
+      rerunNotify.current = false;
 
       // Not awaited, here or anywhere else on this screen: haptics failing is
       // not the operation failing. Awaited inside a try, it reported "could not
@@ -439,6 +449,11 @@ export const Rewards = () => {
               throw new Error('Rewards fetched, but the local database sync failed');
             }
             console.log('Rewards refreshed and AppContext synced');
+          }
+          // Hand the next pass only the intent that asked for it.
+          if (rerunRequested.current) {
+            notifyOnFailureRef.current = rerunNotify.current;
+            rerunNotify.current = false;
           }
         } while (rerunRequested.current);
       } catch (error) {

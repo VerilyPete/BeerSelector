@@ -470,6 +470,70 @@ describe('Rewards error state', () => {
     expect(fetchRewardsFromAPI).toHaveBeenCalledTimes(2);
   });
 
+  it('should not report a re-run that only the silent sync asked for', async () => {
+    // The mirror of the "joined a silent refresh" test, and the hole coalescing
+    // opens: intent has to travel with the PASS, not with the loop. A user
+    // pulls to refresh (wants to be told), a queue joins mid-flight (wants
+    // silence), the user's pass succeeds — and the extra pass that exists only
+    // for the queue then fails. Alerting there tells a user whose refresh
+    // worked that it did not.
+    let releaseUserFetch: ((value: unknown) => void) | undefined;
+    (fetchRewardsFromAPI as jest.Mock).mockImplementationOnce(
+      () =>
+        new Promise(resolve => {
+          releaseUserFetch = resolve;
+        })
+    );
+
+    const { getByTestId, getByText } = renderRewards();
+
+    await waitFor(() => {
+      expect(getByText('Free Plate')).toBeDefined();
+    });
+
+    // The user pulls to refresh; it parks on its fetch.
+    await act(async () => {
+      getByTestId('rewards-list').props.refreshControl.props.onRefresh();
+    });
+    expect(releaseUserFetch).toBeDefined();
+
+    // A reward is queued while that is in flight, so its silent sync joins.
+    (getSessionData as jest.Mock).mockResolvedValue({
+      memberId: 'm1',
+      storeId: 's1',
+      storeName: 'Test Saucer',
+      sessionId: 'sess',
+      username: 'tester',
+      firstName: 'Test',
+      lastName: 'User',
+      email: 'test@example.com',
+      cardNum: '1',
+    });
+    global.fetch = jest.fn().mockResolvedValue({ ok: true, text: async () => '' }) as jest.Mock;
+
+    await act(async () => {
+      fireEvent.press(getByText('Free Plate'));
+    });
+    const confirm = (Alert.alert as jest.Mock).mock.calls
+      .flatMap(([, , buttons]) => buttons ?? [])
+      .find((button: { text?: string }) => button?.text === 'Queue It!');
+    await act(async () => {
+      await confirm.onPress();
+    });
+
+    // The user's pass succeeds; the queue's re-run then fails.
+    (fetchRewardsFromAPI as jest.Mock).mockResolvedValue({
+      status: 'unavailable',
+      reason: { code: 'NET', detail: 'offline' },
+    });
+
+    await act(async () => {
+      releaseUserFetch?.({ status: 'fetched', data: { kind: 'data', items: mockRewards } });
+    });
+
+    expect(Alert.alert).not.toHaveBeenCalledWith('Rewards Refresh Failed', expect.anything());
+  });
+
   it('should not show the failure banner when nothing has failed', async () => {
     // The banner lives in the list header now, so "render it unconditionally"
     // is a live mutant: an empty bordered error box with a working TRY AGAIN

@@ -151,7 +151,7 @@ jobs:
       - name: Assert the suite has not shrunk
         if: ${{ always() && (steps.jest.outcome == 'success' || steps.jest.outcome == 'failure') }}
         env:
-          MIN_TESTS_RUN: '2393'
+          MIN_TESTS_RUN: '2394'
           MAX_SKIPPED: '0'
         run: |
           python3 - <<'PY'
