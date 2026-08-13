@@ -201,7 +201,6 @@ describe('Beerfinder Loading States', () => {
 
     (useDataRefresh as jest.Mock).mockReturnValue({
       refreshing: false,
-      error: null,
       handleRefresh: jest.fn(),
     });
 
@@ -491,7 +490,6 @@ describe('Beerfinder Loading States', () => {
       const handleRefresh = jest.fn().mockResolvedValue(undefined);
       (useDataRefresh as jest.Mock).mockReturnValue({
         refreshing: false,
-        error: null,
         handleRefresh,
       });
 
@@ -538,7 +536,6 @@ describe('Beerfinder Loading States', () => {
     it('should pass the refreshing state through to the RefreshControl', async () => {
       (useDataRefresh as jest.Mock).mockReturnValue({
         refreshing: true,
-        error: null,
         handleRefresh: jest.fn(),
       });
 
@@ -612,7 +609,6 @@ describe('Beerfinder Loading States', () => {
       const handleRefresh = jest.fn();
       (useDataRefresh as jest.Mock).mockReturnValue({
         refreshing: false,
-        error: null,
         handleRefresh,
       });
 
@@ -636,7 +632,6 @@ describe('Beerfinder Loading States', () => {
 
       (useDataRefresh as jest.Mock).mockReturnValue({
         refreshing: true,
-        error: null,
         handleRefresh: jest.fn(),
       });
 

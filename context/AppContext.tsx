@@ -444,6 +444,19 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
    */
   const hasLoadedBeerData = useRef(false);
 
+  /**
+   * Monotonic id for each call to `loadBeerDataFromDatabase`, so a load that
+   * settles after a newer one can recognise itself as stale and commit nothing.
+   *
+   * Distinct from `hasLoadedBeerData` and not a replacement for it. The latch
+   * answers "has ANY load ever committed", which is what the retry chain's
+   * final-failure branch needs. This answers "is MY result still the newest",
+   * which is what every writer needs. The latch alone cannot tell a late loser
+   * from a first arrival, so a slow rewards read could raise an error over a
+   * completed refresh — the failure this counter exists to stop.
+   */
+  const loadGeneration = useRef(0);
+
   // ============================================================================
   // SHARED DATABASE LOADING FUNCTION
   // ============================================================================
@@ -454,6 +467,13 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
    * Avoids code duplication and ensures consistent loading behavior
    */
   const loadBeerDataFromDatabase = useCallback(async () => {
+    // Claim a generation before reading. Loads overlap — the mount retry chain
+    // runs for up to 7s while pull-to-refresh, Try Again and the settings login
+    // flow all call in — and a slow one that settles late must not commit its
+    // stale answer over a newer one that already finished. Reads are not
+    // cancellable, so the guard is at the write.
+    const generation = ++loadGeneration.current;
+
     // Load all data in parallel for better performance.
     //
     // The rewards read is caught separately rather than sharing the others'
@@ -478,10 +498,21 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       ),
     ]);
 
+    // A newer load started while this one was in flight, so its answer is the
+    // current truth and ours is history. Commit nothing — not the rows, not the
+    // rewards error, not the latch. Without this, a mount load whose rewards
+    // query sat on a lock for ten seconds would surface a full-screen rewards
+    // error over data a manual refresh had already loaded correctly, and there
+    // is no retry chain behind `rewardError` to undo it.
+    if (generation !== loadGeneration.current) {
+      console.log('[AppContext] Discarding a superseded load; a newer one already committed');
+      return { superseded: true as const };
+    }
+
     // Update state with all data at once, preserving queuedBeerIds — and, when
     // the rewards read failed, the rewards already in context. Writing [] there
-    // would render "no rewards earned" underneath "rewards could not be
-    // loaded", which is the same lie the swallowed error used to tell.
+    // would put "No Rewards Yet" under the failure banner on Rewards.tsx, which
+    // is the same lie the swallowed repository error used to tell.
     setBeers(prev => ({
       allBeers: allBeersData,
       tastedBeers: tastedBeersData,
@@ -489,12 +520,14 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       queuedBeerIds: prev.queuedBeerIds,
     }));
 
-    // Called, not listed in the dependency array below — the same way the
-    // retry chain and `refreshBeerData` already use `setBeerError`. Both are
-    // `useCallback([])`, so their identities never change and listing them
-    // would be inert; keeping this callback's dependencies empty is what makes
-    // the `hasLoadedBeerData` latch above sound, so the omission is deliberate
-    // rather than an oversight for a later `--fix` to tidy up.
+    // Called, not listed in the dependency array below — the same way the retry
+    // chain and `refreshBeerData` already use `setBeerError`. Naming any of
+    // them there would NOT be inert: they are `const`s declared ~200 lines
+    // further down, and a dependency array is evaluated during render, so the
+    // reference lands in their temporal dead zone and throws
+    // "Cannot access 'setRewardError' before initialization" — a white screen
+    // on first render, not a no-op. Keeping this callback's dependencies empty
+    // is also what makes the `hasLoadedBeerData` latch above sound.
     setRewardError(rewardsOutcome.loaded ? null : 'Failed to load rewards from database');
 
     hasLoadedBeerData.current = true;
@@ -504,7 +537,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         (rewardsOutcome.loaded ? `${rewardsOutcome.rewards.length} rewards` : 'rewards unreadable')
     );
 
-    return { allBeersData, tastedBeersData, rewardsOutcome };
+    return { allBeersData, tastedBeersData, rewardsOutcome, superseded: false as const };
   }, []);
 
   /**

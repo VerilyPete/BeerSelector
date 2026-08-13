@@ -91,9 +91,10 @@ export const Beerfinder = () => {
    *
    * The failure this button appears under is a local read failure, so the
    * network round-trip is not what needs retrying. `handleRefresh` also bails
-   * at its API-URL check for a visitor or a logged-out user — the state a
-   * first-launch failure leaves you in — which made Try Again a dead control
-   * for exactly the users most likely to press it.
+   * at its API-URL check before it ever reaches `onDataReloaded`, which made
+   * Try Again a dead control for anyone logged out or on a first launch. (Not
+   * for visitors on this screen specifically — this tab is `href: null` in
+   * visitor mode, per app/(tabs)/_layout.tsx. AllBeers is where that matters.)
    */
   const handleTryAgain = useCallback(() => {
     void refreshBeerData();

@@ -80,6 +80,27 @@ describe('useDataRefresh', () => {
     expect(getByTestId('refreshing').props.children).toBe('false');
   });
 
+  it('should raise one alert, not two, when the refresh and the reload both fail', async () => {
+    // Two `Alert.alert` calls in the same tick do not queue or collapse: RN
+    // creates a fresh UIWindow per alert at UIWindowLevelAlert + 1, so both
+    // present and the LATER one sits on top. The user's first modal was
+    // therefore "Refreshed, but…" — asserting a success that did not happen —
+    // over the top of the API failure that explains it, in that order.
+    (manualRefreshAllData as jest.Mock).mockResolvedValue({
+      hasErrors: true,
+      allNetworkErrors: true,
+    });
+    const onDataReloaded = jest.fn().mockRejectedValue(new Error('database locked'));
+
+    await pressRefresh(onDataReloaded);
+
+    expect(Alert.alert).toHaveBeenCalledTimes(1);
+
+    // And the one alert must not claim the refresh worked.
+    const [, body] = (Alert.alert as jest.Mock).mock.calls[0];
+    expect(body).not.toMatch(/^Refreshed/);
+  });
+
   it('should tell the user when reloading local data fails', async () => {
     // This failure reached nobody. The API refresh succeeds, the local re-read
     // throws, and the catch wrote a `error` state that no consumer of this hook
@@ -91,7 +112,14 @@ describe('useDataRefresh', () => {
 
     await pressRefresh(onDataReloaded);
 
-    expect(Alert.alert).toHaveBeenCalled();
+    // The message pair, not merely "an alert fired". Asserting the bare call
+    // let a mutant replace this with Alert.alert('Success', 'Everything is
+    // fine.') and kept the suite green — the test named for a silent failure
+    // passing while the code told the user the opposite.
+    expect(Alert.alert).toHaveBeenCalledWith(
+      'Error',
+      'Refreshed, but the updated data could not be loaded from this device. What you see may be out of date.'
+    );
   });
 
   it('should tell the user when the refresh itself fails', async () => {
@@ -130,8 +158,12 @@ describe('useDataRefresh', () => {
       'API URLs Not Configured',
       'Please log in via the Settings screen to configure API URLs before refreshing.'
     );
-    // Early return, not the finally — this is the path that leaves the spinner
-    // up if the flag is lowered in the wrong place.
+    // The spinner comes down on this path too. Note this assertion cannot
+    // distinguish WHERE it happens: the early return is inside the try, so the
+    // finally covers it, and deleting the explicit `setRefreshing(false)` that
+    // used to sit beside the alert left the suite green. Kept because a stuck
+    // spinner here would wedge the hook — `handleRefresh` returns early while
+    // `refreshing` is true — but it guards the outcome, not the mechanism.
     expect(getByTestId('refreshing').props.children).toBe('false');
   });
 });

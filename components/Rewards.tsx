@@ -374,11 +374,32 @@ export const Rewards = () => {
         console.log('Rewards refreshed and AppContext synced');
       }
     } catch (error) {
+      // Told, not just logged. This caught its own failure into a console line
+      // and changed no state: the spinner retracted, the screen was identical,
+      // and a member whose rewards never arrived had no way to know the attempt
+      // had failed at all.
       console.error('Error refreshing rewards:', error);
+      Alert.alert(
+        'Rewards Refresh Failed',
+        'Could not refresh your rewards. Check your connection and try again.'
+      );
     } finally {
       setRefreshing(false);
     }
   }, [session.isVisitor, refreshBeerData]);
+
+  /**
+   * Try Again re-reads the database; pull-to-refresh goes to the network.
+   *
+   * `rewardError` is raised by a failed local read in AppContext, so the
+   * network round-trip `handleRefresh` performs is not what needs retrying —
+   * and worse, it throws before reaching its own `refreshBeerData()` whenever
+   * the fetch fails, so offline this button could never clear the error it sat
+   * under. Same fix the other three screens got.
+   */
+  const handleTryAgain = useCallback(() => {
+    void refreshBeerData();
+  }, [refreshBeerData]);
 
   const queueReward = useCallback(
     async (rewardId: string, rewardType: string) => {
@@ -568,26 +589,10 @@ export const Rewards = () => {
     );
   }
 
-  if (errors.rewardError) {
-    return (
-      <View style={[styles.errorContainer, { backgroundColor: colors.background }]}>
-        <Ionicons name="alert-circle" size={48} color={colors.error} />
-        <Text style={[styles.errorText, { color: colors.textSecondary }]}>
-          {errors.rewardError}
-        </Text>
-        <TouchableOpacity
-          style={[styles.retryButton, { borderColor: colors.tint }]}
-          onPress={handleRefresh}
-        >
-          <Text style={[styles.retryButtonText, { color: colors.tint }]}>TRY AGAIN</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <FlatList
+        testID="rewards-list"
         data={beers.rewards}
         renderItem={renderRewardItem}
         keyExtractor={item => item.reward_id}
@@ -595,6 +600,37 @@ export const Rewards = () => {
         ListHeaderComponent={
           <>
             {!session.isVisitor ? <ProgressHeader tastedCount={tastedCount} /> : null}
+            {/*
+              A rewards failure is reported in place, not by replacing the
+              screen. This used to be an early `return` above the list, which
+              was invisible while nothing wrote `rewardError` — and the moment
+              something did, one unreadable table would have taken the 200 Beer
+              Challenge progress ring and milestone bar with it. Those are
+              computed from `tastedBeers`, which is fine; so are the rewards the
+              provider deliberately preserved rather than overwriting with [].
+              Full-screen is for "I have nothing to show", and here we usually do.
+            */}
+            {errors.rewardError ? (
+              <View
+                testID="reward-error-banner"
+                style={[
+                  styles.errorBanner,
+                  { backgroundColor: colors.backgroundSecondary, borderColor: colors.error },
+                ]}
+              >
+                <Ionicons name="alert-circle" size={24} color={colors.error} />
+                <Text style={[styles.errorText, { color: colors.textSecondary }]}>
+                  {errors.rewardError}
+                </Text>
+                <TouchableOpacity
+                  style={[styles.retryButton, { borderColor: colors.tint }]}
+                  onPress={handleTryAgain}
+                  testID="reward-retry-button"
+                >
+                  <Text style={[styles.retryButtonText, { color: colors.tint }]}>TRY AGAIN</Text>
+                </TouchableOpacity>
+              </View>
+            ) : null}
             <View
               style={[
                 styles.labelPlate,
@@ -605,7 +641,12 @@ export const Rewards = () => {
             </View>
           </>
         }
-        ListEmptyComponent={<EmptyState isVisitor={session.isVisitor} />}
+        // Suppressed while the read is failing: "No Rewards Yet" under a
+        // "could not load rewards" banner is the same lie the swallowed
+        // repository error used to tell, just with a caption.
+        ListEmptyComponent={
+          errors.rewardError ? null : <EmptyState isVisitor={session.isVisitor} />
+        }
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -641,12 +682,12 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
 
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
+  errorBanner: {
     alignItems: 'center',
-    padding: 32,
-    gap: 16,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderRadius: 8,
   },
   errorText: {
     fontFamily: 'SpaceMono',

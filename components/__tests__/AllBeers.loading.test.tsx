@@ -165,7 +165,6 @@ describe('AllBeers Loading States (MP-3 Step 3a)', () => {
     // Mock useDataRefresh hook
     (useDataRefresh as jest.Mock).mockReturnValue({
       refreshing: false,
-      error: null,
       handleRefresh: jest.fn(),
     });
   });
@@ -453,7 +452,6 @@ describe('AllBeers Loading States (MP-3 Step 3a)', () => {
 
       (useDataRefresh as jest.Mock).mockReturnValue({
         refreshing: true,
-        error: null,
         handleRefresh: jest.fn(),
       });
 
@@ -474,7 +472,6 @@ describe('AllBeers Loading States (MP-3 Step 3a)', () => {
       const handleRefresh = jest.fn();
       (useDataRefresh as jest.Mock).mockReturnValue({
         refreshing: false,
-        error: null,
         handleRefresh,
       });
 

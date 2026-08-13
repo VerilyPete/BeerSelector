@@ -335,8 +335,14 @@ describe('AppContext', () => {
     it('should keep the rewards it already had', async () => {
       // Same rule the beer list gets from the refresh-failure test below it:
       // a failed re-read must not empty what is already on screen. Writing []
-      // beside the error would show "no rewards earned" underneath "rewards
-      // could not be loaded".
+      // beside the error puts "No Rewards Yet" under the failure banner on
+      // Rewards.tsx — the same lie the swallowed repository error used to tell.
+      //
+      // An earlier version of this comment claimed that outcome while the
+      // screen could not produce it: `rewardError` took the whole screen over,
+      // so neither the rewards nor the empty state rendered at all, and this
+      // preservation was unobservable. Rewards.tsx now reports the failure in
+      // place, which is what makes the rows worth keeping.
       (rewardsRepository.getAll as jest.Mock).mockResolvedValue(mockRewards);
 
       const { getByTestId } = renderProbe();
@@ -355,6 +361,83 @@ describe('AppContext', () => {
         'Failed to load rewards from database'
       );
       expect(getByTestId('reward-count').props.children).toBe('1');
+    });
+
+    it('should not let a stale load raise an error over a newer good one', async () => {
+      // Found independently by three reviewers, which is why it is fixed here
+      // rather than deferred.
+      //
+      // Load A starts at mount; its rewards query blocks on a lock. The user
+      // refreshes, and load B completes entirely — good rewards, no error. Then
+      // A's rewards query finally rejects, and A commits ITS outcome over the
+      // top of B's: a full-screen rewards error raised seconds later over data
+      // that is fine and is still sitting in context.
+      //
+      // `hasLoadedBeerData` does not cover this. That latch guards `beerError`
+      // raised by the mount retry chain; `rewardError` had no equivalent, and
+      // the last writer won unconditionally.
+      let releaseStaleRewards: (() => void) | undefined;
+      (rewardsRepository.getAll as jest.Mock).mockImplementationOnce(
+        () =>
+          new Promise((_resolve, reject) => {
+            releaseStaleRewards = () => reject(new Error('rewards read timed out'));
+          })
+      );
+
+      const { getByTestId } = renderProbe();
+
+      // Load A is now in flight with its rewards read parked. Load B runs to
+      // completion against a healthy database.
+      (rewardsRepository.getAll as jest.Mock).mockResolvedValue(mockRewards);
+
+      await act(async () => {
+        fireEvent.press(getByTestId('refresh'));
+      });
+
+      expect(getByTestId('reward-count').props.children).toBe('1');
+      expect(getByTestId('reward-error').props.children).toBe('none');
+
+      // A's rewards read fails, long after B settled everything.
+      await act(async () => {
+        releaseStaleRewards?.();
+      });
+
+      expect(getByTestId('reward-error').props.children).toBe('none');
+      expect(getByTestId('reward-count').props.children).toBe('1');
+    });
+
+    it('should not let a stale load overwrite newer rows', async () => {
+      // The other half of the same guard. The rewards error is what made this
+      // race newly visible, but a late load also carries a stale catalog and
+      // tasted list, and committing those moves the whole screen backwards —
+      // on FINDER, to a tasted list that no longer matches what was checked in.
+      let releaseStaleBeers: ((rows: typeof mockBeers) => void) | undefined;
+      (beerRepository.getAll as jest.Mock).mockImplementationOnce(
+        () =>
+          new Promise(resolve => {
+            releaseStaleBeers = resolve;
+          })
+      );
+
+      const { getByTestId } = renderProbe();
+
+      (beerRepository.getAll as jest.Mock).mockResolvedValue([
+        ...mockBeers,
+        { ...mockBeers[0], id: '2', brew_name: 'Newer Stout' },
+      ]);
+
+      await act(async () => {
+        fireEvent.press(getByTestId('refresh'));
+      });
+
+      expect(getByTestId('beer-count').props.children).toBe('2');
+
+      // The parked mount read finally answers with the one row it saw.
+      await act(async () => {
+        releaseStaleBeers?.(mockBeers);
+      });
+
+      expect(getByTestId('beer-count').props.children).toBe('2');
     });
 
     it('should clear the rewards error once a later read succeeds', async () => {
