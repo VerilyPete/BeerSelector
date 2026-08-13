@@ -86,6 +86,19 @@ export const Beerfinder = () => {
     componentName: 'Beerfinder',
   });
 
+  /**
+   * Try Again re-reads the database; pull-to-refresh goes to the network.
+   *
+   * The failure this button appears under is a local read failure, so the
+   * network round-trip is not what needs retrying. `handleRefresh` also bails
+   * at its API-URL check for a visitor or a logged-out user — the state a
+   * first-launch failure leaves you in — which made Try Again a dead control
+   * for exactly the users most likely to press it.
+   */
+  const handleTryAgain = useCallback(() => {
+    void refreshBeerData();
+  }, [refreshBeerData]);
+
   // Wrap refresh to also sync queued beer IDs
   const handleRefresh = useCallback(async () => {
     await baseHandleRefresh();
@@ -355,7 +368,7 @@ export const Beerfinder = () => {
           <Text style={[styles.errorText, { color: colors.text }]}>{errors.beerError}</Text>
           <TouchableOpacity
             style={[styles.refreshButton, { backgroundColor: colors.tint }]}
-            onPress={handleRefresh}
+            onPress={handleTryAgain}
           >
             <Text style={[styles.buttonText, { color: colors.textOnPrimary }]}>Try Again</Text>
           </TouchableOpacity>

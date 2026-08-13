@@ -18,7 +18,8 @@ import { useAppContext } from '@/context/AppContext';
 
 export const AllBeers = () => {
   // MP-4 Step 2: Use context for beer data instead of local state
-  const { beers, loading, errors, setAllBeers, setLoadingBeers, setBeerError } = useAppContext();
+  const { beers, loading, errors, setAllBeers, setLoadingBeers, setBeerError, refreshBeerData } =
+    useAppContext();
 
   // Responsive layout: 1 column on phone, 2 on tablet portrait, 3 on tablet landscape
   const { numColumns } = useBreakpoint();
@@ -82,6 +83,18 @@ export const AllBeers = () => {
   useEffect(() => {
     loadBeers();
   }, [loadBeers]);
+
+  /**
+   * Try Again reloads the whole context, not just this screen's catalog.
+   *
+   * `loadBeers` reads `beerRepository` alone, so recovering through it leaves
+   * `tastedBeers` and `rewards` at whatever the failed load left behind —
+   * invisible here, and visible on FINDER, which subtracts the tasted list from
+   * the catalog and would offer beers the user has already checked in.
+   */
+  const handleTryAgain = useCallback(() => {
+    void refreshBeerData();
+  }, [refreshBeerData]);
 
   /**
    * MP-3 Bottleneck #5: Memoized event handlers for stable references
@@ -150,7 +163,7 @@ export const AllBeers = () => {
           </Text>
           <TouchableOpacity
             style={[styles.refreshButton, { backgroundColor: colors.tint }]}
-            onPress={loadBeers}
+            onPress={handleTryAgain}
             testID="try-again-button"
           >
             <Text style={[styles.buttonText, { color: colors.textOnPrimary }]}>Try Again</Text>

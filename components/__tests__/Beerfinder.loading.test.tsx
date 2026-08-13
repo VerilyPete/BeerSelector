@@ -474,16 +474,33 @@ describe('Beerfinder Loading States', () => {
       expect(queryByTestId('beer-list')).toBeNull();
     });
 
-    it('should trigger a refresh when try again is pressed', async () => {
+    it('should re-read the database and clear the error when try again is pressed', async () => {
+      // The whole point of the error screen: a user stuck on it gets out.
+      //
+      // What this replaced asserted that the mocked `useDataRefresh` was
+      // called — a statement about wiring, made entirely against a jest.fn(),
+      // which could not observe whether the press recovered anything. It also
+      // could not have observed the bug that shipped in #17: `refreshBeerData`
+      // reloaded successfully and left `beerError` set, so this exact press
+      // refetched the data and kept the error screen up.
+      //
+      // Try Again re-reads the DATABASE, not the network. The reported failure
+      // is a local read failure, and `handleRefresh` bails at the API-URL check
+      // for a visitor or logged-out user, which is precisely the state a
+      // first-launch failure leaves you in.
       const handleRefresh = jest.fn().mockResolvedValue(undefined);
       (useDataRefresh as jest.Mock).mockReturnValue({
         refreshing: false,
         error: null,
         handleRefresh,
       });
-      (beerRepository.getAll as jest.Mock).mockRejectedValue(new Error('Network error'));
 
-      const { getByText } = renderBeerfinder();
+      let dbHealthy = false;
+      (beerRepository.getAll as jest.Mock).mockImplementation(() =>
+        dbHealthy ? Promise.resolve(mockAllBeers) : Promise.reject(new Error('Network error'))
+      );
+
+      const { getByText, queryByText, getByTestId } = renderBeerfinder();
 
       await waitFor(
         () => {
@@ -492,11 +509,28 @@ describe('Beerfinder Loading States', () => {
         { timeout: ERROR_SURFACE_TIMEOUT }
       );
 
+      // The database recovers underneath the error screen.
+      dbHealthy = true;
+      const callsBeforePress = (beerRepository.getAll as jest.Mock).mock.calls.length;
+
       fireEvent.press(getByText('Try Again'));
 
-      await waitFor(() => {
-        expect(handleRefresh).toHaveBeenCalled();
-      });
+      // Synchronous, before any timer advance. The provider's retry chain has
+      // already exhausted by the time the error surfaces, so nothing else is
+      // pending that could explain a refetch — but asserting it here rather
+      // than after an await keeps that true even if the schedule changes.
+      expect((beerRepository.getAll as jest.Mock).mock.calls.length).toBe(callsBeforePress + 1);
+
+      // Flush the reload's microtasks without advancing the clock.
+      await act(async () => {});
+
+      expect(queryByText('Try Again')).toBeNull();
+      expect(getByTestId('beer-list')).toBeDefined();
+
+      // Not through the refresh hook. Routing Try Again back through
+      // `handleRefresh` is the shape this test replaced, and it is wrong for
+      // the reason in the comment above; pin it so it cannot come back.
+      expect(handleRefresh).not.toHaveBeenCalled();
     });
   });
 
