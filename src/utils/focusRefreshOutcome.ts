@@ -5,8 +5,9 @@
  *
  * The three tab screens await `checkAndRefreshOnAppOpen` and then do nothing
  * with the result but log it. The refresh writes `allbeers` and
- * `tasted_brew_current_round`, but `AppContext.loadBeerDataFromDatabase` is
- * only invoked by the mount effect, so nothing re-reads afterwards and the
+ * `tasted_brew_current_round`, but nothing on the focus path calls
+ * `refreshBeerData` — the only other caller of `loadBeerDataFromDatabase` — so
+ * nothing re-reads afterwards and the
  * Beerfinder count keeps rendering the pre-refresh snapshot. That is one of the
  * paths to the reported "count is wrong or empty".
  */

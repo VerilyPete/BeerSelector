@@ -321,6 +321,71 @@ describe('Rewards error state', () => {
     });
   });
 
+  it('should still report to a user whose pull joined a silent refresh', async () => {
+    // The in-flight guard dedupes by call, and the two callers have opposite
+    // reporting policies. A user pulling to refresh while a post-queue sync is
+    // running was dropped silently: the RefreshControl was already spinning
+    // from the sync they never started, so the pull looked like it worked, and
+    // when the sync then failed offline nothing was said. That is the exact
+    // silence this PR exists to remove, reintroduced by the fix for a
+    // different one. The dropped call goes away; its intent must not.
+    let releaseSilentFetch: ((value: unknown) => void) | undefined;
+    (fetchRewardsFromAPI as jest.Mock).mockImplementationOnce(
+      () =>
+        new Promise(resolve => {
+          releaseSilentFetch = resolve;
+        })
+    );
+
+    const { getByTestId, getByText } = renderRewards();
+
+    await waitFor(() => {
+      expect(getByText('Free Plate')).toBeDefined();
+    });
+
+    // A silent post-queue sync starts and parks on its fetch. Reached the only
+    // way production reaches it: queue a reward.
+    (getSessionData as jest.Mock).mockResolvedValue({
+      memberId: 'm1',
+      storeId: 's1',
+      storeName: 'Test Saucer',
+      sessionId: 'sess',
+      username: 'tester',
+      firstName: 'Test',
+      lastName: 'User',
+      email: 'test@example.com',
+      cardNum: '1',
+    });
+    global.fetch = jest.fn().mockResolvedValue({ ok: true, text: async () => '' }) as jest.Mock;
+
+    await act(async () => {
+      fireEvent.press(getByText('Free Plate'));
+    });
+    const confirm = (Alert.alert as jest.Mock).mock.calls
+      .flatMap(([, , buttons]) => buttons ?? [])
+      .find((button: { text?: string }) => button?.text === 'Queue It!');
+    await act(async () => {
+      await confirm.onPress();
+    });
+
+    expect(releaseSilentFetch).toBeDefined();
+
+    // The user pulls to refresh while it is still running.
+    await act(async () => {
+      getByTestId('rewards-list').props.refreshControl.props.onRefresh();
+    });
+
+    // The in-flight sync then fails.
+    await act(async () => {
+      releaseSilentFetch?.({ status: 'unavailable', reason: { code: 'NET', detail: 'offline' } });
+    });
+
+    expect(Alert.alert).toHaveBeenCalledWith(
+      'Rewards Refresh Failed',
+      'Could not refresh your rewards. Please try again.'
+    );
+  });
+
   it('should not show the failure banner when nothing has failed', async () => {
     // The banner lives in the list header now, so "render it unconditionally"
     // is a live mutant: an empty bordered error box with a working TRY AGAIN

@@ -406,6 +406,50 @@ describe('AppContext', () => {
       expect(getByTestId('reward-count').props.children).toBe('1');
     });
 
+    it('should keep retrying a failing launch even after a refresh overtakes it', async () => {
+      // The retry chain is the app's whole answer to SQLITE_BUSY at launch:
+      // three attempts over 7s against a fault that clears in milliseconds.
+      //
+      // Guarding the catch against stale rejections disarmed it. The guard sat
+      // ABOVE the retry scheduler, so any refresh that overtook a failing mount
+      // load — a pull-to-refresh, a post-queue sync — made attempt 1 return
+      // instead of scheduling attempt 2. The chain is serial and never
+      // re-arms, so the automatic recovery was gone for the session, silently:
+      // the user is left with whatever the overtaking refresh managed.
+      //
+      // Ignoring a stale FAILURE and abandoning the RETRY are different
+      // decisions, and only the first one was intended.
+      let dbHealthy = false;
+      (beerRepository.getAll as jest.Mock).mockImplementation(() =>
+        dbHealthy ? Promise.resolve(mockBeers) : Promise.reject(new Error('SQLITE_BUSY'))
+      );
+
+      const { getByTestId } = renderProbe();
+
+      // A refresh overtakes the failing mount load and fails against the same
+      // contention.
+      await act(async () => {
+        fireEvent.press(getByTestId('refresh'));
+      });
+
+      const attemptsAfterOvertake = (beerRepository.getAll as jest.Mock).mock.calls.length;
+
+      // The lock clears. The chain must still be alive to notice.
+      dbHealthy = true;
+
+      for (let i = 0; i < 6; i++) {
+        await act(async () => {
+          jest.advanceTimersByTime(5000);
+        });
+      }
+
+      expect((beerRepository.getAll as jest.Mock).mock.calls.length).toBeGreaterThan(
+        attemptsAfterOvertake
+      );
+      expect(getByTestId('beer-count').props.children).toBe('1');
+      expect(getByTestId('beer-error').props.children).toBe('none');
+    });
+
     it('should not clear a newer failure when a stale load finishes', async () => {
       // The mirror image of the two tests around this one, and a defect the
       // first version of the generation guard introduced: it stopped the stale

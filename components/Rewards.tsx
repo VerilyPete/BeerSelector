@@ -342,6 +342,8 @@ export const Rewards = () => {
   const [refreshing, setRefreshing] = useState(false);
   /** Guards against overlapping refreshes; see `refreshRewards`. */
   const refreshInFlight = useRef(false);
+  /** Whether the refresh in flight owes anyone a failure report. */
+  const notifyOnFailureRef = useRef(false);
   const [queueingRewards, setQueueingRewards] = useState<Record<string, boolean>>({});
 
   const colorScheme = useColorScheme() ?? 'dark';
@@ -366,10 +368,18 @@ export const Rewards = () => {
       // A ref, not the `refreshing` state, because the second call can arrive in
       // the same tick as the first and would read a stale `false`.
       if (refreshInFlight.current) {
-        console.log('[Rewards] Refresh already in progress, ignoring duplicate request');
+        // The dropped CALL goes away; its intent must not. A user pulling to
+        // refresh while a silent post-queue sync happens to be running would
+        // otherwise be dropped into that sync's silence — and since the sync
+        // already has the RefreshControl spinning, an offline failure would
+        // look exactly like a refresh that worked. Whoever asked to be told
+        // gets told.
+        notifyOnFailureRef.current = notifyOnFailureRef.current || notifyOnFailure;
+        console.log('[Rewards] Refresh already in progress, joining it');
         return;
       }
       refreshInFlight.current = true;
+      notifyOnFailureRef.current = notifyOnFailure;
 
       // Outside the try, and not awaited: haptics failing is not a refresh
       // failing. Inside, it was the one thing in a visitor's code path that
@@ -421,7 +431,7 @@ export const Rewards = () => {
         // `rewardsRepository.insertMany` and the context sync, so "check your
         // connection" sent a user to toggle wifi over a failed local write.
         console.error('Error refreshing rewards:', error);
-        if (notifyOnFailure) {
+        if (notifyOnFailureRef.current) {
           Alert.alert(
             'Rewards Refresh Failed',
             'Could not refresh your rewards. Please try again.'
@@ -429,6 +439,7 @@ export const Rewards = () => {
         }
       } finally {
         refreshInFlight.current = false;
+        notifyOnFailureRef.current = false;
         setRefreshing(false);
       }
     },

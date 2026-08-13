@@ -462,6 +462,12 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
    * which is what every writer needs. The latch alone cannot tell a late loser
    * from a first arrival, so a slow rewards read could raise an error over a
    * completed refresh — the failure this counter exists to stop.
+   *
+   * It assumes the newest load always settles. True today: the reads are plain
+   * `getAllAsync` over an already-resolved connection, with no lock acquisition
+   * and no fetch on the path. Put anything that can hang in there and a
+   * superseded load will correctly decline to lower `isLoadingBeers` while the
+   * winner never lowers it either — a permanent skeleton.
    */
   const loadGeneration = useRef(0);
 
@@ -594,13 +600,20 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
           error
         );
 
-        // A stale rejection is history too. The generation check inside the
-        // read is skipped when the read throws, so without this a load that
-        // lost the race would still retry and still raise a fatal error over
-        // whatever the winner committed.
-        if (generation !== loadGeneration.current) {
-          console.log('[AppContext] Ignoring a superseded load failure; a newer load has started');
-          return;
+        // A stale rejection must not RAISE anything — the generation check
+        // inside the read is skipped when the read throws, so without this a
+        // load that lost the race would paint a fatal error over whatever the
+        // winner committed.
+        //
+        // It must still RETRY, though, and conflating the two disarmed the
+        // chain: returning here meant any refresh overtaking a failing launch
+        // load ended the 1s/2s/4s recovery permanently, because the chain is
+        // serial and never re-arms. Ignoring someone else's verdict is not the
+        // same as giving up on our own read. A retry claims a fresh generation
+        // and competes honestly.
+        const superseded = generation !== loadGeneration.current;
+        if (superseded) {
+          console.log('[AppContext] A newer load has started; not raising this failure');
         }
 
         if (retryCount < maxRetries && !isCancelled) {
@@ -615,7 +628,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
             }
           }, delay);
           timers.add(timer);
-        } else if (!isCancelled) {
+        } else if (!isCancelled && !superseded) {
           // A load that started before this chain gave up may have succeeded
           // meanwhile — a manual refresh inside the 7s retry window is the
           // ordinary case, and SQLITE_BUSY contention at launch makes it a
