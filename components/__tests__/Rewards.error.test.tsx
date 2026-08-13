@@ -250,6 +250,77 @@ describe('Rewards error state', () => {
     expect(Alert.alert).not.toHaveBeenCalledWith('Rewards Refresh Failed', expect.anything());
   });
 
+  it('should tell the user when the fetch worked but the local sync did not', async () => {
+    // `refreshBeerData` swallows its own read failures into `beerError`, and
+    // this screen renders only `rewardError` — so a pull-to-refresh whose
+    // database sync failed printed "Rewards refreshed and AppContext synced",
+    // retracted the spinner, changed nothing on screen and said nothing. The
+    // fetch succeeding is not the same as the refresh succeeding.
+    (fetchRewardsFromAPI as jest.Mock).mockResolvedValue({
+      status: 'fetched',
+      data: { kind: 'data', items: mockRewards },
+    });
+
+    const { getByTestId } = renderRewards();
+
+    await waitFor(() => {
+      expect(getByTestId('rewards-list')).toBeDefined();
+    });
+
+    // The write lands, the re-read does not.
+    (rewardsRepository.getAll as jest.Mock).mockRejectedValue(new Error('db gone'));
+    (beerRepository.getAll as jest.Mock).mockRejectedValue(new Error('db gone'));
+
+    await act(async () => {
+      getByTestId('rewards-list').props.refreshControl.props.onRefresh();
+    });
+
+    expect(Alert.alert).toHaveBeenCalledWith(
+      'Rewards Refresh Failed',
+      'Could not refresh your rewards. Please try again.'
+    );
+  });
+
+  it('should ignore a second refresh while one is already running', async () => {
+    // There is no in-flight guard on this screen, unlike `useDataRefresh`.
+    // Two overlapping refreshes each fetch, each write the whole rewards table
+    // with `insertMany` (which clears it first), and the SLOWER fetch wins —
+    // so a stale server snapshot can be published last, with no error. The
+    // shared `refreshing` flag also lies: whichever finishes first retracts the
+    // spinner while the other is still running.
+    let releaseFirstFetch: ((value: unknown) => void) | undefined;
+    (fetchRewardsFromAPI as jest.Mock).mockImplementationOnce(
+      () =>
+        new Promise(resolve => {
+          releaseFirstFetch = resolve;
+        })
+    );
+
+    const { getByTestId } = renderRewards();
+
+    await waitFor(() => {
+      expect(getByTestId('rewards-list')).toBeDefined();
+    });
+
+    await act(async () => {
+      getByTestId('rewards-list').props.refreshControl.props.onRefresh();
+    });
+
+    expect(releaseFirstFetch).toBeDefined();
+    expect(fetchRewardsFromAPI).toHaveBeenCalledTimes(1);
+
+    // Second pull while the first is still in flight.
+    await act(async () => {
+      getByTestId('rewards-list').props.refreshControl.props.onRefresh();
+    });
+
+    expect(fetchRewardsFromAPI).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      releaseFirstFetch?.({ status: 'fetched', data: { kind: 'data', items: mockRewards } });
+    });
+  });
+
   it('should not show the failure banner when nothing has failed', async () => {
     // The banner lives in the list header now, so "render it unconditionally"
     // is a live mutant: an empty bordered error box with a working TRY AGAIN

@@ -243,8 +243,16 @@ export interface AppContextValue extends AppState {
   /** Update rewards list */
   setRewards: (rewards: Reward[]) => void;
 
-  /** Reload all beer data from database (call after data refresh) */
-  refreshBeerData: () => Promise<void>;
+  /**
+   * Reload all beer data from database (call after data refresh).
+   *
+   * Resolves `false` only when THIS call failed and its failure is now on
+   * screen as `beerError`. It never rejects, which is why the boolean exists:
+   * a caller that awaits it and reports success cannot otherwise tell that the
+   * re-read it just triggered failed. Superseded calls resolve `true` — a newer
+   * load owns the outcome, and there is nothing for this caller to report.
+   */
+  refreshBeerData: () => Promise<boolean>;
 
   /** Add a beer ID to the queued set (called after successful check-in) */
   addQueuedBeer: (beerId: string) => void;
@@ -700,7 +708,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
    * Call this after data refresh operations to update AppContext state
    * Uses shared loading function to avoid code duplication
    */
-  const refreshBeerData = useCallback(async () => {
+  const refreshBeerData = useCallback(async (): Promise<boolean> => {
     // Same ownership rule as the mount effect: this refresh owns the error and
     // the loading flag only for as long as no newer load has been claimed. Two
     // overlapping refreshes are ordinary — Rewards' Try Again beside its own
@@ -710,10 +718,11 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     try {
       setLoading(prev => ({ ...prev, isLoadingBeers: true }));
       const outcome = await loadBeerDataFromDatabase(generation);
-      if (outcome.superseded) return;
+      if (outcome.superseded) return true;
 
       setBeerError(null); // Clear error on success — mirrors the mount effect
       console.log('[AppContext] Refreshed beer data from database');
+      return true;
     } catch (error) {
       console.error('[AppContext] Error refreshing beer data:', error);
 
@@ -721,10 +730,11 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       // a full-screen error over rows a newer refresh had just committed.
       if (generation !== loadGeneration.current) {
         console.log('[AppContext] Ignoring a superseded refresh failure');
-        return;
+        return true;
       }
 
       setBeerError('Failed to refresh beer data from database');
+      return false;
     } finally {
       if (generation === loadGeneration.current) {
         setLoading(prev => ({ ...prev, isLoadingBeers: false }));

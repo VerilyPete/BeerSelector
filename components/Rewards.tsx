@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   StyleSheet,
   View,
@@ -340,6 +340,8 @@ export const Rewards = () => {
   const { session, beers, loading, errors, refreshBeerData } = useAppContext();
 
   const [refreshing, setRefreshing] = useState(false);
+  /** Guards against overlapping refreshes; see `refreshRewards`. */
+  const refreshInFlight = useRef(false);
   const [queueingRewards, setQueueingRewards] = useState<Record<string, boolean>>({});
 
   const colorScheme = useColorScheme() ?? 'dark';
@@ -357,6 +359,18 @@ export const Rewards = () => {
    */
   const refreshRewards = useCallback(
     async ({ notifyOnFailure }: { notifyOnFailure: boolean }) => {
+      // Only one at a time. `insertMany` CLEARS the table before writing, so two
+      // overlapping refreshes race to publish whole snapshots and the slower
+      // FETCH wins — a post-queue sync started first but answering last would
+      // reinstate a rewards list from before the queue, with no error anywhere.
+      // A ref, not the `refreshing` state, because the second call can arrive in
+      // the same tick as the first and would read a stale `false`.
+      if (refreshInFlight.current) {
+        console.log('[Rewards] Refresh already in progress, ignoring duplicate request');
+        return;
+      }
+      refreshInFlight.current = true;
+
       // Outside the try, and not awaited: haptics failing is not a refresh
       // failing. Inside, it was the one thing in a visitor's code path that
       // could reject, which would have reported "could not refresh your
@@ -386,7 +400,15 @@ export const Rewards = () => {
           if (source.data.kind === 'data') {
             await rewardsRepository.insertMany([...source.data.items]);
           }
-          await refreshBeerData();
+          // The fetch working is not the refresh working. `refreshBeerData`
+          // swallows its own read failures into `beerError`, which this screen
+          // does not render — so without this the sync could fail, the log
+          // would still say "synced", the spinner would retract and nothing
+          // would be said. Rethrow into the one place that reports.
+          const synced = await refreshBeerData();
+          if (!synced) {
+            throw new Error('Rewards fetched, but the local database sync failed');
+          }
           console.log('Rewards refreshed and AppContext synced');
         }
       } catch (error) {
@@ -396,7 +418,7 @@ export const Rewards = () => {
         // had failed at all.
         //
         // The wording names no cause on purpose: this `try` also spans
-        // `rewardsRepository.insertMany` and the haptics call, so "check your
+        // `rewardsRepository.insertMany` and the context sync, so "check your
         // connection" sent a user to toggle wifi over a failed local write.
         console.error('Error refreshing rewards:', error);
         if (notifyOnFailure) {
@@ -406,6 +428,7 @@ export const Rewards = () => {
           );
         }
       } finally {
+        refreshInFlight.current = false;
         setRefreshing(false);
       }
     },

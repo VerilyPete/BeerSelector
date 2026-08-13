@@ -11,8 +11,12 @@ export type UseDataRefreshParams = {
   /**
    * Callback to reload local data after a successful or partial refresh
    * This should fetch data from the local database and update component state
+   *
+   * Its resolved value is ignored — `Promise<unknown>` only so callers can pass
+   * a function that happens to return something, such as the context's
+   * `refreshBeerData`. What this hook reacts to is a REJECTION.
    */
-  onDataReloaded: () => Promise<void>;
+  onDataReloaded: () => Promise<unknown>;
 
   /**
    * Optional name for logging purposes (e.g., 'AllBeers', 'Beerfinder')
