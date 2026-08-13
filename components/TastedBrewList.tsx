@@ -58,6 +58,20 @@ export const TastedBrewList = () => {
     componentName: 'TastedBrewList',
   });
 
+  /**
+   * Try Again re-reads the database; pull-to-refresh goes to the network.
+   *
+   * The failure this button appears under is a local read failure, so the
+   * network round-trip is not what needs retrying. `handleRefresh` also bails
+   * at its API-URL check before it ever reaches `onDataReloaded`, which made
+   * Try Again a dead control for anyone logged out or on a first launch. (Not
+   * for visitors on this screen specifically — this tab is `href: null` in
+   * visitor mode, per app/(tabs)/_layout.tsx. AllBeers is where that matters.)
+   */
+  const handleTryAgain = useCallback(() => {
+    void refreshBeerData();
+  }, [refreshBeerData]);
+
   // Sync debounced search text with hook's search state
   useEffect(() => {
     setSearchText(debouncedSearchText);
@@ -123,7 +137,7 @@ export const TastedBrewList = () => {
           <Text style={[styles.errorText, { color: colors.error }]}>{errors.beerError}</Text>
           <TouchableOpacity
             style={[styles.refreshButton, { backgroundColor: colors.tint }]}
-            onPress={handleRefresh}
+            onPress={handleTryAgain}
           >
             <Text style={[styles.buttonText, { color: colors.textOnPrimary }]}>Try Again</Text>
           </TouchableOpacity>

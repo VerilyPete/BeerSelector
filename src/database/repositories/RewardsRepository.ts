@@ -136,11 +136,16 @@ export class RewardsRepository {
   /**
    * Get all rewards from the database
    *
-   * Returns empty array on error instead of throwing.
+   * Rethrows on error. An unreadable rewards table and a member who has earned
+   * nothing are different facts, and returning [] for both made them
+   * indistinguishable to every caller — including AppContext, which is the only
+   * thing that could tell the user.
+   *
    * Orders by reward_id.
    * Validates all rows with type guards and filters out invalid data.
    *
    * @returns Array of Reward objects
+   * @throws Propagates any database error to the caller
    */
   async getAll(): Promise<Reward[]> {
     const database = await getDatabase();
@@ -153,7 +158,7 @@ export class RewardsRepository {
       return rows.filter(row => isRewardRow(row)).map(row => rewardRowToReward(row));
     } catch (error) {
       console.error('Error getting rewards:', error);
-      return [];
+      throw error;
     }
   }
 

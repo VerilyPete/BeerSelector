@@ -268,15 +268,18 @@ describe('Repository Validation Integration', () => {
       expect(result).toHaveLength(2);
     });
 
-    it('should return empty array when database returns null', async () => {
+    it('should throw when the database returns null', async () => {
       const mockDatabase = createMockDatabase();
       const repository = new RewardsRepository();
+      jest.spyOn(console, 'error').mockImplementation();
       mockDatabase.getAllAsync.mockResolvedValue(null);
 
-      const result = await repository.getAll();
-
-      // RewardsRepository handles null gracefully
-      expect(result).toEqual([]);
+      // Was "handles null gracefully" — which meant a `rows.filter` TypeError
+      // laundered into an empty reward list, indistinguishable from a member
+      // who has earned nothing. It propagates now, like every other read
+      // failure on this repository and like BeerRepository.getAll on the same
+      // input.
+      await expect(repository.getAll()).rejects.toThrow(TypeError);
     });
 
     it('should filter out rewards with wrong type values', async () => {

@@ -11,8 +11,12 @@ export type UseDataRefreshParams = {
   /**
    * Callback to reload local data after a successful or partial refresh
    * This should fetch data from the local database and update component state
+   *
+   * Its resolved value is ignored — `Promise<unknown>` only so callers can pass
+   * a function that happens to return something, such as the context's
+   * `refreshBeerData`. What this hook reacts to is a REJECTION.
    */
-  onDataReloaded: () => Promise<void>;
+  onDataReloaded: () => Promise<unknown>;
 
   /**
    * Optional name for logging purposes (e.g., 'AllBeers', 'Beerfinder')
@@ -28,11 +32,6 @@ export type UseDataRefreshResult = {
    * Whether a refresh operation is currently in progress
    */
   refreshing: boolean;
-
-  /**
-   * Error message from the last refresh operation, if any
-   */
-  error: string | null;
 
   /**
    * Function to trigger a manual refresh of all data types
@@ -57,13 +56,25 @@ export type UseDataRefreshResult = {
  * 5. Reloads local data from database (even on partial success)
  * 6. Updates component state via onDataReloaded callback
  *
+ * Every failure it can see is alerted, and one user action produces at most one
+ * alert. It used to return an `error` string as well, which no caller ever
+ * destructured — so the one failure reported only that way (a local re-read
+ * that throws after a successful fetch) reached nobody at all. The alert is now
+ * the whole contract; there is no second, silent channel to forget to read.
+ *
+ * How far that reaches depends on the `onDataReloaded` a screen passes.
+ * Beerfinder and TastedBrewList pass the context's `refreshBeerData`, which
+ * catches its own failures into `beerError` and never rejects — so for them
+ * this branch is unreachable and the failure surfaces as the context's error
+ * screen instead. Only AllBeers, whose callback reads `beerRepository`
+ * directly, can reach it today.
+ *
  * @example
  * ```tsx
- * const { refreshing, handleRefresh, error } = useDataRefresh({
+ * const { refreshing, handleRefresh } = useDataRefresh({
  *   onDataReloaded: async () => {
  *     const beers = await getAllBeers();
  *     setAllBeers(beers);
- *     setError(null);
  *   },
  *   componentName: 'AllBeers'
  * });
@@ -77,14 +88,13 @@ export type UseDataRefreshResult = {
  * ```
  *
  * @param params - Configuration object with onDataReloaded callback and optional componentName
- * @returns Object containing refreshing state, error state, and handleRefresh function
+ * @returns Object containing refreshing state and handleRefresh function
  */
 export const useDataRefresh = ({
   onDataReloaded,
   componentName = 'Component',
 }: UseDataRefreshParams): UseDataRefreshResult => {
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   /**
    * Handle manual refresh triggered by user pull-to-refresh gesture
@@ -114,7 +124,9 @@ export const useDataRefresh = ({
           'API URLs Not Configured',
           'Please log in via the Settings screen to configure API URLs before refreshing.'
         );
-        setRefreshing(false);
+        // No `setRefreshing(false)` here: this return is inside the try, so the
+        // finally below already lowers it. The explicit call that used to sit
+        // here was unreachable-by-effect, and no test could tell the two apart.
         return;
       }
 
@@ -122,13 +134,44 @@ export const useDataRefresh = ({
       console.log('Using unified refresh to update all data types');
       const result = await manualRefreshAllData();
 
-      // Check if there were any errors
+      // Refresh the local display regardless of API errors (use cached data)
+      // This implements offline-first approach - show what we have even if API
+      // fails. Done BEFORE the alerts, not after: two `Alert.alert` calls in
+      // one tick do not queue or collapse — RN gives each its own UIWindow at
+      // the same level, so both present and the later sits on top. Reporting
+      // the API failure and then the local failure put "Refreshed, but…" over
+      // the top of the error explaining why nothing was refreshed. One user
+      // action, one message.
+      let localReloadFailed = false;
+      try {
+        await onDataReloaded();
+
+        if (!result.hasErrors) {
+          console.log(`All data refreshed successfully from ${componentName} tab`);
+        }
+      } catch (localError: unknown) {
+        // Reported, not merely recorded. This branch used to write an `error`
+        // state that no consumer of this hook destructures, so a refresh that
+        // fetched fine and then failed to re-read the database was
+        // indistinguishable from one with nothing new to show: spinner
+        // retracts, stale rows stay, user told nothing.
+        console.error('Error loading local beer data after refresh:', localError);
+        localReloadFailed = true;
+      }
+
+      // The local re-read failing is appended to the API error rather than
+      // raised beside it, so the two facts arrive together and in the order
+      // that explains them.
+      const staleWarning = localReloadFailed
+        ? '\n\nThe list on screen could not be reloaded either, so it may be out of date.'
+        : '';
+
       if (result.hasErrors) {
         if (result.allNetworkErrors) {
           // All errors are network-related
           Alert.alert(
             'Server Connection Error',
-            'Unable to connect to the server. Please check your internet connection and try again later.',
+            `Unable to connect to the server. Please check your internet connection and try again later.${staleWarning}`,
             [{ text: 'OK' }]
           );
         } else {
@@ -139,27 +182,18 @@ export const useDataRefresh = ({
 
           Alert.alert(
             'Data Refresh Error',
-            `There were problems refreshing beer data:\n\n${errorMessages.join('\n\n')}`,
+            `There were problems refreshing beer data:\n\n${errorMessages.join('\n\n')}${staleWarning}`,
             [{ text: 'OK' }]
           );
         }
-      }
-
-      // Refresh the local display regardless of API errors (use cached data)
-      // This implements offline-first approach - show what we have even if API fails
-      try {
-        await onDataReloaded();
-
-        if (!result.hasErrors) {
-          console.log(`All data refreshed successfully from ${componentName} tab`);
-        }
-      } catch (localError: unknown) {
-        console.error('Error loading local beer data after refresh:', localError);
-        setError('Failed to load beer data from local storage.');
+      } else if (localReloadFailed) {
+        Alert.alert(
+          'Error',
+          'Refreshed, but the updated data could not be loaded from this device. What you see may be out of date.'
+        );
       }
     } catch (error: unknown) {
       console.error(`Error in unified refresh from ${componentName}:`, error);
-      setError('Failed to refresh beer data. Please try again later.');
       Alert.alert('Error', 'Failed to refresh beer data. Please try again later.');
     } finally {
       setRefreshing(false);
@@ -168,7 +202,6 @@ export const useDataRefresh = ({
 
   return {
     refreshing,
-    error,
     handleRefresh,
   };
 };

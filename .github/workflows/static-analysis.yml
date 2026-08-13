@@ -66,11 +66,15 @@ jobs:
       # encouraged as warnings get fixed.
       #
       # 364 when this file was added; 152 after the sweep that fixed them.
+      # 154 since 2026-08-13: TastedBrewList.error.test.tsx stubs SkeletonLoader
+      # in a `jest.mock` factory, which costs the two `require`s below. The real
+      # component runs a `withRepeat` Reanimated animation, so rendering it is
+      # the hang TESTING.md warns about — the stub is not a shortcut.
       # What remains is not a backlog of easy wins — every one was examined and
       # argued for:
-      #   146  @typescript-eslint/no-require-imports
+      #   148  @typescript-eslint/no-require-imports
       #     6  @typescript-eslint/no-unused-vars
-      # 123 of the 146 are `jest.resetModules()` + `require('../config')` in
+      # 123 of the 148 are `jest.resetModules()` + `require('../config')` in
       # four config test suites, where a static import is hoisted above the
       # env-var mutation the test exists to exercise and would silently defeat
       # the reset. The rest sit inside `jest.mock(...)` factories, where
@@ -92,7 +96,7 @@ jobs:
       # `--max-warnings 5` exits 1, `--max-warnings 364` exits 0.
       - name: Lint
         env:
-          MAX_WARNINGS: '152'
+          MAX_WARNINGS: '154'
         run: npm run lint -- --max-warnings "$MAX_WARNINGS"
 
   typescript:

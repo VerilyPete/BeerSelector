@@ -165,7 +165,6 @@ describe('AllBeers Loading States (MP-3 Step 3a)', () => {
     // Mock useDataRefresh hook
     (useDataRefresh as jest.Mock).mockReturnValue({
       refreshing: false,
-      error: null,
       handleRefresh: jest.fn(),
     });
   });
@@ -365,6 +364,47 @@ describe('AllBeers Loading States (MP-3 Step 3a)', () => {
       });
     });
 
+    it('should reload every context source when try again is pressed', async () => {
+      // Try Again goes through the context's loader, not AllBeers' own
+      // `loadBeers`, which reads `beerRepository` alone.
+      //
+      // Nothing on this screen renders the tasted list, so the difference is
+      // invisible here and visible one tab over: recovering the catalog while
+      // leaving `tastedBeers` at whatever it was means Beerfinder computes
+      // `allBeers − tastedBeers` from a stale subtrahend and offers beers the
+      // user has already checked in. That is the 200 Beer Challenge rule in
+      // CLAUDE.md, broken by a button on a different screen.
+      //
+      // Asserted on the repositories rather than on rendered state for that
+      // reason — this component has no view of the state that goes stale.
+      let dbHealthy = false;
+      (beerRepository.getAll as jest.Mock).mockImplementation(() =>
+        dbHealthy ? Promise.resolve(mockBeers) : Promise.reject(new Error('Database error'))
+      );
+
+      const { getByTestId, queryByTestId } = renderAllBeers();
+
+      await waitFor(() => {
+        expect(getByTestId('try-again-button')).toBeDefined();
+      });
+
+      dbHealthy = true;
+      const tastedCallsBefore = (myBeersRepository.getAll as jest.Mock).mock.calls.length;
+      const rewardCallsBefore = (rewardsRepository.getAll as jest.Mock).mock.calls.length;
+
+      fireEvent.press(getByTestId('try-again-button'));
+
+      // Synchronous: the provider's retry chain also reads all three, but it
+      // only fires on a timer and nothing advances the clock here.
+      expect((myBeersRepository.getAll as jest.Mock).mock.calls.length).toBe(tastedCallsBefore + 1);
+      expect((rewardsRepository.getAll as jest.Mock).mock.calls.length).toBe(rewardCallsBefore + 1);
+
+      await act(async () => {});
+
+      expect(queryByTestId('error-container')).toBeNull();
+      expect(getByTestId('beer-list')).toBeDefined();
+    });
+
     it('should not show beer list on error', async () => {
       (beerRepository.getAll as jest.Mock).mockRejectedValue(new Error('Failed'));
 
@@ -412,7 +452,6 @@ describe('AllBeers Loading States (MP-3 Step 3a)', () => {
 
       (useDataRefresh as jest.Mock).mockReturnValue({
         refreshing: true,
-        error: null,
         handleRefresh: jest.fn(),
       });
 
@@ -433,7 +472,6 @@ describe('AllBeers Loading States (MP-3 Step 3a)', () => {
       const handleRefresh = jest.fn();
       (useDataRefresh as jest.Mock).mockReturnValue({
         refreshing: false,
-        error: null,
         handleRefresh,
       });
 
@@ -556,12 +594,14 @@ describe('AllBeers Loading States (MP-3 Step 3a)', () => {
       //
       // `waitFor` pumps the fake clock, which lets AppProvider's own background
       // retries (1s/2s/4s) fire and clear the error by themselves. Asserting
-      // through a waitFor here therefore proves nothing about loadBeers:
-      // deleting `setBeerError(null)` from AllBeers.tsx:63 passed this test.
+      // through a waitFor here therefore proves nothing about the button:
+      // while Try Again was wired to `loadBeers`, deleting that path's
+      // `setBeerError(null)` passed this test.
       //
       // Flushing microtasks without advancing the clock keeps the provider's
       // timers unfired, so the only thing that can have cleared the error is
-      // loadBeers itself.
+      // the press — now `refreshBeerData`, and its success path's
+      // `setBeerError(null)` is what this holds down.
       await act(async () => {});
 
       expect(queryByTestId('error-container')).toBeNull();

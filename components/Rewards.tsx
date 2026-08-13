@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   StyleSheet,
   View,
@@ -340,51 +340,171 @@ export const Rewards = () => {
   const { session, beers, loading, errors, refreshBeerData } = useAppContext();
 
   const [refreshing, setRefreshing] = useState(false);
+  /** Guards against overlapping refreshes; see `refreshRewards`. */
+  const refreshInFlight = useRef(false);
+  /** Whether the refresh in flight owes anyone a failure report. */
+  const notifyOnFailureRef = useRef(false);
+  /** Whether someone asked for a refresh while one was already running. */
+  const rerunRequested = useRef(false);
+  /**
+   * Whether the re-run those requests earned owes anyone a failure report.
+   * Tracked separately from `notifyOnFailureRef` because intent belongs to the
+   * PASS, not to the loop: a user's pull and a silent post-queue sync can be
+   * coalesced, and the extra pass that exists only for the sync must not alert
+   * a user whose own refresh already succeeded.
+   */
+  const rerunNotify = useRef(false);
   const [queueingRewards, setQueueingRewards] = useState<Record<string, boolean>>({});
 
   const colorScheme = useColorScheme() ?? 'dark';
   const colors = Colors[colorScheme];
 
-  const handleRefresh = useCallback(async () => {
-    try {
-      setRefreshing(true);
-      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  /**
+   * Fetch rewards and sync the context.
+   *
+   * `notifyOnFailure` exists because this is two callers wearing one hat: the
+   * user's pull-to-refresh, where silence was the bug, and `queueReward`'s
+   * post-write sync, which the user never asked for. Alerting on both put a
+   * "could not refresh, check your connection" modal on top of the "added to
+   * your queue!" confirmation for a reward the server had already accepted —
+   * one action, two dialogs, the false one last, inviting a double-queue.
+   */
+  const refreshRewards = useCallback(
+    async ({ notifyOnFailure }: { notifyOnFailure: boolean }) => {
+      // Only one at a time. `insertMany` CLEARS the table before writing, so two
+      // overlapping refreshes race to publish whole snapshots and the slower
+      // FETCH wins — a post-queue sync started first but answering last would
+      // reinstate a rewards list from before the queue, with no error anywhere.
+      // A ref, not the `refreshing` state, because the second call can arrive in
+      // the same tick as the first and would read a stale `false`.
+      if (refreshInFlight.current) {
+        // The dropped CALL goes away; its intent must not. A user pulling to
+        // refresh while a silent post-queue sync happens to be running would
+        // otherwise be dropped into that sync's silence — and since the sync
+        // already has the RefreshControl spinning, an offline failure would
+        // look exactly like a refresh that worked. Whoever asked to be told
+        // gets told.
+        notifyOnFailureRef.current = notifyOnFailureRef.current || notifyOnFailure;
+        // And the WORK is deferred, not dropped. The in-flight fetch may have
+        // started before whatever prompted this call — a reward queued a moment
+        // ago — so its snapshot can be older than the change this call exists
+        // to pick up. Dropping it left a just-queued reward showing as
+        // AVAILABLE with nothing wrong anywhere.
+        rerunRequested.current = true;
+        rerunNotify.current = rerunNotify.current || notifyOnFailure;
+        console.log('[Rewards] Refresh already in progress, joining it');
+        return;
+      }
+      refreshInFlight.current = true;
+      notifyOnFailureRef.current = notifyOnFailure;
+      rerunRequested.current = false;
+      rerunNotify.current = false;
 
-      if (!session.isVisitor) {
-        const source = await fetchRewardsFromAPI();
+      // Not awaited, here or anywhere else on this screen: haptics failing is
+      // not the operation failing. Awaited inside a try, it reported "could not
+      // refresh your rewards" for a refresh that never attempted anything — and
+      // worse, as the first statement of `queueReward`'s CATCH it jumped past
+      // the `Alert.alert` beneath it, so a failed check-in told the user
+      // nothing at all and the rejection escaped an onPress handler. Feedback
+      // about a failure must not depend on the vibration motor.
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
 
-        // `unavailable` is an ERROR state, not an empty list — the old bare []
-        // rendered "no rewards" for a member whose request never happened.
-        if (source.status !== 'fetched') {
-          throw new Error(
-            source.status === 'unavailable'
-              ? `Rewards unavailable (${source.reason.code}): ${source.reason.detail}`
-              : `Rewards could not be fetched (${source.status})`
+      try {
+        setRefreshing(true);
+
+        // Runs again for any request absorbed while this one was in flight. The
+        // flag is cleared before each pass, so a request arriving mid-pass buys
+        // exactly one more and no further; a failure exits the loop rather than
+        // hammering an endpoint that just refused.
+        do {
+          rerunRequested.current = false;
+
+          if (!session.isVisitor) {
+            const source = await fetchRewardsFromAPI();
+
+            // `unavailable` is an ERROR state, not an empty list — the old bare []
+            // rendered "no rewards" for a member whose request never happened.
+            if (source.status !== 'fetched') {
+              throw new Error(
+                source.status === 'unavailable'
+                  ? `Rewards unavailable (${source.reason.code}): ${source.reason.detail}`
+                  : `Rewards could not be fetched (${source.status})`
+              );
+            }
+            if (source.data.kind === 'malformed') {
+              throw new Error(`Rewards malformed: ${source.data.detail}`);
+            }
+            // confirmed-empty is a real state — a member with none earned yet — so
+            // it renders the empty state rather than writing or erroring.
+            if (source.data.kind === 'data') {
+              await rewardsRepository.insertMany([...source.data.items]);
+            }
+            // The fetch working is not the refresh working. `refreshBeerData`
+            // swallows its own read failures into `beerError`, which this screen
+            // does not render — so without this the sync could fail, the log
+            // would still say "synced", the spinner would retract and nothing
+            // would be said. Rethrow into the one place that reports.
+            const synced = await refreshBeerData();
+            if (!synced) {
+              throw new Error('Rewards fetched, but the local database sync failed');
+            }
+            console.log('Rewards refreshed and AppContext synced');
+          }
+          // Hand the next pass only the intent that asked for it.
+          if (rerunRequested.current) {
+            notifyOnFailureRef.current = rerunNotify.current;
+            rerunNotify.current = false;
+          }
+        } while (rerunRequested.current);
+      } catch (error) {
+        // Told, not just logged. This caught its own failure into a console line
+        // and changed no state: the spinner retracted, the screen was identical,
+        // and a member whose rewards never arrived had no way to know the attempt
+        // had failed at all.
+        //
+        // The wording names no cause on purpose: this `try` also spans
+        // `rewardsRepository.insertMany` and the context sync, so "check your
+        // connection" sent a user to toggle wifi over a failed local write.
+        console.error('Error refreshing rewards:', error);
+        if (notifyOnFailureRef.current) {
+          Alert.alert(
+            'Rewards Refresh Failed',
+            'Could not refresh your rewards. Please try again.'
           );
         }
-        if (source.data.kind === 'malformed') {
-          throw new Error(`Rewards malformed: ${source.data.detail}`);
-        }
-        // confirmed-empty is a real state — a member with none earned yet — so
-        // it renders the empty state rather than writing or erroring.
-        if (source.data.kind === 'data') {
-          await rewardsRepository.insertMany([...source.data.items]);
-        }
-        await refreshBeerData();
-        console.log('Rewards refreshed and AppContext synced');
+      } finally {
+        refreshInFlight.current = false;
+        notifyOnFailureRef.current = false;
+        setRefreshing(false);
       }
-    } catch (error) {
-      console.error('Error refreshing rewards:', error);
-    } finally {
-      setRefreshing(false);
-    }
-  }, [session.isVisitor, refreshBeerData]);
+    },
+    [session.isVisitor, refreshBeerData]
+  );
+
+  /** Pull-to-refresh: the user asked, so the user is told if it fails. */
+  const handleRefresh = useCallback(
+    () => refreshRewards({ notifyOnFailure: true }),
+    [refreshRewards]
+  );
+
+  /**
+   * Try Again re-reads the database; pull-to-refresh goes to the network.
+   *
+   * `rewardError` is raised by a failed local read in AppContext, so the
+   * network round-trip `handleRefresh` performs is not what needs retrying —
+   * and worse, it throws before reaching its own `refreshBeerData()` whenever
+   * the fetch fails, so offline this button could never clear the error it sat
+   * under. Same fix the other three screens got.
+   */
+  const handleTryAgain = useCallback(() => {
+    void refreshBeerData();
+  }, [refreshBeerData]);
 
   const queueReward = useCallback(
     async (rewardId: string, rewardType: string) => {
       try {
         setQueueingRewards(prev => ({ ...prev, [rewardId]: true }));
-        await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
 
         const sessionData = await getSessionData();
 
@@ -448,12 +568,14 @@ export const Rewards = () => {
         console.log('API Response:', responseText);
 
         if (response.ok) {
-          await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
 
           if (!responseText || responseText.trim().length < 2) {
             console.log('Empty response received from server, considering reward queue successful');
             Alert.alert('Success', `${rewardType} has been added to your queue!`);
-            handleRefresh();
+            // Silent: the queue succeeded, and the user did not ask for this
+            // sync. Its failure must not contradict the confirmation above.
+            void refreshRewards({ notifyOnFailure: false });
             return;
           }
 
@@ -466,14 +588,14 @@ export const Rewards = () => {
             Alert.alert('Success', `${rewardType} has been added to your queue!`);
           }
 
-          handleRefresh();
+          void refreshRewards({ notifyOnFailure: false });
         } else {
-          await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+          void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
           console.error('Failed to queue reward:', responseText);
           Alert.alert('Error', `Failed to queue the reward. Status: ${response.status}`);
         }
       } catch (err: unknown) {
-        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
         console.error('Error queuing reward:', err);
         Alert.alert(
           'Error',
@@ -483,12 +605,12 @@ export const Rewards = () => {
         setQueueingRewards(prev => ({ ...prev, [rewardId]: false }));
       }
     },
-    [handleRefresh]
+    [refreshRewards]
   );
 
   const handleRewardPress = useCallback(
     async (item: Reward) => {
-      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
       const isRedeemed = item.redeemed === '1';
 
       if (isRedeemed) {
@@ -568,26 +690,10 @@ export const Rewards = () => {
     );
   }
 
-  if (errors.rewardError) {
-    return (
-      <View style={[styles.errorContainer, { backgroundColor: colors.background }]}>
-        <Ionicons name="alert-circle" size={48} color={colors.error} />
-        <Text style={[styles.errorText, { color: colors.textSecondary }]}>
-          {errors.rewardError}
-        </Text>
-        <TouchableOpacity
-          style={[styles.retryButton, { borderColor: colors.tint }]}
-          onPress={handleRefresh}
-        >
-          <Text style={[styles.retryButtonText, { color: colors.tint }]}>TRY AGAIN</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <FlatList
+        testID="rewards-list"
         data={beers.rewards}
         renderItem={renderRewardItem}
         keyExtractor={item => item.reward_id}
@@ -595,6 +701,37 @@ export const Rewards = () => {
         ListHeaderComponent={
           <>
             {!session.isVisitor ? <ProgressHeader tastedCount={tastedCount} /> : null}
+            {/*
+              A rewards failure is reported in place, not by replacing the
+              screen. This used to be an early `return` above the list, which
+              was invisible while nothing wrote `rewardError` — and the moment
+              something did, one unreadable table would have taken the 200 Beer
+              Challenge progress ring and milestone bar with it. Those are
+              computed from `tastedBeers`, which is fine; so are the rewards the
+              provider deliberately preserved rather than overwriting with [].
+              Full-screen is for "I have nothing to show", and here we usually do.
+            */}
+            {errors.rewardError ? (
+              <View
+                testID="reward-error-banner"
+                style={[
+                  styles.errorBanner,
+                  { backgroundColor: colors.backgroundSecondary, borderColor: colors.error },
+                ]}
+              >
+                <Ionicons name="alert-circle" size={24} color={colors.error} />
+                <Text style={[styles.errorText, { color: colors.textSecondary }]}>
+                  {errors.rewardError}
+                </Text>
+                <TouchableOpacity
+                  style={[styles.retryButton, { borderColor: colors.tint }]}
+                  onPress={handleTryAgain}
+                  testID="reward-retry-button"
+                >
+                  <Text style={[styles.retryButtonText, { color: colors.tint }]}>TRY AGAIN</Text>
+                </TouchableOpacity>
+              </View>
+            ) : null}
             <View
               style={[
                 styles.labelPlate,
@@ -605,7 +742,12 @@ export const Rewards = () => {
             </View>
           </>
         }
-        ListEmptyComponent={<EmptyState isVisitor={session.isVisitor} />}
+        // Suppressed while the read is failing: "No Rewards Yet" under a
+        // "could not load rewards" banner is the same lie the swallowed
+        // repository error used to tell, just with a caption.
+        ListEmptyComponent={
+          errors.rewardError ? null : <EmptyState isVisitor={session.isVisitor} />
+        }
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -641,12 +783,12 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
 
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
+  errorBanner: {
     alignItems: 'center',
-    padding: 32,
-    gap: 16,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderRadius: 8,
   },
   errorText: {
     fontFamily: 'SpaceMono',
