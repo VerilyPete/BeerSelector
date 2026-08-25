@@ -227,10 +227,11 @@ const attemptFetch = async (
 
       // The ordinary retry logs at its own recursion; without a sibling line
       // here, an unreadable retry that SUCCEEDS leaves no trace anywhere. The
-      // source and the remaining budget are included so a future breaker can be
-      // sized from incidents rather than from attempts.
+      // retry delay and remaining attempt count are included so a future breaker
+      // can be sized from incidents rather than from attempts. The URL is not:
+      // member endpoints carry a stable uid in their query string.
       console.log(
-        `Response body could not be read, retrying once in ${delay}ms... (${retries - 1} retries left) ${url}`
+        `Response body could not be read, retrying once in ${delay}ms... (${retries - 1} retries left)`
       );
       await new Promise(resolve => setTimeout(resolve, delay));
 

@@ -375,6 +375,23 @@ describe('fetchWithRetry retry policy', () => {
       await expect(result).resolves.toEqual(payload);
     });
 
+    it('does not log a member identifier from the retried URL', async () => {
+      const memberId = 'SENTINEL_MEMBER_12345';
+      const memberUrl = `https://fsbs.beerknurd.com/bk-member-json.php?uid=${memberId}`;
+      const payload = { brewInStock: [] };
+      (global.fetch as jest.Mock)
+        .mockResolvedValueOnce(unreadableBody())
+        .mockResolvedValueOnce({ ok: true, json: async () => payload });
+
+      const result = fetchWithRetry(memberUrl, 3, 10);
+      await jest.advanceTimersByTimeAsync(1000);
+      await expect(result).resolves.toEqual(payload);
+
+      const logged = JSON.stringify((console.log as jest.Mock).mock.calls);
+      expect(logged).toContain('2 retries left');
+      expect(logged).not.toContain(memberId);
+    });
+
     it.each([
       // Both recursion sites multiply the delay, and neither multiplication was
       // pinned: `delay * 1.5 -> delay` survived the whole API set at both. The
