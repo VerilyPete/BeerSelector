@@ -37,7 +37,12 @@ import {
 import { config } from '@/src/config';
 import { getPreference, setPreference } from '../../database/preferences';
 import { databaseLockManager } from '../../database/DatabaseLockManager';
-import { fetchedRows, failed, unavailable } from '../../api/__tests__/helpers/fetchOutcomeFixtures';
+import {
+  fetchedRows,
+  failed,
+  malformed,
+  unavailable,
+} from '../../api/__tests__/helpers/fetchOutcomeFixtures';
 import { sequentialRefreshAllData, resetInFlightSequentialRefresh } from '../dataUpdateService';
 
 /**
@@ -255,17 +260,15 @@ describe('sequentialRefreshAllData locking', () => {
     enrichmentSpy.mockRestore();
   });
 
-  it('writes the sources that fetched successfully when another source fails', async () => {
+  it('writes valid rewards when the same member body has malformed tasted rows', async () => {
     respondsWith(fetchBeersFromAPI as jest.Mock, 'allBeers', fetchedRows(ALL_BEERS));
-    respondsWith(fetchMyBeersFromAPI as jest.Mock, 'myBeers', failed());
+    respondsWith(fetchMyBeersFromAPI as jest.Mock, 'myBeers', malformed('rows lacked an id'));
     respondsWith(fetchRewardsFromAPI as jest.Mock, 'rewards', fetchedRows(REWARDS));
 
     const result = await sequentialRefreshAllData();
 
-    // Per-source isolation is the property that made hoisting safe at all — 02
-    // Phase 2.5 is what removed the blocker recorded in 01 Phase 4. If a single
-    // failure could suppress the other two writes, this restructure would be
-    // the regression it exists to prevent.
+    // Both member outcomes can come from one real response. A malformed tasted
+    // array must not suppress the valid reward half of that body.
     expect(beerRepository.insertManyUnsafe).toHaveBeenCalled();
     expect(rewardsRepository.insertManyUnsafe).toHaveBeenCalled();
     expect(myBeersRepository.insertManyUnsafe).not.toHaveBeenCalled();

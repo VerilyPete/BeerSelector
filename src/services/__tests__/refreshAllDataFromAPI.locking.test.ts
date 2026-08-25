@@ -40,7 +40,12 @@ import { fetchEnrichmentBatchWithMissing, syncBeersToWorker } from '../enrichmen
 import { config } from '@/src/config';
 import { getPreference, setPreference } from '../../database/preferences';
 import { fetchBeersFromProxy } from '../enrichmentService';
-import { fetchedRows, failed, unavailable } from '../../api/__tests__/helpers/fetchOutcomeFixtures';
+import {
+  fetchedRows,
+  failed,
+  malformed,
+  unavailable,
+} from '../../api/__tests__/helpers/fetchOutcomeFixtures';
 import { refreshAllDataFromAPI } from '../dataUpdateService';
 
 /** One ordered log of everything worth ordering. See the sibling suite. */
@@ -226,12 +231,11 @@ describe('refreshAllDataFromAPI locking', () => {
     expect(mockEvents.indexOf('sync:worker')).toBeGreaterThan(mockEvents.indexOf('lock:release'));
   });
 
-  it('writes the sources that fetched successfully when another source fails', async () => {
-    // The exact property `01` Phase 4 refused to risk when it left this
-    // function alone. `02` Phase 2.5 supplied the per-source isolation that
-    // makes hoisting safe; this is the assertion that it still does.
+  it('writes valid rewards when the same member body has malformed tasted rows', async () => {
+    // This pairing can come from one real member response: malformed tasted
+    // rows beside a valid reward array. The valid half must still be written.
     respondsWith(fetchBeersFromAPI as jest.Mock, 'allBeers', fetchedRows(ALL_BEERS));
-    respondsWith(fetchMyBeersFromAPI as jest.Mock, 'myBeers', failed());
+    respondsWith(fetchMyBeersFromAPI as jest.Mock, 'myBeers', malformed('rows lacked an id'));
     respondsWith(fetchRewardsFromAPI as jest.Mock, 'rewards', fetchedRows(REWARDS));
 
     const result = await refreshAllDataFromAPI();
