@@ -845,10 +845,7 @@ async function runTaplistFetch(storeId: string | null): Promise<TaplistFetchResu
  * future INFO producer inherits the verbatim-message hazard the moment it is
  * written, and this rule is what it will be measured against.
  *
- * (This paragraph has now been wrong in both directions. It first said "the one
- * classification", understating the hazard; it was corrected to cite a live INFO
- * producer; and this branch then deleted that producer. Cite the RULE, not an
- * example — examples rot.)
+ * Cite the RULE, not an example — examples rot.
  *
  * Shared rather than written per site for the reason `resolveMemberApiUrl` is
  * shared: the last round fixed the TYPE at each site independently and left the
@@ -871,9 +868,7 @@ async function runTaplistFetch(storeId: string | null): Promise<TaplistFetchResu
  * the only code any producer currently reaches here — the `!apiUrl` arm of
  * `fetchBeersFromAPI` is the sole `unavailable` the taplist can return, and
  * `prepareMyBeers` routes `not-applicable` to a quiet success before it can
- * arrive. (By symbol, not by line: the line this cited moved on this very
- * branch, in the paragraph three lines above that complains about exactly
- * that.) The second arm is
+ * arrive. By symbol, not by line. The second arm is
  * defensive, and is worded to stay true rather than to match the first.
  */
 function unavailableCopy(label: string, code: UnavailableReason['code']): string {
@@ -2097,8 +2092,6 @@ export async function manualRefreshAllData(): Promise<ManualRefreshResult> {
     // could not affect this refresh, the next one, or anything else; they were
     // two database writes per manual refresh spent on state nothing consults.
     // Deleting the four writers as well is a wider change than this one.
-    // (Four, not the six an earlier draft said: that count included the two
-    // clears this comment is explaining the removal of.)
     await setPreference('all_beers_last_check', '');
     await setPreference('my_beers_last_check', '');
 

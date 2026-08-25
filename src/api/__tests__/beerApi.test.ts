@@ -1133,6 +1133,10 @@ describe('a non-array payload is malformed, not data (plan refresh-failure-class
           reward: [
             { reward_id: 'r1', redeemed: '0', reward_type: '$5 Credit' },
             'oops',
+            // Object-shaped with no id at all — the other input that separates
+            // the two clauses of the check. Without it, "drop the object test
+            // and keep only the id test" passes the whole API suite.
+            {},
             { reward_id: 'r2', redeemed: '1', reward_type: 'Plate' },
           ],
         },
@@ -1148,8 +1152,14 @@ describe('a non-array payload is malformed, not data (plan refresh-failure-class
       // actual payload would turn every real refresh into `malformed` and wipe
       // nothing — but report a failure to every member, forever. Driven from the
       // committed fixture rather than a hand-written row.
+      // The COMMITTED fixture, not the repo-root copy. The two are byte-identical
+      // today, but `mybeers.json` at the root is gitignored and untracked
+      // (`.gitignore:103`), so a fresh checkout does not have it — and the note
+      // beside that rule records CI losing a whole suite to ENOENT for exactly
+      // this reason. The re-include at `.gitignore:112` exists to make this path
+      // the safe one.
       // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const fixture = require('../../../mybeers.json');
+      const fixture = require('../../services/__tests__/fixtures/mybeers.json');
       respondWith(fixture);
 
       const body = payload(await fetchRewardsFromAPI());

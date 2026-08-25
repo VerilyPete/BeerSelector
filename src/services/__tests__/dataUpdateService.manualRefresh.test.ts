@@ -674,11 +674,15 @@ describe('what a manual refresh does to the freshness timestamps', () => {
  * produce for anything upstream of the extractors. One request means one
  * `resolveMemberApiUrl`, one verdict, both halves.
  *
- * That is a deliberate trade (converting ~160 per-source stubs would be a far
- * larger change than the one under test) but it left the CENTRAL behavioural
- * change of this work with no service-layer coverage at all. These two tests
- * bypass the factory for this describe only, and are the only place the
- * consequences of shared fate are visible below `beerApi`.
+ * That is a deliberate trade — converting ~160 per-source stubs would be a far
+ * larger change than the one under test. These two tests OVERRIDE that mock for
+ * this describe only, with a hand-built both-failed pair.
+ *
+ * What they are and are not: they show what shared fate costs a user, which
+ * nothing else states. They do NOT prove production produces a both-failed pair
+ * — they stub the output — and mutation testing found no defect that only they
+ * catch. The production property lives in `beerApi.memberCoalescing.test.ts`,
+ * where a real `global.fetch` exists.
  */
 describe('one member request means one verdict for both halves', () => {
   const bothHalvesFail = (type: ApiErrorType, message: string): void => {

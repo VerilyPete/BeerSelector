@@ -238,18 +238,18 @@ describe('fetchMemberDataFromAPI', () => {
  * which is the only place it can actually be shown.
  */
 describe('extracting the real mybeers.json fixture', () => {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const fs = require('fs');
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const path = require('path');
-
   beforeEach(() => {
     jest.clearAllMocks();
     (preferences.getPreference as jest.Mock).mockImplementation(memberPrefs);
   });
 
-  const fixture = (): unknown =>
-    JSON.parse(fs.readFileSync(path.join(process.cwd(), 'mybeers.json'), 'utf8'));
+  // The COMMITTED fixture. This read `process.cwd() + '/mybeers.json'`, which is
+  // wrong twice over: the repo-root copy is gitignored and untracked, so a fresh
+  // checkout does not have it (`.gitignore:103`, and the note there records CI
+  // losing a whole suite to ENOENT for exactly this), and `process.cwd()`
+  // depends on where jest was invoked from rather than on `rootDir`.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const fixture = (): unknown => require('../../services/__tests__/fixtures/mybeers.json');
 
   it('returns every tasted row the fixture carries', async () => {
     const body = fixture() as [unknown, { tasted_brew_current_round: unknown[] }];

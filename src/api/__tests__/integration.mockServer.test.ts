@@ -143,16 +143,15 @@ describe('API Integration with Mock Server', () => {
     });
 
     it('should fetch rewards from mock server successfully', async () => {
-      const mockRewards = [
-        {
-          id: 1,
-          name: 'Test Reward',
-          description: 'A test reward',
-          points: 100,
-          earned_date: '2025-01-01',
-          reward_type: 'badge',
-        },
-      ];
+      // The REAL reward shape. This fixture used to invent
+      // `{id, name, description, points, earned_date}`, which the server has
+      // never sent — the committed capture, the `Reward` type and the `rewards`
+      // table all agree on exactly these three fields, and the table has exactly
+      // these three columns. A mock server whose payload does not match the
+      // server is worth less than no mock server: it passed for as long as the
+      // extraction trusted whatever it was handed, and went red the moment the
+      // extraction started validating.
+      const mockRewards = [{ reward_id: '22208492', redeemed: '0', reward_type: '$5 Credit' }];
 
       // Rewards use my_beers_api_url and expect data in position [2].reward
       mockGetPreference.mockImplementation((key: string) => {
@@ -751,16 +750,8 @@ describe('API Integration with Mock Server', () => {
         return Promise.resolve(null);
       });
 
-      const mockRewards = [
-        {
-          id: 1,
-          name: 'Reward 1',
-          description: 'First reward',
-          points: 100,
-          earned_date: '2025-01-01',
-          reward_type: 'badge',
-        },
-      ];
+      // The real shape; see the sibling fixture above.
+      const mockRewards = [{ reward_id: '22208492', redeemed: '0', reward_type: '$5 Credit' }];
 
       mockServer.setResponse('/rewards.php', {
         status: 200,

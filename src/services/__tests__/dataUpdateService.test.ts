@@ -2134,20 +2134,36 @@ describe('refreshAllDataFromAPI per-source isolation', () => {
     (setPreference as jest.Mock).mockResolvedValue(undefined);
   });
 
-  // The live scenario: CHECK IN with an expired session on a weak link.
-  // checkInBeer -> autoLogin -> refreshAllDataFromAPI. The taplist write
-  // succeeds, then the my-beers fetch throws, and the throw escapes past BOTH
-  // the my-beers write and the rewards write. autoLogin logs and returns
-  // success, the check-in proceeds, and the user is left with a fresh taplist,
-  // a stale tasted list, and stale rewards — a wrong-high Beerfinder count.
-  it('still writes rewards when the my-beers fetch fails', async () => {
+  // WHICH ISOLATION SURVIVES COALESCING, restated after review found these
+  // asserting a property production no longer has.
+  //
+  // The live scenario is unchanged: CHECK IN with an expired session on a weak
+  // link. checkInBeer -> autoLogin -> refreshAllDataFromAPI. A source fails and
+  // the throw used to escape past every later write, leaving the user with a
+  // fresh taplist, a stale tasted list and stale rewards — a wrong-high
+  // Beerfinder count.
+  //
+  // What changed is the boundary. My-beers and rewards read the SAME url and are
+  // now one request, so they share fate by design: a real member-request failure
+  // fails both, and rewards are NOT written. The two tests below that assert
+  // otherwise pass only because the shared mock drives the halves from two
+  // independent per-source mocks — an arrangement production cannot produce.
+  // They are retitled and repointed at the boundary that IS still real: the
+  // taplist is a different url and a different request, and it survives a member
+  // failure. Left as they were, they would have documented isolation between
+  // my-beers and rewards that no longer exists, and the next person to rely on
+  // it would have believed them.
+  it('writes the taplist even when the member request fails', async () => {
     (fetchBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockAllBeers));
     (fetchMyBeersFromAPI as jest.Mock).mockRejectedValue(new Error('network timeout'));
     (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockRewards));
 
     await refreshAllDataFromAPI();
 
-    expect(rewardsRepository.insertManyUnsafe).toHaveBeenCalled();
+    // The taplist is the isolated source now. Asserting rewards here instead —
+    // which this did — pins my-beers/rewards independence, which coalescing
+    // deliberately removed.
+    expect(beerRepository.insertManyUnsafe).toHaveBeenCalled();
   });
 
   it('preserves the all-beers write when the my-beers fetch fails', async () => {
@@ -2160,15 +2176,19 @@ describe('refreshAllDataFromAPI per-source isolation', () => {
     expect(beerRepository.insertManyUnsafe).toHaveBeenCalled();
   });
 
-  it('still writes the taplist and rewards when the rewards fetch fails', async () => {
+  it('still writes the taplist when the rewards half fails', async () => {
     (fetchBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockAllBeers));
     (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockMyBeers));
     (fetchRewardsFromAPI as jest.Mock).mockRejectedValue(new Error('network timeout'));
 
     await refreshAllDataFromAPI();
 
+    // Taplist only. The `myBeersRepository` assertion this used to carry said
+    // my-beers survives a rewards failure — true of two independent requests,
+    // false of one shared one. Shared fate for the member pair is pinned in
+    // `dataUpdateService.manualRefresh.test.ts`; this file owns the taplist
+    // boundary.
     expect(beerRepository.insertManyUnsafe).toHaveBeenCalled();
-    expect(myBeersRepository.insertManyUnsafe).toHaveBeenCalled();
   });
 
   // GUARD — passes today via the existing finally. Not this phase's RED.

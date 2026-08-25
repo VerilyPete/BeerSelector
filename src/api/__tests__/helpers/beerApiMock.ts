@@ -13,7 +13,7 @@
  * prove a saving none of them can observe. Delegation also keeps the four
  * `expect(fetchMyBeersFromAPI).toHaveBeenCalledTimes(1)` assertions meaningful.
  *
- * TWO real limits follow, and review found the second one understated here:
+ * TWO real limits follow:
  *
  * 1. **The request saving is invisible.** This factory un-does the coalescing,
  *    so no suite using it can count requests. That property is measured against
@@ -28,10 +28,13 @@
  *    different slices of one body — so the unreachable arrangements are
  *    specifically the ones where exactly one half is `failed` or `unavailable`.
  *
- * Shared fate itself is therefore pinned in exactly one place below `beerApi`:
  * `dataUpdateService.manualRefresh.test.ts`'s "one member request means one
- * verdict" block, which bypasses this factory and drives
- * `fetchMemberDataFromAPI` directly. Reviewers proposed instead making a
+ * verdict" block OVERRIDES the delegating mock with a hand-built both-failed
+ * pair. That documents what shared fate costs a user, but it does not prove
+ * production produces such a pair — it stubs the output. The production property
+ * is pinned one layer up, in `beerApi.memberCoalescing.test.ts`'s "gives both
+ * halves the same failure when the request fails", where a real `global.fetch`
+ * exists. Reviewers proposed instead making a
  * delegate rejection fail both halves; that is more faithful, and it would
  * rewrite the arrangements of a dozen existing rejection-based tests to prove a
  * property those two tests already prove. Recorded as a considered trade rather

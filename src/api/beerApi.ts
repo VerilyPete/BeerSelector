@@ -16,8 +16,7 @@ import type { FetchOutcome, UnavailableReason, UnconditionalSource } from './fet
  * `setTimeout(abort, deadline - Date.now())` with a few milliseconds left — an
  * attempt born dead that still costs the server a request.
  *
- * TWO things it does not cover, both deliberate and both flagged in review so
- * they are recorded rather than assumed:
+ * TWO things it deliberately does not cover:
  *
  * 1. **The suspension hole.** The budget is reserved BEFORE the sleep, and a 1s
  *    sleep can resume 20s later if the app is backgrounded or the JS thread
@@ -99,9 +98,7 @@ const attemptFetch = async (
   // with no bound, while the apiClient and enrichment paths all have their own
   // AbortController — and the chain deadline it arms is what keeps a whole
   // refresh inside a predictable ceiling.
-  //
-  // (Stale rationale caught in review: the comment still described the locked
-  // shape two plans after the fetches were hoisted out of it.)
+
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), deadline - Date.now());
 
@@ -145,24 +142,13 @@ const attemptFetch = async (
     // hold. Transient failures below still retry; this exit is only for the
     // deadline.
     //
-    // Asks the controller rather than inspecting the error, and the reason is
-    // that the controller is AUTHORITATIVE — not the DOMException story this
-    // comment used to tell, which was wrong on both halves.
-    //
-    // What it claimed: that RN's whatwg-fetch polyfill raises a DOMException
-    // which is not `instanceof Error` and whose name would not match, so an
-    // abort fell through and was retried three times. Neither half held.
-    // `whatwg-fetch/dist/fetch.umd.js` prefers a global `DOMException` and RN
-    // ships none (`grep -r DOMException node_modules/react-native/Libraries/`
-    // is empty), so its `Object.create(Error.prototype)` shim is always the live
-    // path — it IS `instanceof Error`, and it sets `this.name = name` with
-    // aborts passing 'AbortError'. The name check would have matched. The
-    // retried-three-times consequence could not happen.
-    //
-    // The conclusion survives its bad argument: `error.name === 'AbortError'`
-    // would exit here for any error so named from any source, and the controller
-    // knows the answer without inferring it. Same argument notificationUtils
-    // makes for classifying by type rather than by message.
+    // Asks the controller rather than inspecting the error, because the
+    // controller is authoritative and a name check is not. RN's whatwg-fetch
+    // shim IS `instanceof Error` and DOES set `name = 'AbortError'`, so
+    // `error.name === 'AbortError'` matches here — and equally matches any error
+    // so named from any other source. Matching too much is the failure mode, not
+    // matching too little. Same argument `notificationUtils` makes for
+    // classifying by type rather than by message.
     if (controller.signal.aborted) {
       // The deadline is how we stopped waiting; it is not what went wrong. If
       // an earlier attempt produced a real answer — a 500, a refused
