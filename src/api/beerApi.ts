@@ -741,7 +741,13 @@ export const fetchRewardsFromAPI = async (): Promise<UnconditionalSource<FetchOu
   }
 };
 
-/** Mirror the primitive-to-TEXT coercion the rewards writer applied before validation. */
+/**
+ * Normalize supported primitive reward fields before validation.
+ *
+ * Truthiness/defaults and the meaningful integer/boolean cases match the old
+ * writer. Other finite numbers deliberately use JavaScript's canonical string
+ * spelling, which is stable here but can differ from SQLite's TEXT formatting.
+ */
 const toPersistedRewardText = (value: unknown, fallback: string): string => {
   const persisted = value || fallback;
   if (typeof persisted === 'string') return persisted;
@@ -842,16 +848,17 @@ const extractRewards = (data: unknown): UnconditionalSource<FetchOutcome<Reward>
     // primitive values into the TEXT columns. Gating on them adds nothing
     // against the wipe and turns a cosmetic upstream change (a numeric
     // `redeemed`, a renamed field) into a PERMANENT
-    // total outage. Constructing the row here mirrors that old writer behavior:
-    // numeric and boolean values keep their persisted meaning, while missing or
-    // unsupported values receive the same defaults.
+    // total outage. Constructing the row here preserves the meaningful primitive
+    // cases: numeric and boolean redemption flags retain their meaning, finite
+    // numeric types get JavaScript's canonical spelling, and missing or
+    // unsupported primitive values receive the established defaults.
     //
     // Constructed rather than asserted. `(row): row is Reward => …` is an
     // unchecked claim — TypeScript verifies only that `Reward` is assignable to
     // the parameter, never that the body implies it — so a narrowed runtime
     // check under a widened annotation is the same unsoundness this validation
     // was added to remove. Building the object is the version that cannot lie,
-    // and it applies the writer's own defaults where the rows are read.
+    // and it applies the ingest defaults where the rows are read.
     const rewards = rows.reduce<Reward[]>((kept, row) => {
       if (!row || typeof row !== 'object') return kept;
       const candidate = row as Record<string, unknown>;

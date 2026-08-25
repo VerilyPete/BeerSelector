@@ -1099,6 +1099,13 @@ describe('a non-array payload is malformed, not data (plan refresh-failure-class
         false,
       ],
       [
+        'a non-integer reward_type',
+        { reward_id: 'r1', redeemed: '0', reward_type: 1e-7 },
+        '0',
+        '1e-7',
+        false,
+      ],
+      [
         'a missing redeemed',
         { reward_id: 'r1', reward_type: '$5 Credit' },
         '0',
@@ -1109,7 +1116,7 @@ describe('a non-array payload is malformed, not data (plan refresh-failure-class
     ];
 
     it.each(DEFAULTED)(
-      'normalizes %s to the value persistence and consumers expect',
+      'normalizes %s to the canonical value ingest promises',
       async (_label, row, expectedRedeemed, expectedRewardType, expectedIsRedeemed) => {
         // THE OUTAGE TRIP-WIRE, removed. Gating on the full `isReward` — all three
         // fields, all strings — protects against nothing the wipe depends on and
