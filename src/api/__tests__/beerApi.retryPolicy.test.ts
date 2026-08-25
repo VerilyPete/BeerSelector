@@ -518,6 +518,27 @@ describe('fetchWithRetry retry policy', () => {
   });
 
   describe('the deadline bounds the chain, not the attempt', () => {
+    it('does not give an attempt more than one configured timeout after the clock moves backward', async () => {
+      const signals = capturedSignals();
+      (global.fetch as jest.Mock).mockRejectedValueOnce(new TypeError('Network request failed'));
+
+      const backoff = 1000;
+      const result = fetchWithRetry(config.api.baseUrl, 3, backoff);
+      const rejection = expect(result).rejects.toThrow('Network request failed');
+
+      // The chain deadline was computed before this adjustment. The old
+      // `deadline - Date.now()` timer treated the backward minute as new budget
+      // and let attempt 2 wait 60 seconds longer than any configured attempt.
+      jest.setSystemTime(Date.now() - 60_000);
+      await jest.advanceTimersByTimeAsync(backoff);
+      expect(signals).toHaveLength(1);
+
+      await jest.advanceTimersByTimeAsync(config.network.timeout);
+
+      expect(signals[0].aborted).toBe(true);
+      await rejection;
+    });
+
     it('gives a later attempt only the budget the earlier ones left', async () => {
       // `mockRejectedValueOnce` takes precedence over the implementation and
       // does NOT run it, so attempt 1 records no signal and `signals` holds the

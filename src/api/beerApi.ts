@@ -98,10 +98,15 @@ const attemptFetch = async (
   // failing on its own terms — it was the one network await in this codebase
   // with no bound, while the apiClient and enrichment paths all have their own
   // AbortController — and the chain deadline it arms is what keeps a whole
-  // refresh inside a predictable ceiling.
+  // refresh inside a predictable ceiling while the wall clock advances
+  // normally. Each attempt is also capped independently below so a backward
+  // wall-clock adjustment cannot turn that absolute deadline into extra wait.
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), deadline - Date.now());
+  const timeoutId = setTimeout(
+    () => controller.abort(),
+    Math.min(deadline - Date.now(), config.network.timeout)
+  );
 
   try {
     const response = await fetch(url, { signal: controller.signal });
