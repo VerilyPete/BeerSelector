@@ -57,7 +57,7 @@ const memberPrefs = (key: string) => {
 const MEMBER_BODY = [
   {},
   { tasted_brew_current_round: [{ id: 't1', brew_name: 'Tasted', brewer: 'X' }] },
-  // All three fields `isReward` requires. An earlier version of this fixture
+  // The three fields the server actually sends. An earlier version of this fixture
   // omitted `redeemed` and the rewards half came back `malformed` — which is the
   // element validation doing its job on a hand-written row that did not match
   // what the server actually sends.

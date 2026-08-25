@@ -23,7 +23,12 @@ import { beerRepository } from '../../database/repositories/BeerRepository';
 import { myBeersRepository } from '../../database/repositories/MyBeersRepository';
 import { rewardsRepository } from '../../database/repositories/RewardsRepository';
 import { databaseLockManager } from '../../database/DatabaseLockManager';
-import { fetchBeersFromAPI, fetchMyBeersFromAPI, fetchRewardsFromAPI } from '../../api/beerApi';
+import {
+  fetchBeersFromAPI,
+  fetchMemberDataFromAPI,
+  fetchMyBeersFromAPI,
+  fetchRewardsFromAPI,
+} from '../../api/beerApi';
 import {
   fetchedRows,
   confirmedEmpty,
@@ -2153,17 +2158,31 @@ describe('refreshAllDataFromAPI per-source isolation', () => {
   // failure. Left as they were, they would have documented isolation between
   // my-beers and rewards that no longer exists, and the next person to rely on
   // it would have believed them.
-  it('writes the taplist even when the member request fails', async () => {
+  it('writes the taplist and neither member source when the member request fails', async () => {
+    // Drives a real both-failed member pair by overriding the delegating mock,
+    // which is the only way to reach this state: the shared factory builds the
+    // two halves from two independent per-source mocks, so rejecting
+    // `fetchMyBeersFromAPI` alone produces a pairing production cannot.
+    //
+    // This reclaims the assertion the retitle deleted, as a POSITIVE statement
+    // of the new behaviour rather than an absence — rewards are NOT written when
+    // the member request fails — and it is the only shared-fate coverage on the
+    // login entry point. The sibling block in
+    // `dataUpdateService.manualRefresh.test.ts` drives
+    // `sequentialRefreshAllData` and `manualRefreshAllData`, not this function.
     (fetchBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockAllBeers));
-    (fetchMyBeersFromAPI as jest.Mock).mockRejectedValue(new Error('network timeout'));
-    (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockRewards));
+    (fetchMemberDataFromAPI as jest.Mock).mockResolvedValueOnce({
+      myBeers: failed(ApiErrorType.NETWORK_ERROR, 'Network request failed'),
+      rewards: failed(ApiErrorType.NETWORK_ERROR, 'Network request failed'),
+    });
 
     await refreshAllDataFromAPI();
 
-    // The taplist is the isolated source now. Asserting rewards here instead —
-    // which this did — pins my-beers/rewards independence, which coalescing
-    // deliberately removed.
+    // The taplist is a different url and a different request, so it survives.
     expect(beerRepository.insertManyUnsafe).toHaveBeenCalled();
+    // Both member sources share the one request, so neither lands.
+    expect(myBeersRepository.insertManyUnsafe).not.toHaveBeenCalled();
+    expect(rewardsRepository.insertManyUnsafe).not.toHaveBeenCalled();
   });
 
   it('preserves the all-beers write when the my-beers fetch fails', async () => {
@@ -2176,19 +2195,29 @@ describe('refreshAllDataFromAPI per-source isolation', () => {
     expect(beerRepository.insertManyUnsafe).toHaveBeenCalled();
   });
 
-  it('still writes the taplist when the rewards half fails', async () => {
+  it('writes the taplist and my beers when only the rewards HALF is unusable', async () => {
+    // `malformed`, not a rejection — and that is what makes both assertions
+    // below legitimate again. A rejection produces a one-sided `failed`, which
+    // coalescing makes unreachable; but a mixed `malformed`/`data` pairing is
+    // still entirely reachable, because the two extractors read different slices
+    // of ONE body. A response with a good `data[1].tasted_brew_current_round`
+    // and an unusable `data[2].reward` gives exactly this, and my-beers must
+    // still be written.
+    //
+    // The `myBeersRepository` assertion was deleted when this test was retitled,
+    // correctly for the old arrangement and incorrectly for the property: the
+    // property is real, it is the one the mock docstring names as still
+    // reachable, and nothing else at the service layer drives a coalesced
+    // `rewards: malformed`.
     (fetchBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockAllBeers));
     (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockMyBeers));
-    (fetchRewardsFromAPI as jest.Mock).mockRejectedValue(new Error('network timeout'));
+    (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(
+      malformed('response contained no reward array')
+    );
 
     await refreshAllDataFromAPI();
-
-    // Taplist only. The `myBeersRepository` assertion this used to carry said
-    // my-beers survives a rewards failure — true of two independent requests,
-    // false of one shared one. Shared fate for the member pair is pinned in
-    // `dataUpdateService.manualRefresh.test.ts`; this file owns the taplist
-    // boundary.
     expect(beerRepository.insertManyUnsafe).toHaveBeenCalled();
+    expect(myBeersRepository.insertManyUnsafe).toHaveBeenCalled();
   });
 
   // GUARD — passes today via the existing finally. Not this phase's RED.

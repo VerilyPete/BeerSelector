@@ -1057,38 +1057,60 @@ describe('a non-array payload is malformed, not data (plan refresh-failure-class
       expect(payload(await fetchRewardsFromAPI()).kind).toBe('malformed');
     });
 
-    it.each([
-      ['a numeric redeemed', { reward_id: 'r1', redeemed: 0, reward_type: '$5 Credit' }],
-      ['a missing redeemed', { reward_id: 'r1', reward_type: '$5 Credit' }],
-      ['a missing reward_type', { reward_id: 'r1', redeemed: '0' }],
-    ])('survives %s, because nothing downstream requires it', async (_label, row) => {
-      // THE OUTAGE TRIP-WIRE, removed. Gating on the full `isReward` — all three
-      // fields, all strings — protects against nothing the wipe depends on and
-      // turns a cosmetic upstream change into a permanent, total failure:
-      // `malformed` on every refresh, forever, with copy telling the member the
-      // server is broken, until an app update ships.
-      //
-      // And `redeemed`/`reward_type` are demonstrably not required. The schema
-      // has `redeemed: z.string().optional()`; `_insertManyInternal` writes
-      // `reward.redeemed || '0'` and `reward.reward_type || ''`, defaulting both
-      // itself; and the UI only ever asks `item.redeemed === '1'`. The old code
-      // wrote a numeric `redeemed` and SQLite coerced it into the TEXT column.
-      //
-      // So this validates what the WIPE actually depends on — a usable
-      // `reward_id` — and defaults the other two exactly as the writer already
-      // does. A quiet failure made loud is right; making it loud, total and
-      // permanent for a condition that is cosmetic is not.
-      respondWith([{}, {}, { reward: [row] }]);
+    // The expected VALUES, not just their type. This asserted
+    // `typeof … === 'string'`, which any wrong default satisfies — mutation
+    // showed `reward_type: '' -> 'unknown'` survives the whole API suite,
+    // typechecks, and is not absorbed downstream: `reward.reward_type || ''`
+    // keeps a truthy `'unknown'`, it lands in the table, and the member reads it
+    // in the rewards list and in `Would you like to add "unknown" to your
+    // queue?`. A test named for a behaviour must assert that behaviour.
+    //
+    // `redeemed`'s wrong default IS absorbed — `reward.redeemed || '0'` makes
+    // `''` and `'0'` identical by the time they reach SQLite — but it is pinned
+    // here anyway, because "absorbed by a caller two layers down" is not a
+    // property this function should rely on.
+    const DEFAULTED: readonly [string, Record<string, unknown>, string, string][] = [
+      [
+        'a numeric redeemed',
+        { reward_id: 'r1', redeemed: 0, reward_type: '$5 Credit' },
+        '0',
+        '$5 Credit',
+      ],
+      ['a missing redeemed', { reward_id: 'r1', reward_type: '$5 Credit' }, '0', '$5 Credit'],
+      ['a missing reward_type', { reward_id: 'r1', redeemed: '0' }, '0', ''],
+    ];
 
-      const body = payload(await fetchRewardsFromAPI());
-      expect(body.kind).toBe('data');
-      if (body.kind === 'data') {
-        expect(body.items[0].reward_id).toBe('r1');
-        // Normalised to the same defaults the writer would have applied.
-        expect(typeof body.items[0].redeemed).toBe('string');
-        expect(typeof body.items[0].reward_type).toBe('string');
+    it.each(DEFAULTED)(
+      'survives %s, because nothing downstream requires it',
+      async (_label, row, expectedRedeemed, expectedRewardType) => {
+        // THE OUTAGE TRIP-WIRE, removed. Gating on the full `isReward` — all three
+        // fields, all strings — protects against nothing the wipe depends on and
+        // turns a cosmetic upstream change into a permanent, total failure:
+        // `malformed` on every refresh, forever, with copy telling the member the
+        // server is broken, until an app update ships.
+        //
+        // And `redeemed`/`reward_type` are demonstrably not required. The schema
+        // has `redeemed: z.string().optional()`; `_insertManyInternal` writes
+        // `reward.redeemed || '0'` and `reward.reward_type || ''`, defaulting both
+        // itself; and the UI only ever asks `item.redeemed === '1'`. The old code
+        // wrote a numeric `redeemed` and SQLite coerced it into the TEXT column.
+        //
+        // So this validates what the WIPE actually depends on — a usable
+        // `reward_id` — and defaults the other two exactly as the writer already
+        // does. A quiet failure made loud is right; making it loud, total and
+        // permanent for a condition that is cosmetic is not.
+        respondWith([{}, {}, { reward: [row] }]);
+
+        const body = payload(await fetchRewardsFromAPI());
+        expect(body.kind).toBe('data');
+        if (body.kind === 'data') {
+          expect(body.items[0].reward_id).toBe('r1');
+          // The same defaults the writer would have applied, by value.
+          expect(body.items[0].redeemed).toBe(expectedRedeemed);
+          expect(body.items[0].reward_type).toBe(expectedRewardType);
+        }
       }
-    });
+    );
 
     it('reports confirmed-empty for a genuinely empty reward list', async () => {
       // THE ORDERING, pinned. The empty check runs BEFORE element validation,
@@ -1107,15 +1129,13 @@ describe('a non-array payload is malformed, not data (plan refresh-failure-class
     });
 
     it('rejects a reward row whose id is the empty string', async () => {
-      // `isReward` only asks that `reward_id` be a STRING, and `''` is one — but
+      // `''` is a string, so a `typeof === 'string'` check accepts it — and
       // `''` is exactly the key the wipe mechanism collapses onto:
       // `_insertManyInternal` deletes every row, then writes
       // `reward.reward_id || ''` into a TEXT PRIMARY KEY, so a payload of
       // empty-id rows replaces the member's rewards with a single junk row and
-      // reports success. Refined at this call site rather than in `isReward`
-      // itself, which five repository readers share and which is asking a
-      // different question (is this row-shaped) than this one (is this worth
-      // writing).
+      // reports success. Checked where the rows are read, because this is a
+      // question about what is worth WRITING, not about what is row-shaped.
       respondWith([{}, {}, { reward: [{ reward_id: '', redeemed: '0', reward_type: 'X' }] }]);
 
       expect(payload(await fetchRewardsFromAPI()).kind).toBe('malformed');
@@ -1133,9 +1153,13 @@ describe('a non-array payload is malformed, not data (plan refresh-failure-class
           reward: [
             { reward_id: 'r1', redeemed: '0', reward_type: '$5 Credit' },
             'oops',
-            // Object-shaped with no id at all — the other input that separates
-            // the two clauses of the check. Without it, "drop the object test
-            // and keep only the id test" passes the whole API suite.
+            // Object-shaped with no id at all. It catches dropping the ID
+            // check while keeping the object guard — NOT the reverse, which an
+            // earlier version of this comment claimed: `'oops'` and `{}` both
+            // have an `undefined` `.reward_id`, so neither separates the object
+            // guard from the id check. It is also not the sole killer of that
+            // mutant (the empty-id test above kills it too); it is a second and
+            // more legible one.
             {},
             { reward_id: 'r2', redeemed: '1', reward_type: 'Plate' },
           ],
@@ -1156,7 +1180,7 @@ describe('a non-array payload is malformed, not data (plan refresh-failure-class
       // today, but `mybeers.json` at the root is gitignored and untracked
       // (`.gitignore:103`), so a fresh checkout does not have it — and the note
       // beside that rule records CI losing a whole suite to ENOENT for exactly
-      // this reason. The re-include at `.gitignore:112` exists to make this path
+      // this reason. The re-include at `.gitignore:111` exists to make this path
       // the safe one.
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const fixture = require('../../services/__tests__/fixtures/mybeers.json');

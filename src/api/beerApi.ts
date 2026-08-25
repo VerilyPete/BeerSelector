@@ -143,8 +143,11 @@ const attemptFetch = async (
     // deadline.
     //
     // Asks the controller rather than inspecting the error, because the
-    // controller is authoritative and a name check is not. RN's whatwg-fetch
-    // shim IS `instanceof Error` and DOES set `name = 'AbortError'`, so
+    // controller is authoritative and a name check is not. whatwg-fetch prefers
+    // a global `DOMException` and RN ships none, so its
+    // `Object.create(Error.prototype)` shim is always the live path — which
+    // means the rejected value IS `instanceof Error` and DOES carry
+    // `name = 'AbortError'`, so
     // `error.name === 'AbortError'` matches here — and equally matches any error
     // so named from any other source. Matching too much is the failure mode, not
     // matching too little. Same argument `notificationUtils` makes for
@@ -755,10 +758,23 @@ const extractRewards = (data: unknown): UnconditionalSource<FetchOutcome<Reward>
   // `no-explicit-any` says a word about it. `reward: ['oops']` passed the
   // container check and reproduced the same silent wipe one level in.
   //
-  // So the ELEMENTS are validated too, exactly as the my-beers sibling above
-  // validates its own: keep what is a reward, report `malformed` only when
-  // nothing survives. Rejecting a whole payload for one odd row would throw away
-  // a good list; accepting rows nothing has checked is what deleted one.
+  // Elements are validated too, and a row that fails is DROPPED rather than
+  // failing the payload. The reason is not "rejecting throws away a good list" —
+  // an earlier version said that and it is false for rewards, where `malformed`
+  // leaves the local table untouched.
+  //
+  // The reason is that a dropped row is one no reader would ever return.
+  // `rewardRowSchema` requires a non-empty `reward_id` and all three
+  // `RewardsRepository` readers filter through it, so such a row is invisible to
+  // the member under any ingest policy. Rejecting the payload instead would
+  // freeze the rows they CAN see at their previous state — a redeemed reward
+  // still showing unredeemed — and report a server fault on every refresh, to
+  // protect one row that is invisible either way.
+  //
+  // THIS HOLDS ONLY WHILE THE GATE IS `reward_id` ALONE. Widen it — to
+  // `redeemed`, to `reward_type`, to anything the readers tolerate — and
+  // dropping starts deleting rewards the member could have used, at which point
+  // rejecting becomes the better answer.
   if (data && Array.isArray(data) && data.length >= 3 && data[2] && Array.isArray(data[2].reward)) {
     const rows: unknown[] = data[2].reward;
 
@@ -811,11 +827,13 @@ const extractRewards = (data: unknown): UnconditionalSource<FetchOutcome<Reward>
     if (nonEmpty === null) {
       return fetched({
         kind: 'malformed',
-        // Names the actual cause. This said "none carried the expected fields",
-        // false for the case that motivated the check — those rows carried every
-        // field and an EMPTY id. The renderer discards this string, so it exists
-        // only in `logError` output, which is the one place someone chasing a
-        // bug report will look.
+        // Names the actual cause: these rows may have carried every field and an
+        // empty id, which "none carried the expected fields" got wrong. The
+        // renderer discards this string, so it survives only in the two
+        // `logWarning` calls that report a rewards failure and in
+        // `Rewards.tsx`'s `console.error` — NOT in `logError`, a distinction
+        // `prepareRewards` states explicitly ("skip and fail must stay
+        // distinguishable"). Grep for it accordingly.
         detail: `${rows.length} reward rows returned and none carried a usable reward_id`,
       });
     }
