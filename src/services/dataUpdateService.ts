@@ -1407,7 +1407,15 @@ export async function fetchAndUpdateMyBeers(): Promise<DataUpdateResult> {
       Array.isArray(data) &&
       data.length >= 2 &&
       data[1] &&
-      data[1].tasted_brew_current_round
+      // `Array.isArray`, not truthiness — the same hole `beerApi` carried at its
+      // three extraction sites, in this duplicate parser. `{}` is truthy and
+      // `{}.length` is `undefined`, so `myBeers.filter` below threw
+      // `TypeError: beers.filter is not a function` into the outer catch, where
+      // UNKNOWN_ERROR rendered it verbatim in the refresh alert. There is no
+      // `malformed` to reach from here: a non-array now falls into the existing
+      // VALIDATION_ERROR return below, which is where the sibling
+      // "missing tasted_brew_current_round" case already goes.
+      Array.isArray(data[1].tasted_brew_current_round)
     ) {
       myBeers = data[1].tasted_brew_current_round;
       console.log(`Found tasted_brew_current_round with ${myBeers.length} beers`);

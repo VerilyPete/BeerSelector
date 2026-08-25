@@ -310,7 +310,19 @@ export const fetchBeersFromAPI = async (): Promise<UnconditionalSource<FetchOutc
 
     // Handle different response formats based on API endpoint
     // 1. Regular format: Array with brewInStock in second element
-    if (data && Array.isArray(data) && data.length >= 2 && data[1] && data[1].brewInStock) {
+    // `Array.isArray`, not truthiness: `{}` is truthy, and `fromArray({})` reads
+    // `.length` as `undefined`, so a non-array payload became `confirmed-empty`
+    // — the right refusal for entirely the wrong reason, and one that says the
+    // SERVER reported nothing on tap. A non-array falls through to
+    // `findBeersArray` below, which may still recognise a nested array, and
+    // otherwise to the `malformed` return at the end.
+    if (
+      data &&
+      Array.isArray(data) &&
+      data.length >= 2 &&
+      data[1] &&
+      Array.isArray(data[1].brewInStock)
+    ) {
       console.log(
         `Found regular format with brewInStock array (${data[1].brewInStock.length} beers)`
       );
@@ -435,7 +447,12 @@ export const fetchMyBeersFromAPI = async (): Promise<
       Array.isArray(data) &&
       data.length >= 2 &&
       data[1] &&
-      data[1].tasted_brew_current_round
+      // `Array.isArray`, not truthiness. `{}` is truthy and `{}.length` is
+      // `undefined`, so the empty-round branch below was skipped and `.filter`
+      // threw `TypeError: beers.filter is not a function` — caught by this
+      // function's outer catch, classified UNKNOWN_ERROR, and rendered verbatim
+      // as "Beerfinder data: beers.filter is not a function".
+      Array.isArray(data[1].tasted_brew_current_round)
     ) {
       const beers = data[1].tasted_brew_current_round;
       console.log(`DB: Found tasted_brew_current_round with ${beers.length} beers`);
@@ -519,10 +536,26 @@ export const fetchRewardsFromAPI = async (): Promise<UnconditionalSource<FetchOu
     const data = await fetchWithRetry(resolved.url);
 
     // Extract the reward array from the response
-    if (data && Array.isArray(data) && data.length >= 3 && data[2] && data[2].reward) {
+    // `Array.isArray`, not truthiness, and it is this site that made the hole
+    // dangerous rather than merely wrong. `{}.length === 0` is FALSE, so the
+    // ternary below took the `data` arm and `toNonEmpty({})!` put `items: null`
+    // into a `NonEmptyArray` slot; `writeRewards` then spread it under the write
+    // lock. A string payload was worse and silent: `toNonEmpty('oops')` yields
+    // four one-character rows that spread fine, and `_insertManyInternal` runs
+    // `DELETE FROM rewards` before collapsing them onto one empty `reward_id` —
+    // the member's rewards deleted, and the refresh reporting success.
+    //
+    // The guard also retires the `as Reward[]` cast: the check is the narrowing.
+    if (
+      data &&
+      Array.isArray(data) &&
+      data.length >= 3 &&
+      data[2] &&
+      Array.isArray(data[2].reward)
+    ) {
       // An empty reward list is a real state — a member with none earned yet —
       // so it is confirmed-empty rather than malformed.
-      const rewards = data[2].reward as Reward[];
+      const rewards: Reward[] = data[2].reward;
       return fetched(
         rewards.length === 0
           ? { kind: 'confirmed-empty' }

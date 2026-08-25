@@ -414,6 +414,28 @@ describe('dataUpdateService', () => {
       expect(result.error).toBeDefined();
     });
 
+    it('classifies a non-array tasted_brew_current_round rather than crashing on it', async () => {
+      // The duplicate raw parser has the same truthiness hole as `beerApi`: `{}`
+      // is truthy, so `myBeers.filter` threw `TypeError: beers.filter is not a
+      // function` from inside the try. `success: false` and "no write" were
+      // already true — the throw saw to that — so what is actually red here is
+      // the CLASSIFICATION and what the user reads. An UNKNOWN_ERROR renders
+      // `error.message` verbatim, which put "Beerfinder data: beers.filter is
+      // not a function" in the refresh alert.
+      (getPreference as jest.Mock)
+        .mockResolvedValueOnce('false') // is_visitor_mode
+        .mockResolvedValueOnce(testMyBeersUrl); // my_beers_api_url
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValueOnce([{}, { tasted_brew_current_round: {} }]),
+      });
+
+      const result = await fetchAndUpdateMyBeers();
+
+      expect(result.error?.type).toBe(ApiErrorType.VALIDATION_ERROR);
+      expect(getUserFriendlyErrorMessage(result.error!)).not.toMatch(/is not a function/);
+    });
+
     it('should return failure result if response does not contain tasted_brew_current_round', async () => {
       // Mock getPreference for visitor mode check and API URL
       (getPreference as jest.Mock)

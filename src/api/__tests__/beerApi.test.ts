@@ -36,6 +36,16 @@ function payload<T>(source: FetchedSource<FetchOutcome<T>>): FetchOutcome<T> {
   if (source.status !== 'fetched') {
     throw new Error(`expected a fetched source, got "${source.status}"`);
   }
+  // `kind: 'data'` promises a NON-EMPTY ARRAY of rows, and the type system does
+  // not enforce it: `toNonEmpty(x)!` at the rewards site manufactured
+  // `items: null` in a NonEmptyArray slot from a non-array payload, and the
+  // consumer then did `[...null]` under the write lock. Asserted in the shared
+  // helper rather than per test, so every outcome-returning test in this file
+  // enforces it instead of only the ones that remember to.
+  if (source.data.kind === 'data') {
+    expect(Array.isArray(source.data.items)).toBe(true);
+    expect(source.data.items.length).toBeGreaterThan(0);
+  }
   return source.data;
 }
 
@@ -910,5 +920,128 @@ describe('FetchOutcome semantics (plan 02 Phase 3)', () => {
       expect(outcome.reason.code).toBe('not-applicable');
     }
     expect(global.fetch).not.toHaveBeenCalled();
+  });
+});
+
+describe('a non-array payload is malformed, not data (plan refresh-failure-classification Phase 0)', () => {
+  // Four extraction sites tested their payload for TRUTHINESS only, and `{}` is
+  // truthy. Each then handed a non-array to code that assumes an array:
+  //
+  // - `tasted_brew_current_round` skipped the wipe branch (`.length` is
+  //   undefined) and threw `TypeError: beers.filter is not a function`, which
+  //   reached the user's refresh alert verbatim as
+  //   "Beerfinder data: beers.filter is not a function".
+  // - `brewInStock` became `confirmed-empty` — the right refusal for the wrong
+  //   reason.
+  // - `reward` was the worst: `{}.length === 0` is false, so it returned
+  //   `{kind:'data', items: toNonEmpty({})!}` — `items: null` in a NonEmptyArray
+  //   slot — and `writeRewards` spread it under the write lock. For a STRING
+  //   payload it is worse still and silent: `toNonEmpty('oops')` yields four
+  //   one-character rows that spread fine, `_insertManyInternal` runs
+  //   `DELETE FROM rewards` first, and `reward_id || ''` collapses all four into
+  //   one junk row. The member's real rewards are deleted and the refresh
+  //   reports success.
+  //
+  // Every assertion here is on the OUTCOME. `beerApi.ts` imports no repository,
+  // so a repository assertion in this file could not be mutated by any change to
+  // the module under test.
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  const memberPrefs = (urlKey: string) => (key: string) => {
+    if (key === 'is_visitor_mode') return Promise.resolve('false');
+    if (key === urlKey) return Promise.resolve('https://example.com/data.json');
+    return Promise.resolve(null);
+  };
+
+  const respondWith = (body: unknown): void => {
+    (global.fetch as jest.Mock).mockResolvedValue({ ok: true, json: async () => body });
+  };
+
+  describe('fetchMyBeersFromAPI', () => {
+    beforeEach(() => {
+      (preferences.getPreference as jest.Mock).mockImplementation(memberPrefs('my_beers_api_url'));
+    });
+
+    // Not an uncaught throw today: the TypeError is caught by the fetcher's own
+    // outer catch and returned as `failed`, which is why this reads as a
+    // transport fault to every consumer downstream.
+    it.each([
+      ['an object', {}],
+      ['a string', 'oops'],
+      ['a number', 42],
+    ])('reports malformed when tasted_brew_current_round is %s', async (_label, value) => {
+      respondWith([{}, { tasted_brew_current_round: value }]);
+
+      const outcome = await fetchMyBeersFromAPI();
+
+      expect(outcome.status).toBe('fetched');
+      expect(payload(outcome).kind).toBe('malformed');
+    });
+  });
+
+  describe('fetchBeersFromAPI', () => {
+    beforeEach(() => {
+      (preferences.getPreference as jest.Mock).mockImplementation(memberPrefs('all_beers_api_url'));
+    });
+
+    it('reports malformed when brewInStock is an object, not confirmed-empty', async () => {
+      // `confirmed-empty` is a claim about what the SERVER said. A payload this
+      // code cannot read is not the server saying "nothing on tap".
+      respondWith([{}, { brewInStock: {} }]);
+
+      expect(payload(await fetchBeersFromAPI()).kind).toBe('malformed');
+    });
+
+    it('accepts a nested beer array that the truthiness check used to discard', async () => {
+      // THE WIDENING, PINNED. Falling through to `findBeersArray` is not purely
+      // a narrowing: `{brewInStock: {beers: [...]}}` currently becomes
+      // `confirmed-empty` and will now become `data`. An improvement, and a
+      // deliberate behaviour change, so it gets an assertion rather than only
+      // prose in a plan.
+      respondWith([
+        {},
+        { brewInStock: { beers: [{ id: '1', brew_name: 'Nested', brewer: 'X' }] } },
+      ]);
+
+      const body = payload(await fetchBeersFromAPI());
+      expect(body.kind).toBe('data');
+      if (body.kind === 'data') expect(body.items).toHaveLength(1);
+    });
+  });
+
+  describe('fetchRewardsFromAPI', () => {
+    beforeEach(() => {
+      (preferences.getPreference as jest.Mock).mockImplementation(memberPrefs('my_beers_api_url'));
+    });
+
+    it('reports malformed for an object reward payload, carrying no items at all', async () => {
+      respondWith([{}, {}, { reward: {} }]);
+
+      // The WHOLE outcome, exactly. `expect(kind).toBe('malformed')` alone would
+      // pass against `{kind:'data', items:null}` becoming `{kind:'malformed'}`
+      // while some other arm still manufactured a null-carrying data outcome;
+      // an exact-shape assertion is the closest expressible form of "no outcome
+      // carries a non-array in a NonEmptyArray slot".
+      await expect(fetchRewardsFromAPI()).resolves.toEqual({
+        status: 'fetched',
+        data: { kind: 'malformed', detail: expect.any(String) },
+        etag: null,
+      });
+    });
+
+    it('reports malformed for a string reward payload rather than four fabricated rows', async () => {
+      // THE SILENT WIPE. This is the whole fence for it, deliberately with no
+      // service-level companion: the service suites mock the three fetchers
+      // wholesale, so they cannot be handed the raw body, and feeding them the
+      // OUTCOME instead bypasses `beerApi` altogether — red today and still red
+      // after this phase, whose entire GREEN is four guards in this module.
+      // Closing the only producer of those rows is what this phase does; a
+      // production fence against a lying `{kind:'data'}` is a different change.
+      respondWith([{}, {}, { reward: 'oops' }]);
+
+      expect(payload(await fetchRewardsFromAPI()).kind).toBe('malformed');
+    });
   });
 });
