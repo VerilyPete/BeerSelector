@@ -331,9 +331,13 @@ describe('fetchWithRetry retry policy', () => {
       // prevent — a backoff of `timeout - 500` again arms the abort with 500ms
       // left, an attempt born dead that still costs the server a request.
       //
-      // These two bracket the value from both sides: 500ms of headroom must be
-      // refused and 1500ms must be allowed, which is only true for a reserve in
-      // (500, 1500].
+      // These two bracket the value from both sides. With `delay = timeout - h`
+      // and `Date.now()` still at the start (fake timers, first attempt settles
+      // without advancing), the guard reduces to `MIN_ATTEMPT_MS < h` — so
+      // refusing h=500 requires `>= 500` and allowing h=1500 requires `< 1500`.
+      // The pair passes for exactly `[500, 1500)`: closed at the low end, open
+      // at the high end. Confirmed by running the constant at 500, 1499 and
+      // 1500 — the first two pass and the third fails.
       ['refuses to start an attempt with only 500ms of budget left', 500, 1],
       ['still starts an attempt with 1500ms of budget left', 1500, 2],
     ])('%s', async (_label, headroom, expectedCalls) => {

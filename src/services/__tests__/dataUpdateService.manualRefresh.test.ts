@@ -685,7 +685,12 @@ describe('one member request means one verdict for both halves', () => {
     // Overrides the delegating factory implementation for this test. Production
     // builds both halves from ONE `createErrorResponse(error)`, so they are the
     // same classification and the same message by construction.
-    (fetchMemberDataFromAPI as jest.Mock).mockResolvedValue({
+    // `…Once`, not `mockResolvedValue`. `clearAllMocks` does not remove a mock
+    // IMPLEMENTATION, so a persistent override here outlives this describe and
+    // is served to whichever block someone appends next — the exact leak that
+    // broke an ETag test twelve hundred lines away in the sibling suite. This
+    // describe happens to be last today; that is luck, not a design.
+    (fetchMemberDataFromAPI as jest.Mock).mockResolvedValueOnce({
       myBeers: failed(type, message),
       rewards: failed(type, message),
     });

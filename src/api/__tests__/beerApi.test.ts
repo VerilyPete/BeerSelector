@@ -1057,6 +1057,55 @@ describe('a non-array payload is malformed, not data (plan refresh-failure-class
       expect(payload(await fetchRewardsFromAPI()).kind).toBe('malformed');
     });
 
+    it.each([
+      ['a numeric redeemed', { reward_id: 'r1', redeemed: 0, reward_type: '$5 Credit' }],
+      ['a missing redeemed', { reward_id: 'r1', reward_type: '$5 Credit' }],
+      ['a missing reward_type', { reward_id: 'r1', redeemed: '0' }],
+    ])('survives %s, because nothing downstream requires it', async (_label, row) => {
+      // THE OUTAGE TRIP-WIRE, removed. Gating on the full `isReward` — all three
+      // fields, all strings — protects against nothing the wipe depends on and
+      // turns a cosmetic upstream change into a permanent, total failure:
+      // `malformed` on every refresh, forever, with copy telling the member the
+      // server is broken, until an app update ships.
+      //
+      // And `redeemed`/`reward_type` are demonstrably not required. The schema
+      // has `redeemed: z.string().optional()`; `_insertManyInternal` writes
+      // `reward.redeemed || '0'` and `reward.reward_type || ''`, defaulting both
+      // itself; and the UI only ever asks `item.redeemed === '1'`. The old code
+      // wrote a numeric `redeemed` and SQLite coerced it into the TEXT column.
+      //
+      // So this validates what the WIPE actually depends on — a usable
+      // `reward_id` — and defaults the other two exactly as the writer already
+      // does. A quiet failure made loud is right; making it loud, total and
+      // permanent for a condition that is cosmetic is not.
+      respondWith([{}, {}, { reward: [row] }]);
+
+      const body = payload(await fetchRewardsFromAPI());
+      expect(body.kind).toBe('data');
+      if (body.kind === 'data') {
+        expect(body.items[0].reward_id).toBe('r1');
+        // Normalised to the same defaults the writer would have applied.
+        expect(typeof body.items[0].redeemed).toBe('string');
+        expect(typeof body.items[0].reward_type).toBe('string');
+      }
+    });
+
+    it('reports confirmed-empty for a genuinely empty reward list', async () => {
+      // THE ORDERING, pinned. The empty check runs BEFORE element validation,
+      // and that sequence is the only thing separating "you have no rewards"
+      // from "the server sent rows this app cannot read" — the first authorises
+      // clearing the table, the second must never.
+      //
+      // Put the length check after the filter and `[]` becomes `malformed`: the
+      // rewards table then never clears when a member redeems their last
+      // reward, stale rows persist indefinitely, and the refresh reports a
+      // source failure. Verified that mutant survives every other suite in the
+      // repo — this is the only test that dies.
+      respondWith([{}, {}, { reward: [] }]);
+
+      expect(payload(await fetchRewardsFromAPI()).kind).toBe('confirmed-empty');
+    });
+
     it('rejects a reward row whose id is the empty string', async () => {
       // `isReward` only asks that `reward_id` be a STRING, and `''` is one — but
       // `''` is exactly the key the wipe mechanism collapses onto:

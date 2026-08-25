@@ -1,6 +1,6 @@
 import { Beer, Beerfinder } from '../database/types';
 import { isBeer } from '../types/beer';
-import { Reward, isReward } from '../types/database';
+import { Reward } from '../types/database';
 import { getPreference } from '../database/preferences';
 import { config } from '../config';
 import { HttpError, TransportAbortedError, UnreadableBodyError, toNonEmpty } from './fetchOutcome';
@@ -783,22 +783,54 @@ const extractRewards = (data: unknown): UnconditionalSource<FetchOutcome<Reward>
       return fetched({ kind: 'confirmed-empty' });
     }
 
-    // `isReward` plus a non-empty id. The extra clause is not pedantry: `''` is a
-    // string, so `isReward` accepts it, and `''` is precisely the key the wipe
-    // collapses onto — `_insertManyInternal` deletes every row, then writes
-    // `reward.reward_id || ''` into a TEXT PRIMARY KEY. A payload of empty-id
-    // rows would replace the member's rewards with one junk row and report
-    // success, which is the whole failure this validation exists to stop.
+    // Gated on a USABLE `reward_id`, and on nothing else.
     //
-    // Refined here rather than inside `isReward`, which five repository readers
-    // share and which answers a different question — "is this row-shaped?" —
-    // than this one, which is "is this worth writing?".
-    const rewards = rows.filter((row): row is Reward => isReward(row) && row.reward_id.length > 0);
+    // That is exactly what the wipe depends on: `_insertManyInternal` deletes
+    // every row, then writes `reward.reward_id || ''` into a TEXT PRIMARY KEY,
+    // so rows without a usable id collapse onto one and the member's rewards are
+    // replaced by a single junk row while the refresh reports success.
+    //
+    // Deliberately NOT the full `isReward`, which also demands `redeemed` and
+    // `reward_type` be strings. Neither is required downstream — the schema has
+    // `redeemed: z.string().optional()`, `_insertManyInternal` defaults both
+    // itself with `|| '0'` and `|| ''`, and the UI only ever asks
+    // `redeemed === '1'`. Gating on them adds nothing against the wipe and turns
+    // a cosmetic upstream change (a numeric `redeemed`, a renamed field) into a
+    // PERMANENT total outage: `malformed` on every refresh, forever, telling the
+    // member the server is broken, until an app update ships. The old code wrote
+    // a numeric `redeemed` and SQLite coerced it into the TEXT column.
+    //
+    // Constructed rather than asserted. `(row): row is Reward => …` is an
+    // unchecked claim — TypeScript verifies only that `Reward` is assignable to
+    // the parameter, never that the body implies it — so a narrowed runtime
+    // check under a widened annotation is the same unsoundness this validation
+    // was added to remove. Building the object is the version that cannot lie,
+    // and it applies the writer's own defaults where the rows are read.
+    const rewards = rows.reduce<Reward[]>((kept, row) => {
+      if (!row || typeof row !== 'object') return kept;
+      const candidate = row as Record<string, unknown>;
+      if (typeof candidate.reward_id !== 'string' || candidate.reward_id.length === 0) {
+        return kept;
+      }
+      return [
+        ...kept,
+        {
+          reward_id: candidate.reward_id,
+          redeemed: typeof candidate.redeemed === 'string' ? candidate.redeemed : '0',
+          reward_type: typeof candidate.reward_type === 'string' ? candidate.reward_type : '',
+        },
+      ];
+    }, []);
     const nonEmpty = toNonEmpty(rewards);
     if (nonEmpty === null) {
       return fetched({
         kind: 'malformed',
-        detail: `${rows.length} reward rows returned and none carried the expected fields`,
+        // Names the actual cause. This said "none carried the expected fields",
+        // false for the case that motivated the check — those rows carried every
+        // field and an EMPTY id. The renderer discards this string, so it exists
+        // only in `logError` output, which is the one place someone chasing a
+        // bug report will look.
+        detail: `${rows.length} reward rows returned and none carried a usable reward_id`,
       });
     }
 

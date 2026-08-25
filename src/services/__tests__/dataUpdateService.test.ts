@@ -33,6 +33,7 @@ import {
 } from '../../api/__tests__/helpers/fetchOutcomeFixtures';
 import { ApiErrorType, getUserFriendlyErrorMessage } from '../../utils/notificationUtils';
 import { logError, logWarning } from '../../utils/errorLogger';
+import { DatabaseContentionError } from '../../database/errors';
 import {
   fetchBeersFromProxy,
   fetchEnrichmentBatchWithMissing,
@@ -571,15 +572,36 @@ describe('dataUpdateService', () => {
       (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(
         fetchedRows([{ id: 'beer-1', brew_name: 'B', tasted_date: '2023-01-01' }])
       );
+      // `DatabaseContentionError`, NOT a plain `Error` — and this test was
+      // written with a plain one, which made it a false green on the axis that
+      // matters. `_timeoutAcquisition` rejects with the typed error, and its own
+      // comment says why: a plain Error falls through `createErrorResponse` to
+      // the substring rules, where `message.includes('timeout')` classifies a
+      // purely local lock problem as NETWORK_ERROR and tells the user to check
+      // their internet connection. Staging that shape here meant the test
+      // exercised the very defect the lock manager exists to prevent, and then
+      // asserted only that SOME error came back.
+      //
+      // NETWORK_ERROR is also `isTransportFault: true` where CONTENTION_ERROR is
+      // false, so the value the old arrangement drove would have flipped
+      // `allNetworkErrors` — the failure this codebase has now fixed twice — and
+      // the test would not have noticed.
       (databaseLockManager.withDatabaseLock as jest.Mock).mockRejectedValueOnce(
-        new Error('Lock acquisition timeout for my beers write after 30000ms')
+        new DatabaseContentionError(
+          'Lock acquisition timeout for fetchAndUpdateMyBeers after 30000ms'
+        )
       );
 
       const result = await fetchAndUpdateMyBeers();
 
       expect(result.success).toBe(false);
       expect(result.dataUpdated).toBe(false);
-      expect(result.error).toBeDefined();
+      expect(result.error?.type).toBe(ApiErrorType.CONTENTION_ERROR);
+      // Transient and local: the user is told to try again, not to check a
+      // connection that had nothing to do with it.
+      expect(getUserFriendlyErrorMessage(result.error!)).toBe(
+        'The app was busy updating. Please try again in a moment.'
+      );
     });
 
     it('does not take the lock when there is nothing to write', async () => {
