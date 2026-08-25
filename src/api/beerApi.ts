@@ -8,6 +8,26 @@ import { createErrorResponse } from '../utils/notificationUtils';
 import type { FetchOutcome, UnavailableReason, UnconditionalSource } from './fetchOutcome';
 
 /**
+ * Budget an attempt must have left before it is worth making at all.
+ *
+ * An attempt with less than one backoff interval of deadline remaining cannot
+ * plausibly complete a TLS handshake and a response on the links this targets.
+ * Without the term, the retry guard permits a recursion that arms
+ * `setTimeout(abort, deadline - Date.now())` with a few milliseconds left — an
+ * attempt born dead that still costs the server a request.
+ *
+ * It does NOT close the suspension hole: the budget is reserved BEFORE the
+ * sleep, and a 1s sleep can resume 20s later if the app is backgrounded or the
+ * JS thread stalls. Covering that needs a post-sleep recheck on the shared retry
+ * path, which affects the ordinary retry too and is deliberately a separate
+ * change.
+ *
+ * Exported so tests pin the boundary against this value rather than against a
+ * hard-coded copy of it.
+ */
+export const MIN_ATTEMPT_MS = 1000;
+
+/**
  * Fetch with exponential backoff, bounded as a whole.
  *
  * @param url - The URL to fetch
@@ -33,7 +53,7 @@ export const fetchWithRetry = async (
   // purpose was to keep a refresh inside that hold missed it by 3x. A caller
   // asking for a 15s timeout is asking about the call it made, not about an
   // implementation detail of how many times that call is repeated internally.
-  return attemptFetch(url, retries, delay, Date.now() + config.network.timeout);
+  return attemptFetch(url, retries, delay, Date.now() + config.network.timeout, undefined, 1);
 };
 
 /**
@@ -45,13 +65,18 @@ export const fetchWithRetry = async (
  * identically at the call site and silently renews the budget on every recursion
  * — reintroducing the per-attempt bound this exists to remove, in a way no
  * caller could see.
+ *
+ * `unreadableRetriesLeft` is required for exactly the same reason, and the type
+ * is the ONLY available fence: a defaulted version resets on every recursion and
+ * no test can observe the difference at the retry budgets this code runs with.
  */
 const attemptFetch = async (
   url: string,
   retries: number,
   delay: number,
   deadline: number,
-  earlierFailure?: unknown
+  earlierFailure: unknown,
+  unreadableRetriesLeft: number
 ): Promise<unknown> => {
   // An unbounded request here can be an unbounded database lock hold: the full
   // refresh paths call this while holding the master lock, and past the lock's
@@ -155,14 +180,55 @@ const attemptFetch = async (
       throw error;
     }
 
-    // TEMPORARY, and replaced by the bounded retry in the next phase.
+    // A body that could not be READ gets exactly one more chance, inside the
+    // deadline already computed.
     //
-    // It has to be here now: this phase changes the thrown class, so without it
-    // an unreadable body stops matching anything above, falls through to the
-    // generic retry path, and silently takes THREE attempts — a phase before the
-    // change that deliberately adds exactly one.
+    // The old policy applied the 4xx argument to the body — the same request
+    // returns the same unusable answer — which is true of a captive-portal login
+    // page and false of a truncation. Nothing here can tell those apart, so the
+    // old code was choosing the answer that is wrong for a weak link, which is
+    // the case this whole file exists for. A body of the wrong SHAPE is still
+    // never retried, and structurally cannot be: that decision is made by the
+    // three fetchers after this function has returned.
+    //
+    // Conditions 2 and 3 are re-checked here rather than inherited, because this
+    // branch is evaluated BEFORE both the shared `retries <= 1` exit and the
+    // shared deadline guard below.
+    //
+    // Not-aborted is an invariant rather than a fourth condition: the abort exit
+    // above returns before this line is reached.
     if (error instanceof UnreadableBodyError) {
-      throw error;
+      const worthRetrying =
+        unreadableRetriesLeft > 0 && retries > 1 && Date.now() + delay + MIN_ATTEMPT_MS < deadline;
+
+      if (!worthRetrying) {
+        throw error;
+      }
+
+      // The ordinary retry logs at its own recursion; without a sibling line
+      // here, an unreadable retry that SUCCEEDS leaves no trace anywhere. The
+      // source and the remaining budget are included so a future breaker can be
+      // sized from incidents rather than from attempts.
+      console.log(
+        `Response body could not be read, retrying once in ${delay}ms... (${retries - 1} attempts left) ${url}`
+      );
+      await new Promise(resolve => setTimeout(resolve, delay));
+
+      // `earlierFailure` is passed through UNCHANGED, and an UnreadableBodyError
+      // never becomes one. Passing `undefined` would destroy an earlier
+      // `HttpError` and reintroduce verbatim the defect the abort exit above
+      // exists to prevent — a server that answered 500 and then stalled telling
+      // the user to check a connection that demonstrably worked. Carrying the
+      // unreadable body forward would be worse still: it is the least
+      // informative thing that happened.
+      return attemptFetch(
+        url,
+        retries - 1,
+        delay * 1.5,
+        deadline,
+        earlierFailure,
+        unreadableRetriesLeft - 1
+      );
     }
 
     if (retries <= 1) {
@@ -181,7 +247,9 @@ const attemptFetch = async (
     // This attempt's error is carried forward as the one to report if the
     // chain later runs out of budget. Most recent rather than first: it is the
     // freshest evidence of what the server is doing.
-    return attemptFetch(url, retries - 1, delay * 1.5, deadline, error);
+    // `unreadableRetriesLeft` is PRESERVED, not decremented and not refilled: it
+    // is a separate cap on a separate condition, spent only by the branch above.
+    return attemptFetch(url, retries - 1, delay * 1.5, deadline, error, unreadableRetriesLeft);
   } finally {
     // Runs on the retry path too: `return attemptFetch(...)` in the catch
     // evaluates the call, then this clears THIS invocation's timer before the

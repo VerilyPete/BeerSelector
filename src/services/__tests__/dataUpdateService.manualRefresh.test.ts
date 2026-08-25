@@ -9,6 +9,7 @@ import {
   fetchedRows,
   confirmedEmpty,
   failed,
+  malformed,
   unavailable,
 } from '../../api/__tests__/helpers/fetchOutcomeFixtures';
 import { ApiErrorType } from '../../utils/notificationUtils';
@@ -500,5 +501,53 @@ describe('allNetworkErrors and an unreadable body', () => {
     expect(buildRefreshErrorMessages(result)).toContain(
       'All Beer data: Could not read the beer data — your network may be interfering with the connection. Your existing data has been kept.'
     );
+  });
+});
+
+/**
+ * Two extra attempts per source means two extra chances to wipe the tasted table.
+ *
+ * Plan refresh-failure-classification Phase 2. The retry does not change WHICH
+ * outcomes authorise a clear — `confirmed-empty` alone — but it doubles the
+ * exposure, so the boundary gets a test with a positive control rather than a
+ * pair of negatives that would pass just as well against a function that never
+ * clears anything at all.
+ */
+describe('only a confirmed-empty round clears the tasted table', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (fetchBeersFromAPI as jest.Mock).mockResolvedValue(
+      fetchedRows([{ id: 'b1', brew_name: 'Beer', brewer: 'X' }])
+    );
+    (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(fetchedRows([]));
+  });
+
+  it.each([
+    ['a body of the wrong shape', () => malformed()],
+    ['a body that could not be read', () => failed(ApiErrorType.UNREADABLE_BODY_ERROR)],
+    ['a transport failure', () => failed(ApiErrorType.NETWORK_ERROR)],
+  ])('preserves the tasted table and its timestamps for %s', async (_label, outcome) => {
+    (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(outcome());
+
+    await svc.sequentialRefreshAllData();
+
+    expect(myBeersRepository.replaceAllWithEmptyUnsafe).not.toHaveBeenCalled();
+    // No timestamp either. Stamping after a non-answer told the 12-hour window
+    // the data was current, which is what made a wipe survive half a day.
+    expect(setPreference).not.toHaveBeenCalledWith('my_beers_last_update', expect.any(String));
+    expect(setPreference).not.toHaveBeenCalledWith('my_beers_last_check', expect.any(String));
+  });
+
+  it('clears and stamps when the server genuinely reports an empty round', async () => {
+    // THE POSITIVE CONTROL. Without it the three negatives above hold against a
+    // `sequentialRefreshAllData` that never clears and never stamps — which is
+    // to say they would pass against the bug of refusing to clear a real
+    // rollover at 200, and would have told nobody.
+    (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(confirmedEmpty());
+
+    await svc.sequentialRefreshAllData();
+
+    expect(myBeersRepository.replaceAllWithEmptyUnsafe).toHaveBeenCalled();
+    expect(setPreference).toHaveBeenCalledWith('my_beers_last_update', expect.any(String));
   });
 });
