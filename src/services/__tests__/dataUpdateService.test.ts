@@ -152,7 +152,6 @@ const originalConsoleError = console.error;
 describe('dataUpdateService', () => {
   // Test URLs from config
   const testAllBeersUrl = `${config.api.baseUrl}/api/all-beers`;
-  const testMyBeersUrl = `${config.api.baseUrl}/api/my-beers`;
 
   /**
    * Answer `all_beers_api_url` with `url` consistently, for every read.
@@ -355,330 +354,263 @@ describe('dataUpdateService', () => {
   });
 
   describe('fetchAndUpdateMyBeers', () => {
-    it('should return failure result if API URL is not set', async () => {
-      // Mock getPreference to return null for visitor mode check, then null for API URL
-      (getPreference as jest.Mock)
-        .mockResolvedValueOnce('false') // is_visitor_mode
-        .mockResolvedValueOnce(null); // my_beers_api_url
+    /**
+     * Rewritten wholesale by plan refresh-failure-classification D3.
+     *
+     * This entry point carried its own copy of the whole my-beers pipeline: a
+     * raw `fetch` with a hard-coded 15s timeout and no retry, its own parse, its
+     * own extraction, its own validation and its own writes. It therefore
+     * inherited none of the transport work — a body that would not parse was
+     * PARSE_ERROR with no retry, every non-2xx was SERVER_ERROR including a 4xx,
+     * and "all rows lack an id" reached the user verbatim through UNKNOWN_ERROR.
+     * It now composes `fetchMyBeersFromAPI` + `prepareMyBeers` + `writeMyBeers`,
+     * the same three pieces the sequential path uses.
+     *
+     * So these tests drive OUTCOMES rather than response bodies. The body-shaped
+     * cases they used to stage — a non-array payload, a missing array, rows
+     * without ids — are now `beerApi`'s to classify and are tested there against
+     * a real `global.fetch`; what is left here is that this entry point routes
+     * each outcome to the right write, lock and timestamp.
+     */
+    // No preference fixture, and none needed: after D3 this entry point reads no
+    // preferences at all — resolving the URL and checking visitor mode are
+    // `beerApi`'s, expressed here as the `unavailable` outcomes it returns.
+    //
+    // Deliberately not a `beforeEach` that installs one either. `clearAllMocks`
+    // does not clear a `mockImplementation`, so a preference fixture set in a
+    // `beforeEach` here leaks into every later describe in this file — which is
+    // exactly how the ETag test twelve hundred lines below started failing while
+    // this block was being written.
 
-      const result = await fetchAndUpdateMyBeers();
+    it('makes no request of its own — the shared fetcher makes it', async () => {
+      // THE POINT OF D3. A second raw `fetch` in this file is how the entry
+      // point came to have a different timeout, a different retry policy and a
+      // different error vocabulary from every other source.
+      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(
+        fetchedRows([{ id: 'beer-1', brew_name: 'Test Beer 1', tasted_date: '2023-01-01' }])
+      );
 
-      expect(result.success).toBe(false);
-      expect(result.dataUpdated).toBe(false);
-      expect(result.error).toBeDefined();
-      expect(getPreference).toHaveBeenCalledWith('my_beers_api_url');
+      await fetchAndUpdateMyBeers();
+
+      expect(fetchMyBeersFromAPI).toHaveBeenCalledTimes(1);
+      expect(global.fetch).not.toHaveBeenCalled();
     });
 
-    it('should return failure result if fetch fails', async () => {
-      // Mock getPreference for visitor mode check and API URL
-      (getPreference as jest.Mock)
-        .mockResolvedValueOnce('false') // is_visitor_mode
-        .mockResolvedValueOnce(testMyBeersUrl); // my_beers_api_url
-
-      // Mock fetch to fail
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: false,
-        status: 500,
-        statusText: 'Internal Server Error',
-      });
+    it('returns failure with actionable copy when the URL is not configured', async () => {
+      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(
+        unavailable('not-configured', 'my_beers_api_url is not set')
+      );
 
       const result = await fetchAndUpdateMyBeers();
 
       expect(result.success).toBe(false);
       expect(result.dataUpdated).toBe(false);
-      expect(result.error).toBeDefined();
-      expect(getPreference).toHaveBeenCalledWith('my_beers_api_url');
-      expect(global.fetch).toHaveBeenCalledWith(
-        testMyBeersUrl,
-        expect.objectContaining({ signal: expect.any(Object) })
+      // Same type and same sentence as the hand-written branch this replaces —
+      // `unavailableCopy('My beers', 'not-configured')` produces it verbatim.
+      expect(result.error?.type).toBe(ApiErrorType.VALIDATION_ERROR);
+      expect(getUserFriendlyErrorMessage(result.error!)).toBe(
+        'My beers API URL not set. Please log in to configure API URLs.'
       );
     });
 
-    it('should return failure result if response is not an array', async () => {
-      // Mock getPreference for visitor mode check and API URL
-      (getPreference as jest.Mock)
-        .mockResolvedValueOnce('false') // is_visitor_mode
-        .mockResolvedValueOnce(testMyBeersUrl); // my_beers_api_url
-
-      // Mock fetch to return a non-array response
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: true,
-        json: jest.fn().mockResolvedValueOnce({ error: 'Invalid data' }),
-      });
+    it('reports a server error as a server error', async () => {
+      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(
+        failed(ApiErrorType.SERVER_ERROR, 'HTTP 500 Internal Server Error')
+      );
 
       const result = await fetchAndUpdateMyBeers();
 
       expect(result.success).toBe(false);
       expect(result.dataUpdated).toBe(false);
-      expect(result.error).toBeDefined();
+      expect(result.error?.type).toBe(ApiErrorType.SERVER_ERROR);
     });
 
-    it('classifies a non-array tasted_brew_current_round rather than crashing on it', async () => {
-      // The duplicate raw parser has the same truthiness hole as `beerApi`: `{}`
-      // is truthy, so `myBeers.filter` threw `TypeError: beers.filter is not a
-      // function` from inside the try. `success: false` and "no write" were
-      // already true — the throw saw to that — so what is actually red here is
-      // the CLASSIFICATION and what the user reads. An UNKNOWN_ERROR renders
-      // `error.message` verbatim, which put "Beerfinder data: beers.filter is
-      // not a function" in the refresh alert.
-      (getPreference as jest.Mock)
-        .mockResolvedValueOnce('false') // is_visitor_mode
-        .mockResolvedValueOnce(testMyBeersUrl); // my_beers_api_url
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: true,
-        json: jest.fn().mockResolvedValueOnce([{}, { tasted_brew_current_round: {} }]),
-      });
+    it('reports a transport failure as a network error', async () => {
+      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(
+        failed(ApiErrorType.NETWORK_ERROR, 'Network connection error: request timed out')
+      );
 
       const result = await fetchAndUpdateMyBeers();
 
-      expect(result.error?.type).toBe(ApiErrorType.VALIDATION_ERROR);
-      expect(getUserFriendlyErrorMessage(result.error!)).not.toMatch(/is not a function/);
+      expect(result.success).toBe(false);
+      expect(result.error?.type).toBe(ApiErrorType.NETWORK_ERROR);
     });
 
-    it('should return failure result if response does not contain tasted_brew_current_round', async () => {
-      // Mock getPreference for visitor mode check and API URL
-      (getPreference as jest.Mock)
-        .mockResolvedValueOnce('false') // is_visitor_mode
-        .mockResolvedValueOnce(testMyBeersUrl); // my_beers_api_url
+    it('reports a body that could not be read with its own type and copy', async () => {
+      // Previously PARSE_ERROR, produced by this function's own `response.json()`
+      // catch, with no retry and no relation to the classification every other
+      // source uses. Inherited now rather than reimplemented.
+      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(
+        failed(ApiErrorType.UNREADABLE_BODY_ERROR, 'Response body could not be read as JSON')
+      );
 
-      // Mock fetch to return an array without tasted_brew_current_round
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: true,
-        json: jest
-          .fn()
-          .mockResolvedValueOnce([{ something: 'else' }, { notTastedBrewCurrentRound: [] }]),
-      });
+      const result = await fetchAndUpdateMyBeers();
+
+      expect(result.success).toBe(false);
+      expect(result.error?.type).toBe(ApiErrorType.UNREADABLE_BODY_ERROR);
+    });
+
+    it.each([
+      ['a body of the wrong shape', 'response contained no tasted_brew_current_round array'],
+      ['rows that all lack an id', '2 rows returned and none carried an id'],
+    ])('refuses to write for %s, without leaking the detail', async (_label, detail) => {
+      // Two cases this function used to classify itself and get wrong in two
+      // different ways: a missing array was VALIDATION_ERROR, whose renderer
+      // returns `message` verbatim, and rows-without-ids was an untyped `Error`
+      // that reached UNKNOWN_ERROR — which returns `message` verbatim too. Both
+      // put parser prose in the refresh alert. MALFORMED_RESPONSE_ERROR has copy
+      // written to suppress exactly that.
+      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(malformed(detail));
 
       const result = await fetchAndUpdateMyBeers();
 
       expect(result.success).toBe(false);
       expect(result.dataUpdated).toBe(false);
-      expect(result.error).toBeDefined();
-    });
-
-    it('should return success with 0 items if no valid beers with IDs are found', async () => {
-      // Mock getPreference for visitor mode check and API URL
-      (getPreference as jest.Mock)
-        .mockResolvedValueOnce('false') // is_visitor_mode
-        .mockResolvedValueOnce(testMyBeersUrl); // my_beers_api_url
-
-      // Mock beers data without IDs
-      const mockBeers: Partial<Beerfinder>[] = [
-        { brew_name: 'Test Beer 1', brewer: 'Brewery 1' },
-        { brew_name: 'Test Beer 2', brewer: 'Brewery 2' },
-      ];
-
-      // Mock fetch to return data with invalid beers
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: true,
-        json: jest
-          .fn()
-          .mockResolvedValueOnce([{ something: 'else' }, { tasted_brew_current_round: mockBeers }]),
-      });
-
-      // Mock myBeersRepository.insertMany and setPreference to succeed
-      (myBeersRepository.insertMany as jest.Mock).mockResolvedValueOnce(undefined);
-      (setPreference as jest.Mock).mockResolvedValue(undefined);
-
-      const result = await fetchAndUpdateMyBeers();
-
-      // INVERTED by plan 02 Phase 2. Previously asserted success with 0 items,
-      // and wrote an empty table on the way. Rows that all lack an id are
-      // MALFORMED, not an empty round — writing wiped a populated tasted list
-      // and stamping the timestamps hid it for 12 hours.
-      expect(result.success).toBe(false);
-      expect(result.dataUpdated).toBe(false);
-      expect(result.itemCount).toBe(0);
-      expect(myBeersRepository.insertMany).not.toHaveBeenCalled();
-      expect(myBeersRepository.replaceAllWithEmpty).not.toHaveBeenCalled();
+      expect(result.error?.type).toBe(ApiErrorType.MALFORMED_RESPONSE_ERROR);
+      expect(getUserFriendlyErrorMessage(result.error!)).not.toContain(detail);
+      // The table is left alone and no timestamp is stamped — writing here is
+      // what wiped a populated tasted list, and stamping hid it for 12 hours.
+      expect(myBeersRepository.insertManyUnsafe).not.toHaveBeenCalled();
+      expect(myBeersRepository.replaceAllWithEmptyUnsafe).not.toHaveBeenCalled();
       expect(setPreference).not.toHaveBeenCalledWith('my_beers_last_update', expect.anything());
     });
 
-    it('should successfully update my beers', async () => {
-      // Mock getPreference for visitor mode check and API URL
-      (getPreference as jest.Mock)
-        .mockResolvedValueOnce('false') // is_visitor_mode
-        .mockResolvedValueOnce(testMyBeersUrl); // my_beers_api_url
-
-      // Mock beers data with IDs (without container_type - it's added by calculateContainerTypes in the service)
-      const mockBeers: Beerfinder[] = [
-        { id: 'beer-1', brew_name: 'Test Beer 1', tasted_date: '2023-01-01' },
-        { id: 'beer-2', brew_name: 'Test Beer 2', tasted_date: '2023-01-02' },
-      ];
-
-      // Mock fetch to return valid data
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: true,
-        json: jest
-          .fn()
-          .mockResolvedValueOnce([{ something: 'else' }, { tasted_brew_current_round: mockBeers }]),
-      });
-
-      // Mock myBeersRepository.insertMany to succeed
-      (myBeersRepository.insertMany as jest.Mock).mockResolvedValueOnce(undefined);
-
-      // Mock setPreference to succeed
-      (setPreference as jest.Mock).mockResolvedValue(undefined);
+    it('writes the rows and stamps both timestamps on success', async () => {
+      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(
+        fetchedRows([
+          { id: 'beer-1', brew_name: 'Test Beer 1', tasted_date: '2023-01-01' },
+          { id: 'beer-2', brew_name: 'Test Beer 2', tasted_date: '2023-01-02' },
+        ])
+      );
 
       const result = await fetchAndUpdateMyBeers();
 
       expect(result.success).toBe(true);
       expect(result.dataUpdated).toBe(true);
-      expect(result.itemCount).toBe(mockBeers.length);
-      // The service adds container_type, abv, and enrichment fields (all null) to beers before insertion via calculateContainerTypes()
-      expect(myBeersRepository.insertMany).toHaveBeenCalledWith([
-        {
-          id: 'beer-1',
-          brew_name: 'Test Beer 1',
-          tasted_date: '2023-01-01',
-          container_type: null,
-          abv: null,
-          enrichment_confidence: null,
-          enrichment_source: null,
-        },
-        {
-          id: 'beer-2',
-          brew_name: 'Test Beer 2',
-          tasted_date: '2023-01-02',
-          container_type: null,
-          abv: null,
-          enrichment_confidence: null,
-          enrichment_source: null,
-        },
+      expect(result.itemCount).toBe(2);
+      // `insertManyUnsafe`, not `insertMany`: the write now runs inside one
+      // explicit lock hold covering the rows AND the timestamps, instead of the
+      // repository taking and releasing its own lock for the rows alone.
+      // container_type and the enrichment columns are added by
+      // `calculateContainerTypes` before the write.
+      expect(myBeersRepository.insertManyUnsafe).toHaveBeenCalledWith([
+        expect.objectContaining({ id: 'beer-1', container_type: null, abv: null }),
+        expect.objectContaining({ id: 'beer-2', container_type: null, abv: null }),
       ]);
       expect(setPreference).toHaveBeenCalledWith('my_beers_last_update', expect.any(String));
       expect(setPreference).toHaveBeenCalledWith('my_beers_last_check', expect.any(String));
     });
 
-    it('should handle errors during update', async () => {
-      // Mock getPreference for visitor mode check and API URL
-      (getPreference as jest.Mock)
-        .mockResolvedValueOnce('false') // is_visitor_mode
-        .mockResolvedValueOnce(testMyBeersUrl); // my_beers_api_url
-
-      // Mock fetch to throw an error
-      (global.fetch as jest.Mock).mockRejectedValueOnce(new Error('Network error'));
+    it('clears the table when the server confirms an empty round', async () => {
+      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(confirmedEmpty());
 
       const result = await fetchAndUpdateMyBeers();
 
-      expect(result.success).toBe(false);
-      expect(result.dataUpdated).toBe(false);
-      expect(result.error).toBeDefined();
-    });
-
-    it('should skip update in visitor mode', async () => {
-      // Mock getPreference to return visitor mode
-      (getPreference as jest.Mock).mockResolvedValueOnce('true'); // is_visitor_mode
-
-      const result = await fetchAndUpdateMyBeers();
-
-      expect(result.success).toBe(true);
-      expect(result.dataUpdated).toBe(false);
-      expect(result.error?.type).toBe('INFO');
-      expect(result.error?.message).toContain('visitor mode');
-      expect(global.fetch).not.toHaveBeenCalled();
-      expect(setPreference).toHaveBeenCalledWith('my_beers_last_check', expect.any(String));
-    });
-
-    it('should handle empty tasted beers array', async () => {
-      (getPreference as jest.Mock)
-        .mockResolvedValueOnce('false') // is_visitor_mode
-        .mockResolvedValueOnce(testMyBeersUrl); // my_beers_api_url
-
-      // Mock fetch to return empty array
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: true,
-        json: jest.fn().mockResolvedValueOnce([{}, { tasted_brew_current_round: [] }]),
-      });
-
-      (myBeersRepository.insertMany as jest.Mock).mockResolvedValueOnce(undefined);
-      (setPreference as jest.Mock).mockResolvedValue(undefined);
-
-      const result = await fetchAndUpdateMyBeers();
-
-      // Still a success — the server genuinely reported zero tasted beers, which
-      // is a real state (new user, or the round rollover at 200). It just says
-      // so explicitly now instead of inferring it from an empty array.
       expect(result.success).toBe(true);
       expect(result.dataUpdated).toBe(true);
       expect(result.itemCount).toBe(0);
-      expect(myBeersRepository.replaceAllWithEmpty).toHaveBeenCalled();
-      expect(myBeersRepository.insertMany).not.toHaveBeenCalled();
+      expect(myBeersRepository.replaceAllWithEmptyUnsafe).toHaveBeenCalled();
+      expect(myBeersRepository.insertManyUnsafe).not.toHaveBeenCalled();
     });
 
-    it('should handle fetch timeout with AbortError', async () => {
-      (getPreference as jest.Mock)
-        .mockResolvedValueOnce('false') // is_visitor_mode
-        .mockResolvedValueOnce(testMyBeersUrl); // my_beers_api_url
-
-      // Create AbortError
-      const abortError = new Error('The operation was aborted');
-      abortError.name = 'AbortError';
-
-      (global.fetch as jest.Mock).mockRejectedValueOnce(abortError);
+    it('skips in visitor mode without stamping a freshness timestamp', async () => {
+      // BEHAVIOUR CHANGE, and a deliberate one. This used to stamp
+      // `my_beers_last_check` "to prevent repeated checks" and return an INFO
+      // error. Both were inert and one was harmful: `checkAndRefreshOnAppOpen`
+      // already gates my-beers on `!isVisitor`, so the stamp prevented nothing —
+      // but it persisted, so a visitor who logged in had a fresh timestamp
+      // claiming their tasted list had just been checked, and the 12-hour window
+      // could skip the first app-open refresh they were ever entitled to. A
+      // non-answer must not stamp; that is the rule the rest of this work
+      // established.
+      //
+      // The INFO error went unread: `_layout` discards this result and
+      // `checkAndRefreshOnAppOpen` only collects errors when `success` is false.
+      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(
+        unavailable('not-applicable', 'visitor mode has no tasted beers')
+      );
 
       const result = await fetchAndUpdateMyBeers();
 
-      expect(result.success).toBe(false);
+      expect(result.success).toBe(true);
       expect(result.dataUpdated).toBe(false);
-      expect(result.error).toBeDefined();
-      expect(result.error?.type).toBe('NETWORK_ERROR');
-      expect(result.error?.message).toContain('request timed out');
+      expect(setPreference).not.toHaveBeenCalledWith('my_beers_last_check', expect.any(String));
+      expect(myBeersRepository.replaceAllWithEmptyUnsafe).not.toHaveBeenCalled();
     });
 
-    it('should use configured URL from preferences', async () => {
-      const customUrl = 'https://custom.api.com/my-beers';
-      (getPreference as jest.Mock)
-        .mockResolvedValueOnce('false') // is_visitor_mode
-        .mockResolvedValueOnce(customUrl); // my_beers_api_url
-
-      // Mock valid response
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: true,
-        json: jest
-          .fn()
-          .mockResolvedValueOnce([
-            {},
-            { tasted_brew_current_round: [{ id: '1', brew_name: 'Test' }] },
-          ]),
-      });
-
-      (myBeersRepository.insertMany as jest.Mock).mockResolvedValueOnce(undefined);
-      (setPreference as jest.Mock).mockResolvedValue(undefined);
+    it('takes the database lock for the write burst', async () => {
+      // `writeMyBeers` uses the `*Unsafe` repository methods, which assume the
+      // caller holds the lock. The sequential path holds the master lock already;
+      // this entry point has to take one, and the rows and the timestamps must
+      // land inside the same hold.
+      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(
+        fetchedRows([{ id: 'beer-1', brew_name: 'B', tasted_date: '2023-01-01' }])
+      );
 
       await fetchAndUpdateMyBeers();
 
-      expect(global.fetch).toHaveBeenCalledWith(
-        customUrl,
-        expect.objectContaining({ signal: expect.any(Object) })
-      );
+      expect(databaseLockManager.withDatabaseLock).toHaveBeenCalledTimes(1);
     });
 
-    it('should calculate container types AFTER enrichment so ABV is available for glass selection', async () => {
-      (getPreference as jest.Mock)
-        .mockResolvedValueOnce('false') // is_visitor_mode
-        .mockResolvedValueOnce(testMyBeersUrl); // my_beers_api_url
+    it('does not take the lock when there is nothing to write', async () => {
+      // A failed source has no write burst, so taking the lock would be a
+      // pointless acquisition at the moment other retries are most likely to be
+      // contending for it — the same reasoning `runSequentialRefresh` applies.
+      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(failed(ApiErrorType.NETWORK_ERROR));
+
+      await fetchAndUpdateMyBeers();
+
+      expect(databaseLockManager.withDatabaseLock).not.toHaveBeenCalled();
+    });
+
+    it('starts the worker sync after the write, not during the fetch', async () => {
+      // The old code fired this inside its enrichment block, during the fetch.
+      // The sync polls the Worker and then writes enrichment into the same table
+      // under its own lock, so starting it early lets it land BEFORE the
+      // clear-and-reinsert below and be wiped by it.
       (config.enrichment.isConfigured as jest.Mock).mockReturnValue(true);
-
-      // Draft beer with no ABV in description — container type would be null without enrichment
-      const mockBeers: Beerfinder[] = [
-        {
-          id: 'beer-1',
-          brew_name: 'Parish West Coast Ghost',
-          brewer: 'Parish Brewing',
-          brew_container: 'Draft',
-          brew_style: 'IPA',
-          brew_description: 'A west coast IPA',
-          tasted_date: '2024-06-15',
-        },
-      ];
-
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: true,
-        json: jest.fn().mockResolvedValueOnce([{}, { tasted_brew_current_round: mockBeers }]),
+      (fetchEnrichmentBatchWithMissing as jest.Mock).mockResolvedValue({
+        enrichments: {},
+        missing: ['beer-1'],
       });
+      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(
+        fetchedRows([{ id: 'beer-1', brew_name: 'B', tasted_date: '2023-01-01' }])
+      );
 
-      // Enrichment provides ABV = 6.5% (< 8% → pint glass)
+      await fetchAndUpdateMyBeers();
+
+      // No flush needed, and deliberately none: this suite runs on fake timers,
+      // where `flushPromises`' `setImmediate` never fires.
+      // `syncMissingBeersInBackground` reaches `syncBeersToWorker` with no
+      // `await` in front of it, so it has already been invoked by the time the
+      // call above resolves. If it had NOT been started synchronously after the
+      // write, this assertion would fail rather than hang.
+      const writeOrder = (myBeersRepository.insertManyUnsafe as jest.Mock).mock
+        .invocationCallOrder[0];
+      const syncOrder = (syncBeersToWorker as jest.Mock).mock.invocationCallOrder[0];
+      expect(writeOrder).toBeDefined();
+      expect(syncOrder).toBeGreaterThan(writeOrder);
+    });
+
+    it('calculates container types AFTER enrichment so ABV drives glass selection', async () => {
+      // A draft beer with no ABV in its description gets container_type = null —
+      // a question-mark icon — unless enrichment lands first. Kept from the
+      // original suite; it now exercises the shared `prepareMyBeers` ordering
+      // rather than this function's own copy of it.
+      (config.enrichment.isConfigured as jest.Mock).mockReturnValue(true);
+      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(
+        fetchedRows([
+          {
+            id: 'beer-1',
+            brew_name: 'Parish West Coast Ghost',
+            brewer: 'Parish Brewing',
+            brew_container: 'Draft',
+            brew_style: 'IPA',
+            brew_description: 'A west coast IPA',
+            tasted_date: '2024-06-15',
+          },
+        ])
+      );
       (fetchEnrichmentBatchWithMissing as jest.Mock).mockResolvedValueOnce({
         enrichments: {
           'beer-1': {
@@ -691,35 +623,33 @@ describe('dataUpdateService', () => {
         },
         missing: [],
       });
-
-      // Make mergeEnrichmentData actually merge ABV (not just pass through)
-      (mergeEnrichmentData as jest.Mock).mockImplementationOnce((beers, enrichmentData) => {
-        return beers.map((beer: Record<string, unknown>) => {
+      (mergeEnrichmentData as jest.Mock).mockImplementationOnce((beers, enrichmentData) =>
+        beers.map((beer: Record<string, unknown>) => {
           const enrichment = enrichmentData[beer.id as string];
-          if (enrichment) {
-            return {
-              ...beer,
-              abv: enrichment.enriched_abv ?? beer.abv,
-              enrichment_confidence: enrichment.enrichment_confidence,
-              enrichment_source: enrichment.enrichment_source,
-              brew_description: enrichment.brew_description ?? beer.brew_description,
-            };
-          }
-          return beer;
-        });
-      });
-
-      (myBeersRepository.insertMany as jest.Mock).mockResolvedValueOnce(undefined);
-      (setPreference as jest.Mock).mockResolvedValue(undefined);
+          return enrichment
+            ? {
+                ...beer,
+                abv: enrichment.enriched_abv ?? beer.abv,
+                enrichment_confidence: enrichment.enrichment_confidence,
+                enrichment_source: enrichment.enrichment_source,
+                brew_description: enrichment.brew_description ?? beer.brew_description,
+              }
+            : beer;
+        })
+      );
 
       await fetchAndUpdateMyBeers();
 
-      // The beer should have container_type = 'pint' (6.5% ABV draft → pint glass)
-      // NOT null (which would show a question mark)
-      const insertCall = (myBeersRepository.insertMany as jest.Mock).mock.calls[0][0];
-      expect(insertCall[0].container_type).toBe('pint');
-      expect(insertCall[0].abv).toBe(6.5);
+      const inserted = (myBeersRepository.insertManyUnsafe as jest.Mock).mock.calls[0][0];
+      expect(inserted[0].container_type).toBe('pint');
+      expect(inserted[0].abv).toBe(6.5);
     });
+
+    // MOVED, not dropped: 'should use configured URL from preferences' asserted
+    // `global.fetch` was called with the URL from preferences. Resolving that URL
+    // is `beerApi`'s job now, and `beerApi.test.ts` already asserts the fetch is
+    // made against the resolved `my_beers_api_url`. Keeping a copy here would
+    // require this entry point to know the URL, which is the coupling D3 removes.
   });
 
   describe('Config Integration', () => {
@@ -1791,15 +1721,8 @@ describe('dataUpdateService', () => {
       // Use real timers for this test since we need fire-and-forget promise chains to resolve
       jest.useRealTimers();
 
-      const testMyBeersUrl = `${config.api.baseUrl}/api/my-beers`;
-
       // Enable enrichment
       (config.enrichment.isConfigured as jest.Mock).mockReturnValue(true);
-
-      // Set up preferences: not visitor mode, valid API URL
-      (getPreference as jest.Mock)
-        .mockResolvedValueOnce('false') // is_visitor_mode
-        .mockResolvedValueOnce(testMyBeersUrl); // my_beers_api_url
 
       // Mock beers with IDs
       const mockTastedBeers: Beerfinder[] = [
@@ -1807,11 +1730,12 @@ describe('dataUpdateService', () => {
         { id: 'beer-2', brew_name: 'Test Beer 2', tasted_date: '2023-01-02' },
       ];
 
-      // Mock fetch response
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: true,
-        json: jest.fn().mockResolvedValueOnce([{}, { tasted_brew_current_round: mockTastedBeers }]),
-      });
+      // Driven through the shared fetcher, like every other source. The two
+      // `mockResolvedValueOnce` preference values this used to queue are gone
+      // with the raw fetch: `fetchAndUpdateMyBeers` reads no preferences now, so
+      // the queue was never drained and its leftovers were served to whichever
+      // test ran next — which is how the ETag test below started failing.
+      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockTastedBeers));
 
       // Mock enrichment batch: return enrichments + missing IDs
       (fetchEnrichmentBatchWithMissing as jest.Mock).mockResolvedValueOnce({
@@ -1843,8 +1767,9 @@ describe('dataUpdateService', () => {
         queued_for_cleanup: 2,
       });
 
-      // Mock repository methods
-      (myBeersRepository.insertMany as jest.Mock).mockResolvedValueOnce(undefined);
+      // Mock repository methods. `insertManyUnsafe`: the write runs inside one
+      // explicit lock hold now rather than the repository taking its own.
+      (myBeersRepository.insertManyUnsafe as jest.Mock).mockResolvedValueOnce(undefined);
       (setPreference as jest.Mock).mockResolvedValue(undefined);
 
       await fetchAndUpdateMyBeers();

@@ -223,3 +223,59 @@ describe('fetchMemberDataFromAPI', () => {
     }
   });
 });
+
+/**
+ * The real server body, extracted by the layer that now owns extraction.
+ *
+ * `dataUpdateService.integration.test.ts` used to drive `mybeers.json` through
+ * `fetchAndUpdateMyBeers`, because that function carried its own parse and its
+ * own extraction. D3 retired that copy, so the "a real server body still
+ * extracts" half of those tests lives here — against a real `global.fetch`,
+ * which is the only place it can actually be shown.
+ */
+describe('extracting the real mybeers.json fixture', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const fs = require('fs');
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const path = require('path');
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (preferences.getPreference as jest.Mock).mockImplementation(memberPrefs);
+  });
+
+  const fixture = (): unknown =>
+    JSON.parse(fs.readFileSync(path.join(process.cwd(), 'mybeers.json'), 'utf8'));
+
+  it('returns every tasted row the fixture carries', async () => {
+    const body = fixture() as [unknown, { tasted_brew_current_round: unknown[] }];
+    respondWith(body);
+
+    const outcome = await settle(fetchMyBeersFromAPI());
+
+    expect(outcome.status).toBe('fetched');
+    if (outcome.status === 'fetched' && outcome.data.kind === 'data') {
+      expect(outcome.data.items).toHaveLength(body[1].tasted_brew_current_round.length);
+      // The fields the tasted list and the glass icon are built from. Asserted
+      // against the real body rather than a hand-written row, which is the whole
+      // reason this fixture is in the repo.
+      for (const field of ['id', 'brew_name', 'brewer', 'brew_style', 'tasted_date', 'chit_code']) {
+        expect(outcome.data.items[0]).toHaveProperty(field);
+      }
+    } else {
+      throw new Error(`expected data, got ${JSON.stringify(outcome).slice(0, 120)}`);
+    }
+  });
+
+  it('reads the rewards half of the same fixture independently', async () => {
+    // The fixture is a member body, so it exercises the coalesced path on real
+    // data: whatever `data[2]` holds, my-beers is unaffected by it.
+    respondWith(fixture());
+
+    const member = await settle(fetchMemberDataFromAPI());
+
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(member.myBeers.status).toBe('fetched');
+    if (member.myBeers.status === 'fetched') expect(member.myBeers.data.kind).toBe('data');
+  });
+});
