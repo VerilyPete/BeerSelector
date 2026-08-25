@@ -865,14 +865,12 @@ const extractRewards = (data: unknown): UnconditionalSource<FetchOutcome<Reward>
       if (typeof candidate.reward_id !== 'string' || candidate.reward_id.length === 0) {
         return kept;
       }
-      return [
-        ...kept,
-        {
-          reward_id: candidate.reward_id,
-          redeemed: toPersistedRewardText(candidate.redeemed, '0'),
-          reward_type: toPersistedRewardText(candidate.reward_type, ''),
-        },
-      ];
+      kept.push({
+        reward_id: candidate.reward_id,
+        redeemed: toPersistedRewardText(candidate.redeemed, '0'),
+        reward_type: toPersistedRewardText(candidate.reward_type, ''),
+      });
+      return kept;
     }, []);
     const nonEmpty = toNonEmpty(rewards);
     if (nonEmpty === null) {
