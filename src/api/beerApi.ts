@@ -5,6 +5,7 @@ import { getPreference } from '../database/preferences';
 import { config } from '../config';
 import { HttpError, TransportAbortedError, UnreadableBodyError, toNonEmpty } from './fetchOutcome';
 import { createErrorResponse } from '../utils/notificationUtils';
+import { logWarning } from '../utils/errorLogger';
 import type { FetchOutcome, UnavailableReason, UnconditionalSource } from './fetchOutcome';
 
 /**
@@ -772,13 +773,18 @@ const extractRewards = (data: unknown): UnconditionalSource<FetchOutcome<Reward>
   // an earlier version said that and it is false for rewards, where `malformed`
   // leaves the local table untouched.
   //
-  // The reason is that a dropped row is one no reader would ever return.
-  // `rewardRowSchema` requires a non-empty `reward_id` and all three
-  // `RewardsRepository` readers filter through it, so such a row is invisible to
-  // the member under any ingest policy. Rejecting the payload instead would
-  // freeze the rows they CAN see at their previous state — a redeemed reward
-  // still showing unredeemed — and report a server fault on every refresh, to
-  // protect one row that is invisible either way.
+  // A dropped INCOMING row is one no reader could return: `rewardRowSchema`
+  // requires a non-empty `reward_id`, and every repository reader applies it.
+  // The replacement still has collateral, though: `insertMany` deletes the old
+  // snapshot first, so a previously readable row that corresponds to the broken
+  // incoming row disappears along with it. There is no id with which to merge
+  // or preserve that row selectively.
+  //
+  // We accept that trade-off because this endpoint is an authoritative snapshot.
+  // Rejecting every mixed response would freeze every surviving reward and its
+  // redemption state indefinitely for one id-schema break. Keeping the usable
+  // survivors preserves liveness; the structured warning below makes the
+  // collateral replacement visible rather than pretending it did not happen.
   //
   // THIS HOLDS ONLY WHILE THE GATE IS `reward_id` ALONE. Widen it — to
   // `redeemed`, to `reward_type`, to anything the readers tolerate — and
@@ -848,8 +854,18 @@ const extractRewards = (data: unknown): UnconditionalSource<FetchOutcome<Reward>
     }
 
     if (rewards.length < rows.length) {
-      console.warn(
-        `Rewards: dropped ${rows.length - rewards.length} of ${rows.length} rows that were not rewards`
+      const droppedRows = rows.length - rewards.length;
+      logWarning(
+        `Rewards: dropped ${droppedRows} of ${rows.length} rows without a usable reward_id; replacing the stored snapshot with ${rewards.length} survivor${rewards.length === 1 ? '' : 's'}`,
+        {
+          operation: 'extractRewards',
+          component: 'beerApi',
+          additionalData: {
+            droppedRows,
+            receivedRows: rows.length,
+            survivingRows: rewards.length,
+          },
+        }
       );
     }
 
