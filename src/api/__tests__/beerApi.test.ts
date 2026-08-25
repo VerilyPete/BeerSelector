@@ -1069,7 +1069,7 @@ describe('a non-array payload is malformed, not data (plan refresh-failure-class
     // `''` and `'0'` identical by the time they reach SQLite — but it is pinned
     // here anyway, because "absorbed by a caller two layers down" is not a
     // property this function should rely on.
-    const DEFAULTED: readonly [string, Record<string, unknown>, string, string][] = [
+    const NORMALIZED_REWARD_FIELDS: readonly [string, Record<string, unknown>, string, string][] = [
       [
         'numeric redeemed zero',
         { reward_id: 'r1', redeemed: 0, reward_type: '$5 Credit' },
@@ -1099,7 +1099,7 @@ describe('a non-array payload is malformed, not data (plan refresh-failure-class
       ['a missing reward_type', { reward_id: 'r1', redeemed: '0' }, '0', ''],
     ];
 
-    it.each(DEFAULTED)(
+    it.each(NORMALIZED_REWARD_FIELDS)(
       'normalizes %s to the canonical value ingest promises',
       async (_label, row, expectedRedeemed, expectedRewardType) => {
         // THE OUTAGE TRIP-WIRE, removed. Gating on the full `isReward` — all three
