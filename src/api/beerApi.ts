@@ -497,6 +497,19 @@ export const fetchBeersFromAPI = async (): Promise<UnconditionalSource<FetchOutc
 };
 
 /**
+ * The two sources that share `my_beers_api_url`, and therefore share a request.
+ *
+ * A record of two independent outcomes rather than one outcome for "member
+ * data": the halves are extracted separately and a body can answer one and not
+ * the other, so collapsing them would destroy the same distinction
+ * `FetchOutcome` exists to preserve.
+ */
+export type MemberData = {
+  readonly myBeers: UnconditionalSource<FetchOutcome<Beerfinder>>;
+  readonly rewards: UnconditionalSource<FetchOutcome<Reward>>;
+};
+
+/**
  * Fetch user's tasted beers (My Beers) from the Flying Saucer API
  *
  * Note: The tasted_brew_current_round array can be legitimately empty in two scenarios:
@@ -515,6 +528,9 @@ export const fetchMyBeersFromAPI = async (): Promise<
   UnconditionalSource<FetchOutcome<Beerfinder>>
 > => {
   try {
+    // Inside the try, deliberately: `resolveMemberApiUrl` awaits `getPreference`
+    // twice, and a database fault there must arrive as `failed` like any other,
+    // not escape to the caller. Hoisting it out is a silent change of contract.
     const resolved = await resolveMemberApiUrl('tasted beers');
     if (!resolved.ok) {
       return { status: 'unavailable', reason: resolved.reason };
@@ -523,103 +539,167 @@ export const fetchMyBeersFromAPI = async (): Promise<
     console.log('DB: Making API request to fetch My Beers data...');
     const data = await fetchWithRetry(resolved.url);
     console.log('DB: Received response from My Beers API');
-
-    // Log the structure of the response
-    if (data) {
-      console.log('DB: API response type:', typeof data);
-      if (Array.isArray(data)) {
-        console.log(`DB: API response is an array with ${data.length} items`);
-        for (let i = 0; i < data.length; i++) {
-          console.log(`DB: data[${i}] type:`, typeof data[i]);
-          if (data[i] && typeof data[i] === 'object') {
-            console.log(`DB: data[${i}] keys:`, Object.keys(data[i]));
-          }
-        }
-      } else if (typeof data === 'object') {
-        console.log('DB: API response keys:', Object.keys(data));
-      }
-    } else {
-      console.log('DB: API response is null or undefined');
-    }
-
-    // Extract the tasted_brew_current_round array from the response
-    if (
-      data &&
-      Array.isArray(data) &&
-      data.length >= 2 &&
-      data[1] &&
-      // `Array.isArray`, not truthiness. `{}` is truthy and `{}.length` is
-      // `undefined`, so the empty-round branch below was skipped and `.filter`
-      // threw `TypeError: beers.filter is not a function` — caught by this
-      // function's outer catch, classified UNKNOWN_ERROR, and rendered verbatim
-      // as "Beerfinder data: beers.filter is not a function".
-      Array.isArray(data[1].tasted_brew_current_round)
-    ) {
-      const beers = data[1].tasted_brew_current_round;
-      console.log(`DB: Found tasted_brew_current_round with ${beers.length} beers`);
-
-      // Handle empty array as a valid state (user has no tasted beers or round has rolled over)
-      if (beers.length === 0) {
-        console.log(
-          'DB: Empty tasted beers array - user has no tasted beers in current round (new user or round rollover at 200 beers)'
-        );
-        // The server genuinely reported none. This is the ONLY case in which
-        // clearing the local tasted table is correct.
-        return fetched({ kind: 'confirmed-empty' });
-      }
-
-      // Validate the beers array - check for missing IDs
-      const validBeers = beers.filter(
-        (beer: unknown): beer is Beerfinder =>
-          typeof beer === 'object' &&
-          beer !== null &&
-          'id' in beer &&
-          beer.id !== null &&
-          beer.id !== undefined
-      );
-      const invalidBeers = beers.filter(
-        (beer: unknown) =>
-          !beer ||
-          typeof beer !== 'object' ||
-          !('id' in beer) ||
-          beer.id === null ||
-          beer.id === undefined
-      );
-
-      console.log(
-        `DB: Found ${validBeers.length} valid beers with IDs and ${invalidBeers.length} invalid beers without IDs`
-      );
-
-      // Log details about invalid beers for debugging
-      if (invalidBeers.length > 0) {
-        console.log('DB: Invalid beers details:');
-        invalidBeers.forEach((beer: unknown, index: number) => {
-          console.log(`DB: Invalid beer ${index}:`, JSON.stringify(beer));
-        });
-      }
-
-      if (validBeers.length > 0) {
-        return fromArray(validBeers);
-      }
-
-      // Rows arrived and none carried an id: MALFORMED, not an empty round.
-      // Phase 2 bridged this with a throw because there was no way to say it in
-      // the return type; `malformed` is that way, and it lets each caller
-      // decide instead of forcing all of them to catch.
-      return fetched({
-        kind: 'malformed',
-        detail: `${invalidBeers.length} rows returned and none carried an id`,
-      });
-    }
-
-    console.error('DB: Invalid response format from My Beers API');
-    return fetched({
-      kind: 'malformed',
-      detail: 'response contained no tasted_brew_current_round array',
-    });
+    return extractMyBeers(data);
   } catch (error) {
     console.error('DB: Error fetching My Beers from API:', error);
     return failed(error);
+  }
+};
+
+/**
+ * Read the tasted-beers half of a member body. Pure; makes no request.
+ *
+ * Split out so `fetchMemberDataFromAPI` can read BOTH halves of one body. The
+ * classification is unchanged and deliberately still independent of the rewards
+ * half: a body that answers one and not the other must keep saying so.
+ */
+const extractMyBeers = (data: unknown): UnconditionalSource<FetchOutcome<Beerfinder>> => {
+  // Log the structure of the response
+  if (data) {
+    console.log('DB: API response type:', typeof data);
+    if (Array.isArray(data)) {
+      console.log(`DB: API response is an array with ${data.length} items`);
+      for (let i = 0; i < data.length; i++) {
+        console.log(`DB: data[${i}] type:`, typeof data[i]);
+        if (data[i] && typeof data[i] === 'object') {
+          console.log(`DB: data[${i}] keys:`, Object.keys(data[i]));
+        }
+      }
+    } else if (typeof data === 'object') {
+      console.log('DB: API response keys:', Object.keys(data));
+    }
+  } else {
+    console.log('DB: API response is null or undefined');
+  }
+
+  // Extract the tasted_brew_current_round array from the response
+  if (
+    data &&
+    Array.isArray(data) &&
+    data.length >= 2 &&
+    data[1] &&
+    // `Array.isArray`, not truthiness. `{}` is truthy and `{}.length` is
+    // `undefined`, so the empty-round branch below was skipped and `.filter`
+    // threw `TypeError: beers.filter is not a function` — caught by this
+    // function's outer catch, classified UNKNOWN_ERROR, and rendered verbatim
+    // as "Beerfinder data: beers.filter is not a function".
+    Array.isArray(data[1].tasted_brew_current_round)
+  ) {
+    const beers = data[1].tasted_brew_current_round;
+    console.log(`DB: Found tasted_brew_current_round with ${beers.length} beers`);
+
+    // Handle empty array as a valid state (user has no tasted beers or round has rolled over)
+    if (beers.length === 0) {
+      console.log(
+        'DB: Empty tasted beers array - user has no tasted beers in current round (new user or round rollover at 200 beers)'
+      );
+      // The server genuinely reported none. This is the ONLY case in which
+      // clearing the local tasted table is correct.
+      return fetched({ kind: 'confirmed-empty' });
+    }
+
+    // Validate the beers array - check for missing IDs
+    const validBeers = beers.filter(
+      (beer: unknown): beer is Beerfinder =>
+        typeof beer === 'object' &&
+        beer !== null &&
+        'id' in beer &&
+        beer.id !== null &&
+        beer.id !== undefined
+    );
+    const invalidBeers = beers.filter(
+      (beer: unknown) =>
+        !beer ||
+        typeof beer !== 'object' ||
+        !('id' in beer) ||
+        beer.id === null ||
+        beer.id === undefined
+    );
+
+    console.log(
+      `DB: Found ${validBeers.length} valid beers with IDs and ${invalidBeers.length} invalid beers without IDs`
+    );
+
+    // Log details about invalid beers for debugging
+    if (invalidBeers.length > 0) {
+      console.log('DB: Invalid beers details:');
+      invalidBeers.forEach((beer: unknown, index: number) => {
+        console.log(`DB: Invalid beer ${index}:`, JSON.stringify(beer));
+      });
+    }
+
+    if (validBeers.length > 0) {
+      return fromArray(validBeers);
+    }
+
+    // Rows arrived and none carried an id: MALFORMED, not an empty round.
+    // Phase 2 bridged this with a throw because there was no way to say it in
+    // the return type; `malformed` is that way, and it lets each caller
+    // decide instead of forcing all of them to catch.
+    return fetched({
+      kind: 'malformed',
+      detail: `${invalidBeers.length} rows returned and none carried an id`,
+    });
+  }
+
+  console.error('DB: Invalid response format from My Beers API');
+  return fetched({
+    kind: 'malformed',
+    detail: 'response contained no tasted_brew_current_round array',
+  });
+};
+
+/**
+ * Both member sources, from one request.
+ *
+ * `resolveMemberApiUrl` reads `my_beers_api_url` for BOTH my-beers and rewards,
+ * so the two fetchers have always sent the same request to the same URL, back to
+ * back, and discarded half of each answer: my-beers reads
+ * `data[1].tasted_brew_current_round`, rewards reads `data[2].reward`, out of one
+ * array the server sends whole. Two of a refresh's four member requests were
+ * pure duplication, and the bounded retry doubled the cost of that duplication
+ * rather than the cost of the information.
+ *
+ * Saves one request in the happy path and two when the body comes back
+ * unreadable. It does NOT touch the taplist, which is a different URL with its
+ * own fallback and its own bound.
+ *
+ * **Shared fate is the trade.** One request means one verdict for both halves,
+ * so a transient failure that could previously take out my-beers while rewards
+ * succeeded now takes out both. Two requests to one URL a second apart
+ * disagreeing is a transient artifact rather than information, so agreeing is
+ * the more honest answer — but callers do see fewer independent outcomes than
+ * before, and a refresh that fails here now reports two lines carrying the same
+ * message.
+ *
+ * The two extractions stay INDEPENDENT: a body that answers one half and not the
+ * other still says so, exactly as two separate requests for that body would
+ * have. That is what makes this a saving rather than a change of meaning.
+ */
+export const fetchMemberDataFromAPI = async (): Promise<MemberData> => {
+  try {
+    // Everything inside the try, and here it matters more than in the two
+    // single-source fetchers: the service calls this OUTSIDE its per-source
+    // catch, so anything that escaped would take out the whole refresh rather
+    // than the two sources it concerns. This function is total.
+    const resolved = await resolveMemberApiUrl('member data');
+    if (!resolved.ok) {
+      // Resolved ONCE for the pair, so the three conditions that mean "do not
+      // ask" can no longer be answered differently for the two sources — the
+      // divergence that left rewards sending a none:// placeholder to fetch()
+      // for three retries after my-beers had been taught not to.
+      return {
+        myBeers: { status: 'unavailable', reason: resolved.reason },
+        rewards: { status: 'unavailable', reason: resolved.reason },
+      };
+    }
+
+    console.log('DB: Making one API request for both member sources...');
+    const data = await fetchWithRetry(resolved.url);
+    return { myBeers: extractMyBeers(data), rewards: extractRewards(data) };
+  } catch (error) {
+    console.error('DB: Error fetching member data from API:', error);
+    return { myBeers: failed(error), rewards: failed(error) };
   }
 };
 
@@ -629,47 +709,49 @@ export const fetchMyBeersFromAPI = async (): Promise<
  */
 export const fetchRewardsFromAPI = async (): Promise<UnconditionalSource<FetchOutcome<Reward>>> => {
   try {
+    // Inside the try; see `fetchMyBeersFromAPI`.
     const resolved = await resolveMemberApiUrl('rewards');
     if (!resolved.ok) {
       return { status: 'unavailable', reason: resolved.reason };
     }
 
-    const data = await fetchWithRetry(resolved.url);
-
-    // Extract the reward array from the response
-    // `Array.isArray`, not truthiness, and it is this site that made the hole
-    // dangerous rather than merely wrong. `{}.length === 0` is FALSE, so the
-    // ternary below took the `data` arm and `toNonEmpty({})!` put `items: null`
-    // into a `NonEmptyArray` slot; `writeRewards` then spread it under the write
-    // lock. A string payload was worse and silent: `toNonEmpty('oops')` yields
-    // four one-character rows that spread fine, and `_insertManyInternal` runs
-    // `DELETE FROM rewards` before collapsing them onto one empty `reward_id` —
-    // the member's rewards deleted, and the refresh reporting success.
-    //
-    // The guard also retires the `as Reward[]` cast: the check is the narrowing.
-    if (
-      data &&
-      Array.isArray(data) &&
-      data.length >= 3 &&
-      data[2] &&
-      Array.isArray(data[2].reward)
-    ) {
-      // An empty reward list is a real state — a member with none earned yet —
-      // so it is confirmed-empty rather than malformed.
-      const rewards: Reward[] = data[2].reward;
-      return fetched(
-        rewards.length === 0
-          ? { kind: 'confirmed-empty' }
-          : { kind: 'data', items: toNonEmpty(rewards)! }
-      );
-    }
-
-    return fetched({
-      kind: 'malformed',
-      detail: 'response contained no reward array',
-    });
+    return extractRewards(await fetchWithRetry(resolved.url));
   } catch (error) {
     console.error('Error fetching Rewards from API:', error);
     return failed(error);
   }
+};
+
+/**
+ * Read the rewards half of a member body. Pure; makes no request.
+ *
+ * Sibling of `extractMyBeers`; see its note.
+ */
+const extractRewards = (data: unknown): UnconditionalSource<FetchOutcome<Reward>> => {
+  // Extract the reward array from the response
+  // `Array.isArray`, not truthiness, and it is this site that made the hole
+  // dangerous rather than merely wrong. `{}.length === 0` is FALSE, so the
+  // ternary below took the `data` arm and `toNonEmpty({})!` put `items: null`
+  // into a `NonEmptyArray` slot; `writeRewards` then spread it under the write
+  // lock. A string payload was worse and silent: `toNonEmpty('oops')` yields
+  // four one-character rows that spread fine, and `_insertManyInternal` runs
+  // `DELETE FROM rewards` before collapsing them onto one empty `reward_id` —
+  // the member's rewards deleted, and the refresh reporting success.
+  //
+  // The guard also retires the `as Reward[]` cast: the check is the narrowing.
+  if (data && Array.isArray(data) && data.length >= 3 && data[2] && Array.isArray(data[2].reward)) {
+    // An empty reward list is a real state — a member with none earned yet —
+    // so it is confirmed-empty rather than malformed.
+    const rewards: Reward[] = data[2].reward;
+    return fetched(
+      rewards.length === 0
+        ? { kind: 'confirmed-empty' }
+        : { kind: 'data', items: toNonEmpty(rewards)! }
+    );
+  }
+
+  return fetched({
+    kind: 'malformed',
+    detail: 'response contained no reward array',
+  });
 };

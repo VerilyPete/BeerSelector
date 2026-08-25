@@ -106,11 +106,10 @@ jest.mock('../../database/DatabaseLockManager', () => {
   };
 });
 
-jest.mock('../../api/beerApi', () => ({
-  fetchBeersFromAPI: jest.fn(),
-  fetchMyBeersFromAPI: jest.fn(),
-  fetchRewardsFromAPI: jest.fn(),
-}));
+jest.mock('../../api/beerApi', () =>
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  require('../../api/__tests__/helpers/beerApiMock').beerApiMockFactory()
+);
 
 // Mock enrichment service
 jest.mock('../enrichmentService', () => ({

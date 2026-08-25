@@ -1,5 +1,6 @@
 import { getPreference, setPreference, areApiUrlsConfigured } from '../database/preferences';
-import { fetchBeersFromAPI, fetchMyBeersFromAPI, fetchRewardsFromAPI } from '../api/beerApi';
+import { fetchBeersFromAPI, fetchMemberDataFromAPI, fetchRewardsFromAPI } from '../api/beerApi';
+import type { MemberData } from '../api/beerApi';
 import {
   Beer,
   Beerfinder,
@@ -1715,8 +1716,15 @@ export async function sequentialRefreshAllData({
 async function runSequentialRefresh(): Promise<ManualRefreshResult> {
   console.log('Sequential refresh: fetching all sources with no lock held');
   const allBeers = await prepareAllBeers(SEQUENTIAL_REFRESH);
-  const { plan: myBeers, pendingWorkerSync } = await prepareMyBeers(SEQUENTIAL_REFRESH);
-  const rewards = await prepareRewards(SEQUENTIAL_REFRESH);
+  // ONE request for both member sources. They read the same `my_beers_api_url`
+  // and take different slices of the same array, so preparing them separately
+  // sent the identical request twice and discarded half of each answer.
+  const member = await fetchMemberDataFromAPI();
+  const { plan: myBeers, pendingWorkerSync } = await prepareMyBeers(
+    SEQUENTIAL_REFRESH,
+    member.myBeers
+  );
+  const rewards = await prepareRewards(SEQUENTIAL_REFRESH, member.rewards);
 
   /**
    * Applying all three, in order.
@@ -1951,12 +1959,15 @@ async function writeAllBeers(write: AllBeersWrite): Promise<DataUpdateResult> {
  * request inside the lock and forfeit most of this phase's benefit, since it is
  * the request over the largest id list.
  */
-async function prepareMyBeers(operation: RefreshOperation): Promise<MyBeersPreparation> {
-  console.log(`[${operation}] fetching my beers`);
+async function prepareMyBeers(
+  operation: RefreshOperation,
+  myBeersSource: MemberData['myBeers']
+): Promise<MyBeersPreparation> {
+  // Takes the outcome rather than fetching it: my-beers and rewards are two
+  // halves of ONE body from ONE url, and fetching here meant asking twice.
+  console.log(`[${operation}] classifying my beers`);
   let workerSync: PendingWorkerSync | null = null;
   try {
-    const myBeersSource = await fetchMyBeersFromAPI();
-
     // The three outcomes diverge here, and this is the divergence the whole
     // plan exists for. `unavailable` must NOT touch the table and must NOT
     // stamp a timestamp — stamping is what suppressed a retry for 12 hours.
@@ -2127,10 +2138,14 @@ async function writeMyBeers(write: MyBeersWrite): Promise<DataUpdateResult> {
 }
 
 /** Fetch and classify rewards. No database access. */
-async function prepareRewards(operation: RefreshOperation): Promise<SourcePlan<RewardsWrite>> {
-  console.log(`[${operation}] fetching rewards`);
+async function prepareRewards(
+  operation: RefreshOperation,
+  rewardsSource: MemberData['rewards']
+): Promise<SourcePlan<RewardsWrite>> {
+  // Takes the outcome rather than fetching it; see `prepareMyBeers`.
+  console.log(`[${operation}] classifying rewards`);
   try {
-    const decision = decideRewards(await fetchRewardsFromAPI());
+    const decision = decideRewards(rewardsSource);
 
     if (decision.action === 'fail') {
       // Logged here rather than left to the caller, because one of the two
@@ -2418,8 +2433,13 @@ export const refreshAllDataFromAPI = async (): Promise<{
   // This is the autoLogin -> checkInBeer path: a lock held across a stalled
   // fetch here blocks a user trying to check a beer in.
   const allBeersPlan = await prepareAllBeers(REFRESH_FROM_API);
-  const { plan: myBeersPlan, pendingWorkerSync } = await prepareMyBeers(REFRESH_FROM_API);
-  const rewardsPlan = await prepareRewards(REFRESH_FROM_API);
+  // One request for both member sources; see `runSequentialRefresh`.
+  const member = await fetchMemberDataFromAPI();
+  const { plan: myBeersPlan, pendingWorkerSync } = await prepareMyBeers(
+    REFRESH_FROM_API,
+    member.myBeers
+  );
+  const rewardsPlan = await prepareRewards(REFRESH_FROM_API, member.rewards);
 
   // These are the rows the writes were PLANNED to store — not confirmation that
   // they were stored. They are derived from the same plans, so the two cannot

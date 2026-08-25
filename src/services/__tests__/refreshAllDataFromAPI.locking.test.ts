@@ -27,7 +27,12 @@
  * they control.
  */
 
-import { fetchBeersFromAPI, fetchMyBeersFromAPI, fetchRewardsFromAPI } from '../../api/beerApi';
+import {
+  fetchBeersFromAPI,
+  fetchMemberDataFromAPI,
+  fetchMyBeersFromAPI,
+  fetchRewardsFromAPI,
+} from '../../api/beerApi';
 import { beerRepository } from '../../database/repositories/BeerRepository';
 import { myBeersRepository } from '../../database/repositories/MyBeersRepository';
 import { rewardsRepository } from '../../database/repositories/RewardsRepository';
@@ -51,11 +56,10 @@ jest.mock('../../database/preferences', () => ({
   areApiUrlsConfigured: jest.fn(async () => true),
 }));
 
-jest.mock('../../api/beerApi', () => ({
-  fetchBeersFromAPI: jest.fn(),
-  fetchMyBeersFromAPI: jest.fn(),
-  fetchRewardsFromAPI: jest.fn(),
-}));
+jest.mock('../../api/beerApi', () =>
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  require('../../api/__tests__/helpers/beerApiMock').beerApiMockFactory()
+);
 
 jest.mock('../enrichmentService', () => ({
   fetchBeersFromProxy: jest.fn(),
@@ -362,6 +366,19 @@ describe('refreshAllDataFromAPI locking', () => {
         'lock:release',
       ]);
     });
+  });
+
+  it('asks for the member body once for both sources', async () => {
+    // My-beers and rewards read the same `my_beers_api_url` and take different
+    // slices of the same array, so preparing them separately sent the identical
+    // request twice. This is the SECOND of the two sites that prepare both back
+    // to back; `dataUpdateService.manualRefresh.test.ts` pins the other. Wiring
+    // one and leaving the other is what the pair guards against.
+    allSourcesSucceed();
+
+    await refreshAllDataFromAPI();
+
+    expect(fetchMemberDataFromAPI).toHaveBeenCalledTimes(1);
   });
 
   it('returns the rows it wrote', async () => {

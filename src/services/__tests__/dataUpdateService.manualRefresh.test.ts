@@ -1,7 +1,12 @@
 import * as svc from '../../services/dataUpdateService';
 
 // Import mocked functions
-import { fetchBeersFromAPI, fetchMyBeersFromAPI, fetchRewardsFromAPI } from '../../api/beerApi';
+import {
+  fetchBeersFromAPI,
+  fetchMemberDataFromAPI,
+  fetchMyBeersFromAPI,
+  fetchRewardsFromAPI,
+} from '../../api/beerApi';
 import { setPreference } from '../../database/preferences';
 import { myBeersRepository } from '../../database/repositories/MyBeersRepository';
 import { rewardsRepository } from '../../database/repositories/RewardsRepository';
@@ -26,11 +31,10 @@ jest.mock('../../database/preferences', () => ({
   setPreference: jest.fn(async () => {}),
 }));
 
-jest.mock('../../api/beerApi', () => ({
-  fetchBeersFromAPI: jest.fn(),
-  fetchMyBeersFromAPI: jest.fn(),
-  fetchRewardsFromAPI: jest.fn(),
-}));
+jest.mock('../../api/beerApi', () =>
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  require('../../api/__tests__/helpers/beerApiMock').beerApiMockFactory()
+);
 
 jest.mock('../../database/repositories/BeerRepository', () => ({
   beerRepository: {
@@ -550,4 +554,36 @@ describe('only a confirmed-empty round clears the tasted table', () => {
     expect(myBeersRepository.replaceAllWithEmptyUnsafe).toHaveBeenCalled();
     expect(setPreference).toHaveBeenCalledWith('my_beers_last_update', expect.any(String));
   });
+});
+
+describe('the member body is fetched once for both sources', () => {
+  // My-beers and rewards read the SAME `my_beers_api_url`, so preparing them
+  // separately sent two identical requests and threw away half of each answer.
+  // The bounded unreadable retry doubled the cost of that duplication.
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (fetchBeersFromAPI as jest.Mock).mockResolvedValue(
+      fetchedRows([{ id: 'b1', brew_name: 'Beer', brewer: 'X' }])
+    );
+    (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(
+      fetchedRows([{ id: 't1', brew_name: 'Tasted', brewer: 'X', tasted_date: '2026-01-01' }])
+    );
+    (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(
+      fetchedRows([{ reward_id: 'r1', reward_type: 'badge' }])
+    );
+  });
+
+  it('asks for member data once during a sequential refresh', async () => {
+    const result = await svc.sequentialRefreshAllData();
+
+    expect(fetchMemberDataFromAPI).toHaveBeenCalledTimes(1);
+    // Both halves still land, from the one answer.
+    expect(result.myBeersResult.success).toBe(true);
+    expect(result.rewardsResult.success).toBe(true);
+  });
+
+  // The OTHER site that prepares both sources back to back —
+  // `refreshAllDataFromAPI` — is pinned in `refreshAllDataFromAPI.locking.test.ts`,
+  // which already has the `areApiUrlsConfigured` stub that entry point needs.
+  // Wiring one site and leaving the other is the failure the pair guards.
 });

@@ -25,7 +25,10 @@ const myBeersFixture = JSON.parse(
 );
 
 // Mock the modules
-jest.mock('../../api/beerApi');
+jest.mock('../../api/beerApi', () =>
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  require('../../api/__tests__/helpers/beerApiMock').beerApiMockFactory()
+);
 jest.mock('../../database/preferences');
 jest.mock('../../database/repositories/BeerRepository');
 jest.mock('../../database/repositories/MyBeersRepository');
