@@ -3,7 +3,7 @@ import * as preferences from '../../database/preferences';
 import * as connection from '../../database/connection';
 import { logWarning } from '../../utils/errorLogger';
 import type { Reward } from '../../types/database';
-import { createTransactionalRewardsDatabase } from './helpers/transactionalRewardsDatabase';
+import { createRewardsRepositoryDatabase } from './helpers/rewardsRepositoryDatabase';
 
 jest.mock('../../database/preferences');
 jest.mock('../../database/connection');
@@ -34,8 +34,8 @@ describe('mixed rewards snapshots', () => {
     const stored: Reward[] = [
       { reward_id: 'old-redeemable', redeemed: '0', reward_type: 'Free Plate' },
     ];
-    const transaction = createTransactionalRewardsDatabase(stored);
-    (connection.getDatabase as jest.Mock).mockResolvedValue(transaction.database);
+    const repositoryDatabase = createRewardsRepositoryDatabase(stored);
+    (connection.getDatabase as jest.Mock).mockResolvedValue(repositoryDatabase.database);
     const survivor: Reward = {
       reward_id: 'new-valid',
       redeemed: '0',
@@ -53,8 +53,8 @@ describe('mixed rewards snapshots', () => {
       itemCount: 1,
     });
 
-    expect(transaction.committedRewards()).toEqual([survivor]);
-    expect(transaction.committedRewards()).not.toContainEqual(
+    expect(repositoryDatabase.storedRewards()).toEqual([survivor]);
+    expect(repositoryDatabase.storedRewards()).not.toContainEqual(
       expect.objectContaining({ reward_id: 'old-redeemable' })
     );
     expect(logWarning).toHaveBeenCalledWith(
