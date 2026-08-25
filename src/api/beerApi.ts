@@ -3,7 +3,7 @@ import { isBeer } from '../types/beer';
 import { Reward } from '../types/database';
 import { getPreference } from '../database/preferences';
 import { config } from '../config';
-import { HttpError, MalformedResponseError, toNonEmpty } from './fetchOutcome';
+import { HttpError, TransportAbortedError, UnreadableBodyError, toNonEmpty } from './fetchOutcome';
 import { createErrorResponse } from '../utils/notificationUtils';
 import type { FetchOutcome, UnavailableReason, UnconditionalSource } from './fetchOutcome';
 
@@ -79,12 +79,24 @@ const attemptFetch = async (
       // nothing `createErrorResponse` recognises, so it fell through to
       // UNKNOWN_ERROR — which returns `error.message` verbatim and puts
       // "Unexpected token < in JSON at position 0" in a user-facing alert.
-      // `MalformedResponseError` has copy written to suppress precisely that.
-      throw new MalformedResponseError(
-        `Response body could not be parsed as JSON: ${
-          parseError instanceof Error ? parseError.message : String(parseError)
-        }`
-      );
+      //
+      // `UnreadableBodyError`, not `MalformedResponseError`: this says the body
+      // could not be READ, which is a different claim from the server having
+      // sent a well-formed body of the wrong shape. The shape decision is made
+      // by the three fetchers AFTER this returns, and reports through
+      // MALFORMED_RESPONSE_ERROR; this arm cannot see shape and must not
+      // pretend to.
+      //
+      // The parser's error travels as `cause` and is NEVER interpolated — V8
+      // embeds a body excerpt in it, Hermes does not, so interpolation leaks the
+      // response body into `ErrorResponse.message` in CI and silently not on
+      // device.
+      //
+      // An abort during the body read needs no special case here: the catch
+      // below asks the controller BEFORE it looks at this type, so a chain that
+      // has already timed out is reported as the deadline rather than as a body
+      // worth re-fetching. See the ordering fence in beerApi.failureOutcome.test.ts.
+      throw new UnreadableBodyError(parseError);
     }
   } catch (error) {
     // A timeout is NOT retried. The request already spent the full deadline, and
@@ -116,7 +128,16 @@ const attemptFetch = async (
       // per-chain deadline reintroduced it one layer down: shortening the
       // budget makes a late attempt likelier to abort, so the more often the
       // deadline does its job, the more often the real error was discarded.
-      throw earlierFailure ?? error;
+      //
+      // Typed HERE, at the outer exit, rather than inside the `json()` catch:
+      // `fetch()` itself is the abort route that actually fires, and it does not
+      // pass through that catch at all. Typing it where the controller is in
+      // scope also covers a non-`Error` rejection value, which would otherwise
+      // skip `createErrorResponse`'s whole `instanceof Error` block and land on
+      // UNKNOWN_ERROR with 'An unknown error occurred'.
+      throw (
+        earlierFailure ?? new TransportAbortedError('the chain deadline ended the attempt', error)
+      );
     }
 
     // A 4xx is the server reading the request and rejecting it on its merits.
@@ -134,11 +155,13 @@ const attemptFetch = async (
       throw error;
     }
 
-    // A body that will not parse will not parse the second time either. Same
-    // argument as the 4xx above, applied to the response instead of the
-    // request: a captive-portal login page served with 200 OK costs three
-    // requests and 2.5s of backoff to learn the same thing three times.
-    if (error instanceof MalformedResponseError) {
+    // TEMPORARY, and replaced by the bounded retry in the next phase.
+    //
+    // It has to be here now: this phase changes the thrown class, so without it
+    // an unreadable body stops matching anything above, falls through to the
+    // generic retry path, and silently takes THREE attempts — a phase before the
+    // change that deliberately adds exactly one.
+    if (error instanceof UnreadableBodyError) {
       throw error;
     }
 

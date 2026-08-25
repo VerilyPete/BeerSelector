@@ -13,11 +13,12 @@ import {
   formatApiErrorForUser,
   createErrorResponse,
   getUserFriendlyErrorMessage,
+  isTransportFault,
   ApiErrorType,
 } from '../notificationUtils';
 import type { ErrorResponse } from '../notificationUtils';
 import { DatabaseContentionError } from '../../database/errors';
-import { HttpError, MalformedResponseError } from '../../api/fetchOutcome';
+import { HttpError, TransportAbortedError, UnreadableBodyError } from '../../api/fetchOutcome';
 
 jest.mock('react-native', () => ({
   Alert: {
@@ -270,15 +271,13 @@ describe('notificationUtils', () => {
     // failure. Classification is by type, never by message.
     // ----------------------------------------------------------
 
-    it('createErrorResponse classifies a MalformedResponseError', () => {
-      const result = createErrorResponse(
-        new MalformedResponseError('My Beers response contained 2 rows and all lack an id')
-      );
-
-      expect(result.type).toBe(ApiErrorType.MALFORMED_RESPONSE_ERROR);
-      // Not retryable: the same request will return the same unusable body.
-      expect(result.retryable).toBeUndefined();
-    });
+    // DELETED with the class. `MalformedResponseError` had exactly one thrower
+    // in the repo — the `response.json()` catch in `beerApi` — and that site now
+    // throws `UnreadableBodyError`, so the class and its rule are unreachable by
+    // construction. The MALFORMED_RESPONSE_ERROR enum member and its copy STAY:
+    // shape-rejection still reports through it, via the `ErrorResponse` literals
+    // in `dataUpdateService`. The copy fence for it lives in
+    // `getUserFriendlyErrorMessage` below and is deliberately untouched.
 
     it('createErrorResponse classifies a 5xx HttpError as SERVER_ERROR', () => {
       const result = createErrorResponse(new HttpError(500, 'Internal Server Error'));
@@ -432,6 +431,92 @@ describe('notificationUtils', () => {
       const result = getUserFriendlyErrorMessage(makeError(ApiErrorType.UNKNOWN_ERROR));
 
       expect(result).toBe('An unexpected error occurred. Please try again later.');
+    });
+  });
+  describe('isTransportFault', () => {
+    // `allNetworkErrors` selects the whole-refresh alert
+    // ("Unable to connect… check your internet connection") in place of the
+    // per-source list. It was decided TWICE by hand, in string literals, at
+    // `dataUpdateService.ts:1760` and again in the `manualRefreshAllData` outer
+    // catch — so a newly added transport-flavoured type could not match either
+    // site, and the decision to exclude it left no trace, no test, and nothing
+    // for the next such type to be measured against.
+    //
+    // A table over EVERY member, so adding one without deciding is a compile
+    // error here rather than a silent "no".
+    const VERDICTS: readonly { type: ApiErrorType; transport: boolean; why: string }[] = [
+      { type: ApiErrorType.NETWORK_ERROR, transport: true, why: 'the request did not complete' },
+      { type: ApiErrorType.TIMEOUT_ERROR, transport: true, why: 'the request did not complete' },
+      { type: ApiErrorType.SERVER_ERROR, transport: false, why: 'the server answered' },
+      { type: ApiErrorType.PARSE_ERROR, transport: false, why: 'a body arrived' },
+      { type: ApiErrorType.VALIDATION_ERROR, transport: false, why: 'the server answered' },
+      { type: ApiErrorType.CONTENTION_ERROR, transport: false, why: 'a local database fault' },
+      {
+        type: ApiErrorType.MALFORMED_RESPONSE_ERROR,
+        transport: false,
+        why: 'a well-formed body of the wrong shape',
+      },
+      {
+        type: ApiErrorType.UNREADABLE_BODY_ERROR,
+        transport: false,
+        // THE DECISION, and it is about information rather than about truth —
+        // bytes arriving proves nothing about the link, so "the connection
+        // demonstrably worked" is not the argument. If it counted, three
+        // unreadable sources would collapse into the single offline line and the
+        // copy written for this type would be rendered only in the mixed case
+        // and discarded in its own primary one. Excluded, a mixed refresh drops
+        // to the per-source list: more verbose, strictly more informative, never
+        // false.
+        why: 'the cause is unknown; a per-source line says more than the offline alert',
+      },
+      { type: ApiErrorType.UNKNOWN_ERROR, transport: false, why: 'unclassified is not transport' },
+      { type: ApiErrorType.INFO, transport: false, why: 'not a failure' },
+    ];
+
+    it.each(VERDICTS)('$type is transport=$transport — $why', ({ type, transport }) => {
+      expect(isTransportFault(type)).toBe(transport);
+    });
+
+    it('covers every ApiErrorType member', () => {
+      // Without this the table is a list of the members someone remembered.
+      //
+      // `toStrictEqual`, not `toEqual`: the latter treats a missing array slot
+      // and an `undefined` one as equal, so a member the enum does not yet have
+      // — exactly the state this test is meant to catch — passed vacuously.
+      expect(VERDICTS.map(v => v.type).sort()).toStrictEqual(Object.values(ApiErrorType).sort());
+    });
+  });
+
+  describe('UNREADABLE_BODY_ERROR', () => {
+    const makeError = (type: ApiErrorType, message = ''): ErrorResponse => ({ type, message });
+
+    it('createErrorResponse types a body that could not be read', () => {
+      const result = createErrorResponse(new UnreadableBodyError(new SyntaxError('whatever')));
+
+      expect(result.type).toBe(ApiErrorType.UNREADABLE_BODY_ERROR);
+    });
+
+    it('createErrorResponse types a chain-deadline abort as a network fault', () => {
+      const result = createErrorResponse(
+        new TransportAbortedError('the chain deadline ended the attempt', new Error('aborted'))
+      );
+
+      expect(result.type).toBe(ApiErrorType.NETWORK_ERROR);
+    });
+
+    it('has user copy of its own, so it cannot fall through to the verbatim default', () => {
+      // `getUserFriendlyErrorMessage` ends `case UNKNOWN_ERROR: default:`, which
+      // returns `error.message` verbatim — so an enum member added without a
+      // copy arm COMPILES and leaks developer prose into the refresh alert.
+      // There is no TypeScript fence for that, which is why this assertion is
+      // the fence.
+      expect(
+        getUserFriendlyErrorMessage(
+          makeError(ApiErrorType.UNREADABLE_BODY_ERROR, 'Response body could not be read as JSON')
+        )
+      ).toBe(
+        'Could not read the beer data — your network may be interfering with the connection. Your existing data has been kept.'
+      );
     });
   });
 });

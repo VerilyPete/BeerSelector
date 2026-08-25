@@ -20,7 +20,7 @@
  */
 
 import { fetchWithRetry } from '../beerApi';
-import { MalformedResponseError } from '../fetchOutcome';
+import { UnreadableBodyError } from '../fetchOutcome';
 import { config } from '@/src/config';
 
 jest.mock('../../database/preferences');
@@ -127,8 +127,12 @@ describe('fetchWithRetry retry policy', () => {
       // It also fixes the classification. A raw SyntaxError has no type the
       // classifier recognises, so it fell through to UNKNOWN_ERROR — which
       // returns `error.message` verbatim, putting "Unexpected token < in JSON
-      // at position 0" in a user-facing alert. MalformedResponseError has
-      // dedicated copy that exists to suppress exactly that.
+      // at position 0" in a user-facing alert.
+      //
+      // The CLASS changed here and the count did not: `UnreadableBodyError`
+      // stops asserting this was the server's choice, but the retry decision is
+      // still "no" for one more phase. The next phase inverts the count alone,
+      // which is what keeps the two changes reviewable apart.
       (global.fetch as jest.Mock).mockResolvedValue({
         ok: true,
         json: async () => {
@@ -137,7 +141,7 @@ describe('fetchWithRetry retry policy', () => {
       });
 
       const result = fetchWithRetry(config.api.baseUrl, 3, 10);
-      const rejection = expect(result).rejects.toThrow(MalformedResponseError);
+      const rejection = expect(result).rejects.toThrow(UnreadableBodyError);
 
       await jest.advanceTimersByTimeAsync(1000);
 

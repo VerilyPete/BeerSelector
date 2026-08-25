@@ -369,5 +369,14 @@ describe('the message a user actually reads', () => {
     expect(result.myBeersResult.success).toBe(false);
     expect(result.myBeersResult.error?.type).toBe(ApiErrorType.MALFORMED_RESPONSE_ERROR);
     expect(getUserFriendlyErrorMessage(result.myBeersResult.error!)).not.toMatch(/carried an id/);
+    // AND still the ORIGINAL copy. Shape-rejection is a well-formed body the
+    // server chose to send, so it keeps saying so; only "the body could not be
+    // read" moved to UNREADABLE_BODY_ERROR, which is a claim about the bytes
+    // rather than about the server's intent. Deleting the MALFORMED copy arm
+    // along with the now-dead `MalformedResponseError` CLASS would strand these
+    // three `ErrorResponse` literals on the verbatim default.
+    expect(getUserFriendlyErrorMessage(result.myBeersResult.error!)).toBe(
+      'The server sent data this app could not read. Your existing data has been kept.'
+    );
   });
 });

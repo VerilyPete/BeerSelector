@@ -12,6 +12,7 @@ import {
   ErrorResponse,
   SourceFailureError,
   createErrorResponse,
+  isTransportFault,
 } from '../utils/notificationUtils';
 import { beerRepository } from '../database/repositories/BeerRepository';
 import { myBeersRepository } from '../database/repositories/MyBeersRepository';
@@ -1759,14 +1760,19 @@ async function runSequentialRefresh(): Promise<ManualRefreshResult> {
   // Check for errors
   const hasErrors = !allBeersResult.success || !myBeersResult.success || !rewardsResult.success;
 
-  // Check if all errors are network-related
+  // Check if all errors are network-related.
+  //
+  // `isTransportFault`, not two string literals: this decision has a twin in
+  // `manualRefreshAllData`'s outer catch, and hand-written string comparisons at
+  // two sites cannot be told apart from an omission — a newly added
+  // transport-flavoured type simply fails to match at both, and nothing records
+  // that anyone chose. UNREADABLE_BODY_ERROR is the type that made that
+  // concrete; the predicate carries the reasoning and the table test.
   const allNetworkErrors =
     hasErrors &&
     [allBeersResult, myBeersResult, rewardsResult]
       .filter(result => !result.success && result.error)
-      .every(
-        result => result.error?.type === 'NETWORK_ERROR' || result.error?.type === 'TIMEOUT_ERROR'
-      );
+      .every(result => (result.error ? isTransportFault(result.error.type) : false));
 
   console.log('Sequential refresh completed:', {
     allBeers: allBeersResult.success,
@@ -2271,8 +2277,9 @@ export async function manualRefreshAllData(): Promise<ManualRefreshResult> {
       myBeersResult: { success: false, dataUpdated: false, error: errorResponse },
       rewardsResult: { success: false, dataUpdated: false, error: errorResponse },
       hasErrors: true,
-      allNetworkErrors:
-        errorResponse.type === 'NETWORK_ERROR' || errorResponse.type === 'TIMEOUT_ERROR',
+      // The twin of the check in `sequentialRefreshAllData`, and the reason the
+      // decision is a named predicate rather than a comparison written twice.
+      allNetworkErrors: isTransportFault(errorResponse.type),
     };
   }
 }

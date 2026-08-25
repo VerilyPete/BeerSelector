@@ -8,8 +8,12 @@ import { rewardsRepository } from '../../database/repositories/RewardsRepository
 import {
   fetchedRows,
   confirmedEmpty,
+  failed,
   unavailable,
 } from '../../api/__tests__/helpers/fetchOutcomeFixtures';
+import { ApiErrorType } from '../../utils/notificationUtils';
+import { buildRefreshErrorMessages } from '../../utils/refreshErrorMessages';
+import { UnreadableBodyError } from '../../api/fetchOutcome';
 
 // Mock dependencies
 jest.mock('../../database/preferences', () => ({
@@ -379,5 +383,122 @@ describe('sequentialRefreshAllData: FetchOutcome semantics (plan 02 Phase 3)', (
     expect(myBeersRepository.replaceAllWithEmptyUnsafe).toHaveBeenCalled();
     expect(setPreference).toHaveBeenCalledWith('my_beers_last_check', expect.any(String));
     expect(result.myBeersResult.success).toBe(true);
+  });
+});
+
+/**
+ * Which failures select the whole-refresh "check your internet connection" alert.
+ *
+ * Plan refresh-failure-classification Phase 1.
+ *
+ * `allNetworkErrors` decides between ONE line — "Unable to connect… check your
+ * internet connection" — and the per-source list from `buildRefreshErrorMessages`.
+ * It was decided twice by hand in string literals, at the `sequentialRefreshAllData`
+ * site and again in `manualRefreshAllData`'s outer catch, so the decision for a
+ * newly added type was made by accident at both.
+ *
+ * Most of what follows is a DECISION FENCE rather than RED: a string comparison
+ * cannot match an enum member that did not exist, so these verdicts hold on
+ * arrival either way. Their job is to make the decision observable, which it was
+ * not, and to kill the live mutant "widen `isTransportFault` to include
+ * UNREADABLE_BODY_ERROR". The one genuinely red assertion is the copy.
+ */
+describe('allNetworkErrors and an unreadable body', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  const unreadable = <T>() => failed<T>(ApiErrorType.UNREADABLE_BODY_ERROR, 'unreadable body');
+
+  const ROWS: readonly {
+    readonly name: string;
+    readonly allBeers: () => ReturnType<typeof failed>;
+    readonly myBeers: () => ReturnType<typeof failed>;
+    readonly rewards: () => ReturnType<typeof failed>;
+    readonly expected: boolean;
+  }[] = [
+    {
+      name: 'every source unreadable',
+      allBeers: unreadable,
+      myBeers: unreadable,
+      rewards: unreadable,
+      // Not the offline alert. Bytes arriving proves nothing about the link, so
+      // the connection advice would be a guess presented as a diagnosis; the
+      // per-source list is more verbose and never false.
+      expected: false,
+    },
+    {
+      name: 'every source a network failure',
+      allBeers: () => failed(ApiErrorType.NETWORK_ERROR),
+      myBeers: () => failed(ApiErrorType.NETWORK_ERROR),
+      rewards: () => failed(ApiErrorType.NETWORK_ERROR),
+      expected: true,
+    },
+    {
+      name: 'unreadable mixed with a network failure',
+      allBeers: unreadable,
+      myBeers: () => failed(ApiErrorType.NETWORK_ERROR),
+      rewards: () => failed(ApiErrorType.NETWORK_ERROR),
+      // `.every(...)`, so ONE unreadable source suppresses the offline alert for
+      // the whole refresh. That is the cost of the decision, stated rather than
+      // discovered.
+      expected: false,
+    },
+    {
+      name: 'unreadable mixed with a server error',
+      allBeers: unreadable,
+      myBeers: () => failed(ApiErrorType.SERVER_ERROR),
+      rewards: unreadable,
+      expected: false,
+    },
+  ];
+
+  it.each(ROWS)(
+    '$name → allNetworkErrors=$expected',
+    async ({ allBeers, myBeers, rewards, expected }) => {
+      (fetchBeersFromAPI as jest.Mock).mockResolvedValue(allBeers());
+      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(myBeers());
+      (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(rewards());
+
+      const result = await svc.sequentialRefreshAllData();
+
+      expect(result.hasErrors).toBe(true);
+      expect(result.allNetworkErrors).toBe(expected);
+    }
+  );
+
+  it('reaches the same verdict in the manual-refresh outer catch', async () => {
+    // THE TWIN SITE. `sequentialRefreshAllData` is the only site the rows above
+    // reach, so "wire one, leave the other's string literals" survives all of
+    // them — the guard-in-two-places-tested-in-one pattern the shared predicate
+    // exists to eliminate. This enters `manualRefreshAllData`'s outer catch,
+    // whose `try` spans four `setPreference` calls, by failing one of them.
+    (setPreference as jest.Mock).mockRejectedValueOnce(
+      new UnreadableBodyError(new SyntaxError('Unexpected token'))
+    );
+
+    const result = await svc.manualRefreshAllData();
+
+    expect(result.hasErrors).toBe(true);
+    expect(result.allNetworkErrors).toBe(false);
+  });
+
+  it('renders the unreadable-body copy in the per-source list', async () => {
+    // GENUINELY RED, and the only assertion tying the decision to what a user
+    // reads. Excluding the type from `allNetworkErrors` is only defensible
+    // because the per-source list then carries a sentence worth reading; if the
+    // copy arm is missing, `getUserFriendlyErrorMessage` falls through to
+    // `case UNKNOWN_ERROR: default:` and renders `error.message` verbatim.
+    (fetchBeersFromAPI as jest.Mock).mockResolvedValue(unreadable());
+    (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(failed(ApiErrorType.NETWORK_ERROR));
+    (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(
+      fetchedRows([{ reward_id: 'r1', reward_type: 'badge' }])
+    );
+
+    const result = await svc.manualRefreshAllData();
+
+    expect(buildRefreshErrorMessages(result)).toContain(
+      'All Beer data: Could not read the beer data — your network may be interfering with the connection. Your existing data has been kept.'
+    );
   });
 });
