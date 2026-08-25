@@ -805,6 +805,28 @@ const extractRewards = (data: unknown): UnconditionalSource<FetchOutcome<Reward>
       return fetched({ kind: 'confirmed-empty' });
     }
 
+    // A compound value in a scalar slot is a malformed payload, not a missing
+    // optional value. Before validation, Expo SQLite rejected these bindings on
+    // iOS and rolled back the replacement transaction, preserving the stored
+    // snapshot. Defaulting an object or array here instead turns that safe
+    // failure into a successful write with invented redemption/type data.
+    const hasCompoundScalar = rows.some(row => {
+      if (!row || typeof row !== 'object') return false;
+      const candidate = row as Record<string, unknown>;
+      if (typeof candidate.reward_id !== 'string' || candidate.reward_id.length === 0) {
+        return false;
+      }
+      return [candidate.redeemed, candidate.reward_type].some(
+        value => value !== null && typeof value === 'object'
+      );
+    });
+    if (hasCompoundScalar) {
+      return fetched({
+        kind: 'malformed',
+        detail: 'reward rows contained a compound value in a scalar field',
+      });
+    }
+
     // Gated on a USABLE `reward_id`, and on nothing else.
     //
     // That is exactly what the wipe depends on: `_insertManyInternal` deletes
