@@ -522,7 +522,7 @@ describe('allNetworkErrors and an unreadable body', () => {
     const result = await svc.manualRefreshAllData();
 
     expect(buildRefreshErrorMessages(result)).toContain(
-      'All Beer data: Could not read the beer data — your network may be interfering with the connection. Your existing data has been kept.'
+      'All Beer data: Could not read the beer data — your network may be interfering with the connection. Check your connection and try refreshing again. Your existing data has been kept.'
     );
   });
 });
@@ -736,7 +736,7 @@ describe('one member request means one verdict for both halves', () => {
 
     const messages = buildRefreshErrorMessages(await svc.manualRefreshAllData());
     const copy =
-      'Could not read the beer data — your network may be interfering with the connection. Your existing data has been kept.';
+      'Could not read the beer data — your network may be interfering with the connection. Check your connection and try refreshing again. Your existing data has been kept.';
 
     expect(messages).toContain(`Beerfinder data: ${copy}`);
     expect(messages).toContain(`Rewards data: ${copy}`);
