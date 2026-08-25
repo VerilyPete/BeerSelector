@@ -92,8 +92,7 @@ describe('Data Refresh Integration Tests', () => {
 
       // Verify API calls
       expect(beerApi.fetchBeersFromAPI).toHaveBeenCalled();
-      expect(beerApi.fetchMyBeersFromAPI).toHaveBeenCalled();
-      expect(beerApi.fetchRewardsFromAPI).toHaveBeenCalled();
+      expect(beerApi.fetchMemberDataFromAPI).toHaveBeenCalledTimes(1);
 
       // Verify repositories were called with validated data (not raw fixture data)
       expect(beerRepository.beerRepository.insertManyUnsafe).toHaveBeenCalledTimes(1);
