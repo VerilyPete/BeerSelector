@@ -316,7 +316,13 @@ describe('Beer API', () => {
     // SUPERSEDED by plan 02 Phase 3. Phase 2 bridged this with a throw because
     // the return type had no way to say "a body arrived and was unusable".
     // `malformed` is that way, so the caller decides instead of being forced to
-    // catch. The MalformedResponseError type is retired with it.
+    // catch.
+    //
+    // The `MalformedResponseError` CLASS is now gone, but the
+    // MALFORMED_RESPONSE_ERROR type is not, and an earlier version of this
+    // comment ran the two together. Shape-rejection — this case — still reports
+    // through that type and keeps its copy; what left is "the body could not be
+    // read", which is now `UnreadableBodyError` and a different claim.
     it('reports malformed rather than [] when every row lacks an id', async () => {
       (preferences.getPreference as jest.Mock).mockImplementation((key: string) => {
         if (key === 'is_visitor_mode') return Promise.resolve('false');

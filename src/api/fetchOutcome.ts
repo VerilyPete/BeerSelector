@@ -131,9 +131,8 @@ export type UnconditionalSource<T> = Exclude<FetchedSource<T>, { readonly status
  * The server answered with a non-2xx status.
  *
  * A type rather than a message, for the reason `createErrorResponse` states at
- * the top of its body: it classifies `DatabaseContentionError` and
- * `MalformedResponseError` by type precisely so the answer does not depend on
- * prose. Before this existed, the thrown message was
+ * the top of its body: it classifies `DatabaseContentionError` and the two body
+ * types below by type precisely so the answer does not depend on prose. Before this existed, the thrown message was
  * `Failed to fetch: 500 Internal Server Error`, which matched that function's
  * `'Failed to fetch'` substring test — so **every HTTP error was reported to the
  * user as "check your internet connection"**, and counted toward
@@ -151,6 +150,25 @@ export class HttpError extends Error {
     Object.setPrototypeOf(this, HttpError.prototype);
   }
 }
+
+/**
+ * WHAT THROWS WHAT, since the three are easy to confuse and a previous version
+ * of this file claimed one of them was thrown by nothing at all.
+ *
+ * - `HttpError` — `attemptFetch`, on a non-2xx status. 4xx is never retried,
+ *   5xx is.
+ * - `UnreadableBodyError` — `attemptFetch`, when `response.json()` rejects.
+ *   Retried exactly once, inside the chain deadline.
+ * - `TransportAbortedError` — `attemptFetch`'s outer exit, when the chain
+ *   deadline fired. Never retried; the budget is already spent.
+ *
+ * Nothing throws a "wrong shape" error: that decision is made by the three
+ * fetchers AFTER `fetchWithRetry` returns, and reports as
+ * `fetched` + `malformed`, or as `MALFORMED_RESPONSE_ERROR` from the
+ * `ErrorResponse` literals in `dataUpdateService` once a writer refuses it. The
+ * class that used to carry it, `MalformedResponseError`, is gone; the enum
+ * member and its copy are not.
+ */
 
 /**
  * The response body arrived and could not be read as JSON.

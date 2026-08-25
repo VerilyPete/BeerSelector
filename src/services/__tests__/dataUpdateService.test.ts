@@ -1182,10 +1182,11 @@ describe('dataUpdateService', () => {
         const result = await fetchAndUpdateRewards();
 
         expect(result.success).toBe(false);
-        // MALFORMED_RESPONSE_ERROR is the one type here with dedicated user copy
-        // that deliberately SUPPRESSES the developer message
-        // (notificationUtils.ts:208-210). Getting the type wrong leaks
-        // "Rewards response was unusable: …" to the user.
+        // MALFORMED_RESPONSE_ERROR is one of the types with dedicated user copy
+        // that deliberately SUPPRESSES the developer message (the
+        // MALFORMED_RESPONSE_ERROR arm of `getUserFriendlyErrorMessage`; the
+        // line number this used to cite had drifted). Getting the type wrong
+        // leaks "Rewards response was unusable: …" to the user.
         expect(result.error?.type).toBe(ApiErrorType.MALFORMED_RESPONSE_ERROR);
         expect(rewardsRepository.insertMany).not.toHaveBeenCalled();
       });

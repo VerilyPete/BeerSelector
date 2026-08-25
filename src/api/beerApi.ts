@@ -130,14 +130,24 @@ const attemptFetch = async (
     // hold. Transient failures below still retry; this exit is only for the
     // deadline.
     //
-    // Asks the controller rather than inspecting the error. `error.name ===
-    // 'AbortError'` was wrong in both directions: any error so named from any
-    // source would exit here, and an abort that is not an `Error` instance would
-    // not — React Native's whatwg-fetch polyfill raises its own DOMException,
-    // which would have fallen through and been retried three times, defeating
-    // the whole point. The controller knows the answer without inferring it,
-    // which is the same argument notificationUtils makes for classifying by type
-    // rather than by message.
+    // Asks the controller rather than inspecting the error, and the reason is
+    // that the controller is AUTHORITATIVE — not the DOMException story this
+    // comment used to tell, which was wrong on both halves.
+    //
+    // What it claimed: that RN's whatwg-fetch polyfill raises a DOMException
+    // which is not `instanceof Error` and whose name would not match, so an
+    // abort fell through and was retried three times. Neither half held.
+    // `whatwg-fetch/dist/fetch.umd.js` prefers a global `DOMException` and RN
+    // ships none (`grep -r DOMException node_modules/react-native/Libraries/`
+    // is empty), so its `Object.create(Error.prototype)` shim is always the live
+    // path — it IS `instanceof Error`, and it sets `this.name = name` with
+    // aborts passing 'AbortError'. The name check would have matched. The
+    // retried-three-times consequence could not happen.
+    //
+    // The conclusion survives its bad argument: `error.name === 'AbortError'`
+    // would exit here for any error so named from any source, and the controller
+    // knows the answer without inferring it. Same argument notificationUtils
+    // makes for classifying by type rather than by message.
     if (controller.signal.aborted) {
       // The deadline is how we stopped waiting; it is not what went wrong. If
       // an earlier attempt produced a real answer — a 500, a refused

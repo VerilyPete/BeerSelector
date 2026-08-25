@@ -278,9 +278,9 @@ See `.env.example` for complete configuration options.
 
 - Triggers on app open via `setupDatabase()` + `cleanupBadAbvData()` + three `fetchAndUpdate*` calls from `dataUpdateService.ts`
 - Fetches all beers, my beers, and rewards (each with individual error handling)
-- Timestamp-based: only refreshes if >12 hours since last refresh (checked inside each `fetchAndUpdate*` function)
+- **Not** timestamp-gated on this path: `app/_layout.tsx` calls all three `fetchAndUpdate*` functions unconditionally. The 12-hour window is `shouldRefreshData`, which is reached only from `checkAndRefreshOnAppOpen` — a different entry point
 
-**Refresh Logic** (`src/services/dataUpdateService.ts`):
+**Refresh Logic** (`src/services/dataUpdateService.ts`) — inside `shouldRefreshData`, which `checkAndRefreshOnAppOpen` consults before deciding whether to fetch:
 
 ```typescript
 // Check last refresh timestamp (12-hour default window)
