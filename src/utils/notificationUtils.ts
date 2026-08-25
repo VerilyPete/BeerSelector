@@ -307,7 +307,7 @@ export function getUserFriendlyErrorMessage(error: ErrorResponse): string {
       // `case UNKNOWN_ERROR: default:`, which returns `error.message` verbatim,
       // so a member without a copy arm compiles and leaks developer prose into
       // the refresh alert.
-      return 'Could not read the beer data — your network may be interfering with the connection. Your existing data has been kept.';
+      return 'Could not read the beer data — your network may be interfering with the connection. Check your connection and try refreshing again. Your existing data has been kept.';
 
     case ApiErrorType.CONTENTION_ERROR:
       // Deliberately ignores error.message, which carries the raw SQLite text.
