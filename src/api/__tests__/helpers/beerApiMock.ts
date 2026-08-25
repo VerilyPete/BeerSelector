@@ -13,11 +13,29 @@
  * prove a saving none of them can observe. Delegation also keeps the four
  * `expect(fetchMyBeersFromAPI).toHaveBeenCalledTimes(1)` assertions meaningful.
  *
- * The consequence, stated because it is a real limit: this factory UN-DOES the
- * coalescing, so no suite using it can see the request saving. That property is
- * counted against a real `global.fetch` in `beerApi.memberCoalescing.test.ts`,
- * which is the only layer where requests exist at all. What the service suites
- * pin is that the service asks ONCE.
+ * TWO real limits follow, and review found the second one understated here:
+ *
+ * 1. **The request saving is invisible.** This factory un-does the coalescing,
+ *    so no suite using it can count requests. That property is measured against
+ *    a real `global.fetch` in `beerApi.memberCoalescing.test.ts`, the only layer
+ *    where requests exist at all. What the service suites pin is that the
+ *    service asks ONCE.
+ * 2. **Suites can stage outcome pairings production can no longer produce.**
+ *    The two halves come from two independently-configured mocks, so a suite can
+ *    still arrange `myBeers: failed, rewards: fetched`. Production cannot: one
+ *    request means one `resolveMemberApiUrl`, one verdict, both halves. Mixed
+ *    `malformed`/`data` pairings ARE still reachable — the two extractors read
+ *    different slices of one body — so the unreachable arrangements are
+ *    specifically the ones where exactly one half is `failed` or `unavailable`.
+ *
+ * Shared fate itself is therefore pinned in exactly one place below `beerApi`:
+ * `dataUpdateService.manualRefresh.test.ts`'s "one member request means one
+ * verdict" block, which bypasses this factory and drives
+ * `fetchMemberDataFromAPI` directly. Reviewers proposed instead making a
+ * delegate rejection fail both halves; that is more faithful, and it would
+ * rewrite the arrangements of a dozen existing rejection-based tests to prove a
+ * property those two tests already prove. Recorded as a considered trade rather
+ * than an oversight.
  *
  * **Rejections are absorbed, because production never rejects.** The real
  * `fetchMemberDataFromAPI` catches internally and returns `failed` for both

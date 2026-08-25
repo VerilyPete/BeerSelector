@@ -1482,9 +1482,15 @@ export async function fetchAndUpdateRewards(): Promise<DataUpdateResult> {
  * Sequential refresh with master lock coordination to prevent lock contention
  *
  * HP-2 Step 5c: This function solves CI-2 (parallel refresh lock contention) by:
- * - Acquiring a single master lock for the entire refresh sequence
+ * - Fetching every source with NO lock held, then writing them in a single
+ *   locked burst — not, as this said until review caught it, "acquiring a single
+ *   master lock for the entire refresh sequence". The fetches were hoisted out
+ *   of the lock two plans ago; holding it across network I/O is the thing that
+ *   made a stalled request wedge every later writer.
  * - Executing operations sequentially (not in parallel)
- * - Using safe repository methods under master lock protection
+ * - Using the `*Unsafe` repository methods inside that one hold — safe BECAUSE
+ *   the burst holds the lock, which is the opposite of "using safe repository
+ *   methods under master lock protection"
  * - Avoiding lock queueing overhead from parallel Promise execution
  *
  * Performance: ~3x faster than parallel execution with lock contention

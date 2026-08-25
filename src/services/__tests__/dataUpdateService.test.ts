@@ -622,6 +622,32 @@ describe('dataUpdateService', () => {
       expect(syncOrder).toBeGreaterThan(writeOrder);
     });
 
+    it('writes the tasted list even when enrichment fails outright', async () => {
+      // Enrichment is an optional enhancement and its catch says so — but
+      // mutation showed that catch is the ONE uncovered statement on this path:
+      // rethrowing instead of swallowing left all 15 service suites green. An
+      // enrichment outage would then turn a perfectly good tasted-beers refresh
+      // into a failed source and skip the write entirely, and nothing would say
+      // so.
+      //
+      // Pre-existing — `main` had the same catch, untested, in two places. What
+      // changed is that it is now ONE shared site, so this single test covers
+      // every source that enriches.
+      (config.enrichment.isConfigured as jest.Mock).mockReturnValue(true);
+      (fetchEnrichmentBatchWithMissing as jest.Mock).mockRejectedValue(
+        new Error('enrichment worker unreachable')
+      );
+      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(
+        fetchedRows([{ id: 'beer-1', brew_name: 'B', tasted_date: '2023-01-01' }])
+      );
+
+      const result = await fetchAndUpdateMyBeers();
+
+      expect(result.success).toBe(true);
+      expect(result.dataUpdated).toBe(true);
+      expect(myBeersRepository.insertManyUnsafe).toHaveBeenCalled();
+    });
+
     it('calculates container types AFTER enrichment so ABV drives glass selection', async () => {
       // A draft beer with no ABV in its description gets container_type = null —
       // a question-mark icon — unless enrichment lands first. Kept from the

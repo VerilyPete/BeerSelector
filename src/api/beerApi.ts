@@ -16,11 +16,20 @@ import type { FetchOutcome, UnavailableReason, UnconditionalSource } from './fet
  * `setTimeout(abort, deadline - Date.now())` with a few milliseconds left — an
  * attempt born dead that still costs the server a request.
  *
- * It does NOT close the suspension hole: the budget is reserved BEFORE the
- * sleep, and a 1s sleep can resume 20s later if the app is backgrounded or the
- * JS thread stalls. Covering that needs a post-sleep recheck on the shared retry
- * path, which affects the ordinary retry too and is deliberately a separate
- * change.
+ * TWO things it does not cover, both deliberate and both flagged in review so
+ * they are recorded rather than assumed:
+ *
+ * 1. **The suspension hole.** The budget is reserved BEFORE the sleep, and a 1s
+ *    sleep can resume 20s later if the app is backgrounded or the JS thread
+ *    stalls. Covering that needs a post-sleep recheck.
+ * 2. **The ordinary retry path**, which still guards on `Date.now() + delay >=
+ *    deadline` alone and can therefore start a 5xx retry with a couple of
+ *    milliseconds left — the same born-dead attempt, on the older path.
+ *
+ * Both fixes belong on the shared retry path, which every source has used since
+ * long before this change; widening the guard there is a behaviour change to
+ * code this work is not otherwise touching, and it wants its own tests and its
+ * own commit.
  *
  * Exported so tests pin the boundary against this value rather than against a
  * hard-coded copy of it.
@@ -78,15 +87,21 @@ const attemptFetch = async (
   earlierFailure: unknown,
   unreadableRetriesLeft: number
 ): Promise<unknown> => {
-  // An unbounded request here can be an unbounded database lock hold: the full
-  // refresh paths call this while holding the master lock, and past the lock's
-  // hold timeout the grant is abandoned and every later writer blocks until this
-  // returns. It was the one network await in the codebase with no bound — the
-  // apiClient and enrichment paths all have their own AbortController.
+  // Every request here is bounded. The original argument was about the database
+  // lock — the refresh paths used to call this while HOLDING the master lock, so
+  // an unbounded request became an unbounded hold, and past the hold timeout the
+  // grant was abandoned and every later writer blocked until it returned.
   //
-  // (Plan 05 Phase 5.4/5.5 hoists the fetches out of the lock, which weakens the
-  // lock-hold argument but not the bound itself — a request that never settles
-  // is worth failing either way.)
+  // That is no longer the shape: the refresh paths fetch with no lock held and
+  // then write in a single locked burst, so this cannot hold a lock at all. The
+  // bound survives its original argument. A request that never settles is worth
+  // failing on its own terms — it was the one network await in this codebase
+  // with no bound, while the apiClient and enrichment paths all have their own
+  // AbortController — and the chain deadline it arms is what keeps a whole
+  // refresh inside a predictable ceiling.
+  //
+  // (Stale rationale caught in review: the comment still described the locked
+  // shape two plans after the fetches were hoisted out of it.)
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), deadline - Date.now());
 
@@ -768,7 +783,17 @@ const extractRewards = (data: unknown): UnconditionalSource<FetchOutcome<Reward>
       return fetched({ kind: 'confirmed-empty' });
     }
 
-    const rewards = rows.filter(isReward);
+    // `isReward` plus a non-empty id. The extra clause is not pedantry: `''` is a
+    // string, so `isReward` accepts it, and `''` is precisely the key the wipe
+    // collapses onto — `_insertManyInternal` deletes every row, then writes
+    // `reward.reward_id || ''` into a TEXT PRIMARY KEY. A payload of empty-id
+    // rows would replace the member's rewards with one junk row and report
+    // success, which is the whole failure this validation exists to stop.
+    //
+    // Refined here rather than inside `isReward`, which five repository readers
+    // share and which answers a different question — "is this row-shaped?" —
+    // than this one, which is "is this worth writing?".
+    const rewards = rows.filter((row): row is Reward => isReward(row) && row.reward_id.length > 0);
     const nonEmpty = toNonEmpty(rewards);
     if (nonEmpty === null) {
       return fetched({

@@ -322,6 +322,83 @@ describe('fetchWithRetry retry policy', () => {
       await rejection;
     });
 
+    it.each([
+      // Absolute offsets, NOT expressed in terms of MIN_ATTEMPT_MS. The
+      // boundary test above computes its delay as `timeout - MIN_ATTEMPT_MS`,
+      // so input and guard move together and it is structurally blind to the
+      // constant's VALUE: mutation showed both `MIN_ATTEMPT_MS = 0` and
+      // `= 2000` survive it. Zero is the degenerate case the constant exists to
+      // prevent — a backoff of `timeout - 500` again arms the abort with 500ms
+      // left, an attempt born dead that still costs the server a request.
+      //
+      // These two bracket the value from both sides: 500ms of headroom must be
+      // refused and 1500ms must be allowed, which is only true for a reserve in
+      // (500, 1500].
+      ['refuses to start an attempt with only 500ms of budget left', 500, 1],
+      ['still starts an attempt with 1500ms of budget left', 1500, 2],
+    ])('%s', async (_label, headroom, expectedCalls) => {
+      (global.fetch as jest.Mock).mockResolvedValue(unreadableBody());
+
+      const result = fetchWithRetry(config.api.baseUrl, 3, config.network.timeout - headroom);
+      const rejection = expect(result).rejects.toThrow(UnreadableBodyError);
+
+      await jest.advanceTimersByTimeAsync(config.network.timeout + 1);
+
+      expect(global.fetch).toHaveBeenCalledTimes(expectedCalls);
+      await rejection;
+    });
+
+    it('waits the full backoff before the unreadable retry', async () => {
+      // WHEN, not just whether. The suite pinned how many attempts happen and
+      // whether the chain stays inside its deadline, and nothing pinned the
+      // sleep at all — mutation showed `setTimeout(resolve, 0)` survives the
+      // entire API set. With the sleep at zero the retry fires immediately at a
+      // link that is truncating bodies, and the log line it emits
+      // ("retrying once in ${delay}ms") becomes a lie.
+      const payload = { brewInStock: [] };
+      const backoff = 1000;
+      (global.fetch as jest.Mock)
+        .mockResolvedValueOnce(unreadableBody())
+        .mockResolvedValueOnce({ ok: true, json: async () => payload });
+
+      const result = fetchWithRetry(config.api.baseUrl, 3, backoff);
+
+      await jest.advanceTimersByTimeAsync(backoff - 1);
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+
+      await jest.advanceTimersByTimeAsync(2);
+      expect(global.fetch).toHaveBeenCalledTimes(2);
+      await expect(result).resolves.toEqual(payload);
+    });
+
+    it.each([
+      // Both recursion sites multiply the delay, and neither multiplication was
+      // pinned: `delay * 1.5 -> delay` survived the whole API set at both. The
+      // third attempt's START TIME is the only thing that distinguishes them.
+      // At backoff 1000: correct is 0 -> 1000 -> 2500; flat is 0 -> 1000 -> 2000.
+      ['across an unreadable retry', () => unreadableBody()],
+      ['on the ordinary retry', () => serverError()],
+    ])('grows the backoff %s', async (_label, first) => {
+      (global.fetch as jest.Mock)
+        .mockResolvedValueOnce(first())
+        .mockResolvedValueOnce(serverError())
+        .mockResolvedValueOnce({ ok: true, json: async () => ({ brewInStock: [] }) });
+
+      const result = fetchWithRetry(config.api.baseUrl, 3, 1000);
+      const settled = result.then(
+        () => 'resolved',
+        () => 'rejected'
+      );
+
+      // Past a flat-backoff third attempt (2000) and short of a growing one (2500).
+      await jest.advanceTimersByTimeAsync(2400);
+      expect(global.fetch).toHaveBeenCalledTimes(2);
+
+      await jest.advanceTimersByTimeAsync(200);
+      expect(global.fetch).toHaveBeenCalledTimes(3);
+      await settled;
+    });
+
     it('reports the deadline abort, not the earlier unreadable body', async () => {
       // An `UnreadableBodyError` never BECOMES an `earlierFailure`. It is not
       // evidence of what the server is doing — that is the whole reason this

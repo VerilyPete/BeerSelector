@@ -1057,6 +1057,21 @@ describe('a non-array payload is malformed, not data (plan refresh-failure-class
       expect(payload(await fetchRewardsFromAPI()).kind).toBe('malformed');
     });
 
+    it('rejects a reward row whose id is the empty string', async () => {
+      // `isReward` only asks that `reward_id` be a STRING, and `''` is one — but
+      // `''` is exactly the key the wipe mechanism collapses onto:
+      // `_insertManyInternal` deletes every row, then writes
+      // `reward.reward_id || ''` into a TEXT PRIMARY KEY, so a payload of
+      // empty-id rows replaces the member's rewards with a single junk row and
+      // reports success. Refined at this call site rather than in `isReward`
+      // itself, which five repository readers share and which is asking a
+      // different question (is this row-shaped) than this one (is this worth
+      // writing).
+      respondWith([{}, {}, { reward: [{ reward_id: '', redeemed: '0', reward_type: 'X' }] }]);
+
+      expect(payload(await fetchRewardsFromAPI()).kind).toBe('malformed');
+    });
+
     it('keeps the rows that are rewards when only some are not', async () => {
       // Mirrors the my-beers rule: drop what fails validation, report malformed
       // only when nothing survives. Without this the fix above could be "reject
