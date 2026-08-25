@@ -1069,20 +1069,48 @@ describe('a non-array payload is malformed, not data (plan refresh-failure-class
     // `''` and `'0'` identical by the time they reach SQLite — but it is pinned
     // here anyway, because "absorbed by a caller two layers down" is not a
     // property this function should rely on.
-    const DEFAULTED: readonly [string, Record<string, unknown>, string, string][] = [
+    const DEFAULTED: readonly [string, Record<string, unknown>, string, string, boolean][] = [
       [
-        'a numeric redeemed',
+        'numeric redeemed zero',
         { reward_id: 'r1', redeemed: 0, reward_type: '$5 Credit' },
         '0',
         '$5 Credit',
+        false,
       ],
-      ['a missing redeemed', { reward_id: 'r1', reward_type: '$5 Credit' }, '0', '$5 Credit'],
-      ['a missing reward_type', { reward_id: 'r1', redeemed: '0' }, '0', ''],
+      [
+        'numeric redeemed one',
+        { reward_id: 'r1', redeemed: 1, reward_type: '$5 Credit' },
+        '1',
+        '$5 Credit',
+        true,
+      ],
+      [
+        'boolean redeemed true',
+        { reward_id: 'r1', redeemed: true, reward_type: '$5 Credit' },
+        '1',
+        '$5 Credit',
+        true,
+      ],
+      [
+        'a numeric reward_type',
+        { reward_id: 'r1', redeemed: '0', reward_type: 5 },
+        '0',
+        '5',
+        false,
+      ],
+      [
+        'a missing redeemed',
+        { reward_id: 'r1', reward_type: '$5 Credit' },
+        '0',
+        '$5 Credit',
+        false,
+      ],
+      ['a missing reward_type', { reward_id: 'r1', redeemed: '0' }, '0', '', false],
     ];
 
     it.each(DEFAULTED)(
       'survives %s, because nothing downstream requires it',
-      async (_label, row, expectedRedeemed, expectedRewardType) => {
+      async (_label, row, expectedRedeemed, expectedRewardType, expectedIsRedeemed) => {
         // THE OUTAGE TRIP-WIRE, removed. Gating on the full `isReward` — all three
         // fields, all strings — protects against nothing the wipe depends on and
         // turns a cosmetic upstream change into a permanent, total failure:
@@ -1108,6 +1136,9 @@ describe('a non-array payload is malformed, not data (plan refresh-failure-class
           // The same defaults the writer would have applied, by value.
           expect(body.items[0].redeemed).toBe(expectedRedeemed);
           expect(body.items[0].reward_type).toBe(expectedRewardType);
+          // Carry the normalized value through the exact predicate used by
+          // both reward-card rendering and the queue guard.
+          expect(body.items[0].redeemed === '1').toBe(expectedIsRedeemed);
         }
       }
     );

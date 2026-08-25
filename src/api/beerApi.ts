@@ -734,6 +734,15 @@ export const fetchRewardsFromAPI = async (): Promise<UnconditionalSource<FetchOu
   }
 };
 
+/** Mirror the primitive-to-TEXT coercion the rewards writer applied before validation. */
+const toPersistedRewardText = (value: unknown, fallback: string): string => {
+  const persisted = value || fallback;
+  if (typeof persisted === 'string') return persisted;
+  if (typeof persisted === 'number' && Number.isFinite(persisted)) return String(persisted);
+  if (persisted === true) return '1';
+  return fallback;
+};
+
 /**
  * Read the rewards half of a member body. Pure; makes no request.
  *
@@ -794,13 +803,13 @@ const extractRewards = (data: unknown): UnconditionalSource<FetchOutcome<Reward>
     //
     // Deliberately NOT the full `isReward`, which also demands `redeemed` and
     // `reward_type` be strings. Neither is required downstream — the schema has
-    // `redeemed: z.string().optional()`, `_insertManyInternal` defaults both
-    // itself with `|| '0'` and `|| ''`, and the UI only ever asks
-    // `redeemed === '1'`. Gating on them adds nothing against the wipe and turns
-    // a cosmetic upstream change (a numeric `redeemed`, a renamed field) into a
-    // PERMANENT total outage: `malformed` on every refresh, forever, telling the
-    // member the server is broken, until an app update ships. The old code wrote
-    // a numeric `redeemed` and SQLite coerced it into the TEXT column.
+    // `redeemed: z.string().optional()`, and `_insertManyInternal` applies
+    // `|| '0'` / `|| ''` before SQLite coerces primitive values into the TEXT
+    // columns. Gating on them adds nothing against the wipe and turns a cosmetic
+    // upstream change (a numeric `redeemed`, a renamed field) into a PERMANENT
+    // total outage. Constructing the row here mirrors that old writer behavior:
+    // numeric and boolean values keep their persisted meaning, while missing or
+    // unsupported values receive the same defaults.
     //
     // Constructed rather than asserted. `(row): row is Reward => …` is an
     // unchecked claim — TypeScript verifies only that `Reward` is assignable to
@@ -818,8 +827,8 @@ const extractRewards = (data: unknown): UnconditionalSource<FetchOutcome<Reward>
         ...kept,
         {
           reward_id: candidate.reward_id,
-          redeemed: typeof candidate.redeemed === 'string' ? candidate.redeemed : '0',
-          reward_type: typeof candidate.reward_type === 'string' ? candidate.reward_type : '',
+          redeemed: toPersistedRewardText(candidate.redeemed, '0'),
+          reward_type: toPersistedRewardText(candidate.reward_type, ''),
         },
       ];
     }, []);
