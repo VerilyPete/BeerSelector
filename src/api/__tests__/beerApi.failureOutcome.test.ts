@@ -283,7 +283,7 @@ describe('a body that could not be read', () => {
     expect(outcome.status).toBe('failed');
     if (outcome.status === 'failed') {
       expect(getUserFriendlyErrorMessage(outcome.error)).toBe(
-        'Could not read the beer data — your network may be interfering with the connection. Your existing data has been kept.'
+        'Could not read the beer data — your network may be interfering with the connection. Check your connection and try refreshing again. Your existing data has been kept.'
       );
     }
   });
