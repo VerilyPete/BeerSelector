@@ -17,7 +17,7 @@ import {
   malformed,
   unavailable,
 } from '../../api/__tests__/helpers/fetchOutcomeFixtures';
-import { ApiErrorType } from '../../utils/notificationUtils';
+import { ApiErrorType, getUserFriendlyErrorMessage } from '../../utils/notificationUtils';
 import { buildRefreshErrorMessages } from '../../utils/refreshErrorMessages';
 import { UnreadableBodyError } from '../../api/fetchOutcome';
 
@@ -324,14 +324,10 @@ describe('sequentialRefreshAllData: empty vs malformed tasted beers', () => {
   });
 
   it('does not clear the tasted table when the fetch reports malformed rows', async () => {
-    // The FIRST version of this test mocked fetchMyBeersFromAPI resolving
-    // [{brew_name:'no id'}] — a value the real function CANNOT return, because
-    // it filtered for id itself and returned [] when nothing survived. The test
-    // was green while production still wiped the table. beerApi now throws,
-    // which is what makes this case reachable at all; this drives that real
-    // contract instead of an invented one.
-    (fetchMyBeersFromAPI as jest.Mock).mockRejectedValue(
-      new Error('My Beers response contained 2 rows and all lack an id')
+    // Drive the typed contract produced when the member response contains rows
+    // but none has an id. This must remain distinct from an unexpected throw.
+    (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(
+      malformed('My Beers response contained 2 rows and all lack an id')
     );
 
     const result = await svc.sequentialRefreshAllData();
@@ -339,6 +335,10 @@ describe('sequentialRefreshAllData: empty vs malformed tasted beers', () => {
     expect(myBeersRepository.replaceAllWithEmptyUnsafe).not.toHaveBeenCalled();
     expect(myBeersRepository.insertManyUnsafe).not.toHaveBeenCalled();
     expect(result.myBeersResult.success).toBe(false);
+    expect(result.myBeersResult.error?.type).toBe(ApiErrorType.MALFORMED_RESPONSE_ERROR);
+    expect(getUserFriendlyErrorMessage(result.myBeersResult.error!)).toBe(
+      'The server sent data this app could not read. Your existing data has been kept.'
+    );
     // And no timestamp, which is what made the wipe persist for 12 hours.
     expect(setPreference).not.toHaveBeenCalledWith('my_beers_last_update', expect.any(String));
   });
