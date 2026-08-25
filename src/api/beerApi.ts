@@ -683,13 +683,13 @@ const extractMyBeers = (data: unknown): UnconditionalSource<FetchOutcome<Beerfin
  * unreadable. It does NOT touch the taplist, which is a different URL with its
  * own fallback and its own bound.
  *
- * **Shared fate is the trade.** One request means one verdict for both halves,
- * so a transient failure that could previously take out my-beers while rewards
- * succeeded now takes out both. Two requests to one URL a second apart
- * disagreeing is a transient artifact rather than information, so agreeing is
- * the more honest answer — but callers do see fewer independent outcomes than
- * before, and a refresh that fails here now reports two lines carrying the same
- * message.
+ * **Shared request-level fate is the trade.** One resolution or transport
+ * failure gives both halves the same verdict, so a transient failure that could
+ * previously take out my-beers while rewards succeeded now takes out both. Two
+ * requests to one URL a second apart disagreeing is a transient artifact rather
+ * than information, so agreeing is the more honest answer — but callers do see
+ * fewer independent outcomes than before, and a refresh that fails here now
+ * reports two lines carrying the same message.
  *
  * The two extractions stay INDEPENDENT: a body that answers one half and not the
  * other still says so, exactly as two separate requests for that body would

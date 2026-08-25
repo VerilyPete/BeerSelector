@@ -7,7 +7,7 @@
  * now asks for both with ONE call to `fetchMemberDataFromAPI` instead of two.
  *
  * **`fetchMemberDataFromAPI` delegates to the two per-source mocks** rather than
- * being stubbed on its own. About 160 stub setups across ten suites are written
+ * being stubbed on its own. About 160 stub setups across eleven suites are written
  * per-source, and converting them would be a far larger and riskier change than
  * the one under test — every existing test's arrangement silently altered to
  * prove a saving none of them can observe. Delegation also keeps the four
