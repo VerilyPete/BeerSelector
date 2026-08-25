@@ -282,6 +282,8 @@ See `.env.example` for complete configuration options.
 
 **Refresh Logic** (`src/services/dataUpdateService.ts`) — `checkAndRefreshOnAppOpen` calls `shouldRefreshData(lastCheckKey, intervalHours)` separately for all beers and my beers:
 
+The `*_last_check` preferences are ISO timestamps. `shouldRefreshData` returns a boolean: missing or expired timestamps request a refresh, while timestamps inside the interval do not.
+
 ```typescript
 const lastCheck = await getPreference(lastCheckKey);
 if (!lastCheck) return true;
