@@ -813,11 +813,12 @@ const extractRewards = (data: unknown): UnconditionalSource<FetchOutcome<Reward>
     // replaced by a single junk row while the refresh reports success.
     //
     // Deliberately NOT the full `isReward`, which also demands `redeemed` and
-    // `reward_type` be strings. Neither is required downstream — the schema has
-    // `redeemed: z.string().optional()`, and `_insertManyInternal` applies
-    // `|| '0'` / `|| ''` before SQLite coerces primitive values into the TEXT
-    // columns. Gating on them adds nothing against the wipe and turns a cosmetic
-    // upstream change (a numeric `redeemed`, a renamed field) into a PERMANENT
+    // `reward_type` be strings. Neither needs to arrive as a string at this
+    // boundary — the schema has `redeemed: z.string().optional()`, and
+    // `_insertManyInternal` applies `|| '0'` / `|| ''` before SQLite coerces
+    // primitive values into the TEXT columns. Gating on them adds nothing
+    // against the wipe and turns a cosmetic upstream change (a numeric
+    // `redeemed`, a renamed field) into a PERMANENT
     // total outage. Constructing the row here mirrors that old writer behavior:
     // numeric and boolean values keep their persisted meaning, while missing or
     // unsupported values receive the same defaults.

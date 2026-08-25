@@ -159,8 +159,9 @@ export class HttpError extends Error {
  *   5xx is.
  * - `UnreadableBodyError` — `attemptFetch`, when `response.json()` rejects.
  *   Retried exactly once, inside the chain deadline.
- * - `TransportAbortedError` — `attemptFetch`'s outer exit, when the chain
- *   deadline fired. Never retried; the budget is already spent.
+ * - `TransportAbortedError` — `attemptFetch`'s outer exit, when the chain's
+ *   remaining budget or the per-attempt timeout fires. Never retried; that
+ *   attempt's budget is already spent.
  *
  * Nothing throws a "wrong shape" error: that decision is made by the three
  * fetchers AFTER `fetchWithRetry` returns, and reports as

@@ -1109,7 +1109,7 @@ describe('a non-array payload is malformed, not data (plan refresh-failure-class
     ];
 
     it.each(DEFAULTED)(
-      'survives %s, because nothing downstream requires it',
+      'normalizes %s to the value persistence and consumers expect',
       async (_label, row, expectedRedeemed, expectedRewardType, expectedIsRedeemed) => {
         // THE OUTAGE TRIP-WIRE, removed. Gating on the full `isReward` — all three
         // fields, all strings — protects against nothing the wipe depends on and
