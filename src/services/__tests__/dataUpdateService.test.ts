@@ -552,6 +552,36 @@ describe('dataUpdateService', () => {
       expect(databaseLockManager.withDatabaseLock).toHaveBeenCalledTimes(1);
     });
 
+    it('resolves to a classified failure when the lock cannot be acquired', async () => {
+      // REGRESSION. Rewriting this function around the shared pipeline dropped
+      // its outer try/catch, and `withDatabaseLock` awaits `acquire` BEFORE
+      // entering its own try — so an acquisition failure propagated straight out
+      // and this function stopped honouring `Promise<DataUpdateResult>`.
+      //
+      // `acquire` rejects on two live paths: the 30s acquisition timeout, and
+      // `isShuttingDown`. The first is reachable whenever app open contends with
+      // an in-flight refresh holding the master lock. `checkAndRefreshOnAppOpen`
+      // then unwinds to its own outer catch and returns `{updated:false}`,
+      // discarding the `updated` flag from an all-beers refresh that had already
+      // succeeded.
+      //
+      // `applyPlan`'s catch does NOT cover this: it sits inside the lock
+      // callback, so it only ever sees the write. The two sibling entry points
+      // both kept an outer catch; this one was the odd case out.
+      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(
+        fetchedRows([{ id: 'beer-1', brew_name: 'B', tasted_date: '2023-01-01' }])
+      );
+      (databaseLockManager.withDatabaseLock as jest.Mock).mockRejectedValueOnce(
+        new Error('Lock acquisition timeout for my beers write after 30000ms')
+      );
+
+      const result = await fetchAndUpdateMyBeers();
+
+      expect(result.success).toBe(false);
+      expect(result.dataUpdated).toBe(false);
+      expect(result.error).toBeDefined();
+    });
+
     it('does not take the lock when there is nothing to write', async () => {
       // A failed source has no write burst, so taking the lock would be a
       // pointless acquisition at the moment other retries are most likely to be

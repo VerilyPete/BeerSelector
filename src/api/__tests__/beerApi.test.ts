@@ -1037,6 +1037,62 @@ describe('a non-array payload is malformed, not data (plan refresh-failure-class
       });
     });
 
+    it('reports malformed for an ARRAY of rows that are not rewards', async () => {
+      // The hole the `Array.isArray` guard did NOT close, found in review. The
+      // guard narrows the CONTAINER only: `['oops']` is an array, so it passed,
+      // `length !== 0` took the data arm, and `toNonEmpty(['oops'])!` produced
+      // `{kind:'data', items:['oops']}` — the same silent wipe as the string
+      // case, one level in. `_insertManyInternal` runs `DELETE FROM rewards`
+      // first and then maps `reward.reward_id || ''`, so the member's rewards
+      // are deleted, replaced by one junk row, and the refresh reports success.
+      //
+      // The comment above this guard claimed "the check is the narrowing". It
+      // was not: `Array.isArray` on an `any` yields `any[]`, so the annotated
+      // assignment was an unchecked widening — as unsound as the cast it
+      // replaced and less visible, because neither `tsc` nor the linter says a
+      // word. The elements are validated now, as the my-beers sibling already
+      // validated its own.
+      respondWith([{}, {}, { reward: ['oops'] }]);
+
+      expect(payload(await fetchRewardsFromAPI()).kind).toBe('malformed');
+    });
+
+    it('keeps the rows that are rewards when only some are not', async () => {
+      // Mirrors the my-beers rule: drop what fails validation, report malformed
+      // only when nothing survives. Without this the fix above could be "reject
+      // the whole payload if any row is odd", which would throw away a good
+      // list for one bad row.
+      respondWith([
+        {},
+        {},
+        {
+          reward: [
+            { reward_id: 'r1', redeemed: '0', reward_type: '$5 Credit' },
+            'oops',
+            { reward_id: 'r2', redeemed: '1', reward_type: 'Plate' },
+          ],
+        },
+      ]);
+
+      const body = payload(await fetchRewardsFromAPI());
+      expect(body.kind).toBe('data');
+      if (body.kind === 'data') expect(body.items.map(r => r.reward_id)).toEqual(['r1', 'r2']);
+    });
+
+    it('accepts the real reward rows the fixture carries', async () => {
+      // GUARD on the validation itself. A predicate stricter than the server's
+      // actual payload would turn every real refresh into `malformed` and wipe
+      // nothing — but report a failure to every member, forever. Driven from the
+      // committed fixture rather than a hand-written row.
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const fixture = require('../../../mybeers.json');
+      respondWith(fixture);
+
+      const body = payload(await fetchRewardsFromAPI());
+      expect(body.kind).toBe('data');
+      if (body.kind === 'data') expect(body.items).toHaveLength(fixture[2].reward.length);
+    });
+
     it('reports malformed for a string reward payload rather than four fabricated rows', async () => {
       // THE SILENT WIPE. This is the whole fence for it, deliberately with no
       // service-level companion: the service suites mock the three fetchers

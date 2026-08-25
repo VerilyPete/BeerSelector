@@ -57,7 +57,11 @@ const memberPrefs = (key: string) => {
 const MEMBER_BODY = [
   {},
   { tasted_brew_current_round: [{ id: 't1', brew_name: 'Tasted', brewer: 'X' }] },
-  { reward: [{ reward_id: 'r1', reward_type: 'badge' }] },
+  // All three fields `isReward` requires. An earlier version of this fixture
+  // omitted `redeemed` and the rewards half came back `malformed` — which is the
+  // element validation doing its job on a hand-written row that did not match
+  // what the server actually sends.
+  { reward: [{ reward_id: 'r1', redeemed: '0', reward_type: '$5 Credit' }] },
 ];
 
 const respondWith = (body: unknown): void => {

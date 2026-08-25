@@ -488,6 +488,25 @@ describe('allNetworkErrors and an unreadable body', () => {
     expect(result.allNetworkErrors).toBe(false);
   });
 
+  it('sets allNetworkErrors in the outer catch when the fault IS transport', async () => {
+    // THE OTHER DIRECTION at the twin site, and without it the site is not
+    // pinned at all: mutation showed `allNetworkErrors: false` hard-coded there
+    // survives all 15 service suites, because the only test at that site drives
+    // an unreadable body and asserts `false`. Hard-coding satisfies it.
+    //
+    // What shipped green under that mutant is the mirror image of the defect
+    // `isTransportFault` was extracted to prevent — a genuine transport fault
+    // reaching this catch would show the per-source list instead of the "check
+    // your internet connection" alert. The sibling site was already pinned both
+    // ways; this one was not.
+    (setPreference as jest.Mock).mockRejectedValueOnce(new TypeError('Network request failed'));
+
+    const result = await svc.manualRefreshAllData();
+
+    expect(result.hasErrors).toBe(true);
+    expect(result.allNetworkErrors).toBe(true);
+  });
+
   it('renders the unreadable-body copy in the per-source list', async () => {
     // GENUINELY RED, and the only assertion tying the decision to what a user
     // reads. Excluding the type from `allNetworkErrors` is only defensible
@@ -598,7 +617,7 @@ describe('the member body is fetched once for both sources', () => {
  * it precedes. It is not: `sequentialRefreshAllData` fetches unconditionally and
  * never consults a timestamp. Verified across the repo — the ONLY reader of
  * `*_last_check` is `shouldRefreshData`, reached only from
- * `checkAndRefreshOnAppOpen`, and `*_last_update` is written in six places and
+ * `checkAndRefreshOnAppOpen`, and `*_last_update` is written in four places and
  * read nowhere at all.
  *
  * So the clears have exactly one effect, on a LATER refresh rather than this
@@ -643,5 +662,74 @@ describe('what a manual refresh does to the freshness timestamps', () => {
 
     const stamps = stampsFor('my_beers_last_check');
     expect(stamps[stamps.length - 1]).toEqual(expect.stringMatching(/^\d{4}-/));
+  });
+});
+
+/**
+ * Shared fate, driven through the service — the one thing the shared mock cannot show.
+ *
+ * `beerApiMock.beerApiMockFactory` has `fetchMemberDataFromAPI` delegate to the
+ * two per-source mocks, so every other suite in the repo can still stage
+ * `myBeers: failed, rewards: fetched` — a pairing production can no longer
+ * produce for anything upstream of the extractors. One request means one
+ * `resolveMemberApiUrl`, one verdict, both halves.
+ *
+ * That is a deliberate trade (converting ~160 per-source stubs would be a far
+ * larger change than the one under test) but it left the CENTRAL behavioural
+ * change of this work with no service-layer coverage at all. These two tests
+ * bypass the factory for this describe only, and are the only place the
+ * consequences of shared fate are visible below `beerApi`.
+ */
+describe('one member request means one verdict for both halves', () => {
+  const bothHalvesFail = (type: ApiErrorType, message: string): void => {
+    // Overrides the delegating factory implementation for this test. Production
+    // builds both halves from ONE `createErrorResponse(error)`, so they are the
+    // same classification and the same message by construction.
+    (fetchMemberDataFromAPI as jest.Mock).mockResolvedValue({
+      myBeers: failed(type, message),
+      rewards: failed(type, message),
+    });
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (fetchBeersFromAPI as jest.Mock).mockResolvedValue(
+      fetchedRows([{ id: 'b1', brew_name: 'Beer', brewer: 'X' }])
+    );
+  });
+
+  it('fails both sources together when the single member request fails', async () => {
+    bothHalvesFail(ApiErrorType.UNREADABLE_BODY_ERROR, 'Response body could not be read as JSON');
+
+    const result = await svc.sequentialRefreshAllData();
+
+    expect(result.myBeersResult.success).toBe(false);
+    expect(result.rewardsResult.success).toBe(false);
+    // The taplist is a different URL with its own fetch, so it is untouched —
+    // shared fate is scoped to the two sources that share a request, not to the
+    // refresh.
+    expect(result.allBeersResult.success).toBe(true);
+  });
+
+  it('renders the same sentence twice, which is the cost of the trade', async () => {
+    // Stated rather than discovered. `buildRefreshErrorMessages` emits one line
+    // per failed source, so a member failure now always produces two lines
+    // carrying identical copy under different labels. That is what the user
+    // sees, and it is the price of not asking the same URL twice.
+    //
+    // It also re-prices the `isTransportFault` exclusion argument, which was
+    // written before coalescing: "a mixed refresh drops to the per-source list —
+    // more verbose, strictly more informative" now buys one distinct sentence
+    // and one duplicate rather than two distinct ones. Still more informative
+    // than the single offline line, and still never false; just less of a margin
+    // than the docstring claims.
+    bothHalvesFail(ApiErrorType.UNREADABLE_BODY_ERROR, 'Response body could not be read as JSON');
+
+    const messages = buildRefreshErrorMessages(await svc.manualRefreshAllData());
+    const copy =
+      'Could not read the beer data — your network may be interfering with the connection. Your existing data has been kept.';
+
+    expect(messages).toContain(`Beerfinder data: ${copy}`);
+    expect(messages).toContain(`Rewards data: ${copy}`);
   });
 });

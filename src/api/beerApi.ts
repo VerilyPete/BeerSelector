@@ -1,6 +1,6 @@
 import { Beer, Beerfinder } from '../database/types';
 import { isBeer } from '../types/beer';
-import { Reward } from '../types/database';
+import { Reward, isReward } from '../types/database';
 import { getPreference } from '../database/preferences';
 import { config } from '../config';
 import { HttpError, TransportAbortedError, UnreadableBodyError, toNonEmpty } from './fetchOutcome';
@@ -220,7 +220,7 @@ const attemptFetch = async (
       // source and the remaining budget are included so a future breaker can be
       // sized from incidents rather than from attempts.
       console.log(
-        `Response body could not be read, retrying once in ${delay}ms... (${retries - 1} attempts left) ${url}`
+        `Response body could not be read, retrying once in ${delay}ms... (${retries - 1} retries left) ${url}`
       );
       await new Promise(resolve => setTimeout(resolve, delay));
 
@@ -411,12 +411,19 @@ export const fetchBeersFromAPI = async (): Promise<UnconditionalSource<FetchOutc
 
     // Handle different response formats based on API endpoint
     // 1. Regular format: Array with brewInStock in second element
-    // `Array.isArray`, not truthiness: `{}` is truthy, and `fromArray({})` reads
-    // `.length` as `undefined`, so a non-array payload became `confirmed-empty`
-    // — the right refusal for entirely the wrong reason, and one that says the
-    // SERVER reported nothing on tap. A non-array falls through to
-    // `findBeersArray` below, which may still recognise a nested array, and
-    // otherwise to the `malformed` return at the end.
+    // `Array.isArray`, not truthiness, and the old hole had TWO shapes here, not
+    // one. An object `{}` reached `fromArray({})`, whose `.length` is
+    // `undefined`, and became `confirmed-empty` — the right refusal for entirely
+    // the wrong reason, and one that says the SERVER reported nothing on tap. A
+    // STRING was the same defect as the rewards site: `toNonEmpty('oops')`
+    // returns four one-character rows, so this produced
+    // `{kind:'data', items:[…]}` out of a payload that was never an array. It
+    // ended as a VALIDATION_ERROR rather than a table wipe only because
+    // `validateBeerArray` rejects char rows downstream — the classification was
+    // wrong either way, and the safety was someone else's.
+    //
+    // A non-array now falls through to `findBeersArray` below, which may still
+    // recognise a nested array, and otherwise to the `malformed` return.
     if (
       data &&
       Array.isArray(data) &&
@@ -656,9 +663,10 @@ const extractMyBeers = (data: unknown): UnconditionalSource<FetchOutcome<Beerfin
  * so the two fetchers have always sent the same request to the same URL, back to
  * back, and discarded half of each answer: my-beers reads
  * `data[1].tasted_brew_current_round`, rewards reads `data[2].reward`, out of one
- * array the server sends whole. Two of a refresh's four member requests were
- * pure duplication, and the bounded retry doubled the cost of that duplication
- * rather than the cost of the information.
+ * array the server sends whole. A refresh made TWO member requests where one
+ * would do, and the bounded retry doubled the cost of that duplication rather
+ * than the cost of the information — four requests in the unreadable case to
+ * learn one thing twice.
  *
  * Saves one request in the happy path and two when the body comes back
  * unreadable. It does NOT touch the taplist, which is a different URL with its
@@ -738,16 +746,44 @@ const extractRewards = (data: unknown): UnconditionalSource<FetchOutcome<Reward>
   // `DELETE FROM rewards` before collapsing them onto one empty `reward_id` —
   // the member's rewards deleted, and the refresh reporting success.
   //
-  // The guard also retires the `as Reward[]` cast: the check is the narrowing.
+  // The CONTAINER check is not enough, and an earlier version of this comment
+  // wrongly claimed it was ("the guard retires the cast: the check is the
+  // narrowing"). `Array.isArray` on an `any` expression yields `any[]`, so
+  // annotating the result `Reward[]` was an unchecked widening — as unsound as
+  // the `as Reward[]` cast it replaced and less visible, since neither `tsc` nor
+  // `no-explicit-any` says a word about it. `reward: ['oops']` passed the
+  // container check and reproduced the same silent wipe one level in.
+  //
+  // So the ELEMENTS are validated too, exactly as the my-beers sibling above
+  // validates its own: keep what is a reward, report `malformed` only when
+  // nothing survives. Rejecting a whole payload for one odd row would throw away
+  // a good list; accepting rows nothing has checked is what deleted one.
   if (data && Array.isArray(data) && data.length >= 3 && data[2] && Array.isArray(data[2].reward)) {
-    // An empty reward list is a real state — a member with none earned yet —
-    // so it is confirmed-empty rather than malformed.
-    const rewards: Reward[] = data[2].reward;
-    return fetched(
-      rewards.length === 0
-        ? { kind: 'confirmed-empty' }
-        : { kind: 'data', items: toNonEmpty(rewards)! }
-    );
+    const rows: unknown[] = data[2].reward;
+
+    // Checked BEFORE validation: "the server says you have none" and "the server
+    // sent rows this app cannot read" are different answers, and only the first
+    // authorises clearing the table.
+    if (rows.length === 0) {
+      return fetched({ kind: 'confirmed-empty' });
+    }
+
+    const rewards = rows.filter(isReward);
+    const nonEmpty = toNonEmpty(rewards);
+    if (nonEmpty === null) {
+      return fetched({
+        kind: 'malformed',
+        detail: `${rows.length} reward rows returned and none carried the expected fields`,
+      });
+    }
+
+    if (rewards.length < rows.length) {
+      console.warn(
+        `Rewards: dropped ${rows.length - rewards.length} of ${rows.length} rows that were not rewards`
+      );
+    }
+
+    return fetched({ kind: 'data', items: nonEmpty });
   }
 
   return fetched({

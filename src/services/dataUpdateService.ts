@@ -838,10 +838,17 @@ async function runTaplistFetch(storeId: string | null): Promise<TaplistFetchResu
  * This said "the one classification", which was false and dangerously so: read
  * literally it licenses leaving an UNKNOWN_ERROR site interpolated, which is
  * exactly the defect being fixed at `prepareMyBeers` twelve hundred lines below.
- * INFO is live too — `fetchAndUpdateMyBeers` returns an INFO-typed error in
- * visitor mode. Corrected after review; the commit message and the sibling
- * comment at the my-beers throw both had it right, and only this docstring —
- * the one meant to be canonical — had it wrong.
+ * INFO renders `message` verbatim as well, which is the second half of the same
+ * point. It has NO producer in production any more — `fetchAndUpdateMyBeers`'s
+ * visitor-mode arm was the only one, and retiring that function's duplicate
+ * pipeline removed it. The member is kept because its renderer is the fence: a
+ * future INFO producer inherits the verbatim-message hazard the moment it is
+ * written, and this rule is what it will be measured against.
+ *
+ * (This paragraph has now been wrong in both directions. It first said "the one
+ * classification", understating the hazard; it was corrected to cite a live INFO
+ * producer; and this branch then deleted that producer. Cite the RULE, not an
+ * example — examples rot.)
  *
  * Shared rather than written per site for the reason `resolveMemberApiUrl` is
  * shared: the last round fixed the TYPE at each site independently and left the
@@ -861,9 +868,12 @@ async function runTaplistFetch(storeId: string | null): Promise<TaplistFetchResu
  * branch a line citation has rotted before it was read.
  *
  * Reachability, so the wording is not mistaken for a guess: `not-configured` is
- * the only code any producer currently reaches here — `beerApi.ts:299` is the
- * sole `unavailable` the taplist can return, and `prepareMyBeers` routes
- * `not-applicable` to a quiet success before it can arrive. The second arm is
+ * the only code any producer currently reaches here — the `!apiUrl` arm of
+ * `fetchBeersFromAPI` is the sole `unavailable` the taplist can return, and
+ * `prepareMyBeers` routes `not-applicable` to a quiet success before it can
+ * arrive. (By symbol, not by line: the line this cited moved on this very
+ * branch, in the paragraph three lines above that complains about exactly
+ * that.) The second arm is
  * defensive, and is worded to stay true rather than to match the first.
  */
 function unavailableCopy(label: string, code: UnavailableReason['code']): string {
@@ -1317,12 +1327,26 @@ export async function fetchAndUpdateMyBeers(): Promise<DataUpdateResult> {
   // No write, no lock: a settled plan touches no database at all, so acquiring
   // would be a pointless acquisition at the moment other retries are most likely
   // to be contending for it. Same reasoning as `runSequentialRefresh`.
-  const result =
-    plan.kind === 'write'
-      ? await databaseLockManager.withDatabaseLock(FETCH_AND_UPDATE_MY_BEERS, () =>
-          applyPlan(plan, writeMyBeers, FETCH_AND_UPDATE_MY_BEERS)
-        )
-      : await applyPlan(plan, writeMyBeers, FETCH_AND_UPDATE_MY_BEERS);
+  // The outer catch is load-bearing and `applyPlan`'s is not a substitute:
+  // `applyPlan` runs INSIDE the lock callback, so it only ever sees the write.
+  // `withDatabaseLock` awaits `acquire` BEFORE entering its own try, and
+  // `acquire` rejects on two live paths — the 30s acquisition timeout, and
+  // `isShuttingDown`. Without this, an acquisition failure escapes and this
+  // function stops honouring `Promise<DataUpdateResult>`, which every caller and
+  // the comment at `app/_layout.tsx` rely on. Both sibling `fetchAndUpdate*`
+  // entry points keep the same catch for the same reason.
+  let result: DataUpdateResult;
+  try {
+    result =
+      plan.kind === 'write'
+        ? await databaseLockManager.withDatabaseLock(FETCH_AND_UPDATE_MY_BEERS, () =>
+            applyPlan(plan, writeMyBeers, FETCH_AND_UPDATE_MY_BEERS)
+          )
+        : await applyPlan(plan, writeMyBeers, FETCH_AND_UPDATE_MY_BEERS);
+  } catch (error) {
+    logError(error, { operation: FETCH_AND_UPDATE_MY_BEERS, component: 'dataUpdateService' });
+    return { success: false, dataUpdated: false, error: createErrorResponse(error) };
+  }
 
   // After the write, not during the fetch. The sync polls the Worker and then
   // writes enrichment into this same table under its own lock, so starting it
@@ -2063,10 +2087,12 @@ export async function manualRefreshAllData(): Promise<ManualRefreshResult> {
     // mid-refresh, which a post-hoc clear would not.
     //
     // The `*_last_update` clears that used to sit here are GONE. Those two
-    // preferences are written in six places and read in none, so clearing them
+    // preferences are written in four places and read in NONE, so clearing them
     // could not affect this refresh, the next one, or anything else; they were
     // two database writes per manual refresh spent on state nothing consults.
-    // Deleting the writers as well is a wider change than this one.
+    // Deleting the four writers as well is a wider change than this one.
+    // (Four, not the six an earlier draft said: that count included the two
+    // clears this comment is explaining the removal of.)
     await setPreference('all_beers_last_check', '');
     await setPreference('my_beers_last_check', '');
 
