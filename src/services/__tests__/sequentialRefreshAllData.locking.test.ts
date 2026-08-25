@@ -109,7 +109,7 @@ const ALL_BEERS = [{ id: 'b1', brew_name: 'Taplist Beer', brewer: 'Brewery' }];
 const MY_BEERS = [
   { id: 'b1', brew_name: 'Taplist Beer', brewer: 'Brewery', tasted_date: '2026-01-01' },
 ];
-const REWARDS = [{ reward_id: 'r1', reward_type: 'badge' }];
+const REWARDS = [{ reward_id: 'r1', redeemed: '0', reward_type: 'badge' }];
 
 /** Record a fetch in the log, then answer with `outcome`. */
 const respondsWith = (mock: jest.Mock, label: string, outcome: unknown): void => {
