@@ -104,9 +104,11 @@ type SequentialRefreshOptions = {
    * - `manualRefreshAllData` clears `all_beers_etag` on a rapid second refresh
    *   so the user can force a full fetch. Joining hands back the result of a run
    *   that read the OLD ETag, so the escape hatch becomes a silent no-op.
-   * - It also clears the four timestamp preferences. Joining a run that already
-   *   stamped them leaves them at `''`, and `shouldRefreshData` then forces a
-   *   redundant full refresh on the next app open.
+   * - It also clears the `*_last_check` preferences, so that a source this
+   *   refresh fails to update is retried on the next app open rather than
+   *   skipped inside the 12-hour window. Joining a run that already stamped them
+   *   leaves them at `''`, and `shouldRefreshData` then forces a redundant full
+   *   refresh instead.
    * - The post-login refresh (`useLoginFlow` → `onRefreshData`) runs the moment
    *   a visitor becomes a member. Joining a visitor-mode run returns
    *   `my beers not applicable` as a success, with `silent: true` so nothing is
@@ -2252,7 +2254,6 @@ export async function manualRefreshAllData(): Promise<ManualRefreshResult> {
     await settleInFlightRefresh();
 
     // Force fresh data by clearing relevant timestamps
-    console.log('Clearing timestamp checks for manual refresh (all data)');
     const now = Date.now();
     if (now - lastManualRefreshTime < RAPID_REFRESH_WINDOW_MS) {
       console.log('Rapid double-refresh detected, clearing ETag to force full fetch');
@@ -2268,9 +2269,25 @@ export async function manualRefreshAllData(): Promise<ManualRefreshResult> {
     // `settleInFlightRefresh` does not know this join point exists.
     dropInFlightTaplistFetch();
 
-    await setPreference('all_beers_last_update', '');
+    // NOT a gate on the refresh below, which is what "clearing timestamp checks
+    // for manual refresh" made this look like. `sequentialRefreshAllData` fetches
+    // unconditionally and never reads a timestamp; the only reader of
+    // `*_last_check` in the repo is `shouldRefreshData`, reached only from
+    // `checkAndRefreshOnAppOpen`.
+    //
+    // What this actually does is act on the NEXT app open: a source that the
+    // refresh below fails to update keeps an empty `*_last_check`, so the
+    // 12-hour window refreshes it instead of skipping it. A source that succeeds
+    // re-stamps on its way out, so the clear costs it nothing. Clearing BEFORE
+    // rather than after is deliberate — it survives the app being killed
+    // mid-refresh, which a post-hoc clear would not.
+    //
+    // The `*_last_update` clears that used to sit here are GONE. Those two
+    // preferences are written in six places and read in none, so clearing them
+    // could not affect this refresh, the next one, or anything else; they were
+    // two database writes per manual refresh spent on state nothing consults.
+    // Deleting the writers as well is a wider change than this one.
     await setPreference('all_beers_last_check', '');
-    await setPreference('my_beers_last_update', '');
     await setPreference('my_beers_last_check', '');
 
     // Delegate to sequential refresh for proper lock coordination (CI-4 fix)

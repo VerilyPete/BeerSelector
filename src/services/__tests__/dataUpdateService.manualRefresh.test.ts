@@ -587,3 +587,61 @@ describe('the member body is fetched once for both sources', () => {
   // which already has the `areApiUrlsConfigured` stub that entry point needs.
   // Wiring one site and leaving the other is the failure the pair guards.
 });
+
+/**
+ * What clearing the timestamp preferences before a manual refresh actually does.
+ *
+ * Plan refresh-failure-classification, deferred item D6.
+ *
+ * `manualRefreshAllData` cleared four preferences and logged "Clearing timestamp
+ * checks for manual refresh", which reads as though it were gating the refresh
+ * it precedes. It is not: `sequentialRefreshAllData` fetches unconditionally and
+ * never consults a timestamp. Verified across the repo — the ONLY reader of
+ * `*_last_check` is `shouldRefreshData`, reached only from
+ * `checkAndRefreshOnAppOpen`, and `*_last_update` is written in six places and
+ * read nowhere at all.
+ *
+ * So the clears have exactly one effect, on a LATER refresh rather than this
+ * one: a source this refresh fails to update is left with an empty
+ * `*_last_check`, and the next app open therefore refreshes it instead of
+ * skipping it inside the 12-hour window. That is worth keeping and was worth
+ * nobody having to reverse-engineer. Nothing asserted it before.
+ */
+describe('what a manual refresh does to the freshness timestamps', () => {
+  const stampsFor = (key: string): unknown[] =>
+    (setPreference as jest.Mock).mock.calls.filter((c: unknown[]) => c[0] === key).map(c => c[1]);
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (fetchBeersFromAPI as jest.Mock).mockResolvedValue(
+      fetchedRows([{ id: 'b1', brew_name: 'Beer', brewer: 'X' }])
+    );
+  });
+
+  it('leaves my_beers_last_check empty when the source failed', async () => {
+    // The one real effect. Without it the next app open sees a stale-but-recent
+    // timestamp, decides the data is fresh, and skips the source this refresh
+    // just failed to update.
+    (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(failed(ApiErrorType.NETWORK_ERROR));
+    (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(fetchedRows([]));
+
+    await svc.manualRefreshAllData();
+
+    expect(stampsFor('my_beers_last_check')).toEqual(['']);
+  });
+
+  it('ends with a fresh my_beers_last_check when the source succeeded', async () => {
+    // THE POSITIVE CONTROL. Without it the assertion above holds just as well
+    // against a refresh that never stamps anything — which would suppress
+    // nothing and force a full refresh on every single app open.
+    (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(
+      fetchedRows([{ id: 't1', brew_name: 'Tasted', brewer: 'X', tasted_date: '2026-01-01' }])
+    );
+    (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(fetchedRows([]));
+
+    await svc.manualRefreshAllData();
+
+    const stamps = stampsFor('my_beers_last_check');
+    expect(stamps[stamps.length - 1]).toEqual(expect.stringMatching(/^\d{4}-/));
+  });
+});
