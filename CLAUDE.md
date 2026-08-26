@@ -278,16 +278,21 @@ See `.env.example` for complete configuration options.
 
 - Triggers on app open via `setupDatabase()` + `cleanupBadAbvData()` + three `fetchAndUpdate*` calls from `dataUpdateService.ts`
 - Fetches all beers, my beers, and rewards (each with individual error handling)
-- Timestamp-based: only refreshes if >12 hours since last refresh (checked inside each `fetchAndUpdate*` function)
+- **Not** timestamp-gated on this path: `app/_layout.tsx` calls all three `fetchAndUpdate*` functions unconditionally. The 12-hour window is `shouldRefreshData`, which is reached only from `checkAndRefreshOnAppOpen` — a different entry point
 
-**Refresh Logic** (`src/services/dataUpdateService.ts`):
+**Refresh Logic** (`src/services/dataUpdateService.ts`) — `checkAndRefreshOnAppOpen` calls `shouldRefreshData(lastCheckKey, intervalHours)` separately for all beers and my beers:
+
+The `*_last_check` preferences are ISO timestamps. `shouldRefreshData` returns a boolean: missing or expired timestamps request a refresh, while timestamps inside the interval do not.
 
 ```typescript
-// Check last refresh timestamp (12-hour default window)
-const lastCheck = await getPreference('all_beers_last_check');
-if (lastCheck && Date.now() - parseInt(lastCheck) < 12 * 60 * 60 * 1000) {
-  return; // Skip refresh
-}
+const lastCheck = await getPreference(lastCheckKey);
+if (!lastCheck) return true;
+
+const lastCheckDate = new Date(lastCheck);
+const now = new Date();
+const hoursSinceLastCheck = (now.getTime() - lastCheckDate.getTime()) / (1000 * 60 * 60);
+
+return hoursSinceLastCheck >= intervalHours;
 ```
 
 **Preference Keys**:

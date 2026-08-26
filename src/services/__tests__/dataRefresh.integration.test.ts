@@ -25,7 +25,10 @@ const myBeersFixture = JSON.parse(
 );
 
 // Mock the modules
-jest.mock('../../api/beerApi');
+jest.mock('../../api/beerApi', () =>
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  require('../../api/__tests__/helpers/beerApiMock').beerApiMockFactory()
+);
 jest.mock('../../database/preferences');
 jest.mock('../../database/repositories/BeerRepository');
 jest.mock('../../database/repositories/MyBeersRepository');
@@ -89,8 +92,7 @@ describe('Data Refresh Integration Tests', () => {
 
       // Verify API calls
       expect(beerApi.fetchBeersFromAPI).toHaveBeenCalled();
-      expect(beerApi.fetchMyBeersFromAPI).toHaveBeenCalled();
-      expect(beerApi.fetchRewardsFromAPI).toHaveBeenCalled();
+      expect(beerApi.fetchMemberDataFromAPI).toHaveBeenCalledTimes(1);
 
       // Verify repositories were called with validated data (not raw fixture data)
       expect(beerRepository.beerRepository.insertManyUnsafe).toHaveBeenCalledTimes(1);

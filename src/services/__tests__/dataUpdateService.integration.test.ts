@@ -2,11 +2,18 @@ import { fetchAndUpdateAllBeers, fetchAndUpdateMyBeers } from '../dataUpdateServ
 import { getPreference, setPreference } from '../../database/preferences';
 import { beerRepository } from '../../database/repositories/BeerRepository';
 import { myBeersRepository } from '../../database/repositories/MyBeersRepository';
-import { fetchBeersFromAPI } from '../../api/beerApi';
+import { fetchBeersFromAPI, fetchMyBeersFromAPI } from '../../api/beerApi';
 import { config } from '@/src/config';
 import * as fs from 'fs';
 import * as path from 'path';
-import { fetchedRows } from '../../api/__tests__/helpers/fetchOutcomeFixtures';
+import {
+  confirmedEmpty,
+  failed,
+  fetchedRows,
+  malformed,
+  unavailable,
+} from '../../api/__tests__/helpers/fetchOutcomeFixtures';
+import { ApiErrorType } from '../../utils/notificationUtils';
 
 // Mock dependencies
 jest.mock('../../database/preferences', () => ({
@@ -29,17 +36,20 @@ jest.mock('../../database/repositories/BeerRepository', () => ({
 jest.mock('../../database/repositories/MyBeersRepository', () => ({
   myBeersRepository: {
     insertMany: jest.fn(),
+    // `fetchAndUpdateMyBeers` writes through `writeMyBeers` now, which uses the
+    // `*Unsafe` pair inside one explicit lock hold.
+    insertManyUnsafe: jest.fn(),
     replaceAllWithEmpty: jest.fn(),
     replaceAllWithEmptyUnsafe: jest.fn(),
+    updateEnrichmentData: jest.fn().mockResolvedValue(0),
   },
 }));
 
 // Mock beerApi to avoid fetchWithRetry setTimeout retries in tests
-jest.mock('../../api/beerApi', () => ({
-  fetchBeersFromAPI: jest.fn(),
-  fetchMyBeersFromAPI: jest.fn(),
-  fetchRewardsFromAPI: jest.fn(),
-}));
+jest.mock('../../api/beerApi', () =>
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  require('../../api/__tests__/helpers/beerApiMock').beerApiMockFactory()
+);
 
 // Mock enrichment service
 jest.mock('../enrichmentService', () => ({
@@ -243,222 +253,103 @@ describe('dataUpdateService integration tests', () => {
   });
 
   describe('fetchAndUpdateMyBeers', () => {
-    it('should process valid mybeers.json data correctly', async () => {
-      // Load test data from the actual file
+    /**
+     * Rewritten by plan refresh-failure-classification D3.
+     *
+     * These tests used to stage raw response bodies, because this entry point
+     * carried its own `fetch`, its own parse and its own extraction. It now
+     * composes `fetchMyBeersFromAPI` + `prepareMyBeers` + `writeMyBeers`, so the
+     * body-shaped half of each case belongs to `beerApi` and is tested there
+     * against a real `global.fetch` — including this same `mybeers.json`
+     * fixture, so the "real server body still extracts" coverage moved rather
+     * than disappeared. What remains here is that each OUTCOME reaches the right
+     * write and the right timestamps.
+     */
+    it('writes every row of the real mybeers.json fixture, with container types added', async () => {
       const myBeersData = loadTestData('mybeers.json');
+      const fixtureRows = myBeersData[1].tasted_brew_current_round;
+      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(fixtureRows));
 
-      // Mock fetch to return the test data (fetchAndUpdateMyBeers still uses raw fetch)
-      (global.fetch as jest.Mock).mockResolvedValue({
-        ok: true,
-        json: jest.fn().mockResolvedValue(myBeersData),
-      });
-
-      // Call the function
       const result = await fetchAndUpdateMyBeers();
 
-      // Verify the result
       expect(result.success).toBe(true);
       expect(result.dataUpdated).toBe(true);
       expect(result.itemCount).toBeGreaterThan(0);
 
-      // Verify that fetch was called with the my beers URL
-      expect(global.fetch).toHaveBeenCalled();
+      // `insertManyUnsafe`: the write runs inside one explicit lock hold now,
+      // covering the rows and both timestamps, rather than the repository taking
+      // its own lock for the rows alone.
+      expect(myBeersRepository.insertManyUnsafe).toHaveBeenCalledTimes(1);
+      const written = (myBeersRepository.insertManyUnsafe as jest.Mock).mock.calls[0][0];
+      expect(Array.isArray(written)).toBe(true);
+      expect(written.length).toBe(fixtureRows.length);
 
-      // Verify that myBeersRepository.insertMany was called with the correct data
-      expect(myBeersRepository.insertMany).toHaveBeenCalledTimes(1);
+      // The real fixture's fields survive the round trip, and
+      // `calculateContainerTypes` adds the two the glass icon needs.
+      const firstBeer = written[0];
+      for (const field of ['id', 'brew_name', 'brewer', 'brew_style', 'tasted_date', 'chit_code']) {
+        expect(firstBeer).toHaveProperty(field);
+      }
+      expect(firstBeer).toHaveProperty('container_type');
+      expect(firstBeer).toHaveProperty('abv');
 
-      // Verify that the data passed to myBeersRepository.insertMany is the tasted_brew_current_round array
-      const beersPassedToPopulate = (myBeersRepository.insertMany as jest.Mock).mock.calls[0][0];
-      expect(Array.isArray(beersPassedToPopulate)).toBe(true);
-
-      // Verify that the data has correct count (same as source data)
-      expect(beersPassedToPopulate.length).toBe(myBeersData[1].tasted_brew_current_round.length);
-
-      // Verify that each beer has the expected properties including container_type and abv (added by calculateContainerTypes)
-      const firstBeer = beersPassedToPopulate[0];
-      expect(firstBeer).toHaveProperty('id');
-      expect(firstBeer).toHaveProperty('brew_name');
-      expect(firstBeer).toHaveProperty('brewer');
-      expect(firstBeer).toHaveProperty('brew_style');
-      expect(firstBeer).toHaveProperty('tasted_date');
-      expect(firstBeer).toHaveProperty('chit_code');
-      expect(firstBeer).toHaveProperty('container_type'); // Added by calculateContainerTypes
-      expect(firstBeer).toHaveProperty('abv'); // Added by calculateContainerTypes
-
-      // Verify that setPreference was called to update the timestamps
       expect(setPreference).toHaveBeenCalledWith('my_beers_last_update', expect.any(String));
       expect(setPreference).toHaveBeenCalledWith('my_beers_last_check', expect.any(String));
     });
 
-    it('should handle missing API URL', async () => {
-      // Mock getPreference to return null for the API URL
-      (getPreference as jest.Mock).mockImplementation(async (key: string) => {
-        if (key === 'my_beers_api_url') return null;
-        return null;
-      });
+    it('handles a missing API URL without writing or stamping', async () => {
+      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(
+        unavailable('not-configured', 'my_beers_api_url is not set')
+      );
 
-      // Call the function
       const result = await fetchAndUpdateMyBeers();
 
-      // Verify the result
       expect(result.success).toBe(false);
       expect(result.dataUpdated).toBe(false);
-
-      // Verify that fetch was not called
-      expect(global.fetch).not.toHaveBeenCalled();
-
-      // Verify that myBeersRepository.insertMany was not called
-      expect(myBeersRepository.insertMany).not.toHaveBeenCalled();
-
-      // Verify that setPreference was not called
+      expect(myBeersRepository.insertManyUnsafe).not.toHaveBeenCalled();
       expect(setPreference).not.toHaveBeenCalled();
     });
 
-    it('should handle failed fetch', async () => {
-      // Mock fetch to return an error response
-      (global.fetch as jest.Mock).mockResolvedValue({
-        ok: false,
-        status: 404,
-        statusText: 'Not Found',
-      });
+    it.each([
+      ['a 404', () => failed(ApiErrorType.VALIDATION_ERROR, 'HTTP 404 Not Found')],
+      ['a transport failure', () => failed(ApiErrorType.NETWORK_ERROR, 'Network request failed')],
+      [
+        'a body of the wrong shape',
+        () => malformed('response contained no tasted_brew_current_round array'),
+      ],
+      ['rows that all lack an id', () => malformed('3 rows returned and none carried an id')],
+    ])('leaves the tasted table and its timestamps alone for %s', async (_label, outcome) => {
+      // Four conditions that used to be four hand-written branches in this
+      // function, each classifying differently and two of them leaking parser
+      // prose into the refresh alert. They are one shape now: not a
+      // `confirmed-empty`, so nothing is written and nothing is stamped —
+      // stamping after a non-answer is what hid a wiped list for 12 hours.
+      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(outcome());
 
-      // Call the function
       const result = await fetchAndUpdateMyBeers();
 
-      // Verify the result
       expect(result.success).toBe(false);
       expect(result.dataUpdated).toBe(false);
-
-      // Verify that fetch was called
-      expect(global.fetch).toHaveBeenCalled();
-
-      // Verify that myBeersRepository.insertMany was not called
-      expect(myBeersRepository.insertMany).not.toHaveBeenCalled();
-
-      // Verify that setPreference was not called
-      expect(setPreference).not.toHaveBeenCalled();
-    });
-
-    it('should handle invalid data format', async () => {
-      // Mock fetch to return invalid data
-      (global.fetch as jest.Mock).mockResolvedValue({
-        ok: true,
-        json: jest.fn().mockResolvedValue({ invalid: 'data' }),
-      });
-
-      // Call the function
-      const result = await fetchAndUpdateMyBeers();
-
-      // Verify the result
-      expect(result.success).toBe(false);
-      expect(result.dataUpdated).toBe(false);
-
-      // Verify that fetch was called
-      expect(global.fetch).toHaveBeenCalled();
-
-      // Verify that myBeersRepository.insertMany was not called
-      expect(myBeersRepository.insertMany).not.toHaveBeenCalled();
-
-      // Verify that setPreference was not called
-      expect(setPreference).not.toHaveBeenCalled();
-    });
-
-    it('should handle empty tasted beers array (new user or round rollover)', async () => {
-      // Create data with empty tasted_brew_current_round array (happens when round rolls over at 200 beers)
-      const emptyBeersData = [
-        { member: { member_id: '123', name: 'Test User' } },
-        { tasted_brew_current_round: [] }, // Empty array - new user or round rollover
-      ];
-
-      // Mock fetch to return the empty data
-      (global.fetch as jest.Mock).mockResolvedValue({
-        ok: true,
-        json: jest.fn().mockResolvedValue(emptyBeersData),
-      });
-
-      // Call the function
-      const result = await fetchAndUpdateMyBeers();
-
-      // Verify the result - should succeed with 0 items
-      expect(result.success).toBe(true);
-      expect(result.dataUpdated).toBe(true);
-      expect(result.itemCount).toBe(0);
-
-      // Verify that fetch was called
-      expect(global.fetch).toHaveBeenCalled();
-
-      // INVERTED by plan 02 Phase 2: a genuine empty round is now stated
-      // explicitly rather than inferred from an empty array.
-      expect(myBeersRepository.replaceAllWithEmpty).toHaveBeenCalled();
-      expect(myBeersRepository.insertMany).not.toHaveBeenCalled();
-
-      // Verify that setPreference was called to update timestamps
-      expect(setPreference).toHaveBeenCalledWith('my_beers_last_update', expect.any(String));
-      expect(setPreference).toHaveBeenCalledWith('my_beers_last_check', expect.any(String));
-    });
-
-    it('should handle data with no valid beers', async () => {
-      // Create a modified version of the data with invalid beers (no IDs)
-      const invalidBeersData = [
-        { member: { member_id: '123', name: 'Test User' } },
-        {
-          tasted_brew_current_round: [
-            { brew_name: 'Beer 1', brewer: 'Brewery 1' }, // No ID
-            { brew_name: 'Beer 2', brewer: 'Brewery 2' }, // No ID
-            { brew_name: 'Beer 3', brewer: 'Brewery 3' }, // No ID
-          ],
-        },
-      ];
-
-      // Mock fetch to return the invalid data
-      (global.fetch as jest.Mock).mockResolvedValue({
-        ok: true,
-        json: jest.fn().mockResolvedValue(invalidBeersData),
-      });
-
-      // Call the function
-      const result = await fetchAndUpdateMyBeers();
-
-      // INVERTED by plan 02 Phase 2. Rows that all lack an id are MALFORMED,
-      // not an empty round — the old behaviour wiped a populated tasted list
-      // and reported success.
-      expect(result.success).toBe(false);
-      expect(result.dataUpdated).toBe(false);
-      expect(result.itemCount).toBe(0);
-
-      // Verify that fetch was called
-      expect(global.fetch).toHaveBeenCalled();
-
-      // Nothing was written, in either shape
-      expect(myBeersRepository.insertMany).not.toHaveBeenCalled();
-      expect(myBeersRepository.replaceAllWithEmpty).not.toHaveBeenCalled();
-
-      // Verify that setPreference was called to update timestamps
-      // And crucially NOT stamped: stamping the timestamps after a malformed
-      // response is what hid the wiped list for the next 12 hours.
+      expect(myBeersRepository.insertManyUnsafe).not.toHaveBeenCalled();
+      expect(myBeersRepository.replaceAllWithEmptyUnsafe).not.toHaveBeenCalled();
       expect(setPreference).not.toHaveBeenCalledWith('my_beers_last_update', expect.any(String));
       expect(setPreference).not.toHaveBeenCalledWith('my_beers_last_check', expect.any(String));
     });
 
-    it('should handle fetch throwing an exception', async () => {
-      // Mock fetch to throw an error
-      (global.fetch as jest.Mock).mockRejectedValue(new Error('Network error'));
+    it('clears the table for a genuinely empty round (new user or rollover at 200)', async () => {
+      // The ONE case where emptying is correct, and the reason every case above
+      // must be distinguishable from it.
+      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(confirmedEmpty());
 
-      // Call the function
       const result = await fetchAndUpdateMyBeers();
 
-      // Verify the result
-      expect(result.success).toBe(false);
-      expect(result.dataUpdated).toBe(false);
-
-      // Verify that fetch was called
-      expect(global.fetch).toHaveBeenCalled();
-
-      // Verify that myBeersRepository.insertMany was not called
-      expect(myBeersRepository.insertMany).not.toHaveBeenCalled();
-
-      // Verify that setPreference was not called
-      expect(setPreference).not.toHaveBeenCalled();
+      expect(result.success).toBe(true);
+      expect(result.dataUpdated).toBe(true);
+      expect(result.itemCount).toBe(0);
+      expect(myBeersRepository.replaceAllWithEmptyUnsafe).toHaveBeenCalled();
+      expect(myBeersRepository.insertManyUnsafe).not.toHaveBeenCalled();
+      expect(setPreference).toHaveBeenCalledWith('my_beers_last_update', expect.any(String));
+      expect(setPreference).toHaveBeenCalledWith('my_beers_last_check', expect.any(String));
     });
   });
 

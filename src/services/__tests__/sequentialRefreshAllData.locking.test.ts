@@ -37,7 +37,12 @@ import {
 import { config } from '@/src/config';
 import { getPreference, setPreference } from '../../database/preferences';
 import { databaseLockManager } from '../../database/DatabaseLockManager';
-import { fetchedRows, failed, unavailable } from '../../api/__tests__/helpers/fetchOutcomeFixtures';
+import {
+  fetchedRows,
+  failed,
+  malformed,
+  unavailable,
+} from '../../api/__tests__/helpers/fetchOutcomeFixtures';
 import { sequentialRefreshAllData, resetInFlightSequentialRefresh } from '../dataUpdateService';
 
 /**
@@ -60,11 +65,10 @@ jest.mock('../../database/preferences', () => ({
   areApiUrlsConfigured: jest.fn(async () => true),
 }));
 
-jest.mock('../../api/beerApi', () => ({
-  fetchBeersFromAPI: jest.fn(),
-  fetchMyBeersFromAPI: jest.fn(),
-  fetchRewardsFromAPI: jest.fn(),
-}));
+jest.mock('../../api/beerApi', () =>
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  require('../../api/__tests__/helpers/beerApiMock').beerApiMockFactory()
+);
 
 jest.mock('../enrichmentService', () => ({
   fetchBeersFromProxy: jest.fn(),
@@ -110,7 +114,7 @@ const ALL_BEERS = [{ id: 'b1', brew_name: 'Taplist Beer', brewer: 'Brewery' }];
 const MY_BEERS = [
   { id: 'b1', brew_name: 'Taplist Beer', brewer: 'Brewery', tasted_date: '2026-01-01' },
 ];
-const REWARDS = [{ reward_id: 'r1', reward_type: 'badge' }];
+const REWARDS = [{ reward_id: 'r1', redeemed: '0', reward_type: 'badge' }];
 
 /** Record a fetch in the log, then answer with `outcome`. */
 const respondsWith = (mock: jest.Mock, label: string, outcome: unknown): void => {
@@ -256,17 +260,15 @@ describe('sequentialRefreshAllData locking', () => {
     enrichmentSpy.mockRestore();
   });
 
-  it('writes the sources that fetched successfully when another source fails', async () => {
+  it('writes valid rewards when the same member body has malformed tasted rows', async () => {
     respondsWith(fetchBeersFromAPI as jest.Mock, 'allBeers', fetchedRows(ALL_BEERS));
-    respondsWith(fetchMyBeersFromAPI as jest.Mock, 'myBeers', failed());
+    respondsWith(fetchMyBeersFromAPI as jest.Mock, 'myBeers', malformed('rows lacked an id'));
     respondsWith(fetchRewardsFromAPI as jest.Mock, 'rewards', fetchedRows(REWARDS));
 
     const result = await sequentialRefreshAllData();
 
-    // Per-source isolation is the property that made hoisting safe at all — 02
-    // Phase 2.5 is what removed the blocker recorded in 01 Phase 4. If a single
-    // failure could suppress the other two writes, this restructure would be
-    // the regression it exists to prevent.
+    // Both member outcomes can come from one real response. A malformed tasted
+    // array must not suppress the valid reward half of that body.
     expect(beerRepository.insertManyUnsafe).toHaveBeenCalled();
     expect(rewardsRepository.insertManyUnsafe).toHaveBeenCalled();
     expect(myBeersRepository.insertManyUnsafe).not.toHaveBeenCalled();

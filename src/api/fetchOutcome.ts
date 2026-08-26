@@ -131,9 +131,8 @@ export type UnconditionalSource<T> = Exclude<FetchedSource<T>, { readonly status
  * The server answered with a non-2xx status.
  *
  * A type rather than a message, for the reason `createErrorResponse` states at
- * the top of its body: it classifies `DatabaseContentionError` and
- * `MalformedResponseError` by type precisely so the answer does not depend on
- * prose. Before this existed, the thrown message was
+ * the top of its body: it classifies `DatabaseContentionError` and the two body
+ * types below by type precisely so the answer does not depend on prose. Before this existed, the thrown message was
  * `Failed to fetch: 500 Internal Server Error`, which matched that function's
  * `'Failed to fetch'` substring test — so **every HTTP error was reported to the
  * user as "check your internet connection"**, and counted toward
@@ -153,27 +152,87 @@ export class HttpError extends Error {
 }
 
 /**
- * A body arrived and could not be used.
+ * WHAT THROWS WHAT, since the three are easy to confuse and a previous version
+ * of this file claimed one of them was thrown by nothing at all.
  *
- * Typed so that callers — and the user-facing error formatter — can tell it
- * apart from a network failure or an unknown fault. Without this the raw
- * developer message reaches the Settings refresh alert verbatim, which is what
- * `CONTENTION_ERROR` already exists to prevent for the database layer.
+ * - `HttpError` — `attemptFetch`, on a non-2xx status. 4xx is never retried,
+ *   5xx is.
+ * - `UnreadableBodyError` — `attemptFetch`, when `response.json()` rejects.
+ *   Retried exactly once, inside the chain deadline.
+ * - `TransportAbortedError` — `attemptFetch`'s outer exit, when the chain's
+ *   remaining budget or the per-attempt timeout fires. Never retried; that
+ *   attempt's budget is already spent.
  *
- * Deliberately NOT retryable: the same request returns the same unusable body,
- * so offering "try again" would be a lie.
- *
- * Retained deliberately although nothing throws it today. Plan 05 Phase 5.3
- * migrated the three `beerApi` fetchers to return `fetched`/`malformed` instead,
- * which is the better shape — but `createErrorResponse` still classifies this,
- * and the classification is what stops the raw message reaching the user. Any
- * future thrower gets that for free.
+ * Nothing throws a "wrong shape" error: that decision is made by the three
+ * fetchers AFTER `fetchWithRetry` returns, and reports as
+ * `fetched` + `malformed`, or as `MALFORMED_RESPONSE_ERROR` from the
+ * `ErrorResponse` literals in `dataUpdateService` once a writer refuses it. The
+ * class that used to carry it, `MalformedResponseError`, is gone; the enum
+ * member and its copy are not.
  */
-export class MalformedResponseError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'MalformedResponseError';
+
+/**
+ * The response body arrived and could not be read as JSON.
+ *
+ * The axis this sits on (see `HttpError` above, and plan 02): `malformed` is a
+ * fact about a BODY, `failed` is a fact about a REQUEST. "A body arrived and
+ * could not be read" straddles them, and `attemptFetch` used to file all of it
+ * on the body side as `MalformedResponseError` — asserting that the SERVER chose
+ * to send this, and refusing to retry on that basis. A body truncated or
+ * replaced by a stuttering link is not that.
+ *
+ * What this type claims is exactly: **the body could not be read, and one
+ * transient retry is warranted.** It does NOT claim a transport fault. Three
+ * causes remain indistinguishable — a truncation, a transient non-JSON body from
+ * the origin, an interposed non-JSON body — and nothing at this layer can rank
+ * them, so the type must not pretend to. That is why `UNREADABLE_BODY_ERROR` is
+ * excluded from `isTransportFault`.
+ *
+ * **Fixed message; the parser's error travels as `cause` and is never
+ * interpolated.** V8 embeds an excerpt of the body in its own message —
+ * `JSON.parse('<html>Sign in…')` yields
+ * `Unexpected token '<', "<html>Sign"... is not valid JSON` — and Hermes does
+ * not. Interpolating it puts the response body into `ErrorResponse.message`: a
+ * leak that CI would show and a device would hide, which is the wrong direction
+ * for a fence to fail in.
+ *
+ * `cause` is assigned rather than passed to `super`, so this does not depend on
+ * the runtime supporting the `Error` options argument.
+ */
+export class UnreadableBodyError extends Error {
+  readonly cause: unknown;
+
+  constructor(cause: unknown) {
+    super('Response body could not be read as JSON');
+    this.name = 'UnreadableBodyError';
+    this.cause = cause;
     // Required for `instanceof` to survive transpilation of Error subclasses.
-    Object.setPrototypeOf(this, MalformedResponseError.prototype);
+    Object.setPrototypeOf(this, UnreadableBodyError.prototype);
+  }
+}
+
+/**
+ * The chain deadline ended the attempt.
+ *
+ * Constructed at `attemptFetch`'s outer exit, from the controller rather than
+ * from the rejected value, and that placement is the point. `fetch()` itself is
+ * the abort route that actually fires, and the value it rejects with is not this
+ * codebase's to choose: a non-`Error` rejection skips the entire
+ * `instanceof Error` block in `createErrorResponse` and lands on UNKNOWN_ERROR
+ * with the literal 'An unknown error occurred', losing both the classification
+ * and the message. Typing it once, where the controller is in scope, covers
+ * `Error`, `DOMException` and non-`Error` values uniformly.
+ *
+ * Carries the raw rejection as `cause`, for the same reason as above.
+ */
+export class TransportAbortedError extends Error {
+  readonly cause: unknown;
+
+  constructor(message: string, cause: unknown) {
+    super(message);
+    this.name = 'TransportAbortedError';
+    this.cause = cause;
+    // Required for `instanceof` to survive transpilation of Error subclasses.
+    Object.setPrototypeOf(this, TransportAbortedError.prototype);
   }
 }

@@ -1,6 +1,6 @@
 import { Alert } from 'react-native';
 import { DatabaseContentionError } from '../database/errors';
-import { HttpError, MalformedResponseError } from '../api/fetchOutcome';
+import { HttpError, TransportAbortedError, UnreadableBodyError } from '../api/fetchOutcome';
 
 /**
  * Error types for API requests
@@ -13,6 +13,17 @@ export enum ApiErrorType {
   VALIDATION_ERROR = 'VALIDATION_ERROR',
   CONTENTION_ERROR = 'CONTENTION_ERROR',
   MALFORMED_RESPONSE_ERROR = 'MALFORMED_RESPONSE_ERROR',
+  /**
+   * A body arrived and could not be READ — truncated, or not JSON at all.
+   *
+   * Distinct from MALFORMED_RESPONSE_ERROR, which is a well-formed body of the
+   * wrong SHAPE and is genuinely the server's doing. Nothing at the transport
+   * layer can tell a truncation from an interposed login page from a transient
+   * bad body, so this type claims only that the body could not be read.
+   *
+   * Deliberately NOT counted by `isTransportFault`; see the table test.
+   */
+  UNREADABLE_BODY_ERROR = 'UNREADABLE_BODY_ERROR',
   UNKNOWN_ERROR = 'UNKNOWN_ERROR',
   INFO = 'INFO',
 }
@@ -178,12 +189,26 @@ export function createErrorResponse(error: unknown): ErrorResponse {
     };
   }
 
-  // A body arrived and was unusable. Classified by type so the raw developer
-  // message never reaches the user, and deliberately not retryable — the same
-  // request returns the same unusable body.
-  if (error instanceof MalformedResponseError) {
+  // The chain deadline ended the attempt. Typed at `attemptFetch`'s outer exit
+  // from the CONTROLLER rather than from the rejected value, so this rule sees
+  // one class whatever `fetch()` chose to reject with — including a non-`Error`,
+  // which would otherwise skip the whole `instanceof Error` block below and land
+  // on UNKNOWN_ERROR with 'An unknown error occurred'.
+  if (error instanceof TransportAbortedError) {
     return {
-      type: ApiErrorType.MALFORMED_RESPONSE_ERROR,
+      type: ApiErrorType.NETWORK_ERROR,
+      message: 'Network connection error: request timed out',
+      originalError: error,
+    };
+  }
+
+  // A body arrived and could not be read. NOT MALFORMED_RESPONSE_ERROR, which
+  // asserts the server sent a well-formed body of the wrong shape — a claim
+  // nothing at this layer can make about a body that would not parse. The
+  // parser's message is not carried here: it embeds a body excerpt on V8.
+  if (error instanceof UnreadableBodyError) {
+    return {
+      type: ApiErrorType.UNREADABLE_BODY_ERROR,
       message: error.message,
       originalError: error,
     };
@@ -265,7 +290,24 @@ export function getUserFriendlyErrorMessage(error: ErrorResponse): string {
 
     case ApiErrorType.MALFORMED_RESPONSE_ERROR:
       // Deliberately ignores error.message, which carries developer prose.
+      //
+      // Still reachable, and still the server's doing: shape-rejection reports
+      // through this type from `dataUpdateService`'s `ErrorResponse` literals.
+      // What no longer reports through it is a body that would not parse, which
+      // this sentence was wrongly asserting the server had chosen to send.
       return 'The server sent data this app could not read. Your existing data has been kept.';
+
+    case ApiErrorType.UNREADABLE_BODY_ERROR:
+      // Ignores error.message for the same reason, and names the likeliest
+      // actionable cause without asserting it: the app cannot tell a truncation
+      // from an interposed page from a transient bad body, so "may be
+      // interfering" is as strong a claim as the evidence supports.
+      //
+      // This arm MUST land with the enum member. The switch ends
+      // `case UNKNOWN_ERROR: default:`, which returns `error.message` verbatim,
+      // so a member without a copy arm compiles and leaks developer prose into
+      // the refresh alert.
+      return 'Could not read the beer data — your network may be interfering with the connection. Check your connection and try refreshing again. Your existing data has been kept.';
 
     case ApiErrorType.CONTENTION_ERROR:
       // Deliberately ignores error.message, which carries the raw SQLite text.
@@ -281,4 +323,31 @@ export function getUserFriendlyErrorMessage(error: ErrorResponse): string {
     default:
       return error.message || 'An unexpected error occurred. Please try again later.';
   }
+}
+
+/**
+ * Does this failure mean the REQUEST did not complete?
+ *
+ * `allNetworkErrors` — which selects the single "Unable to connect… check your
+ * internet connection" alert in place of the per-source list — was decided twice
+ * by hand, in string literals, at two sites in `dataUpdateService`. Two copies of
+ * a decision is how one of them gets updated and the other missed, and a string
+ * comparison cannot be told apart from an omission: a newly added
+ * transport-flavoured type simply fails to match, leaving no trace that anyone
+ * chose.
+ *
+ * **UNREADABLE_BODY_ERROR is excluded, and that is a decision rather than an
+ * absence.** The reason is about information, not truth — bytes arriving proves
+ * nothing about the link, so "the connection demonstrably worked" is not the
+ * argument. If it counted, three unreadable sources would collapse into the one
+ * offline line, and the copy written for that type would be rendered only in the
+ * mixed case and discarded in its own primary one. Excluded, a mixed refresh
+ * drops to the per-source list: more verbose, strictly more informative, never
+ * false.
+ *
+ * The table test over every enum member is what makes the next such type a
+ * decision instead of an accident.
+ */
+export function isTransportFault(type: ApiErrorType): boolean {
+  return type === ApiErrorType.NETWORK_ERROR || type === ApiErrorType.TIMEOUT_ERROR;
 }

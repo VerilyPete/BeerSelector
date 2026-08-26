@@ -19,6 +19,7 @@
  */
 
 import { fetchWithRetry } from '../beerApi';
+import { TransportAbortedError } from '../fetchOutcome';
 import { config } from '@/src/config';
 
 jest.mock('../../database/preferences');
@@ -85,7 +86,7 @@ describe('fetchWithRetry timeout', () => {
     // an assertion — reporting a retry defect as an unexplained hang, in the
     // test that does not own retry behaviour. The test below owns it.
     const result = fetchWithRetry(config.api.baseUrl, 1);
-    const rejection = expect(result).rejects.toMatchObject({ name: 'AbortError' });
+    const rejection = expect(result).rejects.toThrow(TransportAbortedError);
 
     await jest.advanceTimersByTimeAsync(config.network.timeout + 1);
 
@@ -112,7 +113,7 @@ describe('fetchWithRetry timeout', () => {
     neverSettlingFetch();
 
     const result = fetchWithRetry(config.api.baseUrl, 3, 10);
-    const rejection = expect(result).rejects.toMatchObject({ name: 'AbortError' });
+    const rejection = expect(result).rejects.toThrow(TransportAbortedError);
 
     // Past the timeout, then past every retry delay that would follow it.
     await jest.advanceTimersByTimeAsync(config.network.timeout + 1);

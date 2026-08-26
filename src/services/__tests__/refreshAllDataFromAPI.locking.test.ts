@@ -27,7 +27,12 @@
  * they control.
  */
 
-import { fetchBeersFromAPI, fetchMyBeersFromAPI, fetchRewardsFromAPI } from '../../api/beerApi';
+import {
+  fetchBeersFromAPI,
+  fetchMemberDataFromAPI,
+  fetchMyBeersFromAPI,
+  fetchRewardsFromAPI,
+} from '../../api/beerApi';
 import { beerRepository } from '../../database/repositories/BeerRepository';
 import { myBeersRepository } from '../../database/repositories/MyBeersRepository';
 import { rewardsRepository } from '../../database/repositories/RewardsRepository';
@@ -35,7 +40,12 @@ import { fetchEnrichmentBatchWithMissing, syncBeersToWorker } from '../enrichmen
 import { config } from '@/src/config';
 import { getPreference, setPreference } from '../../database/preferences';
 import { fetchBeersFromProxy } from '../enrichmentService';
-import { fetchedRows, failed, unavailable } from '../../api/__tests__/helpers/fetchOutcomeFixtures';
+import {
+  fetchedRows,
+  failed,
+  malformed,
+  unavailable,
+} from '../../api/__tests__/helpers/fetchOutcomeFixtures';
 import { refreshAllDataFromAPI } from '../dataUpdateService';
 
 /** One ordered log of everything worth ordering. See the sibling suite. */
@@ -51,11 +61,10 @@ jest.mock('../../database/preferences', () => ({
   areApiUrlsConfigured: jest.fn(async () => true),
 }));
 
-jest.mock('../../api/beerApi', () => ({
-  fetchBeersFromAPI: jest.fn(),
-  fetchMyBeersFromAPI: jest.fn(),
-  fetchRewardsFromAPI: jest.fn(),
-}));
+jest.mock('../../api/beerApi', () =>
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  require('../../api/__tests__/helpers/beerApiMock').beerApiMockFactory()
+);
 
 jest.mock('../enrichmentService', () => ({
   fetchBeersFromProxy: jest.fn(),
@@ -101,7 +110,7 @@ const ALL_BEERS = [{ id: 'b1', brew_name: 'Taplist Beer', brewer: 'Brewery' }];
 const MY_BEERS = [
   { id: 'b1', brew_name: 'Taplist Beer', brewer: 'Brewery', tasted_date: '2026-01-01' },
 ];
-const REWARDS = [{ reward_id: 'r1', reward_type: 'badge' }];
+const REWARDS = [{ reward_id: 'r1', redeemed: '0', reward_type: 'badge' }];
 
 const respondsWith = (mock: jest.Mock, label: string, outcome: unknown): void => {
   mock.mockImplementation(async () => {
@@ -222,12 +231,11 @@ describe('refreshAllDataFromAPI locking', () => {
     expect(mockEvents.indexOf('sync:worker')).toBeGreaterThan(mockEvents.indexOf('lock:release'));
   });
 
-  it('writes the sources that fetched successfully when another source fails', async () => {
-    // The exact property `01` Phase 4 refused to risk when it left this
-    // function alone. `02` Phase 2.5 supplied the per-source isolation that
-    // makes hoisting safe; this is the assertion that it still does.
+  it('writes valid rewards when the same member body has malformed tasted rows', async () => {
+    // This pairing can come from one real member response: malformed tasted
+    // rows beside a valid reward array. The valid half must still be written.
     respondsWith(fetchBeersFromAPI as jest.Mock, 'allBeers', fetchedRows(ALL_BEERS));
-    respondsWith(fetchMyBeersFromAPI as jest.Mock, 'myBeers', failed());
+    respondsWith(fetchMyBeersFromAPI as jest.Mock, 'myBeers', malformed('rows lacked an id'));
     respondsWith(fetchRewardsFromAPI as jest.Mock, 'rewards', fetchedRows(REWARDS));
 
     const result = await refreshAllDataFromAPI();
@@ -362,6 +370,19 @@ describe('refreshAllDataFromAPI locking', () => {
         'lock:release',
       ]);
     });
+  });
+
+  it('asks for the member body once for both sources', async () => {
+    // My-beers and rewards read the same `my_beers_api_url` and take different
+    // slices of the same array, so preparing them separately sent the identical
+    // request twice. This is the SECOND of the two sites that prepare both back
+    // to back; `dataUpdateService.manualRefresh.test.ts` pins the other. Wiring
+    // one and leaving the other is what the pair guards against.
+    allSourcesSucceed();
+
+    await refreshAllDataFromAPI();
+
+    expect(fetchMemberDataFromAPI).toHaveBeenCalledTimes(1);
   });
 
   it('returns the rows it wrote', async () => {

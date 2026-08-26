@@ -23,7 +23,7 @@
 
 import { fetchBeersFromAPI, fetchMyBeersFromAPI, fetchRewardsFromAPI } from '../beerApi';
 import * as preferences from '../../database/preferences';
-import { ApiErrorType } from '../../utils/notificationUtils';
+import { ApiErrorType, getUserFriendlyErrorMessage } from '../../utils/notificationUtils';
 import type { FetchOutcome, UnconditionalSource } from '../fetchOutcome';
 
 jest.mock('../../database/preferences');
@@ -183,6 +183,181 @@ describe.each(FETCHERS)('$name failure outcomes', ({ urlKey, call, unusableBody 
     );
 
     const outcome = await settle(call());
+
+    expect(outcome.status).toBe('failed');
+    if (outcome.status === 'failed') {
+      expect(outcome.error.type).toBe(ApiErrorType.NETWORK_ERROR);
+    }
+  });
+});
+
+/**
+ * A body that could not be READ is not the same fault as a body of the wrong SHAPE.
+ *
+ * Plan refresh-failure-classification Phase 1.
+ *
+ * `attemptFetch` filed every `response.json()` rejection as
+ * `MalformedResponseError` and refused to retry it — so a body truncated or
+ * replaced by a stuttering link was reported to the user as a deliberate act of
+ * the server ("The server sent data this app could not read"), a classification
+ * `allNetworkErrors` does not count. Because that check is an `.every(...)`, ONE
+ * such source suppressed the connection advice for the entire refresh.
+ *
+ * Three causes remain indistinguishable and none is ranked here: a body
+ * truncated by a stalling link, a transient non-JSON body from the origin, and
+ * an interposed non-JSON body. `UNREADABLE_BODY_ERROR` therefore means "the body
+ * could not be read, and one transient retry is warranted" — NOT "a transport
+ * fault". It deliberately does not count toward `allNetworkErrors`; see the
+ * table in `dataUpdateService.manualRefresh.test.ts`.
+ */
+describe('a body that could not be read', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (preferences.getPreference as jest.Mock).mockImplementation(memberPrefs('my_beers_api_url'));
+  });
+
+  /**
+   * A 200 whose body is not JSON, parsed by the real parser.
+   *
+   * Deliberately NOT a hand-thrown `SyntaxError` with invented text: the leak
+   * fence below is about what V8 actually puts in that message, and inventing it
+   * would let the fence pass against a message shape the runtime never produces.
+   */
+  const respondWithUnparseableBody = (body: string): void => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      json: async () => JSON.parse(body),
+    });
+  };
+
+  const abortError = (): Error => {
+    const error = new Error('The operation was aborted');
+    error.name = 'AbortError';
+    return error;
+  };
+
+  it('is classified apart from a body of the wrong shape', async () => {
+    respondWithUnparseableBody('<html>Sign in to continue</html>');
+
+    const outcome = await settle(fetchMyBeersFromAPI());
+
+    expect(outcome.status).toBe('failed');
+    if (outcome.status === 'failed') {
+      // Was MALFORMED_RESPONSE_ERROR, which asserts the SERVER chose to send
+      // this. Nothing here knows that.
+      expect(outcome.error.type).toBe(ApiErrorType.UNREADABLE_BODY_ERROR);
+    }
+  });
+
+  it('describes the fault without carrying the body into the message', async () => {
+    // THE LEAK FENCE. V8 embeds a body excerpt in the parser's own message —
+    // `JSON.parse('<html>Sign in…')` yields
+    // `Unexpected token '<', "<html>Sign"... is not valid JSON` on the pinned
+    // Node — while Hermes does not. Interpolating it would put the response body
+    // in `ErrorResponse.message`: caught in CI, silent on device. The cause is
+    // carried as `cause`, never as text.
+    //
+    // `JSON.stringify` ALONE is insufficient — `Error.message` on
+    // `originalError` is non-enumerable, so it inspects only the plain fields —
+    // which is why the direct `message` check is here too. Nothing in this phase
+    // puts a body anywhere; this is the forward fence for evidence capture.
+    respondWithUnparseableBody('<html>Sign in to continue</html>');
+
+    const outcome = await settle(fetchMyBeersFromAPI());
+
+    expect(outcome.status).toBe('failed');
+    if (outcome.status === 'failed') {
+      expect(outcome.error.message).not.toContain('<html>');
+      expect(JSON.stringify(outcome.error)).not.toContain('<html>');
+      expect(getUserFriendlyErrorMessage(outcome.error)).not.toContain('<html>');
+    }
+  });
+
+  it('tells the user their network may be interfering, not that the server is at fault', async () => {
+    respondWithUnparseableBody('<html>Sign in to continue</html>');
+
+    const outcome = await settle(fetchMyBeersFromAPI());
+
+    expect(outcome.status).toBe('failed');
+    if (outcome.status === 'failed') {
+      expect(getUserFriendlyErrorMessage(outcome.error)).toBe(
+        'Could not read the beer data — your network may be interfering with the connection. Check your connection and try refreshing again. Your existing data has been kept.'
+      );
+    }
+  });
+
+  it('reports an abort raised during the body read as a network fault, not an unreadable body', async () => {
+    // The ORDER of the two checks in the catch, which is the whole property:
+    // the deadline is asked about first, so a chain that has already timed out
+    // cannot be mistaken for a body worth re-fetching and spend the budget it
+    // no longer has. Swap the two and this dies.
+    (global.fetch as jest.Mock).mockImplementation(
+      (_url: string, options: { signal: AbortSignal }) =>
+        Promise.resolve({
+          ok: true,
+          status: 200,
+          statusText: 'OK',
+          json: () =>
+            new Promise((_resolve, reject) => {
+              options.signal.addEventListener('abort', () => reject(abortError()));
+            }),
+        })
+    );
+
+    const outcome = await settle(fetchMyBeersFromAPI());
+
+    expect(outcome.status).toBe('failed');
+    if (outcome.status === 'failed') {
+      expect(outcome.error.type).toBe(ApiErrorType.NETWORK_ERROR);
+    }
+  });
+
+  it('types an abort that is not an Error at all', async () => {
+    // The abort route that actually fires is `fetch()` itself, and the value it
+    // rejects with is not this function's to choose. A non-`Error` rejection
+    // skips the whole `instanceof Error` block in `createErrorResponse` and
+    // lands on UNKNOWN_ERROR with the literal 'An unknown error occurred' —
+    // losing the classification AND the message. Asking the controller rather
+    // than inspecting the value is what covers `Error`, `DOMException` and this
+    // uniformly.
+    //
+    // Deliberately NOT the `abortError()` helper the sibling suites use: that
+    // builds a real `Error` named 'AbortError', which passes through the name
+    // route and gives a false green. The installed whatwg-fetch shim never
+    // produces this shape, so treat it as a forward fence on the rule rather
+    // than as the case the rule exists for.
+    (global.fetch as jest.Mock).mockImplementation(
+      (_url: string, options: { signal: AbortSignal }) =>
+        new Promise((_resolve, reject) => {
+          options.signal.addEventListener('abort', () =>
+            reject({ name: 'AbortError', message: 'Aborted' })
+          );
+        })
+    );
+
+    const outcome = await settle(fetchMyBeersFromAPI());
+
+    expect(outcome.status).toBe('failed');
+    if (outcome.status === 'failed') {
+      expect(outcome.error.type).toBe(ApiErrorType.NETWORK_ERROR);
+    }
+  });
+
+  it('types an Error-shaped abort of the request the same way', async () => {
+    // A DUPLICATE, stated as one: 'reports a timed-out request as failed' above
+    // already drives a deadline abort through a whole fetcher and asserts
+    // NETWORK_ERROR. Kept because it fences the new typed exit locally, next to
+    // the non-`Error` case it must agree with — not because it adds coverage.
+    (global.fetch as jest.Mock).mockImplementation(
+      (_url: string, options: { signal: AbortSignal }) =>
+        new Promise((_resolve, reject) => {
+          options.signal.addEventListener('abort', () => reject(abortError()));
+        })
+    );
+
+    const outcome = await settle(fetchMyBeersFromAPI());
 
     expect(outcome.status).toBe('failed');
     if (outcome.status === 'failed') {

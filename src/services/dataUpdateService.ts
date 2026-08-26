@@ -1,17 +1,19 @@
 import { getPreference, setPreference, areApiUrlsConfigured } from '../database/preferences';
-import { fetchBeersFromAPI, fetchMyBeersFromAPI, fetchRewardsFromAPI } from '../api/beerApi';
 import {
-  Beer,
-  Beerfinder,
-  BeerWithContainerType,
-  BeerfinderWithContainerType,
-} from '../types/beer';
+  fetchBeersFromAPI,
+  fetchMemberDataFromAPI,
+  fetchMyBeersFromAPI,
+  fetchRewardsFromAPI,
+} from '../api/beerApi';
+import type { MemberData } from '../api/beerApi';
+import { Beer, BeerWithContainerType, BeerfinderWithContainerType } from '../types/beer';
 import { Reward } from '../types/database';
 import {
   ApiErrorType,
   ErrorResponse,
   SourceFailureError,
   createErrorResponse,
+  isTransportFault,
 } from '../utils/notificationUtils';
 import { beerRepository } from '../database/repositories/BeerRepository';
 import { myBeersRepository } from '../database/repositories/MyBeersRepository';
@@ -72,9 +74,10 @@ export function resetInFlightSequentialRefresh(): void {
  */
 const SEQUENTIAL_REFRESH = 'sequentialRefreshAllData';
 const REFRESH_FROM_API = 'refreshAllDataFromAPI';
+const FETCH_AND_UPDATE_MY_BEERS = 'fetchAndUpdateMyBeers';
 
 /**
- * The only two values the shared `prepare*` phase may be labelled with.
+ * The only values the shared `prepare*` phase may be labelled with.
  *
  * A bare `string` let a caller pass anything, and the label is interpolated as
  * `${operation} - all beers` — so `prepareAllBeers('refreshAllDataFromAPI -
@@ -83,7 +86,10 @@ const REFRESH_FROM_API = 'refreshAllDataFromAPI';
  * misdirection this threading exists to prevent. Two tests pin two of six
  * emitting sites; the type covers all of them.
  */
-type RefreshOperation = typeof SEQUENTIAL_REFRESH | typeof REFRESH_FROM_API;
+type RefreshOperation =
+  | typeof SEQUENTIAL_REFRESH
+  | typeof REFRESH_FROM_API
+  | typeof FETCH_AND_UPDATE_MY_BEERS;
 
 /**
  * How a caller wants to be treated when a refresh is already running.
@@ -102,9 +108,11 @@ type SequentialRefreshOptions = {
    * - `manualRefreshAllData` clears `all_beers_etag` on a rapid second refresh
    *   so the user can force a full fetch. Joining hands back the result of a run
    *   that read the OLD ETag, so the escape hatch becomes a silent no-op.
-   * - It also clears the four timestamp preferences. Joining a run that already
-   *   stamped them leaves them at `''`, and `shouldRefreshData` then forces a
-   *   redundant full refresh on the next app open.
+   * - It also clears the `*_last_check` preferences, so that a source this
+   *   refresh fails to update is retried on the next app open rather than
+   *   skipped inside the 12-hour window. Joining a run that already stamped them
+   *   leaves them at `''`, and `shouldRefreshData` then forces a redundant full
+   *   refresh instead.
    * - The post-login refresh (`useLoginFlow` → `onRefreshData`) runs the moment
    *   a visitor becomes a member. Joining a visitor-mode run returns
    *   `my beers not applicable` as a success, with `silent: true` so nothing is
@@ -830,10 +838,14 @@ async function runTaplistFetch(storeId: string | null): Promise<TaplistFetchResu
  * This said "the one classification", which was false and dangerously so: read
  * literally it licenses leaving an UNKNOWN_ERROR site interpolated, which is
  * exactly the defect being fixed at `prepareMyBeers` twelve hundred lines below.
- * INFO is live too — `fetchAndUpdateMyBeers` returns an INFO-typed error in
- * visitor mode. Corrected after review; the commit message and the sibling
- * comment at the my-beers throw both had it right, and only this docstring —
- * the one meant to be canonical — had it wrong.
+ * INFO renders `message` verbatim as well, which is the second half of the same
+ * point. It has NO producer in production any more — `fetchAndUpdateMyBeers`'s
+ * visitor-mode arm was the only one, and retiring that function's duplicate
+ * pipeline removed it. The member is kept because its renderer is the fence: a
+ * future INFO producer inherits the verbatim-message hazard the moment it is
+ * written, and this rule is what it will be measured against.
+ *
+ * Cite the RULE, not an example — examples rot.
  *
  * Shared rather than written per site for the reason `resolveMemberApiUrl` is
  * shared: the last round fixed the TYPE at each site independently and left the
@@ -853,9 +865,10 @@ async function runTaplistFetch(storeId: string | null): Promise<TaplistFetchResu
  * branch a line citation has rotted before it was read.
  *
  * Reachability, so the wording is not mistaken for a guess: `not-configured` is
- * the only code any producer currently reaches here — `beerApi.ts:299` is the
- * sole `unavailable` the taplist can return, and `prepareMyBeers` routes
- * `not-applicable` to a quiet success before it can arrive. The second arm is
+ * the only code any producer currently reaches here — the `!apiUrl` arm of
+ * `fetchBeersFromAPI` is the sole `unavailable` the taplist can return, and
+ * `prepareMyBeers` routes `not-applicable` to a quiet success before it can
+ * arrive. By symbol, not by line. The second arm is
  * defensive, and is worded to stay true rather than to match the first.
  */
 function unavailableCopy(label: string, code: UnavailableReason['code']): string {
@@ -1281,270 +1294,68 @@ export async function fetchAndUpdateAllBeers(): Promise<DataUpdateResult> {
  * @returns DataUpdateResult with success status and error information if applicable
  */
 export async function fetchAndUpdateMyBeers(): Promise<DataUpdateResult> {
+  // Composed from the same three pieces the sequential path uses, rather than
+  // reimplementing them.
+  //
+  // This function used to carry its own copy of the whole pipeline: a raw
+  // `fetch` with a hard-coded 15s timeout and no retry, its own `response.json()`
+  // catch, its own extraction, its own validation, its own writes. It therefore
+  // inherited nothing from the transport work every other source received — a
+  // body that would not parse was PARSE_ERROR with no retry and no relation to
+  // the classification used elsewhere; every non-2xx was SERVER_ERROR, so a 4xx
+  // told the user the server had failed; and "all rows lack an id" left as an
+  // untyped Error, reaching the refresh alert verbatim through UNKNOWN_ERROR.
+  //
+  // Deliberately NOT by routing this caller into `sequentialRefreshAllData`,
+  // which would put cold start behind a fetch-and-write of all three sources
+  // under one master lock hold.
+  const { plan, pendingWorkerSync } = await prepareMyBeers(
+    FETCH_AND_UPDATE_MY_BEERS,
+    await fetchMyBeersFromAPI()
+  );
+
+  // `writeMyBeers` uses the `*Unsafe` repository methods, which assume the
+  // caller holds the lock — the sequential path holds the master lock already,
+  // and this entry point has to take one. Taking it here rather than inside the
+  // repository is what puts the rows AND the timestamps in a single hold.
+  //
+  // No write, no lock: a settled plan touches no database at all, so acquiring
+  // would be a pointless acquisition at the moment other retries are most likely
+  // to be contending for it. Same reasoning as `runSequentialRefresh`.
+  // The outer catch is load-bearing and `applyPlan`'s is not a substitute:
+  // `applyPlan` runs INSIDE the lock callback, so it only ever sees the write.
+  // `withDatabaseLock` awaits `acquire` BEFORE entering its own try, and
+  // `acquire` rejects on two live paths — the 30s acquisition timeout, and
+  // `isShuttingDown`. Without this, an acquisition failure escapes and this
+  // function stops honouring `Promise<DataUpdateResult>`, which every caller and
+  // the comment at `app/_layout.tsx` rely on. Both sibling `fetchAndUpdate*`
+  // entry points keep the same catch for the same reason.
+  let result: DataUpdateResult;
   try {
-    // Check if in visitor mode
-    const isVisitor = (await getPreference('is_visitor_mode')) === 'true';
-    if (isVisitor) {
-      console.log('In visitor mode, my beers functionality not available');
-
-      // Update the last check timestamp still to prevent repeated checks
-      await setPreference('my_beers_last_check', new Date().toISOString());
-
-      return {
-        success: true,
-        dataUpdated: false,
-        error: {
-          type: ApiErrorType.INFO,
-          message: 'My beers not available in visitor mode.',
-        },
-      };
-    }
-
-    // Get the API URL from preferences
-    const apiUrl = await getPreference('my_beers_api_url');
-    if (!apiUrl) {
-      logError('My beers API URL not set', {
-        operation: 'fetchAndUpdateMyBeers',
-        component: 'dataUpdateService',
-      });
-      return {
-        success: false,
-        dataUpdated: false,
-        error: {
-          type: ApiErrorType.VALIDATION_ERROR,
-          message: 'My beers API URL not set. Please log in to configure API URLs.',
-        },
-      };
-    }
-
-    // Make the request
-    console.log('Fetching my beers data...');
-    let response;
-    try {
-      // Set a timeout for the fetch request
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
-
-      response = await fetch(apiUrl, { signal: controller.signal });
-      clearTimeout(timeoutId);
-    } catch (fetchError) {
-      logError(fetchError, {
-        operation: 'fetchAndUpdateMyBeers',
-        component: 'dataUpdateService',
-        additionalData: { message: 'Network error fetching my beers data' },
-      });
-
-      // Check if it's an abort error (timeout) - treat as network error for consolidated messaging
-      if (fetchError instanceof Error && fetchError.name === 'AbortError') {
-        return {
-          success: false,
-          dataUpdated: false,
-          error: {
-            type: ApiErrorType.NETWORK_ERROR, // Changed from TIMEOUT_ERROR to NETWORK_ERROR
-            message: 'Network connection error: request timed out while fetching tasted beer data.',
-            originalError: fetchError,
-          },
-        };
-      }
-
-      // Handle other network errors
-      return {
-        success: false,
-        dataUpdated: false,
-        error: createErrorResponse(fetchError),
-      };
-    }
-
-    // If the response is not OK, something went wrong
-    if (!response.ok) {
-      logError(`Failed to fetch my beers data: ${response.status} ${response.statusText}`, {
-        operation: 'fetchAndUpdateMyBeers',
-        component: 'dataUpdateService',
-        additionalData: { status: response.status, statusText: response.statusText },
-      });
-      return {
-        success: false,
-        dataUpdated: false,
-        error: {
-          type: ApiErrorType.SERVER_ERROR,
-          message: `Server error: ${response.statusText || 'Unknown error'}`,
-          statusCode: response.status,
-        },
-      };
-    }
-
-    // Parse the response
-    let data;
-    try {
-      data = await response.json();
-    } catch (parseError) {
-      logError(parseError, {
-        operation: 'fetchAndUpdateMyBeers',
-        component: 'dataUpdateService',
-        additionalData: { message: 'Error parsing my beers data' },
-      });
-      return {
-        success: false,
-        dataUpdated: false,
-        error: {
-          type: ApiErrorType.PARSE_ERROR,
-          message: 'Failed to parse server response',
-          originalError: parseError,
-        },
-      };
-    }
-
-    // Log the structure of the response for debugging
-    console.log('API response structure:', typeof data);
-    if (Array.isArray(data)) {
-      console.log(`API response is an array with ${data.length} items`);
-    }
-
-    // Extract the tasted_brew_current_round array from the response
-    let myBeers: Beerfinder[] = [];
-    if (
-      data &&
-      Array.isArray(data) &&
-      data.length >= 2 &&
-      data[1] &&
-      data[1].tasted_brew_current_round
-    ) {
-      myBeers = data[1].tasted_brew_current_round;
-      console.log(`Found tasted_brew_current_round with ${myBeers.length} beers`);
-    } else {
-      logError('Invalid my beers data format: missing tasted_brew_current_round', {
-        operation: 'fetchAndUpdateMyBeers',
-        component: 'dataUpdateService',
-      });
-      return {
-        success: false,
-        dataUpdated: false,
-        error: {
-          type: ApiErrorType.VALIDATION_ERROR,
-          message: 'Invalid data format received from server: missing tasted beer data',
-        },
-      };
-    }
-
-    // Handle empty array as a valid state (user has no tasted beers or round has rolled over)
-    if (myBeers.length === 0) {
-      console.log(
-        'Empty tasted beers array - user has no tasted beers in current round (new user or round rollover at 200 beers), clearing database'
-      );
-      // A confirmed-empty round: the server really did report zero tasted
-      // beers. Emptying is correct here, and now says so explicitly.
-      await myBeersRepository.replaceAllWithEmpty();
-
-      // Update the last update timestamp
-      await setPreference('my_beers_last_update', new Date().toISOString());
-      await setPreference('my_beers_last_check', new Date().toISOString());
-
-      console.log('Updated my beers data with 0 beers (empty state)');
-      return {
-        success: true,
-        dataUpdated: true,
-        itemCount: 0,
-      };
-    }
-
-    // Validate that we have beers with IDs
-    const validBeers = myBeers.filter(beer => beer && beer.id);
-    console.log(
-      `Found ${validBeers.length} valid beers with IDs out of ${myBeers.length} total beers`
-    );
-
-    if (validBeers.length === 0) {
-      // The API returned rows and every one lacked an id — malformed, NOT an
-      // empty round. Leave the table alone and report failure. Writing here is
-      // what wiped a populated tasted list; stamping the timestamps then hid it
-      // for 12 hours. Phase 4 owns the surrounding semantics.
-      console.error(
-        `Refusing to write my beers: all ${myBeers.length} rows from the API lack an id`
-      );
-      return {
-        success: false,
-        dataUpdated: false,
-        itemCount: 0,
-        error: createErrorResponse(
-          new Error(`All ${myBeers.length} tasted beers from the API lack an id`)
-        ),
-      };
-    }
-
-    // =========================================================================
-    // ENRICHMENT: Fetch enrichment data BEFORE container type calculation
-    // so that ABV from enrichment is available for glass type selection.
-    // Without this ordering, draft beers without ABV in their description
-    // would get container_type=null (question mark icon) even when the
-    // Worker has enriched ABV data.
-    // =========================================================================
-    let beersForContainerCalc: Beerfinder[] = validBeers;
-    if (config.enrichment.isConfigured()) {
-      try {
-        const beerIds = validBeers.map(beer => beer.id);
-        console.log(
-          `[dataUpdateService] Fetching enrichment for ${beerIds.length} tasted beers...`
-        );
-
-        const { enrichments: enrichmentData, missing: missingIds } =
-          await fetchEnrichmentBatchWithMissing(beerIds);
-        const enrichedCount = Object.keys(enrichmentData).length;
-
-        if (enrichedCount > 0) {
-          console.log(`[dataUpdateService] Got enrichment data for ${enrichedCount} beers`);
-          beersForContainerCalc = mergeEnrichmentData(validBeers, enrichmentData);
-        }
-
-        // Sync missing beers to Worker for enrichment (in background)
-        syncMissingBeersInBackground(missingIds, validBeers, 'dataUpdateService');
-      } catch (enrichmentError) {
-        // Log but don't fail - enrichment is optional enhancement
-        logWarning('Failed to fetch enrichment for tasted beers, continuing without', {
-          operation: 'fetchAndUpdateMyBeers',
-          component: 'dataUpdateService',
-          additionalData: {
-            error:
-              enrichmentError instanceof Error ? enrichmentError.message : String(enrichmentError),
-          },
-        });
-      }
-    }
-
-    // Calculate container types AFTER enrichment so ABV is available for glass selection
-    console.log('Calculating container types for tasted beers...');
-    const beersWithContainerTypes = calculateContainerTypes(beersForContainerCalc);
-
-    // toNonEmpty replaces a type assertion here, and validBeers.length was
-    // already checked above, so null means the container-type step dropped
-    // everything — a logic error worth surfacing rather than a silent clear.
-    const myBeersToInsert = toNonEmpty(beersWithContainerTypes as BeerfinderWithContainerType[]);
-    if (myBeersToInsert === null) {
-      throw new Error('No valid tasted beers to insert after container-type calculation');
-    }
-    await myBeersRepository.insertMany(myBeersToInsert);
-
-    // Update the last update timestamp
-    await setPreference('my_beers_last_update', new Date().toISOString());
-    await setPreference('my_beers_last_check', new Date().toISOString());
-
-    console.log(`Updated my beers data with ${validBeers.length} valid beers`);
-    return {
-      success: true,
-      dataUpdated: true,
-      itemCount: validBeers.length,
-    };
+    result =
+      plan.kind === 'write'
+        ? await databaseLockManager.withDatabaseLock(FETCH_AND_UPDATE_MY_BEERS, () =>
+            applyPlan(plan, writeMyBeers, FETCH_AND_UPDATE_MY_BEERS)
+          )
+        : await applyPlan(plan, writeMyBeers, FETCH_AND_UPDATE_MY_BEERS);
   } catch (error) {
-    logError(error, {
-      operation: 'fetchAndUpdateMyBeers',
-      component: 'dataUpdateService',
-      additionalData: { message: 'Error updating my beers data' },
-    });
-    return {
-      success: false,
-      dataUpdated: false,
-      error: createErrorResponse(error),
-    };
+    logError(error, { operation: FETCH_AND_UPDATE_MY_BEERS, component: 'dataUpdateService' });
+    return { success: false, dataUpdated: false, error: createErrorResponse(error) };
   }
+
+  // After the write, not during the fetch. The sync polls the Worker and then
+  // writes enrichment into this same table under its own lock, so starting it
+  // early — which the old inline version did — let it land BEFORE the
+  // clear-and-reinsert above and be wiped by it.
+  if (pendingWorkerSync !== null) {
+    syncMissingBeersInBackground(
+      pendingWorkerSync.missingIds,
+      pendingWorkerSync.beers,
+      FETCH_AND_UPDATE_MY_BEERS
+    );
+  }
+
+  return result;
 }
 
 /**
@@ -1666,9 +1477,15 @@ export async function fetchAndUpdateRewards(): Promise<DataUpdateResult> {
  * Sequential refresh with master lock coordination to prevent lock contention
  *
  * HP-2 Step 5c: This function solves CI-2 (parallel refresh lock contention) by:
- * - Acquiring a single master lock for the entire refresh sequence
+ * - Fetching every source with NO lock held, then writing them in a single
+ *   locked burst — not, as this said until review caught it, "acquiring a single
+ *   master lock for the entire refresh sequence". The fetches were hoisted out
+ *   of the lock two plans ago; holding it across network I/O is the thing that
+ *   made a stalled request wedge every later writer.
  * - Executing operations sequentially (not in parallel)
- * - Using safe repository methods under master lock protection
+ * - Using the `*Unsafe` repository methods inside that one hold — safe BECAUSE
+ *   the burst holds the lock, which is the opposite of "using safe repository
+ *   methods under master lock protection"
  * - Avoiding lock queueing overhead from parallel Promise execution
  *
  * Performance: ~3x faster than parallel execution with lock contention
@@ -1706,8 +1523,15 @@ export async function sequentialRefreshAllData({
 async function runSequentialRefresh(): Promise<ManualRefreshResult> {
   console.log('Sequential refresh: fetching all sources with no lock held');
   const allBeers = await prepareAllBeers(SEQUENTIAL_REFRESH);
-  const { plan: myBeers, pendingWorkerSync } = await prepareMyBeers(SEQUENTIAL_REFRESH);
-  const rewards = await prepareRewards(SEQUENTIAL_REFRESH);
+  // ONE request for both member sources. They read the same `my_beers_api_url`
+  // and take different slices of the same array, so preparing them separately
+  // sent the identical request twice and discarded half of each answer.
+  const member = await fetchMemberDataFromAPI();
+  const { plan: myBeers, pendingWorkerSync } = await prepareMyBeers(
+    SEQUENTIAL_REFRESH,
+    member.myBeers
+  );
+  const rewards = await prepareRewards(SEQUENTIAL_REFRESH, member.rewards);
 
   /**
    * Applying all three, in order.
@@ -1751,14 +1575,19 @@ async function runSequentialRefresh(): Promise<ManualRefreshResult> {
   // Check for errors
   const hasErrors = !allBeersResult.success || !myBeersResult.success || !rewardsResult.success;
 
-  // Check if all errors are network-related
+  // Check if all errors are network-related.
+  //
+  // `isTransportFault`, not two string literals: this decision has a twin in
+  // `manualRefreshAllData`'s outer catch, and hand-written string comparisons at
+  // two sites cannot be told apart from an omission — a newly added
+  // transport-flavoured type simply fails to match at both, and nothing records
+  // that anyone chose. UNREADABLE_BODY_ERROR is the type that made that
+  // concrete; the predicate carries the reasoning and the table test.
   const allNetworkErrors =
     hasErrors &&
     [allBeersResult, myBeersResult, rewardsResult]
       .filter(result => !result.success && result.error)
-      .every(
-        result => result.error?.type === 'NETWORK_ERROR' || result.error?.type === 'TIMEOUT_ERROR'
-      );
+      .every(result => (result.error ? isTransportFault(result.error.type) : false));
 
   console.log('Sequential refresh completed:', {
     allBeers: allBeersResult.success,
@@ -1937,12 +1766,15 @@ async function writeAllBeers(write: AllBeersWrite): Promise<DataUpdateResult> {
  * request inside the lock and forfeit most of this phase's benefit, since it is
  * the request over the largest id list.
  */
-async function prepareMyBeers(operation: RefreshOperation): Promise<MyBeersPreparation> {
-  console.log(`[${operation}] fetching my beers`);
+async function prepareMyBeers(
+  operation: RefreshOperation,
+  myBeersSource: MemberData['myBeers']
+): Promise<MyBeersPreparation> {
+  // Takes the outcome rather than fetching it: my-beers and rewards are two
+  // halves of ONE body from ONE url, and fetching here meant asking twice.
+  console.log(`[${operation}] classifying my beers`);
   let workerSync: PendingWorkerSync | null = null;
   try {
-    const myBeersSource = await fetchMyBeersFromAPI();
-
     // The three outcomes diverge here, and this is the divergence the whole
     // plan exists for. `unavailable` must NOT touch the table and must NOT
     // stamp a timestamp — stamping is what suppressed a retry for 12 hours.
@@ -2113,10 +1945,14 @@ async function writeMyBeers(write: MyBeersWrite): Promise<DataUpdateResult> {
 }
 
 /** Fetch and classify rewards. No database access. */
-async function prepareRewards(operation: RefreshOperation): Promise<SourcePlan<RewardsWrite>> {
-  console.log(`[${operation}] fetching rewards`);
+async function prepareRewards(
+  operation: RefreshOperation,
+  rewardsSource: MemberData['rewards']
+): Promise<SourcePlan<RewardsWrite>> {
+  // Takes the outcome rather than fetching it; see `prepareMyBeers`.
+  console.log(`[${operation}] classifying rewards`);
   try {
-    const decision = decideRewards(await fetchRewardsFromAPI());
+    const decision = decideRewards(rewardsSource);
 
     if (decision.action === 'fail') {
       // Logged here rather than left to the caller, because one of the two
@@ -2223,7 +2059,6 @@ export async function manualRefreshAllData(): Promise<ManualRefreshResult> {
     await settleInFlightRefresh();
 
     // Force fresh data by clearing relevant timestamps
-    console.log('Clearing timestamp checks for manual refresh (all data)');
     const now = Date.now();
     if (now - lastManualRefreshTime < RAPID_REFRESH_WINDOW_MS) {
       console.log('Rapid double-refresh detected, clearing ETag to force full fetch');
@@ -2239,9 +2074,25 @@ export async function manualRefreshAllData(): Promise<ManualRefreshResult> {
     // `settleInFlightRefresh` does not know this join point exists.
     dropInFlightTaplistFetch();
 
-    await setPreference('all_beers_last_update', '');
+    // NOT a gate on the refresh below, which is what "clearing timestamp checks
+    // for manual refresh" made this look like. `sequentialRefreshAllData` fetches
+    // unconditionally and never reads a timestamp; the only reader of
+    // `*_last_check` in the repo is `shouldRefreshData`, reached only from
+    // `checkAndRefreshOnAppOpen`.
+    //
+    // What this actually does is act on the NEXT app open: a source that the
+    // refresh below fails to update keeps an empty `*_last_check`, so the
+    // 12-hour window refreshes it instead of skipping it. A source that succeeds
+    // re-stamps on its way out, so the clear costs it nothing. Clearing BEFORE
+    // rather than after is deliberate — it survives the app being killed
+    // mid-refresh, which a post-hoc clear would not.
+    //
+    // The `*_last_update` clears that used to sit here are GONE. Those two
+    // preferences are written in four places and read in NONE, so clearing them
+    // could not affect this refresh, the next one, or anything else; they were
+    // two database writes per manual refresh spent on state nothing consults.
+    // Deleting the four writers as well is a wider change than this one.
     await setPreference('all_beers_last_check', '');
-    await setPreference('my_beers_last_update', '');
     await setPreference('my_beers_last_check', '');
 
     // Delegate to sequential refresh for proper lock coordination (CI-4 fix)
@@ -2263,8 +2114,9 @@ export async function manualRefreshAllData(): Promise<ManualRefreshResult> {
       myBeersResult: { success: false, dataUpdated: false, error: errorResponse },
       rewardsResult: { success: false, dataUpdated: false, error: errorResponse },
       hasErrors: true,
-      allNetworkErrors:
-        errorResponse.type === 'NETWORK_ERROR' || errorResponse.type === 'TIMEOUT_ERROR',
+      // The twin of the check in `sequentialRefreshAllData`, and the reason the
+      // decision is a named predicate rather than a comparison written twice.
+      allNetworkErrors: isTransportFault(errorResponse.type),
     };
   }
 }
@@ -2403,8 +2255,13 @@ export const refreshAllDataFromAPI = async (): Promise<{
   // This is the autoLogin -> checkInBeer path: a lock held across a stalled
   // fetch here blocks a user trying to check a beer in.
   const allBeersPlan = await prepareAllBeers(REFRESH_FROM_API);
-  const { plan: myBeersPlan, pendingWorkerSync } = await prepareMyBeers(REFRESH_FROM_API);
-  const rewardsPlan = await prepareRewards(REFRESH_FROM_API);
+  // One request for both member sources; see `runSequentialRefresh`.
+  const member = await fetchMemberDataFromAPI();
+  const { plan: myBeersPlan, pendingWorkerSync } = await prepareMyBeers(
+    REFRESH_FROM_API,
+    member.myBeers
+  );
+  const rewardsPlan = await prepareRewards(REFRESH_FROM_API, member.rewards);
 
   // These are the rows the writes were PLANNED to store — not confirmation that
   // they were stored. They are derived from the same plans, so the two cannot

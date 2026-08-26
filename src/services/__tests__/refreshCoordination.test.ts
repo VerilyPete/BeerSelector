@@ -57,11 +57,10 @@ jest.mock('../../database/preferences', () => ({
   areApiUrlsConfigured: jest.fn(),
 }));
 
-jest.mock('../../api/beerApi', () => ({
-  fetchBeersFromAPI: jest.fn(),
-  fetchMyBeersFromAPI: jest.fn(),
-  fetchRewardsFromAPI: jest.fn(),
-}));
+jest.mock('../../api/beerApi', () =>
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  require('../../api/__tests__/helpers/beerApiMock').beerApiMockFactory()
+);
 
 jest.mock('../../database/repositories/BeerRepository', () => ({
   beerRepository: {
@@ -526,9 +525,14 @@ describe('Sequential Refresh Coordination', () => {
       // one that had to wait for the in-flight run, and only the second call is
       // inside the rapid window, so only it precedes its timestamps with an ETag
       // clear.
+      // Keyed on `all_beers_last_check`, which is now the FIRST clear in the
+      // burst. It was `all_beers_last_update` until that clear was deleted as
+      // provably dead — nothing in the repo reads `*_last_update` — and this
+      // test used it purely as a marker for "the timestamp burst starts here".
+      // The property below is unchanged; only the marker moved.
       const timestampClears = order.reduce<number[]>(
         (indices, entry, index) =>
-          entry === 'clear:all_beers_last_update' ? [...indices, index] : indices,
+          entry === 'clear:all_beers_last_check' ? [...indices, index] : indices,
         []
       );
       // Deliberately not `toHaveLength(2)` and not positional adjacency. Pinning

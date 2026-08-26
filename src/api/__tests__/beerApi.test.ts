@@ -36,6 +36,16 @@ function payload<T>(source: FetchedSource<FetchOutcome<T>>): FetchOutcome<T> {
   if (source.status !== 'fetched') {
     throw new Error(`expected a fetched source, got "${source.status}"`);
   }
+  // `kind: 'data'` promises a NON-EMPTY ARRAY of rows, and the type system does
+  // not enforce it: `toNonEmpty(x)!` at the rewards site manufactured
+  // `items: null` in a NonEmptyArray slot from a non-array payload, and the
+  // consumer then did `[...null]` under the write lock. Asserted in the shared
+  // helper rather than per test, so every outcome-returning test in this file
+  // enforces it instead of only the ones that remember to.
+  if (source.data.kind === 'data') {
+    expect(Array.isArray(source.data.items)).toBe(true);
+    expect(source.data.items.length).toBeGreaterThan(0);
+  }
   return source.data;
 }
 
@@ -306,7 +316,13 @@ describe('Beer API', () => {
     // SUPERSEDED by plan 02 Phase 3. Phase 2 bridged this with a throw because
     // the return type had no way to say "a body arrived and was unusable".
     // `malformed` is that way, so the caller decides instead of being forced to
-    // catch. The MalformedResponseError type is retired with it.
+    // catch.
+    //
+    // The `MalformedResponseError` CLASS is now gone, but the
+    // MALFORMED_RESPONSE_ERROR type is not, and an earlier version of this
+    // comment ran the two together. Shape-rejection — this case — still reports
+    // through that type and keeps its copy; what left is "the body could not be
+    // read", which is now `UnreadableBodyError` and a different claim.
     it('reports malformed rather than [] when every row lacks an id', async () => {
       (preferences.getPreference as jest.Mock).mockImplementation((key: string) => {
         if (key === 'is_visitor_mode') return Promise.resolve('false');
@@ -910,5 +926,301 @@ describe('FetchOutcome semantics (plan 02 Phase 3)', () => {
       expect(outcome.reason.code).toBe('not-applicable');
     }
     expect(global.fetch).not.toHaveBeenCalled();
+  });
+});
+
+describe('a non-array payload is malformed, not data (plan refresh-failure-classification Phase 0)', () => {
+  // Four extraction sites tested their payload for TRUTHINESS only, and `{}` is
+  // truthy. Each then handed a non-array to code that assumes an array:
+  //
+  // - `tasted_brew_current_round` skipped the wipe branch (`.length` is
+  //   undefined) and threw `TypeError: beers.filter is not a function`, which
+  //   reached the user's refresh alert verbatim as
+  //   "Beerfinder data: beers.filter is not a function".
+  // - `brewInStock` became `confirmed-empty` — the right refusal for the wrong
+  //   reason.
+  // - `reward` was the worst: `{}.length === 0` is false, so it returned
+  //   `{kind:'data', items: toNonEmpty({})!}` — `items: null` in a NonEmptyArray
+  //   slot — and `writeRewards` spread it under the write lock. For a STRING
+  //   payload it is worse still and silent: `toNonEmpty('oops')` yields four
+  //   one-character rows that spread fine, `_insertManyInternal` runs
+  //   `DELETE FROM rewards` first, and `reward_id || ''` collapses all four into
+  //   one junk row. The member's real rewards are deleted and the refresh
+  //   reports success.
+  //
+  // Every assertion here is on the OUTCOME. `beerApi.ts` imports no repository,
+  // so a repository assertion in this file could not be mutated by any change to
+  // the module under test.
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  const memberPrefs = (urlKey: string) => (key: string) => {
+    if (key === 'is_visitor_mode') return Promise.resolve('false');
+    if (key === urlKey) return Promise.resolve('https://example.com/data.json');
+    return Promise.resolve(null);
+  };
+
+  const respondWith = (body: unknown): void => {
+    (global.fetch as jest.Mock).mockResolvedValue({ ok: true, json: async () => body });
+  };
+
+  describe('fetchMyBeersFromAPI', () => {
+    beforeEach(() => {
+      (preferences.getPreference as jest.Mock).mockImplementation(memberPrefs('my_beers_api_url'));
+    });
+
+    // Not an uncaught throw today: the TypeError is caught by the fetcher's own
+    // outer catch and returned as `failed`, which is why this reads as a
+    // transport fault to every consumer downstream.
+    it.each([
+      ['an object', {}],
+      ['a string', 'oops'],
+      ['a number', 42],
+    ])('reports malformed when tasted_brew_current_round is %s', async (_label, value) => {
+      respondWith([{}, { tasted_brew_current_round: value }]);
+
+      const outcome = await fetchMyBeersFromAPI();
+
+      expect(outcome.status).toBe('fetched');
+      expect(payload(outcome).kind).toBe('malformed');
+    });
+  });
+
+  describe('fetchBeersFromAPI', () => {
+    beforeEach(() => {
+      (preferences.getPreference as jest.Mock).mockImplementation(memberPrefs('all_beers_api_url'));
+    });
+
+    it('reports malformed when brewInStock is an object, not confirmed-empty', async () => {
+      // `confirmed-empty` is a claim about what the SERVER said. A payload this
+      // code cannot read is not the server saying "nothing on tap".
+      respondWith([{}, { brewInStock: {} }]);
+
+      expect(payload(await fetchBeersFromAPI()).kind).toBe('malformed');
+    });
+
+    it('accepts a nested beer array that the truthiness check used to discard', async () => {
+      // THE WIDENING, PINNED. Falling through to `findBeersArray` is not purely
+      // a narrowing: `{brewInStock: {beers: [...]}}` currently becomes
+      // `confirmed-empty` and will now become `data`. An improvement, and a
+      // deliberate behaviour change, so it gets an assertion rather than only
+      // prose in a plan.
+      respondWith([
+        {},
+        { brewInStock: { beers: [{ id: '1', brew_name: 'Nested', brewer: 'X' }] } },
+      ]);
+
+      const body = payload(await fetchBeersFromAPI());
+      expect(body.kind).toBe('data');
+      if (body.kind === 'data') expect(body.items).toHaveLength(1);
+    });
+  });
+
+  describe('fetchRewardsFromAPI', () => {
+    beforeEach(() => {
+      (preferences.getPreference as jest.Mock).mockImplementation(memberPrefs('my_beers_api_url'));
+    });
+
+    it('reports malformed for an object reward payload, carrying no items at all', async () => {
+      respondWith([{}, {}, { reward: {} }]);
+
+      // The WHOLE outcome, exactly. `expect(kind).toBe('malformed')` alone would
+      // pass against `{kind:'data', items:null}` becoming `{kind:'malformed'}`
+      // while some other arm still manufactured a null-carrying data outcome;
+      // an exact-shape assertion is the closest expressible form of "no outcome
+      // carries a non-array in a NonEmptyArray slot".
+      await expect(fetchRewardsFromAPI()).resolves.toEqual({
+        status: 'fetched',
+        data: { kind: 'malformed', detail: expect.any(String) },
+        etag: null,
+      });
+    });
+
+    it('reports malformed for an ARRAY of rows that are not rewards', async () => {
+      // The hole the `Array.isArray` guard did NOT close, found in review. The
+      // guard narrows the CONTAINER only: `['oops']` is an array, so it passed,
+      // `length !== 0` took the data arm, and `toNonEmpty(['oops'])!` produced
+      // `{kind:'data', items:['oops']}` — the same silent wipe as the string
+      // case, one level in. `_insertManyInternal` runs `DELETE FROM rewards`
+      // first and then maps `reward.reward_id || ''`, so the member's rewards
+      // are deleted, replaced by one junk row, and the refresh reports success.
+      //
+      // The comment above this guard claimed "the check is the narrowing". It
+      // was not: `Array.isArray` on an `any` yields `any[]`, so the annotated
+      // assignment was an unchecked widening — as unsound as the cast it
+      // replaced and less visible, because neither `tsc` nor the linter says a
+      // word. The elements are validated now, as the my-beers sibling already
+      // validated its own.
+      respondWith([{}, {}, { reward: ['oops'] }]);
+
+      expect(payload(await fetchRewardsFromAPI()).kind).toBe('malformed');
+    });
+
+    // The expected VALUES, not just their type. This asserted
+    // `typeof … === 'string'`, which any wrong default satisfies — mutation
+    // showed `reward_type: '' -> 'unknown'` survives the whole API suite,
+    // typechecks, and is not absorbed downstream: `reward.reward_type || ''`
+    // keeps a truthy `'unknown'`, it lands in the table, and the member reads it
+    // in the rewards list and in `Would you like to add "unknown" to your
+    // queue?`. A test named for a behaviour must assert that behaviour.
+    //
+    // `redeemed`'s wrong default IS absorbed — `reward.redeemed || '0'` makes
+    // `''` and `'0'` identical by the time they reach SQLite — but it is pinned
+    // here anyway, because "absorbed by a caller two layers down" is not a
+    // property this function should rely on.
+    const NORMALIZED_REWARD_FIELDS: readonly [string, Record<string, unknown>, string, string][] = [
+      [
+        'numeric redeemed zero',
+        { reward_id: 'r1', redeemed: 0, reward_type: '$5 Credit' },
+        '0',
+        '$5 Credit',
+      ],
+      [
+        'numeric redeemed one',
+        { reward_id: 'r1', redeemed: 1, reward_type: '$5 Credit' },
+        '1',
+        '$5 Credit',
+      ],
+      [
+        'boolean redeemed true',
+        { reward_id: 'r1', redeemed: true, reward_type: '$5 Credit' },
+        '1',
+        '$5 Credit',
+      ],
+      ['a numeric reward_type', { reward_id: 'r1', redeemed: '0', reward_type: 5 }, '0', '5'],
+      [
+        'a non-integer reward_type',
+        { reward_id: 'r1', redeemed: '0', reward_type: 1e-7 },
+        '0',
+        '1e-7',
+      ],
+      ['a missing redeemed', { reward_id: 'r1', reward_type: '$5 Credit' }, '0', '$5 Credit'],
+      ['a missing reward_type', { reward_id: 'r1', redeemed: '0' }, '0', ''],
+    ];
+
+    it.each(NORMALIZED_REWARD_FIELDS)(
+      'normalizes %s to the canonical value ingest promises',
+      async (_label, row, expectedRedeemed, expectedRewardType) => {
+        // THE OUTAGE TRIP-WIRE, removed. Gating on the full `isReward` — all three
+        // fields, all strings — protects against nothing the wipe depends on and
+        // turns a cosmetic upstream change into a permanent, total failure:
+        // `malformed` on every refresh, forever, with copy telling the member the
+        // server is broken, until an app update ships.
+        //
+        // And `redeemed`/`reward_type` are demonstrably not required. The schema
+        // has `redeemed: z.string().optional()`; `_insertManyInternal` writes
+        // `reward.redeemed || '0'` and `reward.reward_type || ''`, defaulting both
+        // itself; and the UI only ever asks `item.redeemed === '1'`. The old code
+        // wrote a numeric `redeemed` and SQLite coerced it into the TEXT column.
+        //
+        // So this validates what the WIPE actually depends on — a usable
+        // `reward_id` — and defaults the other two exactly as the writer already
+        // does. A quiet failure made loud is right; making it loud, total and
+        // permanent for a condition that is cosmetic is not.
+        respondWith([{}, {}, { reward: [row] }]);
+
+        const body = payload(await fetchRewardsFromAPI());
+        expect(body.kind).toBe('data');
+        if (body.kind === 'data') {
+          expect(body.items[0].reward_id).toBe('r1');
+          // The same defaults the writer would have applied, by value.
+          expect(body.items[0].redeemed).toBe(expectedRedeemed);
+          expect(body.items[0].reward_type).toBe(expectedRewardType);
+        }
+      }
+    );
+
+    it('reports confirmed-empty for a genuinely empty reward list', async () => {
+      // THE ORDERING, pinned. The empty check runs BEFORE element validation,
+      // and that sequence is the only thing separating "you have no rewards"
+      // from "the server sent rows this app cannot read" — the first authorises
+      // clearing the table, the second must never.
+      //
+      // Put the length check after the filter and `[]` becomes `malformed`: the
+      // rewards table then never clears when a member redeems their last
+      // reward, stale rows persist indefinitely, and the refresh reports a
+      // source failure. Verified that mutant survives every other suite in the
+      // repo — this is the only test that dies.
+      respondWith([{}, {}, { reward: [] }]);
+
+      expect(payload(await fetchRewardsFromAPI()).kind).toBe('confirmed-empty');
+    });
+
+    it('rejects a reward row whose id is the empty string', async () => {
+      // `''` is a string, so a `typeof === 'string'` check accepts it — and
+      // `''` is exactly the key the wipe mechanism collapses onto:
+      // `_insertManyInternal` deletes every row, then writes
+      // `reward.reward_id || ''` into a TEXT PRIMARY KEY, so a payload of
+      // empty-id rows replaces the member's rewards with a single junk row and
+      // reports success. Checked where the rows are read, because this is a
+      // question about what is worth WRITING, not about what is row-shaped.
+      respondWith([{}, {}, { reward: [{ reward_id: '', redeemed: '0', reward_type: 'X' }] }]);
+
+      expect(payload(await fetchRewardsFromAPI()).kind).toBe('malformed');
+    });
+
+    it('keeps the rows that are rewards when only some are not', async () => {
+      // Mirrors the my-beers rule: drop what fails validation, report malformed
+      // only when nothing survives. Without this the fix above could be "reject
+      // the whole payload if any row is odd", which would throw away a good
+      // list for one bad row.
+      respondWith([
+        {},
+        {},
+        {
+          reward: [
+            { reward_id: 'r1', redeemed: '0', reward_type: '$5 Credit' },
+            'oops',
+            // Object-shaped with no id at all. It catches dropping the ID
+            // check while keeping the object guard — NOT the reverse, which an
+            // earlier version of this comment claimed: `'oops'` and `{}` both
+            // have an `undefined` `.reward_id`, so neither separates the object
+            // guard from the id check. It is also not the sole killer of that
+            // mutant (the empty-id test above kills it too); it is a second and
+            // more legible one.
+            {},
+            { reward_id: 'r2', redeemed: '1', reward_type: 'Plate' },
+          ],
+        },
+      ]);
+
+      const body = payload(await fetchRewardsFromAPI());
+      expect(body.kind).toBe('data');
+      if (body.kind === 'data') expect(body.items.map(r => r.reward_id)).toEqual(['r1', 'r2']);
+    });
+
+    it('accepts the real reward rows the fixture carries', async () => {
+      // GUARD on the validation itself. A predicate stricter than the server's
+      // actual payload would turn every real refresh into `malformed` and wipe
+      // nothing — but report a failure to every member, forever. Driven from the
+      // committed fixture rather than a hand-written row.
+      // The COMMITTED fixture, not the repo-root copy. The two are byte-identical
+      // today, but `mybeers.json` at the root is gitignored and untracked
+      // (`.gitignore:103`), so a fresh checkout does not have it — and the note
+      // beside that rule records CI losing a whole suite to ENOENT for exactly
+      // this reason. The re-include at `.gitignore:111` exists to make this path
+      // the safe one.
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const fixture = require('../../services/__tests__/fixtures/mybeers.json');
+      respondWith(fixture);
+
+      const body = payload(await fetchRewardsFromAPI());
+      expect(body.kind).toBe('data');
+      if (body.kind === 'data') expect(body.items).toHaveLength(fixture[2].reward.length);
+    });
+
+    it('reports malformed for a string reward payload rather than four fabricated rows', async () => {
+      // THE SILENT WIPE. This is the whole fence for it, deliberately with no
+      // service-level companion: the service suites mock the three fetchers
+      // wholesale, so they cannot be handed the raw body, and feeding them the
+      // OUTCOME instead bypasses `beerApi` altogether — red today and still red
+      // after this phase, whose entire GREEN is four guards in this module.
+      // Closing the only producer of those rows is what this phase does; a
+      // production fence against a lying `{kind:'data'}` is a different change.
+      respondWith([{}, {}, { reward: 'oops' }]);
+
+      expect(payload(await fetchRewardsFromAPI()).kind).toBe('malformed');
+    });
   });
 });
