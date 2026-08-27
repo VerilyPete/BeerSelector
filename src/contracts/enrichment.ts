@@ -1,9 +1,17 @@
 import { z } from 'zod';
 
+// The Worker uses this producer-internal value when description-derived ABV
+// survives a cleanup fallback. It has the same meaning as the app-level
+// `description` source, so normalize it at the wire boundary.
+const enrichmentSourceSchema = z.preprocess(
+  value => (value === 'description-fallback' ? 'description' : value),
+  z.enum(['description', 'perplexity', 'manual'])
+);
+
 export const enrichmentDataSchema = z.object({
   enriched_abv: z.number().nullable(),
   enrichment_confidence: z.number().nullable(),
-  enrichment_source: z.enum(['description', 'perplexity', 'manual']).nullable(),
+  enrichment_source: enrichmentSourceSchema.nullable(),
   brew_description: z.string().nullable(),
   has_cleaned_description: z.boolean(),
 });
@@ -21,7 +29,7 @@ export const enrichedBeerResponseSchema = z.object({
   added_date: z.string().optional(),
   enriched_abv: z.number().nullable(),
   enrichment_confidence: z.number().nullable(),
-  enrichment_source: z.enum(['description', 'perplexity', 'manual']).nullable(),
+  enrichment_source: enrichmentSourceSchema.nullable(),
 });
 
 export const beersProxyResponseSchema = z.object({
