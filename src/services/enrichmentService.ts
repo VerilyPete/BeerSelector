@@ -14,11 +14,32 @@
  * @module enrichmentService
  */
 
-import { z } from 'zod';
 import { config, assertEnrichmentConfigured } from '@/src/config';
 import { getPreference, setPreference } from '@/src/database/preferences';
 import { logWarning } from '@/src/utils/errorLogger';
 import { Beer } from '@/src/types/beer';
+import {
+  batchEnrichmentResponseSchema,
+  beersProxyResponseSchema,
+  healthResponseSchema,
+  syncBeersResponseSchema,
+} from '../contracts/enrichment';
+import type {
+  BeersProxyResponse as BeersProxyResponseBody,
+  EnrichmentData,
+  HealthResponse,
+  SyncBeersRequest,
+  SyncBeersResponse,
+} from '../contracts/enrichment';
+
+export type {
+  BatchEnrichmentResponse,
+  EnrichedBeerResponse,
+  EnrichmentData,
+  HealthResponse,
+  SyncBeersRequest,
+  SyncBeersResponse,
+} from '../contracts/enrichment';
 
 // Conditionally import expo-application only in React Native environment
 let Application: { applicationId: string | null } | undefined;
@@ -30,120 +51,15 @@ try {
   Application = undefined;
 }
 
-// ============================================================================
-// Zod Schemas (runtime validation at API trust boundaries)
-// ============================================================================
-
-const enrichmentDataSchema = z.object({
-  enriched_abv: z.number().nullable(),
-  enrichment_confidence: z.number().nullable(),
-  enrichment_source: z.enum(['description', 'perplexity', 'manual']).nullable(),
-  brew_description: z.string().nullable(),
-  has_cleaned_description: z.boolean(),
-});
-
-const enrichedBeerResponseSchema = z.object({
-  id: z.string(),
-  brew_name: z.string(),
-  brewer: z.string(),
-  brewer_loc: z.string().optional(),
-  brew_style: z.string().optional(),
-  brew_container: z.string().optional(),
-  review_count: z.string().nullish(),
-  review_rating: z.string().nullish(),
-  brew_description: z.string().optional(),
-  added_date: z.string().optional(),
-  enriched_abv: z.number().nullable(),
-  enrichment_confidence: z.number().nullable(),
-  enrichment_source: z.enum(['description', 'perplexity', 'manual']).nullable(),
-});
-
-const beersProxyResponseSchema = z.object({
-  storeId: z.string(),
-  beers: z.array(enrichedBeerResponseSchema),
-  requestId: z.string().optional(),
-  source: z.enum(['live', 'cache', 'stale']).optional(),
-  cached_at: z.string().optional(),
-});
-
-const batchEnrichmentResponseSchema = z.object({
-  enrichments: z.record(z.string(), enrichmentDataSchema),
-  missing: z.array(z.string()),
-  requestId: z.string(),
-});
-
-const syncBeersResponseSchema = z.object({
-  synced: z.number(),
-  queued_for_cleanup: z.number(),
-  requestId: z.string(),
-  errors: z.array(z.string()).optional(),
-});
-
-const healthResponseSchema = z.object({
-  status: z.enum(['ok', 'error']),
-  database: z.string(),
-  enrichment: z
-    .object({
-      enabled: z.boolean(),
-      daily: z.object({ used: z.number(), limit: z.number(), remaining: z.number() }),
-      monthly: z.object({ used: z.number(), limit: z.number(), remaining: z.number() }),
-    })
-    .optional(),
-});
-
-// ============================================================================
-// Types
-// ============================================================================
-
-/**
- * Enrichment data returned by the Worker for a single beer
- * Note: Worker now returns merged description (consistent with GET /beers)
- */
-export type EnrichmentData = z.infer<typeof enrichmentDataSchema>;
-
-/**
- * Beer response from Worker's GET /beers endpoint
- */
-export type EnrichedBeerResponse = z.infer<typeof enrichedBeerResponseSchema>;
-
 /**
  * Response from GET /beers?sid={storeId}
  * Includes etag extracted from HTTP response headers (not part of JSON body).
  */
-export type BeersProxyResponse = Omit<z.infer<typeof beersProxyResponseSchema>, 'source'> & {
+export type BeersProxyResponse = Omit<BeersProxyResponseBody, 'source'> & {
   etag: string | null;
   notModified: boolean;
   source?: 'live' | 'cache' | 'stale' | 'not_modified';
 };
-
-/**
- * Response from POST /beers/batch
- */
-export type BatchEnrichmentResponse = z.infer<typeof batchEnrichmentResponseSchema>;
-
-/**
- * Request body for POST /beers/sync
- * Accepts beer data from mobile client for syncing to enriched_beers table
- */
-export type SyncBeersRequest = {
-  beers: {
-    id: string;
-    brew_name: string;
-    brewer?: string;
-    brew_description?: string;
-  }[];
-};
-
-/**
- * Response for POST /beers/sync
- * Returns counts of synced and queued beers
- */
-export type SyncBeersResponse = z.infer<typeof syncBeersResponseSchema>;
-
-/**
- * Response from GET /health
- */
-export type HealthResponse = z.infer<typeof healthResponseSchema>;
 
 // ============================================================================
 // Metrics & Observability
