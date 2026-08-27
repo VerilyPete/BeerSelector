@@ -57,6 +57,18 @@ describe('mobile enrichment consumer contracts', () => {
     }
   );
 
+  it('normalizes the API description fallback source to description', () => {
+    const parsed = enrichedBeerResponseSchema.safeParse({
+      ...completeBeer,
+      enrichment_source: 'description-fallback',
+    });
+
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.enrichment_source).toBe('description');
+    }
+  });
+
   it('accepts each valid Golden Taproom response shape', () => {
     expect(enrichedBeerResponseSchema.safeParse(completeBeer).success).toBe(true);
     expect(enrichedBeerResponseSchema.safeParse(nullableBeer).success).toBe(true);
