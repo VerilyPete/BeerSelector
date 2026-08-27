@@ -372,7 +372,7 @@ For local cross-repository runs, check out the siblings in this exact layout:
 Run the local contract-module checks from `BeerSelector`:
 
 ```bash
-npm test -- --run src/contracts
+npm test -- --watch=false src/contracts
 npm run typecheck
 ```
 
