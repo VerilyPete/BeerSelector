@@ -10,7 +10,7 @@
     "web": "expo start --web",
     "test": "vitest",
     "test:rn": "jest --config=jest.config.js --watchAll",
-    "test:ci": "vitest run && jest --config=jest.config.js --ci --coverage --reporters=default --reporters=jest-junit",
+    "test:ci": "vitest run --reporter=default --reporter=junit --outputFile=vitest.junit.xml && jest --config=jest.config.js --ci --coverage --reporters=default --reporters=jest-junit",
     "test:e2e": "maestro test .maestro/",
     "test:e2e:ios": "maestro test .maestro/",
     "test:e2e:single": "maestro test",
