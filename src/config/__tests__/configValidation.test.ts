@@ -137,18 +137,19 @@ describe('Configuration Validation', () => {
       });
 
       it('should provide helpful error message for invalid URLs', async () => {
+        let caught: unknown;
         try {
           config.setCustomApiUrl('not-a-url');
-          fail('Should have thrown InvalidUrlError');
-        } catch (error: unknown) {
-          assertError(error);
-          expect(error).toBeInstanceOf(InvalidUrlError);
-          // Message contains "Invalid API base URL" which includes "Invalid"
-          expect(error.message).toContain('Invalid');
-          expect(error.message).toContain('not-a-url');
-          expect(error.message).toContain('http://');
-          expect(error.message).toContain('https://');
+        } catch (error) {
+          caught = error;
         }
+        assertError(caught);
+        expect(caught).toBeInstanceOf(InvalidUrlError);
+        // Message contains "Invalid API base URL" which includes "Invalid"
+        expect(caught.message).toContain('Invalid');
+        expect(caught.message).toContain('not-a-url');
+        expect(caught.message).toContain('http://');
+        expect(caught.message).toContain('https://');
       });
     });
 
@@ -181,58 +182,62 @@ describe('Configuration Validation', () => {
       it('should reject negative timeout values', async () => {
         process.env.EXPO_PUBLIC_API_TIMEOUT = '-1000';
 
+        let caught: unknown;
         try {
           const { config: freshConfig } = await import('../config');
           void freshConfig.network; // Access to trigger validation
-          fail('Should have thrown InvalidNetworkConfigError');
-        } catch (error: unknown) {
-          assertError(error);
-          expect(error.name).toBe('InvalidNetworkConfigError');
-          expect(error.message).toContain('timeout');
+        } catch (error) {
+          caught = error;
         }
+        assertError(caught);
+        expect(caught.name).toBe('InvalidNetworkConfigError');
+        expect(caught.message).toContain('timeout');
       });
 
       it('should reject zero timeout', async () => {
         process.env.EXPO_PUBLIC_API_TIMEOUT = '0';
 
+        let caught: unknown;
         try {
           const { config: freshConfig } = await import('../config');
           void freshConfig.network; // Access to trigger validation
-          fail('Should have thrown InvalidNetworkConfigError');
-        } catch (error: unknown) {
-          assertError(error);
-          expect(error.name).toBe('InvalidNetworkConfigError');
-          expect(error.message).toContain('timeout');
+        } catch (error) {
+          caught = error;
         }
+        assertError(caught);
+        expect(caught.name).toBe('InvalidNetworkConfigError');
+        expect(caught.message).toContain('timeout');
       });
 
       it('should reject extremely large timeout (>60 seconds)', async () => {
         process.env.EXPO_PUBLIC_API_TIMEOUT = '61000';
 
+        let caught: unknown;
         try {
           const { config: freshConfig } = await import('../config');
           void freshConfig.network; // Access to trigger validation
-          fail('Should have thrown InvalidNetworkConfigError');
-        } catch (error: unknown) {
-          assertError(error);
-          expect(error.name).toBe('InvalidNetworkConfigError');
-          expect(error.message).toContain('timeout');
+        } catch (error) {
+          caught = error;
         }
+        assertError(caught);
+        expect(caught.name).toBe('InvalidNetworkConfigError');
+        expect(caught.message).toContain('timeout');
       });
 
       it('should provide helpful error message for invalid timeout', async () => {
         process.env.EXPO_PUBLIC_API_TIMEOUT = '-5000';
+        let caught: unknown;
         try {
           const { config: freshConfig } = await import('../config');
           void freshConfig.network; // Access to trigger validation
-          fail('Should have thrown InvalidNetworkConfigError');
-        } catch (error: unknown) {
-          assertError(error);
-          expect(error.name).toBe('InvalidNetworkConfigError');
-          expect(error.message).toContain('timeout');
-          expect(error.message).toContain('-5000');
-          expect(error.message).toContain('between 1 and 60000');
+        } catch (error) {
+          caught = error;
         }
+        assertError(caught);
+        expect(caught.name).toBe('InvalidNetworkConfigError');
+        expect(caught.message).toContain('timeout');
+        expect(caught.message).toContain('-5000');
+        expect(caught.message).toContain('between 1 and 60000');
       });
     });
 
@@ -252,44 +257,47 @@ describe('Configuration Validation', () => {
       it('should reject negative retry values', async () => {
         process.env.EXPO_PUBLIC_API_RETRIES = '-1';
 
+        let caught: unknown;
         try {
           const { config: freshConfig } = await import('../config');
           void freshConfig.network; // Access to trigger validation
-          fail('Should have thrown InvalidNetworkConfigError');
-        } catch (error: unknown) {
-          assertError(error);
-          expect(error.name).toBe('InvalidNetworkConfigError');
-          expect(error.message).toContain('retries');
+        } catch (error) {
+          caught = error;
         }
+        assertError(caught);
+        expect(caught.name).toBe('InvalidNetworkConfigError');
+        expect(caught.message).toContain('retries');
       });
 
       it('should reject excessive retry values (>5)', async () => {
         process.env.EXPO_PUBLIC_API_RETRIES = '10';
 
+        let caught: unknown;
         try {
           const { config: freshConfig } = await import('../config');
           void freshConfig.network; // Access to trigger validation
-          fail('Should have thrown InvalidNetworkConfigError');
-        } catch (error: unknown) {
-          assertError(error);
-          expect(error.name).toBe('InvalidNetworkConfigError');
-          expect(error.message).toContain('retries');
+        } catch (error) {
+          caught = error;
         }
+        assertError(caught);
+        expect(caught.name).toBe('InvalidNetworkConfigError');
+        expect(caught.message).toContain('retries');
       });
 
       it('should provide helpful error message for invalid retries', async () => {
         process.env.EXPO_PUBLIC_API_RETRIES = '20';
+        let caught: unknown;
         try {
           const { config: freshConfig } = await import('../config');
           void freshConfig.network; // Access to trigger validation
-          fail('Should have thrown InvalidNetworkConfigError');
-        } catch (error: unknown) {
-          assertError(error);
-          expect(error.name).toBe('InvalidNetworkConfigError');
-          expect(error.message).toContain('retries');
-          expect(error.message).toContain('20');
-          expect(error.message).toContain('between 0 and 5');
+        } catch (error) {
+          caught = error;
         }
+        assertError(caught);
+        expect(caught.name).toBe('InvalidNetworkConfigError');
+        expect(caught.message).toContain('retries');
+        expect(caught.message).toContain('20');
+        expect(caught.message).toContain('between 0 and 5');
       });
     });
 
@@ -303,58 +311,62 @@ describe('Configuration Validation', () => {
       it('should reject negative retry delay', async () => {
         process.env.EXPO_PUBLIC_API_RETRY_DELAY = '-500';
 
+        let caught: unknown;
         try {
           const { config: freshConfig } = await import('../config');
           void freshConfig.network; // Access to trigger validation
-          fail('Should have thrown InvalidNetworkConfigError');
-        } catch (error: unknown) {
-          assertError(error);
-          expect(error.name).toBe('InvalidNetworkConfigError');
-          expect(error.message).toContain('retry delay');
+        } catch (error) {
+          caught = error;
         }
+        assertError(caught);
+        expect(caught.name).toBe('InvalidNetworkConfigError');
+        expect(caught.message).toContain('retry delay');
       });
 
       it('should reject zero retry delay', async () => {
         process.env.EXPO_PUBLIC_API_RETRY_DELAY = '0';
 
+        let caught: unknown;
         try {
           const { config: freshConfig } = await import('../config');
           void freshConfig.network; // Access to trigger validation
-          fail('Should have thrown InvalidNetworkConfigError');
-        } catch (error: unknown) {
-          assertError(error);
-          expect(error.name).toBe('InvalidNetworkConfigError');
-          expect(error.message).toContain('retry delay');
+        } catch (error) {
+          caught = error;
         }
+        assertError(caught);
+        expect(caught.name).toBe('InvalidNetworkConfigError');
+        expect(caught.message).toContain('retry delay');
       });
 
       it('should reject excessive retry delay (>10 seconds)', async () => {
         process.env.EXPO_PUBLIC_API_RETRY_DELAY = '11000';
 
+        let caught: unknown;
         try {
           const { config: freshConfig } = await import('../config');
           void freshConfig.network; // Access to trigger validation
-          fail('Should have thrown InvalidNetworkConfigError');
-        } catch (error: unknown) {
-          assertError(error);
-          expect(error.name).toBe('InvalidNetworkConfigError');
-          expect(error.message).toContain('retry delay');
+        } catch (error) {
+          caught = error;
         }
+        assertError(caught);
+        expect(caught.name).toBe('InvalidNetworkConfigError');
+        expect(caught.message).toContain('retry delay');
       });
 
       it('should provide helpful error message for invalid retry delay', async () => {
         process.env.EXPO_PUBLIC_API_RETRY_DELAY = '-1000';
+        let caught: unknown;
         try {
           const { config: freshConfig } = await import('../config');
           void freshConfig.network; // Access to trigger validation
-          fail('Should have thrown InvalidNetworkConfigError');
-        } catch (error: unknown) {
-          assertError(error);
-          expect(error.name).toBe('InvalidNetworkConfigError');
-          expect(error.message).toContain('retry delay');
-          expect(error.message).toContain('-1000');
-          expect(error.message).toContain('between 1 and 10000');
+        } catch (error) {
+          caught = error;
         }
+        assertError(caught);
+        expect(caught.name).toBe('InvalidNetworkConfigError');
+        expect(caught.message).toContain('retry delay');
+        expect(caught.message).toContain('-1000');
+        expect(caught.message).toContain('between 1 and 10000');
       });
     });
   });
@@ -397,18 +409,19 @@ describe('Configuration Validation', () => {
     });
 
     it('should provide helpful error message for invalid environment', async () => {
+      let caught: unknown;
       try {
         config.setEnvironment('invalid-env' as any);
-        fail('Should have thrown InvalidEnvironmentError');
-      } catch (error: unknown) {
-        assertError(error);
-        expect(error).toBeInstanceOf(InvalidEnvironmentError);
-        expect(error.message).toContain('Invalid environment');
-        expect(error.message).toContain('invalid-env');
-        expect(error.message).toContain('development');
-        expect(error.message).toContain('staging');
-        expect(error.message).toContain('production');
+      } catch (error) {
+        caught = error;
       }
+      assertError(caught);
+      expect(caught).toBeInstanceOf(InvalidEnvironmentError);
+      expect(caught.message).toContain('Invalid environment');
+      expect(caught.message).toContain('invalid-env');
+      expect(caught.message).toContain('development');
+      expect(caught.message).toContain('staging');
+      expect(caught.message).toContain('production');
     });
   });
 
@@ -509,15 +522,16 @@ describe('Configuration Validation', () => {
     it('should validate network configuration when accessed', async () => {
       process.env.EXPO_PUBLIC_API_TIMEOUT = '-1000';
 
+      let caught: unknown;
       try {
         const { config: freshConfig } = await import('../config');
         void freshConfig.network; // Access to trigger validation
-        fail('Should have thrown InvalidNetworkConfigError');
-      } catch (error: unknown) {
-        assertError(error);
-        expect(error.name).toBe('InvalidNetworkConfigError');
-        expect(error.message).toContain('timeout');
+      } catch (error) {
+        caught = error;
       }
+      assertError(caught);
+      expect(caught.name).toBe('InvalidNetworkConfigError');
+      expect(caught.message).toContain('timeout');
     });
   });
 

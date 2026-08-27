@@ -241,14 +241,15 @@ describe('Database Transactions', () => {
         }
       );
 
+      let caught: unknown;
       try {
         await withDatabaseTransaction(asDatabase(mockDatabase), mockOperation);
-        fail('Should have thrown error');
       } catch (error) {
-        expect(error).toBe(mockError);
-        expect((error as Error).name).toBe('SQLiteError');
-        expect((error as Error).message).toBe('Constraint violation');
+        caught = error;
       }
+      expect(caught).toBe(mockError);
+      expect((caught as Error).name).toBe('SQLiteError');
+      expect((caught as Error).message).toBe('Constraint violation');
     });
 
     it('should handle operation with complex return type', async () => {

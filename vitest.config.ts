@@ -84,7 +84,7 @@ export default defineConfig({
     // The boundary with jest-expo, stated as a rule rather than a directory
     // list: every `.test.ts` in the repo is logic and runs here; every
     // `.test.tsx` needs the renderer and stays on jest-expo. That holds for all
-    // 108 suites, so there is nothing to keep in sync when a file moves.
+    // 109 suites, so there is nothing to keep in sync when a file moves.
     // `jest.config.js` ignores the complement of this pattern.
     include: ['**/*.test.ts'],
     // Setting `exclude` replaces vitest's defaults rather than adding to them,

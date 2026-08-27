@@ -335,18 +335,19 @@ describe('MockServer', () => {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 50);
 
+      let caught: unknown;
       try {
         await fetch(`${mockServer.getUrl()}/timeout`, {
           signal: controller.signal,
         });
-        fail('Should have timed out');
       } catch (error: unknown) {
-        expect(error).toBeInstanceOf(Error);
-        if (error instanceof Error) {
-          expect(error.name).toBe('AbortError');
-        }
+        caught = error;
       } finally {
         clearTimeout(timeout);
+      }
+      expect(caught).toBeInstanceOf(Error);
+      if (caught instanceof Error) {
+        expect(caught.name).toBe('AbortError');
       }
     });
   });

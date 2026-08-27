@@ -182,13 +182,14 @@ describe('queueService', () => {
       it('should throw ApiError with 401 status code for expired session', async () => {
         (getSessionData as Mock).mockResolvedValue(null);
 
+        let caught: unknown;
         try {
           await getQueuedBeers();
-          fail('Should have thrown ApiError');
         } catch (error) {
-          expect(error).toBeInstanceOf(ApiError);
-          expect((error as ApiError).statusCode).toBe(401);
+          caught = error;
         }
+        expect(caught).toBeInstanceOf(ApiError);
+        expect((caught as ApiError).statusCode).toBe(401);
       });
     });
 

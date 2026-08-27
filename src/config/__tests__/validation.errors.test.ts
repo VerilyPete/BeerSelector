@@ -313,15 +313,16 @@ describe('Config Validation Error Tests', () => {
       const { config: freshConfig, InvalidNetworkConfigError: ErrorClass } =
         await import('../config');
 
+      let caught: unknown;
       try {
         void freshConfig.network;
-        fail('Should have thrown InvalidNetworkConfigError');
-      } catch (error: unknown) {
-        assertError(error);
-        expect(error).toBeInstanceOf(ErrorClass);
-        expect(error.name).toBe('InvalidNetworkConfigError');
-        expect(error.message).toContain('timeout');
+      } catch (error) {
+        caught = error;
       }
+      assertError(caught);
+      expect(caught).toBeInstanceOf(ErrorClass);
+      expect(caught.name).toBe('InvalidNetworkConfigError');
+      expect(caught.message).toContain('timeout');
     });
 
     it('should reject zero timeout', async () => {
@@ -330,15 +331,16 @@ describe('Config Validation Error Tests', () => {
       const { config: freshConfig, InvalidNetworkConfigError: ErrorClass } =
         await import('../config');
 
+      let caught: unknown;
       try {
         void freshConfig.network;
-        fail('Should have thrown InvalidNetworkConfigError');
-      } catch (error: unknown) {
-        assertError(error);
-        expect(error).toBeInstanceOf(ErrorClass);
-        expect(error.name).toBe('InvalidNetworkConfigError');
-        expect(error.message).toContain('timeout');
+      } catch (error) {
+        caught = error;
       }
+      assertError(caught);
+      expect(caught).toBeInstanceOf(ErrorClass);
+      expect(caught.name).toBe('InvalidNetworkConfigError');
+      expect(caught.message).toContain('timeout');
     });
 
     it('should reject timeout exactly at upper limit + 1', async () => {
@@ -347,15 +349,16 @@ describe('Config Validation Error Tests', () => {
       const { config: freshConfig, InvalidNetworkConfigError: ErrorClass } =
         await import('../config');
 
+      let caught: unknown;
       try {
         void freshConfig.network;
-        fail('Should have thrown InvalidNetworkConfigError');
-      } catch (error: unknown) {
-        assertError(error);
-        expect(error).toBeInstanceOf(ErrorClass);
-        expect(error.name).toBe('InvalidNetworkConfigError');
-        expect(error.message).toContain('timeout');
+      } catch (error) {
+        caught = error;
       }
+      assertError(caught);
+      expect(caught).toBeInstanceOf(ErrorClass);
+      expect(caught.name).toBe('InvalidNetworkConfigError');
+      expect(caught.message).toContain('timeout');
     });
 
     it('should reject extremely large timeout', async () => {
@@ -364,15 +367,16 @@ describe('Config Validation Error Tests', () => {
       const { config: freshConfig, InvalidNetworkConfigError: ErrorClass } =
         await import('../config');
 
+      let caught: unknown;
       try {
         void freshConfig.network;
-        fail('Should have thrown InvalidNetworkConfigError');
-      } catch (error: unknown) {
-        assertError(error);
-        expect(error).toBeInstanceOf(ErrorClass);
-        expect(error.name).toBe('InvalidNetworkConfigError');
-        expect(error.message).toContain('timeout');
+      } catch (error) {
+        caught = error;
       }
+      assertError(caught);
+      expect(caught).toBeInstanceOf(ErrorClass);
+      expect(caught.name).toBe('InvalidNetworkConfigError');
+      expect(caught.message).toContain('timeout');
     });
 
     it('should accept timeout at lower boundary (1ms)', async () => {
@@ -413,15 +417,16 @@ describe('Config Validation Error Tests', () => {
       const { config: freshConfig, InvalidNetworkConfigError: ErrorClass } =
         await import('../config');
 
+      let caught: unknown;
       try {
         void freshConfig.network;
-        fail('Should have thrown InvalidNetworkConfigError');
-      } catch (error: unknown) {
-        assertError(error);
-        expect(error).toBeInstanceOf(ErrorClass);
-        expect(error.name).toBe('InvalidNetworkConfigError');
-        expect(error.message).toContain('retries');
+      } catch (error) {
+        caught = error;
       }
+      assertError(caught);
+      expect(caught).toBeInstanceOf(ErrorClass);
+      expect(caught.name).toBe('InvalidNetworkConfigError');
+      expect(caught.message).toContain('retries');
     });
 
     it('should reject retry count exactly at upper limit + 1', async () => {
@@ -430,15 +435,16 @@ describe('Config Validation Error Tests', () => {
       const { config: freshConfig, InvalidNetworkConfigError: ErrorClass } =
         await import('../config');
 
+      let caught: unknown;
       try {
         void freshConfig.network;
-        fail('Should have thrown InvalidNetworkConfigError');
-      } catch (error: unknown) {
-        assertError(error);
-        expect(error).toBeInstanceOf(ErrorClass);
-        expect(error.name).toBe('InvalidNetworkConfigError');
-        expect(error.message).toContain('retries');
+      } catch (error) {
+        caught = error;
       }
+      assertError(caught);
+      expect(caught).toBeInstanceOf(ErrorClass);
+      expect(caught.name).toBe('InvalidNetworkConfigError');
+      expect(caught.message).toContain('retries');
     });
 
     it('should reject extremely large retry count', async () => {
@@ -447,15 +453,16 @@ describe('Config Validation Error Tests', () => {
       const { config: freshConfig, InvalidNetworkConfigError: ErrorClass } =
         await import('../config');
 
+      let caught: unknown;
       try {
         void freshConfig.network;
-        fail('Should have thrown InvalidNetworkConfigError');
-      } catch (error: unknown) {
-        assertError(error);
-        expect(error).toBeInstanceOf(ErrorClass);
-        expect(error.name).toBe('InvalidNetworkConfigError');
-        expect(error.message).toContain('retries');
+      } catch (error) {
+        caught = error;
       }
+      assertError(caught);
+      expect(caught).toBeInstanceOf(ErrorClass);
+      expect(caught.name).toBe('InvalidNetworkConfigError');
+      expect(caught.message).toContain('retries');
     });
 
     it('should accept zero retries (no retry)', async () => {
@@ -490,15 +497,16 @@ describe('Config Validation Error Tests', () => {
       const { config: freshConfig, InvalidNetworkConfigError: ErrorClass } =
         await import('../config');
 
+      let caught: unknown;
       try {
         void freshConfig.network;
-        fail('Should have thrown InvalidNetworkConfigError');
-      } catch (error: unknown) {
-        assertError(error);
-        expect(error).toBeInstanceOf(ErrorClass);
-        expect(error.name).toBe('InvalidNetworkConfigError');
-        expect(error.message).toContain('retry delay');
+      } catch (error) {
+        caught = error;
       }
+      assertError(caught);
+      expect(caught).toBeInstanceOf(ErrorClass);
+      expect(caught.name).toBe('InvalidNetworkConfigError');
+      expect(caught.message).toContain('retry delay');
     });
 
     it('should reject zero retry delay', async () => {
@@ -507,15 +515,16 @@ describe('Config Validation Error Tests', () => {
       const { config: freshConfig, InvalidNetworkConfigError: ErrorClass } =
         await import('../config');
 
+      let caught: unknown;
       try {
         void freshConfig.network;
-        fail('Should have thrown InvalidNetworkConfigError');
-      } catch (error: unknown) {
-        assertError(error);
-        expect(error).toBeInstanceOf(ErrorClass);
-        expect(error.name).toBe('InvalidNetworkConfigError');
-        expect(error.message).toContain('retry delay');
+      } catch (error) {
+        caught = error;
       }
+      assertError(caught);
+      expect(caught).toBeInstanceOf(ErrorClass);
+      expect(caught.name).toBe('InvalidNetworkConfigError');
+      expect(caught.message).toContain('retry delay');
     });
 
     it('should reject retry delay exactly at upper limit + 1', async () => {
@@ -524,15 +533,16 @@ describe('Config Validation Error Tests', () => {
       const { config: freshConfig, InvalidNetworkConfigError: ErrorClass } =
         await import('../config');
 
+      let caught: unknown;
       try {
         void freshConfig.network;
-        fail('Should have thrown InvalidNetworkConfigError');
-      } catch (error: unknown) {
-        assertError(error);
-        expect(error).toBeInstanceOf(ErrorClass);
-        expect(error.name).toBe('InvalidNetworkConfigError');
-        expect(error.message).toContain('retry delay');
+      } catch (error) {
+        caught = error;
       }
+      assertError(caught);
+      expect(caught).toBeInstanceOf(ErrorClass);
+      expect(caught.name).toBe('InvalidNetworkConfigError');
+      expect(caught.message).toContain('retry delay');
     });
 
     it('should reject extremely large retry delay', async () => {
@@ -541,15 +551,16 @@ describe('Config Validation Error Tests', () => {
       const { config: freshConfig, InvalidNetworkConfigError: ErrorClass } =
         await import('../config');
 
+      let caught: unknown;
       try {
         void freshConfig.network;
-        fail('Should have thrown InvalidNetworkConfigError');
-      } catch (error: unknown) {
-        assertError(error);
-        expect(error).toBeInstanceOf(ErrorClass);
-        expect(error.name).toBe('InvalidNetworkConfigError');
-        expect(error.message).toContain('retry delay');
+      } catch (error) {
+        caught = error;
       }
+      assertError(caught);
+      expect(caught).toBeInstanceOf(ErrorClass);
+      expect(caught.name).toBe('InvalidNetworkConfigError');
+      expect(caught.message).toContain('retry delay');
     });
 
     it('should accept retry delay at lower boundary (1ms)', async () => {
@@ -628,55 +639,60 @@ describe('Config Validation Error Tests', () => {
   describe('Error Message Quality', () => {
     describe('URL Error Messages', () => {
       it('should include invalid URL value in error message', async () => {
+        let caught: unknown;
         try {
           config.setCustomApiUrl('not-a-url');
-          fail('Should have thrown InvalidUrlError');
-        } catch (error: unknown) {
-          assertError(error);
-          expect(error).toBeInstanceOf(InvalidUrlError);
-          expect(error.message).toContain('not-a-url');
+        } catch (error) {
+          caught = error;
         }
+        assertError(caught);
+        expect(caught).toBeInstanceOf(InvalidUrlError);
+        expect(caught.message).toContain('not-a-url');
       });
 
       it('should suggest http:// or https:// for URL without protocol', async () => {
+        let caught: unknown;
         try {
           config.setCustomApiUrl('example.com');
-          fail('Should have thrown');
-        } catch (error: unknown) {
-          assertError(error);
-          expect(error.message).toContain('http://');
-          expect(error.message).toContain('https://');
+        } catch (error) {
+          caught = error;
         }
+        assertError(caught);
+        expect(caught.message).toContain('http://');
+        expect(caught.message).toContain('https://');
       });
 
       it('should provide example URL in error message', async () => {
+        let caught: unknown;
         try {
           config.setCustomApiUrl('invalid-url');
-          fail('Should have thrown');
-        } catch (error: unknown) {
-          assertError(error);
-          expect(error.message).toMatch(/example\.com/i);
+        } catch (error) {
+          caught = error;
         }
+        assertError(caught);
+        expect(caught.message).toMatch(/example\.com/i);
       });
 
       it('should mention URL encoding for space errors', async () => {
+        let caught: unknown;
         try {
           config.setCustomApiUrl('https://example .com');
-          fail('Should have thrown');
-        } catch (error: unknown) {
-          assertError(error);
-          expect(error.message).toMatch(/encod/i);
+        } catch (error) {
+          caught = error;
         }
+        assertError(caught);
+        expect(caught.message).toMatch(/encod/i);
       });
 
       it('should provide context about what URL is for', async () => {
+        let caught: unknown;
         try {
           config.setCustomApiUrl('');
-          fail('Should have thrown');
-        } catch (error: unknown) {
-          assertError(error);
-          expect(error.message).toMatch(/API base URL/i);
+        } catch (error) {
+          caught = error;
         }
+        assertError(caught);
+        expect(caught.message).toMatch(/API base URL/i);
       });
     });
 
@@ -684,106 +700,114 @@ describe('Config Validation Error Tests', () => {
       it('should include invalid timeout value in error message', async () => {
         process.env.EXPO_PUBLIC_API_TIMEOUT = '-5000';
         vi.resetModules();
+        let caught: unknown;
         try {
           const { config: freshConfig } = await import('../config');
           void freshConfig.network.timeout;
-          fail('Should have thrown');
-        } catch (error: unknown) {
-          assertError(error);
-          expect(error.message).toContain('-5000');
+        } catch (error) {
+          caught = error;
         }
+        assertError(caught);
+        expect(caught.message).toContain('-5000');
       });
 
       it('should include valid range in timeout error message', async () => {
         process.env.EXPO_PUBLIC_API_TIMEOUT = '100000';
         vi.resetModules();
+        let caught: unknown;
         try {
           const { config: freshConfig } = await import('../config');
           void freshConfig.network.timeout;
-          fail('Should have thrown');
-        } catch (error: unknown) {
-          assertError(error);
-          expect(error.message).toContain('1');
-          expect(error.message).toContain('60000');
+        } catch (error) {
+          caught = error;
         }
+        assertError(caught);
+        expect(caught.message).toContain('1');
+        expect(caught.message).toContain('60000');
       });
 
       it('should mention environment variable name in network config errors', async () => {
         process.env.EXPO_PUBLIC_API_TIMEOUT = '-1000';
         vi.resetModules();
+        let caught: unknown;
         try {
           const { config: freshConfig } = await import('../config');
           void freshConfig.network.timeout;
-          fail('Should have thrown');
-        } catch (error: unknown) {
-          assertError(error);
-          expect(error.message).toContain('EXPO_PUBLIC_API_TIMEOUT');
+        } catch (error) {
+          caught = error;
         }
+        assertError(caught);
+        expect(caught.message).toContain('EXPO_PUBLIC_API_TIMEOUT');
       });
 
       it('should include invalid retry count in error message', async () => {
         process.env.EXPO_PUBLIC_API_RETRIES = '20';
         vi.resetModules();
+        let caught: unknown;
         try {
           const { config: freshConfig } = await import('../config');
           void freshConfig.network.retries;
-          fail('Should have thrown');
-        } catch (error: unknown) {
-          assertError(error);
-          expect(error.message).toContain('20');
-          expect(error.message).toContain('0');
-          expect(error.message).toContain('5');
+        } catch (error) {
+          caught = error;
         }
+        assertError(caught);
+        expect(caught.message).toContain('20');
+        expect(caught.message).toContain('0');
+        expect(caught.message).toContain('5');
       });
 
       it('should include invalid retry delay in error message', async () => {
         process.env.EXPO_PUBLIC_API_RETRY_DELAY = '-1000';
         vi.resetModules();
+        let caught: unknown;
         try {
           const { config: freshConfig } = await import('../config');
           void freshConfig.network.retryDelay;
-          fail('Should have thrown');
-        } catch (error: unknown) {
-          assertError(error);
-          expect(error.message).toContain('-1000');
-          expect(error.message).toContain('1');
-          expect(error.message).toContain('10000');
+        } catch (error) {
+          caught = error;
         }
+        assertError(caught);
+        expect(caught.message).toContain('-1000');
+        expect(caught.message).toContain('1');
+        expect(caught.message).toContain('10000');
       });
     });
 
     describe('Environment Error Messages', () => {
       it('should include invalid environment name in error message', async () => {
+        let caught: unknown;
         try {
           config.setEnvironment('invalid-env' as any);
-          fail('Should have thrown');
-        } catch (error: unknown) {
-          assertError(error);
-          expect(error).toBeInstanceOf(InvalidEnvironmentError);
-          expect(error.message).toContain('invalid-env');
+        } catch (error) {
+          caught = error;
         }
+        assertError(caught);
+        expect(caught).toBeInstanceOf(InvalidEnvironmentError);
+        expect(caught.message).toContain('invalid-env');
       });
 
       it('should list all valid environments in error message', async () => {
+        let caught: unknown;
         try {
           config.setEnvironment('test' as any);
-          fail('Should have thrown');
-        } catch (error: unknown) {
-          assertError(error);
-          expect(error.message).toContain('development');
-          expect(error.message).toContain('staging');
-          expect(error.message).toContain('production');
+        } catch (error) {
+          caught = error;
         }
+        assertError(caught);
+        expect(caught.message).toContain('development');
+        expect(caught.message).toContain('staging');
+        expect(caught.message).toContain('production');
       });
 
       it('should mention how to set environment correctly', async () => {
+        let caught: unknown;
         try {
           config.setEnvironment('invalid' as any);
-          fail('Should have thrown');
-        } catch (error: unknown) {
-          assertError(error);
-          expect(error.message).toMatch(/setEnvironment|EXPO_PUBLIC_DEFAULT_ENV/);
+        } catch (error) {
+          caught = error;
         }
+        assertError(caught);
+        expect(caught.message).toMatch(/setEnvironment|EXPO_PUBLIC_DEFAULT_ENV/);
       });
     });
   });
@@ -801,14 +825,15 @@ describe('Config Validation Error Tests', () => {
       const { config: freshConfig, InvalidNetworkConfigError: ErrorClass } =
         await import('../config');
 
+      let caught: unknown;
       try {
         void freshConfig.network.timeout;
-        fail('Should have thrown');
-      } catch (error: unknown) {
-        assertError(error);
-        expect(error).toBeInstanceOf(ErrorClass);
-        expect(error.name).toBe('InvalidNetworkConfigError');
+      } catch (error) {
+        caught = error;
       }
+      assertError(caught);
+      expect(caught).toBeInstanceOf(ErrorClass);
+      expect(caught.name).toBe('InvalidNetworkConfigError');
     });
 
     it('should throw InvalidNetworkConfigError for retry validation failures', async () => {
@@ -817,14 +842,15 @@ describe('Config Validation Error Tests', () => {
       const { config: freshConfig, InvalidNetworkConfigError: ErrorClass } =
         await import('../config');
 
+      let caught: unknown;
       try {
         void freshConfig.network.retries;
-        fail('Should have thrown');
-      } catch (error: unknown) {
-        assertError(error);
-        expect(error).toBeInstanceOf(ErrorClass);
-        expect(error.name).toBe('InvalidNetworkConfigError');
+      } catch (error) {
+        caught = error;
       }
+      assertError(caught);
+      expect(caught).toBeInstanceOf(ErrorClass);
+      expect(caught.name).toBe('InvalidNetworkConfigError');
     });
 
     it('should throw InvalidEnvironmentError for environment validation failures', async () => {
@@ -834,36 +860,39 @@ describe('Config Validation Error Tests', () => {
     });
 
     it('should have correct error name for InvalidUrlError', async () => {
+      let caught: unknown;
       try {
         config.setCustomApiUrl('invalid');
-        fail('Should have thrown');
-      } catch (error: unknown) {
-        assertError(error);
-        expect(error.name).toBe('InvalidUrlError');
+      } catch (error) {
+        caught = error;
       }
+      assertError(caught);
+      expect(caught.name).toBe('InvalidUrlError');
     });
 
     it('should have correct error name for InvalidNetworkConfigError', async () => {
       process.env.EXPO_PUBLIC_API_TIMEOUT = '-1000';
       vi.resetModules();
+      let caught: unknown;
       try {
         const { config: freshConfig } = await import('../config');
         void freshConfig.network.timeout;
-        fail('Should have thrown');
-      } catch (error: unknown) {
-        assertError(error);
-        expect(error.name).toBe('InvalidNetworkConfigError');
+      } catch (error) {
+        caught = error;
       }
+      assertError(caught);
+      expect(caught.name).toBe('InvalidNetworkConfigError');
     });
 
     it('should have correct error name for InvalidEnvironmentError', async () => {
+      let caught: unknown;
       try {
         config.setEnvironment('invalid' as any);
-        fail('Should have thrown');
-      } catch (error: unknown) {
-        assertError(error);
-        expect(error.name).toBe('InvalidEnvironmentError');
+      } catch (error) {
+        caught = error;
       }
+      assertError(caught);
+      expect(caught.name).toBe('InvalidEnvironmentError');
     });
   });
 
@@ -921,15 +950,16 @@ describe('Config Validation Error Tests', () => {
         await import('../config');
 
       // Should fail on first validation check (timeout)
+      let caught: unknown;
       try {
         void freshConfig.network.timeout;
-        fail('Should have thrown');
-      } catch (error: unknown) {
-        assertError(error);
-        expect(error).toBeInstanceOf(ErrorClass);
-        expect(error.name).toBe('InvalidNetworkConfigError');
-        expect(error.message).toContain('timeout');
+      } catch (error) {
+        caught = error;
       }
+      assertError(caught);
+      expect(caught).toBeInstanceOf(ErrorClass);
+      expect(caught.name).toBe('InvalidNetworkConfigError');
+      expect(caught.message).toContain('timeout');
     });
 
     it('should validate environment before applying custom URL', async () => {
@@ -1020,52 +1050,55 @@ describe('Config Validation Error Tests', () => {
 
   describe('Error Class Hierarchy', () => {
     it('InvalidUrlError should inherit from Error', async () => {
+      let caught: unknown;
       try {
         config.setCustomApiUrl('invalid-url');
-        fail('Should have thrown');
-      } catch (error: unknown) {
-        assertError(error);
-        // Verify inheritance chain
-        expect(error).toBeInstanceOf(InvalidUrlError);
-        expect(error).toBeInstanceOf(Error);
-
-        // Verify error name
-        expect(error.name).toBe('InvalidUrlError');
-
-        // Verify it has standard Error properties
-        expect(error.message).toBeTruthy();
-        expect(error.stack).toBeTruthy();
+      } catch (error) {
+        caught = error;
       }
+      assertError(caught);
+      // Verify inheritance chain
+      expect(caught).toBeInstanceOf(InvalidUrlError);
+      expect(caught).toBeInstanceOf(Error);
+
+      // Verify error name
+      expect(caught.name).toBe('InvalidUrlError');
+
+      // Verify it has standard Error properties
+      expect(caught.message).toBeTruthy();
+      expect(caught.stack).toBeTruthy();
     });
 
     it('InvalidNetworkConfigError should inherit from Error', async () => {
       process.env.EXPO_PUBLIC_API_TIMEOUT = '-1000';
       vi.resetModules();
 
+      let caught: unknown;
       try {
         const { config: freshConfig } = await import('../config');
         void freshConfig.network.timeout;
-        fail('Should have thrown');
-      } catch (error: unknown) {
-        assertError(error);
-        expect(error).toBeInstanceOf(Error);
-        expect(error.name).toBe('InvalidNetworkConfigError');
-        expect(error.message).toContain('-1000');
-        expect(error.stack).toBeTruthy();
+      } catch (error) {
+        caught = error;
       }
+      assertError(caught);
+      expect(caught).toBeInstanceOf(Error);
+      expect(caught.name).toBe('InvalidNetworkConfigError');
+      expect(caught.message).toContain('-1000');
+      expect(caught.stack).toBeTruthy();
     });
 
     it('InvalidEnvironmentError should inherit from Error', async () => {
+      let caught: unknown;
       try {
         config.setEnvironment('invalid-env' as any);
-        fail('Should have thrown');
-      } catch (error: unknown) {
-        assertError(error);
-        expect(error).toBeInstanceOf(Error);
-        expect(error.name).toBe('InvalidEnvironmentError');
-        expect(error.message).toContain('invalid-env');
-        expect(error.stack).toBeTruthy();
+      } catch (error) {
+        caught = error;
       }
+      assertError(caught);
+      expect(caught).toBeInstanceOf(Error);
+      expect(caught.name).toBe('InvalidEnvironmentError');
+      expect(caught.message).toContain('invalid-env');
+      expect(caught.stack).toBeTruthy();
     });
 
     it('all custom errors should have Error.captureStackTrace behavior', async () => {
