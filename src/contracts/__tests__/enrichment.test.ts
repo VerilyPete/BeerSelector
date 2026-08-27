@@ -112,6 +112,45 @@ describe('mobile enrichment consumer contracts', () => {
     ).toBe(true);
   });
 
+  it('normalizes the API description fallback source in taplist and batch data', () => {
+    const taplistBeer = enrichedBeerResponseSchema.safeParse({
+      ...completeBeer,
+      enrichment_source: 'description-fallback',
+    });
+    expect(taplistBeer.success).toBe(true);
+    if (taplistBeer.success) {
+      expect(taplistBeer.data.enrichment_source).toBe('description');
+    }
+
+    const batchData = enrichmentDataSchema.safeParse({
+      enriched_abv: 6.5,
+      enrichment_confidence: 0.8,
+      enrichment_source: 'description-fallback',
+      brew_description: 'Fallback description',
+      has_cleaned_description: true,
+    });
+    expect(batchData.success).toBe(true);
+    if (batchData.success) {
+      expect(batchData.data.enrichment_source).toBe('description');
+    }
+
+    expect(
+      enrichedBeerResponseSchema.safeParse({
+        ...completeBeer,
+        enrichment_source: 'future-description-source',
+      }).success
+    ).toBe(false);
+    expect(
+      enrichmentDataSchema.safeParse({
+        enriched_abv: 6.5,
+        enrichment_confidence: 0.8,
+        enrichment_source: 'future-description-source',
+        brew_description: 'Fallback description',
+        has_cleaned_description: true,
+      }).success
+    ).toBe(false);
+  });
+
   it('rejects missing required keys', () => {
     const missingName = {
       ...proxyResponse,
