@@ -346,6 +346,50 @@ See **TESTING.md** for detailed testing documentation including:
 - **Never** use `renderHook()` with React Native hooks - will hang
 - **Never** test components using `useThemeColor`/`useColorScheme` in Jest - will hang
 
+### Golden Taproom Contracts
+
+Public enrichment response contracts live in
+`src/contracts/enrichment.ts`, with the wire-to-app adapter in
+`src/contracts/enrichmentAdapter.ts`. BeerSelector owns the consumer boundary:
+keep `enrichment.ts` pure and importable outside React Native (it may import
+only Zod); the adapter may use `import type` for app types but no runtime app,
+React Native, or Expo imports. Do not redeclare Worker response schemas in
+services.
+
+Unknown or optional response fields are normally compatible. Removing a
+required field, changing a type, adding an unsupported enum value, or changing
+nullability requires coordinated API work and a contract update. The API
+repository owns the producer-side Golden Taproom harness and fixture.
+
+For local cross-repository runs, check out the siblings in this exact layout:
+
+```text
+<parent>/
+├── BeerSelector/
+└── ufobeer/
+```
+
+Run the local contract-module checks from `BeerSelector`:
+
+```bash
+npm test -- --watch=false src/contracts
+npm run typecheck
+```
+
+The cross-repository contract test runs from the sibling checkout parent after
+both dependencies are installed:
+
+```bash
+npm ci --prefix BeerSelector
+npm ci --prefix ufobeer
+npm run typecheck:contract --prefix ufobeer
+npm run test:contract --prefix ufobeer
+```
+
+For rollout, land the mobile consumer contracts on `BeerSelector` `main` and
+the API harness/scripts on `ufobeer` `main` before expecting the opposite
+repository's `Golden Taproom Contract` workflow to pass.
+
 ### Type System
 
 **Type Guards** (in `src/database/types.ts` and `src/types/`):
