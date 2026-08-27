@@ -1,8 +1,8 @@
 import { z } from 'zod';
 
-// The API uses this value when description-derived ABV survives a cleanup
-// fallback. It is the same app-level source as `description`; normalize it at
-// the wire boundary so the domain types do not need a producer-internal alias.
+// The Worker uses this producer-internal value when description-derived ABV
+// survives a cleanup fallback. It has the same meaning as the app-level
+// `description` source, so normalize it at the wire boundary.
 const enrichmentSourceSchema = z.preprocess(
   value => (value === 'description-fallback' ? 'description' : value),
   z.enum(['description', 'perplexity', 'manual'])

@@ -124,6 +124,69 @@ describe('mobile enrichment consumer contracts', () => {
     ).toBe(true);
   });
 
+  it('normalizes the API description fallback source in taplist and batch data', () => {
+    const taplist = beersProxyResponseSchema.safeParse({
+      ...proxyResponse,
+      beers: [
+        {
+          ...completeBeer,
+          enrichment_source: 'description-fallback',
+        },
+        nullableBeer,
+      ],
+    });
+    expect(taplist.success).toBe(true);
+    if (taplist.success) {
+      expect(taplist.data.beers[0].enrichment_source).toBe('description');
+    }
+
+    const batch = batchEnrichmentResponseSchema.safeParse({
+      enrichments: {
+        'golden-complete': {
+          enriched_abv: 6.5,
+          enrichment_confidence: 0.8,
+          enrichment_source: 'description-fallback',
+          brew_description: 'Fallback description',
+          has_cleaned_description: true,
+        },
+      },
+      missing: [],
+      requestId: 'golden-request',
+    });
+    expect(batch.success).toBe(true);
+    if (batch.success) {
+      expect(batch.data.enrichments['golden-complete'].enrichment_source).toBe('description');
+    }
+
+    expect(
+      beersProxyResponseSchema.safeParse({
+        ...proxyResponse,
+        beers: [
+          {
+            ...completeBeer,
+            enrichment_source: 'future-description-source',
+          },
+          nullableBeer,
+        ],
+      }).success
+    ).toBe(false);
+    expect(
+      batchEnrichmentResponseSchema.safeParse({
+        enrichments: {
+          'golden-complete': {
+            enriched_abv: 6.5,
+            enrichment_confidence: 0.8,
+            enrichment_source: 'future-description-source',
+            brew_description: 'Fallback description',
+            has_cleaned_description: true,
+          },
+        },
+        missing: [],
+        requestId: 'golden-request',
+      }).success
+    ).toBe(false);
+  });
+
   it('rejects missing required keys', () => {
     const missingName = {
       ...proxyResponse,
