@@ -172,7 +172,7 @@ jobs:
           # nobody saw it. Raising this when tests are added is expected;
           # lowering it is only ever correct when tests were deliberately
           # removed, and now also requires saying which runner lost them.
-          MIN_TESTS_RUN: '2504'
+          MIN_TESTS_RUN: '2505'
           MAX_SKIPPED: '0'
         run: |
           python3 - <<'PY'
