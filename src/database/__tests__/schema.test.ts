@@ -1,4 +1,4 @@
-import { vi } from 'vitest';
+import { vi, type Mock, type MockInstance } from 'vitest';
 /**
  * Tests for database schema and table creation
  */
@@ -10,11 +10,11 @@ import * as connection from '../connection';
 vi.mock('../connection');
 
 describe('Database Schema', () => {
-  const mockExecAsync = jest.fn().mockResolvedValue(undefined);
-  const mockRunAsync = jest.fn().mockResolvedValue({ changes: 0, lastInsertRowId: 0 });
-  const mockGetFirstAsync = jest.fn();
-  const mockGetAllAsync = jest.fn().mockResolvedValue([]);
-  const mockWithTransactionAsync = jest.fn(async callback => {
+  const mockExecAsync = vi.fn().mockResolvedValue(undefined);
+  const mockRunAsync = vi.fn().mockResolvedValue({ changes: 0, lastInsertRowId: 0 });
+  const mockGetFirstAsync = vi.fn();
+  const mockGetAllAsync = vi.fn().mockResolvedValue([]);
+  const mockWithTransactionAsync = vi.fn(async callback => {
     await callback();
   });
 
@@ -24,27 +24,27 @@ describe('Database Schema', () => {
     getFirstAsync: mockGetFirstAsync,
     getAllAsync: mockGetAllAsync,
     withTransactionAsync: mockWithTransactionAsync,
-    closeAsync: jest.fn().mockResolvedValue(undefined),
+    closeAsync: vi.fn().mockResolvedValue(undefined),
   };
 
-  let consoleLogSpy: jest.SpyInstance;
-  let consoleErrorSpy: jest.SpyInstance;
+  let consoleLogSpy: MockInstance;
+  let consoleErrorSpy: MockInstance;
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
 
     // Use real timers for these tests
-    jest.useRealTimers();
+    vi.useRealTimers();
 
     // Reset database state machine
     resetDatabaseState();
 
     // Mock getDatabase to return our mock database
-    (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+    (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
 
     // Spy on console methods
-    consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
-    consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+    consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     // Reset mocks
     mockExecAsync.mockClear().mockResolvedValue(undefined);
@@ -60,7 +60,7 @@ describe('Database Schema', () => {
     consoleLogSpy.mockRestore();
     consoleErrorSpy.mockRestore();
     // Restore fake timers
-    jest.useFakeTimers();
+    vi.useFakeTimers();
   });
 
   describe('setupDatabase', () => {
@@ -92,11 +92,13 @@ describe('Database Schema', () => {
       await setupDatabase();
 
       // Find the call that creates the allbeers table
-      const allbeersCall = (mockExecAsync as jest.Mock).mock.calls.find(call =>
+      const allbeersCall = (mockExecAsync as Mock).mock.calls.find(call =>
         call[0].includes('CREATE TABLE IF NOT EXISTS allbeers')
       );
 
-      expect(allbeersCall).toBeDefined();
+      if (!allbeersCall) {
+        throw new Error('no CREATE TABLE call matched for allbeersCall');
+      }
       const sql = allbeersCall[0];
 
       // Verify all required columns exist
@@ -115,11 +117,13 @@ describe('Database Schema', () => {
     it('should create tasted_brew_current_round table with correct columns', async () => {
       await setupDatabase();
 
-      const tastedBrewCall = (mockExecAsync as jest.Mock).mock.calls.find(call =>
+      const tastedBrewCall = (mockExecAsync as Mock).mock.calls.find(call =>
         call[0].includes('CREATE TABLE IF NOT EXISTS tasted_brew_current_round')
       );
 
-      expect(tastedBrewCall).toBeDefined();
+      if (!tastedBrewCall) {
+        throw new Error('no CREATE TABLE call matched for tastedBrewCall');
+      }
       const sql = tastedBrewCall[0];
 
       // Verify all required columns
@@ -140,11 +144,13 @@ describe('Database Schema', () => {
     it('should create rewards table with correct columns', async () => {
       await setupDatabase();
 
-      const rewardsCall = (mockExecAsync as jest.Mock).mock.calls.find(call =>
+      const rewardsCall = (mockExecAsync as Mock).mock.calls.find(call =>
         call[0].includes('CREATE TABLE IF NOT EXISTS rewards')
       );
 
-      expect(rewardsCall).toBeDefined();
+      if (!rewardsCall) {
+        throw new Error('no CREATE TABLE call matched for rewardsCall');
+      }
       const sql = rewardsCall[0];
 
       expect(sql).toContain('reward_id TEXT PRIMARY KEY');
@@ -155,11 +161,13 @@ describe('Database Schema', () => {
     it('should create preferences table with correct columns', async () => {
       await setupDatabase();
 
-      const preferencesCall = (mockExecAsync as jest.Mock).mock.calls.find(call =>
+      const preferencesCall = (mockExecAsync as Mock).mock.calls.find(call =>
         call[0].includes('CREATE TABLE IF NOT EXISTS preferences')
       );
 
-      expect(preferencesCall).toBeDefined();
+      if (!preferencesCall) {
+        throw new Error('no CREATE TABLE call matched for preferencesCall');
+      }
       const sql = preferencesCall[0];
 
       expect(sql).toContain('key TEXT PRIMARY KEY');
@@ -170,11 +178,13 @@ describe('Database Schema', () => {
     it('should create operation_queue table with correct columns', async () => {
       await setupDatabase();
 
-      const operationQueueCall = (mockExecAsync as jest.Mock).mock.calls.find(call =>
+      const operationQueueCall = (mockExecAsync as Mock).mock.calls.find(call =>
         call[0].includes('CREATE TABLE IF NOT EXISTS operation_queue')
       );
 
-      expect(operationQueueCall).toBeDefined();
+      if (!operationQueueCall) {
+        throw new Error('no CREATE TABLE call matched for operationQueueCall');
+      }
       const sql = operationQueueCall[0];
 
       expect(sql).toContain('id TEXT PRIMARY KEY');
@@ -191,7 +201,7 @@ describe('Database Schema', () => {
       await setupDatabase();
 
       // Verify default preferences were inserted
-      const runAsyncCalls = (mockRunAsync as jest.Mock).mock.calls;
+      const runAsyncCalls = (mockRunAsync as Mock).mock.calls;
 
       // Should have inserted preferences for:
       // - all_beers_api_url
@@ -217,7 +227,7 @@ describe('Database Schema', () => {
       await setupDatabase();
 
       // Verify no preference inserts occurred
-      const runAsyncCalls = (mockRunAsync as jest.Mock).mock.calls;
+      const runAsyncCalls = (mockRunAsync as Mock).mock.calls;
       const preferenceInserts = runAsyncCalls.filter(
         call => call[0] && call[0].includes('INSERT OR IGNORE INTO preferences')
       );
@@ -263,7 +273,7 @@ describe('Database Schema', () => {
 
       // Count the number of CREATE TABLE calls
       // Tables: allbeers, tasted_brew_current_round, rewards, preferences, operation_queue, schema_version
-      const createTableCalls = (mockExecAsync as jest.Mock).mock.calls.filter(call =>
+      const createTableCalls = (mockExecAsync as Mock).mock.calls.filter(call =>
         call[0].includes('CREATE TABLE IF NOT EXISTS')
       );
 
@@ -273,7 +283,7 @@ describe('Database Schema', () => {
     it('should use TEXT type for all columns', async () => {
       await setupDatabase();
 
-      const createTableCalls = (mockExecAsync as jest.Mock).mock.calls.filter(call =>
+      const createTableCalls = (mockExecAsync as Mock).mock.calls.filter(call =>
         call[0].includes('CREATE TABLE IF NOT EXISTS')
       );
 
@@ -287,7 +297,7 @@ describe('Database Schema', () => {
     it('should use PRIMARY KEY for id columns', async () => {
       await setupDatabase();
 
-      const createTableCalls = (mockExecAsync as jest.Mock).mock.calls.filter(call =>
+      const createTableCalls = (mockExecAsync as Mock).mock.calls.filter(call =>
         call[0].includes('CREATE TABLE IF NOT EXISTS')
       );
 
@@ -301,7 +311,7 @@ describe('Database Schema', () => {
     it('should use IF NOT EXISTS for all tables', async () => {
       await setupDatabase();
 
-      const createTableCalls = (mockExecAsync as jest.Mock).mock.calls.filter(call =>
+      const createTableCalls = (mockExecAsync as Mock).mock.calls.filter(call =>
         call[0].includes('CREATE TABLE')
       );
 

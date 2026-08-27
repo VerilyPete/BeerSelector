@@ -1,5 +1,6 @@
+import { vi, type Mock } from 'vitest';
 /**
- * The `jest.mock` factory for `src/api/beerApi`, shared by every suite that
+ * The `vi.mock` factory for `src/api/beerApi`, shared by every suite that
  * mocks it.
  *
  * Plan refresh-failure-classification, D2. My-beers and rewards read the same
@@ -53,7 +54,7 @@
  */
 
 /** One half of the member body, with a rejection turned into a `failed` outcome. */
-async function settleHalf(fetcher: jest.Mock): Promise<unknown> {
+async function settleHalf(fetcher: Mock): Promise<unknown> {
   const { createErrorResponse } = await import('../../../utils/notificationUtils');
   try {
     return await fetcher();
@@ -65,18 +66,18 @@ async function settleHalf(fetcher: jest.Mock): Promise<unknown> {
 /**
  * Build the mock module.
  *
- * Called from inside a `jest.mock` factory, which may not close over
+ * Called from inside a `vi.mock` factory, which may not close over
  * out-of-scope variables — hence `require` at the call site.
  */
 export function beerApiMockFactory() {
-  const fetchMyBeersFromAPI = jest.fn();
-  const fetchRewardsFromAPI = jest.fn();
+  const fetchMyBeersFromAPI = vi.fn();
+  const fetchRewardsFromAPI = vi.fn();
 
   return {
-    fetchBeersFromAPI: jest.fn(),
+    fetchBeersFromAPI: vi.fn(),
     fetchMyBeersFromAPI,
     fetchRewardsFromAPI,
-    fetchMemberDataFromAPI: jest.fn(async () => ({
+    fetchMemberDataFromAPI: vi.fn(async () => ({
       myBeers: await settleHalf(fetchMyBeersFromAPI),
       rewards: await settleHalf(fetchRewardsFromAPI),
     })),

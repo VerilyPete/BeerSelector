@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 /**
  * Config Validation Error Tests
  *
@@ -30,7 +31,7 @@ describe('Config Validation Error Tests', () => {
 
   beforeEach(async () => {
     // Reset modules to get fresh config instance
-    jest.resetModules();
+    vi.resetModules();
     // Clone process.env for each test
     process.env = { ...originalEnv };
   });
@@ -308,7 +309,7 @@ describe('Config Validation Error Tests', () => {
   describe('Invalid Timeout Values', () => {
     it('should reject negative timeout', async () => {
       process.env.EXPO_PUBLIC_API_TIMEOUT = '-1000';
-      jest.resetModules();
+      vi.resetModules();
       const { config: freshConfig, InvalidNetworkConfigError: ErrorClass } =
         await import('../config');
 
@@ -325,7 +326,7 @@ describe('Config Validation Error Tests', () => {
 
     it('should reject zero timeout', async () => {
       process.env.EXPO_PUBLIC_API_TIMEOUT = '0';
-      jest.resetModules();
+      vi.resetModules();
       const { config: freshConfig, InvalidNetworkConfigError: ErrorClass } =
         await import('../config');
 
@@ -342,7 +343,7 @@ describe('Config Validation Error Tests', () => {
 
     it('should reject timeout exactly at upper limit + 1', async () => {
       process.env.EXPO_PUBLIC_API_TIMEOUT = '60001';
-      jest.resetModules();
+      vi.resetModules();
       const { config: freshConfig, InvalidNetworkConfigError: ErrorClass } =
         await import('../config');
 
@@ -359,7 +360,7 @@ describe('Config Validation Error Tests', () => {
 
     it('should reject extremely large timeout', async () => {
       process.env.EXPO_PUBLIC_API_TIMEOUT = '999999999';
-      jest.resetModules();
+      vi.resetModules();
       const { config: freshConfig, InvalidNetworkConfigError: ErrorClass } =
         await import('../config');
 
@@ -408,7 +409,7 @@ describe('Config Validation Error Tests', () => {
   describe('Invalid Retry Counts', () => {
     it('should reject negative retry count', async () => {
       process.env.EXPO_PUBLIC_API_RETRIES = '-1';
-      jest.resetModules();
+      vi.resetModules();
       const { config: freshConfig, InvalidNetworkConfigError: ErrorClass } =
         await import('../config');
 
@@ -425,7 +426,7 @@ describe('Config Validation Error Tests', () => {
 
     it('should reject retry count exactly at upper limit + 1', async () => {
       process.env.EXPO_PUBLIC_API_RETRIES = '6';
-      jest.resetModules();
+      vi.resetModules();
       const { config: freshConfig, InvalidNetworkConfigError: ErrorClass } =
         await import('../config');
 
@@ -442,7 +443,7 @@ describe('Config Validation Error Tests', () => {
 
     it('should reject extremely large retry count', async () => {
       process.env.EXPO_PUBLIC_API_RETRIES = '100';
-      jest.resetModules();
+      vi.resetModules();
       const { config: freshConfig, InvalidNetworkConfigError: ErrorClass } =
         await import('../config');
 
@@ -485,7 +486,7 @@ describe('Config Validation Error Tests', () => {
   describe('Invalid Retry Delay Values', () => {
     it('should reject negative retry delay', async () => {
       process.env.EXPO_PUBLIC_API_RETRY_DELAY = '-500';
-      jest.resetModules();
+      vi.resetModules();
       const { config: freshConfig, InvalidNetworkConfigError: ErrorClass } =
         await import('../config');
 
@@ -502,7 +503,7 @@ describe('Config Validation Error Tests', () => {
 
     it('should reject zero retry delay', async () => {
       process.env.EXPO_PUBLIC_API_RETRY_DELAY = '0';
-      jest.resetModules();
+      vi.resetModules();
       const { config: freshConfig, InvalidNetworkConfigError: ErrorClass } =
         await import('../config');
 
@@ -519,7 +520,7 @@ describe('Config Validation Error Tests', () => {
 
     it('should reject retry delay exactly at upper limit + 1', async () => {
       process.env.EXPO_PUBLIC_API_RETRY_DELAY = '10001';
-      jest.resetModules();
+      vi.resetModules();
       const { config: freshConfig, InvalidNetworkConfigError: ErrorClass } =
         await import('../config');
 
@@ -536,7 +537,7 @@ describe('Config Validation Error Tests', () => {
 
     it('should reject extremely large retry delay', async () => {
       process.env.EXPO_PUBLIC_API_RETRY_DELAY = '99999999';
-      jest.resetModules();
+      vi.resetModules();
       const { config: freshConfig, InvalidNetworkConfigError: ErrorClass } =
         await import('../config');
 
@@ -682,7 +683,7 @@ describe('Config Validation Error Tests', () => {
     describe('Network Config Error Messages', () => {
       it('should include invalid timeout value in error message', async () => {
         process.env.EXPO_PUBLIC_API_TIMEOUT = '-5000';
-        jest.resetModules();
+        vi.resetModules();
         try {
           const { config: freshConfig } = await import('../config');
           void freshConfig.network.timeout;
@@ -695,7 +696,7 @@ describe('Config Validation Error Tests', () => {
 
       it('should include valid range in timeout error message', async () => {
         process.env.EXPO_PUBLIC_API_TIMEOUT = '100000';
-        jest.resetModules();
+        vi.resetModules();
         try {
           const { config: freshConfig } = await import('../config');
           void freshConfig.network.timeout;
@@ -709,7 +710,7 @@ describe('Config Validation Error Tests', () => {
 
       it('should mention environment variable name in network config errors', async () => {
         process.env.EXPO_PUBLIC_API_TIMEOUT = '-1000';
-        jest.resetModules();
+        vi.resetModules();
         try {
           const { config: freshConfig } = await import('../config');
           void freshConfig.network.timeout;
@@ -722,7 +723,7 @@ describe('Config Validation Error Tests', () => {
 
       it('should include invalid retry count in error message', async () => {
         process.env.EXPO_PUBLIC_API_RETRIES = '20';
-        jest.resetModules();
+        vi.resetModules();
         try {
           const { config: freshConfig } = await import('../config');
           void freshConfig.network.retries;
@@ -737,7 +738,7 @@ describe('Config Validation Error Tests', () => {
 
       it('should include invalid retry delay in error message', async () => {
         process.env.EXPO_PUBLIC_API_RETRY_DELAY = '-1000';
-        jest.resetModules();
+        vi.resetModules();
         try {
           const { config: freshConfig } = await import('../config');
           void freshConfig.network.retryDelay;
@@ -796,7 +797,7 @@ describe('Config Validation Error Tests', () => {
 
     it('should throw InvalidNetworkConfigError for timeout validation failures', async () => {
       process.env.EXPO_PUBLIC_API_TIMEOUT = '-1000';
-      jest.resetModules();
+      vi.resetModules();
       const { config: freshConfig, InvalidNetworkConfigError: ErrorClass } =
         await import('../config');
 
@@ -812,7 +813,7 @@ describe('Config Validation Error Tests', () => {
 
     it('should throw InvalidNetworkConfigError for retry validation failures', async () => {
       process.env.EXPO_PUBLIC_API_RETRIES = '10';
-      jest.resetModules();
+      vi.resetModules();
       const { config: freshConfig, InvalidNetworkConfigError: ErrorClass } =
         await import('../config');
 
@@ -844,7 +845,7 @@ describe('Config Validation Error Tests', () => {
 
     it('should have correct error name for InvalidNetworkConfigError', async () => {
       process.env.EXPO_PUBLIC_API_TIMEOUT = '-1000';
-      jest.resetModules();
+      vi.resetModules();
       try {
         const { config: freshConfig } = await import('../config');
         void freshConfig.network.timeout;
@@ -915,7 +916,7 @@ describe('Config Validation Error Tests', () => {
       process.env.EXPO_PUBLIC_API_TIMEOUT = '-1000';
       process.env.EXPO_PUBLIC_API_RETRIES = '10';
       process.env.EXPO_PUBLIC_API_RETRY_DELAY = '-500';
-      jest.resetModules();
+      vi.resetModules();
       const { config: freshConfig, InvalidNetworkConfigError: ErrorClass } =
         await import('../config');
 
@@ -1039,7 +1040,7 @@ describe('Config Validation Error Tests', () => {
 
     it('InvalidNetworkConfigError should inherit from Error', async () => {
       process.env.EXPO_PUBLIC_API_TIMEOUT = '-1000';
-      jest.resetModules();
+      vi.resetModules();
 
       try {
         const { config: freshConfig } = await import('../config');

@@ -1,4 +1,4 @@
-import { vi } from 'vitest';
+import { vi, type Mock } from 'vitest';
 /**
  * My-beers and rewards are two halves of ONE body, and cost one request.
  *
@@ -34,17 +34,17 @@ import type { FetchOutcome, UnconditionalSource } from '../fetchOutcome';
 
 vi.mock('../../database/preferences');
 
-global.fetch = jest.fn();
+global.fetch = vi.fn();
 
 /**
  * Drive a call to completion.
  *
- * `jest.setup.js` calls `jest.useFakeTimers()` for every suite, so the backoff
+ * `src/__vitest__/setup.ts` calls `vi.useFakeTimers()` for every suite, so the backoff
  * `setTimeout` inside `fetchWithRetry` never fires on its own and the promise
  * simply never settles.
  */
 const settle = async <T>(pending: Promise<T>): Promise<T> => {
-  await jest.advanceTimersByTimeAsync(60_000);
+  await vi.advanceTimersByTimeAsync(60_000);
   return pending;
 };
 
@@ -66,7 +66,7 @@ const MEMBER_BODY = [
 ];
 
 const respondWith = (body: unknown): void => {
-  (global.fetch as jest.Mock).mockResolvedValue({
+  (global.fetch as Mock).mockResolvedValue({
     ok: true,
     status: 200,
     statusText: 'OK',
@@ -76,8 +76,8 @@ const respondWith = (body: unknown): void => {
 
 describe('fetchMemberDataFromAPI', () => {
   beforeEach(async () => {
-    jest.clearAllMocks();
-    (preferences.getPreference as jest.Mock).mockImplementation(memberPrefs);
+    vi.clearAllMocks();
+    (preferences.getPreference as Mock).mockImplementation(memberPrefs);
   });
 
   it('answers both sources from a single request', async () => {
@@ -99,11 +99,11 @@ describe('fetchMemberDataFromAPI', () => {
 
     await settle(fetchMyBeersFromAPI());
     await settle(fetchRewardsFromAPI());
-    const separately = (global.fetch as jest.Mock).mock.calls.length;
+    const separately = (global.fetch as Mock).mock.calls.length;
 
-    (global.fetch as jest.Mock).mockClear();
+    (global.fetch as Mock).mockClear();
     await settle(fetchMemberDataFromAPI());
-    const coalesced = (global.fetch as jest.Mock).mock.calls.length;
+    const coalesced = (global.fetch as Mock).mock.calls.length;
 
     expect(separately).toBe(2);
     expect(coalesced).toBe(1);
@@ -129,7 +129,7 @@ describe('fetchMemberDataFromAPI', () => {
     // Phase 2's cost, halved on this path. Two separate fetchers against a body
     // that never parses spend two attempts EACH — four requests to one URL to
     // learn one thing twice.
-    (global.fetch as jest.Mock).mockResolvedValue({
+    (global.fetch as Mock).mockResolvedValue({
       ok: true,
       status: 200,
       statusText: 'OK',
@@ -145,7 +145,7 @@ describe('fetchMemberDataFromAPI', () => {
 
   it('gives both halves the same failure when the request fails', async () => {
     // SHARED FATE, pinned. One request, one verdict.
-    (global.fetch as jest.Mock).mockResolvedValue({
+    (global.fetch as Mock).mockResolvedValue({
       ok: false,
       status: 500,
       statusText: 'Internal Server Error',
@@ -168,7 +168,7 @@ describe('fetchMemberDataFromAPI', () => {
     // service's per-source catch, so anything escaping it takes out the whole
     // refresh instead of the two sources it concerns — which is what happened
     // when an earlier draft of this change hoisted the resolve out of the try.
-    (preferences.getPreference as jest.Mock).mockRejectedValue(new Error('database is locked'));
+    (preferences.getPreference as Mock).mockRejectedValue(new Error('database is locked'));
 
     const member = await settle(fetchMemberDataFromAPI());
 
@@ -192,7 +192,7 @@ describe('fetchMemberDataFromAPI', () => {
     async (_l, call) => {
       // The same contract on the two single-source fetchers, which had it before
       // this change and must keep it.
-      (preferences.getPreference as jest.Mock).mockRejectedValue(new Error('database is locked'));
+      (preferences.getPreference as Mock).mockRejectedValue(new Error('database is locked'));
 
       await expect(settle(call())).resolves.toMatchObject({ status: 'failed' });
     }
@@ -216,7 +216,7 @@ describe('fetchMemberDataFromAPI', () => {
     // "do not ask" cannot now be answered differently for the two sources — the
     // divergence that let rewards keep sending a none:// placeholder to fetch()
     // after my-beers had been taught not to.
-    (preferences.getPreference as jest.Mock).mockImplementation(prefs);
+    (preferences.getPreference as Mock).mockImplementation(prefs);
 
     const member = await settle(fetchMemberDataFromAPI());
 
@@ -240,8 +240,8 @@ describe('fetchMemberDataFromAPI', () => {
  */
 describe('extracting the real mybeers.json fixture', () => {
   beforeEach(async () => {
-    jest.clearAllMocks();
-    (preferences.getPreference as jest.Mock).mockImplementation(memberPrefs);
+    vi.clearAllMocks();
+    (preferences.getPreference as Mock).mockImplementation(memberPrefs);
   });
 
   // The COMMITTED fixture. This read `process.cwd() + '/mybeers.json'`, which is

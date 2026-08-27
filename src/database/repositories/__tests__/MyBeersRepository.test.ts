@@ -1,4 +1,4 @@
-import { vi } from 'vitest';
+import { vi, type Mock } from 'vitest';
 /**
  * Comprehensive tests for MyBeersRepository
  * Tests CRUD operations for tasted beers (Beerfinder) entity using TDD approach
@@ -16,20 +16,20 @@ import { DatabaseContentionError } from '../../errors';
 vi.mock('../../connection');
 
 type MockDatabase = {
-  withTransactionAsync: jest.Mock;
-  runAsync: jest.Mock;
-  getAllAsync: jest.Mock;
-  getFirstAsync: jest.Mock;
+  withTransactionAsync: Mock;
+  runAsync: Mock;
+  getAllAsync: Mock;
+  getFirstAsync: Mock;
 };
 
 function createMockDatabase(): MockDatabase {
   return {
-    withTransactionAsync: jest.fn(async (callback: () => Promise<void>) => await callback()),
+    withTransactionAsync: vi.fn(async (callback: () => Promise<void>) => await callback()),
     // The real runAsync always resolves an SQLiteRunResult; the clear path
     // reads `changes` off the DELETE instead of a count-before-delete read.
-    runAsync: jest.fn().mockResolvedValue({ changes: 0, lastInsertRowId: 0 }),
-    getAllAsync: jest.fn(),
-    getFirstAsync: jest.fn(),
+    runAsync: vi.fn().mockResolvedValue({ changes: 0, lastInsertRowId: 0 }),
+    getAllAsync: vi.fn(),
+    getFirstAsync: vi.fn(),
   };
 }
 
@@ -52,7 +52,7 @@ describe('MyBeersRepository', () => {
   describe('insertMany', () => {
     it('should insert multiple tasted beers in batches', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
       const beers: BeerfinderWithContainerType[] = [
         {
@@ -104,9 +104,9 @@ describe('MyBeersRepository', () => {
     // empty round all reach the same DELETE. Emptying is now explicit.
     it('should route an empty payload through replaceAllWithEmpty', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
-      jest.spyOn(console, 'log').mockImplementation();
+      vi.spyOn(console, 'log').mockImplementation(() => {});
       mockDatabase.getFirstAsync.mockResolvedValue({ count: 5 });
 
       await repository.replaceAllWithEmpty();
@@ -123,7 +123,7 @@ describe('MyBeersRepository', () => {
 
     it('should filter out beers without IDs', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
       const beers: BeerfinderWithContainerType[] = [
         {
@@ -178,9 +178,9 @@ describe('MyBeersRepository', () => {
     // able to empty a user's tasted list.
     it('should throw rather than clear when all beers are invalid', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
-      jest.spyOn(console, 'log').mockImplementation();
+      vi.spyOn(console, 'log').mockImplementation(() => {});
       const beers: BeerfinderWithContainerType[] = [
         {
           id: '',
@@ -220,7 +220,7 @@ describe('MyBeersRepository', () => {
 
     it('should process beers in batches of 20', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
       const beers: BeerfinderWithContainerType[] = Array.from({ length: 50 }, (_, i) => ({
         id: `beer-${i}`,
@@ -249,7 +249,7 @@ describe('MyBeersRepository', () => {
 
     it('should handle beers with optional fields missing', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
       const beers: BeerfinderWithContainerType[] = [
         {
@@ -276,7 +276,7 @@ describe('MyBeersRepository', () => {
 
     it('should throw error on database failure during insert', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
       const beers: BeerfinderWithContainerType[] = [
         {
@@ -297,7 +297,7 @@ describe('MyBeersRepository', () => {
 
     it('should include all Beerfinder-specific fields in insert', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
       const beers: BeerfinderWithContainerType[] = [
         {
@@ -334,7 +334,7 @@ describe('MyBeersRepository', () => {
   describe('getAll', () => {
     it('should return all tasted beers ordered by id', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
       const mockBeers: BeerfinderWithContainerType[] = [
         {
@@ -373,7 +373,7 @@ describe('MyBeersRepository', () => {
 
     it('should return empty array when no tasted beers exist', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
 
       mockDatabase.getAllAsync.mockResolvedValue([]);
@@ -385,7 +385,7 @@ describe('MyBeersRepository', () => {
 
     it('should throw error on database failure', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
 
       mockDatabase.getAllAsync.mockRejectedValueOnce(new Error('Database error'));
@@ -397,7 +397,7 @@ describe('MyBeersRepository', () => {
   describe('getById', () => {
     it('should return tasted beer when found', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
       const mockBeer: BeerfinderWithContainerType = {
         id: '123',
@@ -424,7 +424,7 @@ describe('MyBeersRepository', () => {
 
     it('should return null when beer not found', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
 
       mockDatabase.getFirstAsync.mockResolvedValue(null);
@@ -436,7 +436,7 @@ describe('MyBeersRepository', () => {
 
     it('should handle empty ID string', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
 
       mockDatabase.getFirstAsync.mockResolvedValue(null);
@@ -452,7 +452,7 @@ describe('MyBeersRepository', () => {
 
     it('should throw error on database failure', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
 
       mockDatabase.getFirstAsync.mockRejectedValueOnce(new Error('Database error'));
@@ -464,7 +464,7 @@ describe('MyBeersRepository', () => {
   describe('clear', () => {
     it('should clear all tasted beers from the table', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
 
       mockDatabase.getFirstAsync
@@ -479,7 +479,7 @@ describe('MyBeersRepository', () => {
 
     it('should handle clearing empty table', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
 
       mockDatabase.getFirstAsync
@@ -493,7 +493,7 @@ describe('MyBeersRepository', () => {
 
     it('should throw error on database failure', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
 
       mockDatabase.runAsync.mockRejectedValueOnce(new Error('Database error'));
@@ -505,7 +505,7 @@ describe('MyBeersRepository', () => {
   describe('getCount', () => {
     it('should return count of tasted beers', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
 
       mockDatabase.getFirstAsync.mockResolvedValue({ count: 42 });
@@ -520,7 +520,7 @@ describe('MyBeersRepository', () => {
 
     it('should return 0 when no beers exist', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
 
       mockDatabase.getFirstAsync.mockResolvedValue({ count: 0 });
@@ -532,7 +532,7 @@ describe('MyBeersRepository', () => {
 
     it('should handle null count result', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
 
       mockDatabase.getFirstAsync.mockResolvedValue(null);
@@ -544,7 +544,7 @@ describe('MyBeersRepository', () => {
 
     it('should throw error on database failure', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
 
       mockDatabase.getFirstAsync.mockRejectedValueOnce(new Error('Database error'));
@@ -561,9 +561,9 @@ describe('MyBeersRepository', () => {
     // success. Rolling back and rejecting leaves the previous list intact.
     it('rejects rather than committing a partial list when a row insert fails', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
-      jest.spyOn(console, 'error').mockImplementation();
+      vi.spyOn(console, 'error').mockImplementation(() => {});
       const beers: BeerfinderWithContainerType[] = [
         {
           id: '1',
@@ -598,7 +598,7 @@ describe('MyBeersRepository', () => {
 
     it('should throw error on transaction failure', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
       const beers: BeerfinderWithContainerType[] = [
         {
@@ -628,7 +628,7 @@ describe('MyBeersRepository', () => {
 
     it('insertMany rethrows a database-is-locked failure as DatabaseContentionError', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
       const beers: BeerfinderWithContainerType[] = [
         {
@@ -651,7 +651,7 @@ describe('MyBeersRepository', () => {
 
     it('insertMany leaves an unrelated database failure unwrapped', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
       const beers: BeerfinderWithContainerType[] = [
         {
@@ -690,7 +690,7 @@ describe('MyBeersRepository', () => {
 
     it('insertMany throws when every supplied beer lacks an id', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
 
       await expect(createRepository().insertMany(idless)).rejects.toThrow(/lack/i);
 
@@ -699,7 +699,7 @@ describe('MyBeersRepository', () => {
 
     it('insertManyUnsafe throws when every supplied beer lacks an id', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
 
       await expect(createRepository().insertManyUnsafe(idless)).rejects.toThrow(/lack/i);
 
@@ -716,8 +716,8 @@ describe('MyBeersRepository', () => {
     // wedge permanently.
     it('replaceAllWithEmpty takes the master lock', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
-      const lockSpy = jest.spyOn(databaseLockManager, 'withDatabaseLock');
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
+      const lockSpy = vi.spyOn(databaseLockManager, 'withDatabaseLock');
 
       await createRepository().replaceAllWithEmpty();
 
@@ -730,8 +730,8 @@ describe('MyBeersRepository', () => {
 
     it('insertMany takes the master lock', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
-      const lockSpy = jest.spyOn(databaseLockManager, 'withDatabaseLock');
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
+      const lockSpy = vi.spyOn(databaseLockManager, 'withDatabaseLock');
 
       await createRepository().insertMany(
         nel([
@@ -756,8 +756,8 @@ describe('MyBeersRepository', () => {
 
     it('replaceAllWithEmptyUnsafe does NOT take the master lock', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
-      const lockSpy = jest.spyOn(databaseLockManager, 'withDatabaseLock');
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
+      const lockSpy = vi.spyOn(databaseLockManager, 'withDatabaseLock');
 
       await createRepository().replaceAllWithEmptyUnsafe();
 
@@ -769,8 +769,8 @@ describe('MyBeersRepository', () => {
 
     it('insertManyUnsafe does NOT take the master lock', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
-      const lockSpy = jest.spyOn(databaseLockManager, 'withDatabaseLock');
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
+      const lockSpy = vi.spyOn(databaseLockManager, 'withDatabaseLock');
 
       await createRepository().insertManyUnsafe(
         nel([
@@ -797,7 +797,7 @@ describe('MyBeersRepository', () => {
     // inferred from an array that happens to be empty.
     it('issues exactly one delete against the tasted table', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
 
       await createRepository().replaceAllWithEmpty();
 
@@ -809,7 +809,7 @@ describe('MyBeersRepository', () => {
 
     it('has an unlocked twin for callers already holding the master lock', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
 
       await createRepository().replaceAllWithEmptyUnsafe();
 
@@ -823,7 +823,7 @@ describe('MyBeersRepository', () => {
   describe('signature', () => {
     it('insertMany cannot be called with an empty array', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
 
       // Compile-time guard: the empty case now has an explicit method, so an
       // empty array must not be expressible as "insert these".
@@ -853,7 +853,7 @@ describe('MyBeersRepository', () => {
     // hours — the reported wrong-count symptom, reached without any wipe branch.
     it('insertMany rejects when a row insert fails', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
 
       mockDatabase.runAsync.mockImplementation(async (sql: string) =>
@@ -867,7 +867,7 @@ describe('MyBeersRepository', () => {
 
     it('insertMany reports the number of rows that failed to insert', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
 
       mockDatabase.runAsync.mockImplementation(async (sql: string) =>
@@ -883,7 +883,7 @@ describe('MyBeersRepository', () => {
 
     it('insertManyUnsafe rejects when a row insert fails', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
 
       mockDatabase.runAsync.mockImplementation(async (sql: string) =>
@@ -897,7 +897,7 @@ describe('MyBeersRepository', () => {
 
     it('surfaces a contention abort on a row as DatabaseContentionError, not a row-count error', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
 
       mockDatabase.runAsync.mockImplementation(async (sql: string) =>
@@ -927,7 +927,7 @@ describe('MyBeersRepository', () => {
 
     it('lets a row failure escape the transaction body so the engine rolls back', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
 
       // The mocked connection cannot model rollback, so assert the property that
@@ -960,7 +960,7 @@ describe('MyBeersRepository', () => {
   describe('insertManyUnsafe contention mapping', () => {
     it('maps a lock abort on replaceAllWithEmpty to DatabaseContentionError', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
 
       mockDatabase.withTransactionAsync.mockRejectedValueOnce(new Error('database is locked'));
@@ -974,7 +974,7 @@ describe('MyBeersRepository', () => {
 
     it('maps a lock abort on the locked clear to DatabaseContentionError', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
 
       mockDatabase.withTransactionAsync.mockRejectedValueOnce(new Error('database is locked'));
@@ -988,7 +988,7 @@ describe('MyBeersRepository', () => {
   describe('insertManyUnsafe', () => {
     it('should insert beers without acquiring lock', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
       const beers: BeerfinderWithContainerType[] = [
         {
@@ -1027,9 +1027,9 @@ describe('MyBeersRepository', () => {
     // INVERTED by plan 02 Phase 2, same reasoning as the locked twin.
     it('should route an empty payload through replaceAllWithEmptyUnsafe', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
-      jest.spyOn(console, 'log').mockImplementation();
+      vi.spyOn(console, 'log').mockImplementation(() => {});
       mockDatabase.getFirstAsync.mockResolvedValue({ count: 5 });
 
       await repository.replaceAllWithEmptyUnsafe();
@@ -1040,9 +1040,9 @@ describe('MyBeersRepository', () => {
     // INVERTED by plan 02 Phase 2, same reasoning as the locked twin.
     it('should throw rather than clear when all beers invalid', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
-      jest.spyOn(console, 'log').mockImplementation();
+      vi.spyOn(console, 'log').mockImplementation(() => {});
       const beers: BeerfinderWithContainerType[] = [
         {
           id: '',
@@ -1066,7 +1066,7 @@ describe('MyBeersRepository', () => {
 
     it('should process beers in batches of 20', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
       const beers: BeerfinderWithContainerType[] = Array.from({ length: 50 }, (_, i) => ({
         id: `beer-${i}`,
@@ -1091,9 +1091,9 @@ describe('MyBeersRepository', () => {
 
     it('should skip beers without IDs during insert', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
-      jest.spyOn(console, 'log').mockImplementation();
+      vi.spyOn(console, 'log').mockImplementation(() => {});
       const beers: BeerfinderWithContainerType[] = [
         {
           id: '1',
@@ -1138,9 +1138,9 @@ describe('MyBeersRepository', () => {
     // reasoning as its locked twin above.
     it('rejects rather than committing a partial list when a row insert fails', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
-      jest.spyOn(console, 'error').mockImplementation();
+      vi.spyOn(console, 'error').mockImplementation(() => {});
       const beers: BeerfinderWithContainerType[] = [
         {
           id: '1',
@@ -1163,7 +1163,7 @@ describe('MyBeersRepository', () => {
 
     it('should throw error on transaction failure', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
       const beers: BeerfinderWithContainerType[] = [
         {
@@ -1194,7 +1194,7 @@ describe('MyBeersRepository', () => {
   describe('lock lifetime', () => {
     it('does not leave the lock held when the write throws', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
       const beers: BeerfinderWithContainerType[] = [
         {
@@ -1218,7 +1218,7 @@ describe('MyBeersRepository', () => {
 
     it('does not leave the lock held on a successful write', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
       const beers: BeerfinderWithContainerType[] = [
         {

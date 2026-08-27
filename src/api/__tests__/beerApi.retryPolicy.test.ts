@@ -1,4 +1,4 @@
-import { vi } from 'vitest';
+import { vi, type Mock } from 'vitest';
 /**
  * What `fetchWithRetry` retries, and how long the whole chain may take.
  *
@@ -27,7 +27,7 @@ import { config } from '@/src/config';
 
 vi.mock('../../database/preferences');
 
-global.fetch = jest.fn();
+global.fetch = vi.fn();
 
 const abortError = (): Error => {
   const error = new Error('The operation was aborted');
@@ -57,7 +57,7 @@ const serverError = () => ({ ok: false, status: 500, statusText: 'Internal Serve
  * `beforeEach` would discard anything installed at module scope.
  */
 const installMemberPrefs = (): void => {
-  (preferences.getPreference as jest.Mock).mockImplementation((key: string) => {
+  (preferences.getPreference as Mock).mockImplementation((key: string) => {
     if (key === 'is_visitor_mode') return Promise.resolve('false');
     if (key === 'my_beers_api_url') return Promise.resolve('https://example.com/my.json');
     return Promise.resolve(null);
@@ -73,14 +73,12 @@ const installMemberPrefs = (): void => {
  */
 const capturedSignals = (): AbortSignal[] => {
   const signals: AbortSignal[] = [];
-  (global.fetch as jest.Mock).mockImplementation(
-    (_url: string, options: { signal: AbortSignal }) => {
-      signals.push(options.signal);
-      return new Promise((_resolve, reject) => {
-        options.signal.addEventListener('abort', () => reject(abortError()));
-      });
-    }
-  );
+  (global.fetch as Mock).mockImplementation((_url: string, options: { signal: AbortSignal }) => {
+    signals.push(options.signal);
+    return new Promise((_resolve, reject) => {
+      options.signal.addEventListener('abort', () => reject(abortError()));
+    });
+  });
   return signals;
 };
 
@@ -93,13 +91,13 @@ describe('fetchWithRetry retry policy', () => {
     // That is how the 404 case came to be served the 200 the 400 case never
     // used, and it is the same leak `beerApi.test.ts` was found carrying in
     // Phase 5.2, reached from the other direction.
-    jest.resetAllMocks();
-    jest.useFakeTimers();
+    vi.resetAllMocks();
+    vi.useFakeTimers();
   });
 
   afterEach(() => {
-    jest.useRealTimers();
-    jest.restoreAllMocks();
+    vi.useRealTimers();
+    vi.restoreAllMocks();
   });
 
   describe('which failures are worth a second attempt', () => {
@@ -128,7 +126,7 @@ describe('fetchWithRetry retry policy', () => {
       'makes $attempts attempt(s) for a $status — $why',
       async ({ status, statusText, attempts }) => {
         const payload = { brewInStock: [] };
-        (global.fetch as jest.Mock)
+        (global.fetch as Mock)
           .mockResolvedValueOnce({ ok: false, status, statusText })
           .mockResolvedValueOnce({ ok: true, json: async () => payload });
 
@@ -142,7 +140,7 @@ describe('fetchWithRetry retry policy', () => {
 
         // Past every backoff a retrying implementation would have taken, so the
         // call count below is the finished total rather than a snapshot.
-        await jest.advanceTimersByTimeAsync(1000);
+        await vi.advanceTimersByTimeAsync(1000);
 
         expect(global.fetch).toHaveBeenCalledTimes(attempts);
         expect(await settled).toBe(attempts === 1 ? 'rejected' : 'resolved');
@@ -157,12 +155,12 @@ describe('fetchWithRetry retry policy', () => {
       // that is wrong for a weak link, which is the case this whole file exists
       // for. One retry, inside the deadline already computed.
       const payload = { brewInStock: [] };
-      (global.fetch as jest.Mock)
+      (global.fetch as Mock)
         .mockResolvedValueOnce(unreadableBody())
         .mockResolvedValueOnce({ ok: true, json: async () => payload });
 
       const result = fetchWithRetry(config.api.baseUrl, 3, 10);
-      await jest.advanceTimersByTimeAsync(1000);
+      await vi.advanceTimersByTimeAsync(1000);
 
       await expect(result).resolves.toEqual(payload);
       expect(global.fetch).toHaveBeenCalledTimes(2);
@@ -174,12 +172,12 @@ describe('fetchWithRetry retry policy', () => {
       // decremented" survive the rest of the set. A captive portal is still a
       // captive portal on the second ask; the retry buys one chance at a
       // truncation, not a loop.
-      (global.fetch as jest.Mock).mockResolvedValue(unreadableBody());
+      (global.fetch as Mock).mockResolvedValue(unreadableBody());
 
       const result = fetchWithRetry(config.api.baseUrl, 3, 10);
       const rejection = expect(result).rejects.toThrow(UnreadableBodyError);
 
-      await jest.advanceTimersByTimeAsync(1000);
+      await vi.advanceTimersByTimeAsync(1000);
 
       expect(global.fetch).toHaveBeenCalledTimes(2);
       await rejection;
@@ -196,7 +194,7 @@ describe('fetchWithRetry retry policy', () => {
       // stops this quietly becoming an assertion about attempt 1.
       const signals: AbortSignal[] = [];
       let calls = 0;
-      (global.fetch as jest.Mock).mockImplementation(
+      (global.fetch as Mock).mockImplementation(
         (_url: string, options: { signal: AbortSignal }) => {
           signals.push(options.signal);
           calls += 1;
@@ -211,7 +209,7 @@ describe('fetchWithRetry retry policy', () => {
       const result = fetchWithRetry(config.api.baseUrl, 3, backoff);
       const rejection = expect(result).rejects.toThrow(TransportAbortedError);
 
-      await jest.advanceTimersByTimeAsync(config.network.timeout);
+      await vi.advanceTimersByTimeAsync(config.network.timeout);
 
       expect(signals).toHaveLength(2);
       expect(signals[1].aborted).toBe(true);
@@ -226,7 +224,7 @@ describe('fetchWithRetry retry policy', () => {
       // Kills "`retries` not decremented" and "the ordinary retry DECREMENTS the
       // unreadable cap" — the latter would stop at 2, because attempt 2 would
       // find the cap already spent by attempt 1's ordinary retry.
-      (global.fetch as jest.Mock)
+      (global.fetch as Mock)
         .mockResolvedValueOnce(serverError())
         .mockResolvedValueOnce(unreadableBody())
         .mockResolvedValueOnce(serverError());
@@ -234,7 +232,7 @@ describe('fetchWithRetry retry policy', () => {
       const result = fetchWithRetry(config.api.baseUrl, 3, 10);
       const rejection = expect(result).rejects.toThrow('HTTP 500 Internal Server Error');
 
-      await jest.advanceTimersByTimeAsync(1000);
+      await vi.advanceTimersByTimeAsync(1000);
 
       expect(global.fetch).toHaveBeenCalledTimes(3);
       await rejection;
@@ -251,7 +249,7 @@ describe('fetchWithRetry retry policy', () => {
       // the reset happens. Only a sequence whose unreadable attempt comes FIRST
       // can see the difference. (The plan claimed one test killed both; it does
       // not.)
-      (global.fetch as jest.Mock)
+      (global.fetch as Mock)
         .mockResolvedValueOnce(unreadableBody())
         .mockResolvedValueOnce(serverError())
         .mockResolvedValueOnce(unreadableBody());
@@ -259,7 +257,7 @@ describe('fetchWithRetry retry policy', () => {
       const result = fetchWithRetry(config.api.baseUrl, 4, 10);
       const rejection = expect(result).rejects.toThrow(UnreadableBodyError);
 
-      await jest.advanceTimersByTimeAsync(1000);
+      await vi.advanceTimersByTimeAsync(1000);
 
       expect(global.fetch).toHaveBeenCalledTimes(3);
       await rejection;
@@ -270,7 +268,7 @@ describe('fetchWithRetry retry policy', () => {
       // the unreadable branch, because that branch is evaluated BEFORE the
       // shared `retries <= 1` exit further down. Without the re-check this makes
       // a fourth request the budget does not have.
-      (global.fetch as jest.Mock)
+      (global.fetch as Mock)
         .mockResolvedValueOnce(serverError())
         .mockResolvedValueOnce(serverError())
         .mockResolvedValueOnce(unreadableBody());
@@ -278,7 +276,7 @@ describe('fetchWithRetry retry policy', () => {
       const result = fetchWithRetry(config.api.baseUrl, 3, 10);
       const rejection = expect(result).rejects.toThrow(UnreadableBodyError);
 
-      await jest.advanceTimersByTimeAsync(1000);
+      await vi.advanceTimersByTimeAsync(1000);
 
       expect(global.fetch).toHaveBeenCalledTimes(3);
       await rejection;
@@ -287,12 +285,12 @@ describe('fetchWithRetry retry policy', () => {
     it('does not retry past the original deadline boundary', async () => {
       // The deadline guard is re-checked in this branch for the same reason as
       // `retries`: the unreadable exit is evaluated before the shared one.
-      (global.fetch as jest.Mock).mockResolvedValue(unreadableBody());
+      (global.fetch as Mock).mockResolvedValue(unreadableBody());
 
       const result = fetchWithRetry(config.api.baseUrl, 3, config.network.timeout);
       const rejection = expect(result).rejects.toThrow(UnreadableBodyError);
 
-      await jest.advanceTimersByTimeAsync(config.network.timeout + 1);
+      await vi.advanceTimersByTimeAsync(config.network.timeout + 1);
 
       expect(global.fetch).toHaveBeenCalledTimes(1);
       await rejection;
@@ -312,12 +310,12 @@ describe('fetchWithRetry retry policy', () => {
       //
       // Pinned against the exported constant rather than a hard-coded 1000, so
       // changing the value does not silently make this test about nothing.
-      (global.fetch as jest.Mock).mockResolvedValue(unreadableBody());
+      (global.fetch as Mock).mockResolvedValue(unreadableBody());
 
       const result = fetchWithRetry(config.api.baseUrl, 3, config.network.timeout - MIN_ATTEMPT_MS);
       const rejection = expect(result).rejects.toThrow(UnreadableBodyError);
 
-      await jest.advanceTimersByTimeAsync(config.network.timeout + 1);
+      await vi.advanceTimersByTimeAsync(config.network.timeout + 1);
 
       expect(global.fetch).toHaveBeenCalledTimes(1);
       await rejection;
@@ -342,12 +340,12 @@ describe('fetchWithRetry retry policy', () => {
       ['refuses to start an attempt with only 500ms of budget left', 500, 1],
       ['still starts an attempt with 1500ms of budget left', 1500, 2],
     ])('%s', async (_label, headroom, expectedCalls) => {
-      (global.fetch as jest.Mock).mockResolvedValue(unreadableBody());
+      (global.fetch as Mock).mockResolvedValue(unreadableBody());
 
       const result = fetchWithRetry(config.api.baseUrl, 3, config.network.timeout - headroom);
       const rejection = expect(result).rejects.toThrow(UnreadableBodyError);
 
-      await jest.advanceTimersByTimeAsync(config.network.timeout + 1);
+      await vi.advanceTimersByTimeAsync(config.network.timeout + 1);
 
       expect(global.fetch).toHaveBeenCalledTimes(expectedCalls);
       await rejection;
@@ -362,16 +360,16 @@ describe('fetchWithRetry retry policy', () => {
       // ("retrying once in ${delay}ms") becomes a lie.
       const payload = { brewInStock: [] };
       const backoff = 1000;
-      (global.fetch as jest.Mock)
+      (global.fetch as Mock)
         .mockResolvedValueOnce(unreadableBody())
         .mockResolvedValueOnce({ ok: true, json: async () => payload });
 
       const result = fetchWithRetry(config.api.baseUrl, 3, backoff);
 
-      await jest.advanceTimersByTimeAsync(backoff - 1);
+      await vi.advanceTimersByTimeAsync(backoff - 1);
       expect(global.fetch).toHaveBeenCalledTimes(1);
 
-      await jest.advanceTimersByTimeAsync(2);
+      await vi.advanceTimersByTimeAsync(2);
       expect(global.fetch).toHaveBeenCalledTimes(2);
       await expect(result).resolves.toEqual(payload);
     });
@@ -380,15 +378,15 @@ describe('fetchWithRetry retry policy', () => {
       const memberId = 'SENTINEL_MEMBER_12345';
       const memberUrl = `https://fsbs.beerknurd.com/bk-member-json.php?uid=${memberId}`;
       const payload = { brewInStock: [] };
-      (global.fetch as jest.Mock)
+      (global.fetch as Mock)
         .mockResolvedValueOnce(unreadableBody())
         .mockResolvedValueOnce({ ok: true, json: async () => payload });
 
       const result = fetchWithRetry(memberUrl, 3, 10);
-      await jest.advanceTimersByTimeAsync(1000);
+      await vi.advanceTimersByTimeAsync(1000);
       await expect(result).resolves.toEqual(payload);
 
-      const logged = JSON.stringify((console.log as jest.Mock).mock.calls);
+      const logged = JSON.stringify((console.log as Mock).mock.calls);
       expect(logged).toContain('2 retries left');
       expect(logged).not.toContain(memberId);
     });
@@ -401,7 +399,7 @@ describe('fetchWithRetry retry policy', () => {
       ['across an unreadable retry', () => unreadableBody()],
       ['on the ordinary retry', () => serverError()],
     ])('grows the backoff %s', async (_label, first) => {
-      (global.fetch as jest.Mock)
+      (global.fetch as Mock)
         .mockResolvedValueOnce(first())
         .mockResolvedValueOnce(serverError())
         .mockResolvedValueOnce({ ok: true, json: async () => ({ brewInStock: [] }) });
@@ -413,10 +411,10 @@ describe('fetchWithRetry retry policy', () => {
       );
 
       // Past a flat-backoff third attempt (2000) and short of a growing one (2500).
-      await jest.advanceTimersByTimeAsync(2400);
+      await vi.advanceTimersByTimeAsync(2400);
       expect(global.fetch).toHaveBeenCalledTimes(2);
 
-      await jest.advanceTimersByTimeAsync(200);
+      await vi.advanceTimersByTimeAsync(200);
       expect(global.fetch).toHaveBeenCalledTimes(3);
       await settled;
     });
@@ -427,7 +425,7 @@ describe('fetchWithRetry retry policy', () => {
       // patch stopped filing it as the server's fault — so carrying it forward
       // would report the least informative thing that happened.
       let calls = 0;
-      (global.fetch as jest.Mock).mockImplementation(
+      (global.fetch as Mock).mockImplementation(
         (_url: string, options: { signal: AbortSignal }) => {
           calls += 1;
           if (calls === 1) return Promise.resolve(unreadableBody());
@@ -441,7 +439,7 @@ describe('fetchWithRetry retry policy', () => {
       const rejection = expect(result).rejects.toThrow(TransportAbortedError);
       const notUnreadable = expect(result).rejects.not.toThrow(UnreadableBodyError);
 
-      await jest.advanceTimersByTimeAsync(config.network.timeout + 1);
+      await vi.advanceTimersByTimeAsync(config.network.timeout + 1);
 
       await rejection;
       await notUnreadable;
@@ -456,7 +454,7 @@ describe('fetchWithRetry retry policy', () => {
       //
       // Nothing else in the suite distinguishes pass-through from `undefined`.
       let calls = 0;
-      (global.fetch as jest.Mock).mockImplementation(
+      (global.fetch as Mock).mockImplementation(
         (_url: string, options: { signal: AbortSignal }) => {
           calls += 1;
           if (calls === 1) return Promise.resolve(serverError());
@@ -470,7 +468,7 @@ describe('fetchWithRetry retry policy', () => {
       const result = fetchWithRetry(config.api.baseUrl, 3, 1000);
       const rejection = expect(result).rejects.toThrow('HTTP 500 Internal Server Error');
 
-      await jest.advanceTimersByTimeAsync(config.network.timeout + 1);
+      await vi.advanceTimersByTimeAsync(config.network.timeout + 1);
 
       expect(calls).toBe(3);
       await rejection;
@@ -486,10 +484,10 @@ describe('fetchWithRetry retry policy', () => {
       // all, which is the same construct that disqualifies them for the tests
       // above.
       installMemberPrefs();
-      (global.fetch as jest.Mock).mockResolvedValue(unreadableBody());
+      (global.fetch as Mock).mockResolvedValue(unreadableBody());
 
       const pending = fetchMyBeersFromAPI();
-      await jest.advanceTimersByTimeAsync(config.network.timeout + 1);
+      await vi.advanceTimersByTimeAsync(config.network.timeout + 1);
       const outcome = await pending;
 
       expect(outcome.status).toBe('failed');
@@ -503,7 +501,7 @@ describe('fetchWithRetry retry policy', () => {
       // retry. Stated as a test because "cannot" is worth pinning, and the
       // mutation it guards lives in `fetchMyBeersFromAPI`.
       installMemberPrefs();
-      (global.fetch as jest.Mock).mockResolvedValue({
+      (global.fetch as Mock).mockResolvedValue({
         ok: true,
         status: 200,
         statusText: 'OK',
@@ -511,7 +509,7 @@ describe('fetchWithRetry retry policy', () => {
       });
 
       const pending = fetchMyBeersFromAPI();
-      await jest.advanceTimersByTimeAsync(config.network.timeout + 1);
+      await vi.advanceTimersByTimeAsync(config.network.timeout + 1);
       const outcome = await pending;
 
       expect(outcome.status).toBe('fetched');
@@ -523,12 +521,12 @@ describe('fetchWithRetry retry policy', () => {
       // every rejection to the non-retry path would silently delete backoff for
       // the dropped-connection case this whole plan exists for.
       const payload = { brewInStock: [] };
-      (global.fetch as jest.Mock)
+      (global.fetch as Mock)
         .mockRejectedValueOnce(new TypeError('Network request failed'))
         .mockResolvedValueOnce({ ok: true, json: async () => payload });
 
       const result = fetchWithRetry(config.api.baseUrl, 3, 10);
-      await jest.advanceTimersByTimeAsync(15);
+      await vi.advanceTimersByTimeAsync(15);
 
       await expect(result).resolves.toEqual(payload);
       expect(global.fetch).toHaveBeenCalledTimes(2);
@@ -538,7 +536,7 @@ describe('fetchWithRetry retry policy', () => {
   describe('the deadline bounds the chain, not the attempt', () => {
     it('does not give an attempt more than one configured timeout after the clock moves backward', async () => {
       const signals = capturedSignals();
-      (global.fetch as jest.Mock).mockRejectedValueOnce(new TypeError('Network request failed'));
+      (global.fetch as Mock).mockRejectedValueOnce(new TypeError('Network request failed'));
 
       const backoff = 1000;
       const result = fetchWithRetry(config.api.baseUrl, 3, backoff);
@@ -547,11 +545,11 @@ describe('fetchWithRetry retry policy', () => {
       // The chain deadline was computed before this adjustment. The old
       // `deadline - Date.now()` timer treated the backward minute as new budget
       // and let attempt 2 wait 60 seconds longer than any configured attempt.
-      jest.setSystemTime(Date.now() - 60_000);
-      await jest.advanceTimersByTimeAsync(backoff);
+      vi.setSystemTime(Date.now() - 60_000);
+      await vi.advanceTimersByTimeAsync(backoff);
       expect(signals).toHaveLength(1);
 
-      await jest.advanceTimersByTimeAsync(config.network.timeout);
+      await vi.advanceTimersByTimeAsync(config.network.timeout);
 
       expect(signals[0].aborted).toBe(true);
       await rejection;
@@ -563,7 +561,7 @@ describe('fetchWithRetry retry policy', () => {
       // stalled attempt 2 alone. The length assertion below pins that, so this
       // does not quietly become an assertion about attempt 1.
       const signals = capturedSignals();
-      (global.fetch as jest.Mock).mockRejectedValueOnce(new TypeError('Network request failed'));
+      (global.fetch as Mock).mockRejectedValueOnce(new TypeError('Network request failed'));
 
       const backoff = 1000;
       const result = fetchWithRetry(config.api.baseUrl, 3, backoff);
@@ -575,11 +573,11 @@ describe('fetchWithRetry retry policy', () => {
 
       // Attempt 1 fails at once; the backoff carries us to T=backoff, where
       // attempt 2 starts.
-      await jest.advanceTimersByTimeAsync(backoff);
+      await vi.advanceTimersByTimeAsync(backoff);
       expect(signals).toHaveLength(1);
 
       // Now to T=timeout exactly — the chain's whole budget, spent.
-      await jest.advanceTimersByTimeAsync(config.network.timeout - backoff);
+      await vi.advanceTimersByTimeAsync(config.network.timeout - backoff);
 
       // Per-chain: attempt 2 inherited `timeout - backoff` and is done.
       // Per-attempt: attempt 2 got a fresh `timeout` and has `backoff` still to
@@ -607,7 +605,7 @@ describe('fetchWithRetry retry policy', () => {
         { ok: false, status: 500, statusText: 'Internal Server Error' },
       ];
       let attempts = 0;
-      (global.fetch as jest.Mock).mockImplementation(
+      (global.fetch as Mock).mockImplementation(
         (_url: string, options: { signal: AbortSignal }) =>
           new Promise((resolve, reject) => {
             attempts += 1;
@@ -622,7 +620,7 @@ describe('fetchWithRetry retry policy', () => {
       const result = fetchWithRetry(config.api.baseUrl);
       const rejection = expect(result).rejects.toThrow('HTTP 500 Internal Server Error');
 
-      await jest.advanceTimersByTimeAsync(config.network.timeout + 1);
+      await vi.advanceTimersByTimeAsync(config.network.timeout + 1);
 
       // Three attempts: two real 500s, then one armed with the sliver of
       // budget left, which aborts. The abort must not become the answer.
@@ -635,12 +633,12 @@ describe('fetchWithRetry retry policy', () => {
       // after the deadline, so the attempt it schedules is born already aborted.
       // Reporting the failure that actually happened beats spending the wait to
       // manufacture an AbortError that describes nothing.
-      (global.fetch as jest.Mock).mockRejectedValue(new TypeError('Network request failed'));
+      (global.fetch as Mock).mockRejectedValue(new TypeError('Network request failed'));
 
       const result = fetchWithRetry(config.api.baseUrl, 3, config.network.timeout);
       const rejection = expect(result).rejects.toThrow('Network request failed');
 
-      await jest.advanceTimersByTimeAsync(config.network.timeout + 1);
+      await vi.advanceTimersByTimeAsync(config.network.timeout + 1);
 
       expect(global.fetch).toHaveBeenCalledTimes(1);
       await rejection;

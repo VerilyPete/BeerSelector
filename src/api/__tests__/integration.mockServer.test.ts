@@ -1,4 +1,4 @@
-import { vi } from 'vitest';
+import { vi, type MockedFunction } from 'vitest';
 /**
  * API Integration Tests with Mock Server
  *
@@ -29,7 +29,7 @@ process.env.EXPO_PUBLIC_API_RETRY_DELAY = '100';
 vi.mock('@/src/database/preferences');
 
 // IMPORTANT: Do NOT mock fetch - we need real HTTP calls to the mock server
-// Save the real fetch before jest.setup.js mocks it
+// Save the real fetch before src/__vitest__/setup.ts mocks it
 const realFetch = global.fetch;
 
 /**
@@ -47,13 +47,13 @@ function rowsOf<T>(source: FetchedSource<FetchOutcome<T>>): T[] {
 describe('API Integration with Mock Server', () => {
   let mockServer: any;
   let cleanup: () => Promise<void>;
-  const mockGetPreference = preferences.getPreference as jest.MockedFunction<
+  const mockGetPreference = preferences.getPreference as MockedFunction<
     typeof preferences.getPreference
   >;
 
   beforeAll(async () => {
     // Use real timers for integration tests (we need real HTTP delays)
-    jest.useRealTimers();
+    vi.useRealTimers();
 
     // Restore real fetch for integration tests
     const nodeFetch = (await import('node-fetch')) as unknown as { default: typeof global.fetch };
@@ -75,7 +75,7 @@ describe('API Integration with Mock Server', () => {
   beforeEach(async () => {
     mockServer.clearHistory();
     mockServer.clearAllResponses();
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   // =========================================================================

@@ -43,11 +43,6 @@ export default defineConfig({
           .pathname,
       },
       {
-        // A few suites import it explicitly; it throws outside jest.
-        find: /^@jest\/globals$/,
-        replacement: new URL('./src/__vitest__/jest-globals-shim.ts', import.meta.url).pathname,
-      },
-      {
         // tsconfig's `@/*` -> `./*`; vite does not read tsconfig paths.
         find: /^@\//,
         replacement: new URL('./', import.meta.url).pathname,

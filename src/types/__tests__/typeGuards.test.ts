@@ -61,7 +61,6 @@ describe('Type Guards', () => {
         expect(isSessionData(null)).toBe(false);
       });
     });
-
   });
 
   describe('Database Type Guards', () => {

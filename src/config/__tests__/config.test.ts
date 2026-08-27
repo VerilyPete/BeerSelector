@@ -1,3 +1,4 @@
+import { expect } from 'vitest';
 /**
  * Configuration Module Tests (TDD - Red Phase)
  *
@@ -293,29 +294,3 @@ describe('assertEnrichmentConfigured', () => {
     expect(typeof narrowed.apiKey).toBe('string');
   });
 });
-
-// Custom Jest matcher for environment enum check
-expect.extend({
-  toBeOneOf(received: unknown, expected: unknown[]) {
-    const pass = expected.includes(received);
-    if (pass) {
-      return {
-        message: () => `expected ${received} not to be one of ${expected.join(', ')}`,
-        pass: true,
-      };
-    } else {
-      return {
-        message: () => `expected ${received} to be one of ${expected.join(', ')}`,
-        pass: false,
-      };
-    }
-  },
-});
-
-declare global {
-  namespace jest {
-    interface Matchers<R> {
-      toBeOneOf(expected: unknown[]): R;
-    }
-  }
-}

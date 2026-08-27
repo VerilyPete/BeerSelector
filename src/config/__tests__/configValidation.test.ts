@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 /**
  * Configuration Validation Tests (TDD - Red Phase)
  *
@@ -37,7 +38,7 @@ describe('Configuration Validation', () => {
 
   beforeEach(async () => {
     // Reset modules to get fresh config instance
-    jest.resetModules();
+    vi.resetModules();
     // Clone process.env for each test
     process.env = { ...originalEnv };
   });

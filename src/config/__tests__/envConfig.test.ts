@@ -1,3 +1,4 @@
+import { vi, expect } from 'vitest';
 /**
  * Environment Variable Configuration Tests (TDD - Red Phase)
  *
@@ -20,7 +21,7 @@ describe('Environment Variable Configuration', () => {
 
   beforeEach(async () => {
     // Reset modules to get fresh config instance
-    jest.resetModules();
+    vi.resetModules();
 
     // Clear all EXPO_PUBLIC_* environment variables to prevent .env.development from interfering
     Object.keys(process.env).forEach(key => {
@@ -321,29 +322,3 @@ describe('Environment Variable Configuration', () => {
     });
   });
 });
-
-// Custom Jest matcher (if not already defined in other test file)
-expect.extend({
-  toBeOneOf(received: unknown, expected: unknown[]) {
-    const pass = expected.includes(received);
-    if (pass) {
-      return {
-        message: () => `expected ${received} not to be one of ${expected.join(', ')}`,
-        pass: true,
-      };
-    } else {
-      return {
-        message: () => `expected ${received} to be one of ${expected.join(', ')}`,
-        pass: false,
-      };
-    }
-  },
-});
-
-declare global {
-  namespace jest {
-    interface Matchers<R> {
-      toBeOneOf(expected: unknown[]): R;
-    }
-  }
-}

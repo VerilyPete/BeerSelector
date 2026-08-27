@@ -1,4 +1,4 @@
-import { vi } from 'vitest';
+import { vi, type Mock } from 'vitest';
 /**
  * Repository Validation Integration Tests
  *
@@ -20,20 +20,20 @@ import * as connection from '../../connection';
 vi.mock('../../connection');
 
 type MockDatabase = {
-  withTransactionAsync: jest.Mock;
-  runAsync: jest.Mock;
-  getAllAsync: jest.Mock;
-  getFirstAsync: jest.Mock;
+  withTransactionAsync: Mock;
+  runAsync: Mock;
+  getAllAsync: Mock;
+  getFirstAsync: Mock;
 };
 
 function createMockDatabase(): MockDatabase {
   const mockDatabase: MockDatabase = {
-    withTransactionAsync: jest.fn(async (callback: () => Promise<void>) => await callback()),
-    runAsync: jest.fn(),
-    getAllAsync: jest.fn(),
-    getFirstAsync: jest.fn(),
+    withTransactionAsync: vi.fn(async (callback: () => Promise<void>) => await callback()),
+    runAsync: vi.fn(),
+    getAllAsync: vi.fn(),
+    getFirstAsync: vi.fn(),
   };
-  (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+  (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
   return mockDatabase;
 }
 
@@ -272,7 +272,7 @@ describe('Repository Validation Integration', () => {
     it('should throw when the database returns null', async () => {
       const mockDatabase = createMockDatabase();
       const repository = new RewardsRepository();
-      jest.spyOn(console, 'error').mockImplementation();
+      vi.spyOn(console, 'error').mockImplementation(() => {});
       mockDatabase.getAllAsync.mockResolvedValue(null);
 
       // Was "handles null gracefully" — which meant a `rows.filter` TypeError

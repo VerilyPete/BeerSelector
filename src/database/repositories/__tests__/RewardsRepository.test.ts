@@ -1,4 +1,4 @@
-import { vi } from 'vitest';
+import { vi, type Mock } from 'vitest';
 /**
  * Comprehensive tests for RewardsRepository
  * Tests CRUD operations for Reward entity using TDD approach
@@ -13,18 +13,18 @@ import { databaseLockManager } from '../../locks';
 vi.mock('../../connection');
 
 type MockDatabase = {
-  withTransactionAsync: jest.Mock;
-  runAsync: jest.Mock;
-  getAllAsync: jest.Mock;
-  getFirstAsync: jest.Mock;
+  withTransactionAsync: Mock;
+  runAsync: Mock;
+  getAllAsync: Mock;
+  getFirstAsync: Mock;
 };
 
 function createMockDatabase(): MockDatabase {
   return {
-    withTransactionAsync: jest.fn(async (callback: () => Promise<void>) => await callback()),
-    runAsync: jest.fn(),
-    getAllAsync: jest.fn(),
-    getFirstAsync: jest.fn(),
+    withTransactionAsync: vi.fn(async (callback: () => Promise<void>) => await callback()),
+    runAsync: vi.fn(),
+    getAllAsync: vi.fn(),
+    getFirstAsync: vi.fn(),
   };
 }
 
@@ -43,7 +43,7 @@ describe('RewardsRepository', () => {
     // a table has to be asked for, never inferred from an empty payload.
     it('empties the rewards table', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       mockDatabase.runAsync.mockResolvedValue({ changes: 3 });
 
       await createRepository().replaceAllWithEmpty();
@@ -53,9 +53,9 @@ describe('RewardsRepository', () => {
 
     it('takes the master lock', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       mockDatabase.runAsync.mockResolvedValue({ changes: 0 });
-      const lockSpy = jest.spyOn(databaseLockManager, 'withDatabaseLock');
+      const lockSpy = vi.spyOn(databaseLockManager, 'withDatabaseLock');
 
       await createRepository().replaceAllWithEmpty();
 
@@ -70,9 +70,9 @@ describe('RewardsRepository', () => {
       // The refresh paths call this while already holding the write lock; a
       // nested acquisition there is the contention the master lock removed.
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       mockDatabase.runAsync.mockResolvedValue({ changes: 0 });
-      const lockSpy = jest.spyOn(databaseLockManager, 'withDatabaseLock');
+      const lockSpy = vi.spyOn(databaseLockManager, 'withDatabaseLock');
 
       await createRepository().replaceAllWithEmptyUnsafe();
 
@@ -85,7 +85,7 @@ describe('RewardsRepository', () => {
   describe('insertMany', () => {
     it('should insert multiple rewards in batches', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
       const rewards: Reward[] = [
         {
@@ -117,10 +117,10 @@ describe('RewardsRepository', () => {
 
     it('should handle empty array by returning early', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
-      (connection.getDatabase as jest.Mock).mockClear();
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockClear();
       const repository = createRepository();
-      jest.spyOn(console, 'log').mockImplementation();
+      vi.spyOn(console, 'log').mockImplementation(() => {});
 
       await repository.insertMany([]);
 
@@ -130,10 +130,10 @@ describe('RewardsRepository', () => {
 
     it('should handle null rewards array', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
-      (connection.getDatabase as jest.Mock).mockClear();
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockClear();
       const repository = createRepository();
-      jest.spyOn(console, 'log').mockImplementation();
+      vi.spyOn(console, 'log').mockImplementation(() => {});
 
       await repository.insertMany(null as any);
 
@@ -142,7 +142,7 @@ describe('RewardsRepository', () => {
 
     it('should process rewards in batches of 100', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
       const rewards: Reward[] = Array.from({ length: 250 }, (_, i) => ({
         reward_id: `reward-${i}`,
@@ -164,7 +164,7 @@ describe('RewardsRepository', () => {
 
     it('should handle rewards with empty optional fields', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
       const rewards: Reward[] = [
         {
@@ -185,7 +185,7 @@ describe('RewardsRepository', () => {
 
     it('should use placeholders for each reward', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
       const rewards: Reward[] = [
         { reward_id: '1', redeemed: 'false', reward_type: 'plate' },
@@ -204,7 +204,7 @@ describe('RewardsRepository', () => {
 
     it('should throw error on database failure', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
       const rewards: Reward[] = [{ reward_id: '1', redeemed: 'false', reward_type: 'plate' }];
 
@@ -215,7 +215,7 @@ describe('RewardsRepository', () => {
 
     it('should handle missing reward_id by using empty string', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
       const rewards: Reward[] = [
         {
@@ -235,7 +235,7 @@ describe('RewardsRepository', () => {
 
     it('should clear table before inserting', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
       const rewards: Reward[] = [{ reward_id: '1', redeemed: 'false', reward_type: 'plate' }];
 
@@ -250,6 +250,9 @@ describe('RewardsRepository', () => {
       );
 
       // Delete should come before insert
+      if (!deleteCall || !insertCall) {
+        throw new Error('expected both a DELETE and an INSERT OR REPLACE call');
+      }
       expect(calls.indexOf(deleteCall)).toBeLessThan(calls.indexOf(insertCall));
     });
   });
@@ -257,7 +260,7 @@ describe('RewardsRepository', () => {
   describe('getAll', () => {
     it('should return all rewards ordered by reward_id', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
       const mockRewards: Reward[] = [
         {
@@ -284,7 +287,7 @@ describe('RewardsRepository', () => {
 
     it('should return empty array when no rewards exist', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
 
       mockDatabase.getAllAsync.mockResolvedValue([]);
@@ -307,9 +310,9 @@ describe('RewardsRepository', () => {
       // there was nothing to notice. Rewards.tsx has an error branch; nothing
       // could reach it.
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
-      jest.spyOn(console, 'error').mockImplementation();
+      vi.spyOn(console, 'error').mockImplementation(() => {});
       mockDatabase.getAllAsync.mockRejectedValueOnce(new Error('Database error'));
 
       await expect(repository.getAll()).rejects.toThrow('Database error');
@@ -321,9 +324,9 @@ describe('RewardsRepository', () => {
       // instead of being laundered into an empty list — the same thing
       // BeerRepository.getAll does with the same input.
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
-      jest.spyOn(console, 'error').mockImplementation();
+      vi.spyOn(console, 'error').mockImplementation(() => {});
 
       mockDatabase.getAllAsync.mockResolvedValue(null);
 
@@ -334,7 +337,7 @@ describe('RewardsRepository', () => {
   describe('getById', () => {
     it('should return reward when found', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
       const mockReward: Reward = {
         reward_id: '123',
@@ -355,7 +358,7 @@ describe('RewardsRepository', () => {
 
     it('should return null when reward not found', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
 
       mockDatabase.getFirstAsync.mockResolvedValue(null);
@@ -367,7 +370,7 @@ describe('RewardsRepository', () => {
 
     it('should handle empty reward_id string', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
 
       mockDatabase.getFirstAsync.mockResolvedValue(null);
@@ -383,7 +386,7 @@ describe('RewardsRepository', () => {
 
     it('should throw error on database failure', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
 
       mockDatabase.getFirstAsync.mockRejectedValueOnce(new Error('Database error'));
@@ -395,7 +398,7 @@ describe('RewardsRepository', () => {
   describe('getByType', () => {
     it('should return rewards matching the type', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
       const mockRewards: Reward[] = [
         {
@@ -423,7 +426,7 @@ describe('RewardsRepository', () => {
 
     it('should return empty array when no rewards match type', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
 
       mockDatabase.getAllAsync.mockResolvedValue([]);
@@ -435,7 +438,7 @@ describe('RewardsRepository', () => {
 
     it('should handle empty type string', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
 
       mockDatabase.getAllAsync.mockResolvedValue([]);
@@ -448,7 +451,7 @@ describe('RewardsRepository', () => {
 
     it('should throw error on database failure', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
 
       mockDatabase.getAllAsync.mockRejectedValueOnce(new Error('Database error'));
@@ -460,7 +463,7 @@ describe('RewardsRepository', () => {
   describe('getRedeemed', () => {
     it('should return rewards that have been redeemed', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
       const mockRewards: Reward[] = [
         {
@@ -487,7 +490,7 @@ describe('RewardsRepository', () => {
 
     it('should return empty array when no redeemed rewards exist', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
 
       mockDatabase.getAllAsync.mockResolvedValue([]);
@@ -499,7 +502,7 @@ describe('RewardsRepository', () => {
 
     it('should throw error on database failure', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
 
       mockDatabase.getAllAsync.mockRejectedValueOnce(new Error('Database error'));
@@ -511,7 +514,7 @@ describe('RewardsRepository', () => {
   describe('getUnredeemed', () => {
     it('should return rewards that have not been redeemed', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
       const mockRewards: Reward[] = [
         {
@@ -538,7 +541,7 @@ describe('RewardsRepository', () => {
 
     it('should return empty array when all rewards are redeemed', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
 
       mockDatabase.getAllAsync.mockResolvedValue([]);
@@ -550,7 +553,7 @@ describe('RewardsRepository', () => {
 
     it('should handle redeemed stored as "0" (alternative false)', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
 
       mockDatabase.getAllAsync.mockResolvedValue([]);
@@ -565,7 +568,7 @@ describe('RewardsRepository', () => {
 
     it('should throw error on database failure', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
 
       mockDatabase.getAllAsync.mockRejectedValueOnce(new Error('Database error'));
@@ -577,7 +580,7 @@ describe('RewardsRepository', () => {
   describe('clear', () => {
     it('should clear all rewards from the table', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
 
       await repository.clear();
@@ -588,9 +591,9 @@ describe('RewardsRepository', () => {
 
     it('should log clearing message', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
-      const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
+      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
       await repository.clear();
 
@@ -603,7 +606,7 @@ describe('RewardsRepository', () => {
 
     it('should throw error on database failure', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
 
       mockDatabase.runAsync.mockRejectedValueOnce(new Error('Database error'));
@@ -615,7 +618,7 @@ describe('RewardsRepository', () => {
   describe('getCount', () => {
     it('should return count of rewards', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
 
       mockDatabase.getFirstAsync.mockResolvedValue({ count: 25 });
@@ -630,7 +633,7 @@ describe('RewardsRepository', () => {
 
     it('should return 0 when no rewards exist', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
 
       mockDatabase.getFirstAsync.mockResolvedValue({ count: 0 });
@@ -642,7 +645,7 @@ describe('RewardsRepository', () => {
 
     it('should handle null count result', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
 
       mockDatabase.getFirstAsync.mockResolvedValue(null);
@@ -654,7 +657,7 @@ describe('RewardsRepository', () => {
 
     it('should throw error on database failure', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
 
       mockDatabase.getFirstAsync.mockRejectedValueOnce(new Error('Database error'));
@@ -666,7 +669,7 @@ describe('RewardsRepository', () => {
   describe('error handling', () => {
     it('should log error when populate fails', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
       const rewards: Reward[] = [{ reward_id: '1', redeemed: 'false', reward_type: 'plate' }];
 
@@ -678,7 +681,7 @@ describe('RewardsRepository', () => {
 
     it('should use transaction for atomic operations', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
       const rewards: Reward[] = [{ reward_id: '1', redeemed: 'false', reward_type: 'plate' }];
 
@@ -700,7 +703,7 @@ describe('RewardsRepository', () => {
   describe('lock lifetime', () => {
     it('does not leave the lock held when the write throws', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
       const rewards: Reward[] = [{ reward_id: '1', redeemed: 'false', reward_type: 'plate' }];
 
@@ -714,7 +717,7 @@ describe('RewardsRepository', () => {
 
     it('does not leave the lock held on a successful write', async () => {
       const mockDatabase = createMockDatabase();
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       const repository = createRepository();
       const rewards: Reward[] = [{ reward_id: '1', redeemed: 'false', reward_type: 'plate' }];
 

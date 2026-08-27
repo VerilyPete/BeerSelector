@@ -31,19 +31,19 @@ describe('htmlParser - parseQueuedBeersFromHtml', () => {
       expect(result[0]).toEqual({
         name: 'Firestone Walker Parabola (BTL)',
         date: 'Apr 08, 2025 @ 03:10:18pm',
-        id: '1885490'
+        id: '1885490',
       });
 
       expect(result[1]).toEqual({
         name: 'Stone IPA (Draft)',
         date: 'Apr 09, 2025 @ 10:30:00am',
-        id: '1885491'
+        id: '1885491',
       });
 
       expect(result[2]).toEqual({
         name: 'Founders KBS (Can)',
         date: 'Apr 10, 2025 @ 02:15:45pm',
-        id: '1885492'
+        id: '1885492',
       });
     });
 
@@ -101,7 +101,7 @@ describe('htmlParser - parseQueuedBeersFromHtml', () => {
       expect(result[0]).toEqual({
         name: 'Single Beer (BTL)',
         date: 'May 15, 2025 @ 06:30:00pm',
-        id: '2000'
+        id: '2000',
       });
     });
   });

@@ -1,4 +1,4 @@
-import { vi } from 'vitest';
+import { vi, type Mock } from 'vitest';
 /**
  * Comprehensive tests for beerApi module
  *
@@ -25,7 +25,7 @@ process.env.EXPO_PUBLIC_API_RETRY_DELAY = '10';
 vi.mock('../../database/preferences');
 
 // Mock global fetch
-global.fetch = jest.fn();
+global.fetch = vi.fn();
 
 /**
  * Assert a request completed and return its payload outcome.
@@ -52,25 +52,25 @@ function payload<T>(source: FetchedSource<FetchOutcome<T>>): FetchOutcome<T> {
 
 describe('Beer API', () => {
   beforeEach(async () => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   afterEach(async () => {
-    jest.restoreAllMocks();
+    vi.restoreAllMocks();
   });
 
   describe('fetchWithRetry', () => {
     beforeEach(async () => {
-      jest.useFakeTimers();
+      vi.useFakeTimers();
     });
 
     afterEach(async () => {
-      jest.useRealTimers();
+      vi.useRealTimers();
     });
 
     it('should return data on successful fetch', async () => {
       const mockData = { brewInStock: [] };
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
+      (global.fetch as Mock).mockResolvedValueOnce({
         ok: true,
         json: async () => mockData,
       });
@@ -108,7 +108,7 @@ describe('Beer API', () => {
       const mockData = { brewInStock: [] };
 
       // First call fails, second succeeds
-      (global.fetch as jest.Mock)
+      (global.fetch as Mock)
         .mockRejectedValueOnce(new Error('Network error'))
         .mockResolvedValueOnce({
           ok: true,
@@ -118,7 +118,7 @@ describe('Beer API', () => {
       const resultPromise = fetchWithRetry(config.api.baseUrl, 2, 10);
 
       // Fast-forward time to trigger retry
-      await jest.advanceTimersByTimeAsync(15);
+      await vi.advanceTimersByTimeAsync(15);
 
       const result = await resultPromise;
 
@@ -130,7 +130,7 @@ describe('Beer API', () => {
       const mockData = { brewInStock: [] };
 
       // First call fails, second succeeds
-      (global.fetch as jest.Mock)
+      (global.fetch as Mock)
         .mockRejectedValueOnce(new Error('Network error'))
         .mockResolvedValueOnce({
           ok: true,
@@ -144,7 +144,7 @@ describe('Beer API', () => {
       );
 
       // Fast-forward time to trigger retry
-      await jest.advanceTimersByTimeAsync(config.network.retryDelay + 100);
+      await vi.advanceTimersByTimeAsync(config.network.retryDelay + 100);
 
       const result = await resultPromise;
 
@@ -153,7 +153,7 @@ describe('Beer API', () => {
     });
 
     it('should throw error after exhausting retries', async () => {
-      (global.fetch as jest.Mock).mockRejectedValue(new Error('Network error'));
+      (global.fetch as Mock).mockRejectedValue(new Error('Network error'));
 
       const resultPromise = fetchWithRetry(config.api.baseUrl, 1, 10);
 
@@ -162,7 +162,7 @@ describe('Beer API', () => {
     });
 
     it('should throw error on non-ok HTTP status', async () => {
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
+      (global.fetch as Mock).mockResolvedValueOnce({
         ok: false,
         status: 404,
         statusText: 'Not Found',
@@ -178,7 +178,7 @@ describe('Beer API', () => {
 
   describe('fetchBeersFromAPI', () => {
     it('should return empty array when API URL is not configured', async () => {
-      (preferences.getPreference as jest.Mock).mockResolvedValue(null);
+      (preferences.getPreference as Mock).mockResolvedValue(null);
 
       const result = await fetchBeersFromAPI();
 
@@ -194,8 +194,8 @@ describe('Beer API', () => {
       ];
       const mockResponse = [{}, { brewInStock: mockBeers }];
 
-      (preferences.getPreference as jest.Mock).mockResolvedValue(config.api.baseUrl);
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
+      (preferences.getPreference as Mock).mockResolvedValue(config.api.baseUrl);
+      (global.fetch as Mock).mockResolvedValueOnce({
         ok: true,
         json: async () => mockResponse,
       });
@@ -216,8 +216,8 @@ describe('Beer API', () => {
         },
       };
 
-      (preferences.getPreference as jest.Mock).mockResolvedValue(config.api.baseUrl);
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
+      (preferences.getPreference as Mock).mockResolvedValue(config.api.baseUrl);
+      (global.fetch as Mock).mockResolvedValueOnce({
         ok: true,
         json: async () => mockResponse,
       });
@@ -237,8 +237,8 @@ describe('Beer API', () => {
       // `requireRows` and the user saw UNKNOWN_ERROR for a working server.
       const mockResponse = [{}, { brewInStock: [] }];
 
-      (preferences.getPreference as jest.Mock).mockResolvedValue(config.api.baseUrl);
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
+      (preferences.getPreference as Mock).mockResolvedValue(config.api.baseUrl);
+      (global.fetch as Mock).mockResolvedValueOnce({
         ok: true,
         json: async () => mockResponse,
       });
@@ -249,8 +249,8 @@ describe('Beer API', () => {
     it('reports malformed when no beer data is found in the response', async () => {
       const mockResponse = { someOtherData: 'value' };
 
-      (preferences.getPreference as jest.Mock).mockResolvedValue(config.api.baseUrl);
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
+      (preferences.getPreference as Mock).mockResolvedValue(config.api.baseUrl);
+      (global.fetch as Mock).mockResolvedValueOnce({
         ok: true,
         json: async () => mockResponse,
       });
@@ -261,11 +261,9 @@ describe('Beer API', () => {
     });
 
     it('reports failed when the fetch rejects', async () => {
-      (preferences.getPreference as jest.Mock).mockResolvedValue(config.api.baseUrl);
+      (preferences.getPreference as Mock).mockResolvedValue(config.api.baseUrl);
       // Mock fetch to always reject
-      (global.fetch as jest.Mock).mockImplementation(() =>
-        Promise.reject(new Error('Network error'))
-      );
+      (global.fetch as Mock).mockImplementation(() => Promise.reject(new Error('Network error')));
 
       // INVERTED by plan 05 Phase 5.3: transport failures arrive as `failed`.
       expect((await fetchBeersFromAPI()).status).toBe('failed');
@@ -274,7 +272,7 @@ describe('Beer API', () => {
 
   describe('fetchMyBeersFromAPI', () => {
     it('should return empty array in visitor mode', async () => {
-      (preferences.getPreference as jest.Mock).mockImplementation((key: string) => {
+      (preferences.getPreference as Mock).mockImplementation((key: string) => {
         if (key === 'is_visitor_mode') return Promise.resolve('true');
         return Promise.resolve(null);
       });
@@ -287,7 +285,7 @@ describe('Beer API', () => {
     });
 
     it('should return empty array when API URL is not configured', async () => {
-      (preferences.getPreference as jest.Mock).mockImplementation((key: string) => {
+      (preferences.getPreference as Mock).mockImplementation((key: string) => {
         if (key === 'is_visitor_mode') return Promise.resolve('false');
         if (key === 'my_beers_api_url') return Promise.resolve(null);
         return Promise.resolve(null);
@@ -301,7 +299,7 @@ describe('Beer API', () => {
     });
 
     it('should return empty array for none:// protocol URLs', async () => {
-      (preferences.getPreference as jest.Mock).mockImplementation((key: string) => {
+      (preferences.getPreference as Mock).mockImplementation((key: string) => {
         if (key === 'is_visitor_mode') return Promise.resolve('false');
         if (key === 'my_beers_api_url') return Promise.resolve('none://placeholder');
         return Promise.resolve(null);
@@ -325,12 +323,12 @@ describe('Beer API', () => {
     // through that type and keeps its copy; what left is "the body could not be
     // read", which is now `UnreadableBodyError` and a different claim.
     it('reports malformed rather than [] when every row lacks an id', async () => {
-      (preferences.getPreference as jest.Mock).mockImplementation((key: string) => {
+      (preferences.getPreference as Mock).mockImplementation((key: string) => {
         if (key === 'is_visitor_mode') return Promise.resolve('false');
         if (key === 'my_beers_api_url') return Promise.resolve('https://example.com/my.json');
         return Promise.resolve(null);
       });
-      (global.fetch as jest.Mock).mockResolvedValue({
+      (global.fetch as Mock).mockResolvedValue({
         ok: true,
         json: async () => [
           {},
@@ -360,13 +358,13 @@ describe('Beer API', () => {
       ];
       const mockResponse = [{}, { tasted_brew_current_round: mockBeers }, {}];
 
-      (preferences.getPreference as jest.Mock).mockImplementation((key: string) => {
+      (preferences.getPreference as Mock).mockImplementation((key: string) => {
         if (key === 'is_visitor_mode') return Promise.resolve('false');
         if (key === 'my_beers_api_url')
           return Promise.resolve(config.api.getFullUrl('memberDashboard'));
         return Promise.resolve(null);
       });
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
+      (global.fetch as Mock).mockResolvedValueOnce({
         ok: true,
         json: async () => mockResponse,
       });
@@ -382,13 +380,13 @@ describe('Beer API', () => {
     it('should handle empty tasted beers array as valid state', async () => {
       const mockResponse = [{}, { tasted_brew_current_round: [] }, {}];
 
-      (preferences.getPreference as jest.Mock).mockImplementation((key: string) => {
+      (preferences.getPreference as Mock).mockImplementation((key: string) => {
         if (key === 'is_visitor_mode') return Promise.resolve('false');
         if (key === 'my_beers_api_url')
           return Promise.resolve(config.api.getFullUrl('memberDashboard'));
         return Promise.resolve(null);
       });
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
+      (global.fetch as Mock).mockResolvedValueOnce({
         ok: true,
         json: async () => mockResponse,
       });
@@ -410,13 +408,13 @@ describe('Beer API', () => {
       ];
       const mockResponse = [{}, { tasted_brew_current_round: mockBeers }, {}];
 
-      (preferences.getPreference as jest.Mock).mockImplementation((key: string) => {
+      (preferences.getPreference as Mock).mockImplementation((key: string) => {
         if (key === 'is_visitor_mode') return Promise.resolve('false');
         if (key === 'my_beers_api_url')
           return Promise.resolve(config.api.getFullUrl('memberDashboard'));
         return Promise.resolve(null);
       });
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
+      (global.fetch as Mock).mockResolvedValueOnce({
         ok: true,
         json: async () => mockResponse,
       });
@@ -434,13 +432,13 @@ describe('Beer API', () => {
     it('reports malformed on an invalid response format', async () => {
       const mockResponse = { someOtherData: 'value' };
 
-      (preferences.getPreference as jest.Mock).mockImplementation((key: string) => {
+      (preferences.getPreference as Mock).mockImplementation((key: string) => {
         if (key === 'is_visitor_mode') return Promise.resolve('false');
         if (key === 'my_beers_api_url')
           return Promise.resolve(config.api.getFullUrl('memberDashboard'));
         return Promise.resolve(null);
       });
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
+      (global.fetch as Mock).mockResolvedValueOnce({
         ok: true,
         json: async () => mockResponse,
       });
@@ -450,16 +448,14 @@ describe('Beer API', () => {
     });
 
     it('reports failed when the fetch rejects', async () => {
-      (preferences.getPreference as jest.Mock).mockImplementation((key: string) => {
+      (preferences.getPreference as Mock).mockImplementation((key: string) => {
         if (key === 'is_visitor_mode') return Promise.resolve('false');
         if (key === 'my_beers_api_url')
           return Promise.resolve(config.api.getFullUrl('memberDashboard'));
         return Promise.resolve(null);
       });
       // Mock fetch to always reject
-      (global.fetch as jest.Mock).mockImplementation(() =>
-        Promise.reject(new Error('Network error'))
-      );
+      (global.fetch as Mock).mockImplementation(() => Promise.reject(new Error('Network error')));
 
       // INVERTED by plan 05 Phase 5.3.
       expect((await fetchMyBeersFromAPI()).status).toBe('failed');
@@ -468,7 +464,7 @@ describe('Beer API', () => {
 
   describe('fetchRewardsFromAPI', () => {
     it('should return empty array in visitor mode', async () => {
-      (preferences.getPreference as jest.Mock).mockImplementation((key: string) => {
+      (preferences.getPreference as Mock).mockImplementation((key: string) => {
         if (key === 'is_visitor_mode') return Promise.resolve('true');
         return Promise.resolve(null);
       });
@@ -480,7 +476,7 @@ describe('Beer API', () => {
     });
 
     it('should return empty array when API URL is not configured', async () => {
-      (preferences.getPreference as jest.Mock).mockImplementation((key: string) => {
+      (preferences.getPreference as Mock).mockImplementation((key: string) => {
         if (key === 'is_visitor_mode') return Promise.resolve('false');
         if (key === 'my_beers_api_url') return Promise.resolve(null);
         return Promise.resolve(null);
@@ -499,13 +495,13 @@ describe('Beer API', () => {
       ];
       const mockResponse = [{}, { tasted_brew_current_round: [] }, { reward: mockRewards }];
 
-      (preferences.getPreference as jest.Mock).mockImplementation((key: string) => {
+      (preferences.getPreference as Mock).mockImplementation((key: string) => {
         if (key === 'is_visitor_mode') return Promise.resolve('false');
         if (key === 'my_beers_api_url')
           return Promise.resolve(config.api.getFullUrl('memberRewards'));
         return Promise.resolve(null);
       });
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
+      (global.fetch as Mock).mockResolvedValueOnce({
         ok: true,
         json: async () => mockResponse,
       });
@@ -521,13 +517,13 @@ describe('Beer API', () => {
     it('reports malformed on an invalid response format', async () => {
       const mockResponse = { someOtherData: 'value' };
 
-      (preferences.getPreference as jest.Mock).mockImplementation((key: string) => {
+      (preferences.getPreference as Mock).mockImplementation((key: string) => {
         if (key === 'is_visitor_mode') return Promise.resolve('false');
         if (key === 'my_beers_api_url')
           return Promise.resolve(config.api.getFullUrl('memberRewards'));
         return Promise.resolve(null);
       });
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
+      (global.fetch as Mock).mockResolvedValueOnce({
         ok: true,
         json: async () => mockResponse,
       });
@@ -537,16 +533,14 @@ describe('Beer API', () => {
     });
 
     it('reports failed when the fetch rejects', async () => {
-      (preferences.getPreference as jest.Mock).mockImplementation((key: string) => {
+      (preferences.getPreference as Mock).mockImplementation((key: string) => {
         if (key === 'is_visitor_mode') return Promise.resolve('false');
         if (key === 'my_beers_api_url')
           return Promise.resolve(config.api.getFullUrl('memberRewards'));
         return Promise.resolve(null);
       });
       // Mock fetch to always reject
-      (global.fetch as jest.Mock).mockImplementation(() =>
-        Promise.reject(new Error('Network error'))
-      );
+      (global.fetch as Mock).mockImplementation(() => Promise.reject(new Error('Network error')));
 
       // INVERTED by plan 05 Phase 5.3.
       expect((await fetchRewardsFromAPI()).status).toBe('failed');
@@ -559,8 +553,8 @@ describe('Beer API', () => {
         const mockBeers = [{ id: '1', brew_name: 'Test Beer' }];
         const mockResponse = [{}, { brewInStock: mockBeers }];
 
-        (preferences.getPreference as jest.Mock).mockResolvedValue(config.api.baseUrl);
-        (global.fetch as jest.Mock).mockResolvedValueOnce({
+        (preferences.getPreference as Mock).mockResolvedValue(config.api.baseUrl);
+        (global.fetch as Mock).mockResolvedValueOnce({
           ok: true,
           json: async () => mockResponse,
         });
@@ -577,13 +571,13 @@ describe('Beer API', () => {
         const mockBeers = [{ id: '1', brew_name: 'Test Beer' }];
         const mockResponse = [{}, { tasted_brew_current_round: mockBeers }, {}];
 
-        (preferences.getPreference as jest.Mock).mockImplementation((key: string) => {
+        (preferences.getPreference as Mock).mockImplementation((key: string) => {
           if (key === 'is_visitor_mode') return Promise.resolve('false');
           if (key === 'my_beers_api_url')
             return Promise.resolve(config.api.getFullUrl('memberDashboard'));
           return Promise.resolve(null);
         });
-        (global.fetch as jest.Mock).mockResolvedValueOnce({
+        (global.fetch as Mock).mockResolvedValueOnce({
           ok: true,
           json: async () => mockResponse,
         });
@@ -599,18 +593,18 @@ describe('Beer API', () => {
 
     describe('Network Configuration', () => {
       beforeEach(async () => {
-        jest.useFakeTimers();
+        vi.useFakeTimers();
       });
 
       afterEach(async () => {
-        jest.useRealTimers();
+        vi.useRealTimers();
       });
 
       it('should respect config network timeout settings', async () => {
         // Network timeout is configured in config module
         const mockData = { brewInStock: [] };
 
-        (global.fetch as jest.Mock).mockResolvedValueOnce({
+        (global.fetch as Mock).mockResolvedValueOnce({
           ok: true,
           json: async () => mockData,
         });
@@ -626,7 +620,7 @@ describe('Beer API', () => {
         const mockData = { brewInStock: [] };
 
         // First call fails, subsequent calls succeed
-        (global.fetch as jest.Mock)
+        (global.fetch as Mock)
           .mockRejectedValueOnce(new Error('Network error'))
           .mockResolvedValueOnce({
             ok: true,
@@ -640,7 +634,7 @@ describe('Beer API', () => {
         );
 
         // Fast-forward time to trigger retry
-        await jest.advanceTimersByTimeAsync(config.network.retryDelay + 100);
+        await vi.advanceTimersByTimeAsync(config.network.retryDelay + 100);
 
         const result = await resultPromise;
 
@@ -769,7 +763,7 @@ describe('FetchOutcome semantics (plan 02 Phase 3)', () => {
   // run before any test that fetches. A test that cannot fail is worth less than
   // no test, so pin the isolation rather than the ordering.
   beforeEach(async () => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   // Every assertion here is on `kind`, never on array length. Length is what
@@ -782,9 +776,7 @@ describe('FetchOutcome semantics (plan 02 Phase 3)', () => {
 
   describe('fetchMyBeersFromAPI', () => {
     it('reports unavailable/not-configured when my_beers_api_url is absent', async () => {
-      (preferences.getPreference as jest.Mock).mockImplementation(
-        memberPrefs('my_beers_api_url', null)
-      );
+      (preferences.getPreference as Mock).mockImplementation(memberPrefs('my_beers_api_url', null));
 
       const outcome = await fetchMyBeersFromAPI();
 
@@ -795,7 +787,7 @@ describe('FetchOutcome semantics (plan 02 Phase 3)', () => {
     });
 
     it('reports unavailable/not-applicable in visitor mode', async () => {
-      (preferences.getPreference as jest.Mock).mockImplementation((key: string) =>
+      (preferences.getPreference as Mock).mockImplementation((key: string) =>
         Promise.resolve(key === 'is_visitor_mode' ? 'true' : null)
       );
 
@@ -809,7 +801,7 @@ describe('FetchOutcome semantics (plan 02 Phase 3)', () => {
     });
 
     it('reports not-applicable for a none:// URL without calling fetch', async () => {
-      (preferences.getPreference as jest.Mock).mockImplementation(
+      (preferences.getPreference as Mock).mockImplementation(
         memberPrefs('my_beers_api_url', 'none://placeholder')
       );
 
@@ -827,10 +819,10 @@ describe('FetchOutcome semantics (plan 02 Phase 3)', () => {
     });
 
     it('reports confirmed-empty when the server returns an empty round', async () => {
-      (preferences.getPreference as jest.Mock).mockImplementation(
+      (preferences.getPreference as Mock).mockImplementation(
         memberPrefs('my_beers_api_url', 'https://example.com/my.json')
       );
-      (global.fetch as jest.Mock).mockResolvedValue({
+      (global.fetch as Mock).mockResolvedValue({
         ok: true,
         json: async () => [{}, { tasted_brew_current_round: [] }],
       });
@@ -843,10 +835,10 @@ describe('FetchOutcome semantics (plan 02 Phase 3)', () => {
     });
 
     it('reports malformed when every entry lacks an id', async () => {
-      (preferences.getPreference as jest.Mock).mockImplementation(
+      (preferences.getPreference as Mock).mockImplementation(
         memberPrefs('my_beers_api_url', 'https://example.com/my.json')
       );
-      (global.fetch as jest.Mock).mockResolvedValue({
+      (global.fetch as Mock).mockResolvedValue({
         ok: true,
         json: async () => [
           {},
@@ -862,10 +854,10 @@ describe('FetchOutcome semantics (plan 02 Phase 3)', () => {
     });
 
     it('reports data when the server returns beers', async () => {
-      (preferences.getPreference as jest.Mock).mockImplementation(
+      (preferences.getPreference as Mock).mockImplementation(
         memberPrefs('my_beers_api_url', 'https://example.com/my.json')
       );
-      (global.fetch as jest.Mock).mockResolvedValue({
+      (global.fetch as Mock).mockResolvedValue({
         ok: true,
         json: async () => [
           {},
@@ -884,9 +876,7 @@ describe('FetchOutcome semantics (plan 02 Phase 3)', () => {
   });
 
   it('fetchBeersFromAPI reports unavailable/not-configured when all_beers_api_url is absent', async () => {
-    (preferences.getPreference as jest.Mock).mockImplementation(
-      memberPrefs('all_beers_api_url', null)
-    );
+    (preferences.getPreference as Mock).mockImplementation(memberPrefs('all_beers_api_url', null));
 
     const outcome = await fetchBeersFromAPI();
 
@@ -897,7 +887,7 @@ describe('FetchOutcome semantics (plan 02 Phase 3)', () => {
   });
 
   it('fetchRewardsFromAPI reports unavailable rather than an empty list in visitor mode', async () => {
-    (preferences.getPreference as jest.Mock).mockImplementation((key: string) =>
+    (preferences.getPreference as Mock).mockImplementation((key: string) =>
       Promise.resolve(key === 'is_visitor_mode' ? 'true' : null)
     );
 
@@ -916,7 +906,7 @@ describe('FetchOutcome semantics (plan 02 Phase 3)', () => {
     // sites. Without it the placeholder reaches fetch() and burns three retries
     // at 1s / 1.5s / 2.25s — 4.75s of a refresh budget, on the weak links this
     // plan exists to fix, for a URL that was never valid.
-    (preferences.getPreference as jest.Mock).mockImplementation(
+    (preferences.getPreference as Mock).mockImplementation(
       memberPrefs('my_beers_api_url', 'none://placeholder')
     );
 
@@ -953,7 +943,7 @@ describe('a non-array payload is malformed, not data (plan refresh-failure-class
   // so a repository assertion in this file could not be mutated by any change to
   // the module under test.
   beforeEach(async () => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   const memberPrefs = (urlKey: string) => (key: string) => {
@@ -963,12 +953,12 @@ describe('a non-array payload is malformed, not data (plan refresh-failure-class
   };
 
   const respondWith = (body: unknown): void => {
-    (global.fetch as jest.Mock).mockResolvedValue({ ok: true, json: async () => body });
+    (global.fetch as Mock).mockResolvedValue({ ok: true, json: async () => body });
   };
 
   describe('fetchMyBeersFromAPI', () => {
     beforeEach(async () => {
-      (preferences.getPreference as jest.Mock).mockImplementation(memberPrefs('my_beers_api_url'));
+      (preferences.getPreference as Mock).mockImplementation(memberPrefs('my_beers_api_url'));
     });
 
     // Not an uncaught throw today: the TypeError is caught by the fetcher's own
@@ -990,7 +980,7 @@ describe('a non-array payload is malformed, not data (plan refresh-failure-class
 
   describe('fetchBeersFromAPI', () => {
     beforeEach(async () => {
-      (preferences.getPreference as jest.Mock).mockImplementation(memberPrefs('all_beers_api_url'));
+      (preferences.getPreference as Mock).mockImplementation(memberPrefs('all_beers_api_url'));
     });
 
     it('reports malformed when brewInStock is an object, not confirmed-empty', async () => {
@@ -1020,7 +1010,7 @@ describe('a non-array payload is malformed, not data (plan refresh-failure-class
 
   describe('fetchRewardsFromAPI', () => {
     beforeEach(async () => {
-      (preferences.getPreference as jest.Mock).mockImplementation(memberPrefs('my_beers_api_url'));
+      (preferences.getPreference as Mock).mockImplementation(memberPrefs('my_beers_api_url'));
     });
 
     it('reports malformed for an object reward payload, carrying no items at all', async () => {

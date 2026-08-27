@@ -1,4 +1,4 @@
-import { vi } from 'vitest';
+import { vi, type Mock } from 'vitest';
 import { fetchAndUpdateRewards } from '../dataUpdateService';
 import * as preferences from '../../database/preferences';
 import * as connection from '../../database/connection';
@@ -10,21 +10,21 @@ vi.mock('../../database/preferences');
 vi.mock('../../database/connection');
 vi.mock('../../database/locks', async () => ({
   databaseLockManager: {
-    withDatabaseLock: jest.fn(async (_name: string, task: () => Promise<unknown>) => task()),
+    withDatabaseLock: vi.fn(async (_name: string, task: () => Promise<unknown>) => task()),
   },
 }));
 vi.mock('../../utils/errorLogger', async () => ({
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   ...(await vi.importActual<typeof import('../../utils/errorLogger')>('../../utils/errorLogger')),
-  logWarning: jest.fn(),
+  logWarning: vi.fn(),
 }));
 
-global.fetch = jest.fn();
+global.fetch = vi.fn();
 
 describe('mixed rewards snapshots', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
-    (preferences.getPreference as jest.Mock).mockImplementation((key: string) => {
+    vi.clearAllMocks();
+    (preferences.getPreference as Mock).mockImplementation((key: string) => {
       if (key === 'is_visitor_mode') return Promise.resolve('false');
       if (key === 'my_beers_api_url') return Promise.resolve('https://example.com/member.json');
       return Promise.resolve(null);
@@ -36,14 +36,14 @@ describe('mixed rewards snapshots', () => {
       { reward_id: 'old-redeemable', redeemed: '0', reward_type: 'Free Plate' },
     ];
     const repositoryDatabase = createRewardsRepositoryDatabase(stored);
-    (connection.getDatabase as jest.Mock).mockResolvedValue(repositoryDatabase.database);
+    (connection.getDatabase as Mock).mockResolvedValue(repositoryDatabase.database);
     const survivor: Reward = {
       reward_id: 'new-valid',
       redeemed: '0',
       reward_type: '$5 Credit',
     };
 
-    (global.fetch as jest.Mock).mockResolvedValue({
+    (global.fetch as Mock).mockResolvedValue({
       ok: true,
       json: async () => [{}, {}, { reward: [{ redeemed: '0', reward_type: 'No id' }, survivor] }],
     });

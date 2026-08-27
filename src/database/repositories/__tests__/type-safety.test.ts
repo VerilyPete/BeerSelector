@@ -1,4 +1,4 @@
-import { vi } from 'vitest';
+import { vi, type Mock } from 'vitest';
 /**
  * Type Safety Tests for Repository Pattern
  *
@@ -29,19 +29,19 @@ import type { ContainerType } from '@/src/utils/beerGlassType';
 
 // Mock the database connection
 vi.mock('../../connection', () => ({
-  getDatabase: jest.fn(),
+  getDatabase: vi.fn(),
 }));
 
 // Mock the lock manager
 vi.mock('../../locks', () => ({
   databaseLockManager: {
-    withDatabaseLock: jest.fn(async (_name: string, task: () => Promise<unknown>) => task()),
+    withDatabaseLock: vi.fn(async (_name: string, task: () => Promise<unknown>) => task()),
   },
 }));
 
 // getDatabase is replaced by the jest.mock factory above; cast it back to a
 // mock so tests can configure its resolved value.
-const mockedGetDatabase = getDatabase as jest.Mock;
+const mockedGetDatabase = getDatabase as Mock;
 
 /**
  * Narrow a literal fixture array for the NonEmptyArray-typed repository
@@ -66,14 +66,14 @@ function assertType<T>(_value: T): void {}
 describe('Repository Type Safety', () => {
   describe('BeerRepository Type Safety', () => {
     function createBeerRepository() {
-      jest.clearAllMocks();
+      vi.clearAllMocks();
       return new BeerRepository();
     }
 
     it('getAll() should return Promise<Beer[]>', async () => {
       const repository = createBeerRepository();
       const mockDb = {
-        getAllAsync: jest.fn().mockResolvedValue([
+        getAllAsync: vi.fn().mockResolvedValue([
           {
             id: '1',
             brew_name: 'Test Beer',
@@ -106,7 +106,7 @@ describe('Repository Type Safety', () => {
     it('getById() should return Promise<Beer | null>', async () => {
       const repository = createBeerRepository();
       const mockDb = {
-        getFirstAsync: jest.fn().mockResolvedValue({
+        getFirstAsync: vi.fn().mockResolvedValue({
           id: '1',
           brew_name: 'Test Beer',
           added_date: '2025-01-01',
@@ -134,7 +134,7 @@ describe('Repository Type Safety', () => {
     it('search() should return Promise<Beer[]>', async () => {
       const repository = createBeerRepository();
       const mockDb = {
-        getAllAsync: jest.fn().mockResolvedValue([]),
+        getAllAsync: vi.fn().mockResolvedValue([]),
       };
 
       mockedGetDatabase.mockResolvedValue(mockDb);
@@ -149,17 +149,17 @@ describe('Repository Type Safety', () => {
     it('insertMany() should only accept Beer[]', async () => {
       const repository = createBeerRepository();
       const mockDb = {
-        withTransactionAsync: jest.fn(async (callback: () => Promise<void>) => {
+        withTransactionAsync: vi.fn(async (callback: () => Promise<void>) => {
           await callback();
         }),
-        withExclusiveTransactionAsync: jest.fn(async (task: (txn: unknown) => Promise<void>) => {
+        withExclusiveTransactionAsync: vi.fn(async (task: (txn: unknown) => Promise<void>) => {
           await task(mockDb);
         }),
-        getFirstAsync: jest.fn().mockResolvedValue({ count: 0 }),
-        runAsync: jest.fn().mockResolvedValue({ changes: 0, lastInsertRowId: 0 }),
-        prepareAsync: jest.fn().mockResolvedValue({
-          executeAsync: jest.fn().mockResolvedValue({ changes: 1, lastInsertRowId: 1 }),
-          finalizeAsync: jest.fn().mockResolvedValue(undefined),
+        getFirstAsync: vi.fn().mockResolvedValue({ count: 0 }),
+        runAsync: vi.fn().mockResolvedValue({ changes: 0, lastInsertRowId: 0 }),
+        prepareAsync: vi.fn().mockResolvedValue({
+          executeAsync: vi.fn().mockResolvedValue({ changes: 1, lastInsertRowId: 1 }),
+          finalizeAsync: vi.fn().mockResolvedValue(undefined),
         }),
       };
 
@@ -190,14 +190,14 @@ describe('Repository Type Safety', () => {
 
   describe('MyBeersRepository Type Safety', () => {
     function createMyBeersRepository() {
-      jest.clearAllMocks();
+      vi.clearAllMocks();
       return new MyBeersRepository();
     }
 
     it('getAll() should return Promise<BeerfinderWithContainerType[]>', async () => {
       const repository = createMyBeersRepository();
       const mockDb = {
-        getAllAsync: jest.fn().mockResolvedValue([
+        getAllAsync: vi.fn().mockResolvedValue([
           {
             id: '1',
             brew_name: 'Test Beer',
@@ -235,7 +235,7 @@ describe('Repository Type Safety', () => {
     it('getById() should return Promise<Beerfinder | null>', async () => {
       const repository = createMyBeersRepository();
       const mockDb = {
-        getFirstAsync: jest.fn().mockResolvedValue(null),
+        getFirstAsync: vi.fn().mockResolvedValue(null),
       };
 
       mockedGetDatabase.mockResolvedValue(mockDb);
@@ -250,7 +250,7 @@ describe('Repository Type Safety', () => {
     it('getCount() should return Promise<number>', async () => {
       const repository = createMyBeersRepository();
       const mockDb = {
-        getFirstAsync: jest.fn().mockResolvedValue({ count: 42 }),
+        getFirstAsync: vi.fn().mockResolvedValue({ count: 42 }),
       };
 
       mockedGetDatabase.mockResolvedValue(mockDb);
@@ -265,11 +265,11 @@ describe('Repository Type Safety', () => {
     it('insertMany() should only accept BeerfinderWithContainerType[]', async () => {
       const repository = createMyBeersRepository();
       const mockDb = {
-        withTransactionAsync: jest.fn(async (callback: () => Promise<void>) => {
+        withTransactionAsync: vi.fn(async (callback: () => Promise<void>) => {
           await callback();
         }),
-        getFirstAsync: jest.fn().mockResolvedValue({ count: 0 }),
-        runAsync: jest.fn(),
+        getFirstAsync: vi.fn().mockResolvedValue({ count: 0 }),
+        runAsync: vi.fn(),
       };
 
       mockedGetDatabase.mockResolvedValue(mockDb);
@@ -299,14 +299,14 @@ describe('Repository Type Safety', () => {
 
   describe('RewardsRepository Type Safety', () => {
     function createRewardsRepository() {
-      jest.clearAllMocks();
+      vi.clearAllMocks();
       return new RewardsRepository();
     }
 
     it('getAll() should return Promise<Reward[]>', async () => {
       const repository = createRewardsRepository();
       const mockDb = {
-        getAllAsync: jest.fn().mockResolvedValue([
+        getAllAsync: vi.fn().mockResolvedValue([
           {
             reward_id: 'PLATE_1',
             redeemed: 'false',
@@ -332,7 +332,7 @@ describe('Repository Type Safety', () => {
     it('getById() should return Promise<Reward | null>', async () => {
       const repository = createRewardsRepository();
       const mockDb = {
-        getFirstAsync: jest.fn().mockResolvedValue({
+        getFirstAsync: vi.fn().mockResolvedValue({
           reward_id: 'PLATE_1',
           redeemed: 'false',
           reward_type: 'plate',
@@ -353,7 +353,7 @@ describe('Repository Type Safety', () => {
     it('getByType() should return Promise<Reward[]>', async () => {
       const repository = createRewardsRepository();
       const mockDb = {
-        getAllAsync: jest.fn().mockResolvedValue([]),
+        getAllAsync: vi.fn().mockResolvedValue([]),
       };
 
       mockedGetDatabase.mockResolvedValue(mockDb);
@@ -368,7 +368,7 @@ describe('Repository Type Safety', () => {
     it('getCount() should return Promise<number>', async () => {
       const repository = createRewardsRepository();
       const mockDb = {
-        getFirstAsync: jest.fn().mockResolvedValue({ count: 5 }),
+        getFirstAsync: vi.fn().mockResolvedValue({ count: 5 }),
       };
 
       mockedGetDatabase.mockResolvedValue(mockDb);
@@ -383,10 +383,10 @@ describe('Repository Type Safety', () => {
     it('insertMany() should only accept Reward[]', async () => {
       const repository = createRewardsRepository();
       const mockDb = {
-        withTransactionAsync: jest.fn(async (callback: () => Promise<void>) => {
+        withTransactionAsync: vi.fn(async (callback: () => Promise<void>) => {
           await callback();
         }),
-        runAsync: jest.fn(),
+        runAsync: vi.fn(),
       };
 
       mockedGetDatabase.mockResolvedValue(mockDb);
@@ -410,11 +410,11 @@ describe('Repository Type Safety', () => {
 
   describe('Type Guard Integration', () => {
     it('should use type guards to validate data at runtime', async () => {
-      jest.clearAllMocks();
+      vi.clearAllMocks();
       const repository = new BeerRepository();
 
       const mockDb = {
-        getAllAsync: jest.fn().mockResolvedValue([
+        getAllAsync: vi.fn().mockResolvedValue([
           {
             id: '1',
             brew_name: 'Valid Beer',

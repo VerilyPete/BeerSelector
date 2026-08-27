@@ -1,4 +1,4 @@
-import { vi } from 'vitest';
+import { vi, type Mock } from 'vitest';
 /**
  * Transport failures must arrive as `failed`, not as a thrown error.
  *
@@ -29,7 +29,7 @@ import type { FetchOutcome, UnconditionalSource } from '../fetchOutcome';
 
 vi.mock('../../database/preferences');
 
-global.fetch = jest.fn();
+global.fetch = vi.fn();
 
 const memberPrefs = (urlKey: string) => (key: string) => {
   if (key === 'is_visitor_mode') return Promise.resolve('false');
@@ -40,7 +40,7 @@ const memberPrefs = (urlKey: string) => (key: string) => {
 /**
  * Drive a fetcher to completion.
  *
- * `jest.setup.js` calls `jest.useFakeTimers()` for EVERY suite, so the backoff
+ * `src/__vitest__/setup.ts` calls `vi.useFakeTimers()` for EVERY suite, so the backoff
  * `setTimeout` inside fetchWithRetry never fires on its own — the promise simply
  * never settles and the test dies by timeout with nothing to say. Advancing well
  * past the retry schedule is what makes these tests about outcomes rather than
@@ -52,12 +52,12 @@ const memberPrefs = (urlKey: string) => (key: string) => {
  * wherever you happen to be.
  */
 const settle = async <T>(pending: Promise<T>): Promise<T> => {
-  await jest.advanceTimersByTimeAsync(60_000);
+  await vi.advanceTimersByTimeAsync(60_000);
   return pending;
 };
 
 const respondWith = (body: unknown, ok = true, status = 200): void => {
-  (global.fetch as jest.Mock).mockResolvedValue({
+  (global.fetch as Mock).mockResolvedValue({
     ok,
     status,
     statusText: ok ? 'OK' : 'Internal Server Error',
@@ -110,12 +110,12 @@ const FETCHERS: readonly FetcherCase[] = [
 
 describe.each(FETCHERS)('$name failure outcomes', ({ urlKey, call, unusableBody }) => {
   beforeEach(() => {
-    jest.clearAllMocks();
-    (preferences.getPreference as jest.Mock).mockImplementation(memberPrefs(urlKey));
+    vi.clearAllMocks();
+    (preferences.getPreference as Mock).mockImplementation(memberPrefs(urlKey));
   });
 
   it('returns failed rather than throwing when the network is unavailable', async () => {
-    (global.fetch as jest.Mock).mockRejectedValue(new TypeError('Network request failed'));
+    (global.fetch as Mock).mockRejectedValue(new TypeError('Network request failed'));
 
     const outcome = await settle(call());
 
@@ -162,7 +162,7 @@ describe.each(FETCHERS)('$name failure outcomes', ({ urlKey, call, unusableBody 
     // test can make, and nothing else in the suite pins the default retry
     // budget: `settle` advances 60s of virtual time, so raising `retries` from
     // 3 to 8 would otherwise pass unnoticed.
-    (global.fetch as jest.Mock).mockRejectedValue(new TypeError('Network request failed'));
+    (global.fetch as Mock).mockRejectedValue(new TypeError('Network request failed'));
 
     await expect(settle(call())).resolves.toBeDefined();
     expect(global.fetch).toHaveBeenCalledTimes(3);
@@ -172,7 +172,7 @@ describe.each(FETCHERS)('$name failure outcomes', ({ urlKey, call, unusableBody 
     // The commit claims "offline, HTTP-error and timeout"; the first two were
     // covered here and the third only against `fetchWithRetry` directly. This is
     // the timeout crossing a whole fetcher.
-    (global.fetch as jest.Mock).mockImplementation(
+    (global.fetch as Mock).mockImplementation(
       (_url: string, options: { signal: AbortSignal }) =>
         new Promise((_resolve, reject) => {
           options.signal.addEventListener('abort', () => {
@@ -213,8 +213,8 @@ describe.each(FETCHERS)('$name failure outcomes', ({ urlKey, call, unusableBody 
  */
 describe('a body that could not be read', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
-    (preferences.getPreference as jest.Mock).mockImplementation(memberPrefs('my_beers_api_url'));
+    vi.clearAllMocks();
+    (preferences.getPreference as Mock).mockImplementation(memberPrefs('my_beers_api_url'));
   });
 
   /**
@@ -225,7 +225,7 @@ describe('a body that could not be read', () => {
    * would let the fence pass against a message shape the runtime never produces.
    */
   const respondWithUnparseableBody = (body: string): void => {
-    (global.fetch as jest.Mock).mockResolvedValue({
+    (global.fetch as Mock).mockResolvedValue({
       ok: true,
       status: 200,
       statusText: 'OK',
@@ -294,17 +294,16 @@ describe('a body that could not be read', () => {
     // the deadline is asked about first, so a chain that has already timed out
     // cannot be mistaken for a body worth re-fetching and spend the budget it
     // no longer has. Swap the two and this dies.
-    (global.fetch as jest.Mock).mockImplementation(
-      (_url: string, options: { signal: AbortSignal }) =>
-        Promise.resolve({
-          ok: true,
-          status: 200,
-          statusText: 'OK',
-          json: () =>
-            new Promise((_resolve, reject) => {
-              options.signal.addEventListener('abort', () => reject(abortError()));
-            }),
-        })
+    (global.fetch as Mock).mockImplementation((_url: string, options: { signal: AbortSignal }) =>
+      Promise.resolve({
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        json: () =>
+          new Promise((_resolve, reject) => {
+            options.signal.addEventListener('abort', () => reject(abortError()));
+          }),
+      })
     );
 
     const outcome = await settle(fetchMyBeersFromAPI());
@@ -329,7 +328,7 @@ describe('a body that could not be read', () => {
     // route and gives a false green. The installed whatwg-fetch shim never
     // produces this shape, so treat it as a forward fence on the rule rather
     // than as the case the rule exists for.
-    (global.fetch as jest.Mock).mockImplementation(
+    (global.fetch as Mock).mockImplementation(
       (_url: string, options: { signal: AbortSignal }) =>
         new Promise((_resolve, reject) => {
           options.signal.addEventListener('abort', () =>
@@ -351,7 +350,7 @@ describe('a body that could not be read', () => {
     // already drives a deadline abort through a whole fetcher and asserts
     // NETWORK_ERROR. Kept because it fences the new typed exit locally, next to
     // the non-`Error` case it must agree with — not because it adds coverage.
-    (global.fetch as jest.Mock).mockImplementation(
+    (global.fetch as Mock).mockImplementation(
       (_url: string, options: { signal: AbortSignal }) =>
         new Promise((_resolve, reject) => {
           options.signal.addEventListener('abort', () => reject(abortError()));

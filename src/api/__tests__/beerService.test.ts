@@ -1,4 +1,4 @@
-import { vi } from 'vitest';
+import { vi, type Mock } from 'vitest';
 import { checkInBeer } from '../beerService';
 import { getSessionData } from '../sessionManager';
 import { autoLogin } from '../authService';
@@ -20,23 +20,23 @@ const mockApiClient = vi.hoisted(() => ({
 
 // Mock the apiClientInstance module
 vi.mock('../apiClientInstance', () => ({
-  getApiClient: jest.fn().mockReturnValue(mockApiClient),
+  getApiClient: vi.fn().mockReturnValue(mockApiClient),
   apiClient: mockApiClient,
 }));
 
 describe('beerService', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
 
     // Setup default mocks
-    (getSessionData as jest.Mock).mockResolvedValue({
+    (getSessionData as Mock).mockResolvedValue({
       memberId: 'test-member-id',
       storeId: 'test-store-id',
       storeName: 'Test Store',
       sessionId: 'test-session-id',
     });
 
-    (autoLogin as jest.Mock).mockResolvedValue({
+    (autoLogin as Mock).mockResolvedValue({
       success: true,
       sessionData: {
         memberId: 'test-member-id',
@@ -50,7 +50,7 @@ describe('beerService', () => {
   describe('checkInBeer', () => {
     it('should attempt auto-login if session data is missing', async () => {
       // Mock missing session data
-      (getSessionData as jest.Mock).mockResolvedValue(null);
+      (getSessionData as Mock).mockResolvedValue(null);
 
       mockApiClient.post.mockResolvedValue({
         success: true,

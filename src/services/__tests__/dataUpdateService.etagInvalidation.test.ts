@@ -1,4 +1,4 @@
-import { vi } from 'vitest';
+import { vi, type Mock } from 'vitest';
 /**
  * The stored ETag may only survive a write that it actually describes.
  *
@@ -31,10 +31,10 @@ import { databaseLockManager } from '../../database/DatabaseLockManager';
 import { ApiErrorType } from '../../utils/notificationUtils';
 
 vi.mock('../../database/preferences', () => ({
-  getPreference: jest.fn(),
+  getPreference: vi.fn(),
 
-  setPreference: jest.fn(async () => {}),
-  areApiUrlsConfigured: jest.fn(async () => true),
+  setPreference: vi.fn(async () => {}),
+  areApiUrlsConfigured: vi.fn(async () => true),
 }));
 
 vi.mock('../../api/beerApi', async () =>
@@ -43,36 +43,36 @@ vi.mock('../../api/beerApi', async () =>
 );
 
 vi.mock('../enrichmentService', () => ({
-  fetchBeersFromProxy: jest.fn(),
-  fetchEnrichmentBatchWithMissing: jest.fn(async () => ({ enrichments: {}, missing: [] })),
-  syncBeersToWorker: jest.fn(async () => {}),
-  mergeEnrichmentData: jest.fn((beers: unknown) => beers),
-  recordFallback: jest.fn(),
-  pollForEnrichmentUpdates: jest.fn(),
+  fetchBeersFromProxy: vi.fn(),
+  fetchEnrichmentBatchWithMissing: vi.fn(async () => ({ enrichments: {}, missing: [] })),
+  syncBeersToWorker: vi.fn(async () => {}),
+  mergeEnrichmentData: vi.fn((beers: unknown) => beers),
+  recordFallback: vi.fn(),
+  pollForEnrichmentUpdates: vi.fn(),
 }));
 
 vi.mock('../../database/repositories/BeerRepository', () => ({
   beerRepository: {
-    insertMany: jest.fn(async () => {}),
-    insertManyUnsafe: jest.fn(async () => {}),
-    count: jest.fn(async () => 12),
+    insertMany: vi.fn(async () => {}),
+    insertManyUnsafe: vi.fn(async () => {}),
+    count: vi.fn(async () => 12),
   },
 }));
 
 vi.mock('../../database/repositories/MyBeersRepository', () => ({
   myBeersRepository: {
-    insertMany: jest.fn(async () => {}),
-    insertManyUnsafe: jest.fn(async () => {}),
-    replaceAllWithEmptyUnsafe: jest.fn(async () => {}),
+    insertMany: vi.fn(async () => {}),
+    insertManyUnsafe: vi.fn(async () => {}),
+    replaceAllWithEmptyUnsafe: vi.fn(async () => {}),
   },
 }));
 
 vi.mock('../../database/repositories/RewardsRepository', () => ({
   rewardsRepository: {
-    insertMany: jest.fn(async () => {}),
-    insertManyUnsafe: jest.fn(async () => {}),
-    replaceAllWithEmpty: jest.fn(async () => {}),
-    replaceAllWithEmptyUnsafe: jest.fn(async () => {}),
+    insertMany: vi.fn(async () => {}),
+    insertManyUnsafe: vi.fn(async () => {}),
+    replaceAllWithEmpty: vi.fn(async () => {}),
+    replaceAllWithEmptyUnsafe: vi.fn(async () => {}),
   },
 }));
 
@@ -84,7 +84,7 @@ let mockLockHolder: string | null = null;
 
 vi.mock('../../database/DatabaseLockManager', () => ({
   databaseLockManager: {
-    withDatabaseLock: jest.fn(async (name: string, task: () => Promise<unknown>) => {
+    withDatabaseLock: vi.fn(async (name: string, task: () => Promise<unknown>) => {
       mockLockHolder = name;
       try {
         return await task();
@@ -101,9 +101,7 @@ const STORE_URL = 'https://fsbs.beerknurd.com/bk-store-json.php?sid=13879';
 
 /** Every `all_beers_etag` value written, in order. */
 const etagWrites = (): unknown[] =>
-  (setPreference as jest.Mock).mock.calls
-    .filter(call => call[0] === 'all_beers_etag')
-    .map(c => c[1]);
+  (setPreference as Mock).mock.calls.filter(call => call[0] === 'all_beers_etag').map(c => c[1]);
 
 /**
  * Freshness stamps written this run.
@@ -113,7 +111,7 @@ const etagWrites = (): unknown[] =>
  * corrective full fetch would never happen.
  */
 const freshnessStamps = (): unknown[] =>
-  (setPreference as jest.Mock).mock.calls.filter(call => call[0] === 'all_beers_last_check');
+  (setPreference as Mock).mock.calls.filter(call => call[0] === 'all_beers_last_check');
 
 /**
  * Did an ETag clear land before the rows were replaced?
@@ -122,14 +120,14 @@ const freshnessStamps = (): unknown[] =>
  * describes, so the invalidation has to precede the insert rather than follow it.
  */
 const clearBeforeInsert = (): boolean => {
-  const setPreferenceMock = setPreference as jest.Mock;
-  const insertOrder = (beerRepository.insertManyUnsafe as jest.Mock).mock.invocationCallOrder[0];
+  const setPreferenceMock = setPreference as Mock;
+  const insertOrder = (beerRepository.insertManyUnsafe as Mock).mock.invocationCallOrder[0];
   // Bounded BELOW by the fetch, not just above by the insert. Accepting any
   // earlier clear made this green for the wrong reason: `manualRefreshAllData`
   // emits its own escape-hatch clear before the fetch, so the helper could be
   // satisfied by a clear this writer never made. The writer's pre-clear is the
   // one that lands between fetching the taplist and storing it.
-  const fetchOrder = (fetchBeersFromProxy as jest.Mock).mock.invocationCallOrder[0];
+  const fetchOrder = (fetchBeersFromProxy as Mock).mock.invocationCallOrder[0];
   if (insertOrder === undefined || fetchOrder === undefined) return false;
 
   return setPreferenceMock.mock.calls.some(
@@ -152,7 +150,7 @@ const clearBeforeInsert = (): boolean => {
 const mockConfigReadHolders: (string | null)[] = [];
 
 const storedEtagIs = (value: string | null): void => {
-  (getPreference as jest.Mock).mockImplementation(async (key: string) => {
+  (getPreference as Mock).mockImplementation(async (key: string) => {
     if (key === 'all_beers_api_url') {
       mockConfigReadHolders.push(mockLockHolder);
       return STORE_URL;
@@ -165,20 +163,21 @@ const storedEtagIs = (value: string | null): void => {
 
 /** The member sources answer "not for you", so only the taplist is in play. */
 const onlyTaplistMatters = (): void => {
-  (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(
+  (fetchMyBeersFromAPI as Mock).mockResolvedValue(
     unavailable('not-applicable', 'none:// placeholder')
   );
-  (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(
+  (fetchRewardsFromAPI as Mock).mockResolvedValue(
     unavailable('not-applicable', 'none:// placeholder')
   );
 };
 
 /** Proxy configured and answering. */
 const proxyReturns = (etag: string | null): void => {
-  jest
-    .spyOn(config, 'enrichment', 'get')
-    .mockReturnValue({ ...config.enrichment, isConfigured: () => true });
-  (fetchBeersFromProxy as jest.Mock).mockResolvedValue({
+  vi.spyOn(config, 'enrichment', 'get').mockReturnValue({
+    ...config.enrichment,
+    isConfigured: () => true,
+  });
+  (fetchBeersFromProxy as Mock).mockResolvedValue({
     beers: TAPLIST,
     storeId: '13879',
     source: 'live',
@@ -189,26 +188,27 @@ const proxyReturns = (etag: string | null): void => {
 
 /** Proxy configured but failing, so the direct Flying Saucer fetch supplies the taplist. */
 const proxyFailsAndDirectSucceeds = (): void => {
-  jest
-    .spyOn(config, 'enrichment', 'get')
-    .mockReturnValue({ ...config.enrichment, isConfigured: () => true });
-  (fetchBeersFromProxy as jest.Mock).mockRejectedValue(new Error('proxy unreachable'));
-  (fetchBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(TAPLIST));
+  vi.spyOn(config, 'enrichment', 'get').mockReturnValue({
+    ...config.enrichment,
+    isConfigured: () => true,
+  });
+  (fetchBeersFromProxy as Mock).mockRejectedValue(new Error('proxy unreachable'));
+  (fetchBeersFromAPI as Mock).mockResolvedValue(fetchedRows(TAPLIST));
 };
 
 describe('taplist ETag invalidation', () => {
   beforeEach(async () => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     mockConfigReadHolders.length = 0;
     svc.resetInFlightSequentialRefresh();
     svc.resetLastManualRefreshTime();
     storedEtagIs('W/"old"');
     onlyTaplistMatters();
-    (fetchBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(TAPLIST));
+    (fetchBeersFromAPI as Mock).mockResolvedValue(fetchedRows(TAPLIST));
   });
 
   afterEach(async () => {
-    jest.restoreAllMocks();
+    vi.restoreAllMocks();
   });
 
   describe('the reported bug: a fallback write leaves an ETag naming data the table no longer holds', () => {
@@ -251,11 +251,12 @@ describe('taplist ETag invalidation', () => {
     // `shouldTrustNotModified` was written for exactly this in 04 Phase 1 and
     // then had no production caller for the entire life of the branch — the
     // third inert export in this module, after the two 5.6 wired in.
-    (beerRepository.count as jest.Mock).mockResolvedValue(0);
-    jest
-      .spyOn(config, 'enrichment', 'get')
-      .mockReturnValue({ ...config.enrichment, isConfigured: () => true });
-    (fetchBeersFromProxy as jest.Mock).mockResolvedValue({
+    (beerRepository.count as Mock).mockResolvedValue(0);
+    vi.spyOn(config, 'enrichment', 'get').mockReturnValue({
+      ...config.enrichment,
+      isConfigured: () => true,
+    });
+    (fetchBeersFromProxy as Mock).mockResolvedValue({
       beers: [],
       storeId: '13879',
       source: 'live',
@@ -283,11 +284,12 @@ describe('taplist ETag invalidation', () => {
   });
 
   it('refuses to believe a 304 with an empty table — manual refresh', async () => {
-    (beerRepository.count as jest.Mock).mockResolvedValue(0);
-    jest
-      .spyOn(config, 'enrichment', 'get')
-      .mockReturnValue({ ...config.enrichment, isConfigured: () => true });
-    (fetchBeersFromProxy as jest.Mock).mockResolvedValue({
+    (beerRepository.count as Mock).mockResolvedValue(0);
+    vi.spyOn(config, 'enrichment', 'get').mockReturnValue({
+      ...config.enrichment,
+      isConfigured: () => true,
+    });
+    (fetchBeersFromProxy as Mock).mockResolvedValue({
       beers: [],
       storeId: '13879',
       source: 'live',
@@ -305,11 +307,12 @@ describe('taplist ETag invalidation', () => {
   });
 
   it('refuses to believe a 304 with an empty table — login', async () => {
-    (beerRepository.count as jest.Mock).mockResolvedValue(0);
-    jest
-      .spyOn(config, 'enrichment', 'get')
-      .mockReturnValue({ ...config.enrichment, isConfigured: () => true });
-    (fetchBeersFromProxy as jest.Mock).mockResolvedValue({
+    (beerRepository.count as Mock).mockResolvedValue(0);
+    vi.spyOn(config, 'enrichment', 'get').mockReturnValue({
+      ...config.enrichment,
+      isConfigured: () => true,
+    });
+    (fetchBeersFromProxy as Mock).mockResolvedValue({
       beers: [],
       storeId: '13879',
       source: 'live',
@@ -337,11 +340,12 @@ describe('taplist ETag invalidation', () => {
     // for hours — and the likeliest cause of an unreadable count is a missing or
     // corrupt `allbeers` table, i.e. exactly the state the backstop is for.
     // Neither: keep the validator, stamp nothing, report the failure.
-    (beerRepository.count as jest.Mock).mockResolvedValue(null);
-    jest
-      .spyOn(config, 'enrichment', 'get')
-      .mockReturnValue({ ...config.enrichment, isConfigured: () => true });
-    (fetchBeersFromProxy as jest.Mock).mockResolvedValue({
+    (beerRepository.count as Mock).mockResolvedValue(null);
+    vi.spyOn(config, 'enrichment', 'get').mockReturnValue({
+      ...config.enrichment,
+      isConfigured: () => true,
+    });
+    (fetchBeersFromProxy as Mock).mockResolvedValue({
       beers: [],
       storeId: '13879',
       source: 'live',
@@ -365,14 +369,15 @@ describe('taplist ETag invalidation', () => {
     // ETag in the gap and have it cleared.
     // Record which operation held the lock at the moment the count was read.
     const holderDuringCount: (string | null)[] = [];
-    (beerRepository.count as jest.Mock).mockImplementation(async () => {
+    (beerRepository.count as Mock).mockImplementation(async () => {
       holderDuringCount.push(mockLockHolder);
       return 0;
     });
-    jest
-      .spyOn(config, 'enrichment', 'get')
-      .mockReturnValue({ ...config.enrichment, isConfigured: () => true });
-    (fetchBeersFromProxy as jest.Mock).mockResolvedValue({
+    vi.spyOn(config, 'enrichment', 'get').mockReturnValue({
+      ...config.enrichment,
+      isConfigured: () => true,
+    });
+    (fetchBeersFromProxy as Mock).mockResolvedValue({
       beers: [],
       storeId: '13879',
       source: 'live',
@@ -382,7 +387,7 @@ describe('taplist ETag invalidation', () => {
 
     await svc.fetchAndUpdateAllBeers();
 
-    const lockedOperations = (databaseLockManager.withDatabaseLock as jest.Mock).mock.calls.map(
+    const lockedOperations = (databaseLockManager.withDatabaseLock as Mock).mock.calls.map(
       ([name]) => name
     );
     expect(lockedOperations).toContain('all-beers-etag-invalidate');
@@ -419,7 +424,7 @@ describe('taplist ETag invalidation', () => {
     // rows until something manual happens. The durable harm is here, not in the
     // validator.
     const holderDuringStamp: (string | null)[] = [];
-    (setPreference as jest.Mock).mockImplementation(async (key: string) => {
+    (setPreference as Mock).mockImplementation(async (key: string) => {
       if (key === 'all_beers_last_check') {
         holderDuringStamp.push(mockLockHolder);
       }
@@ -441,11 +446,12 @@ describe('taplist ETag invalidation', () => {
   it('honours a 304 when the table actually holds rows', async () => {
     // The other direction: the backstop must not cost a full download on every
     // ordinary 304, which is the entire point of the ETag.
-    (beerRepository.count as jest.Mock).mockResolvedValue(12);
-    jest
-      .spyOn(config, 'enrichment', 'get')
-      .mockReturnValue({ ...config.enrichment, isConfigured: () => true });
-    (fetchBeersFromProxy as jest.Mock).mockResolvedValue({
+    (beerRepository.count as Mock).mockResolvedValue(12);
+    vi.spyOn(config, 'enrichment', 'get').mockReturnValue({
+      ...config.enrichment,
+      isConfigured: () => true,
+    });
+    (fetchBeersFromProxy as Mock).mockResolvedValue({
       beers: [],
       storeId: '13879',
       source: 'live',
@@ -491,7 +497,7 @@ describe('taplist ETag invalidation', () => {
 
     await svc.fetchAndUpdateAllBeers();
 
-    const setPreferenceMock = setPreference as jest.Mock;
+    const setPreferenceMock = setPreference as Mock;
     const clearOrder = setPreferenceMock.mock.calls
       .map((call: unknown[], index: number) => ({
         call,
@@ -499,7 +505,7 @@ describe('taplist ETag invalidation', () => {
       }))
       .filter(({ call }: { call: unknown[] }) => call[0] === 'all_beers_etag' && call[1] === '')
       .map(({ order }: { order: number }) => order)[0];
-    const insertOrder = (beerRepository.insertManyUnsafe as jest.Mock).mock.invocationCallOrder[0];
+    const insertOrder = (beerRepository.insertManyUnsafe as Mock).mock.invocationCallOrder[0];
 
     expect(clearOrder).toBeDefined();
     expect(insertOrder).toBeDefined();
@@ -555,10 +561,11 @@ describe('taplist ETag invalidation', () => {
     // GUARD, passes before and after. A 304 means the table already matches the
     // stored ETag, so there is nothing to invalidate — and this is the test that
     // fails if the 304 branch is ever "simplified" into the write path.
-    jest
-      .spyOn(config, 'enrichment', 'get')
-      .mockReturnValue({ ...config.enrichment, isConfigured: () => true });
-    (fetchBeersFromProxy as jest.Mock).mockResolvedValue({
+    vi.spyOn(config, 'enrichment', 'get').mockReturnValue({
+      ...config.enrichment,
+      isConfigured: () => true,
+    });
+    (fetchBeersFromProxy as Mock).mockResolvedValue({
       beers: [],
       storeId: '13879',
       source: 'live',

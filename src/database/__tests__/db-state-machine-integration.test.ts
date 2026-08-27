@@ -1,4 +1,4 @@
-import { vi } from 'vitest';
+import { vi, type Mock, type MockedFunction } from 'vitest';
 /**
  * Tests for DatabaseInitializer state machine integration in db.ts
  * Verifies HP-2 Step 2c completion
@@ -14,16 +14,14 @@ import * as schema from '../schema';
 vi.mock('../connection');
 vi.mock('../schema');
 
-const mockGetDatabase = connection.getDatabase as jest.MockedFunction<
-  typeof connection.getDatabase
->;
-const mockSetupTables = schema.setupTables as jest.MockedFunction<typeof schema.setupTables>;
+const mockGetDatabase = connection.getDatabase as MockedFunction<typeof connection.getDatabase>;
+const mockSetupTables = schema.setupTables as MockedFunction<typeof schema.setupTables>;
 
 type MockDatabase = {
-  execAsync: jest.Mock;
-  runAsync: jest.Mock;
-  getAllAsync: jest.Mock;
-  getFirstAsync: jest.Mock;
+  execAsync: Mock;
+  runAsync: Mock;
+  getAllAsync: Mock;
+  getFirstAsync: Mock;
 };
 
 describe('Database State Machine Integration', () => {
@@ -35,10 +33,10 @@ describe('Database State Machine Integration', () => {
 
     // Setup mock database
     mockDatabase = {
-      execAsync: jest.fn().mockResolvedValue(undefined),
-      runAsync: jest.fn().mockResolvedValue({ changes: 0, lastInsertRowId: 0 }),
-      getAllAsync: jest.fn().mockResolvedValue([]),
-      getFirstAsync: jest.fn().mockResolvedValue(null),
+      execAsync: vi.fn().mockResolvedValue(undefined),
+      runAsync: vi.fn().mockResolvedValue({ changes: 0, lastInsertRowId: 0 }),
+      getAllAsync: vi.fn().mockResolvedValue([]),
+      getFirstAsync: vi.fn().mockResolvedValue(null),
     };
 
     // MockDatabase only stubs the methods this suite exercises; the real
@@ -48,13 +46,13 @@ describe('Database State Machine Integration', () => {
     mockSetupTables.mockResolvedValue(undefined);
 
     // Use real timers for event-based waiting tests
-    jest.useRealTimers();
+    vi.useRealTimers();
   });
 
   afterEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     // Restore fake timers after each test
-    jest.useFakeTimers();
+    vi.useFakeTimers();
   });
 
   describe('setupDatabase with state machine', () => {

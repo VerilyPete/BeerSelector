@@ -1,4 +1,4 @@
-import { vi } from 'vitest';
+import { vi, type Mock } from 'vitest';
 /**
  * The same condition must classify the same way whichever entry point sees it.
  *
@@ -46,15 +46,15 @@ import {
 } from '../dataUpdateService';
 
 vi.mock('../../database/preferences', async () => ({
-  getPreference: jest.fn(async (key: string) =>
+  getPreference: vi.fn(async (key: string) =>
     key === 'all_beers_api_url'
       ? 'https://fsbs.beerknurd.com/bk-store-json.php?sid=13885'
       : key === 'my_beers_api_url'
         ? 'https://example.com/mybeers.json'
         : null
   ),
-  setPreference: jest.fn(async () => {}),
-  areApiUrlsConfigured: jest.fn(async () => true),
+  setPreference: vi.fn(async () => {}),
+  areApiUrlsConfigured: vi.fn(async () => true),
 }));
 
 vi.mock('../../api/beerApi', async () =>
@@ -63,48 +63,48 @@ vi.mock('../../api/beerApi', async () =>
 );
 
 vi.mock('../enrichmentService', async () => ({
-  fetchBeersFromProxy: jest.fn(),
-  fetchEnrichmentBatchWithMissing: jest.fn(async () => ({ enrichments: {}, missing: [] })),
-  syncBeersToWorker: jest.fn(async () => ({ synced: 0, failed: 0, queued_for_cleanup: 0 })),
-  mergeEnrichmentData: jest.fn((beers: unknown) => beers),
-  recordFallback: jest.fn(),
-  pollForEnrichmentUpdates: jest.fn(async () => ({})),
+  fetchBeersFromProxy: vi.fn(),
+  fetchEnrichmentBatchWithMissing: vi.fn(async () => ({ enrichments: {}, missing: [] })),
+  syncBeersToWorker: vi.fn(async () => ({ synced: 0, failed: 0, queued_for_cleanup: 0 })),
+  mergeEnrichmentData: vi.fn((beers: unknown) => beers),
+  recordFallback: vi.fn(),
+  pollForEnrichmentUpdates: vi.fn(async () => ({})),
 }));
 
 vi.mock('../../database/repositories/BeerRepository', async () => ({
-  beerRepository: { insertManyUnsafe: jest.fn(async () => {}), count: jest.fn(async () => 12) },
+  beerRepository: { insertManyUnsafe: vi.fn(async () => {}), count: vi.fn(async () => 12) },
 }));
 vi.mock('../../database/repositories/MyBeersRepository', async () => ({
   myBeersRepository: {
-    insertManyUnsafe: jest.fn(async () => {}),
-    replaceAllWithEmptyUnsafe: jest.fn(async () => {}),
+    insertManyUnsafe: vi.fn(async () => {}),
+    replaceAllWithEmptyUnsafe: vi.fn(async () => {}),
   },
 }));
 vi.mock('../../database/repositories/RewardsRepository', async () => ({
   rewardsRepository: {
-    insertManyUnsafe: jest.fn(async () => {}),
-    replaceAllWithEmptyUnsafe: jest.fn(async () => {}),
+    insertManyUnsafe: vi.fn(async () => {}),
+    replaceAllWithEmptyUnsafe: vi.fn(async () => {}),
   },
 }));
 vi.mock('../../database/DatabaseLockManager', async () => ({
   databaseLockManager: {
-    withDatabaseLock: jest.fn(async (_n: string, task: () => Promise<unknown>) => task()),
+    withDatabaseLock: vi.fn(async (_n: string, task: () => Promise<unknown>) => task()),
   },
 }));
-vi.mock('../../utils/errorLogger', async () => ({ logError: jest.fn(), logWarning: jest.fn() }));
+vi.mock('../../utils/errorLogger', async () => ({ logError: vi.fn(), logWarning: vi.fn() }));
 vi.mock('@/src/config', async () => {
   const actual = await vi.importActual<typeof import('@/src/config')>('@/src/config');
   return {
     ...actual,
     config: {
       ...actual.config,
-      enrichment: { ...actual.config.enrichment, isConfigured: jest.fn().mockReturnValue(false) },
+      enrichment: { ...actual.config.enrichment, isConfigured: vi.fn().mockReturnValue(false) },
     },
   };
 });
 
 beforeEach(async () => {
-  jest.clearAllMocks();
+  vi.clearAllMocks();
   // `mockReset`, because `clearAllMocks` clears call data and NOT
   // implementations. `taplistUrlUnset()` installs an unset-URL implementation on
   // `getPreference`, which otherwise persists into every later test in the file
@@ -112,8 +112,8 @@ beforeEach(async () => {
   // and silently handing the next test appended here an unconfigured taplist.
   // Same leak found and fixed in `migrationDispatch.test.ts`; this is its twin,
   // caught by a second reviewer after the first.
-  (getPreference as jest.Mock).mockReset();
-  (getPreference as jest.Mock).mockImplementation(async (key: string) =>
+  (getPreference as Mock).mockReset();
+  (getPreference as Mock).mockImplementation(async (key: string) =>
     key === 'all_beers_api_url'
       ? 'https://fsbs.beerknurd.com/bk-store-json.php?sid=13885'
       : key === 'my_beers_api_url'
@@ -122,18 +122,18 @@ beforeEach(async () => {
   );
   resetInFlightSequentialRefresh();
   dropInFlightTaplistFetch();
-  (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(confirmedEmpty());
-  (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(confirmedEmpty());
-  jest.spyOn(console, 'log').mockImplementation(() => {});
-  jest.spyOn(console, 'error').mockImplementation(() => {});
+  (fetchMyBeersFromAPI as Mock).mockResolvedValue(confirmedEmpty());
+  (fetchRewardsFromAPI as Mock).mockResolvedValue(confirmedEmpty());
+  vi.spyOn(console, 'log').mockImplementation(() => {});
+  vi.spyOn(console, 'error').mockImplementation(() => {});
 });
 
-afterEach(() => jest.restoreAllMocks());
+afterEach(() => vi.restoreAllMocks());
 
 describe('an empty taplist', () => {
   beforeEach(async () => {
     // A well-formed response from a store with nothing on tap.
-    (fetchBeersFromAPI as jest.Mock).mockResolvedValue(confirmedEmpty());
+    (fetchBeersFromAPI as Mock).mockResolvedValue(confirmedEmpty());
   });
 
   it('is a validation error on the direct path', async () => {
@@ -209,10 +209,10 @@ describe('the message a user actually reads', () => {
   // `storeId = null` from it, and carries on into the fetch. (By symbol — both
   // line numbers this originally cited were already wrong when written.)
   const taplistUrlUnset = () => {
-    (getPreference as jest.Mock).mockImplementation(async (key: string) =>
+    (getPreference as Mock).mockImplementation(async (key: string) =>
       key === 'all_beers_api_url' ? null : key === 'my_beers_api_url' ? 'https://x/my.json' : null
     );
-    (fetchBeersFromAPI as jest.Mock).mockResolvedValue(
+    (fetchBeersFromAPI as Mock).mockResolvedValue(
       unavailable('not-configured', 'all_beers_api_url is not set')
     );
   };
@@ -272,7 +272,7 @@ describe('the message a user actually reads', () => {
     // same way `fetchAndUpdateAllBeers` is for the taplist — and it makes the
     // my-beers copy positively pinned rather than guarded only by "contains no
     // developer prose", which any wrong-but-tidy sentence satisfies.
-    (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(
+    (fetchMyBeersFromAPI as Mock).mockResolvedValue(
       unavailable('not-configured', 'my_beers_api_url is not set')
     );
 
@@ -296,10 +296,10 @@ describe('the message a user actually reads', () => {
     // rather than deleted because the guarantee is about what a user reads, and
     // the first producer that does emit `not-applicable` should not be the
     // thing that discovers the copy was never checked.
-    (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(
+    (fetchMyBeersFromAPI as Mock).mockResolvedValue(
       unavailable('not-applicable', 'my_beers_api_url is a none:// placeholder')
     );
-    (fetchBeersFromAPI as jest.Mock).mockResolvedValue(
+    (fetchBeersFromAPI as Mock).mockResolvedValue(
       unavailable('not-applicable', 'all_beers_api_url is a none:// placeholder')
     );
 
@@ -318,7 +318,7 @@ describe('the message a user actually reads', () => {
     // that still throws is `not-configured` — a member whose my_beers_api_url
     // never got written. It threw a plain Error, which is UNKNOWN_ERROR, whose
     // renderer also returns the message verbatim.
-    (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(
+    (fetchMyBeersFromAPI as Mock).mockResolvedValue(
       unavailable('not-configured', 'my_beers_api_url is not set')
     );
 
@@ -360,7 +360,7 @@ describe('the message a user actually reads', () => {
     // `requireRows` types a malformed body as MALFORMED_RESPONSE_ERROR
     // precisely so its copy can suppress the detail, and this path threw a
     // plain Error carrying that detail instead.
-    (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(
+    (fetchMyBeersFromAPI as Mock).mockResolvedValue(
       malformed('rows returned and none carried an id')
     );
 

@@ -1,4 +1,4 @@
-import { vi } from 'vitest';
+import { vi, type Mock } from 'vitest';
 /**
  * Unit tests for enrichmentService.ts
  *
@@ -39,11 +39,11 @@ vi.mock('@/src/config', () => ({
       batchSize: 100,
       rateLimitWindow: 60000,
       rateLimitMaxRequests: 10,
-      isConfigured: jest.fn(() => true),
-      getFullUrl: jest.fn((endpoint: string) => `https://test-api.example.com/${endpoint}`),
+      isConfigured: vi.fn(() => true),
+      getFullUrl: vi.fn((endpoint: string) => `https://test-api.example.com/${endpoint}`),
     },
   },
-  assertEnrichmentConfigured: jest.fn((enrichment: { isConfigured: () => boolean }) => {
+  assertEnrichmentConfigured: vi.fn((enrichment: { isConfigured: () => boolean }) => {
     if (!enrichment.isConfigured()) {
       throw new Error('Enrichment service is not configured: missing API key');
     }
@@ -52,18 +52,18 @@ vi.mock('@/src/config', () => ({
 
 // Mock preferences
 vi.mock('@/src/database/preferences', () => ({
-  getPreference: jest.fn(),
+  getPreference: vi.fn(),
 
-  setPreference: jest.fn(),
+  setPreference: vi.fn(),
 }));
 
 // Mock error logger
 vi.mock('@/src/utils/errorLogger', () => ({
-  logWarning: jest.fn(),
+  logWarning: vi.fn(),
 }));
 
 // Mock fetch globally
-const mockFetch = jest.fn();
+const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
 function setupEnrichmentTest() {
@@ -75,7 +75,7 @@ function setupEnrichmentTest() {
 
 describe('enrichmentService', () => {
   beforeEach(async () => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     setupEnrichmentTest();
   });
 
@@ -543,8 +543,8 @@ describe('enrichmentService', () => {
   });
 
   describe('API Functions', () => {
-    const mockGetPreference = getPreference as jest.Mock;
-    const mockSetPreference = setPreference as jest.Mock;
+    const mockGetPreference = getPreference as Mock;
+    const mockSetPreference = setPreference as Mock;
 
     beforeEach(async () => {
       // Setup mock for client ID - cached value is used
@@ -792,7 +792,7 @@ describe('enrichmentService', () => {
       });
 
       it('should NOT call response.json() on 304 response', async () => {
-        const jsonMock = jest.fn();
+        const jsonMock = vi.fn();
         mockFetch.mockResolvedValueOnce({
           ok: false,
           status: 304,
@@ -1110,7 +1110,7 @@ describe('enrichmentService', () => {
   });
 
   describe('syncBeersToWorker', () => {
-    const mockGetPreference = getPreference as jest.Mock;
+    const mockGetPreference = getPreference as Mock;
 
     beforeEach(async () => {
       mockGetPreference.mockResolvedValue('test-client-id');
@@ -1272,7 +1272,7 @@ describe('enrichmentService', () => {
   });
 
   describe('fetchEnrichmentBatchWithMissing', () => {
-    const mockGetPreference = getPreference as jest.Mock;
+    const mockGetPreference = getPreference as Mock;
 
     beforeEach(async () => {
       mockGetPreference.mockResolvedValue('test-client-id');
@@ -1411,15 +1411,15 @@ describe('enrichmentService', () => {
   });
 
   describe('pollForEnrichmentUpdates', () => {
-    const mockGetPreference = getPreference as jest.Mock;
+    const mockGetPreference = getPreference as Mock;
 
     beforeEach(async () => {
-      jest.useFakeTimers();
+      vi.useFakeTimers();
       mockGetPreference.mockResolvedValue('test-client-id');
     });
 
     afterEach(async () => {
-      jest.useRealTimers();
+      vi.useRealTimers();
     });
 
     it('should return empty when not configured', async () => {
@@ -1473,9 +1473,9 @@ describe('enrichmentService', () => {
       const pollPromise = pollForEnrichmentUpdates(['123']);
 
       // First poll after 5s
-      await jest.advanceTimersByTimeAsync(5000);
+      await vi.advanceTimersByTimeAsync(5000);
       // Second poll after 10s (5 + 10 = 15s total, but capped calculation)
-      await jest.advanceTimersByTimeAsync(10000);
+      await vi.advanceTimersByTimeAsync(10000);
 
       const result = await pollPromise;
 
@@ -1512,7 +1512,7 @@ describe('enrichmentService', () => {
       const pollPromise = pollForEnrichmentUpdates(['123', '456']);
 
       // First poll after 5s
-      await jest.advanceTimersByTimeAsync(5000);
+      await vi.advanceTimersByTimeAsync(5000);
 
       const result = await pollPromise;
 
@@ -1541,7 +1541,7 @@ describe('enrichmentService', () => {
       const pollPromise = pollForEnrichmentUpdates(['123'], 10000);
 
       // Advance past max duration
-      await jest.advanceTimersByTimeAsync(15000);
+      await vi.advanceTimersByTimeAsync(15000);
 
       const result = await pollPromise;
 
@@ -1571,9 +1571,9 @@ describe('enrichmentService', () => {
       const pollPromise = pollForEnrichmentUpdates(['123']);
 
       // First poll fails after 5s
-      await jest.advanceTimersByTimeAsync(5000);
+      await vi.advanceTimersByTimeAsync(5000);
       // Second poll succeeds after 10s
-      await jest.advanceTimersByTimeAsync(10000);
+      await vi.advanceTimersByTimeAsync(10000);
 
       const result = await pollPromise;
 
@@ -1611,15 +1611,15 @@ describe('enrichmentService', () => {
       const pollPromise = pollForEnrichmentUpdates(['123'], 120000);
 
       // Poll 1 at 5s
-      await jest.advanceTimersByTimeAsync(5000);
+      await vi.advanceTimersByTimeAsync(5000);
       // Poll 2 at 10s
-      await jest.advanceTimersByTimeAsync(10000);
+      await vi.advanceTimersByTimeAsync(10000);
       // Poll 3 at 15s
-      await jest.advanceTimersByTimeAsync(15000);
+      await vi.advanceTimersByTimeAsync(15000);
       // Poll 4 at 20s (max cap reached)
-      await jest.advanceTimersByTimeAsync(20000);
+      await vi.advanceTimersByTimeAsync(20000);
       // Poll 5 at 20s (still capped at 20s)
-      await jest.advanceTimersByTimeAsync(20000);
+      await vi.advanceTimersByTimeAsync(20000);
 
       const result = await pollPromise;
 
@@ -1630,7 +1630,7 @@ describe('enrichmentService', () => {
 
   describe('fetchBeersFromProxy response validation', () => {
     beforeEach(async () => {
-      const mockGetPreference = getPreference as jest.Mock;
+      const mockGetPreference = getPreference as Mock;
       mockGetPreference.mockResolvedValue('test-client-id');
     });
 
@@ -1747,7 +1747,7 @@ describe('enrichmentService', () => {
 
   describe('fetchEnrichmentBatch response validation', () => {
     beforeEach(async () => {
-      const mockGetPreference = getPreference as jest.Mock;
+      const mockGetPreference = getPreference as Mock;
       mockGetPreference.mockResolvedValue('test-client-id');
     });
 
@@ -1766,7 +1766,7 @@ describe('enrichmentService', () => {
 
   describe('syncBeersToWorker response validation', () => {
     beforeEach(async () => {
-      const mockGetPreference = getPreference as jest.Mock;
+      const mockGetPreference = getPreference as Mock;
       mockGetPreference.mockResolvedValue('test-client-id');
     });
 

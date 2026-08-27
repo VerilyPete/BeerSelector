@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 /**
  * Tests for database initialization state machine
  *
@@ -179,7 +180,7 @@ describe('DatabaseInitializer', () => {
 
   describe('State transitions logging', () => {
     it('should log state transitions', () => {
-      const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
+      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
       const initializer = createInitializer();
 
       initializer.setInitializing();
@@ -196,7 +197,7 @@ describe('DatabaseInitializer', () => {
     });
 
     it('should log errors when transitioning to ERROR state', () => {
-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       const initializer = createInitializer();
 
       initializer.setInitializing();

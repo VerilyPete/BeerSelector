@@ -1,4 +1,4 @@
-import { vi } from 'vitest';
+import { vi, type Mock } from 'vitest';
 import { migrateToVersion3 } from '../migrateToV3';
 import { databaseLockManager } from '../../DatabaseLockManager';
 import { recordMigration } from '../../schemaVersion';
@@ -8,29 +8,29 @@ import { recordMigration } from '../../schemaVersion';
 // catches a dropped release — a mock asserting a mock cannot.
 
 vi.mock('../../schemaVersion', () => ({
-  recordMigration: jest.fn().mockResolvedValue(undefined),
+  recordMigration: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('@/src/utils/beerGlassType', () => ({
-  getGlassType: jest.fn().mockReturnValue('pint'),
+  getGlassType: vi.fn().mockReturnValue('pint'),
 }));
 
 type MockDb = {
-  getAllAsync: jest.Mock;
-  execAsync: jest.Mock;
-  runAsync: jest.Mock;
-  withTransactionAsync: jest.Mock;
+  getAllAsync: Mock;
+  execAsync: Mock;
+  runAsync: Mock;
+  withTransactionAsync: Mock;
 };
 
 function createMockMigrationDb(): MockDb {
   databaseLockManager.resetForTesting();
-  jest.restoreAllMocks();
-  (recordMigration as jest.Mock).mockClear();
+  vi.restoreAllMocks();
+  (recordMigration as Mock).mockClear();
   return {
-    getAllAsync: jest.fn().mockResolvedValue([]),
-    execAsync: jest.fn().mockResolvedValue(undefined),
-    runAsync: jest.fn().mockResolvedValue(undefined),
-    withTransactionAsync: jest.fn(async (callback: () => Promise<void>) => await callback()),
+    getAllAsync: vi.fn().mockResolvedValue([]),
+    execAsync: vi.fn().mockResolvedValue(undefined),
+    runAsync: vi.fn().mockResolvedValue(undefined),
+    withTransactionAsync: vi.fn(async (callback: () => Promise<void>) => await callback()),
   };
 }
 
@@ -48,7 +48,7 @@ describe('migrateToVersion3', () => {
   describe('happy path: glass_type columns do not exist', () => {
     it('acquires and releases the migration lock', async () => {
       const db = createMockMigrationDb();
-      const lockSpy = jest.spyOn(databaseLockManager, 'withDatabaseLock');
+      const lockSpy = vi.spyOn(databaseLockManager, 'withDatabaseLock');
 
       await migrateToVersion3(db as never);
 
@@ -61,7 +61,7 @@ describe('migrateToVersion3', () => {
 
       await migrateToVersion3(db as never);
 
-      const execCalls = (db.execAsync as jest.Mock).mock.calls.map((c: string[]) => c[0]);
+      const execCalls = (db.execAsync as Mock).mock.calls.map((c: string[]) => c[0]);
       expect(
         execCalls.some(
           (sql: string) => sql.includes('ALTER TABLE allbeers') && sql.includes('glass_type')
@@ -74,7 +74,7 @@ describe('migrateToVersion3', () => {
 
       await migrateToVersion3(db as never);
 
-      const execCalls = (db.execAsync as jest.Mock).mock.calls.map((c: string[]) => c[0]);
+      const execCalls = (db.execAsync as Mock).mock.calls.map((c: string[]) => c[0]);
       expect(
         execCalls.some(
           (sql: string) =>
@@ -107,7 +107,7 @@ describe('migrateToVersion3', () => {
 
       await migrateToVersion3(db as never);
 
-      const getAllCalls = (db.getAllAsync as jest.Mock).mock.calls.map((c: string[]) => c[0]);
+      const getAllCalls = (db.getAllAsync as Mock).mock.calls.map((c: string[]) => c[0]);
       expect(
         getAllCalls.some(
           (sql: string) => sql.includes('allbeers') && sql.includes('glass_type IS NULL')
@@ -129,7 +129,7 @@ describe('migrateToVersion3', () => {
       await migrateToVersion3(db as never);
 
       expect(db.runAsync).toHaveBeenCalled();
-      const runCall = (db.runAsync as jest.Mock).mock.calls[0][0] as string;
+      const runCall = (db.runAsync as Mock).mock.calls[0][0] as string;
       expect(runCall).toContain('UPDATE');
     });
 
@@ -147,7 +147,7 @@ describe('migrateToVersion3', () => {
       const beerRows = createBeerRows(5);
       // allbeers returns 5 rows, tasted returns 5 rows
       db.getAllAsync.mockResolvedValueOnce(beerRows).mockResolvedValueOnce(beerRows);
-      const onProgress = jest.fn();
+      const onProgress = vi.fn();
 
       await migrateToVersion3(db as never, onProgress);
 
@@ -193,9 +193,9 @@ describe('migrateToVersion3', () => {
 
     it('propagates error when lock acquisition fails', async () => {
       const db = createMockMigrationDb();
-      jest
-        .spyOn(databaseLockManager, 'withDatabaseLock')
-        .mockRejectedValue(new Error('Cannot acquire lock: database is shutting down'));
+      vi.spyOn(databaseLockManager, 'withDatabaseLock').mockRejectedValue(
+        new Error('Cannot acquire lock: database is shutting down')
+      );
 
       await expect(migrateToVersion3(db as never)).rejects.toThrow('Cannot acquire lock');
     });

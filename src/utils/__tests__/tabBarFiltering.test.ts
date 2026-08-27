@@ -16,12 +16,12 @@ const tabConfigs: Record<string, { memberOnly?: boolean }> = {
   tastedbrews: { memberOnly: true },
 };
 
-function makeDescriptors(routes: readonly Route[], nullRoutes: string[] = []): Record<string, { options: { href?: string | null } }> {
+function makeDescriptors(
+  routes: readonly Route[],
+  nullRoutes: string[] = []
+): Record<string, { options: { href?: string | null } }> {
   return Object.fromEntries(
-    routes.map((r) => [
-      r.key,
-      { options: { href: nullRoutes.includes(r.name) ? null : undefined } },
-    ])
+    routes.map(r => [r.key, { options: { href: nullRoutes.includes(r.name) ? null : undefined } }])
   );
 }
 
@@ -29,13 +29,13 @@ describe('filterVisibleRoutes', () => {
   test('member sees all 4 tabs', () => {
     const descriptors = makeDescriptors(ALL_ROUTES);
     const result = filterVisibleRoutes(ALL_ROUTES, descriptors, false, tabConfigs);
-    expect(result.map((r) => r.name)).toEqual(['index', 'beerlist', 'mybeers', 'tastedbrews']);
+    expect(result.map(r => r.name)).toEqual(['index', 'beerlist', 'mybeers', 'tastedbrews']);
   });
 
   test('visitor sees only non-memberOnly tabs (HOME and BEERS)', () => {
     const descriptors = makeDescriptors(ALL_ROUTES);
     const result = filterVisibleRoutes(ALL_ROUTES, descriptors, true, tabConfigs);
-    expect(result.map((r) => r.name)).toEqual(['index', 'beerlist']);
+    expect(result.map(r => r.name)).toEqual(['index', 'beerlist']);
   });
 
   test('non-memberOnly routes always visible regardless of visitor status', () => {
@@ -43,8 +43,8 @@ describe('filterVisibleRoutes', () => {
     const memberResult = filterVisibleRoutes(ALL_ROUTES, descriptors, false, tabConfigs);
     const visitorResult = filterVisibleRoutes(ALL_ROUTES, descriptors, true, tabConfigs);
 
-    const memberNames = memberResult.map((r) => r.name);
-    const visitorNames = visitorResult.map((r) => r.name);
+    const memberNames = memberResult.map(r => r.name);
+    const visitorNames = visitorResult.map(r => r.name);
 
     expect(memberNames).toContain('index');
     expect(memberNames).toContain('beerlist');
@@ -55,7 +55,7 @@ describe('filterVisibleRoutes', () => {
   test('routes with href === null are hidden', () => {
     const descriptors = makeDescriptors(ALL_ROUTES, ['mybeers', 'tastedbrews']);
     const result = filterVisibleRoutes(ALL_ROUTES, descriptors, false, tabConfigs);
-    expect(result.map((r) => r.name)).toEqual(['index', 'beerlist']);
+    expect(result.map(r => r.name)).toEqual(['index', 'beerlist']);
   });
 
   test('routes not in tabConfigs are hidden', () => {
@@ -63,6 +63,6 @@ describe('filterVisibleRoutes', () => {
     const routes: readonly Route[] = [HOME, unknownRoute];
     const descriptors = makeDescriptors(routes);
     const result = filterVisibleRoutes(routes, descriptors, false, tabConfigs);
-    expect(result.map((r) => r.name)).toEqual(['index']);
+    expect(result.map(r => r.name)).toEqual(['index']);
   });
 });

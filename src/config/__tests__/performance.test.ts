@@ -369,7 +369,9 @@ describe('Config Module Performance Benchmarks', () => {
         const _timeout = config.network.timeout;
         const _retries = config.network.retries;
         const _retryDelay = config.network.retryDelay;
-        void _timeout; void _retries; void _retryDelay; // Intentionally accessed for performance measurement
+        void _timeout;
+        void _retries;
+        void _retryDelay; // Intentionally accessed for performance measurement
       }, 1000);
 
       const threshold = PERFORMANCE_THRESHOLDS.NETWORK_CONFIG_GETTER * 3;
@@ -546,7 +548,8 @@ describe('Config Module Performance Benchmarks', () => {
           config.api.getFullUrl('deleteQueuedBrew', { cid: '123' });
           const _baseUrl = config.api.baseUrl;
           const _timeout = config.network.timeout;
-          void _baseUrl; void _timeout; // Intentionally accessed for performance measurement
+          void _baseUrl;
+          void _timeout; // Intentionally accessed for performance measurement
           config.external.untappd.searchUrl('Test Beer');
         }
       });
@@ -700,7 +703,11 @@ describe('Config Module Performance Benchmarks', () => {
           const _referers = config.api.referers;
           const _timeout = config.network.timeout;
           const _env = config.environment;
-          void _baseUrl; void _endpoints; void _referers; void _timeout; void _env; // Intentionally accessed for performance measurement
+          void _baseUrl;
+          void _endpoints;
+          void _referers;
+          void _timeout;
+          void _env; // Intentionally accessed for performance measurement
         }
       });
 

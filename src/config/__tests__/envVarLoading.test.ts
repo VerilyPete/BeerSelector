@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 /**
  * Environment Variable Loading Tests (MP-6 Step 4.1)
  *
@@ -35,7 +36,7 @@ describe('Environment Variable Loading', () => {
   };
 
   beforeEach(async () => {
-    jest.resetModules();
+    vi.resetModules();
     process.env = { ...originalEnv };
   });
 
@@ -68,7 +69,7 @@ describe('Environment Variable Loading', () => {
     it('should load default hardcoded URL when no env vars set', async () => {
       const cleanEnv = getCleanEnv();
       process.env = cleanEnv;
-      jest.resetModules(); // Reset after changing env
+      vi.resetModules(); // Reset after changing env
       const { config: freshConfig } = await import('../config');
       freshConfig.setEnvironment('production');
       // Should use hardcoded default from ENV_BASE_URLS
@@ -148,7 +149,7 @@ describe('Environment Variable Loading', () => {
       process.env.EXPO_PUBLIC_API_BASE_URL = 'https://generic.example.com';
       process.env.EXPO_PUBLIC_PROD_API_BASE_URL = 'https://prod-specific.example.com';
 
-      jest.resetModules();
+      vi.resetModules();
       const { config: freshConfig } = await import('../config');
       freshConfig.setEnvironment('production');
 
@@ -159,7 +160,7 @@ describe('Environment Variable Loading', () => {
     it('should fall back to hardcoded default when no env vars set', async () => {
       const cleanEnv = getCleanEnv();
       process.env = cleanEnv;
-      jest.resetModules(); // Reset after changing env
+      vi.resetModules(); // Reset after changing env
       const { config: freshConfig } = await import('../config');
       freshConfig.setEnvironment('development');
       // Should use hardcoded default from ENV_BASE_URLS
@@ -188,7 +189,7 @@ describe('Environment Variable Loading', () => {
     it('should use default Untappd URL when not set', async () => {
       const cleanEnv = getCleanEnv();
       process.env = cleanEnv;
-      jest.resetModules();
+      vi.resetModules();
       const { config: freshConfig } = await import('../config');
       expect(freshConfig.external.untappd.baseUrl).toBe('https://untappd.com');
     });
@@ -196,7 +197,7 @@ describe('Environment Variable Loading', () => {
     it('should use default production environment when not set', async () => {
       const cleanEnv = getCleanEnv();
       process.env = cleanEnv;
-      jest.resetModules();
+      vi.resetModules();
       const { config: freshConfig } = await import('../config');
       expect(freshConfig.getEnvironment()).toBe('production');
     });
@@ -291,7 +292,7 @@ describe('Environment Variable Loading', () => {
       cleanEnv.EXPO_PUBLIC_PROD_API_BASE_URL = '   ';
       process.env = cleanEnv;
 
-      jest.resetModules();
+      vi.resetModules();
       const { config: freshConfig } = await import('../config');
       freshConfig.setEnvironment('production');
 

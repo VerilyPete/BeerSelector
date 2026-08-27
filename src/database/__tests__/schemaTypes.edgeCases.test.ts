@@ -13,7 +13,7 @@
  * 6. Unicode and Special Characters
  */
 
-import { describe, it, expect } from '@jest/globals';
+import { describe, it, expect } from 'vitest';
 import {
   allBeersRowSchema,
   tastedBrewRowSchema,

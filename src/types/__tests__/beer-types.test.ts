@@ -7,7 +7,7 @@ describe('Beer Type Guards', () => {
       const validBeer: Beer = {
         id: 'beer-123',
         brew_name: 'Test Beer',
-        brewer: 'Test Brewery'
+        brewer: 'Test Brewery',
       };
 
       expect(isBeer(validBeer)).toBe(true);
@@ -16,18 +16,18 @@ describe('Beer Type Guards', () => {
     it('should return false for invalid Beer objects', () => {
       const missingId = {
         brew_name: 'Test Beer',
-        brewer: 'Test Brewery'
+        brewer: 'Test Brewery',
       };
 
       const missingBrewName = {
         id: 'beer-123',
-        brewer: 'Test Brewery'
+        brewer: 'Test Brewery',
       };
 
       const wrongTypes = {
         id: 123,
         brew_name: 'Test Beer',
-        brewer: 'Test Brewery'
+        brewer: 'Test Brewery',
       };
 
       expect(isBeer(missingId)).toBe(false);

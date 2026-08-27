@@ -31,7 +31,7 @@ describe('MockServer', () => {
 
   beforeAll(async () => {
     // Use real timers for MockServer tests
-    jest.useRealTimers();
+    vi.useRealTimers();
   });
 
   beforeEach(async () => {
@@ -52,7 +52,7 @@ describe('MockServer', () => {
 
   afterAll(async () => {
     // Restore fake timers for other tests
-    jest.useFakeTimers();
+    vi.useFakeTimers();
   });
 
   describe('server lifecycle', () => {
