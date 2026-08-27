@@ -39,9 +39,9 @@ import {
   mergeEnrichmentData,
   recordFallback,
   pollForEnrichmentUpdates,
-  EnrichedBeerResponse,
 } from './enrichmentService';
 import { EnrichmentUpdate } from '../types/enrichment';
+import { mapEnrichedBeerToAppBeer } from '../contracts/enrichmentAdapter';
 
 const RAPID_REFRESH_WINDOW_MS = 30_000;
 let lastManualRefreshTime = 0;
@@ -370,31 +370,6 @@ async function syncMissingBeersInBackground(
         additionalData: { error: String(syncError) },
       });
     });
-}
-
-/**
- * Map Worker's enriched beer response to app's Beer interface
- */
-function mapEnrichedBeerToAppBeer(beer: EnrichedBeerResponse): Beer {
-  return {
-    id: beer.id,
-    brew_name: beer.brew_name,
-    brewer: beer.brewer,
-    brewer_loc: beer.brewer_loc,
-    brew_style: beer.brew_style,
-    brew_container: beer.brew_container,
-    // `EnrichedBeerResponse` allows `null` here (`z.string().nullish()`);
-    // `Beer` only allows `undefined`. Normalize at this boundary rather than
-    // widening `Beer`'s type for the sake of one producer.
-    review_count: beer.review_count ?? undefined,
-    review_rating: beer.review_rating ?? undefined,
-    brew_description: beer.brew_description,
-    added_date: beer.added_date,
-    // Use enriched ABV from Worker
-    abv: beer.enriched_abv,
-    enrichment_confidence: beer.enrichment_confidence,
-    enrichment_source: beer.enrichment_source,
-  };
 }
 
 /**
