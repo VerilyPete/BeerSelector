@@ -172,7 +172,21 @@ jobs:
           # nobody saw it. Raising this when tests are added is expected;
           # lowering it is only ever correct when tests were deliberately
           # removed, and now also requires saying which runner lost them.
-          MIN_TESTS_RUN: '2505'
+          #
+          # 2505 -> 2492 on 2026-08-27: jest-expo lost 13, vitest unchanged at
+          # 2228. Removed from LoginWebView.test.tsx's "Config Integration"
+          # block, which mocked `config` and then asserted on that mock rather
+          # than on the component: `getFullUrl` returning what the test told it
+          # to return, `baseUrl` equalling the value the test had just assigned,
+          # and `toHaveBeenCalledWith` satisfied by the test's own call while
+          # building the fixture. One claimed to prove URL_CHECK handles a
+          # throwing config, but that handler matches hardcoded
+          # 'member-dash.php' and never calls config, so it could not fail.
+          # The real config module keeps its own vitest coverage
+          # (config.test.ts, validation.errors.test.ts "should construct valid
+          # URLs for all defined endpoints"). The 7 tests in that block that do
+          # assert component behaviour were kept.
+          MIN_TESTS_RUN: '2492'
           MAX_SKIPPED: '0'
         run: |
           python3 - <<'PY'
