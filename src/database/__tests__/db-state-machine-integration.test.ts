@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 /**
  * Tests for DatabaseInitializer state machine integration in db.ts
  * Verifies HP-2 Step 2c completion
@@ -10,8 +11,8 @@ import * as connection from '../connection';
 import * as schema from '../schema';
 
 // Mock dependencies
-jest.mock('../connection');
-jest.mock('../schema');
+vi.mock('../connection');
+vi.mock('../schema');
 
 const mockGetDatabase = connection.getDatabase as jest.MockedFunction<
   typeof connection.getDatabase

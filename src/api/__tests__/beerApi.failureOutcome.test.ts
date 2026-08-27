@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 /**
  * Transport failures must arrive as `failed`, not as a thrown error.
  *
@@ -26,7 +27,7 @@ import * as preferences from '../../database/preferences';
 import { ApiErrorType, getUserFriendlyErrorMessage } from '../../utils/notificationUtils';
 import type { FetchOutcome, UnconditionalSource } from '../fetchOutcome';
 
-jest.mock('../../database/preferences');
+vi.mock('../../database/preferences');
 
 global.fetch = jest.fn();
 

@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 /**
  * Tests for OptimisticUpdateRepository
  * Tests CRUD operations for optimistic UI updates
@@ -15,7 +16,7 @@ import * as connection from '../../connection';
 // Silence expected console.error calls from rowToUpdate validation
 jest.spyOn(console, 'error').mockImplementation(() => undefined);
 
-jest.mock('../../connection');
+vi.mock('../../connection');
 
 type MockDatabase = {
   execAsync: jest.Mock;

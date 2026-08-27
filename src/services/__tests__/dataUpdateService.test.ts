@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 /**
  * Comprehensive tests for dataUpdateService module
  *
@@ -55,7 +56,7 @@ async function flushPromises(iterations = 10): Promise<void> {
 }
 
 // Mock database preferences
-jest.mock('../../database/preferences', () => ({
+vi.mock('../../database/preferences', async () => ({
   getPreference: jest.fn(),
 
   setPreference: jest.fn(),
@@ -63,7 +64,7 @@ jest.mock('../../database/preferences', () => ({
 }));
 
 // Mock repositories
-jest.mock('../../database/repositories/BeerRepository', () => ({
+vi.mock('../../database/repositories/BeerRepository', async () => ({
   beerRepository: {
     count: jest.fn(async () => 12),
     insertMany: jest.fn(),
@@ -72,7 +73,7 @@ jest.mock('../../database/repositories/BeerRepository', () => ({
   },
 }));
 
-jest.mock('../../database/repositories/MyBeersRepository', () => ({
+vi.mock('../../database/repositories/MyBeersRepository', async () => ({
   myBeersRepository: {
     replaceAllWithEmpty: jest.fn(),
     replaceAllWithEmptyUnsafe: jest.fn(),
@@ -82,7 +83,7 @@ jest.mock('../../database/repositories/MyBeersRepository', () => ({
   },
 }));
 
-jest.mock('../../database/repositories/RewardsRepository', () => ({
+vi.mock('../../database/repositories/RewardsRepository', async () => ({
   rewardsRepository: {
     replaceAllWithEmpty: jest.fn(async () => {}),
     replaceAllWithEmptyUnsafe: jest.fn(async () => {}),
@@ -96,8 +97,10 @@ jest.mock('../../database/repositories/RewardsRepository', () => ({
 // observe, so a test asserting "the lock was released" against it passes even
 // when withDatabaseLock's finally is deleted. Keeping a spy on top preserves
 // the call-name assertions while isLocked() reports genuine state.
-jest.mock('../../database/DatabaseLockManager', () => {
-  const actual = jest.requireActual('../../database/DatabaseLockManager');
+vi.mock('../../database/DatabaseLockManager', async () => {
+  const actual = await vi.importActual<typeof import('../../database/DatabaseLockManager')>(
+    '../../database/DatabaseLockManager'
+  );
   const real = new actual.DatabaseLockManager();
   return {
     databaseLockManager: {
@@ -112,13 +115,13 @@ jest.mock('../../database/DatabaseLockManager', () => {
   };
 });
 
-jest.mock('../../api/beerApi', () =>
+vi.mock('../../api/beerApi', async () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  require('../../api/__tests__/helpers/beerApiMock').beerApiMockFactory()
+  (await import('../../api/__tests__/helpers/beerApiMock')).beerApiMockFactory()
 );
 
 // Mock enrichment service
-jest.mock('../enrichmentService', () => ({
+vi.mock('../enrichmentService', async () => ({
   fetchBeersFromProxy: jest.fn(),
   fetchEnrichmentBatchWithMissing: jest.fn().mockResolvedValue({ enrichments: {}, missing: [] }),
   syncBeersToWorker: jest.fn().mockResolvedValue({ synced: 0, failed: 0, queued_for_cleanup: 0 }),
@@ -128,14 +131,14 @@ jest.mock('../enrichmentService', () => ({
 }));
 
 // Mock error logger — pass through to console.error so existing assertions still work
-jest.mock('../../utils/errorLogger', () => ({
+vi.mock('../../utils/errorLogger', async () => ({
   logError: jest.fn((...args: unknown[]) => console.error(...args)),
   logWarning: jest.fn(),
 }));
 
 // Partial mock of config — only override enrichment.isConfigured
-jest.mock('@/src/config', () => {
-  const actual = jest.requireActual('@/src/config');
+vi.mock('@/src/config', async () => {
+  const actual = await vi.importActual<typeof import('@/src/config')>('@/src/config');
   return {
     ...actual,
     config: {
@@ -185,7 +188,7 @@ describe('dataUpdateService', () => {
     );
   };
 
-  beforeEach(() => {
+  beforeEach(async () => {
     jest.clearAllMocks();
 
     // Mock console methods to prevent noise in tests
@@ -199,7 +202,7 @@ describe('dataUpdateService', () => {
     });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     // Restore console methods
     console.log = originalConsoleLog;
     console.error = originalConsoleError;
@@ -1052,7 +1055,7 @@ describe('dataUpdateService', () => {
   // alert. The classification was discarded one frame after it was built, on the
   // very path the fix was written for.
   describe('all-beers preserves the typed fetch error', () => {
-    beforeEach(() => {
+    beforeEach(async () => {
       (getPreference as jest.Mock).mockImplementation(async (key: string) =>
         key === 'all_beers_api_url' ? 'https://example.com/all.json?sid=13884' : null
       );
@@ -1104,7 +1107,7 @@ describe('dataUpdateService', () => {
       expect(result.myBeersResult.error?.type).toBe(ApiErrorType.NETWORK_ERROR);
     });
 
-    it('does not leak the developer message into the user-facing channel', () => {
+    it('does not leak the developer message into the user-facing channel', async () => {
       // UNKNOWN_ERROR and VALIDATION_ERROR return error.message verbatim;
       // SERVER_ERROR has dedicated copy. This is what the type buys.
       expect(
@@ -1139,7 +1142,7 @@ describe('dataUpdateService', () => {
   //   failed          → failure, carrying the transport error
   //   malformed       → failure; a body arrived and was unusable
   describe('rewards outcome handling', () => {
-    beforeEach(() => {
+    beforeEach(async () => {
       (getPreference as jest.Mock).mockResolvedValue('false');
       (rewardsRepository.insertMany as jest.Mock).mockResolvedValue(undefined);
       (rewardsRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
@@ -1253,7 +1256,7 @@ describe('dataUpdateService', () => {
     // from fixing none — the same reasoning plan 04 Phase 2 gives for its own
     // triplicated ETag write.
     describe('sequentialRefreshAllData', () => {
-      beforeEach(() => {
+      beforeEach(async () => {
         (fetchBeersFromAPI as jest.Mock).mockResolvedValue(
           fetchedRows([{ id: 'beer-1', brew_name: 'Test IPA', brewer: 'Brewery 1' }])
         );
@@ -1356,7 +1359,7 @@ describe('dataUpdateService', () => {
     });
 
     describe('refreshAllDataFromAPI', () => {
-      beforeEach(() => {
+      beforeEach(async () => {
         (areApiUrlsConfigured as jest.Mock).mockResolvedValue(true);
         (fetchBeersFromAPI as jest.Mock).mockResolvedValue(
           fetchedRows([{ id: 'beer-1', brew_name: 'Test IPA', brewer: 'Brewery 1' }])
@@ -2125,7 +2128,7 @@ describe('refreshAllDataFromAPI per-source isolation', () => {
   const mockMyBeers = [{ id: 'beer-1', brew_name: 'Test IPA', tasted_date: '2023-01-01' }];
   const mockRewards = [{ id: 'reward-1', name: 'Free Beer' }];
 
-  beforeEach(() => {
+  beforeEach(async () => {
     jest.clearAllMocks();
     (areApiUrlsConfigured as jest.Mock).mockResolvedValue(true);
     // A configured taplist URL, not null. `fetchBeersFromAPI` below returns rows,

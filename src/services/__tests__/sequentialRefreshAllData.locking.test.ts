@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 /**
  * The master lock must not be held across a network request.
  *
@@ -55,7 +56,7 @@ import { sequentialRefreshAllData, resetInFlightSequentialRefresh } from '../dat
  */
 const mockEvents: string[] = [];
 
-jest.mock('../../database/preferences', () => ({
+vi.mock('../../database/preferences', () => ({
   getPreference: jest.fn(async (key: string) => {
     if (key === 'all_beers_api_url') return 'https://example.com/allbeers.json';
     if (key === 'my_beers_api_url') return 'https://example.com/mybeers.json';
@@ -65,12 +66,12 @@ jest.mock('../../database/preferences', () => ({
   areApiUrlsConfigured: jest.fn(async () => true),
 }));
 
-jest.mock('../../api/beerApi', () =>
+vi.mock('../../api/beerApi', async () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  require('../../api/__tests__/helpers/beerApiMock').beerApiMockFactory()
+  (await import('../../api/__tests__/helpers/beerApiMock')).beerApiMockFactory()
 );
 
-jest.mock('../enrichmentService', () => ({
+vi.mock('../enrichmentService', () => ({
   fetchBeersFromProxy: jest.fn(),
   fetchEnrichmentBatchWithMissing: jest.fn(),
   syncBeersToWorker: jest.fn(async () => {}),
@@ -79,25 +80,25 @@ jest.mock('../enrichmentService', () => ({
   pollForEnrichmentUpdates: jest.fn(),
 }));
 
-jest.mock('../../database/repositories/BeerRepository', () => ({
+vi.mock('../../database/repositories/BeerRepository', () => ({
   beerRepository: { insertManyUnsafe: jest.fn(async () => {}), count: jest.fn(async () => 12) },
 }));
 
-jest.mock('../../database/repositories/MyBeersRepository', () => ({
+vi.mock('../../database/repositories/MyBeersRepository', () => ({
   myBeersRepository: {
     insertManyUnsafe: jest.fn(async () => {}),
     replaceAllWithEmptyUnsafe: jest.fn(async () => {}),
   },
 }));
 
-jest.mock('../../database/repositories/RewardsRepository', () => ({
+vi.mock('../../database/repositories/RewardsRepository', () => ({
   rewardsRepository: {
     insertManyUnsafe: jest.fn(async () => {}),
     replaceAllWithEmptyUnsafe: jest.fn(async () => {}),
   },
 }));
 
-jest.mock('../../database/DatabaseLockManager', () => ({
+vi.mock('../../database/DatabaseLockManager', () => ({
   databaseLockManager: {
     withDatabaseLock: jest.fn(async (_name: string, task: () => Promise<unknown>) => {
       mockEvents.push('lock:acquire');
@@ -137,7 +138,7 @@ const allSourcesSucceed = (): void => {
 };
 
 describe('sequentialRefreshAllData locking', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     jest.clearAllMocks();
     mockEvents.length = 0;
 
@@ -147,7 +148,7 @@ describe('sequentialRefreshAllData locking', () => {
     recordWrite(rewardsRepository.insertManyUnsafe as jest.Mock, 'rewards');
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     // Two tests here spy on the `config.enrichment` getter and restore it on
     // the last line of their own body. A test that fails before reaching that
     // line leaves enrichment permanently "configured" for every later test in

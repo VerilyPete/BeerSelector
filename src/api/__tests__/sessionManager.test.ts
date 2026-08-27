@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 import * as SecureStore from 'expo-secure-store';
 import {
   saveSessionData,
@@ -5,12 +6,12 @@ import {
   clearSessionData,
   hasSession,
   parseCookies,
-  extractSessionDataFromResponse
+  extractSessionDataFromResponse,
 } from '../sessionManager';
 import { SessionData } from '../../types/api';
 
 // Mock SecureStore
-jest.mock('expo-secure-store', () => ({
+vi.mock('expo-secure-store', () => ({
   setItemAsync: jest.fn(),
   getItemAsync: jest.fn(),
   deleteItemAsync: jest.fn(),
@@ -31,7 +32,7 @@ describe('sessionManager', () => {
     firstName: 'Test',
     lastName: 'User',
     email: 'test@example.com',
-    cardNum: '12345'
+    cardNum: '12345',
   };
 
   beforeEach(() => {
@@ -70,7 +71,9 @@ describe('sessionManager', () => {
 
   describe('getSessionData', () => {
     it('should return session data from secure storage', async () => {
-      (SecureStore.getItemAsync as jest.Mock).mockResolvedValueOnce(JSON.stringify(mockSessionData));
+      (SecureStore.getItemAsync as jest.Mock).mockResolvedValueOnce(
+        JSON.stringify(mockSessionData)
+      );
 
       const result = await getSessionData();
 
@@ -87,10 +90,12 @@ describe('sessionManager', () => {
     });
 
     it('should return null when session data is invalid', async () => {
-      (SecureStore.getItemAsync as jest.Mock).mockResolvedValueOnce(JSON.stringify({
-        // Missing required fields
-        username: 'testuser'
-      }));
+      (SecureStore.getItemAsync as jest.Mock).mockResolvedValueOnce(
+        JSON.stringify({
+          // Missing required fields
+          username: 'testuser',
+        })
+      );
 
       const result = await getSessionData();
 
@@ -124,7 +129,9 @@ describe('sessionManager', () => {
 
   describe('hasSession', () => {
     it('should return true when session data exists', async () => {
-      (SecureStore.getItemAsync as jest.Mock).mockResolvedValueOnce(JSON.stringify(mockSessionData));
+      (SecureStore.getItemAsync as jest.Mock).mockResolvedValueOnce(
+        JSON.stringify(mockSessionData)
+      );
 
       const result = await hasSession();
 
@@ -192,7 +199,7 @@ describe('sessionManager', () => {
         first_name: 'Test',
         last_name: 'User',
         email: 'test%40example.com',
-        cardNum: '12345'
+        cardNum: '12345',
       };
 
       const result = extractSessionDataFromResponse(headers, cookies);
@@ -206,7 +213,7 @@ describe('sessionManager', () => {
         firstName: 'Test',
         lastName: 'User',
         email: 'test@example.com',
-        cardNum: '12345'
+        cardNum: '12345',
       });
     });
 
@@ -229,7 +236,7 @@ describe('sessionManager', () => {
       const cookies = {
         PHPSESSID: 'test-session-id',
         store_name: '%invalid',
-        email: '%invalid'
+        email: '%invalid',
       };
 
       const result = extractSessionDataFromResponse(headers, cookies);
@@ -237,7 +244,7 @@ describe('sessionManager', () => {
       expect(result).toEqual({
         sessionId: 'test-session-id',
         storeName: '%invalid',
-        email: '%invalid'
+        email: '%invalid',
       });
     });
   });

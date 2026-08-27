@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 import { migrateToVersion8 } from '../migrateToV8';
 import { databaseLockManager } from '../../DatabaseLockManager';
 import { recordMigration } from '../../schemaVersion';
@@ -6,7 +7,7 @@ import { recordMigration } from '../../schemaVersion';
 // the database mocked but the real manager, isLocked() asserts genuine lock
 // state, which is what catches a dropped release.
 
-jest.mock('../../schemaVersion', () => ({
+vi.mock('../../schemaVersion', () => ({
   recordMigration: jest.fn().mockResolvedValue(undefined),
 }));
 

@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 /**
  * The stored ETag may only survive a write that it actually describes.
  *
@@ -29,19 +30,19 @@ import { fetchedRows, unavailable } from '../../api/__tests__/helpers/fetchOutco
 import { databaseLockManager } from '../../database/DatabaseLockManager';
 import { ApiErrorType } from '../../utils/notificationUtils';
 
-jest.mock('../../database/preferences', () => ({
+vi.mock('../../database/preferences', () => ({
   getPreference: jest.fn(),
 
   setPreference: jest.fn(async () => {}),
   areApiUrlsConfigured: jest.fn(async () => true),
 }));
 
-jest.mock('../../api/beerApi', () =>
+vi.mock('../../api/beerApi', async () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  require('../../api/__tests__/helpers/beerApiMock').beerApiMockFactory()
+  (await import('../../api/__tests__/helpers/beerApiMock')).beerApiMockFactory()
 );
 
-jest.mock('../enrichmentService', () => ({
+vi.mock('../enrichmentService', () => ({
   fetchBeersFromProxy: jest.fn(),
   fetchEnrichmentBatchWithMissing: jest.fn(async () => ({ enrichments: {}, missing: [] })),
   syncBeersToWorker: jest.fn(async () => {}),
@@ -50,7 +51,7 @@ jest.mock('../enrichmentService', () => ({
   pollForEnrichmentUpdates: jest.fn(),
 }));
 
-jest.mock('../../database/repositories/BeerRepository', () => ({
+vi.mock('../../database/repositories/BeerRepository', () => ({
   beerRepository: {
     insertMany: jest.fn(async () => {}),
     insertManyUnsafe: jest.fn(async () => {}),
@@ -58,7 +59,7 @@ jest.mock('../../database/repositories/BeerRepository', () => ({
   },
 }));
 
-jest.mock('../../database/repositories/MyBeersRepository', () => ({
+vi.mock('../../database/repositories/MyBeersRepository', () => ({
   myBeersRepository: {
     insertMany: jest.fn(async () => {}),
     insertManyUnsafe: jest.fn(async () => {}),
@@ -66,7 +67,7 @@ jest.mock('../../database/repositories/MyBeersRepository', () => ({
   },
 }));
 
-jest.mock('../../database/repositories/RewardsRepository', () => ({
+vi.mock('../../database/repositories/RewardsRepository', () => ({
   rewardsRepository: {
     insertMany: jest.fn(async () => {}),
     insertManyUnsafe: jest.fn(async () => {}),
@@ -81,7 +82,7 @@ jest.mock('../../database/repositories/RewardsRepository', () => ({
 // empty-hold mutant survive the whole 2241-test suite.
 let mockLockHolder: string | null = null;
 
-jest.mock('../../database/DatabaseLockManager', () => ({
+vi.mock('../../database/DatabaseLockManager', () => ({
   databaseLockManager: {
     withDatabaseLock: jest.fn(async (name: string, task: () => Promise<unknown>) => {
       mockLockHolder = name;
@@ -196,7 +197,7 @@ const proxyFailsAndDirectSucceeds = (): void => {
 };
 
 describe('taplist ETag invalidation', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     jest.clearAllMocks();
     mockConfigReadHolders.length = 0;
     svc.resetInFlightSequentialRefresh();
@@ -206,7 +207,7 @@ describe('taplist ETag invalidation', () => {
     (fetchBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(TAPLIST));
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     jest.restoreAllMocks();
   });
 

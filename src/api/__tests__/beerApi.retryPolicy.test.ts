@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 /**
  * What `fetchWithRetry` retries, and how long the whole chain may take.
  *
@@ -24,7 +25,7 @@ import * as preferences from '../../database/preferences';
 import { TransportAbortedError, UnreadableBodyError } from '../fetchOutcome';
 import { config } from '@/src/config';
 
-jest.mock('../../database/preferences');
+vi.mock('../../database/preferences');
 
 global.fetch = jest.fn();
 

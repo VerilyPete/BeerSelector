@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 /**
  * The same condition must classify the same way whichever entry point sees it.
  *
@@ -44,7 +45,7 @@ import {
   dropInFlightTaplistFetch,
 } from '../dataUpdateService';
 
-jest.mock('../../database/preferences', () => ({
+vi.mock('../../database/preferences', async () => ({
   getPreference: jest.fn(async (key: string) =>
     key === 'all_beers_api_url'
       ? 'https://fsbs.beerknurd.com/bk-store-json.php?sid=13885'
@@ -56,12 +57,12 @@ jest.mock('../../database/preferences', () => ({
   areApiUrlsConfigured: jest.fn(async () => true),
 }));
 
-jest.mock('../../api/beerApi', () =>
+vi.mock('../../api/beerApi', async () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  require('../../api/__tests__/helpers/beerApiMock').beerApiMockFactory()
+  (await import('../../api/__tests__/helpers/beerApiMock')).beerApiMockFactory()
 );
 
-jest.mock('../enrichmentService', () => ({
+vi.mock('../enrichmentService', async () => ({
   fetchBeersFromProxy: jest.fn(),
   fetchEnrichmentBatchWithMissing: jest.fn(async () => ({ enrichments: {}, missing: [] })),
   syncBeersToWorker: jest.fn(async () => ({ synced: 0, failed: 0, queued_for_cleanup: 0 })),
@@ -70,29 +71,29 @@ jest.mock('../enrichmentService', () => ({
   pollForEnrichmentUpdates: jest.fn(async () => ({})),
 }));
 
-jest.mock('../../database/repositories/BeerRepository', () => ({
+vi.mock('../../database/repositories/BeerRepository', async () => ({
   beerRepository: { insertManyUnsafe: jest.fn(async () => {}), count: jest.fn(async () => 12) },
 }));
-jest.mock('../../database/repositories/MyBeersRepository', () => ({
+vi.mock('../../database/repositories/MyBeersRepository', async () => ({
   myBeersRepository: {
     insertManyUnsafe: jest.fn(async () => {}),
     replaceAllWithEmptyUnsafe: jest.fn(async () => {}),
   },
 }));
-jest.mock('../../database/repositories/RewardsRepository', () => ({
+vi.mock('../../database/repositories/RewardsRepository', async () => ({
   rewardsRepository: {
     insertManyUnsafe: jest.fn(async () => {}),
     replaceAllWithEmptyUnsafe: jest.fn(async () => {}),
   },
 }));
-jest.mock('../../database/DatabaseLockManager', () => ({
+vi.mock('../../database/DatabaseLockManager', async () => ({
   databaseLockManager: {
     withDatabaseLock: jest.fn(async (_n: string, task: () => Promise<unknown>) => task()),
   },
 }));
-jest.mock('../../utils/errorLogger', () => ({ logError: jest.fn(), logWarning: jest.fn() }));
-jest.mock('@/src/config', () => {
-  const actual = jest.requireActual('@/src/config');
+vi.mock('../../utils/errorLogger', async () => ({ logError: jest.fn(), logWarning: jest.fn() }));
+vi.mock('@/src/config', async () => {
+  const actual = await vi.importActual<typeof import('@/src/config')>('@/src/config');
   return {
     ...actual,
     config: {
@@ -102,7 +103,7 @@ jest.mock('@/src/config', () => {
   };
 });
 
-beforeEach(() => {
+beforeEach(async () => {
   jest.clearAllMocks();
   // `mockReset`, because `clearAllMocks` clears call data and NOT
   // implementations. `taplistUrlUnset()` installs an unset-URL implementation on
@@ -130,7 +131,7 @@ beforeEach(() => {
 afterEach(() => jest.restoreAllMocks());
 
 describe('an empty taplist', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     // A well-formed response from a store with nothing on tap.
     (fetchBeersFromAPI as jest.Mock).mockResolvedValue(confirmedEmpty());
   });

@@ -26,6 +26,16 @@ module.exports = {
   testMatch: ['**/__tests__/**/*.test.[jt]s?(x)', '**/?(*.)+(spec|test).[jt]s?(x)'],
   testPathIgnorePatterns: [
     '/node_modules/',
+
+    // Ceded to vitest. `src/**/*.test.ts` is pure logic — no renderer, no RN
+    // runtime — and runs under vitest.config.ts with a node environment and no
+    // jest-expo preset. Those files now use `vi.*` and would fail here.
+    //
+    // The boundary is deliberate and mechanical: TS under src/ is vitest's,
+    // anything TSX or under components/ and app/ stays here, because it needs
+    // the renderer and the preset's native mocks.
+    '^<rootDir>/src/.*\\.test\\.ts$',
+
     '/ios/',
     '/android/',
     '/.cursor/',

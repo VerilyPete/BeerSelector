@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 /**
  * Comprehensive tests for BeerRepository
  * Tests CRUD operations for Beer entity using TDD approach
@@ -11,7 +12,7 @@ import type { NonEmptyArray } from '../../../api/fetchOutcome';
 import { databaseLockManager } from '../../locks';
 
 // Mock the database connection module
-jest.mock('../../connection');
+vi.mock('../../connection');
 
 type MockStatement = {
   executeAsync: jest.Mock;

@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 /**
  * OperationQueueRepository Unit Tests
  *
@@ -21,7 +22,7 @@ const mockDb = {
 };
 
 // Mock the database connection
-jest.mock('../../connection', () => ({
+vi.mock('../../connection', () => ({
   getDatabase: jest.fn(() => Promise.resolve(mockDb)),
 }));
 

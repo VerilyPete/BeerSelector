@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 import { fetchAndUpdateRewards } from '../dataUpdateService';
 import * as preferences from '../../database/preferences';
 import * as connection from '../../database/connection';
@@ -5,16 +6,16 @@ import { logWarning } from '../../utils/errorLogger';
 import type { Reward } from '../../types/database';
 import { createRewardsRepositoryDatabase } from './helpers/rewardsRepositoryDatabase';
 
-jest.mock('../../database/preferences');
-jest.mock('../../database/connection');
-jest.mock('../../database/locks', () => ({
+vi.mock('../../database/preferences');
+vi.mock('../../database/connection');
+vi.mock('../../database/locks', async () => ({
   databaseLockManager: {
     withDatabaseLock: jest.fn(async (_name: string, task: () => Promise<unknown>) => task()),
   },
 }));
-jest.mock('../../utils/errorLogger', () => ({
+vi.mock('../../utils/errorLogger', async () => ({
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  ...jest.requireActual('../../utils/errorLogger'),
+  ...(await vi.importActual<typeof import('../../utils/errorLogger')>('../../utils/errorLogger')),
   logWarning: jest.fn(),
 }));
 

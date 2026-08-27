@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 /**
  * Tests for database lifecycle management
  *
@@ -10,7 +11,7 @@ import { getDatabase, closeDatabaseConnection, resetDatabaseConnection } from '.
 import { databaseLockManager } from '../DatabaseLockManager';
 
 // Mock expo-sqlite
-jest.mock('expo-sqlite');
+vi.mock('expo-sqlite');
 
 type MockDatabase = {
   closeAsync: jest.Mock;

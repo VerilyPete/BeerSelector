@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 /**
  * Repository Validation Integration Tests
  *
@@ -16,7 +17,7 @@ import { RewardsRepository } from '../RewardsRepository';
 import * as connection from '../../connection';
 
 // Mock the database connection module
-jest.mock('../../connection');
+vi.mock('../../connection');
 
 type MockDatabase = {
   withTransactionAsync: jest.Mock;

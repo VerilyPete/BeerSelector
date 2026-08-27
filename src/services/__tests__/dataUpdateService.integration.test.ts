@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 import { fetchAndUpdateAllBeers, fetchAndUpdateMyBeers } from '../dataUpdateService';
 import { getPreference, setPreference } from '../../database/preferences';
 import { beerRepository } from '../../database/repositories/BeerRepository';
@@ -16,13 +17,13 @@ import {
 import { ApiErrorType } from '../../utils/notificationUtils';
 
 // Mock dependencies
-jest.mock('../../database/preferences', () => ({
+vi.mock('../../database/preferences', () => ({
   getPreference: jest.fn(),
 
   setPreference: jest.fn(),
 }));
 
-jest.mock('../../database/repositories/BeerRepository', () => ({
+vi.mock('../../database/repositories/BeerRepository', () => ({
   beerRepository: {
     count: jest.fn(async () => 12),
     insertMany: jest.fn(),
@@ -33,7 +34,7 @@ jest.mock('../../database/repositories/BeerRepository', () => ({
   },
 }));
 
-jest.mock('../../database/repositories/MyBeersRepository', () => ({
+vi.mock('../../database/repositories/MyBeersRepository', () => ({
   myBeersRepository: {
     insertMany: jest.fn(),
     // `fetchAndUpdateMyBeers` writes through `writeMyBeers` now, which uses the
@@ -46,13 +47,13 @@ jest.mock('../../database/repositories/MyBeersRepository', () => ({
 }));
 
 // Mock beerApi to avoid fetchWithRetry setTimeout retries in tests
-jest.mock('../../api/beerApi', () =>
+vi.mock('../../api/beerApi', async () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  require('../../api/__tests__/helpers/beerApiMock').beerApiMockFactory()
+  (await import('../../api/__tests__/helpers/beerApiMock')).beerApiMockFactory()
 );
 
 // Mock enrichment service
-jest.mock('../enrichmentService', () => ({
+vi.mock('../enrichmentService', () => ({
   fetchBeersFromProxy: jest.fn(),
   fetchEnrichmentBatchWithMissing: jest.fn().mockResolvedValue({ enrichments: {}, missing: [] }),
   syncBeersToWorker: jest.fn().mockResolvedValue({ synced: 0, failed: 0, queued_for_cleanup: 0 }),
@@ -62,7 +63,7 @@ jest.mock('../enrichmentService', () => ({
 }));
 
 // Mock error logger
-jest.mock('../../utils/errorLogger', () => ({
+vi.mock('../../utils/errorLogger', () => ({
   logError: jest.fn(),
   logWarning: jest.fn(),
 }));
@@ -76,7 +77,7 @@ const originalConsoleError = console.error;
 
 describe('dataUpdateService integration tests', () => {
   // Setup and teardown
-  beforeEach(() => {
+  beforeEach(async () => {
     jest.clearAllMocks();
     console.log = jest.fn();
     console.error = jest.fn();
@@ -99,7 +100,7 @@ describe('dataUpdateService integration tests', () => {
     (myBeersRepository.insertMany as jest.Mock).mockResolvedValue(undefined);
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     console.log = originalConsoleLog;
     console.error = originalConsoleError;
   });

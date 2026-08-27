@@ -1,19 +1,25 @@
+import { vi } from 'vitest';
 import { ApiClient } from '../apiClient';
 import { ApiError } from '../../types/api';
 import { getCurrentSession } from '../sessionValidator';
 import { config } from '@/src/config';
 
 // Mock the sessionValidator
-jest.mock('../sessionValidator', () => ({
+vi.mock('../sessionValidator', () => ({
   getCurrentSession: jest.fn(),
 }));
 
 // Mock fetch
 global.fetch = jest.fn();
-global.AbortController = jest.fn().mockImplementation(() => ({
-  signal: 'mock-signal',
-  abort: jest.fn(),
-}));
+// A class, not `vi.fn().mockImplementation(() => ({...}))`. Jest's mock
+// functions are constructible, so `new AbortController()` worked; vitest's
+// return the plain arrow, which is not a constructor.
+const RealAbortController = global.AbortController;
+global.AbortController = class {
+  private readonly inner = new RealAbortController();
+  readonly signal = this.inner.signal;
+  readonly abort = vi.fn(() => this.inner.abort());
+} as unknown as typeof AbortController;
 
 // Mock setTimeout and clearTimeout
 jest.useFakeTimers();

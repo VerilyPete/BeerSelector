@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 /**
  * API Integration Tests with Mock Server
  *
@@ -25,7 +26,7 @@ import type { FetchOutcome, FetchedSource } from '../fetchOutcome';
 process.env.EXPO_PUBLIC_API_RETRY_DELAY = '100';
 
 // Mock the preferences module
-jest.mock('@/src/database/preferences');
+vi.mock('@/src/database/preferences');
 
 // IMPORTANT: Do NOT mock fetch - we need real HTTP calls to the mock server
 // Save the real fetch before jest.setup.js mocks it
@@ -55,7 +56,8 @@ describe('API Integration with Mock Server', () => {
     jest.useRealTimers();
 
     // Restore real fetch for integration tests
-    global.fetch = require('node-fetch');
+    const nodeFetch = (await import('node-fetch')) as unknown as { default: typeof global.fetch };
+    global.fetch = nodeFetch.default;
 
     const setup = await setupMockServer(0); // Use port 0 for auto-assign
     mockServer = setup.mockServer;
@@ -70,7 +72,7 @@ describe('API Integration with Mock Server', () => {
     global.fetch = realFetch;
   });
 
-  beforeEach(() => {
+  beforeEach(async () => {
     mockServer.clearHistory();
     mockServer.clearAllResponses();
     jest.clearAllMocks();

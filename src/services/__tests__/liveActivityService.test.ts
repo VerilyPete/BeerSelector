@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 /**
  * Unit tests for liveActivityService
  *
@@ -84,7 +85,7 @@ let mockLiveActivitiesModule: LiveActivitiesModuleMock | undefined = {
   getActivityStaleDate: mockGetActivityStaleDate,
 };
 
-jest.mock('react-native', () => ({
+vi.mock('react-native', () => ({
   Platform: {
     get OS() {
       return mockPlatformOS;
@@ -98,7 +99,7 @@ jest.mock('react-native', () => ({
 }));
 
 // Mock the Expo module
-jest.mock('@/modules/live-activity/src', () => ({
+vi.mock('@/modules/live-activity/src', () => ({
   __esModule: true,
   default: {
     get areActivitiesEnabled() {

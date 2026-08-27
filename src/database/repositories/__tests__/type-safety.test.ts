@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 /**
  * Type Safety Tests for Repository Pattern
  *
@@ -27,12 +28,12 @@ import { getDatabase } from '../../connection';
 import type { ContainerType } from '@/src/utils/beerGlassType';
 
 // Mock the database connection
-jest.mock('../../connection', () => ({
+vi.mock('../../connection', () => ({
   getDatabase: jest.fn(),
 }));
 
 // Mock the lock manager
-jest.mock('../../locks', () => ({
+vi.mock('../../locks', () => ({
   databaseLockManager: {
     withDatabaseLock: jest.fn(async (_name: string, task: () => Promise<unknown>) => task()),
   },

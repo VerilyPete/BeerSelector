@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 /**
  * Atomicity tests for BeerRepository's allbeers replacement write
  *
@@ -34,8 +35,8 @@ import { withAtomicWrite } from '../../transactions';
 import { toNonEmpty } from '../../../api/fetchOutcome';
 import type { NonEmptyArray } from '../../../api/fetchOutcome';
 
-jest.mock('../../connection');
-jest.mock('../../locks', () => ({
+vi.mock('../../connection');
+vi.mock('../../locks', () => ({
   databaseLockManager: {
     // Must run the task. A mock missing this method makes the locked-entry-point
     // test pass on a TypeError rather than on atomicity.

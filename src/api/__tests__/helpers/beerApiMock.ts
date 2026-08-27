@@ -54,8 +54,7 @@
 
 /** One half of the member body, with a rejection turned into a `failed` outcome. */
 async function settleHalf(fetcher: jest.Mock): Promise<unknown> {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { createErrorResponse } = require('../../../utils/notificationUtils');
+  const { createErrorResponse } = await import('../../../utils/notificationUtils');
   try {
     return await fetcher();
   } catch (error) {

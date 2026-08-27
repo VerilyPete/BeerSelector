@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 /**
  * Tests for fetchTaplistFromProxyOrDirect shared helper
  *
@@ -17,7 +18,7 @@ import {
 } from '../../api/__tests__/helpers/fetchOutcomeFixtures';
 import { ApiErrorType, createErrorResponse } from '../../utils/notificationUtils';
 
-jest.mock('../../database/preferences', () => ({
+vi.mock('../../database/preferences', async () => ({
   // Returns null, not undefined. The real signature is Promise<string | null>,
   // and a bare jest.fn() answers `undefined` — which `normalizeStoredEtag`
   // rightly does not defend against, since the type forbids it. An
@@ -26,21 +27,21 @@ jest.mock('../../database/preferences', () => ({
   setPreference: jest.fn(),
 }));
 
-jest.mock('../../database/repositories/BeerRepository', () => ({
+vi.mock('../../database/repositories/BeerRepository', async () => ({
   beerRepository: {
     insertMany: jest.fn(),
     insertManyUnsafe: jest.fn(),
   },
 }));
 
-jest.mock('../../database/repositories/MyBeersRepository', () => ({
+vi.mock('../../database/repositories/MyBeersRepository', async () => ({
   myBeersRepository: {
     insertMany: jest.fn(),
     insertManyUnsafe: jest.fn(),
   },
 }));
 
-jest.mock('../../database/repositories/RewardsRepository', () => ({
+vi.mock('../../database/repositories/RewardsRepository', async () => ({
   rewardsRepository: {
     replaceAllWithEmpty: jest.fn(async () => {}),
     replaceAllWithEmptyUnsafe: jest.fn(async () => {}),
@@ -49,18 +50,18 @@ jest.mock('../../database/repositories/RewardsRepository', () => ({
   },
 }));
 
-jest.mock('../../database/DatabaseLockManager', () => ({
+vi.mock('../../database/DatabaseLockManager', async () => ({
   databaseLockManager: {
     withDatabaseLock: jest.fn(async (_name: string, task: () => Promise<unknown>) => task()),
   },
 }));
 
-jest.mock('../../api/beerApi', () =>
+vi.mock('../../api/beerApi', async () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  require('../../api/__tests__/helpers/beerApiMock').beerApiMockFactory()
+  (await import('../../api/__tests__/helpers/beerApiMock')).beerApiMockFactory()
 );
 
-jest.mock('../enrichmentService', () => ({
+vi.mock('../enrichmentService', async () => ({
   fetchBeersFromProxy: jest.fn(),
   fetchEnrichmentBatchWithMissing: jest.fn().mockResolvedValue({ enrichments: {}, missing: [] }),
   syncBeersToWorker: jest.fn().mockResolvedValue({ synced: 0, failed: 0, queued_for_cleanup: 0 }),
@@ -69,13 +70,13 @@ jest.mock('../enrichmentService', () => ({
   pollForEnrichmentUpdates: jest.fn().mockResolvedValue({}),
 }));
 
-jest.mock('../../utils/errorLogger', () => ({
+vi.mock('../../utils/errorLogger', async () => ({
   logError: jest.fn(),
   logWarning: jest.fn(),
 }));
 
-jest.mock('@/src/config', () => {
-  const actual = jest.requireActual('@/src/config');
+vi.mock('@/src/config', async () => {
+  const actual = await vi.importActual<typeof import('@/src/config')>('@/src/config');
   return {
     ...actual,
     config: {
@@ -90,15 +91,15 @@ jest.mock('@/src/config', () => {
 
 // Suppress console.log in tests
 const originalConsoleLog = console.log;
-beforeEach(() => {
+beforeEach(async () => {
   console.log = jest.fn();
 });
-afterEach(() => {
+afterEach(async () => {
   console.log = originalConsoleLog;
 });
 
 describe('fetchTaplistFromProxyOrDirect', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     jest.clearAllMocks();
     (config.enrichment.isConfigured as jest.Mock).mockReturnValue(false);
   });

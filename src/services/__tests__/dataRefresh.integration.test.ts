@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 /**
  * Integration tests for data refresh flows
  * Tests the complete refresh cycle using real JSON fixtures
@@ -25,17 +26,17 @@ const myBeersFixture = JSON.parse(
 );
 
 // Mock the modules
-jest.mock('../../api/beerApi', () =>
+vi.mock('../../api/beerApi', async () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  require('../../api/__tests__/helpers/beerApiMock').beerApiMockFactory()
+  (await import('../../api/__tests__/helpers/beerApiMock')).beerApiMockFactory()
 );
-jest.mock('../../database/preferences');
-jest.mock('../../database/repositories/BeerRepository');
-jest.mock('../../database/repositories/MyBeersRepository');
-jest.mock('../../database/repositories/RewardsRepository');
+vi.mock('../../database/preferences');
+vi.mock('../../database/repositories/BeerRepository');
+vi.mock('../../database/repositories/MyBeersRepository');
+vi.mock('../../database/repositories/RewardsRepository');
 
 describe('Data Refresh Integration Tests', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     jest.clearAllMocks();
 
     // Default mock for areApiUrlsConfigured - tests can override if needed
@@ -463,7 +464,7 @@ describe('Data Refresh Integration Tests', () => {
       // Validator filters out the beer without ID, so only 2 valid beers remain
     });
 
-    it('should verify all beers from fixture have required fields', () => {
+    it('should verify all beers from fixture have required fields', async () => {
       const beers = allBeersFixture[1].brewInStock;
 
       // Check that fixture data is valid
@@ -478,7 +479,7 @@ describe('Data Refresh Integration Tests', () => {
       console.log(`Verified ${beers.length} beers from fixture have valid structure`);
     });
 
-    it('should verify my beers from fixture have Beerfinder fields', () => {
+    it('should verify my beers from fixture have Beerfinder fields', async () => {
       const myBeers = myBeersFixture[1].tasted_brew_current_round;
 
       myBeers.forEach((beer: any) => {

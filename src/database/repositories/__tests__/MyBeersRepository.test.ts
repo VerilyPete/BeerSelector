@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 /**
  * Comprehensive tests for MyBeersRepository
  * Tests CRUD operations for tasted beers (Beerfinder) entity using TDD approach
@@ -12,7 +13,7 @@ import { databaseLockManager } from '../../locks';
 import { DatabaseContentionError } from '../../errors';
 
 // Mock the database connection module
-jest.mock('../../connection');
+vi.mock('../../connection');
 
 type MockDatabase = {
   withTransactionAsync: jest.Mock;

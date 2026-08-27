@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 /**
  * Comprehensive tests for beerApi module
  *
@@ -21,7 +22,7 @@ import type { FetchOutcome, FetchedSource } from '../fetchOutcome';
 process.env.EXPO_PUBLIC_API_RETRY_DELAY = '10';
 
 // Mock the preferences module
-jest.mock('../../database/preferences');
+vi.mock('../../database/preferences');
 
 // Mock global fetch
 global.fetch = jest.fn();
@@ -50,20 +51,20 @@ function payload<T>(source: FetchedSource<FetchOutcome<T>>): FetchOutcome<T> {
 }
 
 describe('Beer API', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     jest.clearAllMocks();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     jest.restoreAllMocks();
   });
 
   describe('fetchWithRetry', () => {
-    beforeEach(() => {
+    beforeEach(async () => {
       jest.useFakeTimers();
     });
 
-    afterEach(() => {
+    afterEach(async () => {
       jest.useRealTimers();
     });
 
@@ -597,11 +598,11 @@ describe('Beer API', () => {
     });
 
     describe('Network Configuration', () => {
-      beforeEach(() => {
+      beforeEach(async () => {
         jest.useFakeTimers();
       });
 
-      afterEach(() => {
+      afterEach(async () => {
         jest.useRealTimers();
       });
 
@@ -651,12 +652,12 @@ describe('Beer API', () => {
     });
 
     describe('Environment Switching', () => {
-      beforeEach(() => {
+      beforeEach(async () => {
         // Reset to default environment before each test
         config.setEnvironment('production');
       });
 
-      afterEach(() => {
+      afterEach(async () => {
         // Reset to default environment after each test
         config.setEnvironment('production');
       });
@@ -686,7 +687,7 @@ describe('Beer API', () => {
         config.setEnvironment('production');
       });
 
-      it('should validate URL format when setting custom URL', () => {
+      it('should validate URL format when setting custom URL', async () => {
         // Invalid URLs should throw error
         expect(() => {
           config.setCustomApiUrl('not-a-valid-url');
@@ -703,7 +704,7 @@ describe('Beer API', () => {
     });
 
     describe('Config Validation', () => {
-      it('should have valid config structure', () => {
+      it('should have valid config structure', async () => {
         // Verify config has required properties
         expect(config).toHaveProperty('api');
         expect(config).toHaveProperty('network');
@@ -721,7 +722,7 @@ describe('Beer API', () => {
         expect(config.network).toHaveProperty('retryDelay');
       });
 
-      it('should have valid endpoint URLs', () => {
+      it('should have valid endpoint URLs', async () => {
         // Verify all endpoints resolve to valid URLs
         const endpoints = [
           'memberDashboard',
@@ -738,14 +739,14 @@ describe('Beer API', () => {
         });
       });
 
-      it('should have valid referer URLs', () => {
+      it('should have valid referer URLs', async () => {
         // Verify all referers are valid URLs
         expect(config.api.referers.memberDashboard).toMatch(/^https?:\/\//);
         expect(config.api.referers.memberRewards).toMatch(/^https?:\/\//);
         expect(config.api.referers.memberQueues).toMatch(/^https?:\/\//);
       });
 
-      it('should have valid network configuration values', () => {
+      it('should have valid network configuration values', async () => {
         // Verify network values are positive integers
         expect(config.network.timeout).toBeGreaterThan(0);
         expect(config.network.retries).toBeGreaterThan(0);
@@ -767,7 +768,7 @@ describe('FetchOutcome semantics (plan 02 Phase 3)', () => {
   // care: the my-beers none:// test in this block passed only because it happened to
   // run before any test that fetches. A test that cannot fail is worth less than
   // no test, so pin the isolation rather than the ordering.
-  beforeEach(() => {
+  beforeEach(async () => {
     jest.clearAllMocks();
   });
 
@@ -951,7 +952,7 @@ describe('a non-array payload is malformed, not data (plan refresh-failure-class
   // Every assertion here is on the OUTCOME. `beerApi.ts` imports no repository,
   // so a repository assertion in this file could not be mutated by any change to
   // the module under test.
-  beforeEach(() => {
+  beforeEach(async () => {
     jest.clearAllMocks();
   });
 
@@ -966,7 +967,7 @@ describe('a non-array payload is malformed, not data (plan refresh-failure-class
   };
 
   describe('fetchMyBeersFromAPI', () => {
-    beforeEach(() => {
+    beforeEach(async () => {
       (preferences.getPreference as jest.Mock).mockImplementation(memberPrefs('my_beers_api_url'));
     });
 
@@ -988,7 +989,7 @@ describe('a non-array payload is malformed, not data (plan refresh-failure-class
   });
 
   describe('fetchBeersFromAPI', () => {
-    beforeEach(() => {
+    beforeEach(async () => {
       (preferences.getPreference as jest.Mock).mockImplementation(memberPrefs('all_beers_api_url'));
     });
 
@@ -1018,7 +1019,7 @@ describe('a non-array payload is malformed, not data (plan refresh-failure-class
   });
 
   describe('fetchRewardsFromAPI', () => {
-    beforeEach(() => {
+    beforeEach(async () => {
       (preferences.getPreference as jest.Mock).mockImplementation(memberPrefs('my_beers_api_url'));
     });
 
@@ -1202,12 +1203,15 @@ describe('a non-array payload is malformed, not data (plan refresh-failure-class
       // this reason. The re-include at `.gitignore:111` exists to make this path
       // the safe one.
       // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const fixture = require('../../services/__tests__/fixtures/mybeers.json');
+      const fixture = (await import('../../services/__tests__/fixtures/mybeers.json')).default;
       respondWith(fixture);
 
       const body = payload(await fetchRewardsFromAPI());
       expect(body.kind).toBe('data');
-      if (body.kind === 'data') expect(body.items).toHaveLength(fixture[2].reward.length);
+      if (body.kind === 'data')
+        expect(body.items).toHaveLength(
+          (fixture as [unknown, unknown, { reward: unknown[] }])[2].reward.length
+        );
     });
 
     it('reports malformed for a string reward payload rather than four fabricated rows', async () => {

@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 /**
  * Tests for MockServer utilities
  *
@@ -17,22 +18,23 @@ import {
 import { config } from '@/src/config';
 
 // Use real fetch for MockServer tests (not the mocked global.fetch)
-// @ts-ignore - node-fetch is available as transitive dependency
-const nodeFetch = require('node-fetch');
+// Namespace, not callable: `require` gave the function directly, `import`
+// gives the module record, so the default export has to be named explicitly.
+const nodeFetch = (await import('node-fetch')).default;
 
 // Increase timeout for server tests
-jest.setTimeout(10000);
+vi.setConfig({ testTimeout: 10000 });
 
 describe('MockServer', () => {
   let mockServer: MockServer;
   let originalFetch: typeof fetch;
 
-  beforeAll(() => {
+  beforeAll(async () => {
     // Use real timers for MockServer tests
     jest.useRealTimers();
   });
 
-  beforeEach(() => {
+  beforeEach(async () => {
     mockServer = new MockServer();
     // Replace global fetch with node-fetch for these tests
     originalFetch = global.fetch;
@@ -48,7 +50,7 @@ describe('MockServer', () => {
     }
   });
 
-  afterAll(() => {
+  afterAll(async () => {
     // Restore fake timers for other tests
     jest.useFakeTimers();
   });
@@ -551,7 +553,7 @@ describe('MockServer', () => {
       await mockServer.start();
     });
 
-    afterEach(() => {
+    afterEach(async () => {
       if (originalEnv) {
         config.setEnvironment(originalEnv as any);
       }
@@ -641,7 +643,7 @@ describe('MockServer', () => {
 
 describe('MockServer helpers', () => {
   describe('networkErrorResponse', () => {
-    it('should create network error response', () => {
+    it('should create network error response', async () => {
       const response = networkErrorResponse();
       expect(response).toEqual({
         status: 0,
@@ -652,7 +654,7 @@ describe('MockServer helpers', () => {
   });
 
   describe('timeoutResponse', () => {
-    it('should create timeout response with default delay', () => {
+    it('should create timeout response with default delay', async () => {
       const response = timeoutResponse();
       expect(response).toEqual({
         status: 200,
@@ -661,7 +663,7 @@ describe('MockServer helpers', () => {
       });
     });
 
-    it('should create timeout response with custom delay', () => {
+    it('should create timeout response with custom delay', async () => {
       const response = timeoutResponse(5000);
       expect(response).toEqual({
         status: 200,
@@ -738,12 +740,12 @@ describe('FlyingSaucerResponses presets', () => {
   let mockServer: MockServer;
   let originalFetch: typeof fetch;
 
-  beforeAll(() => {
+  beforeAll(async () => {
     originalFetch = global.fetch;
     global.fetch = nodeFetch as any;
   });
 
-  afterAll(() => {
+  afterAll(async () => {
     global.fetch = originalFetch;
   });
 
@@ -869,12 +871,12 @@ describe('RequestMatcher', () => {
   let mockServer: MockServer;
   let originalFetch: typeof fetch;
 
-  beforeAll(() => {
+  beforeAll(async () => {
     originalFetch = global.fetch;
     global.fetch = nodeFetch as any;
   });
 
-  afterAll(() => {
+  afterAll(async () => {
     global.fetch = originalFetch;
   });
 
@@ -900,7 +902,7 @@ describe('RequestMatcher', () => {
       }).not.toThrow();
     });
 
-    it('should fail when endpoint was not called', () => {
+    it('should fail when endpoint was not called', async () => {
       expect(() => {
         mockServer.expectRequest('/api/never-called').toHaveBeenCalled();
       }).toThrow('Expected /api/never-called to have been called, but it was not called');
@@ -1008,7 +1010,7 @@ describe('RequestMatcher', () => {
   });
 
   describe('not.toHaveBeenCalled', () => {
-    it('should pass when endpoint was not called', () => {
+    it('should pass when endpoint was not called', async () => {
       expect(() => {
         mockServer.expectRequest('/api/never').not.toHaveBeenCalled();
       }).not.toThrow();

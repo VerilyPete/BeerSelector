@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 /**
  * Unit tests for updateEnrichmentData methods in BeerRepository and MyBeersRepository
  *
@@ -18,12 +19,14 @@ import { databaseLockManager } from '../../locks';
 import { EnrichmentUpdate } from '../../../types/enrichment';
 
 // Mock dependencies
-jest.mock('../../connection');
+vi.mock('../../connection');
 // Delegates to a REAL DatabaseLockManager. A `jest.fn((_name, task) => task())`
 // stand-in has no release to observe, so "released the lock" assertions against
 // it pass even with withDatabaseLock's finally deleted.
-jest.mock('../../locks', () => {
-  const actual = jest.requireActual('../../DatabaseLockManager');
+vi.mock('../../locks', async () => {
+  const actual = await vi.importActual<typeof import('../../DatabaseLockManager')>(
+    '../../DatabaseLockManager'
+  );
   const real = new actual.DatabaseLockManager();
   const delegate = (name: string, task: () => Promise<unknown>) =>
     real.withDatabaseLock(name, task);

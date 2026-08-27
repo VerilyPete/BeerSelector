@@ -1,9 +1,10 @@
+import { vi } from 'vitest';
 import { validateSession, getCurrentSession } from '../sessionValidator';
 import { getSessionData } from '../sessionManager';
 import { ApiError, SessionData } from '../../types/api';
 
 // Mock the sessionManager
-jest.mock('../sessionManager', () => ({
+vi.mock('../sessionManager', () => ({
   getSessionData: jest.fn(),
 }));
 
@@ -21,7 +22,7 @@ describe('sessionValidator', () => {
     firstName: 'Test',
     lastName: 'User',
     email: 'test@example.com',
-    cardNum: '12345'
+    cardNum: '12345',
   };
 
   beforeEach(() => {

@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 /**
  * The startup migration check must not be able to abort app initialisation.
  *
@@ -34,11 +35,11 @@ import { runStartupMigrationCheck, startupMigrationAlert } from '../startupMigra
 import { getCurrentSchemaVersion, CURRENT_SCHEMA_VERSION } from '../schemaVersion';
 import { migrateToVersion3 } from '../migrations/migrateToV3';
 
-jest.mock('../schemaVersion', () => ({
-  ...jest.requireActual('../schemaVersion'),
+vi.mock('../schemaVersion', async () => ({
+  ...(await vi.importActual<typeof import('../schemaVersion')>('../schemaVersion')),
   getCurrentSchemaVersion: jest.fn(),
 }));
-jest.mock('../migrations/migrateToV3', () => ({
+vi.mock('../migrations/migrateToV3', async () => ({
   migrateToVersion3: jest.fn().mockResolvedValue(undefined),
 }));
 

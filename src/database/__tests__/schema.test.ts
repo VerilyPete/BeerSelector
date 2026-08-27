@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 /**
  * Tests for database schema and table creation
  */
@@ -6,7 +7,7 @@ import { setupDatabase, resetDatabaseState } from '../db';
 import * as connection from '../connection';
 
 // Mock the connection module
-jest.mock('../connection');
+vi.mock('../connection');
 
 describe('Database Schema', () => {
   const mockExecAsync = jest.fn().mockResolvedValue(undefined);

@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 import { autoLogin, login, logout, handleTapThatAppLogin } from '../authService';
 import { saveSessionData, clearSessionData } from '../sessionManager';
 import { getApiClient } from '../apiClientInstance';
@@ -6,17 +7,17 @@ import { getPreference, setPreference } from '../../database/preferences';
 import { refreshAllDataFromAPI } from '../../services/dataUpdateService';
 
 // Mock dependencies
-jest.mock('../sessionManager', () => ({
+vi.mock('../sessionManager', () => ({
   saveSessionData: jest.fn().mockResolvedValue(undefined),
   clearSessionData: jest.fn().mockResolvedValue(undefined),
 }));
 
-jest.mock('../apiClientInstance', () => ({
+vi.mock('../apiClientInstance', () => ({
   getApiClient: jest.fn(),
 }));
 
 // Mock database functions
-jest.mock('../../database/preferences', () => ({
+vi.mock('../../database/preferences', () => ({
   getPreference: jest.fn().mockResolvedValue(null),
 
   setPreference: jest.fn().mockResolvedValue(undefined),
@@ -24,7 +25,7 @@ jest.mock('../../database/preferences', () => ({
 }));
 
 // Mock dataUpdateService functions
-jest.mock('../../services/dataUpdateService', () => ({
+vi.mock('../../services/dataUpdateService', () => ({
   refreshAllDataFromAPI: jest.fn().mockResolvedValue({ allBeers: [], myBeers: [], rewards: [] }),
 }));
 

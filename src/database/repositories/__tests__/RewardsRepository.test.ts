@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 /**
  * Comprehensive tests for RewardsRepository
  * Tests CRUD operations for Reward entity using TDD approach
@@ -9,7 +10,7 @@ import * as connection from '../../connection';
 import { databaseLockManager } from '../../locks';
 
 // Mock the database connection module
-jest.mock('../../connection');
+vi.mock('../../connection');
 
 type MockDatabase = {
   withTransactionAsync: jest.Mock;

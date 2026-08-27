@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 /**
  * My-beers and rewards are two halves of ONE body, and cost one request.
  *
@@ -31,7 +32,7 @@ import * as preferences from '../../database/preferences';
 import { ApiErrorType } from '../../utils/notificationUtils';
 import type { FetchOutcome, UnconditionalSource } from '../fetchOutcome';
 
-jest.mock('../../database/preferences');
+vi.mock('../../database/preferences');
 
 global.fetch = jest.fn();
 
@@ -74,7 +75,7 @@ const respondWith = (body: unknown): void => {
 };
 
 describe('fetchMemberDataFromAPI', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     jest.clearAllMocks();
     (preferences.getPreference as jest.Mock).mockImplementation(memberPrefs);
   });
@@ -238,7 +239,7 @@ describe('fetchMemberDataFromAPI', () => {
  * which is the only place it can actually be shown.
  */
 describe('extracting the real mybeers.json fixture', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     jest.clearAllMocks();
     (preferences.getPreference as jest.Mock).mockImplementation(memberPrefs);
   });
@@ -249,10 +250,11 @@ describe('extracting the real mybeers.json fixture', () => {
   // losing a whole suite to ENOENT for exactly this), and `process.cwd()`
   // depends on where jest was invoked from rather than on `rootDir`.
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const fixture = (): unknown => require('../../services/__tests__/fixtures/mybeers.json');
+  const fixture = async (): Promise<unknown> =>
+    (await import('../../services/__tests__/fixtures/mybeers.json')).default;
 
   it('returns every tasted row the fixture carries', async () => {
-    const body = fixture() as [unknown, { tasted_brew_current_round: unknown[] }];
+    const body = (await fixture()) as [unknown, { tasted_brew_current_round: unknown[] }];
     respondWith(body);
 
     const outcome = await settle(fetchMyBeersFromAPI());
@@ -274,7 +276,7 @@ describe('extracting the real mybeers.json fixture', () => {
   it('reads the rewards half of the same fixture independently', async () => {
     // The fixture is a member body, so it exercises the coalesced path on real
     // data: whatever `data[2]` holds, my-beers is unaffected by it.
-    respondWith(fixture());
+    respondWith(await fixture());
 
     const member = await settle(fetchMemberDataFromAPI());
 

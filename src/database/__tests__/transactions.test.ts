@@ -1,8 +1,9 @@
+import { vi } from 'vitest';
 import { withDatabaseTransaction, DatabaseOperationResult } from '../transactions';
 import type { SQLiteDatabase } from 'expo-sqlite';
 
 // Mock expo-sqlite
-jest.mock('expo-sqlite');
+vi.mock('expo-sqlite');
 
 // `runAsync` is REQUIRED, and createMockDatabase always supplies it. It used to
 // be optional, with every call site written `db.runAsync(...)` — which meant a

@@ -1,11 +1,12 @@
+import { vi } from 'vitest';
 import { fetchAndUpdateRewards } from '../dataUpdateService';
 import * as preferences from '../../database/preferences';
 import * as connection from '../../database/connection';
 import { ApiErrorType } from '../../utils/notificationUtils';
 
-jest.mock('../../database/preferences');
-jest.mock('../../database/connection');
-jest.mock('../../database/locks', () => ({
+vi.mock('../../database/preferences');
+vi.mock('../../database/connection');
+vi.mock('../../database/locks', () => ({
   databaseLockManager: {
     withDatabaseLock: jest.fn(async (_name: string, task: () => Promise<unknown>) => task()),
   },

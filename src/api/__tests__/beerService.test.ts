@@ -1,19 +1,25 @@
+import { vi } from 'vitest';
 import { checkInBeer } from '../beerService';
 import { getSessionData } from '../sessionManager';
 import { autoLogin } from '../authService';
 
 // Mock dependencies
-jest.mock('../sessionManager');
-jest.mock('../authService');
+vi.mock('../sessionManager');
+vi.mock('../authService');
 
-// Create a mock API client
-const mockApiClient = {
-  get: jest.fn(),
-  post: jest.fn(),
-};
+// Create a mock API client.
+//
+// `vi.hoisted` because the `vi.mock` factory below is hoisted above every
+// top-level statement; a plain `const` here would still be in its temporal dead
+// zone when the factory runs. This was a plain const under jest, whose
+// `jest.mock` factory ran lazily on first import instead.
+const mockApiClient = vi.hoisted(() => ({
+  get: vi.fn(),
+  post: vi.fn(),
+}));
 
 // Mock the apiClientInstance module
-jest.mock('../apiClientInstance', () => ({
+vi.mock('../apiClientInstance', () => ({
   getApiClient: jest.fn().mockReturnValue(mockApiClient),
   apiClient: mockApiClient,
 }));

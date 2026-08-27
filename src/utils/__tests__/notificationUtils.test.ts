@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 /**
  * Tests for notificationUtils
  *
@@ -20,7 +21,7 @@ import type { ErrorResponse } from '../notificationUtils';
 import { DatabaseContentionError } from '../../database/errors';
 import { HttpError, TransportAbortedError, UnreadableBodyError } from '../../api/fetchOutcome';
 
-jest.mock('react-native', () => ({
+vi.mock('react-native', () => ({
   Alert: {
     alert: jest.fn(),
   },

@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 /**
  * How concurrent refreshes are kept from colliding.
  *
@@ -45,24 +46,24 @@ import { fetchBeersFromAPI, fetchMyBeersFromAPI, fetchRewardsFromAPI } from '../
 import { beerRepository } from '../../database/repositories/BeerRepository';
 import { fetchedRows } from '../../api/__tests__/helpers/fetchOutcomeFixtures';
 
-jest.mock('../../database/db', () => ({
+vi.mock('../../database/db', () => ({
   getPreference: jest.fn(),
   setPreference: jest.fn(),
 }));
 
-jest.mock('../../database/preferences', () => ({
+vi.mock('../../database/preferences', () => ({
   getPreference: jest.fn(),
 
   setPreference: jest.fn(),
   areApiUrlsConfigured: jest.fn(),
 }));
 
-jest.mock('../../api/beerApi', () =>
+vi.mock('../../api/beerApi', async () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  require('../../api/__tests__/helpers/beerApiMock').beerApiMockFactory()
+  (await import('../../api/__tests__/helpers/beerApiMock')).beerApiMockFactory()
 );
 
-jest.mock('../../database/repositories/BeerRepository', () => ({
+vi.mock('../../database/repositories/BeerRepository', () => ({
   beerRepository: {
     count: jest.fn(async () => 12),
     insertMany: jest.fn(),
@@ -70,7 +71,7 @@ jest.mock('../../database/repositories/BeerRepository', () => ({
   },
 }));
 
-jest.mock('../../database/repositories/MyBeersRepository', () => ({
+vi.mock('../../database/repositories/MyBeersRepository', () => ({
   myBeersRepository: {
     insertMany: jest.fn(),
     insertManyUnsafe: jest.fn(),
@@ -78,7 +79,7 @@ jest.mock('../../database/repositories/MyBeersRepository', () => ({
   },
 }));
 
-jest.mock('../../database/repositories/RewardsRepository', () => ({
+vi.mock('../../database/repositories/RewardsRepository', () => ({
   rewardsRepository: {
     replaceAllWithEmpty: jest.fn(async () => {}),
     replaceAllWithEmptyUnsafe: jest.fn(async () => {}),
@@ -117,7 +118,7 @@ const logsAndResolves = (mock: jest.Mock, label: string, rows: readonly unknown[
   });
 
 describe('Sequential Refresh Coordination', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     jest.clearAllMocks();
     databaseLockManager.resetForTesting();
     resetInFlightSequentialRefresh();
@@ -136,7 +137,7 @@ describe('Sequential Refresh Coordination', () => {
     (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(fetchedRows(REWARDS));
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     // In an `afterEach`, not at the end of each test body. A spy on
     // `withDatabaseLock` that a failing test leaves installed is picked up by
     // the NEXT test as its `originalWithLock`, which then wraps itself and dies

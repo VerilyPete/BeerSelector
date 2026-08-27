@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 /**
  * `fetchWithRetry` must bound every request it makes.
  *
@@ -22,7 +23,7 @@ import { fetchWithRetry } from '../beerApi';
 import { TransportAbortedError } from '../fetchOutcome';
 import { config } from '@/src/config';
 
-jest.mock('../../database/preferences');
+vi.mock('../../database/preferences');
 
 global.fetch = jest.fn();
 

@@ -1,10 +1,11 @@
+import { vi } from 'vitest';
 import { getPreference, setPreference, getAllPreferences } from '../preferences';
 import { Preference } from '../../types/database';
 import * as connection from '../connection';
 import { DatabaseContentionError } from '../errors';
 
 // Mock the connection module
-jest.mock('../connection');
+vi.mock('../connection');
 
 type MockDatabase = {
   runAsync: jest.Mock;

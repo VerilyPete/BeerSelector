@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 import * as svc from '../../services/dataUpdateService';
 
 // Import mocked functions
@@ -22,7 +23,7 @@ import { buildRefreshErrorMessages } from '../../utils/refreshErrorMessages';
 import { UnreadableBodyError } from '../../api/fetchOutcome';
 
 // Mock dependencies
-jest.mock('../../database/preferences', () => ({
+vi.mock('../../database/preferences', () => ({
   getPreference: jest.fn(async (k: string) => {
     if (k === 'all_beers_api_url') return 'https://example.com/allbeers.json';
     if (k === 'my_beers_api_url') return 'https://example.com/mybeers.json';
@@ -31,26 +32,26 @@ jest.mock('../../database/preferences', () => ({
   setPreference: jest.fn(async () => {}),
 }));
 
-jest.mock('../../api/beerApi', () =>
+vi.mock('../../api/beerApi', async () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  require('../../api/__tests__/helpers/beerApiMock').beerApiMockFactory()
+  (await import('../../api/__tests__/helpers/beerApiMock')).beerApiMockFactory()
 );
 
-jest.mock('../../database/repositories/BeerRepository', () => ({
+vi.mock('../../database/repositories/BeerRepository', () => ({
   beerRepository: {
     count: jest.fn(async () => 12),
     insertManyUnsafe: jest.fn(async () => {}),
   },
 }));
 
-jest.mock('../../database/repositories/MyBeersRepository', () => ({
+vi.mock('../../database/repositories/MyBeersRepository', () => ({
   myBeersRepository: {
     insertManyUnsafe: jest.fn(async () => {}),
     replaceAllWithEmptyUnsafe: jest.fn(async () => {}),
   },
 }));
 
-jest.mock('../../database/repositories/RewardsRepository', () => ({
+vi.mock('../../database/repositories/RewardsRepository', () => ({
   rewardsRepository: {
     replaceAllWithEmpty: jest.fn(async () => {}),
     replaceAllWithEmptyUnsafe: jest.fn(async () => {}),
@@ -58,14 +59,14 @@ jest.mock('../../database/repositories/RewardsRepository', () => ({
   },
 }));
 
-jest.mock('../../database/DatabaseLockManager', () => ({
+vi.mock('../../database/DatabaseLockManager', () => ({
   databaseLockManager: {
     withDatabaseLock: jest.fn(async (_name: string, task: () => Promise<unknown>) => task()),
   },
 }));
 
 describe('manualRefreshAllData', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     jest.clearAllMocks();
   });
 
@@ -278,7 +279,7 @@ describe('manualRefreshAllData', () => {
 });
 
 describe('sequentialRefreshAllData: empty vs malformed tasted beers', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     jest.clearAllMocks();
     (fetchBeersFromAPI as jest.Mock).mockResolvedValue(
       fetchedRows([{ id: 'beer-1', brew_name: 'Test Beer 1', brewer: 'Test Brewery' }])
@@ -345,7 +346,7 @@ describe('sequentialRefreshAllData: empty vs malformed tasted beers', () => {
 });
 
 describe('sequentialRefreshAllData: FetchOutcome semantics (plan 02 Phase 3)', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     jest.clearAllMocks();
     (fetchBeersFromAPI as jest.Mock).mockResolvedValue(
       fetchedRows([{ id: 'b1', brew_name: 'Beer', brewer: 'X' }])
@@ -409,7 +410,7 @@ describe('sequentialRefreshAllData: FetchOutcome semantics (plan 02 Phase 3)', (
  * UNREADABLE_BODY_ERROR". The one genuinely red assertion is the copy.
  */
 describe('allNetworkErrors and an unreadable body', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     jest.clearAllMocks();
   });
 
@@ -537,7 +538,7 @@ describe('allNetworkErrors and an unreadable body', () => {
  * clears anything at all.
  */
 describe('only a confirmed-empty round clears the tasted table', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     jest.clearAllMocks();
     (fetchBeersFromAPI as jest.Mock).mockResolvedValue(
       fetchedRows([{ id: 'b1', brew_name: 'Beer', brewer: 'X' }])
@@ -579,7 +580,7 @@ describe('the member body is fetched once for both sources', () => {
   // My-beers and rewards read the SAME `my_beers_api_url`, so preparing them
   // separately sent two identical requests and threw away half of each answer.
   // The bounded unreadable retry doubled the cost of that duplication.
-  beforeEach(() => {
+  beforeEach(async () => {
     jest.clearAllMocks();
     (fetchBeersFromAPI as jest.Mock).mockResolvedValue(
       fetchedRows([{ id: 'b1', brew_name: 'Beer', brewer: 'X' }])
@@ -630,7 +631,7 @@ describe('what a manual refresh does to the freshness timestamps', () => {
   const stampsFor = (key: string): unknown[] =>
     (setPreference as jest.Mock).mock.calls.filter((c: unknown[]) => c[0] === key).map(c => c[1]);
 
-  beforeEach(() => {
+  beforeEach(async () => {
     jest.clearAllMocks();
     (fetchBeersFromAPI as jest.Mock).mockResolvedValue(
       fetchedRows([{ id: 'b1', brew_name: 'Beer', brewer: 'X' }])
@@ -700,7 +701,7 @@ describe('one member request means one verdict for both halves', () => {
     });
   };
 
-  beforeEach(() => {
+  beforeEach(async () => {
     jest.clearAllMocks();
     (fetchBeersFromAPI as jest.Mock).mockResolvedValue(
       fetchedRows([{ id: 'b1', brew_name: 'Beer', brewer: 'X' }])

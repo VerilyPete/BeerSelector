@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 /**
  * Migrations must actually be invoked.
  *
@@ -29,23 +30,23 @@ import { migrateToVersion4 } from '../migrations/migrateToV4';
 import { migrateToVersion3 } from '../migrations/migrateToV3';
 import { CURRENT_SCHEMA_VERSION } from '../schemaVersion';
 
-jest.mock('../connection');
-jest.mock('../migrations/migrateToV8', () => ({
+vi.mock('../connection');
+vi.mock('../migrations/migrateToV8', () => ({
   migrateToVersion8: jest.fn().mockResolvedValue(undefined),
 }));
-jest.mock('../migrations/migrateToV7', () => ({
+vi.mock('../migrations/migrateToV7', () => ({
   migrateToVersion7: jest.fn().mockResolvedValue(undefined),
 }));
-jest.mock('../migrations/migrateToV6', () => ({
+vi.mock('../migrations/migrateToV6', () => ({
   migrateToVersion6: jest.fn().mockResolvedValue(undefined),
 }));
-jest.mock('../migrations/migrateToV5', () => ({
+vi.mock('../migrations/migrateToV5', () => ({
   migrateToVersion5: jest.fn().mockResolvedValue(undefined),
 }));
-jest.mock('../migrations/migrateToV4', () => ({
+vi.mock('../migrations/migrateToV4', () => ({
   migrateToVersion4: jest.fn().mockResolvedValue(undefined),
 }));
-jest.mock('../migrations/migrateToV3', () => ({
+vi.mock('../migrations/migrateToV3', () => ({
   migrateToVersion3: jest.fn().mockResolvedValue(undefined),
 }));
 
