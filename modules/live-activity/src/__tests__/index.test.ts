@@ -6,20 +6,23 @@
  * Maestro E2E tests since the native module requires iOS runtime.
  */
 
+import { vi } from 'vitest';
+
 import LiveActivityModule from '../index';
 
-// Mock expo-modules-core for Jest environment
-jest.mock('expo-modules-core', () => ({
-  requireNativeModule: jest.fn(() => ({
-    areActivitiesEnabled: jest.fn(),
-    startActivity: jest.fn(),
-    updateActivity: jest.fn(),
-    endActivity: jest.fn(),
-    endAllActivities: jest.fn(),
-    endAllActivitiesSync: jest.fn(),
-    restartActivity: jest.fn(),
-    getAllActivityIds: jest.fn(),
-    endActivitiesOlderThan: jest.fn(),
+// Mock expo-modules-core: there is no native runtime here, so the real
+// `requireNativeModule('LiveActivity')` throws on import.
+vi.mock('expo-modules-core', () => ({
+  requireNativeModule: vi.fn(() => ({
+    areActivitiesEnabled: vi.fn(),
+    startActivity: vi.fn(),
+    updateActivity: vi.fn(),
+    endActivity: vi.fn(),
+    endAllActivities: vi.fn(),
+    endAllActivitiesSync: vi.fn(),
+    restartActivity: vi.fn(),
+    getAllActivityIds: vi.fn(),
+    endActivitiesOlderThan: vi.fn(),
   })),
 }));
 

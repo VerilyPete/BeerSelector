@@ -27,14 +27,17 @@ module.exports = {
   testPathIgnorePatterns: [
     '/node_modules/',
 
-    // Ceded to vitest. `src/**/*.test.ts` is pure logic — no renderer, no RN
-    // runtime — and runs under vitest.config.ts with a node environment and no
-    // jest-expo preset. Those files now use `vi.*` and would fail here.
+    // Ceded to vitest: every `.test.ts` in the repo, wherever it lives. Those
+    // are pure logic — no renderer, no RN runtime — and run under
+    // vitest.config.ts with a node environment and no jest-expo preset. They
+    // use `vi.*` and would fail here.
     //
-    // The boundary is deliberate and mechanical: TS under src/ is vitest's,
-    // anything TSX or under components/ and app/ stays here, because it needs
-    // the renderer and the preset's native mocks.
-    '^<rootDir>/src/.*\\.test\\.ts$',
+    // The boundary is a rule, not a directory list: `.test.ts` is vitest's,
+    // `.test.tsx` is jest's, because TSX is what needs the renderer and the
+    // preset's native mocks. Note `$` — this does not match `.test.tsx`.
+    // Everything left in this config is TSX, so a suite changes runner only by
+    // gaining or losing a renderer, which is the thing that actually decides it.
+    '\\.test\\.ts$',
 
     '/ios/',
     '/android/',

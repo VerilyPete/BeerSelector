@@ -14,6 +14,10 @@ export default defineConfig({
     // way to intercept a relative import made from inside node_modules.
     alias: [
       {
+        // `react-native` ships untranspiled Flow source, so it can never be
+        // imported for real here. Logic suites only ever touch `Alert`, which
+        // they already mock; this alias makes that mock the only version that
+        // exists.
         find: /^react-native$/,
         replacement: new URL('./src/__vitest__/react-native-stub.ts', import.meta.url).pathname,
       },
@@ -82,9 +86,23 @@ export default defineConfig({
     // jest-expo: Expo ships untranspiled TS/Flow, so these packages must go
     // through vite's transform rather than node's loader.
     server: { deps: { inline: [/expo/, /@expo/, /expo-modules-core/] } },
-    include: ['src/**/*.test.ts'],
-    // `react-native` ships untranspiled Flow source, so it can never be
-    // imported for real here. Logic suites only ever touch `Alert`, which they
-    // already mock; this alias makes that mock the only version that exists.
+    // The boundary with jest-expo, stated as a rule rather than a directory
+    // list: every `.test.ts` in the repo is logic and runs here; every
+    // `.test.tsx` needs the renderer and stays on jest-expo. That holds for all
+    // 108 suites, so there is nothing to keep in sync when a file moves.
+    // `jest.config.js` ignores the complement of this pattern.
+    include: ['**/*.test.ts'],
+    // Setting `exclude` replaces vitest's defaults rather than adding to them,
+    // so `node_modules` and `dist` are restored here by hand. All six are
+    // gitignored; a compiled copy of a suite under `dist/` after an
+    // `expo export` would otherwise be collected a second time.
+    exclude: [
+      '**/node_modules/**',
+      '**/dist/**',
+      '**/.expo/**',
+      '**/coverage/**',
+      'ios/**',
+      'android/**',
+    ],
   },
 });

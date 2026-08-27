@@ -34,13 +34,13 @@ A comprehensive React Native mobile app for beer enthusiasts to discover, track,
 ### Core Framework
 
 - **[React Native](https://reactnative.dev/)** - Cross-platform mobile framework
-- **[Expo](https://expo.dev/)** - React Native development platform with SDK 52
+- **[Expo](https://expo.dev/)** - React Native development platform with SDK 54
 - **[Expo Router](https://docs.expo.dev/router/introduction/)** - File-based routing system
 - **[TypeScript](https://www.typescriptlang.org/)** - Type safety and better development experience
 
 ### Database & Storage
 
-- **[Expo SQLite](https://docs.expo.dev/versions/latest/sdk/sqlite/)** - Local database storage (v15.1.4)
+- **[Expo SQLite](https://docs.expo.dev/versions/latest/sdk/sqlite/)** - Local database storage (v16.0.x)
 - **[Expo Secure Store](https://docs.expo.dev/versions/latest/sdk/securestore/)** - Secure credential storage
 - **[Expo File System](https://docs.expo.dev/versions/latest/sdk/filesystem/)** - File management
 
@@ -196,8 +196,9 @@ npm run android          # Run on Android emulator
 npm run web              # Run web version
 
 # Testing
-npm test                 # Run tests in watch mode
-npm run test:ci          # Run tests with coverage report
+npm test                 # vitest (logic suites), watch mode
+npm run test:rn          # jest-expo (component suites), watch mode
+npm run test:ci          # both, in sequence, with coverage
 
 # Utilities
 npm run reset-project    # Reset project state
@@ -206,19 +207,29 @@ npm run lint             # Run ESLint
 
 ### Testing
 
-The project includes comprehensive testing:
+The suite runs on **two runners, split by file extension**:
 
-- **Unit Tests**: Individual component and function testing
-- **Integration Tests**: API and database operation testing
-- **Component Tests**: React component rendering tests
-- **Type Tests**: TypeScript type guard validation
+|              | Runner    | Environment                            |
+| ------------ | --------- | -------------------------------------- |
+| `*.test.ts`  | vitest    | node — pure logic, no renderer         |
+| `*.test.tsx` | jest-expo | React Native renderer and native mocks |
 
-Run tests with:
+Pick the runner from the extension of the file you want; `npx jest` on a
+`.test.ts` matches nothing, and vice versa.
 
 ```bash
-npm test                 # Watch mode
-npm run test:ci          # Single run with coverage
+npm test                 # vitest, watch mode
+npm run test:rn          # jest-expo, watch mode
+npm run test:ci          # both, in sequence, with coverage
+
+npx vitest run src/services/__tests__/dataUpdateService.test.ts
+npx jest --config=jest.config.js components/beer/__tests__/BeerItem.test.tsx
 ```
+
+What is covered: unit tests for functions and database operations, integration
+tests for API and database flows, component rendering tests, and TypeScript type
+guard validation. Integration and E2E flows that need a device run on Maestro
+(`npm run test:e2e`), not on either unit runner.
 
 ## Deployment
 
