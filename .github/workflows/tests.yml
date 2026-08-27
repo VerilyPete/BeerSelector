@@ -186,7 +186,10 @@ jobs:
           # (config.test.ts, validation.errors.test.ts "should construct valid
           # URLs for all defined endpoints"). The 7 tests in that block that do
           # assert component behaviour were kept.
-          MIN_TESTS_RUN: '2492'
+          #
+          # 2492 -> 2493 on 2026-08-27: jest-expo gained 1 (Beerfinder backoff
+          # regression test), vitest unchanged at 2228.
+          MIN_TESTS_RUN: '2493'
           MAX_SKIPPED: '0'
         run: |
           python3 - <<'PY'

@@ -12,6 +12,7 @@ import { SkeletonLoader } from './beer/SkeletonLoader';
 import { BeerfinderWithContainerType } from '@/src/types/beer';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useAppContext } from '@/context/AppContext';
+import { selectBeerListViewState } from '@/src/utils/beerListViewState';
 import { useOptimisticCheckIn } from '@/hooks/useOptimisticCheckIn';
 import { OptimisticStatusBadge } from './optimistic/OptimisticStatusBadge';
 
@@ -116,10 +117,19 @@ export const TastedBrewList = () => {
     ? 'No tasted beer matches your search criteria.'
     : 'No beers in your current round yet. Start exploring and log some brews!';
 
+  // Same gate as AllBeers and Beerfinder, and the same reason for replacing it:
+  // `isLoadingBeers` drops between retry attempts while `beerError` stays null
+  // until they have all failed, so the old gate fell through to the list branch
+  // mid-backoff. `hasCompletedFirstLoad` is a latch and cannot flap.
+  const viewState = selectBeerListViewState({
+    hasCompletedFirstLoad: loading.hasCompletedFirstLoad,
+    error: errors.beerError,
+    itemCount: beers.tastedBeers.length,
+  });
+
   return (
     <View testID="tasted-brews-container" style={styles.container}>
-      {/* Show skeleton during initial load (when loading=true and no beers yet) */}
-      {loading.isLoadingBeers && beers.tastedBeers.length === 0 ? (
+      {viewState === 'loading' ? (
         <>
           {/* MP-3 Step 3b: Show search bar even during loading for better UX */}
           <View style={styles.filtersContainer}>
@@ -132,7 +142,7 @@ export const TastedBrewList = () => {
           </View>
           <SkeletonLoader count={20} />
         </>
-      ) : errors.beerError ? (
+      ) : viewState === 'error' ? (
         <View style={styles.centered}>
           <Text style={[styles.errorText, { color: colors.error }]}>{errors.beerError}</Text>
           <TouchableOpacity

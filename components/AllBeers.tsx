@@ -6,6 +6,7 @@ import { useBreakpoint } from '@/hooks/useBreakpoint';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { Colors } from '@/constants/Colors';
 import { SearchBar } from './SearchBar';
+import { selectBeerListViewState } from '@/src/utils/beerListViewState';
 import { useBeerFilters } from '@/hooks/useBeerFilters';
 import { useDataRefresh } from '@/hooks/useDataRefresh';
 import { FilterBar } from './beer/FilterBar';
@@ -140,10 +141,20 @@ export const AllBeers = () => {
     [colors, handleUntappdSearch]
   );
 
+  // `isLoadingBeers` is lowered in every attempt's `finally`, but `beerError` is
+  // only set once all retries fail, so the old `isLoadingBeers && length === 0`
+  // gate fell through to the list branch during each backoff and painted
+  // "0 beers on tap" over a load still in progress. The selector keys off
+  // "has a load ever committed" instead, which cannot flap that way.
+  const viewState = selectBeerListViewState({
+    hasCompletedFirstLoad: loading.hasCompletedFirstLoad,
+    error: errors.beerError,
+    itemCount: beers.allBeers.length,
+  });
+
   return (
     <View style={styles.container} testID="all-beers-container">
-      {/* Show skeleton during initial load (when loading=true and no beers yet) */}
-      {loading.isLoadingBeers && beers.allBeers.length === 0 ? (
+      {viewState === 'loading' ? (
         <>
           {/* MP-3 Step 3b: Show search bar even during loading for better UX */}
           <View style={styles.filtersContainer}>
@@ -156,7 +167,7 @@ export const AllBeers = () => {
           </View>
           <SkeletonLoader count={20} />
         </>
-      ) : errors.beerError ? (
+      ) : viewState === 'error' ? (
         <View style={styles.centered} testID="error-container">
           <Text style={[styles.errorText, { color: colors.error }]} testID="error-message">
             {errors.beerError}
