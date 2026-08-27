@@ -6,7 +6,7 @@
  * Maestro E2E tests since the native module requires iOS runtime.
  */
 
-import { vi, type Mock } from 'vitest';
+import { describe, it, expect, vi, type Mock } from 'vitest';
 
 import LiveActivityModule from '../index';
 

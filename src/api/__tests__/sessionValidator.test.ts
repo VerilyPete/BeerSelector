@@ -1,4 +1,4 @@
-import { vi, type Mock } from 'vitest';
+import { vi, type Mock, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { validateSession, getCurrentSession } from '../sessionValidator';
 import { getSessionData } from '../sessionManager';
 import { ApiError, SessionData } from '../../types/api';

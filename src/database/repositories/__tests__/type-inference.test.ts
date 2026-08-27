@@ -6,6 +6,7 @@
  * the repositories are already type-safe.
  */
 
+import { describe, it, expect } from 'vitest';
 import { BeerRepository } from '../BeerRepository';
 import { MyBeersRepository } from '../MyBeersRepository';
 import { RewardsRepository } from '../RewardsRepository';

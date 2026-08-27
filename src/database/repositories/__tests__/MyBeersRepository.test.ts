@@ -1,4 +1,4 @@
-import { vi, type Mock } from 'vitest';
+import { describe, it, expect, vi, type Mock } from 'vitest';
 /**
  * Comprehensive tests for MyBeersRepository
  * Tests CRUD operations for tasted beers (Beerfinder) entity using TDD approach

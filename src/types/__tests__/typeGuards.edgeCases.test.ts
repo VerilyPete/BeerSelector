@@ -12,6 +12,7 @@
  * 5. Security and Malicious Data
  */
 
+import { describe, it, expect } from 'vitest';
 import { isBeer } from '../beer';
 
 import { isSessionData } from '../api';

@@ -1,3 +1,4 @@
+import { describe, it, expect } from 'vitest';
 import { isBeer } from '../beer';
 import { Beer } from '../beer';
 

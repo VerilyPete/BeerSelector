@@ -1,4 +1,4 @@
-import { vi, type Mock } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi, type Mock } from 'vitest';
 /**
  * The same condition must classify the same way whichever entry point sees it.
  *

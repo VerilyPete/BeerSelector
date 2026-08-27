@@ -1,4 +1,4 @@
-import { vi, type Mock } from 'vitest';
+import { vi, type Mock, describe, it, expect, beforeEach } from 'vitest';
 import { autoLogin, login, logout, handleTapThatAppLogin } from '../authService';
 import { saveSessionData, clearSessionData } from '../sessionManager';
 import { getApiClient } from '../apiClientInstance';

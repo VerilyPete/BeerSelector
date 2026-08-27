@@ -1,3 +1,4 @@
+import { describe, it, expect } from 'vitest';
 import { extractABV, getGlassType, getContainerType } from '../beerGlassType';
 
 // extractABV is deprecated in favor of Worker LLM enrichment.

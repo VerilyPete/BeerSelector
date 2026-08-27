@@ -1,4 +1,13 @@
-import { vi, type Mock, type MockedFunction } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+  vi,
+  type Mock,
+  type MockedFunction,
+} from 'vitest';
 /**
  * Tests for DatabaseInitializer state machine integration in db.ts
  * Verifies HP-2 Step 2c completion

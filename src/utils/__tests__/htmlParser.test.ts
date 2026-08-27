@@ -5,6 +5,7 @@
  * queued beer data from Flying Saucer's HTML responses.
  */
 
+import { describe, it, expect } from 'vitest';
 import { parseQueuedBeersFromHtml, QueuedBeer } from '../htmlParser';
 
 describe('htmlParser - parseQueuedBeersFromHtml', () => {

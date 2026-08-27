@@ -1,4 +1,4 @@
-import { vi, type MockInstance } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi, type MockInstance } from 'vitest';
 import { logError, logWarning, logInfo, ErrorContext } from '../errorLogger';
 
 describe('Error Logger', () => {

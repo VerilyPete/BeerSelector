@@ -1,4 +1,4 @@
-import { vi, expect } from 'vitest';
+import { vi, expect, describe, it, beforeEach, afterAll } from 'vitest';
 /**
  * Environment Variable Configuration Tests (TDD - Red Phase)
  *

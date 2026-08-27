@@ -1,4 +1,4 @@
-import { vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createDebouncer } from '../liveActivityDebounce';
 
 describe('liveActivityDebounce', () => {

@@ -1,4 +1,4 @@
-import { vi, type Mock } from 'vitest';
+import { describe, it, expect, vi, type Mock } from 'vitest';
 /**
  * Comprehensive tests for RewardsRepository
  * Tests CRUD operations for Reward entity using TDD approach

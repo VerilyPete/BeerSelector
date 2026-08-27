@@ -1,4 +1,4 @@
-import { vi, type Mock } from 'vitest';
+import { vi, type Mock, describe, it, expect, beforeEach } from 'vitest';
 import { checkInBeer } from '../beerService';
 import { getSessionData } from '../sessionManager';
 import { autoLogin } from '../authService';

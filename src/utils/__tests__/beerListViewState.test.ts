@@ -16,6 +16,7 @@
  * failure — the exact outcome the selector exists to prevent.
  */
 
+import { describe, it, expect } from 'vitest';
 import { selectBeerListViewState } from '../beerListViewState';
 
 describe('selectBeerListViewState', () => {

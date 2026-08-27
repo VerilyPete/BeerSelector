@@ -1,4 +1,4 @@
-import { vi, type Mock } from 'vitest';
+import { vi, type Mock, describe, it, expect, beforeEach, afterEach } from 'vitest';
 /**
  * `fetchWithRetry` must bound every request it makes.
  *

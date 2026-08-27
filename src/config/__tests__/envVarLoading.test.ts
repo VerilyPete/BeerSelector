@@ -1,4 +1,4 @@
-import { vi } from 'vitest';
+import { vi, describe, it, expect, beforeEach, afterAll } from 'vitest';
 /**
  * Environment Variable Loading Tests (MP-6 Step 4.1)
  *

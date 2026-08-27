@@ -10,6 +10,7 @@
  * snapshot. This predicate is the decision those screens are missing.
  */
 
+import { describe, it, expect } from 'vitest';
 import { shouldReloadAfterFocusRefresh } from '../focusRefreshOutcome';
 import type { RefreshOutcome } from '../focusRefreshOutcome';
 import { ApiErrorType } from '../notificationUtils';

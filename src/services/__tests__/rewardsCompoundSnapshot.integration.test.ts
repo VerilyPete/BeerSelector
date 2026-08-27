@@ -1,4 +1,4 @@
-import { vi, type Mock } from 'vitest';
+import { describe, it, expect, beforeEach, vi, type Mock } from 'vitest';
 import { fetchAndUpdateRewards } from '../dataUpdateService';
 import * as preferences from '../../database/preferences';
 import * as connection from '../../database/connection';

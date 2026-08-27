@@ -1,4 +1,4 @@
-import { vi, type Mock } from 'vitest';
+import { describe, it, expect, vi, type Mock } from 'vitest';
 /**
  * Tests for OptimisticUpdateRepository
  * Tests CRUD operations for optimistic UI updates

@@ -1,4 +1,4 @@
-import { vi, type Mock } from 'vitest';
+import { describe, it, expect, vi, type Mock } from 'vitest';
 import { withDatabaseTransaction, DatabaseOperationResult } from '../transactions';
 import type { SQLiteDatabase } from 'expo-sqlite';
 

@@ -1,3 +1,4 @@
+import { describe, it, expect } from 'vitest';
 import { mapEnrichedBeerToAppBeer } from '../enrichmentAdapter';
 
 describe('mapEnrichedBeerToAppBeer', () => {

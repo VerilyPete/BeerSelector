@@ -1,4 +1,4 @@
-import { vi, type Mock } from 'vitest';
+import { describe, it, expect, beforeEach, vi, type Mock } from 'vitest';
 /**
  * Integration tests for data refresh flows
  * Tests the complete refresh cycle using real JSON fixtures

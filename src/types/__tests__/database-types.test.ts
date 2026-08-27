@@ -1,3 +1,4 @@
+import { describe, it, expect } from 'vitest';
 import { isPreference, isReward } from '../database';
 import { Preference, Reward } from '../database';
 

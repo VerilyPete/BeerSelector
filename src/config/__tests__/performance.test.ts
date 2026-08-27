@@ -11,6 +11,7 @@
  * 4. Strict but reasonable thresholds
  */
 
+import { describe, it, expect, afterEach, beforeAll, afterAll } from 'vitest';
 import { config, AppEnvironment } from '../config';
 
 /**

@@ -1,4 +1,13 @@
-import { vi, type Mock, type MockInstance } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+  vi,
+  type Mock,
+  type MockInstance,
+} from 'vitest';
 /**
  * Tests for database schema and table creation
  */

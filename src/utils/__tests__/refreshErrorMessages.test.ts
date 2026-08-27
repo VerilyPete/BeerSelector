@@ -18,6 +18,7 @@
  * `beerListViewState` and `focusRefreshOutcome` are pure modules.
  */
 
+import { describe, it, expect } from 'vitest';
 import { buildRefreshErrorMessages } from '../refreshErrorMessages';
 import { ApiErrorType } from '../notificationUtils';
 import type { ManualRefreshResult } from '../../services/dataUpdateService';

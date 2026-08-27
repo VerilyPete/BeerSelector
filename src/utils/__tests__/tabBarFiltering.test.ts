@@ -1,3 +1,4 @@
+import { describe, test, expect } from 'vitest';
 import { filterVisibleRoutes } from '../tabBarFiltering';
 
 type Route = { name: string; key: string };

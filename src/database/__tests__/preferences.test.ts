@@ -1,4 +1,4 @@
-import { vi, type Mock } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi, type Mock } from 'vitest';
 import { getPreference, setPreference, getAllPreferences } from '../preferences';
 import { Preference } from '../../types/database';
 import * as connection from '../connection';

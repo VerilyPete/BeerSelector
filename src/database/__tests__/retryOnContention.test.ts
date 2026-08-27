@@ -11,6 +11,7 @@
  * was put there for.
  */
 
+import { describe, it, expect } from 'vitest';
 import { DatabaseContentionError, retryOnContention } from '../errors';
 
 function noSleep() {

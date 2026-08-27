@@ -9,6 +9,7 @@
  * now takes a direction parameter.
  */
 
+import { describe, it, expect } from 'vitest';
 import { applyFilters, applySorting } from '../useBeerFilters';
 import { BeerWithContainerType } from '@/src/types/beer';
 
