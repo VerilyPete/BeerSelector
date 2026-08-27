@@ -1,21 +1,17 @@
 /* eslint-env jest */
 
-// Mock the expo-sqlite module
+// This file sets up the 17 `.test.tsx` suites only. Every `.test.ts` runs on
+// vitest, which has its own setup in `src/__vitest__/setup.ts` and its own
+// stubs — nothing here is shared with it. Adding a mock here does not affect
+// the logic suites, and vice versa.
+
+// Mock the expo-sqlite module.
+// Only the async API is mocked: the codebase is on expo-sqlite 16.x and uses
+// `withTransactionAsync` / `getAllAsync` / `runAsync`. The legacy
+// `transaction()` + `executeSql` callback API and `openDatabase()` were
+// dropped after a probe confirmed no suite reaches them.
 jest.mock('expo-sqlite', () => {
   const mockDatabase = {
-    transaction: jest.fn().mockImplementation(callback => {
-      const mockTransaction = {
-        executeSql: jest.fn().mockImplementation((query, params, successCallback) => {
-          if (successCallback) {
-            successCallback(mockTransaction, { rows: { _array: [], length: 0 } });
-          }
-          return Promise.resolve({ rows: { _array: [], length: 0 } });
-        }),
-      };
-      callback(mockTransaction);
-      return Promise.resolve();
-    }),
-    exec: jest.fn().mockResolvedValue([{ rows: { _array: [] } }]),
     closeAsync: jest.fn().mockResolvedValue(),
     deleteAsync: jest.fn().mockResolvedValue(),
     execAsync: jest.fn().mockResolvedValue([{ rows: { _array: [] } }]),
@@ -27,12 +23,13 @@ jest.mock('expo-sqlite', () => {
   };
 
   return {
-    openDatabase: jest.fn().mockReturnValue(mockDatabase),
     openDatabaseAsync: jest.fn().mockResolvedValue(mockDatabase),
   };
 });
 
-// Mock the expo-secure-store module
+// Mock the expo-secure-store module.
+// Stateful on purpose — a real object, not bare `jest.fn()`s — so a
+// setItemAsync/getItemAsync round trip behaves like the real store.
 jest.mock('expo-secure-store', () => {
   const secureStore = {};
   return {
@@ -83,8 +80,19 @@ jest.mock('react-native-safe-area-context', () => {
   };
 });
 
-// Mock the LiveActivity module
-jest.mock('@/modules/live-activity', () => ({
+// Mock the LiveActivity module.
+// Registered under both specifiers because both are live: components import
+// `@/modules/live-activity`, while `src/services/liveActivityService.ts`
+// imports bare `live-activity`. The bare one is not redundant — the linked
+// package in node_modules is native-only and ships no JS entry point, so
+// without this mock any suite reaching that service fails to resolve it.
+// A probe confirmed two suites reach it.
+//
+// The two factories must stay inline: babel-plugin-jest-hoist rejects
+// `jest.mock(name, someConst)` with "The second argument of `jest.mock` must
+// be an inline function". They delegate to a shared builder instead, whose
+// `mock` prefix is what lets the hoisted factory reference it at all.
+const mockLiveActivityModule = () => ({
   __esModule: true,
   default: {
     areActivitiesEnabled: jest.fn().mockResolvedValue(true),
@@ -97,27 +105,13 @@ jest.mock('@/modules/live-activity', () => ({
     endActivitiesOlderThan: jest.fn().mockResolvedValue(0),
     endAllActivitiesSync: jest.fn().mockReturnValue(true),
   },
-}));
+});
 
-// Also mock the path without @ alias
-jest.mock('live-activity', () => ({
-  __esModule: true,
-  default: {
-    areActivitiesEnabled: jest.fn().mockResolvedValue(true),
-    startActivity: jest.fn().mockResolvedValue('mock-activity-id'),
-    updateActivity: jest.fn().mockResolvedValue(undefined),
-    endActivity: jest.fn().mockResolvedValue(undefined),
-    endAllActivities: jest.fn().mockResolvedValue(undefined),
-    restartActivity: jest.fn().mockResolvedValue('mock-activity-id'),
-    getAllActivityIds: jest.fn().mockResolvedValue([]),
-    endActivitiesOlderThan: jest.fn().mockResolvedValue(0),
-    endAllActivitiesSync: jest.fn().mockReturnValue(true),
-  },
-}));
+jest.mock('@/modules/live-activity', () => mockLiveActivityModule());
+jest.mock('live-activity', () => mockLiveActivityModule());
 
-// No expo-network mock needed as we're not using it anymore
-
-// Mock fetch
+// Mock fetch. This is a safety net as much as a convenience: without it a
+// component suite that reaches a data path would issue a real request.
 global.fetch = jest.fn().mockImplementation(() =>
   Promise.resolve({
     ok: true,
@@ -143,9 +137,6 @@ jest.useFakeTimers();
 // Polyfill setImmediate for React Native animations
 global.setImmediate = global.setImmediate || ((fn, ...args) => global.setTimeout(fn, 0, ...args));
 global.clearImmediate = global.clearImmediate || (id => global.clearTimeout(id));
-
-// Note: ScrollView and FlatList deep import mocks removed
-// React Native 0.79+ deprecates deep imports - jest-expo preset handles these properly
 
 // Mock expo-haptics
 jest.mock('expo-haptics', () => ({
