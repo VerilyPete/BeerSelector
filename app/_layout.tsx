@@ -10,6 +10,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { initializeBeerDatabase, getPreference, setPreference } from '@/src/database/db';
+import { migrateAuthCookiesToSecureStore } from '@/src/services/authCookieMigration';
 import { manualRefreshAllData, fetchAndUpdateRewards } from '@/src/services/dataUpdateService';
 
 // Track if database initialization has been started to prevent multiple calls
@@ -66,6 +67,10 @@ export default function RootLayout() {
             await initializeBeerDatabase();
             dbInitialized = true;
             console.log('Database initialized successfully');
+
+            // Move any legacy plaintext auth cookies into SecureStore early
+            // in startup, so migration does not depend on visiting Settings.
+            await migrateAuthCookiesToSecureStore();
 
             // Check if API URLs are set
             const allBeersApiUrl = await getPreference('all_beers_api_url');

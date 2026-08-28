@@ -1,4 +1,4 @@
-import { saveSessionData, clearSessionData } from './sessionManager';
+import { saveSessionData, clearSessionData, clearAuthCookies } from './sessionManager';
 import { getApiClient } from './apiClientInstance';
 import { getPreference, setPreference, refreshAllDataFromAPI } from '../database/db';
 import { SessionData, ApiError, ApiResponse, LoginResult, isSessionData } from '../types/api';
@@ -278,6 +278,7 @@ export async function logout(): Promise<LoginResult> {
     const apiClient = getApiClient();
     const response = await apiClient.post('/logout.php', {});
     await clearSessionData();
+    await clearAuthCookies();
     
     // Clear visitor mode flag on logout
     await setPreference('is_visitor_mode', 'false', 'Flag indicating whether the user is in visitor mode');

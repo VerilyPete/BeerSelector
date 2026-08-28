@@ -1,5 +1,5 @@
 import { autoLogin, login, logout, handleTapThatAppLogin } from '../authService';
-import { saveSessionData, clearSessionData } from '../sessionManager';
+import { saveSessionData, clearSessionData, clearAuthCookies } from '../sessionManager';
 import { getApiClient } from '../apiClientInstance';
 import { ApiError, SessionData } from '../../types/api';
 
@@ -7,6 +7,7 @@ import { ApiError, SessionData } from '../../types/api';
 jest.mock('../sessionManager', () => ({
   saveSessionData: jest.fn().mockResolvedValue(undefined),
   clearSessionData: jest.fn().mockResolvedValue(undefined),
+  clearAuthCookies: jest.fn().mockResolvedValue(undefined),
 }));
 
 jest.mock('../apiClientInstance', () => ({
@@ -212,6 +213,9 @@ describe('authService', () => {
       
       // Check that session data was cleared
       expect(clearSessionData).toHaveBeenCalled();
+
+      // Check that captured auth cookies were cleared too
+      expect(clearAuthCookies).toHaveBeenCalled();
       
       // Check that the result is correct
       expect(result).toEqual({

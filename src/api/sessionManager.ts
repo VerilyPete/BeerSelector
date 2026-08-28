@@ -4,16 +4,43 @@ import { SessionData, isSessionData } from '../types/api';
 // Session storage key
 const SESSION_STORAGE_KEY = 'beerknurd_session';
 
-// Auth cookies storage key (SecureStore — never plaintext SQLite)
+// Auth cookies storage keys (SecureStore — never plaintext SQLite).
+// expo-secure-store caps a single value at 2048 bytes, so the cookie JSON is
+// base64-encoded (byte-safe splitting, no multibyte corruption) and written
+// as numbered chunks. The meta key holds the chunk count and is written last,
+// acting as the commit marker: an interrupted save is never readable.
 const AUTH_COOKIES_STORAGE_KEY = 'beerknurd_auth_cookies';
+const AUTH_COOKIES_META_KEY = 'beerknurd_auth_cookies_meta';
+const AUTH_COOKIES_CHUNK_CHARS = 1500;
+
+// UTF-8-safe base64 (encodeURIComponent→binary→btoa). Avoids TextEncoder,
+// which is not available in every JS environment this code runs in.
+const toBase64 = (value: string): string => btoa(unescape(encodeURIComponent(value)));
+
+const fromBase64 = (encoded: string): string =>
+  decodeURIComponent(escape(atob(encoded)));
+
+const chunkString = (value: string, size: number): string[] => {
+  const chunks: string[] = [];
+  for (let i = 0; i < value.length; i += size) {
+    chunks.push(value.substring(i, i + size));
+  }
+  return chunks;
+};
 
 /**
- * Saves captured authentication cookies to secure storage
+ * Saves captured authentication cookies to secure storage.
+ * Large payloads are base64-encoded and chunked to stay under
+ * SecureStore's 2048-byte per-value limit.
  * @param cookiesJson JSON string of cookie name-value pairs
  */
 export const saveAuthCookies = async (cookiesJson: string): Promise<void> => {
   try {
-    await SecureStore.setItemAsync(AUTH_COOKIES_STORAGE_KEY, cookiesJson);
+    const chunks = chunkString(toBase64(cookiesJson), AUTH_COOKIES_CHUNK_CHARS);
+    for (let i = 0; i < chunks.length; i++) {
+      await SecureStore.setItemAsync(`${AUTH_COOKIES_STORAGE_KEY}:${i}`, chunks[i]);
+    }
+    await SecureStore.setItemAsync(AUTH_COOKIES_META_KEY, String(chunks.length));
   } catch (error) {
     console.error('Error saving auth cookies:', error);
     throw error;
@@ -26,7 +53,24 @@ export const saveAuthCookies = async (cookiesJson: string): Promise<void> => {
  */
 export const getAuthCookies = async (): Promise<string | null> => {
   try {
-    return await SecureStore.getItemAsync(AUTH_COOKIES_STORAGE_KEY);
+    const meta = await SecureStore.getItemAsync(AUTH_COOKIES_META_KEY);
+    if (!meta) {
+      return null;
+    }
+    const chunkCount = parseInt(meta, 10);
+    if (!Number.isFinite(chunkCount) || chunkCount < 1) {
+      return null;
+    }
+    const chunks: string[] = [];
+    for (let i = 0; i < chunkCount; i++) {
+      const chunk = await SecureStore.getItemAsync(`${AUTH_COOKIES_STORAGE_KEY}:${i}`);
+      if (!chunk) {
+        // Partial write — treat as absent rather than returning corrupt data.
+        return null;
+      }
+      chunks.push(chunk);
+    }
+    return fromBase64(chunks.join(''));
   } catch (error) {
     console.error('Error getting auth cookies:', error);
     return null;
@@ -38,6 +82,13 @@ export const getAuthCookies = async (): Promise<string | null> => {
  */
 export const clearAuthCookies = async (): Promise<void> => {
   try {
+    const meta = await SecureStore.getItemAsync(AUTH_COOKIES_META_KEY);
+    const chunkCount = meta ? parseInt(meta, 10) || 0 : 0;
+    for (let i = 0; i < chunkCount; i++) {
+      await SecureStore.deleteItemAsync(`${AUTH_COOKIES_STORAGE_KEY}:${i}`);
+    }
+    await SecureStore.deleteItemAsync(AUTH_COOKIES_META_KEY);
+    // Also remove the single-value format used by the first draft of this store.
     await SecureStore.deleteItemAsync(AUTH_COOKIES_STORAGE_KEY);
   } catch (error) {
     console.error('Error clearing auth cookies:', error);

@@ -12,7 +12,6 @@ import { ThemedView } from '@/components/ThemedView';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { refreshAllDataFromAPI, getAllPreferences, getPreference, setPreference, setUntappdCookie, isUntappdLoggedIn, initDatabase, clearUntappdCookies } from '@/src/database/db';
-import { migrateAuthCookiesToSecureStore } from '@/src/services/authCookieMigration';
 import { saveAuthCookies } from '@/src/api/sessionManager';
 import { manualRefreshAllData } from '@/src/services/dataUpdateService';
 import { LoadingIndicator } from '@/components/LoadingIndicator';
@@ -20,14 +19,6 @@ import Constants from 'expo-constants';
 import { createMockSession } from '@/src/api/mockSession';
 import { getUserFriendlyErrorMessage } from '@/src/utils/notificationUtils';
 import { handleVisitorLogin } from '@/src/api/authService';
-
-// Define a Preference type for typechecking
-interface Preference {
-  key: string;
-  value: string;
-  description: string;
-  editable?: boolean;
-}
 
 export default function SettingsScreen() {
   const backgroundColor = useThemeColor({}, 'background');
@@ -42,7 +33,6 @@ export default function SettingsScreen() {
 
   // Removed the filter preferences and notifications state variables
   const [refreshing, setRefreshing] = useState(false);
-  const [preferences, setPreferences] = useState<Preference[]>([]);
   const [loading, setLoading] = useState(true);
   const [loginLoading, setLoginLoading] = useState(false);
   const [untappdLoginLoading, setUntappdLoginLoading] = useState(false);
@@ -90,11 +80,7 @@ export default function SettingsScreen() {
   const loadPreferences = async () => {
     try {
       setLoading(true);
-      // Move any legacy plaintext auth cookies into SecureStore before the
-      // preferences are read for display.
-      await migrateAuthCookiesToSecureStore();
       const prefs = await getAllPreferences();
-      setPreferences(prefs);
 
       // Check if API URLs are set
       const allBeersApiUrl = prefs.find(p => p.key === 'all_beers_api_url')?.value;
@@ -717,23 +703,6 @@ export default function SettingsScreen() {
         [{ text: 'OK' }]
       );
     }
-  };
-
-  // Render a preference item - simplified to just display.
-  // Values of sensitive-looking keys are masked even if a sensitive value
-  // ever ends up in the preferences table again.
-  const renderPreferenceItem = (preference: Preference) => {
-    const isSensitive = /cookie|token|secret|password|session/i.test(preference.key);
-    const displayValue = isSensitive ? '•••••• (stored securely)' : preference.value;
-    return (
-      <View key={preference.key} style={styles.preferenceItem}>
-        <ThemedText style={styles.preferenceKey}>{preference.key}</ThemedText>
-        <ThemedText style={styles.preferenceDescription}>{preference.description}</ThemedText>
-        <ThemedText style={styles.preferenceValue} numberOfLines={2} ellipsizeMode="middle">
-          {displayValue}
-        </ThemedText>
-      </View>
-    );
   };
 
   return (
