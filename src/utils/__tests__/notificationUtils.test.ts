@@ -1,3 +1,4 @@
+import { describe, it, expect, vi } from 'vitest';
 /**
  * Tests for notificationUtils
  *
@@ -20,9 +21,9 @@ import type { ErrorResponse } from '../notificationUtils';
 import { DatabaseContentionError } from '../../database/errors';
 import { HttpError, TransportAbortedError, UnreadableBodyError } from '../../api/fetchOutcome';
 
-jest.mock('react-native', () => ({
+vi.mock('react-native', () => ({
   Alert: {
-    alert: jest.fn(),
+    alert: vi.fn(),
   },
 }));
 
@@ -41,7 +42,7 @@ describe('notificationUtils', () => {
     });
 
     it('should pass onOk callback to the OK button', () => {
-      const onOk = jest.fn();
+      const onOk = vi.fn();
 
       showErrorAlert('Error', 'Something went wrong', onOk);
 
@@ -61,7 +62,7 @@ describe('notificationUtils', () => {
     });
 
     it('should pass onOk callback to the OK button', () => {
-      const onOk = jest.fn();
+      const onOk = vi.fn();
 
       showSuccessAlert('Success', 'Beer checked in', onOk);
 
@@ -81,7 +82,7 @@ describe('notificationUtils', () => {
     });
 
     it('should pass onOk callback to the OK button', () => {
-      const onOk = jest.fn();
+      const onOk = vi.fn();
 
       showInfoAlert('Info', 'Note this', onOk);
 

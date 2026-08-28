@@ -430,6 +430,31 @@ describe('Beerfinder Loading States', () => {
   });
 
   describe('Error State', () => {
+    it('keeps the skeleton up through a retry backoff instead of flashing an empty list', async () => {
+      // Beerfinder has no loader of its own — unlike AllBeers, it depends
+      // entirely on AppProvider's retry chain. That chain lowers
+      // `isLoadingBeers` in each attempt's `finally` but only sets `beerError`
+      // once all 4 attempts have failed, so between attempt 1 rejecting and the
+      // 1s retry firing the flag is down and the error is still null. The old
+      // `isLoadingBeers && length === 0` gate fell through and painted
+      // "0 to discover" over a load that was still going.
+      (beerRepository.getAll as jest.Mock).mockRejectedValue(
+        new Error('Database connection failed')
+      );
+
+      const { queryByTestId, queryByText } = renderBeerfinder();
+
+      // Let attempt 1 reject and its finally run. Do NOT advance the 1s timer:
+      // that starts attempt 2 and re-raises the flag, hiding the window.
+      await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      expect(queryByTestId('skeleton-loader')).not.toBeNull();
+      expect(queryByText('0 to discover')).toBeNull();
+    });
+
     it('should hide skeleton and show error message on load failure', async () => {
       (beerRepository.getAll as jest.Mock).mockRejectedValue(new Error('Database error'));
 

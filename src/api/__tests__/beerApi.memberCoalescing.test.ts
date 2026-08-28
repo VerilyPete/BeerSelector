@@ -1,3 +1,4 @@
+import { vi, type Mock, describe, it, expect, beforeEach } from 'vitest';
 /**
  * My-beers and rewards are two halves of ONE body, and cost one request.
  *
@@ -31,19 +32,19 @@ import * as preferences from '../../database/preferences';
 import { ApiErrorType } from '../../utils/notificationUtils';
 import type { FetchOutcome, UnconditionalSource } from '../fetchOutcome';
 
-jest.mock('../../database/preferences');
+vi.mock('../../database/preferences');
 
-global.fetch = jest.fn();
+global.fetch = vi.fn();
 
 /**
  * Drive a call to completion.
  *
- * `jest.setup.js` calls `jest.useFakeTimers()` for every suite, so the backoff
+ * `src/__vitest__/setup.ts` calls `vi.useFakeTimers()` for every suite, so the backoff
  * `setTimeout` inside `fetchWithRetry` never fires on its own and the promise
  * simply never settles.
  */
 const settle = async <T>(pending: Promise<T>): Promise<T> => {
-  await jest.advanceTimersByTimeAsync(60_000);
+  await vi.advanceTimersByTimeAsync(60_000);
   return pending;
 };
 
@@ -65,7 +66,7 @@ const MEMBER_BODY = [
 ];
 
 const respondWith = (body: unknown): void => {
-  (global.fetch as jest.Mock).mockResolvedValue({
+  (global.fetch as Mock).mockResolvedValue({
     ok: true,
     status: 200,
     statusText: 'OK',
@@ -74,9 +75,9 @@ const respondWith = (body: unknown): void => {
 };
 
 describe('fetchMemberDataFromAPI', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    (preferences.getPreference as jest.Mock).mockImplementation(memberPrefs);
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    (preferences.getPreference as Mock).mockImplementation(memberPrefs);
   });
 
   it('answers both sources from a single request', async () => {
@@ -98,11 +99,11 @@ describe('fetchMemberDataFromAPI', () => {
 
     await settle(fetchMyBeersFromAPI());
     await settle(fetchRewardsFromAPI());
-    const separately = (global.fetch as jest.Mock).mock.calls.length;
+    const separately = (global.fetch as Mock).mock.calls.length;
 
-    (global.fetch as jest.Mock).mockClear();
+    (global.fetch as Mock).mockClear();
     await settle(fetchMemberDataFromAPI());
-    const coalesced = (global.fetch as jest.Mock).mock.calls.length;
+    const coalesced = (global.fetch as Mock).mock.calls.length;
 
     expect(separately).toBe(2);
     expect(coalesced).toBe(1);
@@ -128,7 +129,7 @@ describe('fetchMemberDataFromAPI', () => {
     // Phase 2's cost, halved on this path. Two separate fetchers against a body
     // that never parses spend two attempts EACH — four requests to one URL to
     // learn one thing twice.
-    (global.fetch as jest.Mock).mockResolvedValue({
+    (global.fetch as Mock).mockResolvedValue({
       ok: true,
       status: 200,
       statusText: 'OK',
@@ -144,7 +145,7 @@ describe('fetchMemberDataFromAPI', () => {
 
   it('gives both halves the same failure when the request fails', async () => {
     // SHARED FATE, pinned. One request, one verdict.
-    (global.fetch as jest.Mock).mockResolvedValue({
+    (global.fetch as Mock).mockResolvedValue({
       ok: false,
       status: 500,
       statusText: 'Internal Server Error',
@@ -167,7 +168,7 @@ describe('fetchMemberDataFromAPI', () => {
     // service's per-source catch, so anything escaping it takes out the whole
     // refresh instead of the two sources it concerns — which is what happened
     // when an earlier draft of this change hoisted the resolve out of the try.
-    (preferences.getPreference as jest.Mock).mockRejectedValue(new Error('database is locked'));
+    (preferences.getPreference as Mock).mockRejectedValue(new Error('database is locked'));
 
     const member = await settle(fetchMemberDataFromAPI());
 
@@ -191,7 +192,7 @@ describe('fetchMemberDataFromAPI', () => {
     async (_l, call) => {
       // The same contract on the two single-source fetchers, which had it before
       // this change and must keep it.
-      (preferences.getPreference as jest.Mock).mockRejectedValue(new Error('database is locked'));
+      (preferences.getPreference as Mock).mockRejectedValue(new Error('database is locked'));
 
       await expect(settle(call())).resolves.toMatchObject({ status: 'failed' });
     }
@@ -215,7 +216,7 @@ describe('fetchMemberDataFromAPI', () => {
     // "do not ask" cannot now be answered differently for the two sources — the
     // divergence that let rewards keep sending a none:// placeholder to fetch()
     // after my-beers had been taught not to.
-    (preferences.getPreference as jest.Mock).mockImplementation(prefs);
+    (preferences.getPreference as Mock).mockImplementation(prefs);
 
     const member = await settle(fetchMemberDataFromAPI());
 
@@ -238,9 +239,9 @@ describe('fetchMemberDataFromAPI', () => {
  * which is the only place it can actually be shown.
  */
 describe('extracting the real mybeers.json fixture', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    (preferences.getPreference as jest.Mock).mockImplementation(memberPrefs);
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    (preferences.getPreference as Mock).mockImplementation(memberPrefs);
   });
 
   // The COMMITTED fixture. This read `process.cwd() + '/mybeers.json'`, which is
@@ -249,10 +250,11 @@ describe('extracting the real mybeers.json fixture', () => {
   // losing a whole suite to ENOENT for exactly this), and `process.cwd()`
   // depends on where jest was invoked from rather than on `rootDir`.
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const fixture = (): unknown => require('../../services/__tests__/fixtures/mybeers.json');
+  const fixture = async (): Promise<unknown> =>
+    (await import('../../services/__tests__/fixtures/mybeers.json')).default;
 
   it('returns every tasted row the fixture carries', async () => {
-    const body = fixture() as [unknown, { tasted_brew_current_round: unknown[] }];
+    const body = (await fixture()) as [unknown, { tasted_brew_current_round: unknown[] }];
     respondWith(body);
 
     const outcome = await settle(fetchMyBeersFromAPI());
@@ -274,7 +276,7 @@ describe('extracting the real mybeers.json fixture', () => {
   it('reads the rewards half of the same fixture independently', async () => {
     // The fixture is a member body, so it exercises the coalesced path on real
     // data: whatever `data[2]` holds, my-beers is unaffected by it.
-    respondWith(fixture());
+    respondWith(await fixture());
 
     const member = await settle(fetchMemberDataFromAPI());
 

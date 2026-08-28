@@ -1,3 +1,4 @@
+import { describe, it, expect, beforeEach, afterEach, vi, type Mock } from 'vitest';
 import { fetchAndUpdateAllBeers, fetchAndUpdateMyBeers } from '../dataUpdateService';
 import { getPreference, setPreference } from '../../database/preferences';
 import { beerRepository } from '../../database/repositories/BeerRepository';
@@ -16,59 +17,59 @@ import {
 import { ApiErrorType } from '../../utils/notificationUtils';
 
 // Mock dependencies
-jest.mock('../../database/preferences', () => ({
-  getPreference: jest.fn(),
+vi.mock('../../database/preferences', () => ({
+  getPreference: vi.fn(),
 
-  setPreference: jest.fn(),
+  setPreference: vi.fn(),
 }));
 
-jest.mock('../../database/repositories/BeerRepository', () => ({
+vi.mock('../../database/repositories/BeerRepository', () => ({
   beerRepository: {
-    count: jest.fn(async () => 12),
-    insertMany: jest.fn(),
+    count: vi.fn(async () => 12),
+    insertMany: vi.fn(),
     // Plan 04 Phase 2 / 05 Phase 5.6: fetchAndUpdateAllBeers now takes its own
     // lock around the rows AND the ETag they imply, so it calls the unlocked
     // variant. A mock without it makes the whole path fail as an undefined call.
-    insertManyUnsafe: jest.fn(),
+    insertManyUnsafe: vi.fn(),
   },
 }));
 
-jest.mock('../../database/repositories/MyBeersRepository', () => ({
+vi.mock('../../database/repositories/MyBeersRepository', () => ({
   myBeersRepository: {
-    insertMany: jest.fn(),
+    insertMany: vi.fn(),
     // `fetchAndUpdateMyBeers` writes through `writeMyBeers` now, which uses the
     // `*Unsafe` pair inside one explicit lock hold.
-    insertManyUnsafe: jest.fn(),
-    replaceAllWithEmpty: jest.fn(),
-    replaceAllWithEmptyUnsafe: jest.fn(),
-    updateEnrichmentData: jest.fn().mockResolvedValue(0),
+    insertManyUnsafe: vi.fn(),
+    replaceAllWithEmpty: vi.fn(),
+    replaceAllWithEmptyUnsafe: vi.fn(),
+    updateEnrichmentData: vi.fn().mockResolvedValue(0),
   },
 }));
 
 // Mock beerApi to avoid fetchWithRetry setTimeout retries in tests
-jest.mock('../../api/beerApi', () =>
+vi.mock('../../api/beerApi', async () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  require('../../api/__tests__/helpers/beerApiMock').beerApiMockFactory()
+  (await import('../../api/__tests__/helpers/beerApiMock')).beerApiMockFactory()
 );
 
 // Mock enrichment service
-jest.mock('../enrichmentService', () => ({
-  fetchBeersFromProxy: jest.fn(),
-  fetchEnrichmentBatchWithMissing: jest.fn().mockResolvedValue({ enrichments: {}, missing: [] }),
-  syncBeersToWorker: jest.fn().mockResolvedValue({ synced: 0, failed: 0, queued_for_cleanup: 0 }),
-  mergeEnrichmentData: jest.fn().mockImplementation(beers => beers),
-  recordFallback: jest.fn(),
-  pollForEnrichmentUpdates: jest.fn().mockResolvedValue({}),
+vi.mock('../enrichmentService', () => ({
+  fetchBeersFromProxy: vi.fn(),
+  fetchEnrichmentBatchWithMissing: vi.fn().mockResolvedValue({ enrichments: {}, missing: [] }),
+  syncBeersToWorker: vi.fn().mockResolvedValue({ synced: 0, failed: 0, queued_for_cleanup: 0 }),
+  mergeEnrichmentData: vi.fn().mockImplementation(beers => beers),
+  recordFallback: vi.fn(),
+  pollForEnrichmentUpdates: vi.fn().mockResolvedValue({}),
 }));
 
 // Mock error logger
-jest.mock('../../utils/errorLogger', () => ({
-  logError: jest.fn(),
-  logWarning: jest.fn(),
+vi.mock('../../utils/errorLogger', () => ({
+  logError: vi.fn(),
+  logWarning: vi.fn(),
 }));
 
 // Mock fetch for functions that still use raw fetch (fetchAndUpdateMyBeers)
-global.fetch = jest.fn();
+global.fetch = vi.fn();
 
 // Mock console methods to keep test output clean
 const originalConsoleLog = console.log;
@@ -76,30 +77,30 @@ const originalConsoleError = console.error;
 
 describe('dataUpdateService integration tests', () => {
   // Setup and teardown
-  beforeEach(() => {
-    jest.clearAllMocks();
-    console.log = jest.fn();
-    console.error = jest.fn();
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    console.log = vi.fn();
+    console.error = vi.fn();
 
     // Set test environment with config
     config.setCustomApiUrl('https://example.com');
 
     // Mock preferences - timestamps return null (no recent check), URLs for myBeers direct fetch
-    (getPreference as jest.Mock).mockImplementation(async (key: string) => {
+    (getPreference as Mock).mockImplementation(async (key: string) => {
       if (key === 'all_beers_api_url') return `${config.api.baseUrl}/api/all-beers`;
       if (key === 'my_beers_api_url') return `${config.api.baseUrl}/api/my-beers`;
       return null;
     });
 
     // Default mock for setPreference
-    (setPreference as jest.Mock).mockResolvedValue(undefined);
+    (setPreference as Mock).mockResolvedValue(undefined);
 
     // Default mock for repository insertMany methods
-    (beerRepository.insertManyUnsafe as jest.Mock).mockResolvedValue(undefined);
-    (myBeersRepository.insertMany as jest.Mock).mockResolvedValue(undefined);
+    (beerRepository.insertManyUnsafe as Mock).mockResolvedValue(undefined);
+    (myBeersRepository.insertMany as Mock).mockResolvedValue(undefined);
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     console.log = originalConsoleLog;
     console.error = originalConsoleError;
   });
@@ -121,7 +122,7 @@ describe('dataUpdateService integration tests', () => {
       const rawBeers = allBeersData[1].brewInStock;
 
       // Mock fetchBeersFromAPI to return the raw beers (already extracted from API response)
-      (fetchBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(rawBeers));
+      (fetchBeersFromAPI as Mock).mockResolvedValue(fetchedRows(rawBeers));
 
       // Call the function
       const result = await fetchAndUpdateAllBeers();
@@ -138,7 +139,7 @@ describe('dataUpdateService integration tests', () => {
       expect(beerRepository.insertManyUnsafe).toHaveBeenCalledTimes(1);
 
       // Verify that the data passed to beerRepository.insertMany is valid
-      const beersPassedToPopulate = (beerRepository.insertManyUnsafe as jest.Mock).mock.calls[0][0];
+      const beersPassedToPopulate = (beerRepository.insertManyUnsafe as Mock).mock.calls[0][0];
       expect(Array.isArray(beersPassedToPopulate)).toBe(true);
 
       // Verify that valid beers were passed (service filters out beers without required fields)
@@ -182,7 +183,7 @@ describe('dataUpdateService integration tests', () => {
 
     it('should handle missing API URL by returning empty from fetchBeersFromAPI', async () => {
       // fetchBeersFromAPI returns [] when API URL is not configured
-      (fetchBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows([]));
+      (fetchBeersFromAPI as Mock).mockResolvedValue(fetchedRows([]));
 
       // Call the function
       const result = await fetchAndUpdateAllBeers();
@@ -197,9 +198,7 @@ describe('dataUpdateService integration tests', () => {
 
     it('should handle fetchBeersFromAPI throwing an error', async () => {
       // Mock fetchBeersFromAPI to throw (simulates network/server errors)
-      (fetchBeersFromAPI as jest.Mock).mockRejectedValue(
-        new Error('Failed to fetch: 404 Not Found')
-      );
+      (fetchBeersFromAPI as Mock).mockRejectedValue(new Error('Failed to fetch: 404 Not Found'));
 
       // Call the function
       const result = await fetchAndUpdateAllBeers();
@@ -217,7 +216,7 @@ describe('dataUpdateService integration tests', () => {
 
     it('should handle invalid data format from fetchBeersFromAPI', async () => {
       // fetchBeersFromAPI returns [] when response format is invalid
-      (fetchBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows([]));
+      (fetchBeersFromAPI as Mock).mockResolvedValue(fetchedRows([]));
 
       // Call the function
       const result = await fetchAndUpdateAllBeers();
@@ -235,7 +234,7 @@ describe('dataUpdateService integration tests', () => {
 
     it('should handle network error from fetchBeersFromAPI', async () => {
       // Mock fetchBeersFromAPI to throw a network error
-      (fetchBeersFromAPI as jest.Mock).mockRejectedValue(new Error('Network error'));
+      (fetchBeersFromAPI as Mock).mockRejectedValue(new Error('Network error'));
 
       // Call the function
       const result = await fetchAndUpdateAllBeers();
@@ -268,7 +267,7 @@ describe('dataUpdateService integration tests', () => {
     it('writes every row of the real mybeers.json fixture, with container types added', async () => {
       const myBeersData = loadTestData('mybeers.json');
       const fixtureRows = myBeersData[1].tasted_brew_current_round;
-      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(fixtureRows));
+      (fetchMyBeersFromAPI as Mock).mockResolvedValue(fetchedRows(fixtureRows));
 
       const result = await fetchAndUpdateMyBeers();
 
@@ -280,7 +279,7 @@ describe('dataUpdateService integration tests', () => {
       // covering the rows and both timestamps, rather than the repository taking
       // its own lock for the rows alone.
       expect(myBeersRepository.insertManyUnsafe).toHaveBeenCalledTimes(1);
-      const written = (myBeersRepository.insertManyUnsafe as jest.Mock).mock.calls[0][0];
+      const written = (myBeersRepository.insertManyUnsafe as Mock).mock.calls[0][0];
       expect(Array.isArray(written)).toBe(true);
       expect(written.length).toBe(fixtureRows.length);
 
@@ -298,7 +297,7 @@ describe('dataUpdateService integration tests', () => {
     });
 
     it('handles a missing API URL without writing or stamping', async () => {
-      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(
+      (fetchMyBeersFromAPI as Mock).mockResolvedValue(
         unavailable('not-configured', 'my_beers_api_url is not set')
       );
 
@@ -324,7 +323,7 @@ describe('dataUpdateService integration tests', () => {
       // prose into the refresh alert. They are one shape now: not a
       // `confirmed-empty`, so nothing is written and nothing is stamped —
       // stamping after a non-answer is what hid a wiped list for 12 hours.
-      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(outcome());
+      (fetchMyBeersFromAPI as Mock).mockResolvedValue(outcome());
 
       const result = await fetchAndUpdateMyBeers();
 
@@ -339,7 +338,7 @@ describe('dataUpdateService integration tests', () => {
     it('clears the table for a genuinely empty round (new user or rollover at 200)', async () => {
       // The ONE case where emptying is correct, and the reason every case above
       // must be distinguishable from it.
-      (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(confirmedEmpty());
+      (fetchMyBeersFromAPI as Mock).mockResolvedValue(confirmedEmpty());
 
       const result = await fetchAndUpdateMyBeers();
 
@@ -359,7 +358,7 @@ describe('dataUpdateService integration tests', () => {
         config.setEnvironment('production');
 
         // fetchBeersFromAPI is mocked - it handles URL resolution internally
-        (fetchBeersFromAPI as jest.Mock).mockResolvedValue(
+        (fetchBeersFromAPI as Mock).mockResolvedValue(
           fetchedRows([{ id: '1', brew_name: 'Test' }])
         );
 
@@ -372,7 +371,7 @@ describe('dataUpdateService integration tests', () => {
       it('should use custom config when set', async () => {
         config.setCustomApiUrl('http://localhost:3000');
 
-        (fetchBeersFromAPI as jest.Mock).mockResolvedValue(
+        (fetchBeersFromAPI as Mock).mockResolvedValue(
           fetchedRows([{ id: '1', brew_name: 'Test' }])
         );
 
@@ -399,7 +398,7 @@ describe('dataUpdateService integration tests', () => {
 
     describe('Multiple Concurrent Requests', () => {
       it('should handle multiple all beers fetch requests', async () => {
-        (fetchBeersFromAPI as jest.Mock).mockResolvedValue(
+        (fetchBeersFromAPI as Mock).mockResolvedValue(
           fetchedRows([{ id: '1', brew_name: 'Test' }])
         );
 
@@ -415,9 +414,9 @@ describe('dataUpdateService integration tests', () => {
       });
 
       it('should handle multiple my beers fetch requests', async () => {
-        (global.fetch as jest.Mock).mockResolvedValue({
+        (global.fetch as Mock).mockResolvedValue({
           ok: true,
-          json: jest
+          json: vi
             .fn()
             .mockResolvedValue([
               {},
@@ -460,7 +459,7 @@ describe('dataUpdateService integration tests', () => {
         // Should not have double slashes
         expect(constructedUrl).not.toContain('//api');
 
-        (fetchBeersFromAPI as jest.Mock).mockResolvedValue(
+        (fetchBeersFromAPI as Mock).mockResolvedValue(
           fetchedRows([{ id: '1', brew_name: 'Test' }])
         );
 
@@ -475,7 +474,7 @@ describe('dataUpdateService integration tests', () => {
         expect(config.api.baseUrl).toBeDefined();
         expect(typeof config.api.baseUrl).toBe('string');
 
-        (fetchBeersFromAPI as jest.Mock).mockResolvedValue(
+        (fetchBeersFromAPI as Mock).mockResolvedValue(
           fetchedRows([{ id: '1', brew_name: 'Test' }])
         );
 
@@ -502,7 +501,7 @@ describe('dataUpdateService integration tests', () => {
       it('should handle timeout errors from fetchBeersFromAPI', async () => {
         const abortError = new Error('Timeout');
         abortError.name = 'AbortError';
-        (fetchBeersFromAPI as jest.Mock).mockRejectedValue(abortError);
+        (fetchBeersFromAPI as Mock).mockRejectedValue(abortError);
 
         const result = await fetchAndUpdateAllBeers();
 
@@ -511,7 +510,7 @@ describe('dataUpdateService integration tests', () => {
       });
 
       it('should handle network errors from fetchBeersFromAPI', async () => {
-        (fetchBeersFromAPI as jest.Mock).mockRejectedValue(new TypeError('Network request failed'));
+        (fetchBeersFromAPI as Mock).mockRejectedValue(new TypeError('Network request failed'));
 
         const result = await fetchAndUpdateAllBeers();
 

@@ -6,20 +6,23 @@
  * Maestro E2E tests since the native module requires iOS runtime.
  */
 
+import { describe, it, expect, vi, type Mock } from 'vitest';
+
 import LiveActivityModule from '../index';
 
-// Mock expo-modules-core for Jest environment
-jest.mock('expo-modules-core', () => ({
-  requireNativeModule: jest.fn(() => ({
-    areActivitiesEnabled: jest.fn(),
-    startActivity: jest.fn(),
-    updateActivity: jest.fn(),
-    endActivity: jest.fn(),
-    endAllActivities: jest.fn(),
-    endAllActivitiesSync: jest.fn(),
-    restartActivity: jest.fn(),
-    getAllActivityIds: jest.fn(),
-    endActivitiesOlderThan: jest.fn(),
+// Mock expo-modules-core: there is no native runtime here, so the real
+// `requireNativeModule('LiveActivity')` throws on import.
+vi.mock('expo-modules-core', () => ({
+  requireNativeModule: vi.fn(() => ({
+    areActivitiesEnabled: vi.fn(),
+    startActivity: vi.fn(),
+    updateActivity: vi.fn(),
+    endActivity: vi.fn(),
+    endAllActivities: vi.fn(),
+    endAllActivitiesSync: vi.fn(),
+    restartActivity: vi.fn(),
+    getAllActivityIds: vi.fn(),
+    endActivitiesOlderThan: vi.fn(),
   })),
 }));
 
@@ -38,7 +41,7 @@ describe('LiveActivityModule types', () => {
 
   it('should have areActivitiesEnabled return a Promise<boolean>', async () => {
     const mockResult = true;
-    (LiveActivityModule.areActivitiesEnabled as jest.Mock).mockResolvedValue(mockResult);
+    (LiveActivityModule.areActivitiesEnabled as Mock).mockResolvedValue(mockResult);
 
     const result = await LiveActivityModule.areActivitiesEnabled();
     expect(result).toBe(mockResult);
@@ -46,7 +49,7 @@ describe('LiveActivityModule types', () => {
 
   it('should have startActivity accept StartActivityData and return Promise<string>', async () => {
     const mockActivityId = 'test-activity-id';
-    (LiveActivityModule.startActivity as jest.Mock).mockResolvedValue(mockActivityId);
+    (LiveActivityModule.startActivity as Mock).mockResolvedValue(mockActivityId);
 
     const result = await LiveActivityModule.startActivity({
       memberId: 'member-123',
@@ -63,7 +66,7 @@ describe('LiveActivityModule types', () => {
   });
 
   it('should have updateActivity accept activityId and UpdateActivityData and return Promise<boolean>', async () => {
-    (LiveActivityModule.updateActivity as jest.Mock).mockResolvedValue(true);
+    (LiveActivityModule.updateActivity as Mock).mockResolvedValue(true);
 
     const result = await LiveActivityModule.updateActivity('activity-123', {
       beers: [{ id: 'beer-1', name: 'Updated IPA' }],
@@ -76,7 +79,7 @@ describe('LiveActivityModule types', () => {
   });
 
   it('should have endActivity accept activityId and return Promise<boolean>', async () => {
-    (LiveActivityModule.endActivity as jest.Mock).mockResolvedValue(true);
+    (LiveActivityModule.endActivity as Mock).mockResolvedValue(true);
 
     const result = await LiveActivityModule.endActivity('activity-123');
 
@@ -85,7 +88,7 @@ describe('LiveActivityModule types', () => {
   });
 
   it('should have endAllActivities return Promise<boolean>', async () => {
-    (LiveActivityModule.endAllActivities as jest.Mock).mockResolvedValue(true);
+    (LiveActivityModule.endAllActivities as Mock).mockResolvedValue(true);
 
     const result = await LiveActivityModule.endAllActivities();
 
@@ -94,7 +97,7 @@ describe('LiveActivityModule types', () => {
 
   it('should have restartActivity accept StartActivityData and return Promise<string | null>', async () => {
     const mockActivityId = 'new-activity-id';
-    (LiveActivityModule.restartActivity as jest.Mock).mockResolvedValue(mockActivityId);
+    (LiveActivityModule.restartActivity as Mock).mockResolvedValue(mockActivityId);
 
     const result = await LiveActivityModule.restartActivity({
       memberId: 'member-123',
@@ -106,7 +109,7 @@ describe('LiveActivityModule types', () => {
   });
 
   it('should have restartActivity return null for empty queue', async () => {
-    (LiveActivityModule.restartActivity as jest.Mock).mockResolvedValue(null);
+    (LiveActivityModule.restartActivity as Mock).mockResolvedValue(null);
 
     const result = await LiveActivityModule.restartActivity({
       memberId: 'member-123',
@@ -119,7 +122,7 @@ describe('LiveActivityModule types', () => {
 
   it('should have getAllActivityIds return Promise<string[]>', async () => {
     const mockIds = ['activity-1', 'activity-2'];
-    (LiveActivityModule.getAllActivityIds as jest.Mock).mockResolvedValue(mockIds);
+    (LiveActivityModule.getAllActivityIds as Mock).mockResolvedValue(mockIds);
 
     const result = await LiveActivityModule.getAllActivityIds();
 
@@ -127,7 +130,7 @@ describe('LiveActivityModule types', () => {
   });
 
   it('should have endActivitiesOlderThan accept maxAgeSeconds and return Promise<number>', async () => {
-    (LiveActivityModule.endActivitiesOlderThan as jest.Mock).mockResolvedValue(2);
+    (LiveActivityModule.endActivitiesOlderThan as Mock).mockResolvedValue(2);
 
     const result = await LiveActivityModule.endActivitiesOlderThan(10800); // 3 hours
 
@@ -136,7 +139,7 @@ describe('LiveActivityModule types', () => {
   });
 
   it('should have endAllActivitiesSync return boolean synchronously', () => {
-    (LiveActivityModule.endAllActivitiesSync as jest.Mock).mockReturnValue(true);
+    (LiveActivityModule.endAllActivitiesSync as Mock).mockReturnValue(true);
 
     const result = LiveActivityModule.endAllActivitiesSync();
 
@@ -145,7 +148,7 @@ describe('LiveActivityModule types', () => {
   });
 
   it('should have endAllActivitiesSync return false on timeout', () => {
-    (LiveActivityModule.endAllActivitiesSync as jest.Mock).mockReturnValue(false);
+    (LiveActivityModule.endAllActivitiesSync as Mock).mockReturnValue(false);
 
     const result = LiveActivityModule.endAllActivitiesSync();
 

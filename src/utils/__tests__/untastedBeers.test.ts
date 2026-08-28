@@ -1,3 +1,4 @@
+import { describe, it, expect } from 'vitest';
 import { selectUntastedBeers } from '../untastedBeers';
 import type { BeerWithContainerType, BeerfinderWithContainerType } from '@/src/types/beer';
 

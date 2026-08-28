@@ -1,3 +1,4 @@
+import { describe, it, expect, beforeEach, afterEach, vi, type Mock } from 'vitest';
 /**
  * The startup migration check must not be able to abort app initialisation.
  *
@@ -34,33 +35,33 @@ import { runStartupMigrationCheck, startupMigrationAlert } from '../startupMigra
 import { getCurrentSchemaVersion, CURRENT_SCHEMA_VERSION } from '../schemaVersion';
 import { migrateToVersion3 } from '../migrations/migrateToV3';
 
-jest.mock('../schemaVersion', () => ({
-  ...jest.requireActual('../schemaVersion'),
-  getCurrentSchemaVersion: jest.fn(),
+vi.mock('../schemaVersion', async () => ({
+  ...(await vi.importActual<typeof import('../schemaVersion')>('../schemaVersion')),
+  getCurrentSchemaVersion: vi.fn(),
 }));
-jest.mock('../migrations/migrateToV3', () => ({
-  migrateToVersion3: jest.fn().mockResolvedValue(undefined),
+vi.mock('../migrations/migrateToV3', async () => ({
+  migrateToVersion3: vi.fn().mockResolvedValue(undefined),
 }));
 
 const database = {} as SQLiteDatabase;
 
 describe('runStartupMigrationCheck', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
-    (migrateToVersion3 as jest.Mock).mockResolvedValue(undefined);
-    jest.spyOn(console, 'log').mockImplementation();
-    jest.spyOn(console, 'error').mockImplementation();
+    vi.clearAllMocks();
+    (migrateToVersion3 as Mock).mockResolvedValue(undefined);
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => vi.restoreAllMocks());
 
   it('runs the migration when behind, and drives progress from 0 to cleared', async () => {
-    (getCurrentSchemaVersion as jest.Mock).mockResolvedValue(CURRENT_SCHEMA_VERSION - 1);
+    (getCurrentSchemaVersion as Mock).mockResolvedValue(CURRENT_SCHEMA_VERSION - 1);
     // The mock must INVOKE its callback. With a bare `mockResolvedValue` the
     // percentage arithmetic is dead under test, so `(current / total) * 100`
     // could drop the `* 100` — or the callback could be dropped from the call
     // entirely — and every test stayed green.
-    (migrateToVersion3 as jest.Mock).mockImplementation(async (_db, onProgress) => {
+    (migrateToVersion3 as Mock).mockImplementation(async (_db, onProgress) => {
       onProgress(1, 4);
     });
     const progress: (number | null)[] = [];
@@ -79,7 +80,7 @@ describe('runStartupMigrationCheck', () => {
   });
 
   it('does nothing when the database is already at the current version', async () => {
-    (getCurrentSchemaVersion as jest.Mock).mockResolvedValue(CURRENT_SCHEMA_VERSION);
+    (getCurrentSchemaVersion as Mock).mockResolvedValue(CURRENT_SCHEMA_VERSION);
     const progress: (number | null)[] = [];
 
     const outcome = await runStartupMigrationCheck(database, p => progress.push(p));
@@ -104,7 +105,7 @@ describe('runStartupMigrationCheck', () => {
     // be able to tell "checked, nothing to do" from "could not check", which is
     // exactly the distinction the pre-9.11 `return 0` destroyed.
     const cause = new Error('database is locked');
-    (getCurrentSchemaVersion as jest.Mock).mockRejectedValue(cause);
+    (getCurrentSchemaVersion as Mock).mockRejectedValue(cause);
 
     const outcome = await runStartupMigrationCheck(database, () => {});
 
@@ -117,8 +118,8 @@ describe('runStartupMigrationCheck', () => {
     // Pre-existing containment, pinned so the extraction cannot lose it: the
     // original block caught migration failure locally and alerted. The alert is
     // the caller's job now, so the outcome has to carry the fact.
-    (getCurrentSchemaVersion as jest.Mock).mockResolvedValue(CURRENT_SCHEMA_VERSION - 1);
-    (migrateToVersion3 as jest.Mock).mockRejectedValue(new Error('migration exploded'));
+    (getCurrentSchemaVersion as Mock).mockResolvedValue(CURRENT_SCHEMA_VERSION - 1);
+    (migrateToVersion3 as Mock).mockRejectedValue(new Error('migration exploded'));
 
     const outcome = await runStartupMigrationCheck(database, () => {});
 
@@ -137,8 +138,8 @@ describe('runStartupMigrationCheck', () => {
     // defect the `finally` exists to prevent. The success half of the contrast
     // now lives in the migration test above; both are needed for either to mean
     // anything.
-    (getCurrentSchemaVersion as jest.Mock).mockResolvedValue(CURRENT_SCHEMA_VERSION - 1);
-    (migrateToVersion3 as jest.Mock).mockRejectedValue(new Error('migration exploded'));
+    (getCurrentSchemaVersion as Mock).mockResolvedValue(CURRENT_SCHEMA_VERSION - 1);
+    (migrateToVersion3 as Mock).mockRejectedValue(new Error('migration exploded'));
     const progress: (number | null)[] = [];
 
     await runStartupMigrationCheck(database, p => progress.push(p));

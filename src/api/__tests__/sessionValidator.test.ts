@@ -1,10 +1,11 @@
+import { vi, type Mock, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { validateSession, getCurrentSession } from '../sessionValidator';
 import { getSessionData } from '../sessionManager';
 import { ApiError, SessionData } from '../../types/api';
 
 // Mock the sessionManager
-jest.mock('../sessionManager', () => ({
-  getSessionData: jest.fn(),
+vi.mock('../sessionManager', () => ({
+  getSessionData: vi.fn(),
 }));
 
 // Mock console methods
@@ -21,15 +22,15 @@ describe('sessionValidator', () => {
     firstName: 'Test',
     lastName: 'User',
     email: 'test@example.com',
-    cardNum: '12345'
+    cardNum: '12345',
   };
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
 
     // Mock console methods to prevent noise in tests
-    console.warn = jest.fn();
-    console.error = jest.fn();
+    console.warn = vi.fn();
+    console.error = vi.fn();
   });
 
   afterEach(() => {
@@ -94,7 +95,7 @@ describe('sessionValidator', () => {
 
   describe('getCurrentSession', () => {
     it('should return validated session data', async () => {
-      (getSessionData as jest.Mock).mockResolvedValueOnce(mockSessionData);
+      (getSessionData as Mock).mockResolvedValueOnce(mockSessionData);
 
       const result = await getCurrentSession();
 
@@ -102,7 +103,7 @@ describe('sessionValidator', () => {
     });
 
     it('should return null when no session data exists', async () => {
-      (getSessionData as jest.Mock).mockResolvedValueOnce(null);
+      (getSessionData as Mock).mockResolvedValueOnce(null);
 
       const result = await getCurrentSession();
 
@@ -110,7 +111,7 @@ describe('sessionValidator', () => {
     });
 
     it('should return null when session data is invalid', async () => {
-      (getSessionData as jest.Mock).mockResolvedValueOnce({
+      (getSessionData as Mock).mockResolvedValueOnce({
         // Missing required fields
         username: 'testuser',
       });
@@ -122,14 +123,14 @@ describe('sessionValidator', () => {
 
     it('should throw ApiError when getSessionData throws an error', async () => {
       const error = new Error('Storage error');
-      (getSessionData as jest.Mock).mockRejectedValueOnce(error);
+      (getSessionData as Mock).mockRejectedValueOnce(error);
 
       await expect(getCurrentSession()).rejects.toThrow(ApiError);
     });
 
     it('should rethrow ApiError when getSessionData throws an ApiError', async () => {
       const apiError = new ApiError('API error', 401, false, false);
-      (getSessionData as jest.Mock).mockRejectedValueOnce(apiError);
+      (getSessionData as Mock).mockRejectedValueOnce(apiError);
 
       await expect(getCurrentSession()).rejects.toThrow(apiError);
     });

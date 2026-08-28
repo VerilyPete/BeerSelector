@@ -1,3 +1,4 @@
+import { describe, it, expect, beforeEach, afterEach, vi, type Mock } from 'vitest';
 /**
  * Unit tests for liveActivityService
  *
@@ -39,32 +40,32 @@ const originalConsoleLog = console.log;
 const originalConsoleError = console.error;
 
 // Create mock functions for the native module
-const mockAreActivitiesEnabled = jest.fn();
-const mockStartActivity = jest.fn();
-const mockUpdateActivity = jest.fn();
-const mockEndActivity = jest.fn();
-const mockEndAllActivities = jest.fn();
-const mockRestartActivity = jest.fn();
-const mockGetAllActivityIds = jest.fn();
-const mockEndActivitiesOlderThan = jest.fn();
-const mockEndAllActivitiesSync = jest.fn();
-const mockScheduleCleanupTask = jest.fn();
-const mockCancelCleanupTask = jest.fn();
-const mockGetActivityStaleDate = jest.fn();
+const mockAreActivitiesEnabled = vi.fn();
+const mockStartActivity = vi.fn();
+const mockUpdateActivity = vi.fn();
+const mockEndActivity = vi.fn();
+const mockEndAllActivities = vi.fn();
+const mockRestartActivity = vi.fn();
+const mockGetAllActivityIds = vi.fn();
+const mockEndActivitiesOlderThan = vi.fn();
+const mockEndAllActivitiesSync = vi.fn();
+const mockScheduleCleanupTask = vi.fn();
+const mockCancelCleanupTask = vi.fn();
+const mockGetActivityStaleDate = vi.fn();
 
 type LiveActivitiesModuleMock = {
-  areActivitiesEnabled: jest.Mock;
-  startActivity: jest.Mock;
-  updateActivity: jest.Mock;
-  endActivity: jest.Mock;
-  endAllActivities: jest.Mock;
-  restartActivity: jest.Mock;
-  getAllActivityIds: jest.Mock;
-  endActivitiesOlderThan: jest.Mock;
-  endAllActivitiesSync: jest.Mock;
-  scheduleCleanupTask: jest.Mock;
-  cancelCleanupTask: jest.Mock;
-  getActivityStaleDate: jest.Mock;
+  areActivitiesEnabled: Mock;
+  startActivity: Mock;
+  updateActivity: Mock;
+  endActivity: Mock;
+  endAllActivities: Mock;
+  restartActivity: Mock;
+  getAllActivityIds: Mock;
+  endActivitiesOlderThan: Mock;
+  endAllActivitiesSync: Mock;
+  scheduleCleanupTask: Mock;
+  cancelCleanupTask: Mock;
+  getActivityStaleDate: Mock;
 };
 
 // Mock Platform and NativeModules from react-native
@@ -84,7 +85,7 @@ let mockLiveActivitiesModule: LiveActivitiesModuleMock | undefined = {
   getActivityStaleDate: mockGetActivityStaleDate,
 };
 
-jest.mock('react-native', () => ({
+vi.mock('react-native', () => ({
   Platform: {
     get OS() {
       return mockPlatformOS;
@@ -98,7 +99,7 @@ jest.mock('react-native', () => ({
 }));
 
 // Mock the Expo module
-jest.mock('@/modules/live-activity/src', () => ({
+vi.mock('@/modules/live-activity/src', () => ({
   __esModule: true,
   default: {
     get areActivitiesEnabled() {
@@ -142,11 +143,11 @@ jest.mock('@/modules/live-activity/src', () => ({
 
 describe('liveActivityService', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
 
     // Silence console output during tests
-    console.log = jest.fn();
-    console.error = jest.fn();
+    console.log = vi.fn();
+    console.error = vi.fn();
 
     // Reset Platform.OS to iOS for each test
     mockPlatformOS = 'ios';
@@ -405,7 +406,7 @@ describe('liveActivityService', () => {
         { beers: [{ id: '1', name: 'Test' }] },
         { memberId: '123', storeId: '1' }
       );
-      jest.clearAllMocks();
+      vi.clearAllMocks();
     });
 
     it('should call endLiveActivity if queue becomes empty', async () => {
@@ -430,7 +431,7 @@ describe('liveActivityService', () => {
     it('should log when no activity exists to update', async () => {
       // End the activity first
       await endLiveActivity();
-      jest.clearAllMocks();
+      vi.clearAllMocks();
 
       mockAreActivitiesEnabled.mockResolvedValueOnce(true);
       await updateLiveActivity({ beers: [{ id: '1', name: 'Test' }] });
@@ -456,7 +457,7 @@ describe('liveActivityService', () => {
     it('should log when no activity to end', async () => {
       // Make sure no activity is active
       await endAllLiveActivities();
-      jest.clearAllMocks();
+      vi.clearAllMocks();
 
       await endLiveActivity();
 
@@ -471,7 +472,7 @@ describe('liveActivityService', () => {
         { beers: [{ id: '1', name: 'Test' }] },
         { memberId: '123', storeId: '1' }
       );
-      jest.clearAllMocks();
+      vi.clearAllMocks();
 
       await endLiveActivity();
 
@@ -487,7 +488,7 @@ describe('liveActivityService', () => {
         { beers: [{ id: '1', name: 'Test' }] },
         { memberId: '123', storeId: '1' }
       );
-      jest.clearAllMocks();
+      vi.clearAllMocks();
 
       mockEndActivity.mockRejectedValueOnce(new Error('Native error'));
 
@@ -504,7 +505,7 @@ describe('liveActivityService', () => {
         { beers: [{ id: '1', name: 'Test' }] },
         { memberId: '123', storeId: '1' }
       );
-      jest.clearAllMocks();
+      vi.clearAllMocks();
 
       mockLiveActivitiesModule = undefined;
 
@@ -630,7 +631,7 @@ describe('liveActivityService', () => {
       // First start an activity
       mockStartActivity.mockResolvedValueOnce('activity-123');
       await updateLiveActivityWithQueue(mockQueuedBeers, mockSessionData);
-      jest.clearAllMocks();
+      vi.clearAllMocks();
 
       await updateLiveActivityWithQueue([], mockSessionData);
 
@@ -640,7 +641,7 @@ describe('liveActivityService', () => {
     it('should start new activity when none exists', async () => {
       // Make sure no activity is active
       await endAllLiveActivities();
-      jest.clearAllMocks();
+      vi.clearAllMocks();
       mockAreActivitiesEnabled.mockResolvedValue(true);
       mockStartActivity.mockResolvedValueOnce('activity-123');
 
@@ -660,7 +661,7 @@ describe('liveActivityService', () => {
       // First start an activity
       mockStartActivity.mockResolvedValueOnce('activity-123');
       await updateLiveActivityWithQueue(mockQueuedBeers, mockSessionData);
-      jest.clearAllMocks();
+      vi.clearAllMocks();
       mockAreActivitiesEnabled.mockResolvedValue(true);
 
       const newBeers: QueuedBeer[] = [{ id: '3', name: 'New Beer', date: 'Apr 10, 2025' }];
@@ -673,7 +674,7 @@ describe('liveActivityService', () => {
     it('should not throw when error occurs', async () => {
       // Make sure no activity is active
       await endAllLiveActivities();
-      jest.clearAllMocks();
+      vi.clearAllMocks();
       mockAreActivitiesEnabled.mockResolvedValue(true);
       mockStartActivity.mockRejectedValueOnce(new Error('Native error'));
 
@@ -695,7 +696,7 @@ describe('liveActivityService', () => {
       sessionId: 'test-session-123',
     };
 
-    const mockGetQueuedBeers = jest.fn();
+    const mockGetQueuedBeers = vi.fn();
 
     beforeEach(() => {
       mockAreActivitiesEnabled.mockResolvedValue(true);
@@ -725,7 +726,7 @@ describe('liveActivityService', () => {
     it('should fetch queue and update activity', async () => {
       // Make sure no activity is active
       await endAllLiveActivities();
-      jest.clearAllMocks();
+      vi.clearAllMocks();
       mockAreActivitiesEnabled.mockResolvedValue(true);
       mockStartActivity.mockResolvedValueOnce('activity-123');
 
@@ -754,7 +755,7 @@ describe('liveActivityService', () => {
 
     it('should return activity ID after starting activity and null after ending', async () => {
       // Clear all mocks and reset module state first
-      jest.clearAllMocks();
+      vi.clearAllMocks();
       mockAreActivitiesEnabled.mockReset();
       mockStartActivity.mockReset();
       mockEndActivity.mockReset();
@@ -819,7 +820,7 @@ describe('liveActivityService', () => {
     };
 
     beforeEach(() => {
-      jest.clearAllMocks();
+      vi.clearAllMocks();
       mockAreActivitiesEnabled.mockResolvedValue(true);
     });
 
@@ -907,14 +908,14 @@ describe('liveActivityService', () => {
     };
 
     beforeEach(() => {
-      jest.clearAllMocks();
+      vi.clearAllMocks();
       mockAreActivitiesEnabled.mockResolvedValue(true);
       // Cancel any pending restarts from previous tests
       cancelPendingRestart();
     });
 
     it('should debounce rapid calls so only one native restart executes', async () => {
-      jest.useFakeTimers();
+      vi.useFakeTimers();
       mockRestartActivity.mockResolvedValue('activity-id');
 
       const p1 = debouncedRestartLiveActivity(mockQueueState);
@@ -926,7 +927,7 @@ describe('liveActivityService', () => {
       await Promise.resolve();
       await Promise.resolve();
 
-      jest.advanceTimersByTime(500);
+      vi.advanceTimersByTime(500);
 
       // Flush the restartActivity promise
       await Promise.resolve();
@@ -938,11 +939,11 @@ describe('liveActivityService', () => {
       expect(r1.success).toBe(true);
       expect(r2.success).toBe(true);
 
-      jest.useRealTimers();
+      vi.useRealTimers();
     });
 
     it('should not execute before the 500ms debounce window elapses', async () => {
-      jest.useFakeTimers();
+      vi.useFakeTimers();
       mockRestartActivity.mockResolvedValue('activity-id');
 
       const promise = debouncedRestartLiveActivity(mockQueueState);
@@ -952,7 +953,7 @@ describe('liveActivityService', () => {
 
       expect(mockRestartActivity).not.toHaveBeenCalled();
 
-      jest.advanceTimersByTime(500);
+      vi.advanceTimersByTime(500);
       await Promise.resolve();
       await Promise.resolve();
 
@@ -960,11 +961,11 @@ describe('liveActivityService', () => {
 
       expect(mockRestartActivity).toHaveBeenCalledTimes(1);
 
-      jest.useRealTimers();
+      vi.useRealTimers();
     });
 
     it('should use the latest state when multiple calls are debounced', async () => {
-      jest.useFakeTimers();
+      vi.useFakeTimers();
       const firstState = { ...mockQueueState, beers: [{ id: '1', name: 'First Beer' }] };
       const latestState = { ...mockQueueState, beers: [{ id: '2', name: 'Latest Beer' }] };
       mockRestartActivity.mockResolvedValue('activity-id');
@@ -977,7 +978,7 @@ describe('liveActivityService', () => {
       await Promise.resolve();
       await Promise.resolve();
 
-      jest.advanceTimersByTime(500);
+      vi.advanceTimersByTime(500);
       await Promise.resolve();
       await Promise.resolve();
 
@@ -988,7 +989,7 @@ describe('liveActivityService', () => {
         expect.objectContaining({ beers: [{ id: '2', name: 'Latest Beer' }] })
       );
 
-      jest.useRealTimers();
+      vi.useRealTimers();
     });
 
     it('should skip debouncing when config.enabled is false', async () => {
@@ -1004,7 +1005,7 @@ describe('liveActivityService', () => {
     });
 
     it('should return wasDebounced true for debounced calls', async () => {
-      jest.useFakeTimers();
+      vi.useFakeTimers();
       mockRestartActivity.mockResolvedValue('new-activity-id');
 
       const promise = debouncedRestartLiveActivity(mockQueueState);
@@ -1012,7 +1013,7 @@ describe('liveActivityService', () => {
       await Promise.resolve();
       await Promise.resolve();
 
-      jest.advanceTimersByTime(500);
+      vi.advanceTimersByTime(500);
       await Promise.resolve();
       await Promise.resolve();
 
@@ -1021,7 +1022,7 @@ describe('liveActivityService', () => {
       expect(result.wasDebounced).toBe(true);
       expect(result.success).toBe(true);
 
-      jest.useRealTimers();
+      vi.useRealTimers();
     });
 
     it('should return success false when not on iOS', async () => {
@@ -1053,13 +1054,13 @@ describe('liveActivityService', () => {
 
   describe('cancelPendingRestart', () => {
     beforeEach(() => {
-      jest.clearAllMocks();
+      vi.clearAllMocks();
       mockAreActivitiesEnabled.mockResolvedValue(true);
       cancelPendingRestart();
     });
 
     it('should cancel a pending debounced restart so the native call never fires', async () => {
-      jest.useFakeTimers();
+      vi.useFakeTimers();
       mockRestartActivity.mockResolvedValue('activity-id');
 
       const mockQueueStateLocal = {
@@ -1077,7 +1078,7 @@ describe('liveActivityService', () => {
       // Cancel before the debounce fires
       cancelPendingRestart();
 
-      jest.advanceTimersByTime(500);
+      vi.advanceTimersByTime(500);
       await Promise.resolve();
 
       const result = await promise;
@@ -1086,7 +1087,7 @@ describe('liveActivityService', () => {
       expect(result.success).toBe(false);
       expect(result.error).toBe('Cancelled');
 
-      jest.useRealTimers();
+      vi.useRealTimers();
     });
 
     it('should be safe to call when no pending restart', () => {
@@ -1101,13 +1102,13 @@ describe('liveActivityService', () => {
 
   describe('flushPendingRestart', () => {
     beforeEach(() => {
-      jest.clearAllMocks();
+      vi.clearAllMocks();
       mockAreActivitiesEnabled.mockResolvedValue(true);
       cancelPendingRestart();
     });
 
     it('should execute a pending restart immediately without waiting for the timer', async () => {
-      jest.useFakeTimers();
+      vi.useFakeTimers();
       mockRestartActivity.mockResolvedValue('activity-id');
 
       const mockQueueStateLocal = {
@@ -1134,7 +1135,7 @@ describe('liveActivityService', () => {
       expect(mockRestartActivity).toHaveBeenCalledTimes(1);
       expect(result.success).toBe(true);
 
-      jest.useRealTimers();
+      vi.useRealTimers();
     });
 
     it('should be safe to call when no pending restart', () => {

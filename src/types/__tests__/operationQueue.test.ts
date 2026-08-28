@@ -2,6 +2,7 @@
  * Tests for operationQueue type guards
  */
 
+import { describe, it, expect } from 'vitest';
 import {
   isQueuedOperation,
   isCheckInBeerPayload,

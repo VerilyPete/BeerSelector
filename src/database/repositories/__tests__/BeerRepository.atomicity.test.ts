@@ -1,3 +1,4 @@
+import { describe, it, expect, vi, type Mock } from 'vitest';
 /**
  * Atomicity tests for BeerRepository's allbeers replacement write
  *
@@ -34,12 +35,12 @@ import { withAtomicWrite } from '../../transactions';
 import { toNonEmpty } from '../../../api/fetchOutcome';
 import type { NonEmptyArray } from '../../../api/fetchOutcome';
 
-jest.mock('../../connection');
-jest.mock('../../locks', () => ({
+vi.mock('../../connection');
+vi.mock('../../locks', () => ({
   databaseLockManager: {
     // Must run the task. A mock missing this method makes the locked-entry-point
     // test pass on a TypeError rather than on atomicity.
-    withDatabaseLock: jest.fn(async (_name: string, task: () => Promise<unknown>) => task()),
+    withDatabaseLock: vi.fn(async (_name: string, task: () => Promise<unknown>) => task()),
   },
 }));
 
@@ -201,7 +202,7 @@ function createTransactionalFake(
   const db = {
     runAsync,
     getFirstAsync,
-    getAllAsync: jest.fn(),
+    getAllAsync: vi.fn(),
     withTransactionAsync: (task: () => Promise<void>) => runTransaction('plain', task),
     withExclusiveTransactionAsync: (task: (t: typeof txn) => Promise<void>) => {
       if (options.webBuild) {
@@ -251,7 +252,7 @@ function makeBeers(count: number, prefix = 'new'): NonEmptyArray<BeerWithContain
 describe('BeerRepository insert atomicity', () => {
   it('leaves the previously committed beers intact when an insert fails partway through', async () => {
     const fake = createTransactionalFake(['old-1', 'old-2', 'old-3']);
-    (connection.getDatabase as jest.Mock).mockResolvedValue(fake.db);
+    (connection.getDatabase as Mock).mockResolvedValue(fake.db);
     fake.failOnInsertNumber(2);
 
     await expect(new BeerRepository().insertManyUnsafe(makeBeers(5))).rejects.toThrow();
@@ -261,7 +262,7 @@ describe('BeerRepository insert atomicity', () => {
 
   it('publishes the cleared table and the full replacement set at a single commit point', async () => {
     const fake = createTransactionalFake(['old-1']);
-    (connection.getDatabase as jest.Mock).mockResolvedValue(fake.db);
+    (connection.getDatabase as Mock).mockResolvedValue(fake.db);
     const beers = makeBeers(120);
 
     await new BeerRepository().insertManyUnsafe(beers);
@@ -272,7 +273,7 @@ describe('BeerRepository insert atomicity', () => {
 
   it('applies the same atomicity to the locked entry point', async () => {
     const fake = createTransactionalFake(['old-1', 'old-2', 'old-3']);
-    (connection.getDatabase as jest.Mock).mockResolvedValue(fake.db);
+    (connection.getDatabase as Mock).mockResolvedValue(fake.db);
     fake.failOnInsertNumber(2);
 
     await expect(new BeerRepository().insertMany(makeBeers(5))).rejects.toThrow();
@@ -282,7 +283,7 @@ describe('BeerRepository insert atomicity', () => {
 
   it('compiles the insert once and reuses it for every row', async () => {
     const fake = createTransactionalFake(['old-1']);
-    (connection.getDatabase as jest.Mock).mockResolvedValue(fake.db);
+    (connection.getDatabase as Mock).mockResolvedValue(fake.db);
 
     await new BeerRepository().insertManyUnsafe(makeBeers(120));
 
@@ -297,7 +298,7 @@ describe('BeerRepository insert atomicity', () => {
 
   it('finalizes the prepared statement even when an insert fails partway through', async () => {
     const fake = createTransactionalFake(['old-1']);
-    (connection.getDatabase as jest.Mock).mockResolvedValue(fake.db);
+    (connection.getDatabase as Mock).mockResolvedValue(fake.db);
     fake.failOnInsertNumber(2);
 
     await expect(new BeerRepository().insertManyUnsafe(makeBeers(5))).rejects.toThrow();
@@ -307,10 +308,10 @@ describe('BeerRepository insert atomicity', () => {
 
   it('surfaces the original failure when finalizing the statement also fails', async () => {
     const fake = createTransactionalFake(['old-1', 'old-2', 'old-3']);
-    (connection.getDatabase as jest.Mock).mockResolvedValue(fake.db);
+    (connection.getDatabase as Mock).mockResolvedValue(fake.db);
     fake.failOnInsertNumber(2);
     fake.failOnFinalize();
-    const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     // If the body throws A and the finally throws B, JS discards A. Here A is
     // the abort we must classify and B is a cleanup failure — losing A means a
@@ -325,7 +326,7 @@ describe('BeerRepository insert atomicity', () => {
 
   it('routes every query through the transaction object, not the database handle', async () => {
     const fake = createTransactionalFake(['old-1']);
-    (connection.getDatabase as jest.Mock).mockResolvedValue(fake.db);
+    (connection.getDatabase as Mock).mockResolvedValue(fake.db);
 
     await new BeerRepository().insertManyUnsafe(makeBeers(60));
 

@@ -2,6 +2,7 @@
  * Tests for optimisticUpdate type guards
  */
 
+import { describe, it, expect } from 'vitest';
 import {
   isCheckInRollbackData,
   isRewardRollbackData,

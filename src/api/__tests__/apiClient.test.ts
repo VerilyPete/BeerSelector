@@ -1,22 +1,28 @@
+import { vi, type Mock, describe, it, expect, afterEach } from 'vitest';
 import { ApiClient } from '../apiClient';
 import { ApiError } from '../../types/api';
 import { getCurrentSession } from '../sessionValidator';
 import { config } from '@/src/config';
 
 // Mock the sessionValidator
-jest.mock('../sessionValidator', () => ({
-  getCurrentSession: jest.fn(),
+vi.mock('../sessionValidator', () => ({
+  getCurrentSession: vi.fn(),
 }));
 
 // Mock fetch
-global.fetch = jest.fn();
-global.AbortController = jest.fn().mockImplementation(() => ({
-  signal: 'mock-signal',
-  abort: jest.fn(),
-}));
+global.fetch = vi.fn();
+// A class, not `vi.fn().mockImplementation(() => ({...}))`. Jest's mock
+// functions are constructible, so `new AbortController()` worked; vitest's
+// return the plain arrow, which is not a constructor.
+const RealAbortController = global.AbortController;
+global.AbortController = class {
+  private readonly inner = new RealAbortController();
+  readonly signal = this.inner.signal;
+  readonly abort = vi.fn(() => this.inner.abort());
+} as unknown as typeof AbortController;
 
 // Mock setTimeout and clearTimeout
-jest.useFakeTimers();
+vi.useFakeTimers();
 
 const mockSessionData = {
   memberId: 'test-member-id',
@@ -27,14 +33,14 @@ const mockSessionData = {
 
 function createApiTestContext() {
   config.setCustomApiUrl('https://test-api.example.com');
-  (getCurrentSession as jest.Mock).mockClear();
-  (global.fetch as jest.Mock).mockClear();
-  (getCurrentSession as jest.Mock).mockResolvedValue(mockSessionData);
-  (global.fetch as jest.Mock).mockResolvedValue({
+  (getCurrentSession as Mock).mockClear();
+  (global.fetch as Mock).mockClear();
+  (getCurrentSession as Mock).mockResolvedValue(mockSessionData);
+  (global.fetch as Mock).mockResolvedValue({
     ok: true,
     status: 200,
-    json: jest.fn().mockResolvedValue({ success: true, data: { test: 'data' } }),
-    text: jest.fn().mockResolvedValue('{"success":true,"data":{"test":"data"}}'),
+    json: vi.fn().mockResolvedValue({ success: true, data: { test: 'data' } }),
+    text: vi.fn().mockResolvedValue('{"success":true,"data":{"test":"data"}}'),
   });
   const apiClient = ApiClient.getInstance();
   return { apiClient };
@@ -73,7 +79,7 @@ describe('ApiClient', () => {
 
     it('should handle errors correctly', async () => {
       const { apiClient } = createApiTestContext();
-      global.fetch = jest.fn().mockImplementation(() =>
+      global.fetch = vi.fn().mockImplementation(() =>
         Promise.resolve({
           ok: false,
           status: 404,
@@ -388,7 +394,7 @@ describe('ApiClient', () => {
   describe('check-in response diagnostics', () => {
     it('request logs response diagnostics for addToQueue only', async () => {
       const { apiClient } = createApiTestContext();
-      const logSpy = jest.spyOn(console, 'log').mockImplementation();
+      const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
       await apiClient.get(config.api.endpoints.addToQueue);
 
@@ -412,15 +418,15 @@ describe('ApiClient', () => {
       // portal or carrier proxy — which is indistinguishable from success once
       // the body has been swallowed. RN populates `url` reliably but
       // `redirected` inconsistently, so Phase 7.2 needs to see both.
-      (global.fetch as jest.Mock).mockResolvedValue({
+      (global.fetch as Mock).mockResolvedValue({
         ok: true,
         status: 200,
         url: 'http://captive.example.net/login',
         redirected: true,
-        headers: { get: jest.fn().mockReturnValue('text/html') },
-        text: jest.fn().mockResolvedValue('<html>Sign in to continue</html>'),
+        headers: { get: vi.fn().mockReturnValue('text/html') },
+        text: vi.fn().mockResolvedValue('<html>Sign in to continue</html>'),
       });
-      const logSpy = jest.spyOn(console, 'log').mockImplementation();
+      const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
       await apiClient.get(config.api.endpoints.addToQueue);
 

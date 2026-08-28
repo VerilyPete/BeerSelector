@@ -7,6 +7,7 @@
  * than this module.
  */
 
+import { describe, it, expect } from 'vitest';
 import { toNonEmpty } from '../fetchOutcome';
 import type { FetchOutcome, FetchedSource } from '../fetchOutcome';
 

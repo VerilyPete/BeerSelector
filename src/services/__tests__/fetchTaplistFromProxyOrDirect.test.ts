@@ -1,3 +1,4 @@
+import { describe, it, expect, beforeEach, afterEach, vi, type Mock } from 'vitest';
 /**
  * Tests for fetchTaplistFromProxyOrDirect shared helper
  *
@@ -17,72 +18,72 @@ import {
 } from '../../api/__tests__/helpers/fetchOutcomeFixtures';
 import { ApiErrorType, createErrorResponse } from '../../utils/notificationUtils';
 
-jest.mock('../../database/preferences', () => ({
+vi.mock('../../database/preferences', async () => ({
   // Returns null, not undefined. The real signature is Promise<string | null>,
   // and a bare jest.fn() answers `undefined` — which `normalizeStoredEtag`
   // rightly does not defend against, since the type forbids it. An
   // under-specified mock is the same trap as a stale one.
-  getPreference: jest.fn(async () => null),
-  setPreference: jest.fn(),
+  getPreference: vi.fn(async () => null),
+  setPreference: vi.fn(),
 }));
 
-jest.mock('../../database/repositories/BeerRepository', () => ({
+vi.mock('../../database/repositories/BeerRepository', async () => ({
   beerRepository: {
-    insertMany: jest.fn(),
-    insertManyUnsafe: jest.fn(),
+    insertMany: vi.fn(),
+    insertManyUnsafe: vi.fn(),
   },
 }));
 
-jest.mock('../../database/repositories/MyBeersRepository', () => ({
+vi.mock('../../database/repositories/MyBeersRepository', async () => ({
   myBeersRepository: {
-    insertMany: jest.fn(),
-    insertManyUnsafe: jest.fn(),
+    insertMany: vi.fn(),
+    insertManyUnsafe: vi.fn(),
   },
 }));
 
-jest.mock('../../database/repositories/RewardsRepository', () => ({
+vi.mock('../../database/repositories/RewardsRepository', async () => ({
   rewardsRepository: {
-    replaceAllWithEmpty: jest.fn(async () => {}),
-    replaceAllWithEmptyUnsafe: jest.fn(async () => {}),
-    insertMany: jest.fn(),
-    insertManyUnsafe: jest.fn(),
+    replaceAllWithEmpty: vi.fn(async () => {}),
+    replaceAllWithEmptyUnsafe: vi.fn(async () => {}),
+    insertMany: vi.fn(),
+    insertManyUnsafe: vi.fn(),
   },
 }));
 
-jest.mock('../../database/DatabaseLockManager', () => ({
+vi.mock('../../database/DatabaseLockManager', async () => ({
   databaseLockManager: {
-    withDatabaseLock: jest.fn(async (_name: string, task: () => Promise<unknown>) => task()),
+    withDatabaseLock: vi.fn(async (_name: string, task: () => Promise<unknown>) => task()),
   },
 }));
 
-jest.mock('../../api/beerApi', () =>
+vi.mock('../../api/beerApi', async () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  require('../../api/__tests__/helpers/beerApiMock').beerApiMockFactory()
+  (await import('../../api/__tests__/helpers/beerApiMock')).beerApiMockFactory()
 );
 
-jest.mock('../enrichmentService', () => ({
-  fetchBeersFromProxy: jest.fn(),
-  fetchEnrichmentBatchWithMissing: jest.fn().mockResolvedValue({ enrichments: {}, missing: [] }),
-  syncBeersToWorker: jest.fn().mockResolvedValue({ synced: 0, failed: 0, queued_for_cleanup: 0 }),
-  mergeEnrichmentData: jest.fn().mockImplementation(beers => beers),
-  recordFallback: jest.fn(),
-  pollForEnrichmentUpdates: jest.fn().mockResolvedValue({}),
+vi.mock('../enrichmentService', async () => ({
+  fetchBeersFromProxy: vi.fn(),
+  fetchEnrichmentBatchWithMissing: vi.fn().mockResolvedValue({ enrichments: {}, missing: [] }),
+  syncBeersToWorker: vi.fn().mockResolvedValue({ synced: 0, failed: 0, queued_for_cleanup: 0 }),
+  mergeEnrichmentData: vi.fn().mockImplementation(beers => beers),
+  recordFallback: vi.fn(),
+  pollForEnrichmentUpdates: vi.fn().mockResolvedValue({}),
 }));
 
-jest.mock('../../utils/errorLogger', () => ({
-  logError: jest.fn(),
-  logWarning: jest.fn(),
+vi.mock('../../utils/errorLogger', async () => ({
+  logError: vi.fn(),
+  logWarning: vi.fn(),
 }));
 
-jest.mock('@/src/config', () => {
-  const actual = jest.requireActual('@/src/config');
+vi.mock('@/src/config', async () => {
+  const actual = await vi.importActual<typeof import('@/src/config')>('@/src/config');
   return {
     ...actual,
     config: {
       ...actual.config,
       enrichment: {
         ...actual.config.enrichment,
-        isConfigured: jest.fn().mockReturnValue(false),
+        isConfigured: vi.fn().mockReturnValue(false),
       },
     },
   };
@@ -90,22 +91,22 @@ jest.mock('@/src/config', () => {
 
 // Suppress console.log in tests
 const originalConsoleLog = console.log;
-beforeEach(() => {
-  console.log = jest.fn();
+beforeEach(async () => {
+  console.log = vi.fn();
 });
-afterEach(() => {
+afterEach(async () => {
   console.log = originalConsoleLog;
 });
 
 describe('fetchTaplistFromProxyOrDirect', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    (config.enrichment.isConfigured as jest.Mock).mockReturnValue(false);
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    (config.enrichment.isConfigured as Mock).mockReturnValue(false);
   });
 
   it('calls fetchBeersFromProxy when enrichment is configured and storeId is provided', async () => {
-    (config.enrichment.isConfigured as jest.Mock).mockReturnValue(true);
-    (fetchBeersFromProxy as jest.Mock).mockResolvedValue({
+    (config.enrichment.isConfigured as Mock).mockReturnValue(true);
+    (fetchBeersFromProxy as Mock).mockResolvedValue({
       beers: [
         {
           id: 'beer-1',
@@ -137,8 +138,8 @@ describe('fetchTaplistFromProxyOrDirect', () => {
   });
 
   it('maps enriched beer response to app Beer via mapEnrichedBeerToAppBeer', async () => {
-    (config.enrichment.isConfigured as jest.Mock).mockReturnValue(true);
-    (fetchBeersFromProxy as jest.Mock).mockResolvedValue({
+    (config.enrichment.isConfigured as Mock).mockReturnValue(true);
+    (fetchBeersFromProxy as Mock).mockResolvedValue({
       beers: [
         {
           id: 'beer-1',
@@ -175,10 +176,10 @@ describe('fetchTaplistFromProxyOrDirect', () => {
   });
 
   it('falls back to fetchBeersFromAPI when proxy fails', async () => {
-    (config.enrichment.isConfigured as jest.Mock).mockReturnValue(true);
-    (fetchBeersFromProxy as jest.Mock).mockRejectedValue(new Error('proxy down'));
+    (config.enrichment.isConfigured as Mock).mockReturnValue(true);
+    (fetchBeersFromProxy as Mock).mockRejectedValue(new Error('proxy down'));
     const mockBeers = [{ id: 'beer-1', brew_name: 'Test IPA', brewer: 'Brewery 1' }];
-    (fetchBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockBeers));
+    (fetchBeersFromAPI as Mock).mockResolvedValue(fetchedRows(mockBeers));
 
     const result = await fetchTaplistFromProxyOrDirect('13885');
 
@@ -189,9 +190,9 @@ describe('fetchTaplistFromProxyOrDirect', () => {
   });
 
   it('calls recordFallback when falling back to direct fetch', async () => {
-    (config.enrichment.isConfigured as jest.Mock).mockReturnValue(true);
-    (fetchBeersFromProxy as jest.Mock).mockRejectedValue(new Error('proxy down'));
-    (fetchBeersFromAPI as jest.Mock).mockResolvedValue(
+    (config.enrichment.isConfigured as Mock).mockReturnValue(true);
+    (fetchBeersFromProxy as Mock).mockRejectedValue(new Error('proxy down'));
+    (fetchBeersFromAPI as Mock).mockResolvedValue(
       fetchedRows([{ id: 'beer-1', brew_name: 'Test', brewer: 'B' }])
     );
 
@@ -201,9 +202,9 @@ describe('fetchTaplistFromProxyOrDirect', () => {
   });
 
   it('calls fetchBeersFromAPI directly when enrichment is NOT configured', async () => {
-    (config.enrichment.isConfigured as jest.Mock).mockReturnValue(false);
+    (config.enrichment.isConfigured as Mock).mockReturnValue(false);
     const mockBeers = [{ id: 'beer-1', brew_name: 'Test', brewer: 'B' }];
-    (fetchBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockBeers));
+    (fetchBeersFromAPI as Mock).mockResolvedValue(fetchedRows(mockBeers));
 
     const result = await fetchTaplistFromProxyOrDirect('13885');
 
@@ -214,8 +215,8 @@ describe('fetchTaplistFromProxyOrDirect', () => {
   });
 
   it('calls recordFallback when enrichment is not configured', async () => {
-    (config.enrichment.isConfigured as jest.Mock).mockReturnValue(false);
-    (fetchBeersFromAPI as jest.Mock).mockResolvedValue(
+    (config.enrichment.isConfigured as Mock).mockReturnValue(false);
+    (fetchBeersFromAPI as Mock).mockResolvedValue(
       fetchedRows([{ id: 'beer-1', brew_name: 'Test', brewer: 'B' }])
     );
 
@@ -225,9 +226,9 @@ describe('fetchTaplistFromProxyOrDirect', () => {
   });
 
   it('calls fetchBeersFromAPI directly when storeId is null', async () => {
-    (config.enrichment.isConfigured as jest.Mock).mockReturnValue(true);
+    (config.enrichment.isConfigured as Mock).mockReturnValue(true);
     const mockBeers = [{ id: 'beer-1', brew_name: 'Test', brewer: 'B' }];
-    (fetchBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(mockBeers));
+    (fetchBeersFromAPI as Mock).mockResolvedValue(fetchedRows(mockBeers));
 
     const result = await fetchTaplistFromProxyOrDirect(null);
 
@@ -237,16 +238,16 @@ describe('fetchTaplistFromProxyOrDirect', () => {
   });
 
   it('throws when both proxy and direct fetch fail', async () => {
-    (config.enrichment.isConfigured as jest.Mock).mockReturnValue(true);
-    (fetchBeersFromProxy as jest.Mock).mockRejectedValue(new Error('proxy down'));
-    (fetchBeersFromAPI as jest.Mock).mockRejectedValue(new Error('direct fetch failed'));
+    (config.enrichment.isConfigured as Mock).mockReturnValue(true);
+    (fetchBeersFromProxy as Mock).mockRejectedValue(new Error('proxy down'));
+    (fetchBeersFromAPI as Mock).mockRejectedValue(new Error('direct fetch failed'));
 
     await expect(fetchTaplistFromProxyOrDirect('13885')).rejects.toThrow('direct fetch failed');
   });
 
   it('throws when direct fetch fails (no proxy configured)', async () => {
-    (config.enrichment.isConfigured as jest.Mock).mockReturnValue(false);
-    (fetchBeersFromAPI as jest.Mock).mockRejectedValue(new Error('network error'));
+    (config.enrichment.isConfigured as Mock).mockReturnValue(false);
+    (fetchBeersFromAPI as Mock).mockRejectedValue(new Error('network error'));
 
     await expect(fetchTaplistFromProxyOrDirect('13885')).rejects.toThrow('network error');
   });
@@ -264,7 +265,7 @@ describe('fetchTaplistFromProxyOrDirect', () => {
     // These assert the classification a caller can act on, not the message —
     // the message is what the old code forced callers to parse.
     it('preserves a validation error when the taplist URL is not configured', async () => {
-      (fetchBeersFromAPI as jest.Mock).mockResolvedValue(unavailable('not-configured'));
+      (fetchBeersFromAPI as Mock).mockResolvedValue(unavailable('not-configured'));
 
       const error = await fetchTaplistFromProxyOrDirect('13885').catch(e => e);
 
@@ -272,7 +273,7 @@ describe('fetchTaplistFromProxyOrDirect', () => {
     });
 
     it('preserves a validation error when the taplist source is not applicable', async () => {
-      (fetchBeersFromAPI as jest.Mock).mockResolvedValue(unavailable('not-applicable'));
+      (fetchBeersFromAPI as Mock).mockResolvedValue(unavailable('not-applicable'));
 
       const error = await fetchTaplistFromProxyOrDirect('13885').catch(e => e);
 
@@ -280,7 +281,7 @@ describe('fetchTaplistFromProxyOrDirect', () => {
     });
 
     it('preserves a malformed-response error when the body cannot be used', async () => {
-      (fetchBeersFromAPI as jest.Mock).mockResolvedValue(malformed('brewInStock was not an array'));
+      (fetchBeersFromAPI as Mock).mockResolvedValue(malformed('brewInStock was not an array'));
 
       const error = await fetchTaplistFromProxyOrDirect('13885').catch(e => e);
 
@@ -296,7 +297,7 @@ describe('fetchTaplistFromProxyOrDirect', () => {
       // that mattered: `prepareAllBeers` did not classify it at all, so the
       // condition this test hands downstream reached the user as UNKNOWN_ERROR
       // on the sequential/manual path.
-      (fetchBeersFromAPI as jest.Mock).mockResolvedValue(confirmedEmpty());
+      (fetchBeersFromAPI as Mock).mockResolvedValue(confirmedEmpty());
 
       await expect(fetchTaplistFromProxyOrDirect('13885')).resolves.toEqual(
         expect.objectContaining({ beers: [], usedProxy: false })
@@ -305,8 +306,8 @@ describe('fetchTaplistFromProxyOrDirect', () => {
   });
 
   it('returns etag as null when proxy does not return one', async () => {
-    (config.enrichment.isConfigured as jest.Mock).mockReturnValue(true);
-    (fetchBeersFromProxy as jest.Mock).mockResolvedValue({
+    (config.enrichment.isConfigured as Mock).mockReturnValue(true);
+    (fetchBeersFromProxy as Mock).mockResolvedValue({
       beers: [
         {
           id: 'beer-1',
@@ -334,8 +335,8 @@ describe('fetchTaplistFromProxyOrDirect', () => {
   });
 
   it('returns etag from proxy response when present', async () => {
-    (config.enrichment.isConfigured as jest.Mock).mockReturnValue(true);
-    (fetchBeersFromProxy as jest.Mock).mockResolvedValue({
+    (config.enrichment.isConfigured as Mock).mockReturnValue(true);
+    (fetchBeersFromProxy as Mock).mockResolvedValue({
       beers: [
         {
           id: 'beer-1',
@@ -364,8 +365,8 @@ describe('fetchTaplistFromProxyOrDirect', () => {
   });
 
   it('returns etag as null on fallback path', async () => {
-    (config.enrichment.isConfigured as jest.Mock).mockReturnValue(false);
-    (fetchBeersFromAPI as jest.Mock).mockResolvedValue(
+    (config.enrichment.isConfigured as Mock).mockReturnValue(false);
+    (fetchBeersFromAPI as Mock).mockResolvedValue(
       fetchedRows([{ id: 'beer-1', brew_name: 'Test', brewer: 'B' }])
     );
 

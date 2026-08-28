@@ -26,6 +26,7 @@ import { getQueuedBeers, deleteQueuedBeer as deleteQueuedBeerApi } from '@/src/a
 import { BeerWithContainerType } from '@/src/types/beer';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useAppContext } from '@/context/AppContext';
+import { selectBeerListViewState } from '@/src/utils/beerListViewState';
 import { selectUntastedBeers } from '@/src/utils/untastedBeers';
 import { useQueuedCheckIn } from '@/hooks/useQueuedCheckIn';
 import { getSessionData } from '@/src/api/sessionManager';
@@ -340,10 +341,20 @@ export const Beerfinder = () => {
     </Modal>
   );
 
+  // Beerfinder has no loader of its own: AppProvider's retry chain lowers
+  // `isLoadingBeers` in each attempt's `finally` while `beerError` is only set
+  // once every retry has failed, so the old `isLoadingBeers && length === 0`
+  // gate fell through mid-backoff and painted "0 to discover" over a load still
+  // running. Keying off "has a load ever committed" cannot flap that way.
+  const viewState = selectBeerListViewState({
+    hasCompletedFirstLoad: loading.hasCompletedFirstLoad,
+    error: errors.beerError,
+    itemCount: beers.allBeers.length,
+  });
+
   return (
     <View testID="beerfinder-container" style={styles.container}>
-      {/* Show skeleton during initial load (when loading=true and no beers yet) */}
-      {loading.isLoadingBeers && beers.allBeers.length === 0 ? (
+      {viewState === 'loading' ? (
         <>
           {/* MP-3 Step 3b: Show action buttons even during loading */}
           <View style={styles.filtersContainer}>
@@ -364,7 +375,7 @@ export const Beerfinder = () => {
           </View>
           <SkeletonLoader count={20} />
         </>
-      ) : errors.beerError ? (
+      ) : viewState === 'error' ? (
         <View style={styles.centered}>
           <Text style={[styles.errorText, { color: colors.text }]}>{errors.beerError}</Text>
           <TouchableOpacity

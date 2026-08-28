@@ -7,7 +7,7 @@
  * 3. Type guards work correctly for runtime type checking
  */
 
-import { describe, it, expect } from '@jest/globals';
+import { describe, it, expect } from 'vitest';
 import {
   allBeersRowSchema,
   tastedBrewRowSchema,

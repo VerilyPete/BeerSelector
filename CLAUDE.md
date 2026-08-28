@@ -92,15 +92,27 @@ npm run web              # Run web version
 
 ### Testing
 
-```bash
-npm test                 # Run tests in watch mode
-npm run test:ci          # Run tests with coverage report (CI mode)
+Two runners, split by file extension: **`.test.ts` runs on vitest**
+(logic — node environment, no renderer) and **`.test.tsx` runs on jest-expo**
+(components — needs the renderer and native mocks). Pick the runner from the
+extension of the file you want; `npx jest` on a `.test.ts` matches nothing.
 
-# Run specific test suites
-npx jest src/services/__tests__/dataUpdateService.test.ts
-npx jest src/services/__tests__/dataUpdateService.integration.test.ts --coverage
-npx jest src/services/__tests__/dataUpdateService --coverage --collectCoverageFrom=src/services/dataUpdateService.ts
+```bash
+npm test                 # vitest, watch mode
+npm run test:rn          # jest-expo, watch mode
+npm run test:ci          # both, in sequence, with coverage
+
+# A specific logic suite (.test.ts -> vitest)
+npx vitest run src/services/__tests__/dataUpdateService.test.ts
+npx vitest run --coverage src/services/__tests__/dataUpdateService.test.ts
+
+# A specific component suite (.test.tsx -> jest-expo)
+npx jest --config=jest.config.js components/beer/__tests__/BeerItem.test.tsx
 ```
+
+Vitest can print every test as passing and still exit non-zero — an unhandled
+rejection counts against the process, not the run. `test:ci` chains on `&&`, so
+that silently skips the jest half. Check `$?`, not the summary line.
 
 ### Utilities
 

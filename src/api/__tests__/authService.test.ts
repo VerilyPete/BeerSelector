@@ -1,3 +1,4 @@
+import { vi, type Mock, describe, it, expect, beforeEach } from 'vitest';
 import { autoLogin, login, logout, handleTapThatAppLogin } from '../authService';
 import { saveSessionData, clearSessionData } from '../sessionManager';
 import { getApiClient } from '../apiClientInstance';
@@ -6,31 +7,31 @@ import { getPreference, setPreference } from '../../database/preferences';
 import { refreshAllDataFromAPI } from '../../services/dataUpdateService';
 
 // Mock dependencies
-jest.mock('../sessionManager', () => ({
-  saveSessionData: jest.fn().mockResolvedValue(undefined),
-  clearSessionData: jest.fn().mockResolvedValue(undefined),
+vi.mock('../sessionManager', () => ({
+  saveSessionData: vi.fn().mockResolvedValue(undefined),
+  clearSessionData: vi.fn().mockResolvedValue(undefined),
 }));
 
-jest.mock('../apiClientInstance', () => ({
-  getApiClient: jest.fn(),
+vi.mock('../apiClientInstance', () => ({
+  getApiClient: vi.fn(),
 }));
 
 // Mock database functions
-jest.mock('../../database/preferences', () => ({
-  getPreference: jest.fn().mockResolvedValue(null),
+vi.mock('../../database/preferences', () => ({
+  getPreference: vi.fn().mockResolvedValue(null),
 
-  setPreference: jest.fn().mockResolvedValue(undefined),
-  areApiUrlsConfigured: jest.fn().mockResolvedValue(true),
+  setPreference: vi.fn().mockResolvedValue(undefined),
+  areApiUrlsConfigured: vi.fn().mockResolvedValue(true),
 }));
 
 // Mock dataUpdateService functions
-jest.mock('../../services/dataUpdateService', () => ({
-  refreshAllDataFromAPI: jest.fn().mockResolvedValue({ allBeers: [], myBeers: [], rewards: [] }),
+vi.mock('../../services/dataUpdateService', () => ({
+  refreshAllDataFromAPI: vi.fn().mockResolvedValue({ allBeers: [], myBeers: [], rewards: [] }),
 }));
 
 describe('authService', () => {
   const mockApiClient = {
-    post: jest.fn(),
+    post: vi.fn(),
   };
 
   const mockSessionData: SessionData = {
@@ -41,12 +42,12 @@ describe('authService', () => {
   };
 
   beforeEach(() => {
-    jest.clearAllMocks();
-    (getApiClient as jest.Mock).mockReturnValue(mockApiClient);
+    vi.clearAllMocks();
+    (getApiClient as Mock).mockReturnValue(mockApiClient);
     // Reset database mocks to default values
-    (getPreference as jest.Mock).mockResolvedValue(null);
-    (setPreference as jest.Mock).mockResolvedValue(undefined);
-    (refreshAllDataFromAPI as jest.Mock).mockResolvedValue(undefined);
+    (getPreference as Mock).mockResolvedValue(null);
+    (setPreference as Mock).mockResolvedValue(undefined);
+    (refreshAllDataFromAPI as Mock).mockResolvedValue(undefined);
   });
 
   describe('autoLogin', () => {

@@ -175,6 +175,19 @@ export interface LoadingState {
   /** Whether beers are currently being loaded */
   isLoadingBeers: boolean;
 
+  /**
+   * Whether a beer load has ever committed rows to state.
+   *
+   * The state mirror of the `hasLoadedBeerData` ref. The ref answers the same
+   * question for the retry chain, but a ref mutation does not re-render, so it
+   * cannot drive what the screen shows. `selectBeerListViewState` needs this at
+   * render time to tell "no rows yet, still loading" from "loaded, genuinely
+   * empty" — a distinction `isLoadingBeers` cannot make, because that flag is
+   * lowered in each attempt's `finally` while the error is only set once every
+   * retry has failed.
+   */
+  hasCompletedFirstLoad: boolean;
+
   /** Whether rewards are currently being loaded */
   isLoadingRewards: boolean;
 
@@ -351,6 +364,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   // Loading state
   const [loading, setLoading] = useState<LoadingState>({
     isLoadingBeers: false,
+    hasCompletedFirstLoad: false,
     isLoadingRewards: false,
     isRefreshing: false,
     isLoadingSession: true,
@@ -547,6 +561,9 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     setRewardError(rewardsOutcome.loaded ? null : 'Failed to load rewards from database');
 
     hasLoadedBeerData.current = true;
+    setLoading(prev =>
+      prev.hasCompletedFirstLoad ? prev : { ...prev, hasCompletedFirstLoad: true }
+    );
 
     console.log(
       `[AppContext] Loaded beer data: ${allBeersData.length} all beers, ${tastedBeersData.length} tasted beers, ` +

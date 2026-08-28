@@ -102,14 +102,25 @@ Before writing a test, ask:
 
 ## Running Tests
 
-```bash
-npm test                 # Watch mode
-npm run test:ci          # CI mode with coverage
+Two runners, split by file extension: `.test.ts` is vitest's (logic, node
+environment), `.test.tsx` is jest-expo's (components, renderer). `npx jest` on a
+`.test.ts` matches nothing — `jest.config.js` ignores them all.
 
-# Specific test suites
-npx jest src/services/__tests__/dataUpdateService.test.ts
-npx jest src/utils/__tests__/beerGlassType.test.ts
+```bash
+npm test                 # vitest, watch mode
+npm run test:rn          # jest-expo, watch mode
+npm run test:ci          # both, in sequence, with coverage
+
+# Logic suites (.test.ts -> vitest)
+npx vitest run src/services/__tests__/dataUpdateService.test.ts
+npx vitest run src/utils/__tests__/beerGlassType.test.ts
+
+# Component suites (.test.tsx -> jest-expo)
+npx jest --config=jest.config.js components/beer/__tests__/BeerItem.test.tsx
 ```
+
+Check `$?` rather than the summary line: vitest reports every test green and
+still exits non-zero on an unhandled rejection, and `test:ci` chains on `&&`.
 
 ## Pre-commit Hook
 

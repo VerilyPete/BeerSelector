@@ -1,3 +1,4 @@
+import { vi, type Mock, describe, it, expect, beforeEach, afterEach } from 'vitest';
 /**
  * Tests for Queue Service
  *
@@ -12,11 +13,11 @@ import { ApiError } from '../../types/api';
 import { config } from '@/src/config';
 
 // Mock dependencies
-jest.mock('../sessionManager');
-jest.mock('../../utils/htmlParser');
+vi.mock('../sessionManager');
+vi.mock('../../utils/htmlParser');
 
 // Mock global fetch
-global.fetch = jest.fn();
+global.fetch = vi.fn();
 
 describe('queueService', () => {
   // Sample session data for testing
@@ -29,7 +30,7 @@ describe('queueService', () => {
     firstName: 'Test',
     lastName: 'User',
     email: 'test@example.com',
-    cardNum: '12345'
+    cardNum: '12345',
   };
 
   // Sample queued beers for testing
@@ -37,26 +38,26 @@ describe('queueService', () => {
     {
       name: 'Firestone Walker Parabola (BTL)',
       date: 'Apr 08, 2025 @ 03:10:18pm',
-      id: '1885490'
+      id: '1885490',
     },
     {
       name: 'Stone IPA (Draft)',
       date: 'Apr 09, 2025 @ 10:30:00am',
-      id: '1885491'
-    }
+      id: '1885491',
+    },
   ];
 
   beforeEach(() => {
     // Clear all mocks before each test
-    jest.clearAllMocks();
+    vi.clearAllMocks();
 
     // Setup default mock implementations
-    (getSessionData as jest.Mock).mockResolvedValue(mockSessionData);
-    (parseQueuedBeersFromHtml as jest.Mock).mockReturnValue(mockQueuedBeers);
+    (getSessionData as Mock).mockResolvedValue(mockSessionData);
+    (parseQueuedBeersFromHtml as Mock).mockReturnValue(mockQueuedBeers);
   });
 
   afterEach(() => {
-    jest.restoreAllMocks();
+    vi.restoreAllMocks();
   });
 
   describe('getQueuedBeers', () => {
@@ -64,10 +65,10 @@ describe('queueService', () => {
       it('should successfully fetch and parse queued beers', async () => {
         // Mock successful fetch
         const mockHtml = '<html>Mock queue page HTML</html>';
-        (global.fetch as jest.Mock).mockResolvedValue({
+        (global.fetch as Mock).mockResolvedValue({
           ok: true,
           status: 200,
-          text: jest.fn().mockResolvedValue(mockHtml)
+          text: vi.fn().mockResolvedValue(mockHtml),
         });
 
         const result = await getQueuedBeers();
@@ -78,9 +79,9 @@ describe('queueService', () => {
           expect.objectContaining({
             method: 'GET',
             headers: expect.objectContaining({
-              'accept': expect.any(String),
-              'Cookie': expect.stringContaining('store__id=test-store-456')
-            })
+              accept: expect.any(String),
+              Cookie: expect.stringContaining('store__id=test-store-456'),
+            }),
           })
         );
 
@@ -93,16 +94,16 @@ describe('queueService', () => {
       });
 
       it('should include all session cookies in request headers', async () => {
-        (global.fetch as jest.Mock).mockResolvedValue({
+        (global.fetch as Mock).mockResolvedValue({
           ok: true,
           status: 200,
-          text: jest.fn().mockResolvedValue('<html>Mock HTML</html>')
+          text: vi.fn().mockResolvedValue('<html>Mock HTML</html>'),
         });
 
         await getQueuedBeers();
 
         // Get the fetch call arguments
-        const fetchCall = (global.fetch as jest.Mock).mock.calls[0];
+        const fetchCall = (global.fetch as Mock).mock.calls[0];
         const headers = fetchCall[1].headers;
         const cookieHeader = headers.Cookie;
 
@@ -119,117 +120,117 @@ describe('queueService', () => {
       });
 
       it('should return empty array when no beers are queued', async () => {
-        (global.fetch as jest.Mock).mockResolvedValue({
+        (global.fetch as Mock).mockResolvedValue({
           ok: true,
           status: 200,
-          text: jest.fn().mockResolvedValue('<html>Empty queue</html>')
+          text: vi.fn().mockResolvedValue('<html>Empty queue</html>'),
         });
 
-        (parseQueuedBeersFromHtml as jest.Mock).mockReturnValue([]);
+        (parseQueuedBeersFromHtml as Mock).mockReturnValue([]);
 
         const result = await getQueuedBeers();
 
         expect(result).toEqual([]);
         expect(result).toHaveLength(0);
       });
-
     });
 
     describe('Session Validation', () => {
       it('should throw ApiError when session data is null', async () => {
-        (getSessionData as jest.Mock).mockResolvedValue(null);
+        (getSessionData as Mock).mockResolvedValue(null);
 
         await expect(getQueuedBeers()).rejects.toThrow(ApiError);
         await expect(getQueuedBeers()).rejects.toThrow('Your session has expired');
       });
 
       it('should throw ApiError when memberId is missing', async () => {
-        (getSessionData as jest.Mock).mockResolvedValue({
+        (getSessionData as Mock).mockResolvedValue({
           ...mockSessionData,
-          memberId: undefined
+          memberId: undefined,
         });
 
         await expect(getQueuedBeers()).rejects.toThrow(ApiError);
       });
 
       it('should throw ApiError when storeId is missing', async () => {
-        (getSessionData as jest.Mock).mockResolvedValue({
+        (getSessionData as Mock).mockResolvedValue({
           ...mockSessionData,
-          storeId: undefined
+          storeId: undefined,
         });
 
         await expect(getQueuedBeers()).rejects.toThrow(ApiError);
       });
 
       it('should throw ApiError when storeName is missing', async () => {
-        (getSessionData as jest.Mock).mockResolvedValue({
+        (getSessionData as Mock).mockResolvedValue({
           ...mockSessionData,
-          storeName: undefined
+          storeName: undefined,
         });
 
         await expect(getQueuedBeers()).rejects.toThrow(ApiError);
       });
 
       it('should throw ApiError when sessionId is missing', async () => {
-        (getSessionData as jest.Mock).mockResolvedValue({
+        (getSessionData as Mock).mockResolvedValue({
           ...mockSessionData,
-          sessionId: undefined
+          sessionId: undefined,
         });
 
         await expect(getQueuedBeers()).rejects.toThrow(ApiError);
       });
 
       it('should throw ApiError with 401 status code for expired session', async () => {
-        (getSessionData as jest.Mock).mockResolvedValue(null);
+        (getSessionData as Mock).mockResolvedValue(null);
 
+        let caught: unknown;
         try {
           await getQueuedBeers();
-          fail('Should have thrown ApiError');
         } catch (error) {
-          expect(error).toBeInstanceOf(ApiError);
-          expect((error as ApiError).statusCode).toBe(401);
+          caught = error;
         }
+        expect(caught).toBeInstanceOf(ApiError);
+        expect((caught as ApiError).statusCode).toBe(401);
       });
     });
 
     describe('Network Error Handling', () => {
       it('should throw error when fetch fails with network error', async () => {
-        (global.fetch as jest.Mock).mockRejectedValue(new Error('Network request failed'));
+        (global.fetch as Mock).mockRejectedValue(new Error('Network request failed'));
 
         await expect(getQueuedBeers()).rejects.toThrow('Network request failed');
       });
 
       it('should throw error when response is not ok (404)', async () => {
-        (global.fetch as jest.Mock).mockResolvedValue({
+        (global.fetch as Mock).mockResolvedValue({
           ok: false,
-          status: 404
+          status: 404,
         });
 
         await expect(getQueuedBeers()).rejects.toThrow('Failed to fetch queues with status: 404');
       });
 
       it('should throw error when response is not ok (500)', async () => {
-        (global.fetch as jest.Mock).mockResolvedValue({
+        (global.fetch as Mock).mockResolvedValue({
           ok: false,
-          status: 500
+          status: 500,
         });
 
         await expect(getQueuedBeers()).rejects.toThrow('Failed to fetch queues with status: 500');
       });
 
       it('should throw error when response is not ok (401 unauthorized)', async () => {
-        (global.fetch as jest.Mock).mockResolvedValue({
+        (global.fetch as Mock).mockResolvedValue({
           ok: false,
-          status: 401
+          status: 401,
         });
 
         await expect(getQueuedBeers()).rejects.toThrow('Failed to fetch queues with status: 401');
       });
 
       it('should throw when network request fails', async () => {
-        jest.spyOn(console, 'error').mockImplementation();
+        vi.spyOn(console, 'error').mockImplementation(() => {});
 
-        (global.fetch as jest.Mock).mockRejectedValue(new Error('Network error'));
+        (global.fetch as Mock).mockRejectedValue(new Error('Network error'));
 
         await expect(getQueuedBeers()).rejects.toThrow('Network error');
       });
@@ -237,13 +238,13 @@ describe('queueService', () => {
 
     describe('HTML Parsing Errors', () => {
       it('should handle parser returning empty array', async () => {
-        (global.fetch as jest.Mock).mockResolvedValue({
+        (global.fetch as Mock).mockResolvedValue({
           ok: true,
           status: 200,
-          text: jest.fn().mockResolvedValue('<html>Some HTML</html>')
+          text: vi.fn().mockResolvedValue('<html>Some HTML</html>'),
         });
 
-        (parseQueuedBeersFromHtml as jest.Mock).mockReturnValue([]);
+        (parseQueuedBeersFromHtml as Mock).mockReturnValue([]);
 
         const result = await getQueuedBeers();
 
@@ -251,13 +252,13 @@ describe('queueService', () => {
       });
 
       it('should propagate parser errors', async () => {
-        (global.fetch as jest.Mock).mockResolvedValue({
+        (global.fetch as Mock).mockResolvedValue({
           ok: true,
           status: 200,
-          text: jest.fn().mockResolvedValue('<html>Some HTML</html>')
+          text: vi.fn().mockResolvedValue('<html>Some HTML</html>'),
         });
 
-        (parseQueuedBeersFromHtml as jest.Mock).mockImplementation(() => {
+        (parseQueuedBeersFromHtml as Mock).mockImplementation(() => {
           throw new Error('Parser error');
         });
 
@@ -265,10 +266,10 @@ describe('queueService', () => {
       });
 
       it('should handle response.text() throwing error', async () => {
-        (global.fetch as jest.Mock).mockResolvedValue({
+        (global.fetch as Mock).mockResolvedValue({
           ok: true,
           status: 200,
-          text: jest.fn().mockRejectedValue(new Error('Failed to read response'))
+          text: vi.fn().mockRejectedValue(new Error('Failed to read response')),
         });
 
         await expect(getQueuedBeers()).rejects.toThrow('Failed to read response');
@@ -281,22 +282,22 @@ describe('queueService', () => {
           memberId: 'test-member-123',
           storeId: 'test-store-456',
           storeName: 'Test Store',
-          sessionId: 'test-session-abc'
+          sessionId: 'test-session-abc',
           // Missing: username, firstName, lastName, email, cardNum
         };
 
-        (getSessionData as jest.Mock).mockResolvedValue(sessionWithoutOptionals);
+        (getSessionData as Mock).mockResolvedValue(sessionWithoutOptionals);
 
-        (global.fetch as jest.Mock).mockResolvedValue({
+        (global.fetch as Mock).mockResolvedValue({
           ok: true,
           status: 200,
-          text: jest.fn().mockResolvedValue('<html>Mock HTML</html>')
+          text: vi.fn().mockResolvedValue('<html>Mock HTML</html>'),
         });
 
         await getQueuedBeers();
 
         // Verify fetch was still called with cookie header
-        const fetchCall = (global.fetch as jest.Mock).mock.calls[0];
+        const fetchCall = (global.fetch as Mock).mock.calls[0];
         const cookieHeader = fetchCall[1].headers.Cookie;
 
         // Should have empty values for missing fields
@@ -312,9 +313,9 @@ describe('queueService', () => {
   describe('deleteQueuedBeer', () => {
     describe('Success Cases', () => {
       it('should successfully delete a queued beer', async () => {
-        (global.fetch as jest.Mock).mockResolvedValue({
+        (global.fetch as Mock).mockResolvedValue({
           ok: true,
-          status: 200
+          status: 200,
         });
 
         const result = await deleteQueuedBeer('1885490');
@@ -325,8 +326,8 @@ describe('queueService', () => {
           expect.objectContaining({
             method: 'GET',
             headers: expect.objectContaining({
-              'Cookie': expect.stringContaining('store__id=test-store-456')
-            })
+              Cookie: expect.stringContaining('store__id=test-store-456'),
+            }),
           })
         );
 
@@ -335,14 +336,14 @@ describe('queueService', () => {
       });
 
       it('should include all session cookies in delete request', async () => {
-        (global.fetch as jest.Mock).mockResolvedValue({
+        (global.fetch as Mock).mockResolvedValue({
           ok: true,
-          status: 200
+          status: 200,
         });
 
         await deleteQueuedBeer('1885490');
 
-        const fetchCall = (global.fetch as jest.Mock).mock.calls[0];
+        const fetchCall = (global.fetch as Mock).mock.calls[0];
         const headers = fetchCall[1].headers;
         const cookieHeader = headers.Cookie;
 
@@ -352,24 +353,23 @@ describe('queueService', () => {
       });
 
       it('should set correct referer header', async () => {
-        (global.fetch as jest.Mock).mockResolvedValue({
+        (global.fetch as Mock).mockResolvedValue({
           ok: true,
-          status: 200
+          status: 200,
         });
 
         await deleteQueuedBeer('1885490');
 
-        const fetchCall = (global.fetch as jest.Mock).mock.calls[0];
+        const fetchCall = (global.fetch as Mock).mock.calls[0];
         const headers = fetchCall[1].headers;
 
         expect(headers.referer).toBe(config.api.referers.memberQueues);
       });
 
-
       it('should handle different cid formats', async () => {
-        (global.fetch as jest.Mock).mockResolvedValue({
+        (global.fetch as Mock).mockResolvedValue({
           ok: true,
-          status: 200
+          status: 200,
         });
 
         await deleteQueuedBeer('999999999');
@@ -383,7 +383,7 @@ describe('queueService', () => {
 
     describe('Input Validation', () => {
       it('should return false when cid is empty string', async () => {
-        jest.spyOn(console, 'error').mockImplementation();
+        vi.spyOn(console, 'error').mockImplementation(() => {});
 
         const result = await deleteQueuedBeer('');
 
@@ -408,9 +408,9 @@ describe('queueService', () => {
 
     describe('Session Validation', () => {
       it('should return false when session data is null (caught and handled)', async () => {
-        jest.spyOn(console, 'error').mockImplementation();
+        vi.spyOn(console, 'error').mockImplementation(() => {});
 
-        (getSessionData as jest.Mock).mockResolvedValue(null);
+        (getSessionData as Mock).mockResolvedValue(null);
 
         const result = await deleteQueuedBeer('1885490');
 
@@ -418,11 +418,11 @@ describe('queueService', () => {
       });
 
       it('should return false when memberId is missing (caught and handled)', async () => {
-        jest.spyOn(console, 'error').mockImplementation();
+        vi.spyOn(console, 'error').mockImplementation(() => {});
 
-        (getSessionData as jest.Mock).mockResolvedValue({
+        (getSessionData as Mock).mockResolvedValue({
           ...mockSessionData,
-          memberId: undefined
+          memberId: undefined,
         });
 
         const result = await deleteQueuedBeer('1885490');
@@ -431,11 +431,11 @@ describe('queueService', () => {
       });
 
       it('should return false when storeId is missing (caught and handled)', async () => {
-        jest.spyOn(console, 'error').mockImplementation();
+        vi.spyOn(console, 'error').mockImplementation(() => {});
 
-        (getSessionData as jest.Mock).mockResolvedValue({
+        (getSessionData as Mock).mockResolvedValue({
           ...mockSessionData,
-          storeId: undefined
+          storeId: undefined,
         });
 
         const result = await deleteQueuedBeer('1885490');
@@ -444,11 +444,11 @@ describe('queueService', () => {
       });
 
       it('should return false when storeName is missing (caught and handled)', async () => {
-        jest.spyOn(console, 'error').mockImplementation();
+        vi.spyOn(console, 'error').mockImplementation(() => {});
 
-        (getSessionData as jest.Mock).mockResolvedValue({
+        (getSessionData as Mock).mockResolvedValue({
           ...mockSessionData,
-          storeName: undefined
+          storeName: undefined,
         });
 
         const result = await deleteQueuedBeer('1885490');
@@ -457,11 +457,11 @@ describe('queueService', () => {
       });
 
       it('should return false when sessionId is missing (caught and handled)', async () => {
-        jest.spyOn(console, 'error').mockImplementation();
+        vi.spyOn(console, 'error').mockImplementation(() => {});
 
-        (getSessionData as jest.Mock).mockResolvedValue({
+        (getSessionData as Mock).mockResolvedValue({
           ...mockSessionData,
-          sessionId: undefined
+          sessionId: undefined,
         });
 
         const result = await deleteQueuedBeer('1885490');
@@ -472,11 +472,11 @@ describe('queueService', () => {
 
     describe('Network Error Handling', () => {
       it('should return false when response is not ok (404)', async () => {
-        jest.spyOn(console, 'error').mockImplementation();
+        vi.spyOn(console, 'error').mockImplementation(() => {});
 
-        (global.fetch as jest.Mock).mockResolvedValue({
+        (global.fetch as Mock).mockResolvedValue({
           ok: false,
-          status: 404
+          status: 404,
         });
 
         const result = await deleteQueuedBeer('1885490');
@@ -485,9 +485,9 @@ describe('queueService', () => {
       });
 
       it('should return false when response is not ok (500)', async () => {
-        (global.fetch as jest.Mock).mockResolvedValue({
+        (global.fetch as Mock).mockResolvedValue({
           ok: false,
-          status: 500
+          status: 500,
         });
 
         const result = await deleteQueuedBeer('1885490');
@@ -496,9 +496,9 @@ describe('queueService', () => {
       });
 
       it('should return false when fetch throws network error', async () => {
-        jest.spyOn(console, 'error').mockImplementation();
+        vi.spyOn(console, 'error').mockImplementation(() => {});
 
-        (global.fetch as jest.Mock).mockRejectedValue(new Error('Network error'));
+        (global.fetch as Mock).mockRejectedValue(new Error('Network error'));
 
         const result = await deleteQueuedBeer('1885490');
 
@@ -508,9 +508,9 @@ describe('queueService', () => {
 
     describe('Edge Cases', () => {
       it('should handle successful deletion with 204 status', async () => {
-        (global.fetch as jest.Mock).mockResolvedValue({
+        (global.fetch as Mock).mockResolvedValue({
           ok: true,
-          status: 204
+          status: 204,
         });
 
         const result = await deleteQueuedBeer('1885490');
@@ -519,9 +519,9 @@ describe('queueService', () => {
       });
 
       it('should handle cid with special characters (URL encoded)', async () => {
-        (global.fetch as jest.Mock).mockResolvedValue({
+        (global.fetch as Mock).mockResolvedValue({
           ok: true,
-          status: 200
+          status: 200,
         });
 
         await deleteQueuedBeer('test-beer-123');
@@ -533,9 +533,9 @@ describe('queueService', () => {
       });
 
       it('should handle very long cid values', async () => {
-        (global.fetch as jest.Mock).mockResolvedValue({
+        (global.fetch as Mock).mockResolvedValue({
           ok: true,
-          status: 200
+          status: 200,
         });
 
         const longCid = '1'.repeat(100);
@@ -552,19 +552,19 @@ describe('queueService', () => {
   describe('Integration Between Functions', () => {
     it('should handle typical workflow: get queues then delete one', async () => {
       // First, get queued beers
-      (global.fetch as jest.Mock).mockResolvedValue({
+      (global.fetch as Mock).mockResolvedValue({
         ok: true,
         status: 200,
-        text: jest.fn().mockResolvedValue('<html>Queue HTML</html>')
+        text: vi.fn().mockResolvedValue('<html>Queue HTML</html>'),
       });
 
       const queues = await getQueuedBeers();
       expect(queues).toHaveLength(2);
 
       // Then delete one
-      (global.fetch as jest.Mock).mockResolvedValue({
+      (global.fetch as Mock).mockResolvedValue({
         ok: true,
-        status: 200
+        status: 200,
       });
 
       const deleteResult = await deleteQueuedBeer(queues[0].id);
@@ -576,18 +576,18 @@ describe('queueService', () => {
 
     it('should use the same session data for both operations', async () => {
       // Get queues
-      (global.fetch as jest.Mock).mockResolvedValue({
+      (global.fetch as Mock).mockResolvedValue({
         ok: true,
         status: 200,
-        text: jest.fn().mockResolvedValue('<html>Queue HTML</html>')
+        text: vi.fn().mockResolvedValue('<html>Queue HTML</html>'),
       });
 
       await getQueuedBeers();
 
       // Delete a beer
-      (global.fetch as jest.Mock).mockResolvedValue({
+      (global.fetch as Mock).mockResolvedValue({
         ok: true,
-        status: 200
+        status: 200,
       });
 
       await deleteQueuedBeer('1885490');

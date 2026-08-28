@@ -1,3 +1,4 @@
+import { describe, it, expect } from 'vitest';
 import { resolveColdStartRoute, deepLinkSegment } from '../coldStartNavigation';
 
 describe('deepLinkSegment', () => {

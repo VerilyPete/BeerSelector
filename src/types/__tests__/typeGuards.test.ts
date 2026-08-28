@@ -1,3 +1,4 @@
+import { describe, it, expect } from 'vitest';
 import { isBeer } from '../beer';
 import { isSessionData } from '../api';
 import { isPreference, isReward } from '../database';
@@ -61,7 +62,6 @@ describe('Type Guards', () => {
         expect(isSessionData(null)).toBe(false);
       });
     });
-
   });
 
   describe('Database Type Guards', () => {

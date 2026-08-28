@@ -1,3 +1,4 @@
+import { describe, it, expect, beforeEach, afterEach, vi, type Mock } from 'vitest';
 /**
  * Migrations must actually be invoked.
  *
@@ -29,35 +30,35 @@ import { migrateToVersion4 } from '../migrations/migrateToV4';
 import { migrateToVersion3 } from '../migrations/migrateToV3';
 import { CURRENT_SCHEMA_VERSION } from '../schemaVersion';
 
-jest.mock('../connection');
-jest.mock('../migrations/migrateToV8', () => ({
-  migrateToVersion8: jest.fn().mockResolvedValue(undefined),
+vi.mock('../connection');
+vi.mock('../migrations/migrateToV8', () => ({
+  migrateToVersion8: vi.fn().mockResolvedValue(undefined),
 }));
-jest.mock('../migrations/migrateToV7', () => ({
-  migrateToVersion7: jest.fn().mockResolvedValue(undefined),
+vi.mock('../migrations/migrateToV7', () => ({
+  migrateToVersion7: vi.fn().mockResolvedValue(undefined),
 }));
-jest.mock('../migrations/migrateToV6', () => ({
-  migrateToVersion6: jest.fn().mockResolvedValue(undefined),
+vi.mock('../migrations/migrateToV6', () => ({
+  migrateToVersion6: vi.fn().mockResolvedValue(undefined),
 }));
-jest.mock('../migrations/migrateToV5', () => ({
-  migrateToVersion5: jest.fn().mockResolvedValue(undefined),
+vi.mock('../migrations/migrateToV5', () => ({
+  migrateToVersion5: vi.fn().mockResolvedValue(undefined),
 }));
-jest.mock('../migrations/migrateToV4', () => ({
-  migrateToVersion4: jest.fn().mockResolvedValue(undefined),
+vi.mock('../migrations/migrateToV4', () => ({
+  migrateToVersion4: vi.fn().mockResolvedValue(undefined),
 }));
-jest.mock('../migrations/migrateToV3', () => ({
-  migrateToVersion3: jest.fn().mockResolvedValue(undefined),
+vi.mock('../migrations/migrateToV3', () => ({
+  migrateToVersion3: vi.fn().mockResolvedValue(undefined),
 }));
 
 describe('migration dispatch', () => {
-  const mockGetFirstAsync = jest.fn();
+  const mockGetFirstAsync = vi.fn();
   const mockDatabase = {
-    execAsync: jest.fn().mockResolvedValue(undefined),
-    runAsync: jest.fn().mockResolvedValue({ changes: 0, lastInsertRowId: 0 }),
+    execAsync: vi.fn().mockResolvedValue(undefined),
+    runAsync: vi.fn().mockResolvedValue({ changes: 0, lastInsertRowId: 0 }),
     getFirstAsync: mockGetFirstAsync,
-    getAllAsync: jest.fn().mockResolvedValue([]),
-    withTransactionAsync: jest.fn(async (cb: () => Promise<void>) => cb()),
-    closeAsync: jest.fn().mockResolvedValue(undefined),
+    getAllAsync: vi.fn().mockResolvedValue([]),
+    withTransactionAsync: vi.fn(async (cb: () => Promise<void>) => cb()),
+    closeAsync: vi.fn().mockResolvedValue(undefined),
   };
 
   /** Make `getCurrentSchemaVersion` report a stored version. */
@@ -66,16 +67,16 @@ describe('migration dispatch', () => {
   };
 
   beforeEach(() => {
-    jest.clearAllMocks();
-    jest.useRealTimers();
+    vi.clearAllMocks();
+    vi.useRealTimers();
     resetDatabaseState();
-    (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
-    jest.spyOn(console, 'log').mockImplementation();
-    jest.spyOn(console, 'error').mockImplementation();
+    (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
   afterEach(() => {
-    jest.restoreAllMocks();
+    vi.restoreAllMocks();
     // `mockReset`, not just `clearAllMocks`/`restoreAllMocks`. Neither of those
     // removes an implementation installed on a bare `jest.fn()`:
     // `clearAllMocks` clears calls only, `restoreAllMocks` restores `spyOn`
@@ -163,13 +164,13 @@ describe('migration dispatch', () => {
    * A per-version table is used rather than one case per arm so that adding a
    * migration without extending this list is itself a failure.
    */
-  const DISPATCH_ARMS: readonly (readonly [number, jest.Mock])[] = [
-    [3, migrateToVersion3 as jest.Mock],
-    [4, migrateToVersion4 as jest.Mock],
-    [5, migrateToVersion5 as jest.Mock],
-    [6, migrateToVersion6 as jest.Mock],
-    [7, migrateToVersion7 as jest.Mock],
-    [8, migrateToVersion8 as jest.Mock],
+  const DISPATCH_ARMS: readonly (readonly [number, Mock])[] = [
+    [3, migrateToVersion3 as Mock],
+    [4, migrateToVersion4 as Mock],
+    [5, migrateToVersion5 as Mock],
+    [6, migrateToVersion6 as Mock],
+    [7, migrateToVersion7 as Mock],
+    [8, migrateToVersion8 as Mock],
   ];
 
   it('covers every dispatch arm in runMigrations', () => {

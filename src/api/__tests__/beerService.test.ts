@@ -1,36 +1,42 @@
+import { vi, type Mock, describe, it, expect, beforeEach } from 'vitest';
 import { checkInBeer } from '../beerService';
 import { getSessionData } from '../sessionManager';
 import { autoLogin } from '../authService';
 
 // Mock dependencies
-jest.mock('../sessionManager');
-jest.mock('../authService');
+vi.mock('../sessionManager');
+vi.mock('../authService');
 
-// Create a mock API client
-const mockApiClient = {
-  get: jest.fn(),
-  post: jest.fn(),
-};
+// Create a mock API client.
+//
+// `vi.hoisted` because the `vi.mock` factory below is hoisted above every
+// top-level statement; a plain `const` here would still be in its temporal dead
+// zone when the factory runs. This was a plain const under jest, whose
+// `jest.mock` factory ran lazily on first import instead.
+const mockApiClient = vi.hoisted(() => ({
+  get: vi.fn(),
+  post: vi.fn(),
+}));
 
 // Mock the apiClientInstance module
-jest.mock('../apiClientInstance', () => ({
-  getApiClient: jest.fn().mockReturnValue(mockApiClient),
+vi.mock('../apiClientInstance', () => ({
+  getApiClient: vi.fn().mockReturnValue(mockApiClient),
   apiClient: mockApiClient,
 }));
 
 describe('beerService', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
 
     // Setup default mocks
-    (getSessionData as jest.Mock).mockResolvedValue({
+    (getSessionData as Mock).mockResolvedValue({
       memberId: 'test-member-id',
       storeId: 'test-store-id',
       storeName: 'Test Store',
       sessionId: 'test-session-id',
     });
 
-    (autoLogin as jest.Mock).mockResolvedValue({
+    (autoLogin as Mock).mockResolvedValue({
       success: true,
       sessionData: {
         memberId: 'test-member-id',
@@ -44,7 +50,7 @@ describe('beerService', () => {
   describe('checkInBeer', () => {
     it('should attempt auto-login if session data is missing', async () => {
       // Mock missing session data
-      (getSessionData as jest.Mock).mockResolvedValue(null);
+      (getSessionData as Mock).mockResolvedValue(null);
 
       mockApiClient.post.mockResolvedValue({
         success: true,

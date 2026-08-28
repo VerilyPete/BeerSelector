@@ -26,6 +26,19 @@ module.exports = {
   testMatch: ['**/__tests__/**/*.test.[jt]s?(x)', '**/?(*.)+(spec|test).[jt]s?(x)'],
   testPathIgnorePatterns: [
     '/node_modules/',
+
+    // Ceded to vitest: every `.test.ts` in the repo, wherever it lives. Those
+    // are pure logic — no renderer, no RN runtime — and run under
+    // vitest.config.ts with a node environment and no jest-expo preset. They
+    // use `vi.*` and would fail here.
+    //
+    // The boundary is a rule, not a directory list: `.test.ts` is vitest's,
+    // `.test.tsx` is jest's, because TSX is what needs the renderer and the
+    // preset's native mocks. Note `$` — this does not match `.test.tsx`.
+    // Everything left in this config is TSX, so a suite changes runner only by
+    // gaining or losing a renderer, which is the thing that actually decides it.
+    '\\.test\\.ts$',
+
     '/ios/',
     '/android/',
     '/.cursor/',
@@ -39,11 +52,17 @@ module.exports = {
     // Dead config carrying a live-looking TODO. Removed rather than left to
     // imply there is a Flashlight migration pending on something real.
     //
-    // BeerList.virtualization is genuinely red (17 pass, 9 fail), so it stays.
-    // Its stated reason was wrong though: it does not hang, and no WebView,
-    // Alert or RN context is involved. It is quarantined because it fails.
-    'components/beer/__tests__/BeerList.virtualization.test.tsx',
-    // Component tests that use WebView, Alert, or RN context - migrate to Maestro
+    // THIS LIST IS NOW EMPTY, and the bar for adding to it is: run the file,
+    // and write down what it actually does. Every entry ever removed from here
+    // was excluded on a premise that turned out to be false when someone
+    // finally checked.
+    //
+    // BeerList.virtualization was the last one. It was 17 pass / 9 fail, not a
+    // hang — the 9 asserted FlatList props the component has never had, because
+    // the suite was a RED-first spec for an optimization that shipped different
+    // numbers, and it was quarantined instead of reconciled. Eight of the 17
+    // "passing" tests asserted arithmetic on their own local constants and could
+    // not fail. It is now one test that pins the real config; see its header.
     //
     // LoginWebView.test.tsx is NOT here any more. The stated reason for the
     // quarantine did not hold: it does not hang, it runs in ~9s. It was red —

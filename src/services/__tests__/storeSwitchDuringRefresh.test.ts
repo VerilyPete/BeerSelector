@@ -1,3 +1,4 @@
+import { describe, it, expect, beforeEach, afterEach, vi, type Mock } from 'vitest';
 /**
  * A refresh must not commit rows fetched for a store the app has since left.
  *
@@ -69,8 +70,8 @@ let mockTaplistUrl = STORE_A;
  */
 const mockConfigReadHolders: (string | null)[] = [];
 
-jest.mock('../../database/preferences', () => ({
-  getPreference: jest.fn(async (key: string) => {
+vi.mock('../../database/preferences', async () => ({
+  getPreference: vi.fn(async (key: string) => {
     if (key === 'all_beers_api_url') {
       mockConfigReadHolders.push(mockLockHolder);
       return mockTaplistUrl;
@@ -78,39 +79,39 @@ jest.mock('../../database/preferences', () => ({
     if (key === 'my_beers_api_url') return 'https://example.com/mybeers.json';
     return null;
   }),
-  setPreference: jest.fn(async () => {}),
-  areApiUrlsConfigured: jest.fn(async () => true),
+  setPreference: vi.fn(async () => {}),
+  areApiUrlsConfigured: vi.fn(async () => true),
 }));
 
-jest.mock('../../api/beerApi', () =>
+vi.mock('../../api/beerApi', async () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  require('../../api/__tests__/helpers/beerApiMock').beerApiMockFactory()
+  (await import('../../api/__tests__/helpers/beerApiMock')).beerApiMockFactory()
 );
 
-jest.mock('../enrichmentService', () => ({
-  fetchBeersFromProxy: jest.fn(),
-  fetchEnrichmentBatchWithMissing: jest.fn(async () => ({ enrichments: {}, missing: [] })),
-  syncBeersToWorker: jest.fn(async () => ({ synced: 0, failed: 0, queued_for_cleanup: 0 })),
-  mergeEnrichmentData: jest.fn((beers: unknown) => beers),
-  recordFallback: jest.fn(),
-  pollForEnrichmentUpdates: jest.fn(async () => ({})),
+vi.mock('../enrichmentService', async () => ({
+  fetchBeersFromProxy: vi.fn(),
+  fetchEnrichmentBatchWithMissing: vi.fn(async () => ({ enrichments: {}, missing: [] })),
+  syncBeersToWorker: vi.fn(async () => ({ synced: 0, failed: 0, queued_for_cleanup: 0 })),
+  mergeEnrichmentData: vi.fn((beers: unknown) => beers),
+  recordFallback: vi.fn(),
+  pollForEnrichmentUpdates: vi.fn(async () => ({})),
 }));
 
-jest.mock('../../database/repositories/BeerRepository', () => ({
-  beerRepository: { insertManyUnsafe: jest.fn(async () => {}), count: jest.fn(async () => 12) },
+vi.mock('../../database/repositories/BeerRepository', async () => ({
+  beerRepository: { insertManyUnsafe: vi.fn(async () => {}), count: vi.fn(async () => 12) },
 }));
 
-jest.mock('../../database/repositories/MyBeersRepository', () => ({
+vi.mock('../../database/repositories/MyBeersRepository', async () => ({
   myBeersRepository: {
-    insertManyUnsafe: jest.fn(async () => {}),
-    replaceAllWithEmptyUnsafe: jest.fn(async () => {}),
+    insertManyUnsafe: vi.fn(async () => {}),
+    replaceAllWithEmptyUnsafe: vi.fn(async () => {}),
   },
 }));
 
-jest.mock('../../database/repositories/RewardsRepository', () => ({
+vi.mock('../../database/repositories/RewardsRepository', async () => ({
   rewardsRepository: {
-    insertManyUnsafe: jest.fn(async () => {}),
-    replaceAllWithEmptyUnsafe: jest.fn(async () => {}),
+    insertManyUnsafe: vi.fn(async () => {}),
+    replaceAllWithEmptyUnsafe: vi.fn(async () => {}),
   },
 }));
 
@@ -128,9 +129,9 @@ jest.mock('../../database/repositories/RewardsRepository', () => ({
 // was assumed.
 let mockLockHolder: string | null = null;
 
-jest.mock('../../database/DatabaseLockManager', () => ({
+vi.mock('../../database/DatabaseLockManager', async () => ({
   databaseLockManager: {
-    withDatabaseLock: jest.fn(async (name: string, task: () => Promise<unknown>) => {
+    withDatabaseLock: vi.fn(async (name: string, task: () => Promise<unknown>) => {
       mockLockHolder = name;
       try {
         return await task();
@@ -142,15 +143,15 @@ jest.mock('../../database/DatabaseLockManager', () => ({
   },
 }));
 
-jest.mock('../../utils/errorLogger', () => ({ logError: jest.fn(), logWarning: jest.fn() }));
+vi.mock('../../utils/errorLogger', async () => ({ logError: vi.fn(), logWarning: vi.fn() }));
 
-jest.mock('@/src/config', () => {
-  const actual = jest.requireActual('@/src/config');
+vi.mock('@/src/config', async () => {
+  const actual = await vi.importActual<typeof import('@/src/config')>('@/src/config');
   return {
     ...actual,
     config: {
       ...actual.config,
-      enrichment: { ...actual.config.enrichment, isConfigured: jest.fn().mockReturnValue(false) },
+      enrichment: { ...actual.config.enrichment, isConfigured: vi.fn().mockReturnValue(false) },
     },
   };
 });
@@ -158,7 +159,7 @@ jest.mock('@/src/config', () => {
 const ALL_BEERS = [{ id: 'b1', brew_name: 'Store A Beer', brewer: 'Brewery' }];
 
 /** Every key written via setPreference, in order. */
-const writtenKeys = (): string[] => (setPreference as jest.Mock).mock.calls.map(([key]) => key);
+const writtenKeys = (): string[] => (setPreference as Mock).mock.calls.map(([key]) => key);
 
 /**
  * Answer the taplist fetch, switching the configured store as it resolves.
@@ -167,14 +168,14 @@ const writtenKeys = (): string[] => (setPreference as jest.Mock).mock.calls.map(
  * time anything can commit them the app is pointed at B.
  */
 const fetchThenSwitchStore = (): void => {
-  (fetchBeersFromAPI as jest.Mock).mockImplementation(async () => {
+  (fetchBeersFromAPI as Mock).mockImplementation(async () => {
     mockTaplistUrl = STORE_B;
     return fetchedRows(ALL_BEERS);
   });
 };
 
-beforeEach(() => {
-  jest.clearAllMocks();
+beforeEach(async () => {
+  vi.clearAllMocks();
   mockConfigReadHolders.length = 0;
   mockTaplistUrl = STORE_A;
   resetInFlightSequentialRefresh();
@@ -183,17 +184,17 @@ beforeEach(() => {
   // `mockReturnValue`, so the 304 tests below — which need the proxy path —
   // would leak `true` into every test after them and silently reroute their
   // fetches. Caught by two previously-passing tests going red.
-  (config.enrichment.isConfigured as jest.Mock).mockReturnValue(false);
-  (fetchBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(ALL_BEERS));
-  (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(confirmedEmpty());
-  (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(confirmedEmpty());
-  jest.spyOn(console, 'log').mockImplementation(() => {});
-  jest.spyOn(console, 'warn').mockImplementation(() => {});
-  jest.spyOn(console, 'error').mockImplementation(() => {});
+  (config.enrichment.isConfigured as Mock).mockReturnValue(false);
+  (fetchBeersFromAPI as Mock).mockResolvedValue(fetchedRows(ALL_BEERS));
+  (fetchMyBeersFromAPI as Mock).mockResolvedValue(confirmedEmpty());
+  (fetchRewardsFromAPI as Mock).mockResolvedValue(confirmedEmpty());
+  vi.spyOn(console, 'log').mockImplementation(() => {});
+  vi.spyOn(console, 'warn').mockImplementation(() => {});
+  vi.spyOn(console, 'error').mockImplementation(() => {});
 });
 
-afterEach(() => {
-  jest.restoreAllMocks();
+afterEach(async () => {
+  vi.restoreAllMocks();
 });
 
 describe('a store switch between fetch and commit', () => {
@@ -267,11 +268,11 @@ describe('a store switch between fetch and commit', () => {
     // describes had no guard. Three reviewers found this independently and no
     // test in this file set `notModified: true`.
     const respondNotModifiedThenSwitchStore = (): void => {
-      (fetchBeersFromProxy as jest.Mock).mockImplementation(async () => {
+      (fetchBeersFromProxy as Mock).mockImplementation(async () => {
         mockTaplistUrl = STORE_B;
         return { beers: [], source: 'cache', notModified: true };
       });
-      (config.enrichment.isConfigured as jest.Mock).mockReturnValue(true);
+      (config.enrichment.isConfigured as Mock).mockReturnValue(true);
     };
 
     it('does not stamp the check timestamp on the direct path', async () => {
@@ -302,12 +303,12 @@ describe('a store switch between fetch and commit', () => {
       // The other half: a 304 for the store we are still on is a successful
       // freshness check and must advance the window, or every refresh re-fetches
       // in full and the ETag buys nothing.
-      (fetchBeersFromProxy as jest.Mock).mockResolvedValue({
+      (fetchBeersFromProxy as Mock).mockResolvedValue({
         beers: [],
         source: 'cache',
         notModified: true,
       });
-      (config.enrichment.isConfigured as jest.Mock).mockReturnValue(true);
+      (config.enrichment.isConfigured as Mock).mockReturnValue(true);
 
       await fetchAndUpdateAllBeers();
 
@@ -323,7 +324,7 @@ describe('a store switch between fetch and commit', () => {
       // the rows belong to the old store and the app is mid-switch. The mutant
       // `current === '' || current === fetchedFor` survived the whole suite,
       // because this file only ever flipped STORE_A -> STORE_B.
-      (fetchBeersFromAPI as jest.Mock).mockImplementation(async () => {
+      (fetchBeersFromAPI as Mock).mockImplementation(async () => {
         mockTaplistUrl = '';
         return fetchedRows(ALL_BEERS);
       });
@@ -352,7 +353,7 @@ describe('a store switch between fetch and commit', () => {
       // guards `if (!apiUrl)` before fetching; this path deliberately tolerates
       // the empty case and passes `storeId: null`, so it had no such guard.
       mockTaplistUrl = '';
-      (fetchBeersFromAPI as jest.Mock).mockImplementation(async () => fetchedRows(ALL_BEERS));
+      (fetchBeersFromAPI as Mock).mockImplementation(async () => fetchedRows(ALL_BEERS));
 
       await sequentialRefreshAllData();
 
@@ -377,7 +378,7 @@ describe('a store switch between fetch and commit', () => {
       // lock is still acquired, the guard still runs, the rows still land —
       // while reintroducing the exact window the lock exists to close.
       const holderDuringInsert: (string | null)[] = [];
-      (beerRepository.insertManyUnsafe as jest.Mock).mockImplementation(async () => {
+      (beerRepository.insertManyUnsafe as Mock).mockImplementation(async () => {
         holderDuringInsert.push(mockLockHolder);
       });
 
@@ -387,7 +388,7 @@ describe('a store switch between fetch and commit', () => {
       // containment is real but comes from somewhere else and is worth
       // asserting rather than assuming.
       const holderDuringStamp: (string | null)[] = [];
-      const realSetPreference = setPreference as jest.Mock;
+      const realSetPreference = setPreference as Mock;
       realSetPreference.mockImplementation(async (key: string) => {
         if (key === 'all_beers_last_check') {
           holderDuringStamp.push(mockLockHolder);
@@ -413,7 +414,7 @@ describe('a store switch between fetch and commit', () => {
       // value. The rows are still valid for it, and a scheme that keyed on "the
       // configuration was written" rather than on what it says would throw away
       // a perfectly good refresh here.
-      (fetchBeersFromAPI as jest.Mock).mockImplementation(async () => {
+      (fetchBeersFromAPI as Mock).mockImplementation(async () => {
         mockTaplistUrl = STORE_A;
         return fetchedRows(ALL_BEERS);
       });

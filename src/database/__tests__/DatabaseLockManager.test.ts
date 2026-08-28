@@ -1,3 +1,4 @@
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 /**
  * Tests for DatabaseLockManager
  *
@@ -159,11 +160,11 @@ describe('DatabaseLockManager', () => {
 
   describe('Timeout handling with fake timers', () => {
     beforeEach(() => {
-      jest.useFakeTimers();
+      vi.useFakeTimers();
     });
 
     afterEach(() => {
-      jest.useRealTimers();
+      vi.useRealTimers();
     });
 
     it('should auto-release lock after timeout', async () => {
@@ -176,7 +177,7 @@ describe('DatabaseLockManager', () => {
       expect(lockManager.isLocked()).toBe(true);
 
       // Fast-forward to timeout (15 seconds for mobile UX)
-      jest.advanceTimersByTime(15000);
+      vi.advanceTimersByTime(15000);
 
       // Lock should be auto-released
       expect(lockManager.isLocked()).toBe(false);
@@ -185,13 +186,13 @@ describe('DatabaseLockManager', () => {
     it('should log warning when lock is forcibly released', async () => {
       // Repointed from console.warn to the injected error reporter: a forced
       // release abandons a grant and is reported as an incident, not chatter.
-      const reportError = jest.fn();
+      const reportError = vi.fn();
       const lockManager = createLockManager({ reportError });
 
       await lockManager.acquireLock('timeout-test');
 
       // Trigger timeout
-      jest.advanceTimersByTime(15000);
+      vi.advanceTimersByTime(15000);
 
       expect(reportError).toHaveBeenCalledWith(
         expect.objectContaining({ message: expect.stringContaining('forcibly released') }),
@@ -200,14 +201,14 @@ describe('DatabaseLockManager', () => {
     });
 
     it('should clear timeout when lock is released normally', async () => {
-      const reportError = jest.fn();
+      const reportError = vi.fn();
       const lockManager = createLockManager({ reportError });
 
       await lockManager.acquireLock('normal-operation');
       lockManager.releaseLock('normal-operation');
 
       // Advance time - should not report anything since the timeout was cleared
-      jest.advanceTimersByTime(15000);
+      vi.advanceTimersByTime(15000);
 
       expect(reportError).not.toHaveBeenCalled();
     });
@@ -320,7 +321,7 @@ describe('DatabaseLockManager', () => {
   describe('Logging', () => {
     it('should log lock acquisition', async () => {
       const lockManager = createLockManager();
-      const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
+      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
       await lockManager.acquireLock('logged-operation');
 
@@ -336,7 +337,7 @@ describe('DatabaseLockManager', () => {
       const lockManager = createLockManager();
       await lockManager.acquireLock('logged-operation');
 
-      const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
+      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
       lockManager.releaseLock('logged-operation');
 
       expect(consoleSpy).toHaveBeenCalledWith(
@@ -348,7 +349,7 @@ describe('DatabaseLockManager', () => {
 
     it('should log when waiting for lock', async () => {
       const lockManager = createLockManager();
-      const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
+      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
       // First operation holds lock
       await lockManager.acquireLock('blocking-operation');
@@ -368,11 +369,11 @@ describe('DatabaseLockManager', () => {
 
   describe('Lock acquisition timeout (Step 5d)', () => {
     beforeEach(() => {
-      jest.useFakeTimers();
+      vi.useFakeTimers();
     });
 
     afterEach(() => {
-      jest.useRealTimers();
+      vi.useRealTimers();
     });
 
     /**
@@ -393,7 +394,7 @@ describe('DatabaseLockManager', () => {
       const acquirePromise = lockManager.acquireLock('timeout-operation', 5000);
 
       // Fast-forward 5 seconds
-      jest.advanceTimersByTime(5000);
+      vi.advanceTimersByTime(5000);
 
       // Promise should reject with timeout error
       await expect(acquirePromise).rejects.toThrow(/timeout.*5000ms/i);
@@ -413,7 +414,7 @@ describe('DatabaseLockManager', () => {
       await lockManager.acquireLock('blocking-operation');
 
       const acquirePromise = lockManager.acquireLock('timeout-operation', 5000);
-      jest.advanceTimersByTime(5000);
+      vi.advanceTimersByTime(5000);
 
       await expect(acquirePromise).rejects.toBeInstanceOf(DatabaseContentionError);
       await expect(acquirePromise).rejects.toMatchObject({ retryable: true });
@@ -439,7 +440,7 @@ describe('DatabaseLockManager', () => {
       const acquirePromise = lockManager.acquireLock('default-timeout-operation');
 
       // Advance to 10 seconds (before hold timeout of 15s) - should still be pending
-      jest.advanceTimersByTime(10000);
+      vi.advanceTimersByTime(10000);
 
       // Check that promise is still pending (not resolved or rejected)
       // We can verify this by checking the queue length
@@ -462,7 +463,7 @@ describe('DatabaseLockManager', () => {
       const timeoutPromise = lockManager.acquireLock('should-timeout-operation', 10000);
 
       // Advance to 10.1 seconds - should timeout
-      jest.advanceTimersByTime(10100);
+      vi.advanceTimersByTime(10100);
 
       // Should timeout and reject
       await expect(timeoutPromise).rejects.toThrow(/timeout.*10000ms/i);
@@ -487,13 +488,13 @@ describe('DatabaseLockManager', () => {
       const acquirePromise2 = lockManager.acquireLock('operation-2', 10000); // 10s acquisition timeout
 
       // Fast-forward 10 seconds - operation 2 should timeout (acquisition timeout)
-      jest.advanceTimersByTime(10000);
+      vi.advanceTimersByTime(10000);
 
       // Operation 2 should reject with acquisition timeout
       await expect(acquirePromise2).rejects.toThrow(/timeout.*10000ms/i);
 
       // Fast-forward 5 more seconds (total 15s) - operation 1 should timeout (hold timeout)
-      jest.advanceTimersByTime(5000);
+      vi.advanceTimersByTime(5000);
 
       // Operation 1 should be forcibly released due to hold timeout
       expect(lockManager.isLocked()).toBe(false);
@@ -517,7 +518,7 @@ describe('DatabaseLockManager', () => {
       const acquirePromise2 = lockManager.acquireLock('operation-2', 30000);
 
       // Release operation 1 after 5 seconds
-      jest.advanceTimersByTime(5000);
+      vi.advanceTimersByTime(5000);
       lockManager.releaseLock('operation-1');
 
       // Let promises resolve
@@ -533,7 +534,7 @@ describe('DatabaseLockManager', () => {
 
       // Fast-forward 10 seconds (total 15s from operation-1's start, before hold timeout)
       // This proves the acquisition timeout was cleared (doesn't fire at 30s from queue time)
-      jest.advanceTimersByTime(10000);
+      vi.advanceTimersByTime(10000);
 
       // Operation 2 should still hold lock (acquisition timeout was cleared when lock granted)
       expect(lockManager.getCurrentOperation()).toBe('operation-2');
@@ -562,7 +563,7 @@ describe('DatabaseLockManager', () => {
       expect(lockManager.getQueueLength()).toBe(2);
 
       // Fast-forward 5 seconds - operation 2 should timeout
-      jest.advanceTimersByTime(5000);
+      vi.advanceTimersByTime(5000);
 
       // Operation 2 should reject
       await expect(promise2).rejects.toThrow(/timeout/i);
@@ -602,12 +603,12 @@ describe('DatabaseLockManager', () => {
       expect(lockManager.getQueueLength()).toBe(3);
 
       // Fast-forward 5 seconds - operation 2 should timeout
-      jest.advanceTimersByTime(5000);
+      vi.advanceTimersByTime(5000);
       await expect(promise2).rejects.toThrow(/timeout/i);
       expect(lockManager.getQueueLength()).toBe(2);
 
       // Fast-forward 5 more seconds (10s total) - operation 3 should timeout
-      jest.advanceTimersByTime(5000);
+      vi.advanceTimersByTime(5000);
       await expect(promise3).rejects.toThrow(/timeout/i);
       expect(lockManager.getQueueLength()).toBe(1);
 
@@ -632,7 +633,7 @@ describe('DatabaseLockManager', () => {
      */
     it('should log warning when acquisition timeout occurs', async () => {
       const lockManager = createLockManager();
-      const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
+      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
       // Operation 1 holds lock
       await lockManager.acquireLock('operation-1');
@@ -641,7 +642,7 @@ describe('DatabaseLockManager', () => {
       const promise2 = lockManager.acquireLock('timed-out-operation', 5000);
 
       // Fast-forward 5 seconds
-      jest.advanceTimersByTime(5000);
+      vi.advanceTimersByTime(5000);
 
       // Wait for rejection
       await expect(promise2).rejects.toThrow();
@@ -658,11 +659,11 @@ describe('DatabaseLockManager', () => {
 
   describe('Graceful Shutdown', () => {
     beforeEach(() => {
-      jest.useFakeTimers();
+      vi.useFakeTimers();
     });
 
     afterEach(() => {
-      jest.useRealTimers();
+      vi.useRealTimers();
     });
 
     it('should prepare for shutdown successfully when lock is free', async () => {
@@ -681,14 +682,14 @@ describe('DatabaseLockManager', () => {
       const shutdownPromise = lockManager.prepareForShutdown(5000);
 
       // Advance time but don't release yet
-      jest.advanceTimersByTime(1000);
+      vi.advanceTimersByTime(1000);
       await Promise.resolve();
 
       // Release lock
       lockManager.releaseLock('active-operation');
 
       // Advance time for polling
-      jest.advanceTimersByTime(200);
+      vi.advanceTimersByTime(200);
       await Promise.resolve();
 
       // Shutdown should succeed
@@ -705,7 +706,7 @@ describe('DatabaseLockManager', () => {
       const shutdownPromise = lockManager.prepareForShutdown(1000);
 
       // Advance time past timeout without releasing
-      jest.advanceTimersByTime(1100);
+      vi.advanceTimersByTime(1100);
       await Promise.resolve();
       await Promise.resolve();
 
@@ -731,13 +732,13 @@ describe('DatabaseLockManager', () => {
       );
 
       // Clean up - let shutdown complete
-      jest.advanceTimersByTime(100);
+      vi.advanceTimersByTime(100);
       await shutdownPromise;
     });
 
     it('should warn when forcing shutdown with lock held', async () => {
       const lockManager = createLockManager();
-      const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
+      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
       // Acquire lock
       await lockManager.acquireLock('active-operation');
@@ -746,7 +747,7 @@ describe('DatabaseLockManager', () => {
       const shutdownPromise = lockManager.prepareForShutdown(500);
 
       // Advance time past timeout
-      jest.advanceTimersByTime(600);
+      vi.advanceTimersByTime(600);
       await Promise.resolve();
 
       const result = await shutdownPromise;
@@ -763,7 +764,7 @@ describe('DatabaseLockManager', () => {
 
     it('should warn when shutting down with non-empty queue', async () => {
       const lockManager = createLockManager();
-      const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
+      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
       // Acquire lock
       await lockManager.acquireLock('operation-1');
@@ -776,7 +777,7 @@ describe('DatabaseLockManager', () => {
       const shutdownPromise = lockManager.prepareForShutdown(500);
 
       // Advance time past timeout
-      jest.advanceTimersByTime(600);
+      vi.advanceTimersByTime(600);
       await Promise.resolve();
 
       await shutdownPromise;
@@ -792,7 +793,7 @@ describe('DatabaseLockManager', () => {
 
     it('should log when entering shutdown state', async () => {
       const lockManager = createLockManager();
-      const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
+      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
       await lockManager.prepareForShutdown(5000);
 
@@ -820,18 +821,18 @@ describe('DatabaseLockManager', () => {
       const shutdownPromise = lockManager.prepareForShutdown(5000);
 
       // Advance time by polling intervals
-      jest.advanceTimersByTime(100); // First poll
+      vi.advanceTimersByTime(100); // First poll
       await Promise.resolve();
 
       expect(lockManager.isLocked()).toBe(true);
 
-      jest.advanceTimersByTime(100); // Second poll
+      vi.advanceTimersByTime(100); // Second poll
       await Promise.resolve();
 
       // Release lock
       lockManager.releaseLock('operation');
 
-      jest.advanceTimersByTime(100); // Final poll
+      vi.advanceTimersByTime(100); // Final poll
       await Promise.resolve();
 
       // Should complete successfully
@@ -848,7 +849,7 @@ describe('DatabaseLockManager', () => {
       const shutdownPromise = lockManager.prepareForShutdown(200);
 
       // Advance time past custom timeout
-      jest.advanceTimersByTime(250);
+      vi.advanceTimersByTime(250);
       await Promise.resolve();
 
       // Should timeout
@@ -867,13 +868,13 @@ describe('DatabaseLockManager', () => {
       const shutdownPromise = lockManager.prepareForShutdown();
 
       // Advance time to just before default timeout (5s)
-      jest.advanceTimersByTime(4900);
+      vi.advanceTimersByTime(4900);
       await Promise.resolve();
 
       // Should still be waiting
       lockManager.releaseLock('operation');
 
-      jest.advanceTimersByTime(100);
+      vi.advanceTimersByTime(100);
       await Promise.resolve();
 
       // Should succeed

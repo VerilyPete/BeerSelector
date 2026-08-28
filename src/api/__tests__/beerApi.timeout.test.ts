@@ -1,3 +1,4 @@
+import { vi, type Mock, describe, it, expect, beforeEach, afterEach } from 'vitest';
 /**
  * `fetchWithRetry` must bound every request it makes.
  *
@@ -22,9 +23,9 @@ import { fetchWithRetry } from '../beerApi';
 import { TransportAbortedError } from '../fetchOutcome';
 import { config } from '@/src/config';
 
-jest.mock('../../database/preferences');
+vi.mock('../../database/preferences');
 
-global.fetch = jest.fn();
+global.fetch = vi.fn();
 
 const abortError = (): Error => {
   const error = new Error('The operation was aborted');
@@ -38,8 +39,8 @@ const abortError = (): Error => {
  * This is the shape the timeout exists for: not a rejection, not a slow success,
  * but a request the network never answers.
  */
-const neverSettlingFetch = (): jest.Mock =>
-  (global.fetch as jest.Mock).mockImplementation(
+const neverSettlingFetch = (): Mock =>
+  (global.fetch as Mock).mockImplementation(
     (_url: string, options: { signal: AbortSignal }) =>
       new Promise((_resolve, reject) => {
         options.signal.addEventListener('abort', () => reject(abortError()));
@@ -55,26 +56,24 @@ const neverSettlingFetch = (): jest.Mock =>
  */
 const capturedSignals = (): AbortSignal[] => {
   const signals: AbortSignal[] = [];
-  (global.fetch as jest.Mock).mockImplementation(
-    (_url: string, options: { signal: AbortSignal }) => {
-      signals.push(options.signal);
-      return new Promise((_resolve, reject) => {
-        options.signal.addEventListener('abort', () => reject(abortError()));
-      });
-    }
-  );
+  (global.fetch as Mock).mockImplementation((_url: string, options: { signal: AbortSignal }) => {
+    signals.push(options.signal);
+    return new Promise((_resolve, reject) => {
+      options.signal.addEventListener('abort', () => reject(abortError()));
+    });
+  });
   return signals;
 };
 
 describe('fetchWithRetry timeout', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
-    jest.useFakeTimers();
+    vi.clearAllMocks();
+    vi.useFakeTimers();
   });
 
   afterEach(() => {
-    jest.useRealTimers();
-    jest.restoreAllMocks();
+    vi.useRealTimers();
+    vi.restoreAllMocks();
   });
 
   it('aborts a request that exceeds the configured timeout', async () => {
@@ -88,7 +87,7 @@ describe('fetchWithRetry timeout', () => {
     const result = fetchWithRetry(config.api.baseUrl, 1);
     const rejection = expect(result).rejects.toThrow(TransportAbortedError);
 
-    await jest.advanceTimersByTimeAsync(config.network.timeout + 1);
+    await vi.advanceTimersByTimeAsync(config.network.timeout + 1);
 
     // Asserted before awaiting the rejection: this line names the defect in 1ms
     // where awaiting first would report it as a generic timeout.
@@ -104,7 +103,7 @@ describe('fetchWithRetry timeout', () => {
     const signals = capturedSignals();
 
     void fetchWithRetry(config.api.baseUrl);
-    await jest.advanceTimersByTimeAsync(config.network.timeout - 1);
+    await vi.advanceTimersByTimeAsync(config.network.timeout - 1);
 
     expect(signals[0]?.aborted).toBe(false);
   });
@@ -116,8 +115,8 @@ describe('fetchWithRetry timeout', () => {
     const rejection = expect(result).rejects.toThrow(TransportAbortedError);
 
     // Past the timeout, then past every retry delay that would follow it.
-    await jest.advanceTimersByTimeAsync(config.network.timeout + 1);
-    await jest.advanceTimersByTimeAsync(1000);
+    await vi.advanceTimersByTimeAsync(config.network.timeout + 1);
+    await vi.advanceTimersByTimeAsync(1000);
 
     // Call count BEFORE the rejection, for the same reason as above: a retried
     // request also never settles, so awaiting first turns "it retried" — this
@@ -128,12 +127,12 @@ describe('fetchWithRetry timeout', () => {
 
   it('still retries a request that fails for a reason other than the timeout', async () => {
     const payload = { brewInStock: [] };
-    (global.fetch as jest.Mock)
+    (global.fetch as Mock)
       .mockRejectedValueOnce(new Error('Network request failed'))
       .mockResolvedValueOnce({ ok: true, json: async () => payload });
 
     const result = fetchWithRetry(config.api.baseUrl, 2, 10);
-    await jest.advanceTimersByTimeAsync(15);
+    await vi.advanceTimersByTimeAsync(15);
 
     await expect(result).resolves.toEqual(payload);
     expect(global.fetch).toHaveBeenCalledTimes(2);
@@ -144,32 +143,28 @@ describe('fetchWithRetry timeout', () => {
     // fires — rather than by spying on clearTimeout. A leaked timer is only a
     // bug because of what it goes on to abort.
     let captured: AbortSignal | undefined;
-    (global.fetch as jest.Mock).mockImplementation(
-      (_url: string, options: { signal: AbortSignal }) => {
-        captured = options.signal;
-        return Promise.resolve({ ok: true, json: async () => ({ brewInStock: [] }) });
-      }
-    );
+    (global.fetch as Mock).mockImplementation((_url: string, options: { signal: AbortSignal }) => {
+      captured = options.signal;
+      return Promise.resolve({ ok: true, json: async () => ({ brewInStock: [] }) });
+    });
 
     await fetchWithRetry(config.api.baseUrl);
-    await jest.advanceTimersByTimeAsync(config.network.timeout + 1);
+    await vi.advanceTimersByTimeAsync(config.network.timeout + 1);
 
     expect(captured?.aborted).toBe(false);
   });
 
   it('disarms the timeout when the request fails', async () => {
     const signals: AbortSignal[] = [];
-    (global.fetch as jest.Mock).mockImplementation(
-      (_url: string, options: { signal: AbortSignal }) => {
-        signals.push(options.signal);
-        return Promise.reject(new Error('Network request failed'));
-      }
-    );
+    (global.fetch as Mock).mockImplementation((_url: string, options: { signal: AbortSignal }) => {
+      signals.push(options.signal);
+      return Promise.reject(new Error('Network request failed'));
+    });
 
     await expect(fetchWithRetry(config.api.baseUrl, 1, 10)).rejects.toThrow(
       'Network request failed'
     );
-    await jest.advanceTimersByTimeAsync(config.network.timeout + 1);
+    await vi.advanceTimersByTimeAsync(config.network.timeout + 1);
 
     expect(signals).toHaveLength(1);
     expect(signals[0].aborted).toBe(false);

@@ -1,3 +1,4 @@
+import { describe, it, expect, vi, type Mock } from 'vitest';
 import { migrateToVersion7 } from '../migrateToV7';
 import { databaseLockManager } from '../../DatabaseLockManager';
 import { recordMigration } from '../../schemaVersion';
@@ -6,26 +7,26 @@ import { recordMigration } from '../../schemaVersion';
 // the real manager, isLocked() asserts genuine lock state, which is what
 // catches a dropped release — a mock asserting a mock cannot.
 
-jest.mock('../../schemaVersion', () => ({
-  recordMigration: jest.fn().mockResolvedValue(undefined),
+vi.mock('../../schemaVersion', () => ({
+  recordMigration: vi.fn().mockResolvedValue(undefined),
 }));
 
 type MockDb = {
-  getAllAsync: jest.Mock;
-  execAsync: jest.Mock;
-  runAsync: jest.Mock;
-  withTransactionAsync: jest.Mock;
+  getAllAsync: Mock;
+  execAsync: Mock;
+  runAsync: Mock;
+  withTransactionAsync: Mock;
 };
 
 function createMockMigrationDb(): MockDb {
   databaseLockManager.resetForTesting();
-  jest.restoreAllMocks();
-  (recordMigration as jest.Mock).mockClear();
+  vi.restoreAllMocks();
+  (recordMigration as Mock).mockClear();
   return {
-    getAllAsync: jest.fn(),
-    execAsync: jest.fn().mockResolvedValue(undefined),
-    runAsync: jest.fn().mockResolvedValue(undefined),
-    withTransactionAsync: jest.fn(async (callback: () => Promise<void>) => await callback()),
+    getAllAsync: vi.fn(),
+    execAsync: vi.fn().mockResolvedValue(undefined),
+    runAsync: vi.fn().mockResolvedValue(undefined),
+    withTransactionAsync: vi.fn(async (callback: () => Promise<void>) => await callback()),
   };
 }
 
@@ -48,7 +49,7 @@ describe('migrateToVersion7', () => {
   describe('happy path: columns do not exist', () => {
     it('acquires and releases the migration lock', async () => {
       const db = createMockMigrationDb();
-      const lockSpy = jest.spyOn(databaseLockManager, 'withDatabaseLock');
+      const lockSpy = vi.spyOn(databaseLockManager, 'withDatabaseLock');
       db.getAllAsync.mockResolvedValue(columnsWithoutEnrichment());
 
       await migrateToVersion7(db as never);
@@ -63,7 +64,7 @@ describe('migrateToVersion7', () => {
 
       await migrateToVersion7(db as never);
 
-      const execCalls = (db.execAsync as jest.Mock).mock.calls.map((c: string[]) => c[0]);
+      const execCalls = (db.execAsync as Mock).mock.calls.map((c: string[]) => c[0]);
       expect(
         execCalls.some(
           (sql: string) => sql.includes('enrichment_confidence') && sql.includes('allbeers')
@@ -82,7 +83,7 @@ describe('migrateToVersion7', () => {
 
       await migrateToVersion7(db as never);
 
-      const execCalls = (db.execAsync as jest.Mock).mock.calls.map((c: string[]) => c[0]);
+      const execCalls = (db.execAsync as Mock).mock.calls.map((c: string[]) => c[0]);
       expect(
         execCalls.some(
           (sql: string) =>
@@ -109,7 +110,7 @@ describe('migrateToVersion7', () => {
     it('calls onProgress callback when provided', async () => {
       const db = createMockMigrationDb();
       db.getAllAsync.mockResolvedValue(columnsWithoutEnrichment());
-      const onProgress = jest.fn();
+      const onProgress = vi.fn();
 
       await migrateToVersion7(db as never, onProgress);
 
@@ -131,7 +132,7 @@ describe('migrateToVersion7', () => {
 
       await migrateToVersion7(db as never);
 
-      const pragmaCalls = (db.getAllAsync as jest.Mock).mock.calls.map((c: string[]) => c[0]);
+      const pragmaCalls = (db.getAllAsync as Mock).mock.calls.map((c: string[]) => c[0]);
       expect(pragmaCalls.some((sql: string) => sql.includes('allbeers'))).toBe(true);
       expect(pragmaCalls.some((sql: string) => sql.includes('tasted_brew_current_round'))).toBe(
         true
@@ -146,7 +147,7 @@ describe('migrateToVersion7', () => {
 
       await migrateToVersion7(db as never);
 
-      const execCalls = (db.execAsync as jest.Mock).mock.calls.map((c: string[]) => c[0]);
+      const execCalls = (db.execAsync as Mock).mock.calls.map((c: string[]) => c[0]);
       const allbeersAlterCalls = execCalls.filter(
         (sql: string) =>
           sql.includes('ALTER TABLE allbeers') &&
@@ -161,7 +162,7 @@ describe('migrateToVersion7', () => {
 
       await migrateToVersion7(db as never);
 
-      const execCalls = (db.execAsync as jest.Mock).mock.calls.map((c: string[]) => c[0]);
+      const execCalls = (db.execAsync as Mock).mock.calls.map((c: string[]) => c[0]);
       const tastedAlterCalls = execCalls.filter(
         (sql: string) =>
           sql.includes('ALTER TABLE tasted_brew_current_round') &&

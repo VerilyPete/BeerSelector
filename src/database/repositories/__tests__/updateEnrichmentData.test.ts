@@ -1,3 +1,4 @@
+import { describe, test, expect, vi, type Mock } from 'vitest';
 /**
  * Unit tests for updateEnrichmentData methods in BeerRepository and MyBeersRepository
  *
@@ -18,18 +19,20 @@ import { databaseLockManager } from '../../locks';
 import { EnrichmentUpdate } from '../../../types/enrichment';
 
 // Mock dependencies
-jest.mock('../../connection');
+vi.mock('../../connection');
 // Delegates to a REAL DatabaseLockManager. A `jest.fn((_name, task) => task())`
 // stand-in has no release to observe, so "released the lock" assertions against
 // it pass even with withDatabaseLock's finally deleted.
-jest.mock('../../locks', () => {
-  const actual = jest.requireActual('../../DatabaseLockManager');
+vi.mock('../../locks', async () => {
+  const actual = await vi.importActual<typeof import('../../DatabaseLockManager')>(
+    '../../DatabaseLockManager'
+  );
   const real = new actual.DatabaseLockManager();
   const delegate = (name: string, task: () => Promise<unknown>) =>
     real.withDatabaseLock(name, task);
   return {
     databaseLockManager: {
-      withDatabaseLock: jest.fn(delegate),
+      withDatabaseLock: vi.fn(delegate),
       // Exposed so setupLocks can restore delegation after a test overrides
       // the implementation (e.g. to simulate an acquisition failure).
       __delegate: delegate,
@@ -41,32 +44,32 @@ jest.mock('../../locks', () => {
 });
 
 type MockStatement = {
-  executeAsync: jest.Mock;
-  finalizeAsync: jest.Mock;
+  executeAsync: Mock;
+  finalizeAsync: Mock;
 };
 
 type MockDatabase = {
-  withTransactionAsync: jest.Mock;
-  prepareAsync: jest.Mock;
-  runAsync: jest.Mock;
-  getAllAsync: jest.Mock;
-  getFirstAsync: jest.Mock;
+  withTransactionAsync: Mock;
+  prepareAsync: Mock;
+  runAsync: Mock;
+  getAllAsync: Mock;
+  getFirstAsync: Mock;
 };
 
 function createMockStatement(): MockStatement {
   return {
-    executeAsync: jest.fn(),
-    finalizeAsync: jest.fn().mockResolvedValue(undefined),
+    executeAsync: vi.fn(),
+    finalizeAsync: vi.fn().mockResolvedValue(undefined),
   };
 }
 
 function createMockDatabase(mockStatement: MockStatement): MockDatabase {
   return {
-    withTransactionAsync: jest.fn(async (callback: () => Promise<void>) => await callback()),
-    prepareAsync: jest.fn().mockResolvedValue(mockStatement),
-    runAsync: jest.fn(),
-    getAllAsync: jest.fn(),
-    getFirstAsync: jest.fn(),
+    withTransactionAsync: vi.fn(async (callback: () => Promise<void>) => await callback()),
+    prepareAsync: vi.fn().mockResolvedValue(mockStatement),
+    runAsync: vi.fn(),
+    getAllAsync: vi.fn(),
+    getFirstAsync: vi.fn(),
   };
 }
 
@@ -76,7 +79,7 @@ function setupLocks(): void {
   };
   // Restores delegation to the real lock manager, undoing any per-test
   // override. Not a plain task-runner: isLocked() has to mean something.
-  (databaseLockManager.withDatabaseLock as jest.Mock).mockImplementation(mocked.__delegate);
+  (databaseLockManager.withDatabaseLock as Mock).mockImplementation(mocked.__delegate);
   databaseLockManager.resetForTesting();
 }
 
@@ -89,10 +92,10 @@ describe('BeerRepository.updateEnrichmentData', () => {
     test('should return 0 when enrichments map is empty', async () => {
       const mockStatement = createMockStatement();
       const mockDatabase = createMockDatabase(mockStatement);
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
-      (connection.getDatabase as jest.Mock).mockClear();
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockClear();
       setupLocks();
-      (databaseLockManager.withDatabaseLock as jest.Mock).mockClear();
+      (databaseLockManager.withDatabaseLock as Mock).mockClear();
       const repository = new BeerRepository();
 
       const result = await repository.updateEnrichmentData({});
@@ -113,7 +116,7 @@ describe('BeerRepository.updateEnrichmentData', () => {
     test('should acquire BeerRepository lock before database operations', async () => {
       const mockStatement = createMockStatement();
       const mockDatabase = createMockDatabase(mockStatement);
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       setupLocks();
       const repository = new BeerRepository();
       const enrichments: Record<string, EnrichmentUpdate> = {
@@ -139,7 +142,7 @@ describe('BeerRepository.updateEnrichmentData', () => {
     test('should release BeerRepository lock after successful operation', async () => {
       const mockStatement = createMockStatement();
       const mockDatabase = createMockDatabase(mockStatement);
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       setupLocks();
       const repository = new BeerRepository();
       const enrichments: Record<string, EnrichmentUpdate> = {
@@ -165,7 +168,7 @@ describe('BeerRepository.updateEnrichmentData', () => {
     test('should release lock even when database operation fails', async () => {
       const mockStatement = createMockStatement();
       const mockDatabase = createMockDatabase(mockStatement);
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       setupLocks();
       const repository = new BeerRepository();
       const enrichments: Record<string, EnrichmentUpdate> = {
@@ -192,12 +195,12 @@ describe('BeerRepository.updateEnrichmentData', () => {
     test('should propagate an acquisition failure without touching the database', async () => {
       const mockStatement = createMockStatement();
       const mockDatabase = createMockDatabase(mockStatement);
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
-      (connection.getDatabase as jest.Mock).mockClear();
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockClear();
       setupLocks();
       // withDatabaseLock has no "returned false" mode — acquisition either
       // succeeds or rejects (timeout / shutdown). That dead branch is gone.
-      (databaseLockManager.withDatabaseLock as jest.Mock).mockRejectedValue(
+      (databaseLockManager.withDatabaseLock as Mock).mockRejectedValue(
         new Error('Lock acquisition timeout for enrichment update after 30000ms')
       );
       const repository = new BeerRepository();
@@ -227,7 +230,7 @@ describe('BeerRepository.updateEnrichmentData', () => {
     test('should update enrichment columns for existing beers', async () => {
       const mockStatement = createMockStatement();
       const mockDatabase = createMockDatabase(mockStatement);
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       setupLocks();
       const repository = new BeerRepository();
       const enrichments: Record<string, EnrichmentUpdate> = {
@@ -261,7 +264,7 @@ describe('BeerRepository.updateEnrichmentData', () => {
     test('should use COALESCE for ABV (preserve existing if null passed)', async () => {
       const mockStatement = createMockStatement();
       const mockDatabase = createMockDatabase(mockStatement);
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       setupLocks();
       const repository = new BeerRepository();
       const enrichments: Record<string, EnrichmentUpdate> = {
@@ -295,7 +298,7 @@ describe('BeerRepository.updateEnrichmentData', () => {
     test('should use COALESCE for description (preserve existing if null passed)', async () => {
       const mockStatement = createMockStatement();
       const mockDatabase = createMockDatabase(mockStatement);
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       setupLocks();
       const repository = new BeerRepository();
       const enrichments: Record<string, EnrichmentUpdate> = {
@@ -320,7 +323,7 @@ describe('BeerRepository.updateEnrichmentData', () => {
     test('should directly assign confidence (even if null)', async () => {
       const mockStatement = createMockStatement();
       const mockDatabase = createMockDatabase(mockStatement);
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       setupLocks();
       const repository = new BeerRepository();
       const enrichments: Record<string, EnrichmentUpdate> = {
@@ -351,7 +354,7 @@ describe('BeerRepository.updateEnrichmentData', () => {
     test('should directly assign source (even if null)', async () => {
       const mockStatement = createMockStatement();
       const mockDatabase = createMockDatabase(mockStatement);
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       setupLocks();
       const repository = new BeerRepository();
       const enrichments: Record<string, EnrichmentUpdate> = {
@@ -385,7 +388,7 @@ describe('BeerRepository.updateEnrichmentData', () => {
     test('should return count of updated beers', async () => {
       const mockStatement = createMockStatement();
       const mockDatabase = createMockDatabase(mockStatement);
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       setupLocks();
       const repository = new BeerRepository();
       const enrichments: Record<string, EnrichmentUpdate> = {
@@ -423,7 +426,7 @@ describe('BeerRepository.updateEnrichmentData', () => {
     test('should return 0 when no beers match in database', async () => {
       const mockStatement = createMockStatement();
       const mockDatabase = createMockDatabase(mockStatement);
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       setupLocks();
       const repository = new BeerRepository();
       const enrichments: Record<string, EnrichmentUpdate> = {
@@ -451,7 +454,7 @@ describe('BeerRepository.updateEnrichmentData', () => {
     test('should throw error on database failure', async () => {
       const mockStatement = createMockStatement();
       const mockDatabase = createMockDatabase(mockStatement);
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       setupLocks();
       const repository = new BeerRepository();
       const enrichments: Record<string, EnrichmentUpdate> = {
@@ -471,7 +474,7 @@ describe('BeerRepository.updateEnrichmentData', () => {
     test('should finalize statement even on execute error', async () => {
       const mockStatement = createMockStatement();
       const mockDatabase = createMockDatabase(mockStatement);
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       setupLocks();
       const repository = new BeerRepository();
       const enrichments: Record<string, EnrichmentUpdate> = {
@@ -502,9 +505,9 @@ describe('MyBeersRepository.updateEnrichmentData', () => {
     test('should return 0 when enrichments map is empty', async () => {
       const mockStatement = createMockStatement();
       const mockDatabase = createMockDatabase(mockStatement);
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       setupLocks();
-      (databaseLockManager.withDatabaseLock as jest.Mock).mockClear();
+      (databaseLockManager.withDatabaseLock as Mock).mockClear();
       const repository = new MyBeersRepository();
 
       const result = await repository.updateEnrichmentData({});
@@ -518,7 +521,7 @@ describe('MyBeersRepository.updateEnrichmentData', () => {
     test('should acquire MyBeersRepository lock', async () => {
       const mockStatement = createMockStatement();
       const mockDatabase = createMockDatabase(mockStatement);
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       setupLocks();
       const repository = new MyBeersRepository();
       const enrichments: Record<string, EnrichmentUpdate> = {
@@ -544,7 +547,7 @@ describe('MyBeersRepository.updateEnrichmentData', () => {
     test('should release MyBeersRepository lock after operation', async () => {
       const mockStatement = createMockStatement();
       const mockDatabase = createMockDatabase(mockStatement);
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       setupLocks();
       const repository = new MyBeersRepository();
       const enrichments: Record<string, EnrichmentUpdate> = {
@@ -570,11 +573,11 @@ describe('MyBeersRepository.updateEnrichmentData', () => {
     test('should propagate an acquisition failure', async () => {
       const mockStatement = createMockStatement();
       const mockDatabase = createMockDatabase(mockStatement);
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       setupLocks();
       // withDatabaseLock has no "returned false" mode — acquisition either
       // succeeds or rejects (timeout / shutdown). That dead branch is gone.
-      (databaseLockManager.withDatabaseLock as jest.Mock).mockRejectedValue(
+      (databaseLockManager.withDatabaseLock as Mock).mockRejectedValue(
         new Error('Lock acquisition timeout for enrichment update after 30000ms')
       );
       const repository = new MyBeersRepository();
@@ -597,7 +600,7 @@ describe('MyBeersRepository.updateEnrichmentData', () => {
     test('should update tasted_brew_current_round table', async () => {
       const mockStatement = createMockStatement();
       const mockDatabase = createMockDatabase(mockStatement);
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       setupLocks();
       const repository = new MyBeersRepository();
       const enrichments: Record<string, EnrichmentUpdate> = {
@@ -621,7 +624,7 @@ describe('MyBeersRepository.updateEnrichmentData', () => {
     test('should use same COALESCE pattern as BeerRepository', async () => {
       const mockStatement = createMockStatement();
       const mockDatabase = createMockDatabase(mockStatement);
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       setupLocks();
       const repository = new MyBeersRepository();
       const enrichments: Record<string, EnrichmentUpdate> = {
@@ -651,7 +654,7 @@ describe('MyBeersRepository.updateEnrichmentData', () => {
     test('should return count of updated beers', async () => {
       const mockStatement = createMockStatement();
       const mockDatabase = createMockDatabase(mockStatement);
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       setupLocks();
       const repository = new MyBeersRepository();
       const enrichments: Record<string, EnrichmentUpdate> = {
@@ -683,7 +686,7 @@ describe('MyBeersRepository.updateEnrichmentData', () => {
     test('should release lock on error', async () => {
       const mockStatement = createMockStatement();
       const mockDatabase = createMockDatabase(mockStatement);
-      (connection.getDatabase as jest.Mock).mockResolvedValue(mockDatabase);
+      (connection.getDatabase as Mock).mockResolvedValue(mockDatabase);
       setupLocks();
       const repository = new MyBeersRepository();
       const enrichments: Record<string, EnrichmentUpdate> = {

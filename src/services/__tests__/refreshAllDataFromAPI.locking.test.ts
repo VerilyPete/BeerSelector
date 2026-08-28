@@ -1,3 +1,4 @@
+import { describe, it, expect, beforeEach, afterEach, vi, type Mock } from 'vitest';
 /**
  * The login path must not hold the master lock across a network request either.
  *
@@ -23,7 +24,7 @@
  *
  * **Ordering is asserted from a recorded event log, never from wall-clock
  * timing.** Every mock settles immediately and no test ADVANCES timers; the
- * suite inherits `jest.setup.js`'s global fake timers and depends on nothing
+ * suite inherits `src/__vitest__/setup.ts`'s global fake timers and depends on nothing
  * they control.
  */
 
@@ -51,51 +52,51 @@ import { refreshAllDataFromAPI } from '../dataUpdateService';
 /** One ordered log of everything worth ordering. See the sibling suite. */
 const mockEvents: string[] = [];
 
-jest.mock('../../database/preferences', () => ({
-  getPreference: jest.fn(async (key: string) => {
+vi.mock('../../database/preferences', () => ({
+  getPreference: vi.fn(async (key: string) => {
     if (key === 'all_beers_api_url') return 'https://example.com/allbeers.json';
     if (key === 'my_beers_api_url') return 'https://example.com/mybeers.json';
     return null;
   }),
-  setPreference: jest.fn(async () => {}),
-  areApiUrlsConfigured: jest.fn(async () => true),
+  setPreference: vi.fn(async () => {}),
+  areApiUrlsConfigured: vi.fn(async () => true),
 }));
 
-jest.mock('../../api/beerApi', () =>
+vi.mock('../../api/beerApi', async () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  require('../../api/__tests__/helpers/beerApiMock').beerApiMockFactory()
+  (await import('../../api/__tests__/helpers/beerApiMock')).beerApiMockFactory()
 );
 
-jest.mock('../enrichmentService', () => ({
-  fetchBeersFromProxy: jest.fn(),
-  fetchEnrichmentBatchWithMissing: jest.fn(),
-  syncBeersToWorker: jest.fn(async () => {}),
-  mergeEnrichmentData: jest.fn((beers: unknown) => beers),
-  recordFallback: jest.fn(),
-  pollForEnrichmentUpdates: jest.fn(),
+vi.mock('../enrichmentService', () => ({
+  fetchBeersFromProxy: vi.fn(),
+  fetchEnrichmentBatchWithMissing: vi.fn(),
+  syncBeersToWorker: vi.fn(async () => {}),
+  mergeEnrichmentData: vi.fn((beers: unknown) => beers),
+  recordFallback: vi.fn(),
+  pollForEnrichmentUpdates: vi.fn(),
 }));
 
-jest.mock('../../database/repositories/BeerRepository', () => ({
-  beerRepository: { insertManyUnsafe: jest.fn(async () => {}), count: jest.fn(async () => 12) },
+vi.mock('../../database/repositories/BeerRepository', () => ({
+  beerRepository: { insertManyUnsafe: vi.fn(async () => {}), count: vi.fn(async () => 12) },
 }));
 
-jest.mock('../../database/repositories/MyBeersRepository', () => ({
+vi.mock('../../database/repositories/MyBeersRepository', () => ({
   myBeersRepository: {
-    insertManyUnsafe: jest.fn(async () => {}),
-    replaceAllWithEmptyUnsafe: jest.fn(async () => {}),
+    insertManyUnsafe: vi.fn(async () => {}),
+    replaceAllWithEmptyUnsafe: vi.fn(async () => {}),
   },
 }));
 
-jest.mock('../../database/repositories/RewardsRepository', () => ({
+vi.mock('../../database/repositories/RewardsRepository', () => ({
   rewardsRepository: {
-    insertManyUnsafe: jest.fn(async () => {}),
-    replaceAllWithEmptyUnsafe: jest.fn(async () => {}),
+    insertManyUnsafe: vi.fn(async () => {}),
+    replaceAllWithEmptyUnsafe: vi.fn(async () => {}),
   },
 }));
 
-jest.mock('../../database/DatabaseLockManager', () => ({
+vi.mock('../../database/DatabaseLockManager', () => ({
   databaseLockManager: {
-    withDatabaseLock: jest.fn(async (_name: string, task: () => Promise<unknown>) => {
+    withDatabaseLock: vi.fn(async (_name: string, task: () => Promise<unknown>) => {
       mockEvents.push('lock:acquire');
       try {
         return await task();
@@ -112,42 +113,42 @@ const MY_BEERS = [
 ];
 const REWARDS = [{ reward_id: 'r1', redeemed: '0', reward_type: 'badge' }];
 
-const respondsWith = (mock: jest.Mock, label: string, outcome: unknown): void => {
+const respondsWith = (mock: Mock, label: string, outcome: unknown): void => {
   mock.mockImplementation(async () => {
     mockEvents.push(`fetch:${label}`);
     return outcome;
   });
 };
 
-const recordWrite = (mock: jest.Mock, label: string): void => {
+const recordWrite = (mock: Mock, label: string): void => {
   mock.mockImplementation(async () => {
     mockEvents.push(`write:${label}`);
   });
 };
 
 const allSourcesSucceed = (): void => {
-  respondsWith(fetchBeersFromAPI as jest.Mock, 'allBeers', fetchedRows(ALL_BEERS));
-  respondsWith(fetchMyBeersFromAPI as jest.Mock, 'myBeers', fetchedRows(MY_BEERS));
-  respondsWith(fetchRewardsFromAPI as jest.Mock, 'rewards', fetchedRows(REWARDS));
+  respondsWith(fetchBeersFromAPI as Mock, 'allBeers', fetchedRows(ALL_BEERS));
+  respondsWith(fetchMyBeersFromAPI as Mock, 'myBeers', fetchedRows(MY_BEERS));
+  respondsWith(fetchRewardsFromAPI as Mock, 'rewards', fetchedRows(REWARDS));
 };
 
 describe('refreshAllDataFromAPI locking', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
+  beforeEach(async () => {
+    vi.clearAllMocks();
     mockEvents.length = 0;
 
-    recordWrite(beerRepository.insertManyUnsafe as jest.Mock, 'allBeers');
-    recordWrite(myBeersRepository.insertManyUnsafe as jest.Mock, 'myBeers');
-    recordWrite(myBeersRepository.replaceAllWithEmptyUnsafe as jest.Mock, 'myBeers:clear');
-    recordWrite(rewardsRepository.insertManyUnsafe as jest.Mock, 'rewards');
-    recordWrite(rewardsRepository.replaceAllWithEmptyUnsafe as jest.Mock, 'rewards:clear');
+    recordWrite(beerRepository.insertManyUnsafe as Mock, 'allBeers');
+    recordWrite(myBeersRepository.insertManyUnsafe as Mock, 'myBeers');
+    recordWrite(myBeersRepository.replaceAllWithEmptyUnsafe as Mock, 'myBeers:clear');
+    recordWrite(rewardsRepository.insertManyUnsafe as Mock, 'rewards');
+    recordWrite(rewardsRepository.replaceAllWithEmptyUnsafe as Mock, 'rewards:clear');
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     // Two tests spy on the `config.enrichment` getter. A failure before their
     // own `mockRestore()` would leave enrichment configured for the rest of the
     // file, and `clearAllMocks` does not undo a spy.
-    jest.restoreAllMocks();
+    vi.restoreAllMocks();
   });
 
   it('completes every network fetch before acquiring the database lock', async () => {
@@ -190,11 +191,12 @@ describe('refreshAllDataFromAPI locking', () => {
     // The spy goes on the GETTER: `config.enrichment` builds a fresh object per
     // access, so spying on the object it returns patches a value production
     // never reads.
-    jest
-      .spyOn(config, 'enrichment', 'get')
-      .mockReturnValue({ ...config.enrichment, isConfigured: () => true });
+    vi.spyOn(config, 'enrichment', 'get').mockReturnValue({
+      ...config.enrichment,
+      isConfigured: () => true,
+    });
     allSourcesSucceed();
-    (fetchEnrichmentBatchWithMissing as jest.Mock).mockImplementation(async () => {
+    (fetchEnrichmentBatchWithMissing as Mock).mockImplementation(async () => {
       mockEvents.push('fetch:enrichment');
       return { enrichments: {}, missing: [] };
     });
@@ -212,15 +214,16 @@ describe('refreshAllDataFromAPI locking', () => {
     // enrichment into both tables under its OWN lock, so starting it during the
     // fetch phase lets it land before the burst and be wiped by the
     // clear-and-reinsert.
-    jest
-      .spyOn(config, 'enrichment', 'get')
-      .mockReturnValue({ ...config.enrichment, isConfigured: () => true });
+    vi.spyOn(config, 'enrichment', 'get').mockReturnValue({
+      ...config.enrichment,
+      isConfigured: () => true,
+    });
     allSourcesSucceed();
-    (fetchEnrichmentBatchWithMissing as jest.Mock).mockResolvedValue({
+    (fetchEnrichmentBatchWithMissing as Mock).mockResolvedValue({
       enrichments: {},
       missing: ['b1'],
     });
-    (syncBeersToWorker as jest.Mock).mockImplementation(async () => {
+    (syncBeersToWorker as Mock).mockImplementation(async () => {
       mockEvents.push('sync:worker');
       return { synced: 1, queued_for_cleanup: 0 };
     });
@@ -234,9 +237,9 @@ describe('refreshAllDataFromAPI locking', () => {
   it('writes valid rewards when the same member body has malformed tasted rows', async () => {
     // This pairing can come from one real member response: malformed tasted
     // rows beside a valid reward array. The valid half must still be written.
-    respondsWith(fetchBeersFromAPI as jest.Mock, 'allBeers', fetchedRows(ALL_BEERS));
-    respondsWith(fetchMyBeersFromAPI as jest.Mock, 'myBeers', malformed('rows lacked an id'));
-    respondsWith(fetchRewardsFromAPI as jest.Mock, 'rewards', fetchedRows(REWARDS));
+    respondsWith(fetchBeersFromAPI as Mock, 'allBeers', fetchedRows(ALL_BEERS));
+    respondsWith(fetchMyBeersFromAPI as Mock, 'myBeers', malformed('rows lacked an id'));
+    respondsWith(fetchRewardsFromAPI as Mock, 'rewards', fetchedRows(REWARDS));
 
     const result = await refreshAllDataFromAPI();
 
@@ -248,9 +251,9 @@ describe('refreshAllDataFromAPI locking', () => {
   });
 
   it('does not acquire the lock at all when every fetch fails', async () => {
-    respondsWith(fetchBeersFromAPI as jest.Mock, 'allBeers', failed());
-    respondsWith(fetchMyBeersFromAPI as jest.Mock, 'myBeers', failed());
-    respondsWith(fetchRewardsFromAPI as jest.Mock, 'rewards', failed());
+    respondsWith(fetchBeersFromAPI as Mock, 'allBeers', failed());
+    respondsWith(fetchMyBeersFromAPI as Mock, 'myBeers', failed());
+    respondsWith(fetchRewardsFromAPI as Mock, 'rewards', failed());
 
     const result = await refreshAllDataFromAPI();
 
@@ -267,14 +270,14 @@ describe('refreshAllDataFromAPI locking', () => {
     // function at all. The reachable route is a `none://` placeholder URL on a
     // member account. The scenario is real; an earlier version of this comment
     // named the wrong cause for it.
-    respondsWith(fetchBeersFromAPI as jest.Mock, 'allBeers', failed());
+    respondsWith(fetchBeersFromAPI as Mock, 'allBeers', failed());
     respondsWith(
-      fetchMyBeersFromAPI as jest.Mock,
+      fetchMyBeersFromAPI as Mock,
       'myBeers',
       unavailable('not-applicable', 'visitor mode')
     );
     respondsWith(
-      fetchRewardsFromAPI as jest.Mock,
+      fetchRewardsFromAPI as Mock,
       'rewards',
       unavailable('not-applicable', 'visitor mode')
     );
@@ -295,15 +298,16 @@ describe('refreshAllDataFromAPI locking', () => {
      * behaviour with no test is indistinguishable from an accident.
      */
     const taplistViaProxyWithEtag = (): void => {
-      jest
-        .spyOn(config, 'enrichment', 'get')
-        .mockReturnValue({ ...config.enrichment, isConfigured: () => true });
-      (getPreference as jest.Mock).mockImplementation(async (key: string) => {
+      vi.spyOn(config, 'enrichment', 'get').mockReturnValue({
+        ...config.enrichment,
+        isConfigured: () => true,
+      });
+      (getPreference as Mock).mockImplementation(async (key: string) => {
         if (key === 'all_beers_api_url') return 'https://example.com/beers?sid=13885';
         if (key === 'my_beers_api_url') return 'https://example.com/mybeers.json';
         return null;
       });
-      (fetchBeersFromProxy as jest.Mock).mockResolvedValue({
+      (fetchBeersFromProxy as Mock).mockResolvedValue({
         notModified: false,
         beers: [{ id: 'b1', brew_name: 'Proxy Beer', brewer: 'Brewery' }],
         etag: 'W/"v1"',
@@ -311,12 +315,12 @@ describe('refreshAllDataFromAPI locking', () => {
     };
 
     const preferenceKeysWritten = (): string[] =>
-      (setPreference as jest.Mock).mock.calls.map(call => call[0]);
+      (setPreference as Mock).mock.calls.map(call => call[0]);
 
     it('stores the ETag but not the freshness timestamps', async () => {
       taplistViaProxyWithEtag();
-      respondsWith(fetchMyBeersFromAPI as jest.Mock, 'myBeers', fetchedRows(MY_BEERS));
-      respondsWith(fetchRewardsFromAPI as jest.Mock, 'rewards', fetchedRows(REWARDS));
+      respondsWith(fetchMyBeersFromAPI as Mock, 'myBeers', fetchedRows(MY_BEERS));
+      respondsWith(fetchRewardsFromAPI as Mock, 'rewards', fetchedRows(REWARDS));
 
       await refreshAllDataFromAPI();
 
@@ -334,26 +338,27 @@ describe('refreshAllDataFromAPI locking', () => {
       // this function, and the existing 304 tests drive fetchAndUpdateAllBeers.
       // A 304 is classified as a WRITE precisely so the check timestamp still
       // advances — the one preference this path does stamp.
-      jest
-        .spyOn(config, 'enrichment', 'get')
-        .mockReturnValue({ ...config.enrichment, isConfigured: () => true });
-      (getPreference as jest.Mock).mockImplementation(async (key: string) => {
+      vi.spyOn(config, 'enrichment', 'get').mockReturnValue({
+        ...config.enrichment,
+        isConfigured: () => true,
+      });
+      (getPreference as Mock).mockImplementation(async (key: string) => {
         if (key === 'all_beers_api_url') return 'https://example.com/beers?sid=13885';
         if (key === 'my_beers_api_url') return 'https://example.com/mybeers.json';
         return null;
       });
-      (fetchBeersFromProxy as jest.Mock).mockResolvedValue({
+      (fetchBeersFromProxy as Mock).mockResolvedValue({
         notModified: true,
         beers: [],
         etag: 'W/"unchanged"',
       });
       respondsWith(
-        fetchMyBeersFromAPI as jest.Mock,
+        fetchMyBeersFromAPI as Mock,
         'myBeers',
         unavailable('not-applicable', 'none:// placeholder')
       );
       respondsWith(
-        fetchRewardsFromAPI as jest.Mock,
+        fetchRewardsFromAPI as Mock,
         'rewards',
         unavailable('not-applicable', 'none:// placeholder')
       );

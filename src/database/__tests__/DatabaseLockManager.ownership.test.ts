@@ -1,3 +1,4 @@
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 /**
  * Grant-ownership tests for DatabaseLockManager
  *
@@ -59,11 +60,11 @@ async function expectPending(promise: Promise<unknown>): Promise<void> {
 
 describe('DatabaseLockManager grant ownership', () => {
   beforeEach(() => {
-    jest.useFakeTimers();
+    vi.useFakeTimers();
   });
 
   afterEach(() => {
-    jest.useRealTimers();
+    vi.useRealTimers();
   });
 
   it('does not grant the lock to a queued waiter when a hold is forcibly released', async () => {
@@ -71,7 +72,7 @@ describe('DatabaseLockManager grant ownership', () => {
     await lockManager.acquire('slow-op');
     const pendingB = lockManager.acquire('waiter-b');
 
-    jest.advanceTimersByTime(50);
+    vi.advanceTimersByTime(50);
 
     expect(lockManager.getCurrentOperation()).toBeNull();
     expect(lockManager.isLocked()).toBe(false);
@@ -83,7 +84,7 @@ describe('DatabaseLockManager grant ownership', () => {
     const lockManager = createLockManager({ holdTimeoutMs: 50 });
     await lockManager.acquire('slow-op');
 
-    jest.advanceTimersByTime(50);
+    vi.advanceTimersByTime(50);
 
     // Skipping _processQueue only protects callers already in the queue. A
     // caller arriving AFTER the force release hits the `!lockHeld` fast path,
@@ -102,7 +103,7 @@ describe('DatabaseLockManager grant ownership', () => {
     const lockManager = createLockManager({ holdTimeoutMs: 50 });
     const tokenA = await lockManager.acquire('slow-op');
 
-    jest.advanceTimersByTime(50);
+    vi.advanceTimersByTime(50);
     const newcomer = lockManager.acquire('newcomer-c');
     await expectPending(newcomer);
 
@@ -122,7 +123,7 @@ describe('DatabaseLockManager grant ownership', () => {
     expect(lockManager.hasAbandonedHolder()).toBe(false);
 
     await lockManager.acquire('slow-op');
-    jest.advanceTimersByTime(50);
+    vi.advanceTimersByTime(50);
 
     // isLocked() is false either way, so without this an abandoned hold is
     // indistinguishable from an idle one to anyone reading logs or metrics.
@@ -135,7 +136,7 @@ describe('DatabaseLockManager grant ownership', () => {
     const lockManager = createLockManager({ holdTimeoutMs: 50 });
     const tokenA = await lockManager.acquire('slow-op');
 
-    jest.advanceTimersByTime(50);
+    vi.advanceTimersByTime(50);
     const pendingB = lockManager.acquire('waiter-b');
     await expectPending(pendingB);
 
@@ -156,7 +157,7 @@ describe('DatabaseLockManager grant ownership', () => {
     const lockManager = createLockManager({ holdTimeoutMs: 50 });
     const tokenA = await lockManager.acquire('slow-op');
 
-    jest.advanceTimersByTime(50);
+    vi.advanceTimersByTime(50);
     const pendingB = lockManager.acquire('waiter-b');
 
     // Same serial, wrong operation. Only the actual abandoned holder returning
@@ -171,7 +172,7 @@ describe('DatabaseLockManager grant ownership', () => {
     const lockManager = createLockManager({ holdTimeoutMs: 50 });
     await lockManager.acquire('slow-op');
 
-    jest.advanceTimersByTime(50);
+    vi.advanceTimersByTime(50);
 
     // connection.ts calls prepareForShutdown before closing the database. It
     // waits on lockHeld, which a force release clears — so an abandoned hold
@@ -183,7 +184,7 @@ describe('DatabaseLockManager grant ownership', () => {
   it('clears an abandoned hold on resetForTesting so suites do not wedge each other', async () => {
     const lockManager = createLockManager({ holdTimeoutMs: 50 });
     await lockManager.acquire('slow-op');
-    jest.advanceTimersByTime(50);
+    vi.advanceTimersByTime(50);
     expect(lockManager.hasAbandonedHolder()).toBe(true);
 
     lockManager.resetForTesting();
@@ -199,7 +200,7 @@ describe('DatabaseLockManager grant ownership', () => {
     const tokenA = await lockManager.acquire('slow-op');
     const pendingB = lockManager.acquire('waiter-b');
 
-    jest.advanceTimersByTime(50);
+    vi.advanceTimersByTime(50);
 
     // A's first release is the recovery signal and hands the lock to B.
     lockManager.release(tokenA);
@@ -240,7 +241,7 @@ describe('DatabaseLockManager grant ownership', () => {
 
     expect(lockManager.getQueueLength()).toBe(2);
 
-    jest.advanceTimersByTime(50);
+    vi.advanceTimersByTime(50);
 
     // Matching by operation name would reject `patient`, the first entry found.
     // Both BeerRepository and MyBeersRepository reuse a single name across two
@@ -253,19 +254,19 @@ describe('DatabaseLockManager grant ownership', () => {
 
 describe('forced release reporting', () => {
   beforeEach(() => {
-    jest.useFakeTimers();
+    vi.useFakeTimers();
   });
 
   afterEach(() => {
-    jest.useRealTimers();
+    vi.useRealTimers();
   });
 
   it('reports a forced release through the error logger with the held operation and duration', async () => {
-    const reportError = jest.fn();
+    const reportError = vi.fn();
     const lockManager = new DatabaseLockManager({ holdTimeoutMs: 5000, reportError });
     await lockManager.acquire('slow-op');
 
-    jest.advanceTimersByTime(5000);
+    vi.advanceTimersByTime(5000);
 
     // A forced release is no longer routine bookkeeping — it abandons a grant
     // and blocks every writer until the holder returns. A console.warn is
@@ -286,13 +287,13 @@ describe('forced release reporting', () => {
   });
 
   it('reports the number of writers left waiting on the abandoned hold', async () => {
-    const reportError = jest.fn();
+    const reportError = vi.fn();
     const lockManager = new DatabaseLockManager({ holdTimeoutMs: 5000, reportError });
     await lockManager.acquire('slow-op');
     const waiter = lockManager.acquire('waiter-b');
     waiter.catch(() => undefined);
 
-    jest.advanceTimersByTime(5000);
+    vi.advanceTimersByTime(5000);
 
     // The queue length is what says whether this stalled anything, which is the
     // difference between a curiosity and an incident.
@@ -309,9 +310,9 @@ describe('forced release reporting', () => {
     });
     await lockManager.acquire('op');
 
-    const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    jest.advanceTimersByTime(100);
+    vi.advanceTimersByTime(100);
 
     // withDatabaseLock already puts release in a finally so a throwing task
     // cannot skip the state transition. The hold timer must extend the same
@@ -329,7 +330,7 @@ describe('forced release reporting', () => {
   });
 
   it('measures the real hold duration rather than echoing the configured timeout', async () => {
-    const reportError = jest.fn();
+    const reportError = vi.fn();
     const lockManager = new DatabaseLockManager({ holdTimeoutMs: 100, reportError });
     await lockManager.acquire('op');
 
@@ -338,8 +339,8 @@ describe('forced release reporting', () => {
     // here. Jumping the wall clock separates a measurement from a constant —
     // and this is also the iOS suspend/resume shape, where the app is frozen
     // and the timer fires late on resume.
-    jest.setSystemTime(Date.now() + 3_600_000);
-    jest.advanceTimersByTime(100);
+    vi.setSystemTime(Date.now() + 3_600_000);
+    vi.advanceTimersByTime(100);
 
     const [, context] = reportError.mock.calls[0];
     expect(context.additionalData.heldForMs).toBeGreaterThan(3_600_000);
@@ -352,12 +353,12 @@ describe('forced release reporting', () => {
   });
 
   it('does not report anything when the lock is released normally', async () => {
-    const reportError = jest.fn();
+    const reportError = vi.fn();
     const lockManager = new DatabaseLockManager({ holdTimeoutMs: 5000, reportError });
     const token = await lockManager.acquire('quick-op');
 
     lockManager.release(token);
-    jest.advanceTimersByTime(5000);
+    vi.advanceTimersByTime(5000);
 
     expect(reportError).not.toHaveBeenCalled();
   });
@@ -365,11 +366,11 @@ describe('forced release reporting', () => {
 
 describe('withDatabaseLock', () => {
   beforeEach(() => {
-    jest.useFakeTimers();
+    vi.useFakeTimers();
   });
 
   afterEach(() => {
-    jest.useRealTimers();
+    vi.useRealTimers();
   });
 
   it('releases the lock when the task throws', async () => {

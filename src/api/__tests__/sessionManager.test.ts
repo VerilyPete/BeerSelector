@@ -1,3 +1,4 @@
+import { vi, type Mock, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as SecureStore from 'expo-secure-store';
 import {
   saveSessionData,
@@ -5,15 +6,15 @@ import {
   clearSessionData,
   hasSession,
   parseCookies,
-  extractSessionDataFromResponse
+  extractSessionDataFromResponse,
 } from '../sessionManager';
 import { SessionData } from '../../types/api';
 
 // Mock SecureStore
-jest.mock('expo-secure-store', () => ({
-  setItemAsync: jest.fn(),
-  getItemAsync: jest.fn(),
-  deleteItemAsync: jest.fn(),
+vi.mock('expo-secure-store', () => ({
+  setItemAsync: vi.fn(),
+  getItemAsync: vi.fn(),
+  deleteItemAsync: vi.fn(),
 }));
 
 // Mock console methods
@@ -31,16 +32,16 @@ describe('sessionManager', () => {
     firstName: 'Test',
     lastName: 'User',
     email: 'test@example.com',
-    cardNum: '12345'
+    cardNum: '12345',
   };
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
 
     // Mock console methods to prevent noise in tests
-    console.log = jest.fn();
-    console.error = jest.fn();
-    console.warn = jest.fn();
+    console.log = vi.fn();
+    console.error = vi.fn();
+    console.warn = vi.fn();
   });
 
   afterEach(() => {
@@ -62,7 +63,7 @@ describe('sessionManager', () => {
 
     it('should throw error when saving session data fails', async () => {
       const error = new Error('Storage error');
-      (SecureStore.setItemAsync as jest.Mock).mockRejectedValueOnce(error);
+      (SecureStore.setItemAsync as Mock).mockRejectedValueOnce(error);
 
       await expect(saveSessionData(mockSessionData)).rejects.toThrow('Storage error');
     });
@@ -70,7 +71,7 @@ describe('sessionManager', () => {
 
   describe('getSessionData', () => {
     it('should return session data from secure storage', async () => {
-      (SecureStore.getItemAsync as jest.Mock).mockResolvedValueOnce(JSON.stringify(mockSessionData));
+      (SecureStore.getItemAsync as Mock).mockResolvedValueOnce(JSON.stringify(mockSessionData));
 
       const result = await getSessionData();
 
@@ -79,7 +80,7 @@ describe('sessionManager', () => {
     });
 
     it('should return null when no session data exists', async () => {
-      (SecureStore.getItemAsync as jest.Mock).mockResolvedValueOnce(null);
+      (SecureStore.getItemAsync as Mock).mockResolvedValueOnce(null);
 
       const result = await getSessionData();
 
@@ -87,10 +88,12 @@ describe('sessionManager', () => {
     });
 
     it('should return null when session data is invalid', async () => {
-      (SecureStore.getItemAsync as jest.Mock).mockResolvedValueOnce(JSON.stringify({
-        // Missing required fields
-        username: 'testuser'
-      }));
+      (SecureStore.getItemAsync as Mock).mockResolvedValueOnce(
+        JSON.stringify({
+          // Missing required fields
+          username: 'testuser',
+        })
+      );
 
       const result = await getSessionData();
 
@@ -99,7 +102,7 @@ describe('sessionManager', () => {
 
     it('should return null when there is an error getting session data', async () => {
       const error = new Error('Storage error');
-      (SecureStore.getItemAsync as jest.Mock).mockRejectedValueOnce(error);
+      (SecureStore.getItemAsync as Mock).mockRejectedValueOnce(error);
 
       const result = await getSessionData();
 
@@ -116,7 +119,7 @@ describe('sessionManager', () => {
 
     it('should throw error when clearing session data fails', async () => {
       const error = new Error('Storage error');
-      (SecureStore.deleteItemAsync as jest.Mock).mockRejectedValueOnce(error);
+      (SecureStore.deleteItemAsync as Mock).mockRejectedValueOnce(error);
 
       await expect(clearSessionData()).rejects.toThrow('Storage error');
     });
@@ -124,7 +127,7 @@ describe('sessionManager', () => {
 
   describe('hasSession', () => {
     it('should return true when session data exists', async () => {
-      (SecureStore.getItemAsync as jest.Mock).mockResolvedValueOnce(JSON.stringify(mockSessionData));
+      (SecureStore.getItemAsync as Mock).mockResolvedValueOnce(JSON.stringify(mockSessionData));
 
       const result = await hasSession();
 
@@ -132,7 +135,7 @@ describe('sessionManager', () => {
     });
 
     it('should return false when no session data exists', async () => {
-      (SecureStore.getItemAsync as jest.Mock).mockResolvedValueOnce(null);
+      (SecureStore.getItemAsync as Mock).mockResolvedValueOnce(null);
 
       const result = await hasSession();
 
@@ -141,7 +144,7 @@ describe('sessionManager', () => {
 
     it('should return false when there is an error checking session', async () => {
       const error = new Error('Storage error');
-      (SecureStore.getItemAsync as jest.Mock).mockRejectedValueOnce(error);
+      (SecureStore.getItemAsync as Mock).mockRejectedValueOnce(error);
 
       const result = await hasSession();
 
@@ -192,7 +195,7 @@ describe('sessionManager', () => {
         first_name: 'Test',
         last_name: 'User',
         email: 'test%40example.com',
-        cardNum: '12345'
+        cardNum: '12345',
       };
 
       const result = extractSessionDataFromResponse(headers, cookies);
@@ -206,7 +209,7 @@ describe('sessionManager', () => {
         firstName: 'Test',
         lastName: 'User',
         email: 'test@example.com',
-        cardNum: '12345'
+        cardNum: '12345',
       });
     });
 
@@ -229,7 +232,7 @@ describe('sessionManager', () => {
       const cookies = {
         PHPSESSID: 'test-session-id',
         store_name: '%invalid',
-        email: '%invalid'
+        email: '%invalid',
       };
 
       const result = extractSessionDataFromResponse(headers, cookies);
@@ -237,7 +240,7 @@ describe('sessionManager', () => {
       expect(result).toEqual({
         sessionId: 'test-session-id',
         storeName: '%invalid',
-        email: '%invalid'
+        email: '%invalid',
       });
     });
   });

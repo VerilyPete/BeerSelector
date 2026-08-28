@@ -1,3 +1,4 @@
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 /**
  * OperationQueueRepository Unit Tests
  *
@@ -15,20 +16,20 @@ import {
 
 // Create mock database
 const mockDb = {
-  runAsync: jest.fn(),
-  getAllAsync: jest.fn(),
-  getFirstAsync: jest.fn(),
+  runAsync: vi.fn(),
+  getAllAsync: vi.fn(),
+  getFirstAsync: vi.fn(),
 };
 
 // Mock the database connection
-jest.mock('../../connection', () => ({
-  getDatabase: jest.fn(() => Promise.resolve(mockDb)),
+vi.mock('../../connection', () => ({
+  getDatabase: vi.fn(() => Promise.resolve(mockDb)),
 }));
 
 describe('OperationQueueRepository', () => {
   beforeEach(() => {
     // Reset mocks
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   describe('addOperation', () => {
@@ -412,13 +413,13 @@ describe('OperationQueueRepository', () => {
 });
 
 describe('OperationQueueRepository under database contention', () => {
-  // Global fake timers (jest.setup.js:141) would stall the retry backoff.
+  // Global fake timers (src/__vitest__/setup.ts) would stall the retry backoff.
   beforeEach(() => {
-    jest.useRealTimers();
+    vi.useRealTimers();
   });
 
   afterEach(() => {
-    jest.useFakeTimers();
+    vi.useFakeTimers();
   });
 
   it('maps a lock abort on addOperation to DatabaseContentionError', async () => {

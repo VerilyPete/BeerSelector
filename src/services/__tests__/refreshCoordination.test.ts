@@ -1,3 +1,4 @@
+import { describe, it, expect, beforeEach, afterEach, vi, type Mock } from 'vitest';
 /**
  * How concurrent refreshes are kept from colliding.
  *
@@ -45,45 +46,45 @@ import { fetchBeersFromAPI, fetchMyBeersFromAPI, fetchRewardsFromAPI } from '../
 import { beerRepository } from '../../database/repositories/BeerRepository';
 import { fetchedRows } from '../../api/__tests__/helpers/fetchOutcomeFixtures';
 
-jest.mock('../../database/db', () => ({
-  getPreference: jest.fn(),
-  setPreference: jest.fn(),
+vi.mock('../../database/db', () => ({
+  getPreference: vi.fn(),
+  setPreference: vi.fn(),
 }));
 
-jest.mock('../../database/preferences', () => ({
-  getPreference: jest.fn(),
+vi.mock('../../database/preferences', () => ({
+  getPreference: vi.fn(),
 
-  setPreference: jest.fn(),
-  areApiUrlsConfigured: jest.fn(),
+  setPreference: vi.fn(),
+  areApiUrlsConfigured: vi.fn(),
 }));
 
-jest.mock('../../api/beerApi', () =>
+vi.mock('../../api/beerApi', async () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  require('../../api/__tests__/helpers/beerApiMock').beerApiMockFactory()
+  (await import('../../api/__tests__/helpers/beerApiMock')).beerApiMockFactory()
 );
 
-jest.mock('../../database/repositories/BeerRepository', () => ({
+vi.mock('../../database/repositories/BeerRepository', () => ({
   beerRepository: {
-    count: jest.fn(async () => 12),
-    insertMany: jest.fn(),
-    insertManyUnsafe: jest.fn(),
+    count: vi.fn(async () => 12),
+    insertMany: vi.fn(),
+    insertManyUnsafe: vi.fn(),
   },
 }));
 
-jest.mock('../../database/repositories/MyBeersRepository', () => ({
+vi.mock('../../database/repositories/MyBeersRepository', () => ({
   myBeersRepository: {
-    insertMany: jest.fn(),
-    insertManyUnsafe: jest.fn(),
-    replaceAllWithEmptyUnsafe: jest.fn(),
+    insertMany: vi.fn(),
+    insertManyUnsafe: vi.fn(),
+    replaceAllWithEmptyUnsafe: vi.fn(),
   },
 }));
 
-jest.mock('../../database/repositories/RewardsRepository', () => ({
+vi.mock('../../database/repositories/RewardsRepository', () => ({
   rewardsRepository: {
-    replaceAllWithEmpty: jest.fn(async () => {}),
-    replaceAllWithEmptyUnsafe: jest.fn(async () => {}),
-    insertMany: jest.fn(),
-    insertManyUnsafe: jest.fn(),
+    replaceAllWithEmpty: vi.fn(async () => {}),
+    replaceAllWithEmptyUnsafe: vi.fn(async () => {}),
+    insertMany: vi.fn(),
+    insertManyUnsafe: vi.fn(),
   },
 }));
 
@@ -108,7 +109,7 @@ const flushUntil = async (predicate: () => boolean, ticks = 50): Promise<void> =
 };
 
 /** Log the call, then answer with the real `FetchedSource` shape. */
-const logsAndResolves = (mock: jest.Mock, label: string, rows: readonly unknown[], log: string[]) =>
+const logsAndResolves = (mock: Mock, label: string, rows: readonly unknown[], log: string[]) =>
   mock.mockImplementation(async () => {
     log.push(`${label}-start`);
     await Promise.resolve();
@@ -117,33 +118,33 @@ const logsAndResolves = (mock: jest.Mock, label: string, rows: readonly unknown[
   });
 
 describe('Sequential Refresh Coordination', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
+  beforeEach(async () => {
+    vi.clearAllMocks();
     databaseLockManager.resetForTesting();
     resetInFlightSequentialRefresh();
     dropInFlightTaplistFetch();
     resetLastManualRefreshTime();
 
-    (getPreference as jest.Mock).mockImplementation(async (key: string) => {
+    (getPreference as Mock).mockImplementation(async (key: string) => {
       if (key === 'all_beers_api_url') return 'http://api.example.com/all';
       if (key === 'my_beers_api_url') return 'http://api.example.com/my';
       return null;
     });
-    (setPreference as jest.Mock).mockResolvedValue(undefined);
-    (areApiUrlsConfigured as jest.Mock).mockResolvedValue(true);
-    (fetchBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(ALL_BEERS));
-    (fetchMyBeersFromAPI as jest.Mock).mockResolvedValue(fetchedRows(MY_BEERS));
-    (fetchRewardsFromAPI as jest.Mock).mockResolvedValue(fetchedRows(REWARDS));
+    (setPreference as Mock).mockResolvedValue(undefined);
+    (areApiUrlsConfigured as Mock).mockResolvedValue(true);
+    (fetchBeersFromAPI as Mock).mockResolvedValue(fetchedRows(ALL_BEERS));
+    (fetchMyBeersFromAPI as Mock).mockResolvedValue(fetchedRows(MY_BEERS));
+    (fetchRewardsFromAPI as Mock).mockResolvedValue(fetchedRows(REWARDS));
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     // In an `afterEach`, not at the end of each test body. A spy on
     // `withDatabaseLock` that a failing test leaves installed is picked up by
     // the NEXT test as its `originalWithLock`, which then wraps itself and dies
     // with "Maximum call stack size exceeded" — reporting the second test as
     // broken when the first one is. That is exactly how this file behaved
     // before the rewrite.
-    jest.restoreAllMocks();
+    vi.restoreAllMocks();
     databaseLockManager.resetForTesting();
   });
 
@@ -158,7 +159,7 @@ describe('Sequential Refresh Coordination', () => {
       // this plan exists to cope with.
       // A real store URL: de-duplication is keyed by `sid`, and a URL without
       // one is a wildcard that deliberately does not join.
-      (getPreference as jest.Mock).mockImplementation(async (key: string) => {
+      (getPreference as Mock).mockImplementation(async (key: string) => {
         if (key === 'all_beers_api_url') {
           return 'https://fsbs.beerknurd.com/bk-store-json.php?sid=13879';
         }
@@ -186,7 +187,7 @@ describe('Sequential Refresh Coordination', () => {
       // about, so `join: false` cannot reach it. A user double-pulling on a slow
       // link is precisely how you arrive here.
       // Identified store, so the join is actually available to be defeated.
-      (getPreference as jest.Mock).mockImplementation(async (key: string) => {
+      (getPreference as Mock).mockImplementation(async (key: string) => {
         if (key === 'all_beers_api_url') {
           return 'https://fsbs.beerknurd.com/bk-store-json.php?sid=13879';
         }
@@ -195,14 +196,14 @@ describe('Sequential Refresh Coordination', () => {
       });
 
       await manualRefreshAllData();
-      const callsBefore = (fetchBeersFromAPI as jest.Mock).mock.calls.length;
+      const callsBefore = (fetchBeersFromAPI as Mock).mock.calls.length;
 
       let releaseInFlight: () => void = () => {};
       let reachedFetch: () => void = () => {};
       const inFlightRegistered = new Promise<void>(resolve => {
         reachedFetch = resolve;
       });
-      (fetchBeersFromAPI as jest.Mock).mockImplementationOnce(async () => {
+      (fetchBeersFromAPI as Mock).mockImplementationOnce(async () => {
         reachedFetch();
         await new Promise<void>(resolve => {
           releaseInFlight = resolve;
@@ -237,11 +238,8 @@ describe('Sequential Refresh Coordination', () => {
       // that joins, and one that arrives too late to have tried, are now both
       // failures rather than both passes. The budget can therefore be generous:
       // overshooting it costs a slow test, not a false green.
-      await flushUntil(
-        () => (fetchBeersFromAPI as jest.Mock).mock.calls.length > callsBefore + 1,
-        500
-      );
-      const callsWhileFirstInFlight = (fetchBeersFromAPI as jest.Mock).mock.calls.length;
+      await flushUntil(() => (fetchBeersFromAPI as Mock).mock.calls.length > callsBefore + 1, 500);
+      const callsWhileFirstInFlight = (fetchBeersFromAPI as Mock).mock.calls.length;
 
       releaseInFlight();
       await Promise.all([focusRefresh, forced]);
@@ -259,14 +257,14 @@ describe('Sequential Refresh Coordination', () => {
       // Real store URLs: the key is the `sid`, and a URL without one yields a
       // null storeId that legitimately joins.
       const storeUrl = (sid: string) => `https://fsbs.beerknurd.com/bk-store-json.php?sid=${sid}`;
-      (getPreference as jest.Mock).mockImplementation(async (key: string) => {
+      (getPreference as Mock).mockImplementation(async (key: string) => {
         if (key === 'all_beers_api_url') return storeUrl('13879');
         if (key === 'my_beers_api_url') return 'http://api.example.com/my';
         return null;
       });
 
       let releaseFirst: () => void = () => {};
-      (fetchBeersFromAPI as jest.Mock).mockImplementationOnce(async () => {
+      (fetchBeersFromAPI as Mock).mockImplementationOnce(async () => {
         await new Promise<void>(resolve => {
           releaseFirst = resolve;
         });
@@ -281,9 +279,9 @@ describe('Sequential Refresh Coordination', () => {
       // write now reads the store configuration through a helper — left it as
       // the no-op initialiser and the test hung for the full 30s timeout
       // instead of failing. The condition is what this step actually needs.
-      await flushUntil(() => (fetchBeersFromAPI as jest.Mock).mock.calls.length > 0);
+      await flushUntil(() => (fetchBeersFromAPI as Mock).mock.calls.length > 0);
 
-      (getPreference as jest.Mock).mockImplementation(async (key: string) => {
+      (getPreference as Mock).mockImplementation(async (key: string) => {
         if (key === 'all_beers_api_url') return storeUrl('13880');
         if (key === 'my_beers_api_url') return 'http://api.example.com/my';
         return null;
@@ -297,8 +295,8 @@ describe('Sequential Refresh Coordination', () => {
       // Confirmed by mutation: dropping `storeId` from the join condition
       // entirely, with 40 extra microtasks upstream of the join, left the
       // end-of-test count at two and this test green.
-      await flushUntil(() => (fetchBeersFromAPI as jest.Mock).mock.calls.length > 1, 500);
-      const callsWhileFirstInFlight = (fetchBeersFromAPI as jest.Mock).mock.calls.length;
+      await flushUntil(() => (fetchBeersFromAPI as Mock).mock.calls.length > 1, 500);
+      const callsWhileFirstInFlight = (fetchBeersFromAPI as Mock).mock.calls.length;
 
       releaseFirst();
       await Promise.all([first, second]);
@@ -310,9 +308,9 @@ describe('Sequential Refresh Coordination', () => {
   describe('sequentialRefreshAllData', () => {
     it('fetches each source in turn rather than all at once', async () => {
       const executionLog: string[] = [];
-      logsAndResolves(fetchBeersFromAPI as jest.Mock, 'allBeers', ALL_BEERS, executionLog);
-      logsAndResolves(fetchMyBeersFromAPI as jest.Mock, 'myBeers', MY_BEERS, executionLog);
-      logsAndResolves(fetchRewardsFromAPI as jest.Mock, 'rewards', REWARDS, executionLog);
+      logsAndResolves(fetchBeersFromAPI as Mock, 'allBeers', ALL_BEERS, executionLog);
+      logsAndResolves(fetchMyBeersFromAPI as Mock, 'myBeers', MY_BEERS, executionLog);
+      logsAndResolves(fetchRewardsFromAPI as Mock, 'rewards', REWARDS, executionLog);
 
       await sequentialRefreshAllData();
 
@@ -333,12 +331,12 @@ describe('Sequential Refresh Coordination', () => {
     it('takes the database lock exactly once', async () => {
       const lockAcquisitions: string[] = [];
       const originalWithLock = databaseLockManager.withDatabaseLock.bind(databaseLockManager);
-      jest
-        .spyOn(databaseLockManager, 'withDatabaseLock')
-        .mockImplementation(async (operation: string, task: () => Promise<unknown>) => {
+      vi.spyOn(databaseLockManager, 'withDatabaseLock').mockImplementation(
+        async (operation: string, task: () => Promise<unknown>) => {
           lockAcquisitions.push(operation);
           return originalWithLock(operation, task);
-        });
+        }
+      );
 
       await sequentialRefreshAllData();
 
@@ -366,7 +364,7 @@ describe('Sequential Refresh Coordination', () => {
     });
 
     it('releases the lock when a source fails', async () => {
-      (fetchMyBeersFromAPI as jest.Mock).mockRejectedValue(new Error('Network error'));
+      (fetchMyBeersFromAPI as Mock).mockRejectedValue(new Error('Network error'));
 
       const result = await sequentialRefreshAllData();
 
@@ -388,16 +386,16 @@ describe('Sequential Refresh Coordination', () => {
       // claimed.
       const lockAcquisitions: string[] = [];
       const originalWithLock = databaseLockManager.withDatabaseLock.bind(databaseLockManager);
-      jest
-        .spyOn(databaseLockManager, 'withDatabaseLock')
-        .mockImplementation(async (operation: string, task: () => Promise<unknown>) => {
+      vi.spyOn(databaseLockManager, 'withDatabaseLock').mockImplementation(
+        async (operation: string, task: () => Promise<unknown>) => {
           lockAcquisitions.push(operation);
           return originalWithLock(operation, task);
-        });
+        }
+      );
 
-      (fetchBeersFromAPI as jest.Mock).mockRejectedValue(new Error('Network error'));
-      (fetchMyBeersFromAPI as jest.Mock).mockRejectedValue(new Error('Network error'));
-      (fetchRewardsFromAPI as jest.Mock).mockRejectedValue(new Error('Network error'));
+      (fetchBeersFromAPI as Mock).mockRejectedValue(new Error('Network error'));
+      (fetchMyBeersFromAPI as Mock).mockRejectedValue(new Error('Network error'));
+      (fetchRewardsFromAPI as Mock).mockRejectedValue(new Error('Network error'));
 
       const result = await sequentialRefreshAllData();
 
@@ -410,9 +408,9 @@ describe('Sequential Refresh Coordination', () => {
   describe('manualRefreshAllData', () => {
     it('delegates to the sequential refresh', async () => {
       const executionLog: string[] = [];
-      logsAndResolves(fetchBeersFromAPI as jest.Mock, 'allBeers', ALL_BEERS, executionLog);
-      logsAndResolves(fetchMyBeersFromAPI as jest.Mock, 'myBeers', MY_BEERS, executionLog);
-      logsAndResolves(fetchRewardsFromAPI as jest.Mock, 'rewards', REWARDS, executionLog);
+      logsAndResolves(fetchBeersFromAPI as Mock, 'allBeers', ALL_BEERS, executionLog);
+      logsAndResolves(fetchMyBeersFromAPI as Mock, 'myBeers', MY_BEERS, executionLog);
+      logsAndResolves(fetchRewardsFromAPI as Mock, 'rewards', REWARDS, executionLog);
 
       await manualRefreshAllData();
 
@@ -430,12 +428,12 @@ describe('Sequential Refresh Coordination', () => {
     it('takes the database lock exactly once', async () => {
       const lockAcquisitions: string[] = [];
       const originalWithLock = databaseLockManager.withDatabaseLock.bind(databaseLockManager);
-      jest
-        .spyOn(databaseLockManager, 'withDatabaseLock')
-        .mockImplementation(async (operation: string, task: () => Promise<unknown>) => {
+      vi.spyOn(databaseLockManager, 'withDatabaseLock').mockImplementation(
+        async (operation: string, task: () => Promise<unknown>) => {
           lockAcquisitions.push(operation);
           return originalWithLock(operation, task);
-        });
+        }
+      );
 
       await manualRefreshAllData();
 
@@ -469,10 +467,10 @@ describe('Sequential Refresh Coordination', () => {
       // own ETag over it and the next request 304s again, so the user's "refresh
       // again, it still looks wrong" does nothing — twice.
       const order: string[] = [];
-      (setPreference as jest.Mock).mockImplementation(async (key: string, value: string) => {
+      (setPreference as Mock).mockImplementation(async (key: string, value: string) => {
         order.push(value === '' ? `clear:${key}` : `set:${key}`);
       });
-      (beerRepository.insertManyUnsafe as jest.Mock).mockImplementation(async () => {
+      (beerRepository.insertManyUnsafe as Mock).mockImplementation(async () => {
         order.push('write:allBeers');
       });
 
@@ -480,7 +478,7 @@ describe('Sequential Refresh Coordination', () => {
       // arrives mid-run rather than after it.
       let releaseFirstRun: () => void = () => {};
       const firstRunReachedRewards = new Promise<void>(resolve => {
-        (fetchRewardsFromAPI as jest.Mock).mockImplementationOnce(async () => {
+        (fetchRewardsFromAPI as Mock).mockImplementationOnce(async () => {
           resolve();
           await new Promise<void>(release => {
             releaseFirstRun = release;
@@ -561,7 +559,7 @@ describe('Sequential Refresh Coordination', () => {
       // "never checked" — so the next app open paid for a full refresh it did
       // not need.
       const written = new Map<string, string>();
-      (setPreference as jest.Mock).mockImplementation(async (key: string, value: string) => {
+      (setPreference as Mock).mockImplementation(async (key: string, value: string) => {
         written.set(key, value);
       });
 
@@ -575,9 +573,9 @@ describe('Sequential Refresh Coordination', () => {
   describe('refreshAllDataFromAPI', () => {
     it('fetches each source in turn', async () => {
       const executionLog: string[] = [];
-      logsAndResolves(fetchBeersFromAPI as jest.Mock, 'allBeers', ALL_BEERS, executionLog);
-      logsAndResolves(fetchMyBeersFromAPI as jest.Mock, 'myBeers', MY_BEERS, executionLog);
-      logsAndResolves(fetchRewardsFromAPI as jest.Mock, 'rewards', REWARDS, executionLog);
+      logsAndResolves(fetchBeersFromAPI as Mock, 'allBeers', ALL_BEERS, executionLog);
+      logsAndResolves(fetchMyBeersFromAPI as Mock, 'myBeers', MY_BEERS, executionLog);
+      logsAndResolves(fetchRewardsFromAPI as Mock, 'rewards', REWARDS, executionLog);
 
       await refreshAllDataFromAPI();
 
@@ -597,12 +595,12 @@ describe('Sequential Refresh Coordination', () => {
       // name the property when 5.5 landed. It did exactly that.
       const lockAcquisitions: string[] = [];
       const originalWithLock = databaseLockManager.withDatabaseLock.bind(databaseLockManager);
-      jest
-        .spyOn(databaseLockManager, 'withDatabaseLock')
-        .mockImplementation(async (operation: string, task: () => Promise<unknown>) => {
+      vi.spyOn(databaseLockManager, 'withDatabaseLock').mockImplementation(
+        async (operation: string, task: () => Promise<unknown>) => {
           lockAcquisitions.push(operation);
           return originalWithLock(operation, task);
-        });
+        }
+      );
 
       await refreshAllDataFromAPI();
 

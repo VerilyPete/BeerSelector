@@ -1,3 +1,4 @@
+import { describe, it, expect, beforeEach, afterEach, vi, type Mock } from 'vitest';
 /**
  * Unit tests for enrichmentService.ts
  *
@@ -29,7 +30,7 @@ import { Beerfinder, BeerWithContainerType, BeerfinderWithContainerType } from '
 import { getPreference, setPreference } from '@/src/database/preferences';
 
 // Mock the config module
-jest.mock('@/src/config', () => ({
+vi.mock('@/src/config', () => ({
   config: {
     enrichment: {
       apiUrl: 'https://test-api.example.com',
@@ -38,11 +39,11 @@ jest.mock('@/src/config', () => ({
       batchSize: 100,
       rateLimitWindow: 60000,
       rateLimitMaxRequests: 10,
-      isConfigured: jest.fn(() => true),
-      getFullUrl: jest.fn((endpoint: string) => `https://test-api.example.com/${endpoint}`),
+      isConfigured: vi.fn(() => true),
+      getFullUrl: vi.fn((endpoint: string) => `https://test-api.example.com/${endpoint}`),
     },
   },
-  assertEnrichmentConfigured: jest.fn((enrichment: { isConfigured: () => boolean }) => {
+  assertEnrichmentConfigured: vi.fn((enrichment: { isConfigured: () => boolean }) => {
     if (!enrichment.isConfigured()) {
       throw new Error('Enrichment service is not configured: missing API key');
     }
@@ -50,19 +51,19 @@ jest.mock('@/src/config', () => ({
 }));
 
 // Mock preferences
-jest.mock('@/src/database/preferences', () => ({
-  getPreference: jest.fn(),
+vi.mock('@/src/database/preferences', () => ({
+  getPreference: vi.fn(),
 
-  setPreference: jest.fn(),
+  setPreference: vi.fn(),
 }));
 
 // Mock error logger
-jest.mock('@/src/utils/errorLogger', () => ({
-  logWarning: jest.fn(),
+vi.mock('@/src/utils/errorLogger', () => ({
+  logWarning: vi.fn(),
 }));
 
 // Mock fetch globally
-const mockFetch = jest.fn();
+const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
 function setupEnrichmentTest() {
@@ -73,14 +74,14 @@ function setupEnrichmentTest() {
 }
 
 describe('enrichmentService', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
+  beforeEach(async () => {
+    vi.clearAllMocks();
     setupEnrichmentTest();
   });
 
   describe('Metrics', () => {
     describe('getEnrichmentMetrics', () => {
-      it('should return initial metrics with all zeros', () => {
+      it('should return initial metrics with all zeros', async () => {
         const metrics = getEnrichmentMetrics();
 
         expect(metrics.proxyRequests).toBe(0);
@@ -94,7 +95,7 @@ describe('enrichmentService', () => {
         expect(metrics.lastReset).toBeDefined();
       });
 
-      it('should return a copy of metrics (not reference)', () => {
+      it('should return a copy of metrics (not reference)', async () => {
         const metrics1 = getEnrichmentMetrics();
         const metrics2 = getEnrichmentMetrics();
 
@@ -105,7 +106,7 @@ describe('enrichmentService', () => {
     });
 
     describe('resetEnrichmentMetrics', () => {
-      it('should reset all metrics to zero', () => {
+      it('should reset all metrics to zero', async () => {
         // First, record some activity
         recordFallback();
         recordFallback();
@@ -123,7 +124,7 @@ describe('enrichmentService', () => {
         expect(metrics.proxySuccesses).toBe(0);
       });
 
-      it('should update lastReset timestamp', () => {
+      it('should update lastReset timestamp', async () => {
         const beforeReset = Date.now();
         resetEnrichmentMetrics();
         const afterReset = Date.now();
@@ -135,7 +136,7 @@ describe('enrichmentService', () => {
     });
 
     describe('recordFallback', () => {
-      it('should increment fallback count', () => {
+      it('should increment fallback count', async () => {
         expect(getEnrichmentMetrics().fallbackCount).toBe(0);
 
         recordFallback();
@@ -149,7 +150,7 @@ describe('enrichmentService', () => {
 
   describe('Rate Limiting', () => {
     describe('getTimeUntilNextRequest', () => {
-      it('should return 0 when under rate limit', () => {
+      it('should return 0 when under rate limit', async () => {
         // Fresh state, should be allowed
         const waitTime = getTimeUntilNextRequest();
         expect(waitTime).toBe(0);
@@ -186,7 +187,7 @@ describe('enrichmentService', () => {
       enrichment_source: null,
     });
 
-    it('should return original array when enrichment data is empty', () => {
+    it('should return original array when enrichment data is empty', async () => {
       const beers = [createMockBeer('1'), createMockBeer('2')];
       const enrichmentData: Record<string, EnrichmentData> = {};
 
@@ -195,7 +196,7 @@ describe('enrichmentService', () => {
       expect(result).toBe(beers); // Same reference
     });
 
-    it('should merge enrichment data into matching beers', () => {
+    it('should merge enrichment data into matching beers', async () => {
       const beers = [createMockBeer('1'), createMockBeer('2'), createMockBeer('3')];
       const enrichmentData: Record<string, EnrichmentData> = {
         '1': {
@@ -234,7 +235,7 @@ describe('enrichmentService', () => {
       expect(result[2].brew_description).toBe('Original description 3');
     });
 
-    it('should preserve existing ABV if enriched_abv is null', () => {
+    it('should preserve existing ABV if enriched_abv is null', async () => {
       const beers = [{ ...createMockBeer('1'), abv: 5.5 }];
       const enrichmentData: Record<string, EnrichmentData> = {
         '1': {
@@ -252,7 +253,7 @@ describe('enrichmentService', () => {
       expect(result[0].enrichment_confidence).toBe(0.8);
     });
 
-    it('should work with BeerfinderWithContainerType', () => {
+    it('should work with BeerfinderWithContainerType', async () => {
       const beers = [createMockBeerfinder('1'), createMockBeerfinder('2')];
       const enrichmentData: Record<string, EnrichmentData> = {
         '2': {
@@ -271,7 +272,7 @@ describe('enrichmentService', () => {
       expect(result[1].enrichment_source).toBe('perplexity');
     });
 
-    it('should not mutate original array', () => {
+    it('should not mutate original array', async () => {
       const originalBeers = [createMockBeer('1')];
       const beers = [...originalBeers];
       const enrichmentData: Record<string, EnrichmentData> = {
@@ -292,7 +293,7 @@ describe('enrichmentService', () => {
       expect(result[0].abv).toBe(6.5);
     });
 
-    it('should handle empty beer array', () => {
+    it('should handle empty beer array', async () => {
       const beers: BeerWithContainerType[] = [];
       const enrichmentData: Record<string, EnrichmentData> = {
         '1': {
@@ -309,7 +310,7 @@ describe('enrichmentService', () => {
       expect(result).toEqual([]);
     });
 
-    it('should use Worker merged description over original beer description', () => {
+    it('should use Worker merged description over original beer description', async () => {
       const beers = [{ ...createMockBeer('1'), brew_description: 'Original from Flying Saucer' }];
       const enrichmentData: Record<string, EnrichmentData> = {
         '1': {
@@ -327,7 +328,7 @@ describe('enrichmentService', () => {
       expect(result[0].brew_description).toBe('Cleaned description from Worker');
     });
 
-    it('should keep beer description when Worker returns null', () => {
+    it('should keep beer description when Worker returns null', async () => {
       const beers = [{ ...createMockBeer('1'), brew_description: 'Original from Flying Saucer' }];
       const enrichmentData: Record<string, EnrichmentData> = {
         '1': {
@@ -345,7 +346,7 @@ describe('enrichmentService', () => {
       expect(result[0].brew_description).toBe('Original from Flying Saucer');
     });
 
-    it('should accept Beerfinder[] (pre-container-type) for enrichment-before-container-type flow', () => {
+    it('should accept Beerfinder[] (pre-container-type) for enrichment-before-container-type flow', async () => {
       const beers: Beerfinder[] = [
         {
           id: '1',
@@ -393,7 +394,7 @@ describe('enrichmentService', () => {
 
   describe('Rate Limiting - Extended Tests', () => {
     describe('__resetRateLimitStateForTests', () => {
-      it('should clear rate limit state', () => {
+      it('should clear rate limit state', async () => {
         // Make requests to fill up rate limit
         // Each call to getTimeUntilNextRequest doesn't consume quota,
         // but we can verify the state is cleared
@@ -406,7 +407,7 @@ describe('enrichmentService', () => {
     describe('isRequestAllowed and getTimeUntilNextRequest interaction', () => {
       // Note: isRequestAllowed is not exported, but we can test its behavior
       // indirectly through getTimeUntilNextRequest
-      it('should return 0 wait time when rate limit not reached', () => {
+      it('should return 0 wait time when rate limit not reached', async () => {
         // Fresh state
         const waitTime = getTimeUntilNextRequest();
         expect(waitTime).toBe(0);
@@ -470,9 +471,9 @@ describe('enrichmentService', () => {
 
       it('should return false when apiUrl is not configured', async () => {
         // Get the mock and temporarily override apiUrl
-        const { config } = require('@/src/config');
+        const { config } = await import('@/src/config');
         const originalApiUrl = config.enrichment.apiUrl;
-        config.enrichment.apiUrl = null;
+        config.enrichment.apiUrl = null as unknown as string;
 
         const result = await checkEnrichmentHealth();
 
@@ -527,9 +528,9 @@ describe('enrichmentService', () => {
       });
 
       it('should return null when apiUrl is not configured', async () => {
-        const { config } = require('@/src/config');
+        const { config } = await import('@/src/config');
         const originalApiUrl = config.enrichment.apiUrl;
-        config.enrichment.apiUrl = null;
+        config.enrichment.apiUrl = null as unknown as string;
 
         const result = await getEnrichmentHealthDetails();
 
@@ -542,10 +543,10 @@ describe('enrichmentService', () => {
   });
 
   describe('API Functions', () => {
-    const mockGetPreference = getPreference as jest.Mock;
-    const mockSetPreference = setPreference as jest.Mock;
+    const mockGetPreference = getPreference as Mock;
+    const mockSetPreference = setPreference as Mock;
 
-    beforeEach(() => {
+    beforeEach(async () => {
       // Setup mock for client ID - cached value is used
       mockGetPreference.mockResolvedValue('test-client-id');
       mockSetPreference.mockResolvedValue(undefined);
@@ -573,8 +574,10 @@ describe('enrichmentService', () => {
 
     describe('fetchBeersFromProxy', () => {
       it('should throw when enrichment is not configured', async () => {
-        const { config } = require('@/src/config');
-        config.enrichment.isConfigured.mockReturnValueOnce(false);
+        const { config } = await import('@/src/config');
+        (config.enrichment.isConfigured as unknown as import('vitest').Mock).mockReturnValueOnce(
+          false
+        );
 
         await expect(fetchBeersFromProxy('13879')).rejects.toThrow(
           'Enrichment service is not configured: missing API key'
@@ -789,7 +792,7 @@ describe('enrichmentService', () => {
       });
 
       it('should NOT call response.json() on 304 response', async () => {
-        const jsonMock = jest.fn();
+        const jsonMock = vi.fn();
         mockFetch.mockResolvedValueOnce({
           ok: false,
           status: 304,
@@ -839,8 +842,10 @@ describe('enrichmentService', () => {
 
     describe('fetchEnrichmentBatch', () => {
       it('should return empty object when not configured', async () => {
-        const { config } = require('@/src/config');
-        config.enrichment.isConfigured.mockReturnValueOnce(false);
+        const { config } = await import('@/src/config');
+        (config.enrichment.isConfigured as unknown as import('vitest').Mock).mockReturnValueOnce(
+          false
+        );
 
         const result = await fetchEnrichmentBatch(['123', '456']);
 
@@ -1105,15 +1110,17 @@ describe('enrichmentService', () => {
   });
 
   describe('syncBeersToWorker', () => {
-    const mockGetPreference = getPreference as jest.Mock;
+    const mockGetPreference = getPreference as Mock;
 
-    beforeEach(() => {
+    beforeEach(async () => {
       mockGetPreference.mockResolvedValue('test-client-id');
     });
 
     it('should return null when not configured', async () => {
-      const { config } = require('@/src/config');
-      config.enrichment.isConfigured.mockReturnValueOnce(false);
+      const { config } = await import('@/src/config');
+      (config.enrichment.isConfigured as unknown as import('vitest').Mock).mockReturnValueOnce(
+        false
+      );
 
       const result = await syncBeersToWorker([{ id: '123', brew_name: 'Test Beer' }]);
 
@@ -1265,15 +1272,17 @@ describe('enrichmentService', () => {
   });
 
   describe('fetchEnrichmentBatchWithMissing', () => {
-    const mockGetPreference = getPreference as jest.Mock;
+    const mockGetPreference = getPreference as Mock;
 
-    beforeEach(() => {
+    beforeEach(async () => {
       mockGetPreference.mockResolvedValue('test-client-id');
     });
 
     it('should return empty when not configured', async () => {
-      const { config } = require('@/src/config');
-      config.enrichment.isConfigured.mockReturnValueOnce(false);
+      const { config } = await import('@/src/config');
+      (config.enrichment.isConfigured as unknown as import('vitest').Mock).mockReturnValueOnce(
+        false
+      );
 
       const result = await fetchEnrichmentBatchWithMissing(['123', '456']);
 
@@ -1402,20 +1411,22 @@ describe('enrichmentService', () => {
   });
 
   describe('pollForEnrichmentUpdates', () => {
-    const mockGetPreference = getPreference as jest.Mock;
+    const mockGetPreference = getPreference as Mock;
 
-    beforeEach(() => {
-      jest.useFakeTimers();
+    beforeEach(async () => {
+      vi.useFakeTimers();
       mockGetPreference.mockResolvedValue('test-client-id');
     });
 
-    afterEach(() => {
-      jest.useRealTimers();
+    afterEach(async () => {
+      vi.useRealTimers();
     });
 
     it('should return empty when not configured', async () => {
-      const { config } = require('@/src/config');
-      config.enrichment.isConfigured.mockReturnValueOnce(false);
+      const { config } = await import('@/src/config');
+      (config.enrichment.isConfigured as unknown as import('vitest').Mock).mockReturnValueOnce(
+        false
+      );
 
       const result = await pollForEnrichmentUpdates(['123', '456']);
 
@@ -1462,9 +1473,9 @@ describe('enrichmentService', () => {
       const pollPromise = pollForEnrichmentUpdates(['123']);
 
       // First poll after 5s
-      await jest.advanceTimersByTimeAsync(5000);
+      await vi.advanceTimersByTimeAsync(5000);
       // Second poll after 10s (5 + 10 = 15s total, but capped calculation)
-      await jest.advanceTimersByTimeAsync(10000);
+      await vi.advanceTimersByTimeAsync(10000);
 
       const result = await pollPromise;
 
@@ -1501,7 +1512,7 @@ describe('enrichmentService', () => {
       const pollPromise = pollForEnrichmentUpdates(['123', '456']);
 
       // First poll after 5s
-      await jest.advanceTimersByTimeAsync(5000);
+      await vi.advanceTimersByTimeAsync(5000);
 
       const result = await pollPromise;
 
@@ -1530,7 +1541,7 @@ describe('enrichmentService', () => {
       const pollPromise = pollForEnrichmentUpdates(['123'], 10000);
 
       // Advance past max duration
-      await jest.advanceTimersByTimeAsync(15000);
+      await vi.advanceTimersByTimeAsync(15000);
 
       const result = await pollPromise;
 
@@ -1560,9 +1571,9 @@ describe('enrichmentService', () => {
       const pollPromise = pollForEnrichmentUpdates(['123']);
 
       // First poll fails after 5s
-      await jest.advanceTimersByTimeAsync(5000);
+      await vi.advanceTimersByTimeAsync(5000);
       // Second poll succeeds after 10s
-      await jest.advanceTimersByTimeAsync(10000);
+      await vi.advanceTimersByTimeAsync(10000);
 
       const result = await pollPromise;
 
@@ -1600,15 +1611,15 @@ describe('enrichmentService', () => {
       const pollPromise = pollForEnrichmentUpdates(['123'], 120000);
 
       // Poll 1 at 5s
-      await jest.advanceTimersByTimeAsync(5000);
+      await vi.advanceTimersByTimeAsync(5000);
       // Poll 2 at 10s
-      await jest.advanceTimersByTimeAsync(10000);
+      await vi.advanceTimersByTimeAsync(10000);
       // Poll 3 at 15s
-      await jest.advanceTimersByTimeAsync(15000);
+      await vi.advanceTimersByTimeAsync(15000);
       // Poll 4 at 20s (max cap reached)
-      await jest.advanceTimersByTimeAsync(20000);
+      await vi.advanceTimersByTimeAsync(20000);
       // Poll 5 at 20s (still capped at 20s)
-      await jest.advanceTimersByTimeAsync(20000);
+      await vi.advanceTimersByTimeAsync(20000);
 
       const result = await pollPromise;
 
@@ -1618,8 +1629,8 @@ describe('enrichmentService', () => {
   });
 
   describe('fetchBeersFromProxy response validation', () => {
-    beforeEach(() => {
-      const mockGetPreference = getPreference as jest.Mock;
+    beforeEach(async () => {
+      const mockGetPreference = getPreference as Mock;
       mockGetPreference.mockResolvedValue('test-client-id');
     });
 
@@ -1735,8 +1746,8 @@ describe('enrichmentService', () => {
   });
 
   describe('fetchEnrichmentBatch response validation', () => {
-    beforeEach(() => {
-      const mockGetPreference = getPreference as jest.Mock;
+    beforeEach(async () => {
+      const mockGetPreference = getPreference as Mock;
       mockGetPreference.mockResolvedValue('test-client-id');
     });
 
@@ -1754,8 +1765,8 @@ describe('enrichmentService', () => {
   });
 
   describe('syncBeersToWorker response validation', () => {
-    beforeEach(() => {
-      const mockGetPreference = getPreference as jest.Mock;
+    beforeEach(async () => {
+      const mockGetPreference = getPreference as Mock;
       mockGetPreference.mockResolvedValue('test-client-id');
     });
 

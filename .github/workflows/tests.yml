@@ -49,6 +49,13 @@ jobs:
     # Both are deleted now, so only static-analysis.yml remains to collide with.
     # "Jest Unit Tests" is also the sole required check on main: renaming this
     # job makes every PR unmergeable. See plans/ci-recovery.md item 5.7.
+    #
+    # That name is now a misnomer and stays one deliberately. Since the runner
+    # split, this job runs vitest (the `*.test.ts` logic suites) AND jest-expo
+    # (the `*.test.tsx` component suites). Renaming it to match would take every
+    # PR unmergeable until someone with admin rights updates branch protection,
+    # which is a worse trade than an inaccurate label. Fix the name and the
+    # required-check setting together, or not at all.
     name: Jest Unit Tests
     runs-on: ubuntu-latest
     # Measured basis: ~57s user CPU locally, so roughly 20-40s wall on a 4-vCPU
@@ -72,7 +79,9 @@ jobs:
         run: npm ci
 
       - name: Run tests
-        id: jest
+        # `id: tests`, not `id: jest` — this step runs both runners, and the
+        # three post-test steps below gate on its outcome.
+        id: tests
         # `rm -f` first so the floor step below can only ever read a report
         # this run produced. Today that is belt-and-braces — the runner is
         # ephemeral and checkout's default `clean: true` runs `git clean -ffdx`,
@@ -89,9 +98,13 @@ jobs:
           # count. Root `errors` would then be permanently "0", and a blown-up
           # suite would reach the gate below looking exactly like a deliberately
           # deleted one. Env options have top precedence in jest-junit's merge.
+          # Vitest's junit reporter needs no equivalent: a suite that fails
+          # to load is recorded there as tests="1" failures="1" with a
+          # <testcase><failure> in the body (checked against vitest 4.1.11),
+          # so it reaches the floor step as a failure rather than as silence.
           JEST_JUNIT_REPORT_TEST_SUITE_ERRORS: 'true'
         run: |
-          rm -f junit.xml
+          rm -f junit.xml vitest.junit.xml
           npm run test:ci
 
       # Items 5.4 / 5.4a — the floor. Without this, the job certifies only that
@@ -120,7 +133,7 @@ jobs:
       # `it.todo`.
       #
       # This step deliberately RUNS EVEN WHEN JEST FAILED, and asserts
-      # failures==0 itself, rather than gating on `steps.jest.outcome ==
+      # failures==0 itself, rather than gating on `steps.tests.outcome ==
       # 'success'`. Gating on success looks tidier and is a trapdoor: adding
       # `continue-on-error: true` to the "Run tests" step above — the usual
       # "unblock the branch, fix the flake later" move — makes jest's outcome
@@ -149,9 +162,34 @@ jobs:
       # both this and the failure branch, with the shrink message pointing at
       # the wrong cause); the failure count is asserted separately below.
       - name: Assert the suite has not shrunk
-        if: ${{ always() && (steps.jest.outcome == 'success' || steps.jest.outcome == 'failure') }}
+        if: ${{ always() && (steps.tests.outcome == 'success' || steps.tests.outcome == 'failure') }}
         env:
-          MIN_TESTS_RUN: '2394'
+          # The floor spans BOTH runners, because the suite it certifies does.
+          # A jest-only floor is how this gate quietly stopped working: the
+          # runner split moved ~2200 tests to vitest without touching this file,
+          # leaving a floor of 2394 read against a jest report of 276. It has
+          # been failing since that landed; the branch was never pushed, so
+          # nobody saw it. Raising this when tests are added is expected;
+          # lowering it is only ever correct when tests were deliberately
+          # removed, and now also requires saying which runner lost them.
+          #
+          # 2505 -> 2492 on 2026-08-27: jest-expo lost 13, vitest unchanged at
+          # 2228. Removed from LoginWebView.test.tsx's "Config Integration"
+          # block, which mocked `config` and then asserted on that mock rather
+          # than on the component: `getFullUrl` returning what the test told it
+          # to return, `baseUrl` equalling the value the test had just assigned,
+          # and `toHaveBeenCalledWith` satisfied by the test's own call while
+          # building the fixture. One claimed to prove URL_CHECK handles a
+          # throwing config, but that handler matches hardcoded
+          # 'member-dash.php' and never calls config, so it could not fail.
+          # The real config module keeps its own vitest coverage
+          # (config.test.ts, validation.errors.test.ts "should construct valid
+          # URLs for all defined endpoints"). The 7 tests in that block that do
+          # assert component behaviour were kept.
+          #
+          # 2492 -> 2493 on 2026-08-27: jest-expo gained 1 (Beerfinder backoff
+          # regression test), vitest unchanged at 2228.
+          MIN_TESTS_RUN: '2493'
           MAX_SKIPPED: '0'
         run: |
           python3 - <<'PY'
@@ -159,38 +197,69 @@ jobs:
 
           floor = int(os.environ['MIN_TESTS_RUN'])
           max_skipped = int(os.environ['MAX_SKIPPED'])
-          # int() parsing lives inside the try as well: an attribute present but
-          # empty (tests="") raises ValueError, and outside the handler that
-          # exits with a bare traceback and no ::error:: annotation - failing
-          # closed, but invisibly in the checks UI.
-          try:
-              root = ET.parse('junit.xml').getroot()
-              total = int(root.get('tests', 0))
-              attr_failed = int(root.get('failures', 0)) + int(root.get('errors', 0))
-              # The root <testsuites> element carries no `skipped` attribute;
-              # only the child <testsuite> elements do. Summing them is required.
-              skipped = sum(int(ts.get('skipped', 0)) for ts in root.iter('testsuite'))
-          except Exception as exc:
-              sys.exit(f'::error::junit.xml missing or unparseable ({exc}) - failing closed.')
 
-          # Attribute counts alone miss a real failure: a suite where every test
-          # PASSED but a late hook (afterAll) threw. Verified against jest
-          # 29.7.0 - jest-junit records that as a synthetic <testcase><failure>
-          # in the body and never increments failures/errors at either the suite
-          # or root level, so the root reads tests="1" failures="0" errors="0".
-          # jest's own exit code catches it today, which is exactly the
-          # guarantee continue-on-error would remove. Count the body too.
-          body_failed = len(root.findall('.//testcase/failure')) + \
-                        len(root.findall('.//testcase/error'))
-          failed = max(attr_failed, body_failed)
-          ran = total - skipped
+          # Two runners, two reports, one floor over the sum. `test:ci` chains
+          # them with `&&`, so a vitest failure stops before jest ever runs and
+          # leaves junit.xml absent. That is a specific, nameable outcome — not
+          # an unparseable-report mystery — so a missing report is reported as
+          # itself, per runner, rather than collapsing into one message that
+          # sends the reader to the wrong half of the run.
+          REPORTS = [('vitest', 'vitest.junit.xml'), ('jest', 'junit.xml')]
+
+          ran = failed = skipped = 0
+          attr_total = body_total = 0
+          problems = []
+
+          for label, path in REPORTS:
+              # int() parsing lives inside the try as well: an attribute present
+              # but empty (tests="") raises ValueError, and outside the handler
+              # that exits with a bare traceback and no ::error:: annotation -
+              # failing closed, but invisibly in the checks UI.
+              try:
+                  root = ET.parse(path).getroot()
+                  total = int(root.get('tests', 0))
+                  attr_failed = int(root.get('failures', 0)) + int(root.get('errors', 0))
+                  # The root <testsuites> element carries no `skipped`
+                  # attribute; only the child <testsuite> elements do. Summing
+                  # them is required.
+                  sk = sum(int(ts.get('skipped', 0)) for ts in root.iter('testsuite'))
+              except FileNotFoundError:
+                  problems.append(
+                      f'{label} produced no report ({path}). test:ci chains the two '
+                      'runners with `&&`, so whichever one exited non-zero stopped the '
+                      'other from running at all - see the "Run tests" step above.'
+                  )
+                  continue
+              except Exception as exc:
+                  sys.exit(f'::error::{path} unparseable ({exc}) - failing closed.')
+
+              # Attribute counts alone miss a real failure: a suite where every
+              # test PASSED but a late hook (afterAll) threw. Verified against
+              # jest 29.7.0 - jest-junit records that as a synthetic
+              # <testcase><failure> in the body and never increments
+              # failures/errors at either the suite or root level, so the root
+              # reads tests="1" failures="0" errors="0". The runner's own exit
+              # code catches it today, which is exactly the guarantee
+              # continue-on-error would remove. Count the body too.
+              body_failed = len(root.findall('.//testcase/failure')) + \
+                            len(root.findall('.//testcase/error'))
+              f = max(attr_failed, body_failed)
+
+              ran += total - sk
+              failed += f
+              skipped += sk
+              attr_total += attr_failed
+              body_total += body_failed
+              print(f'{label}: ran={total - sk} total={total} failed={f} '
+                    f'(attr={attr_failed} body={body_failed}) skipped={sk}')
+
           passed = ran - failed
-
-          print(f'passed={passed} ran={ran} total={total} failed={failed} '
-                f'(attr={attr_failed} body={body_failed}) skipped={skipped} '
+          print(f'combined: passed={passed} ran={ran} failed={failed} '
+                f'(attr={attr_total} body={body_total}) skipped={skipped} '
                 f'floor={floor} max_skipped={max_skipped}')
 
-          problems = []
+          # NOTE: `problems` is seeded above, inside the report loop — a missing
+          # report is already recorded there. Do not re-initialise it here.
           if failed:
               problems.append(
                   f'{failed} failure(s)/error(s) reported - see the "Run tests" step '
@@ -212,10 +281,12 @@ jobs:
           # five hundred.
           if ran < floor:
               problems.append(
-                  f'{ran} test(s) ran, below the committed floor ({floor}). '
-                  'If this is the first run on a new platform, confirm which tests '
-                  'did not run before touching the floor - lowering MIN_TESTS_RUN is '
-                  'the correct fix ONLY when tests were deliberately removed.'
+                  f'{ran} test(s) ran across both runners, below the committed floor '
+                  f'({floor}). The per-runner counts printed above say which side lost '
+                  'them - a suite moving between runners should leave the total flat. '
+                  'If this is the first run on a new platform, confirm which tests did '
+                  'not run before touching the floor; lowering MIN_TESTS_RUN is the '
+                  'correct fix ONLY when tests were deliberately removed.'
               )
           for p in problems:
               print(f'::error::{p}')
@@ -240,7 +311,7 @@ jobs:
       # evaluated with an implicit `success() &&`, which would suppress these
       # uploads on exactly the red runs whose evidence is most wanted.
       - name: Upload JUnit results
-        if: ${{ always() && (steps.jest.outcome == 'success' || steps.jest.outcome == 'failure') }}
+        if: ${{ always() && (steps.tests.outcome == 'success' || steps.tests.outcome == 'failure') }}
         uses: actions/upload-artifact@v7
         with:
           # Suffixed by attempt, NOT `overwrite: true`. v4 rejects a duplicate
@@ -253,7 +324,13 @@ jobs:
           # ATTEMPT, not per job, so two matrix legs would collide within one
           # attempt and the 409 returns. Add the matrix dimension to the name.
           name: jest-junit-results-attempt-${{ github.run_attempt }}
-          path: junit.xml
+          # Both reports. `if-no-files-found: error` fires only when NEITHER
+          # exists, so a run where vitest failed and stopped the chain still
+          # uploads the vitest report that names the failure. The floor step is
+          # what fails on a half-run, and it says which half.
+          path: |
+            vitest.junit.xml
+            junit.xml
           # Fail rather than warn on a missing result file. The default
           # ('warn') is what let this repo's E2E uploads point at unresolvable
           # paths for the life of a branch (item 2.2b).
@@ -265,7 +342,7 @@ jobs:
           if-no-files-found: error
 
       - name: Upload coverage report
-        if: ${{ always() && (steps.jest.outcome == 'success' || steps.jest.outcome == 'failure') }}
+        if: ${{ always() && (steps.tests.outcome == 'success' || steps.tests.outcome == 'failure') }}
         uses: actions/upload-artifact@v7
         with:
           name: jest-coverage-attempt-${{ github.run_attempt }}
@@ -274,6 +351,15 @@ jobs:
           # coverageThreshold — item 5.5). jest.config.js sets collectCoverage
           # globally, so absent coverage means jest did not finish normally.
           # Revisit if 5.5 makes coverage output conditional.
+          #
+          # READ THIS BEFORE QUOTING A COVERAGE NUMBER FROM THIS ARTIFACT: it
+          # is jest's alone, and jest is now only the 16 component suites. The
+          # 2228 logic tests run under vitest, which is not collecting coverage
+          # at all, while jest.config.js still collects FROM every source file.
+          # The result understates real coverage badly — it reports the whole
+          # codebase as exercised by a tenth of the suite. Fixing it means
+          # enabling vitest coverage and merging the two reports; until then,
+          # treat this artifact as a jest-side diagnostic, not a project metric.
           if-no-files-found: error
           # v4.4+ omits hidden files by default, which would drop the dot-prefixed
           # entries the HTML report links to (on a clean checkout, `.expo`) and

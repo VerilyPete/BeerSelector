@@ -1,3 +1,4 @@
+import { describe, it, expect, vi, type Mock } from 'vitest';
 import { migrateToVersion8 } from '../migrateToV8';
 import { databaseLockManager } from '../../DatabaseLockManager';
 import { recordMigration } from '../../schemaVersion';
@@ -6,18 +7,18 @@ import { recordMigration } from '../../schemaVersion';
 // the database mocked but the real manager, isLocked() asserts genuine lock
 // state, which is what catches a dropped release.
 
-jest.mock('../../schemaVersion', () => ({
-  recordMigration: jest.fn().mockResolvedValue(undefined),
+vi.mock('../../schemaVersion', () => ({
+  recordMigration: vi.fn().mockResolvedValue(undefined),
 }));
 
 /** One write the migration made, and whether a transaction was open for it. */
 type WriteLogEntry = { readonly write: string; readonly transactionsOpen: number };
 
 type MockDb = {
-  getAllAsync: jest.Mock;
-  execAsync: jest.Mock;
-  runAsync: jest.Mock;
-  withTransactionAsync: jest.Mock;
+  getAllAsync: Mock;
+  execAsync: Mock;
+  runAsync: Mock;
+  withTransactionAsync: Mock;
   /**
    * Every write, in order, tagged with the transaction depth at the moment it
    * ran.
@@ -33,8 +34,8 @@ type MockDb = {
 
 function createMockMigrationDb(): MockDb {
   databaseLockManager.resetForTesting();
-  jest.restoreAllMocks();
-  (recordMigration as jest.Mock).mockClear();
+  vi.restoreAllMocks();
+  (recordMigration as Mock).mockClear();
 
   // A depth count rather than a boolean, so a nested transaction still reads as
   // open and cannot be mistaken for the outer one having closed.
@@ -43,17 +44,17 @@ function createMockMigrationDb(): MockDb {
 
   // `recordMigration` is a module mock, so its position relative to the
   // transaction is only observable if it reports it here.
-  (recordMigration as jest.Mock).mockImplementation(async () => {
+  (recordMigration as Mock).mockImplementation(async () => {
     writeLog.push({ write: 'recordMigration', transactionsOpen });
   });
 
   return {
-    getAllAsync: jest.fn().mockResolvedValue([]),
-    execAsync: jest.fn().mockResolvedValue(undefined),
-    runAsync: jest.fn(async (sql: string) => {
+    getAllAsync: vi.fn().mockResolvedValue([]),
+    execAsync: vi.fn().mockResolvedValue(undefined),
+    runAsync: vi.fn(async (sql: string) => {
       writeLog.push({ write: sql.trim().split(/\s+/)[0].toUpperCase(), transactionsOpen });
     }),
-    withTransactionAsync: jest.fn(async (callback: () => Promise<void>) => {
+    withTransactionAsync: vi.fn(async (callback: () => Promise<void>) => {
       transactionsOpen += 1;
       try {
         await callback();
@@ -67,7 +68,7 @@ function createMockMigrationDb(): MockDb {
 
 /** Every `runAsync` call as a [sql, params] pair. */
 function writes(db: MockDb): [string, unknown[]][] {
-  return (db.runAsync as jest.Mock).mock.calls as [string, unknown[]][];
+  return (db.runAsync as Mock).mock.calls as [string, unknown[]][];
 }
 
 describe('migrateToVersion8', () => {
@@ -87,7 +88,7 @@ describe('migrateToVersion8', () => {
 
   it('acquires and releases the migration lock', async () => {
     const db = createMockMigrationDb();
-    const lockSpy = jest.spyOn(databaseLockManager, 'withDatabaseLock');
+    const lockSpy = vi.spyOn(databaseLockManager, 'withDatabaseLock');
 
     await migrateToVersion8(db as never);
 

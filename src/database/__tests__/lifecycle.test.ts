@@ -1,3 +1,4 @@
+import { describe, it, expect, beforeEach, afterEach, vi, type Mock } from 'vitest';
 /**
  * Tests for database lifecycle management
  *
@@ -10,25 +11,25 @@ import { getDatabase, closeDatabaseConnection, resetDatabaseConnection } from '.
 import { databaseLockManager } from '../DatabaseLockManager';
 
 // Mock expo-sqlite
-jest.mock('expo-sqlite');
+vi.mock('expo-sqlite');
 
 type MockDatabase = {
-  closeAsync: jest.Mock;
-  execAsync: jest.Mock;
-  getFirstAsync: jest.Mock;
+  closeAsync: Mock;
+  execAsync: Mock;
+  getFirstAsync: Mock;
 };
 
 function createMockDatabase(): MockDatabase {
   return {
-    closeAsync: jest.fn().mockResolvedValue(undefined),
-    execAsync: jest.fn().mockResolvedValue(undefined),
-    getFirstAsync: jest.fn().mockResolvedValue({ journal_mode: 'wal' }),
+    closeAsync: vi.fn().mockResolvedValue(undefined),
+    execAsync: vi.fn().mockResolvedValue(undefined),
+    getFirstAsync: vi.fn().mockResolvedValue({ journal_mode: 'wal' }),
   };
 }
 
 describe('Database Lifecycle Management', () => {
   beforeEach(() => {
-    (SQLite.openDatabaseAsync as jest.Mock).mockClear();
+    (SQLite.openDatabaseAsync as Mock).mockClear();
     resetDatabaseConnection();
   });
 
@@ -39,7 +40,7 @@ describe('Database Lifecycle Management', () => {
   describe('Database Opening', () => {
     it('should open database successfully', async () => {
       const mockDb = createMockDatabase();
-      (SQLite.openDatabaseAsync as jest.Mock).mockResolvedValue(mockDb);
+      (SQLite.openDatabaseAsync as Mock).mockResolvedValue(mockDb);
 
       const db = await getDatabase();
 
@@ -50,7 +51,7 @@ describe('Database Lifecycle Management', () => {
 
     it('should reuse existing database connection', async () => {
       const mockDb = createMockDatabase();
-      (SQLite.openDatabaseAsync as jest.Mock).mockResolvedValue(mockDb);
+      (SQLite.openDatabaseAsync as Mock).mockResolvedValue(mockDb);
 
       const db1 = await getDatabase();
       const db2 = await getDatabase();
@@ -61,7 +62,7 @@ describe('Database Lifecycle Management', () => {
 
     it('should throw error if database open fails', async () => {
       const error = new Error('Failed to open database');
-      (SQLite.openDatabaseAsync as jest.Mock).mockRejectedValue(error);
+      (SQLite.openDatabaseAsync as Mock).mockRejectedValue(error);
 
       await expect(getDatabase()).rejects.toThrow('Failed to open database');
     });
@@ -70,7 +71,7 @@ describe('Database Lifecycle Management', () => {
   describe('WAL Mode Enablement', () => {
     it('should enable WAL mode when opening database', async () => {
       const mockDb = createMockDatabase();
-      (SQLite.openDatabaseAsync as jest.Mock).mockResolvedValue(mockDb);
+      (SQLite.openDatabaseAsync as Mock).mockResolvedValue(mockDb);
 
       await getDatabase();
 
@@ -79,7 +80,7 @@ describe('Database Lifecycle Management', () => {
 
     it('should set PRAGMA synchronous to NORMAL', async () => {
       const mockDb = createMockDatabase();
-      (SQLite.openDatabaseAsync as jest.Mock).mockResolvedValue(mockDb);
+      (SQLite.openDatabaseAsync as Mock).mockResolvedValue(mockDb);
 
       await getDatabase();
 
@@ -89,8 +90,8 @@ describe('Database Lifecycle Management', () => {
     it('should warn if WAL mode enablement fails', async () => {
       const mockDb = createMockDatabase();
       mockDb.getFirstAsync.mockResolvedValueOnce({ journal_mode: 'delete' });
-      (SQLite.openDatabaseAsync as jest.Mock).mockResolvedValue(mockDb);
-      const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
+      (SQLite.openDatabaseAsync as Mock).mockResolvedValue(mockDb);
+      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
       await getDatabase();
 
@@ -103,9 +104,9 @@ describe('Database Lifecycle Management', () => {
     it('should handle missing journal_mode in response gracefully', async () => {
       const mockDb = createMockDatabase();
       mockDb.getFirstAsync.mockResolvedValueOnce(null);
-      (SQLite.openDatabaseAsync as jest.Mock).mockResolvedValue(mockDb);
-      jest.spyOn(console, 'log').mockImplementation();
-      const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
+      (SQLite.openDatabaseAsync as Mock).mockResolvedValue(mockDb);
+      vi.spyOn(console, 'log').mockImplementation(() => {});
+      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
       await getDatabase();
 
@@ -118,7 +119,7 @@ describe('Database Lifecycle Management', () => {
 
     it('should not re-execute PRAGMA on connection reuse', async () => {
       const mockDb = createMockDatabase();
-      (SQLite.openDatabaseAsync as jest.Mock).mockResolvedValue(mockDb);
+      (SQLite.openDatabaseAsync as Mock).mockResolvedValue(mockDb);
 
       await getDatabase();
       mockDb.getFirstAsync.mockClear();
@@ -134,7 +135,7 @@ describe('Database Lifecycle Management', () => {
       const mockDb = createMockDatabase();
       const error = new Error('PRAGMA failed');
       mockDb.getFirstAsync.mockRejectedValueOnce(error);
-      (SQLite.openDatabaseAsync as jest.Mock).mockResolvedValue(mockDb);
+      (SQLite.openDatabaseAsync as Mock).mockResolvedValue(mockDb);
 
       await expect(getDatabase()).rejects.toThrow('PRAGMA failed');
     });
@@ -143,7 +144,7 @@ describe('Database Lifecycle Management', () => {
   describe('Database Closing', () => {
     it('should close database connection successfully', async () => {
       const mockDb = createMockDatabase();
-      (SQLite.openDatabaseAsync as jest.Mock).mockResolvedValue(mockDb);
+      (SQLite.openDatabaseAsync as Mock).mockResolvedValue(mockDb);
 
       await getDatabase();
       await closeDatabaseConnection();
@@ -153,14 +154,14 @@ describe('Database Lifecycle Management', () => {
 
     it('should nullify database reference after close', async () => {
       const mockDb = createMockDatabase();
-      (SQLite.openDatabaseAsync as jest.Mock).mockResolvedValue(mockDb);
+      (SQLite.openDatabaseAsync as Mock).mockResolvedValue(mockDb);
 
       await getDatabase();
       await closeDatabaseConnection();
 
       // Next getDatabase call should open a new connection
       mockDb.closeAsync.mockClear();
-      (SQLite.openDatabaseAsync as jest.Mock).mockClear();
+      (SQLite.openDatabaseAsync as Mock).mockClear();
 
       await getDatabase();
 
@@ -169,7 +170,7 @@ describe('Database Lifecycle Management', () => {
 
     it('should handle close when database is not open', async () => {
       const mockDb = createMockDatabase();
-      (SQLite.openDatabaseAsync as jest.Mock).mockResolvedValue(mockDb);
+      (SQLite.openDatabaseAsync as Mock).mockResolvedValue(mockDb);
 
       // Don't open database, just try to close
       await expect(closeDatabaseConnection()).resolves.not.toThrow();
@@ -178,7 +179,7 @@ describe('Database Lifecycle Management', () => {
 
     it('should handle close errors gracefully', async () => {
       const mockDb = createMockDatabase();
-      (SQLite.openDatabaseAsync as jest.Mock).mockResolvedValue(mockDb);
+      (SQLite.openDatabaseAsync as Mock).mockResolvedValue(mockDb);
 
       await getDatabase();
 
@@ -190,8 +191,8 @@ describe('Database Lifecycle Management', () => {
 
     it('should throw when close errors occur', async () => {
       const mockDb = createMockDatabase();
-      (SQLite.openDatabaseAsync as jest.Mock).mockResolvedValue(mockDb);
-      jest.spyOn(console, 'error').mockImplementation();
+      (SQLite.openDatabaseAsync as Mock).mockResolvedValue(mockDb);
+      vi.spyOn(console, 'error').mockImplementation(() => {});
 
       await getDatabase();
 
@@ -205,7 +206,7 @@ describe('Database Lifecycle Management', () => {
   describe('Connection Reuse After Close/Reopen Cycle', () => {
     it('should open new connection after close', async () => {
       const mockDb = createMockDatabase();
-      (SQLite.openDatabaseAsync as jest.Mock).mockResolvedValue(mockDb);
+      (SQLite.openDatabaseAsync as Mock).mockResolvedValue(mockDb);
 
       const db1 = await getDatabase();
       await closeDatabaseConnection();
@@ -218,7 +219,7 @@ describe('Database Lifecycle Management', () => {
 
     it('should re-enable WAL mode after reopen', async () => {
       const mockDb = createMockDatabase();
-      (SQLite.openDatabaseAsync as jest.Mock).mockResolvedValue(mockDb);
+      (SQLite.openDatabaseAsync as Mock).mockResolvedValue(mockDb);
 
       await getDatabase();
       mockDb.getFirstAsync.mockClear();
@@ -233,7 +234,7 @@ describe('Database Lifecycle Management', () => {
 
     it('should handle multiple close/open cycles', async () => {
       const mockDb = createMockDatabase();
-      (SQLite.openDatabaseAsync as jest.Mock).mockResolvedValue(mockDb);
+      (SQLite.openDatabaseAsync as Mock).mockResolvedValue(mockDb);
 
       for (let i = 0; i < 3; i++) {
         await getDatabase();
@@ -248,7 +249,7 @@ describe('Database Lifecycle Management', () => {
   describe('Forced Close Option', () => {
     it('should support force close without waiting', async () => {
       const mockDb = createMockDatabase();
-      (SQLite.openDatabaseAsync as jest.Mock).mockResolvedValue(mockDb);
+      (SQLite.openDatabaseAsync as Mock).mockResolvedValue(mockDb);
 
       await getDatabase();
       await closeDatabaseConnection(true);
@@ -260,14 +261,14 @@ describe('Database Lifecycle Management', () => {
   describe('Database State Validation', () => {
     it('should verify database is closed after closeDatabaseConnection', async () => {
       const mockDb = createMockDatabase();
-      (SQLite.openDatabaseAsync as jest.Mock).mockResolvedValue(mockDb);
+      (SQLite.openDatabaseAsync as Mock).mockResolvedValue(mockDb);
 
       await getDatabase();
       await closeDatabaseConnection();
 
       // Attempt to use closed connection should require reopening
       mockDb.closeAsync.mockClear();
-      (SQLite.openDatabaseAsync as jest.Mock).mockClear();
+      (SQLite.openDatabaseAsync as Mock).mockClear();
 
       await getDatabase();
 
@@ -276,7 +277,7 @@ describe('Database Lifecycle Management', () => {
 
     it('should handle rapid open/close sequences', async () => {
       const mockDb = createMockDatabase();
-      (SQLite.openDatabaseAsync as jest.Mock).mockResolvedValue(mockDb);
+      (SQLite.openDatabaseAsync as Mock).mockResolvedValue(mockDb);
 
       const promises = [];
 
@@ -295,7 +296,7 @@ describe('Database Lifecycle Management', () => {
   describe('Error Recovery', () => {
     it('should recover from failed close by allowing reopen', async () => {
       const mockDb = createMockDatabase();
-      (SQLite.openDatabaseAsync as jest.Mock).mockResolvedValue(mockDb);
+      (SQLite.openDatabaseAsync as Mock).mockResolvedValue(mockDb);
 
       await getDatabase();
 
@@ -309,7 +310,7 @@ describe('Database Lifecycle Management', () => {
 
       // Should still be able to open database again
       mockDb.closeAsync.mockResolvedValue(undefined);
-      (SQLite.openDatabaseAsync as jest.Mock).mockClear();
+      (SQLite.openDatabaseAsync as Mock).mockClear();
 
       await getDatabase();
 
@@ -318,7 +319,7 @@ describe('Database Lifecycle Management', () => {
 
     it('should handle WAL mode failure on reopen', async () => {
       const mockDb = createMockDatabase();
-      (SQLite.openDatabaseAsync as jest.Mock).mockResolvedValue(mockDb);
+      (SQLite.openDatabaseAsync as Mock).mockResolvedValue(mockDb);
 
       await getDatabase();
       await closeDatabaseConnection();
@@ -332,7 +333,7 @@ describe('Database Lifecycle Management', () => {
   describe('Database Lock Manager Integration (CI-HP6-1)', () => {
     it('should allow lock acquisition after database reopens following shutdown', async () => {
       const mockDb = createMockDatabase();
-      (SQLite.openDatabaseAsync as jest.Mock).mockResolvedValue(mockDb);
+      (SQLite.openDatabaseAsync as Mock).mockResolvedValue(mockDb);
 
       const database = await getDatabase();
       expect(database).toBeDefined();
@@ -354,11 +355,11 @@ describe('Database Lifecycle Management', () => {
 
     it('should reset shutdown state when getDatabase is called after close', async () => {
       const mockDb = createMockDatabase();
-      (SQLite.openDatabaseAsync as jest.Mock).mockResolvedValue(mockDb);
+      (SQLite.openDatabaseAsync as Mock).mockResolvedValue(mockDb);
 
       await getDatabase();
       await closeDatabaseConnection();
-      jest.spyOn(console, 'log').mockImplementation();
+      vi.spyOn(console, 'log').mockImplementation(() => {});
 
       await getDatabase();
 
@@ -370,7 +371,7 @@ describe('Database Lifecycle Management', () => {
 
     it('should handle multiple background/foreground cycles without lock issues', async () => {
       const mockDb = createMockDatabase();
-      (SQLite.openDatabaseAsync as jest.Mock).mockResolvedValue(mockDb);
+      (SQLite.openDatabaseAsync as Mock).mockResolvedValue(mockDb);
 
       // Simulate app lifecycle: open -> background -> foreground -> background -> foreground
       for (let i = 0; i < 3; i++) {

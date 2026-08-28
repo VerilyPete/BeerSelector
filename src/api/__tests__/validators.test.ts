@@ -1,3 +1,4 @@
+import { describe, it, expect } from 'vitest';
 import { validateBrewInStockResponse, validateBeer, ValidationResult } from '../validators';
 
 describe('API Response Validators', () => {

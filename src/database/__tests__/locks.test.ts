@@ -1,3 +1,4 @@
+import { describe, it, expect, vi } from 'vitest';
 /**
  * Tests for database locking mechanism
  */
@@ -46,7 +47,7 @@ describe('DatabaseLockManager', () => {
 
     it('should log lock acquisition', async () => {
       const lockManager = createLockManager();
-      const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
+      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
       await lockManager.acquireLock('test-operation');
 
@@ -75,7 +76,7 @@ describe('DatabaseLockManager', () => {
       // Acquires first: releasing a lock this caller never held is now a no-op
       // by design, so the old version of this test pinned the wrong behaviour.
       await lockManager.acquireLock('test-operation');
-      const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
+      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
       lockManager.releaseLock('test-operation');
 
@@ -391,7 +392,7 @@ describe('DatabaseLockManager', () => {
   describe('debug logging (HP-2 Step 8)', () => {
     it('should enable debug logging', () => {
       const lockManager = createLockManager();
-      const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
+      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
       lockManager.setDebugLogging(true);
 
@@ -402,7 +403,7 @@ describe('DatabaseLockManager', () => {
 
     it('should log detailed lock acquisition when debug enabled', async () => {
       const lockManager = createLockManager();
-      const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
+      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
       lockManager.setDebugLogging(true);
 
@@ -419,7 +420,7 @@ describe('DatabaseLockManager', () => {
 
     it('should log wait time when debug enabled for queued operations', async () => {
       const lockManager = createLockManager();
-      const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
+      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
       lockManager.setDebugLogging(true);
 
@@ -442,7 +443,7 @@ describe('DatabaseLockManager', () => {
   describe('queue warning (HP-2 Step 8)', () => {
     it('should warn when queue length exceeds threshold', async () => {
       const lockManager = createLockManager();
-      const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
+      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
       await lockManager.acquireLock('operation1');
 

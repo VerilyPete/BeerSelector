@@ -1,8 +1,9 @@
+import { describe, it, expect, vi, type Mock } from 'vitest';
 import { withDatabaseTransaction, DatabaseOperationResult } from '../transactions';
 import type { SQLiteDatabase } from 'expo-sqlite';
 
 // Mock expo-sqlite
-jest.mock('expo-sqlite');
+vi.mock('expo-sqlite');
 
 // `runAsync` is REQUIRED, and createMockDatabase always supplies it. It used to
 // be optional, with every call site written `db.runAsync(...)` — which meant a
@@ -12,14 +13,14 @@ jest.mock('expo-sqlite');
 // was that nothing stopped the next one from being. Making it required moves
 // that from luck to a compile error.
 type MockDatabase = {
-  withTransactionAsync: jest.Mock;
-  runAsync: jest.Mock;
+  withTransactionAsync: Mock;
+  runAsync: Mock;
 };
 
 function createMockDatabase(): MockDatabase {
   return {
-    withTransactionAsync: jest.fn(),
-    runAsync: jest.fn(),
+    withTransactionAsync: vi.fn(),
+    runAsync: vi.fn(),
   };
 }
 
@@ -44,7 +45,7 @@ describe('Database Transactions', () => {
   describe('withDatabaseTransaction', () => {
     it('should execute operation within transaction successfully', async () => {
       const mockDatabase = createMockDatabase();
-      const mockOperation = jest.fn().mockResolvedValue({ success: true, recordsAffected: 10 });
+      const mockOperation = vi.fn().mockResolvedValue({ success: true, recordsAffected: 10 });
 
       mockDatabase.withTransactionAsync.mockImplementation(
         async (callback: () => Promise<unknown>) => {
@@ -63,7 +64,7 @@ describe('Database Transactions', () => {
     it('should rollback transaction on operation failure', async () => {
       const mockDatabase = createMockDatabase();
       const mockError = new Error('Database operation failed');
-      const mockOperation = jest.fn().mockRejectedValue(mockError);
+      const mockOperation = vi.fn().mockRejectedValue(mockError);
 
       mockDatabase.withTransactionAsync.mockImplementation(
         async (callback: () => Promise<unknown>) => {
@@ -86,7 +87,7 @@ describe('Database Transactions', () => {
 
     it('should pass database to operation callback', async () => {
       const mockDatabase = createMockDatabase();
-      const mockOperation = jest.fn().mockResolvedValue({ success: true });
+      const mockOperation = vi.fn().mockResolvedValue({ success: true });
 
       mockDatabase.withTransactionAsync.mockImplementation(
         async (callback: () => Promise<unknown>) => {
@@ -104,7 +105,7 @@ describe('Database Transactions', () => {
       let insertCalled = false;
       let updateCalled = false;
 
-      const mockOperation = jest.fn(async (db: SQLiteDatabase) => {
+      const mockOperation = vi.fn(async (db: SQLiteDatabase) => {
         // Simulate multiple database operations
         await db.runAsync('INSERT INTO table1...');
         insertCalled = true;
@@ -115,7 +116,7 @@ describe('Database Transactions', () => {
         return { success: true, recordsAffected: 2 };
       });
 
-      mockDatabase.runAsync = jest.fn().mockResolvedValue(undefined);
+      mockDatabase.runAsync = vi.fn().mockResolvedValue(undefined);
 
       mockDatabase.withTransactionAsync.mockImplementation(
         async (callback: () => Promise<unknown>) => {
@@ -133,7 +134,7 @@ describe('Database Transactions', () => {
 
     it('should rollback all operations if any operation fails', async () => {
       const mockDatabase = createMockDatabase();
-      const mockOperation = jest.fn(async (db: SQLiteDatabase) => {
+      const mockOperation = vi.fn(async (db: SQLiteDatabase) => {
         // First operation succeeds
         await db.runAsync('INSERT INTO table1...');
 
@@ -141,7 +142,7 @@ describe('Database Transactions', () => {
         throw new Error('Second operation failed');
       });
 
-      mockDatabase.runAsync = jest.fn().mockResolvedValue(undefined);
+      mockDatabase.runAsync = vi.fn().mockResolvedValue(undefined);
 
       mockDatabase.withTransactionAsync.mockImplementation(
         async (callback: () => Promise<unknown>) => {
@@ -171,7 +172,7 @@ describe('Database Transactions', () => {
         data: { someKey: 'someValue' },
       };
 
-      const mockOperation = jest.fn().mockResolvedValue(expectedResult);
+      const mockOperation = vi.fn().mockResolvedValue(expectedResult);
 
       mockDatabase.withTransactionAsync.mockImplementation(
         async (callback: () => Promise<unknown>) => {
@@ -186,7 +187,7 @@ describe('Database Transactions', () => {
 
     it('should handle operation returning undefined', async () => {
       const mockDatabase = createMockDatabase();
-      const mockOperation = jest.fn().mockResolvedValue(undefined);
+      const mockOperation = vi.fn().mockResolvedValue(undefined);
 
       mockDatabase.withTransactionAsync.mockImplementation(
         async (callback: () => Promise<unknown>) => {
@@ -201,7 +202,7 @@ describe('Database Transactions', () => {
 
     it('should handle concurrent transaction attempts gracefully', async () => {
       const mockDatabase = createMockDatabase();
-      const mockOperation = jest.fn().mockResolvedValue({ success: true });
+      const mockOperation = vi.fn().mockResolvedValue({ success: true });
 
       mockDatabase.withTransactionAsync.mockImplementation(
         async (callback: () => Promise<unknown>) => {
@@ -228,7 +229,7 @@ describe('Database Transactions', () => {
       const mockError = new Error('Constraint violation');
       mockError.name = 'SQLiteError';
 
-      const mockOperation = jest.fn().mockRejectedValue(mockError);
+      const mockOperation = vi.fn().mockRejectedValue(mockError);
 
       mockDatabase.withTransactionAsync.mockImplementation(
         async (callback: () => Promise<unknown>) => {
@@ -240,14 +241,15 @@ describe('Database Transactions', () => {
         }
       );
 
+      let caught: unknown;
       try {
         await withDatabaseTransaction(asDatabase(mockDatabase), mockOperation);
-        fail('Should have thrown error');
       } catch (error) {
-        expect(error).toBe(mockError);
-        expect((error as Error).name).toBe('SQLiteError');
-        expect((error as Error).message).toBe('Constraint violation');
+        caught = error;
       }
+      expect(caught).toBe(mockError);
+      expect((caught as Error).name).toBe('SQLiteError');
+      expect((caught as Error).message).toBe('Constraint violation');
     });
 
     it('should handle operation with complex return type', async () => {
@@ -266,7 +268,7 @@ describe('Database Transactions', () => {
         summary: { valid: 2, invalid: 1 },
       };
 
-      const mockOperation = jest.fn().mockResolvedValue(expectedResult);
+      const mockOperation = vi.fn().mockResolvedValue(expectedResult);
 
       mockDatabase.withTransactionAsync.mockImplementation(
         async (callback: () => Promise<unknown>) => {
@@ -291,7 +293,7 @@ describe('Database Transactions', () => {
         { id: 3, brew_name: 'Beer 3' },
       ];
 
-      const mockOperation = jest.fn(async (db: SQLiteDatabase) => {
+      const mockOperation = vi.fn(async (db: SQLiteDatabase) => {
         let recordsInserted = 0;
 
         for (const beer of beers) {
@@ -305,7 +307,7 @@ describe('Database Transactions', () => {
         return { success: true, recordsAffected: recordsInserted };
       });
 
-      mockDatabase.runAsync = jest.fn().mockResolvedValue(undefined);
+      mockDatabase.runAsync = vi.fn().mockResolvedValue(undefined);
 
       mockDatabase.withTransactionAsync.mockImplementation(
         async (callback: () => Promise<unknown>) => {
@@ -328,7 +330,7 @@ describe('Database Transactions', () => {
         { id: 1, brew_name: 'Duplicate ID' }, // Duplicate ID should fail
       ];
 
-      const mockOperation = jest.fn(async (db: SQLiteDatabase) => {
+      const mockOperation = vi.fn(async (db: SQLiteDatabase) => {
         for (const beer of beers) {
           await db.runAsync('INSERT INTO allbeers (id, brew_name) VALUES (?, ?)', [
             beer.id,
@@ -340,7 +342,7 @@ describe('Database Transactions', () => {
       });
 
       // First two inserts succeed, third fails
-      mockDatabase.runAsync = jest
+      mockDatabase.runAsync = vi
         .fn()
         .mockResolvedValueOnce(undefined)
         .mockResolvedValueOnce(undefined)
@@ -366,7 +368,7 @@ describe('Database Transactions', () => {
 
     it('should handle multi-table update transaction', async () => {
       const mockDatabase = createMockDatabase();
-      const mockOperation = jest.fn(async (db: SQLiteDatabase) => {
+      const mockOperation = vi.fn(async (db: SQLiteDatabase) => {
         // Update beers table
         await db.runAsync('UPDATE allbeers SET style = ? WHERE id = ?', ['IPA', 1]);
 
@@ -385,7 +387,7 @@ describe('Database Transactions', () => {
         return { success: true, recordsAffected: 3 };
       });
 
-      mockDatabase.runAsync = jest.fn().mockResolvedValue(undefined);
+      mockDatabase.runAsync = vi.fn().mockResolvedValue(undefined);
 
       mockDatabase.withTransactionAsync.mockImplementation(
         async (callback: () => Promise<unknown>) => {
@@ -406,7 +408,7 @@ describe('Database Transactions', () => {
         { id: 2, brew_name: 'New Beer 2' },
       ];
 
-      const mockOperation = jest.fn(async (db: SQLiteDatabase) => {
+      const mockOperation = vi.fn(async (db: SQLiteDatabase) => {
         // Delete old data
         await db.runAsync('DELETE FROM allbeers');
 
@@ -421,7 +423,7 @@ describe('Database Transactions', () => {
         return { success: true, recordsAffected: newBeers.length };
       });
 
-      mockDatabase.runAsync = jest.fn().mockResolvedValue(undefined);
+      mockDatabase.runAsync = vi.fn().mockResolvedValue(undefined);
 
       mockDatabase.withTransactionAsync.mockImplementation(
         async (callback: () => Promise<unknown>) => {
@@ -438,7 +440,7 @@ describe('Database Transactions', () => {
 
     it('should ensure all-or-nothing behavior for data refresh', async () => {
       const mockDatabase = createMockDatabase();
-      const mockOperation = jest.fn(async (db: SQLiteDatabase) => {
+      const mockOperation = vi.fn(async (db: SQLiteDatabase) => {
         // Step 1: Clear old data
         await db.runAsync('DELETE FROM allbeers');
 
@@ -446,7 +448,7 @@ describe('Database Transactions', () => {
         throw new Error('Network error during data fetch');
       });
 
-      mockDatabase.runAsync = jest.fn().mockResolvedValue(undefined);
+      mockDatabase.runAsync = vi.fn().mockResolvedValue(undefined);
 
       mockDatabase.withTransactionAsync.mockImplementation(
         async (callback: () => Promise<unknown>) => {

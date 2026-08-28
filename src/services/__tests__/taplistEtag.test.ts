@@ -16,6 +16,7 @@
  * then 304s and the ABV placards never come back.
  */
 
+import { describe, it, expect } from 'vitest';
 import { nextTaplistEtag, normalizeStoredEtag, shouldTrustNotModified } from '../taplistEtag';
 
 describe('nextTaplistEtag', () => {
