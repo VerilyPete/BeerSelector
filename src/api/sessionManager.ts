@@ -4,6 +4,47 @@ import { SessionData, isSessionData } from '../types/api';
 // Session storage key
 const SESSION_STORAGE_KEY = 'beerknurd_session';
 
+// Auth cookies storage key (SecureStore — never plaintext SQLite)
+const AUTH_COOKIES_STORAGE_KEY = 'beerknurd_auth_cookies';
+
+/**
+ * Saves captured authentication cookies to secure storage
+ * @param cookiesJson JSON string of cookie name-value pairs
+ */
+export const saveAuthCookies = async (cookiesJson: string): Promise<void> => {
+  try {
+    await SecureStore.setItemAsync(AUTH_COOKIES_STORAGE_KEY, cookiesJson);
+  } catch (error) {
+    console.error('Error saving auth cookies:', error);
+    throw error;
+  }
+};
+
+/**
+ * Gets captured authentication cookies from secure storage
+ * @returns The JSON string of cookie name-value pairs if it exists, otherwise null
+ */
+export const getAuthCookies = async (): Promise<string | null> => {
+  try {
+    return await SecureStore.getItemAsync(AUTH_COOKIES_STORAGE_KEY);
+  } catch (error) {
+    console.error('Error getting auth cookies:', error);
+    return null;
+  }
+};
+
+/**
+ * Clears captured authentication cookies from secure storage
+ */
+export const clearAuthCookies = async (): Promise<void> => {
+  try {
+    await SecureStore.deleteItemAsync(AUTH_COOKIES_STORAGE_KEY);
+  } catch (error) {
+    console.error('Error clearing auth cookies:', error);
+    throw error;
+  }
+};
+
 /**
  * Saves session data to secure storage
  * @param sessionData The session data to save

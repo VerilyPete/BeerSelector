@@ -238,6 +238,17 @@ export const setPreference = async (key: string, value: string, description?: st
   }
 };
 
+export const deletePreference = async (key: string): Promise<void> => {
+  const database = await initDatabase();
+
+  try {
+    await database.runAsync('DELETE FROM preferences WHERE key = ?', [key]);
+  } catch (error) {
+    console.error(`Error deleting preference ${key}:`, error);
+    throw error;
+  }
+};
+
 // Get all preferences from the database
 export const getAllPreferences = async (): Promise<Preference[]> => {
   const database = await initDatabase();

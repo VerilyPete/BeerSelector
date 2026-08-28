@@ -12,6 +12,8 @@ import { ThemedView } from '@/components/ThemedView';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { refreshAllDataFromAPI, getAllPreferences, getPreference, setPreference, setUntappdCookie, isUntappdLoggedIn, initDatabase, clearUntappdCookies } from '@/src/database/db';
+import { migrateAuthCookiesToSecureStore } from '@/src/services/authCookieMigration';
+import { saveAuthCookies } from '@/src/api/sessionManager';
 import { manualRefreshAllData } from '@/src/services/dataUpdateService';
 import { LoadingIndicator } from '@/components/LoadingIndicator';
 import Constants from 'expo-constants';
@@ -88,6 +90,9 @@ export default function SettingsScreen() {
   const loadPreferences = async () => {
     try {
       setLoading(true);
+      // Move any legacy plaintext auth cookies into SecureStore before the
+      // preferences are read for display.
+      await migrateAuthCookiesToSecureStore();
       const prefs = await getAllPreferences();
       setPreferences(prefs);
 
@@ -440,8 +445,8 @@ export default function SettingsScreen() {
           // Save login timestamp
           setPreference('last_login_timestamp', new Date().toISOString(), 'Last successful login timestamp');
 
-          // Save cookies
-          setPreference('auth_cookies', JSON.stringify(cookies), 'Authentication cookies');
+          // Save cookies to SecureStore (never plaintext preferences)
+          await saveAuthCookies(JSON.stringify(cookies));
 
           // Refresh the data
           handleRefresh();
@@ -714,14 +719,18 @@ export default function SettingsScreen() {
     }
   };
 
-  // Render a preference item - simplified to just display
+  // Render a preference item - simplified to just display.
+  // Values of sensitive-looking keys are masked even if a sensitive value
+  // ever ends up in the preferences table again.
   const renderPreferenceItem = (preference: Preference) => {
+    const isSensitive = /cookie|token|secret|password|session/i.test(preference.key);
+    const displayValue = isSensitive ? '•••••• (stored securely)' : preference.value;
     return (
       <View key={preference.key} style={styles.preferenceItem}>
         <ThemedText style={styles.preferenceKey}>{preference.key}</ThemedText>
         <ThemedText style={styles.preferenceDescription}>{preference.description}</ThemedText>
         <ThemedText style={styles.preferenceValue} numberOfLines={2} ellipsizeMode="middle">
-          {preference.value}
+          {displayValue}
         </ThemedText>
       </View>
     );
