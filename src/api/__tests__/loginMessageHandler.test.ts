@@ -3,7 +3,11 @@ import { Alert } from 'react-native';
 import { handleLoginMessage, type LoginMessageDeps } from '../loginMessageHandler';
 import { setPreference } from '@/src/database/preferences';
 import { commitTaplistWrite } from '@/src/services/taplistEtag';
-import { saveSessionData, extractSessionDataFromResponse } from '@/src/api/sessionManager';
+import {
+  saveAuthCookies,
+  saveSessionData,
+  extractSessionDataFromResponse,
+} from '@/src/api/sessionManager';
 import { handleVisitorLogin } from '@/src/api/authService';
 // Deliberately NOT mocked. The behaviour under test — that the gate-open
 // write genuinely queues behind a concurrent lock holder rather than merely
@@ -37,6 +41,7 @@ vi.mock('@/src/services/taplistEtag', () => ({
 }));
 
 vi.mock('@/src/api/sessionManager', () => ({
+  saveAuthCookies: vi.fn().mockResolvedValue(undefined),
   saveSessionData: vi.fn().mockResolvedValue(undefined),
   extractSessionDataFromResponse: vi.fn().mockReturnValue({
     memberId: '12345',
@@ -112,6 +117,7 @@ describe('handleLoginMessage', () => {
     // -independent.
     (setPreference as Mock).mockResolvedValue(undefined);
     (commitTaplistWrite as Mock).mockResolvedValue(undefined);
+    (saveAuthCookies as Mock).mockResolvedValue(undefined);
     (saveSessionData as Mock).mockResolvedValue(undefined);
     (extractSessionDataFromResponse as Mock).mockReturnValue(defaultSessionData);
     (handleVisitorLogin as Mock).mockResolvedValue({ success: true });
@@ -167,7 +173,7 @@ describe('handleLoginMessage', () => {
       expect(deps.onLoginSuccess).toHaveBeenCalled();
     });
 
-    it('never writes session cookies to the preferences table', async () => {
+    it('stores session cookies only in SecureStore, never in the preferences table', async () => {
       // INVERTED. This used to assert the write. `auth_cookies` held the raw
       // cookie jar — PHPSESSID included — as plaintext in an ordinary SQLite
       // row, while the same session was already in SecureStore via
@@ -208,6 +214,7 @@ describe('handleLoginMessage', () => {
       );
 
       expect(saveSessionData).toHaveBeenCalled();
+      expect(saveAuthCookies).toHaveBeenCalledWith(JSON.stringify(testCookies));
 
       const writes = (setPreference as Mock).mock.calls;
 
@@ -439,6 +446,17 @@ describe('handleLoginMessage', () => {
         ([key]) => key === 'all_beers_api_url'
       );
       expect(gateWrites.every(([, value]) => !value)).toBe(true);
+    });
+
+    it('does not commit the session when secure cookie storage fails', async () => {
+      (saveAuthCookies as Mock).mockRejectedValueOnce(new Error('storage locked'));
+      const deps = createDeps();
+
+      await handleLoginMessage(memberLoginRaw, deps);
+
+      expect(saveSessionData).not.toHaveBeenCalled();
+      expect(deps.onLoginSuccess).not.toHaveBeenCalled();
+      expect(deps.onLoginCancel).toHaveBeenCalled();
     });
 
     it('completes the login when a preference nothing reads fails to write', async () => {

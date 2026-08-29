@@ -3,7 +3,11 @@ import { setPreference } from '@/src/database/preferences';
 import { commitTaplistWrite } from '@/src/services/taplistEtag';
 import { databaseLockManager } from '@/src/database/DatabaseLockManager';
 import { handleVisitorLogin } from '@/src/api/authService';
-import { saveSessionData, extractSessionDataFromResponse } from '@/src/api/sessionManager';
+import {
+  saveAuthCookies,
+  saveSessionData,
+  extractSessionDataFromResponse,
+} from '@/src/api/sessionManager';
 import { isSessionData } from '@/src/types/api';
 import { createErrorResponse, getUserFriendlyErrorMessage } from '@/src/utils/notificationUtils';
 
@@ -78,18 +82,9 @@ async function recordUnreadLoginMetadata({
       new Date().toISOString(),
       'Last successful login timestamp'
     );
-    // `auth_cookies` used to be written here: the entire cookie jar, PHPSESSID
-    // included, JSON-stringified into a plain SQLite row, while the same
-    // session was already going to SecureStore via `saveSessionData` a few
-    // lines below the caller. `migrateToV8` deletes the rows already on
-    // devices, and its docstring is the canonical account — including a
-    // correction to what this comment used to claim about the key's history,
-    // and the difference between a row being unlinked and a credential being
-    // gone. Do not restate either here; three copies of that story is how the
-    // false version of it survived review.
-    //
-    // The `cookies` parameter went with it rather than being left unused: the
-    // point is that this function has no business receiving them.
+    // Authentication cookies are deliberately absent here. They are committed
+    // to SecureStore alongside the validated session in the caller below;
+    // ordinary SQLite preferences must never receive credential material.
   } catch (error) {
     console.warn('Login metadata write failed; login continues because nothing reads it:', error);
   }
@@ -197,8 +192,9 @@ export async function handleLoginMessage(raw: string, deps: LoginMessageDeps): P
             );
           }
 
+          await saveAuthCookies(JSON.stringify(cookies));
           await saveSessionData(sessionData);
-          console.log('Member session data saved to SecureStore successfully');
+          console.log('Member credentials saved to SecureStore successfully');
 
           // Reopen the gate only now, with `all_beers_api_url` last — it is
           // the key both branches of `areApiUrlsConfigured` require, so it is

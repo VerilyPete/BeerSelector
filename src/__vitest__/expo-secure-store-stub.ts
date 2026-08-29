@@ -17,11 +17,23 @@ import { vi } from 'vitest';
  */
 const store = new Map<string, string>();
 
-export const getItemAsync = vi.fn(async (key: string) => store.get(key) ?? null);
+const assertValidKey = (key: string): void => {
+  if (!/^[A-Za-z0-9._-]+$/.test(key)) {
+    throw new Error(`Invalid SecureStore key: ${key}`);
+  }
+};
+
+export const getItemAsync = vi.fn(async (key: string) => {
+  assertValidKey(key);
+  return store.get(key) ?? null;
+});
 export const setItemAsync = vi.fn(async (key: string, value: string) => {
+  assertValidKey(key);
+  if (value.length > 2048) throw new Error(`SecureStore value too large: ${value.length}`);
   store.set(key, value);
 });
 export const deleteItemAsync = vi.fn(async (key: string) => {
+  assertValidKey(key);
   store.delete(key);
 });
 export const isAvailableAsync = vi.fn(async () => true);

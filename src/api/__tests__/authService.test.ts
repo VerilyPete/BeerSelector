@@ -1,6 +1,6 @@
 import { vi, type Mock, describe, it, expect, beforeEach } from 'vitest';
 import { autoLogin, login, logout, handleTapThatAppLogin } from '../authService';
-import { saveSessionData, clearSessionData } from '../sessionManager';
+import { saveSessionData, clearSessionData, clearAuthCookies } from '../sessionManager';
 import { getApiClient } from '../apiClientInstance';
 import { ApiError, SessionData } from '../../types/api';
 import { getPreference, setPreference } from '../../database/preferences';
@@ -10,6 +10,7 @@ import { refreshAllDataFromAPI } from '../../services/dataUpdateService';
 vi.mock('../sessionManager', () => ({
   saveSessionData: vi.fn().mockResolvedValue(undefined),
   clearSessionData: vi.fn().mockResolvedValue(undefined),
+  clearAuthCookies: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('../apiClientInstance', () => ({
@@ -48,6 +49,8 @@ describe('authService', () => {
     (getPreference as Mock).mockResolvedValue(null);
     (setPreference as Mock).mockResolvedValue(undefined);
     (refreshAllDataFromAPI as Mock).mockResolvedValue(undefined);
+    (clearSessionData as Mock).mockResolvedValue(undefined);
+    (clearAuthCookies as Mock).mockResolvedValue(undefined);
   });
 
   describe('autoLogin', () => {
@@ -234,6 +237,7 @@ describe('authService', () => {
 
       // Check that session data was cleared
       expect(clearSessionData).toHaveBeenCalled();
+      expect(clearAuthCookies).toHaveBeenCalled();
 
       // Check that the result is correct
       expect(result).toEqual({
@@ -255,6 +259,102 @@ describe('authService', () => {
         success: false,
         error: 'Network error',
         statusCode: 0,
+      });
+      expect(clearSessionData).toHaveBeenCalled();
+      expect(clearAuthCookies).toHaveBeenCalled();
+      expect(setPreference).toHaveBeenCalledWith(
+        'is_visitor_mode',
+        'false',
+        'Flag indicating whether the user is in visitor mode'
+      );
+    });
+
+    it('attempts every local cleanup when one deletion fails', async () => {
+      mockApiClient.post.mockResolvedValueOnce({ success: true, statusCode: 200 });
+      (clearSessionData as Mock).mockRejectedValueOnce(new Error('session delete failed'));
+
+      const result = await logout();
+
+      expect(clearSessionData).toHaveBeenCalled();
+      expect(clearAuthCookies).toHaveBeenCalled();
+      expect(setPreference).toHaveBeenCalledWith(
+        'is_visitor_mode',
+        'false',
+        'Flag indicating whether the user is in visitor mode'
+      );
+      expect(result).toEqual({
+        success: false,
+        error: 'Local logout cleanup failed: session delete failed',
+        statusCode: 500,
+      });
+    });
+
+    it('reports a local cleanup failure even when remote logout also fails', async () => {
+      mockApiClient.post.mockRejectedValueOnce(new ApiError('Network error', 0, true, false));
+      (clearAuthCookies as Mock).mockRejectedValueOnce(new Error('keychain locked'));
+
+      const result = await logout();
+
+      expect(clearSessionData).toHaveBeenCalled();
+      expect(clearAuthCookies).toHaveBeenCalled();
+      expect(setPreference).toHaveBeenCalled();
+      expect(result).toEqual({
+        success: false,
+        error:
+          'Local logout cleanup failed: keychain locked; remote logout also failed: Network error',
+        statusCode: 500,
+      });
+    });
+
+    it('cleans local credentials when the server returns an unsuccessful result', async () => {
+      mockApiClient.post.mockResolvedValueOnce({
+        success: false,
+        error: 'Offline',
+        statusCode: 503,
+      });
+
+      const result = await logout();
+
+      expect(clearSessionData).toHaveBeenCalled();
+      expect(clearAuthCookies).toHaveBeenCalled();
+      expect(setPreference).toHaveBeenCalledWith(
+        'is_visitor_mode',
+        'false',
+        'Flag indicating whether the user is in visitor mode'
+      );
+      expect(result).toEqual({ success: false, error: 'Offline', statusCode: 503 });
+    });
+
+    it('preserves status zero from a resolved network failure', async () => {
+      mockApiClient.post.mockResolvedValueOnce({
+        success: false,
+        error: 'Network error',
+        statusCode: 0,
+      });
+
+      await expect(logout()).resolves.toEqual({
+        success: false,
+        error: 'Network error',
+        statusCode: 0,
+      });
+    });
+
+    it.each([
+      ['auth cookie cleanup', clearAuthCookies as Mock],
+      ['visitor-mode cleanup', setPreference as Mock],
+    ])('continues cleanup when %s fails', async (_label, failingCleanup) => {
+      mockApiClient.post.mockResolvedValueOnce({ success: true, statusCode: 200 });
+      failingCleanup.mockRejectedValueOnce(new Error('local failure'));
+
+      const result = await logout();
+
+      expect(clearSessionData).toHaveBeenCalled();
+      expect(clearAuthCookies).toHaveBeenCalled();
+      expect(setPreference).toHaveBeenCalled();
+      expect(result).toEqual({
+        success: false,
+        error: 'Local logout cleanup failed: local failure',
+        statusCode: 500,
       });
     });
   });

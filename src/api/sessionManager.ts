@@ -4,6 +4,260 @@ import { SessionData, isSessionData } from '../types/api';
 // Session storage key
 const SESSION_STORAGE_KEY = 'beerknurd_session';
 
+// Auth cookie values can exceed SecureStore's practical per-value limit, so
+// they are encoded and split across immutable, generation-specific chunks.
+// The active marker is switched only after every chunk is present. A separate
+// registry records both committed and interrupted generations because
+// SecureStore cannot enumerate keys during logout.
+const AUTH_COOKIES_STORAGE_KEY = 'beerknurd_auth_cookies';
+const AUTH_COOKIES_META_KEY = 'beerknurd_auth_cookies_meta';
+const AUTH_COOKIES_GENERATIONS_KEY = 'beerknurd_auth_cookies_generations';
+const AUTH_COOKIES_CHUNK_CHARS = 1500;
+const AUTH_COOKIES_MAX_CHUNKS = 1000;
+const AUTH_COOKIES_REGISTRY_MAX_CHARS = 1500;
+
+type AuthCookieGeneration = {
+  generation: string;
+  count: number;
+};
+
+let generationSequence = 0;
+let authCookieMutation: Promise<void> = Promise.resolve();
+
+const toBase64 = (value: string): string => btoa(unescape(encodeURIComponent(value)));
+
+const fromBase64 = (encoded: string): string => decodeURIComponent(escape(atob(encoded)));
+
+const chunkString = (value: string, size: number): string[] => {
+  if (value.length === 0) return [''];
+  const chunks: string[] = [];
+  for (let i = 0; i < value.length; i += size) {
+    chunks.push(value.substring(i, i + size));
+  }
+  return chunks;
+};
+
+const isGeneration = (value: unknown): value is AuthCookieGeneration => {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Partial<AuthCookieGeneration>;
+  return (
+    typeof candidate.generation === 'string' &&
+    /^[A-Za-z0-9_-]+$/.test(candidate.generation) &&
+    Number.isInteger(candidate.count) &&
+    (candidate.count ?? 0) > 0 &&
+    (candidate.count ?? 0) <= AUTH_COOKIES_MAX_CHUNKS
+  );
+};
+
+const parseGeneration = (value: string | null): AuthCookieGeneration | null => {
+  if (!value) return null;
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return isGeneration(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+};
+
+const parseGenerationRegistry = (value: string | null): AuthCookieGeneration[] => {
+  if (!value) return [];
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed.filter(isGeneration) : [];
+  } catch {
+    return [];
+  }
+};
+
+const generationKey = (generation: string, index: number): string =>
+  `${AUTH_COOKIES_STORAGE_KEY}_${generation}_${index}`;
+
+const createGeneration = (): string => {
+  generationSequence += 1;
+  return `${Date.now().toString(36)}_${generationSequence.toString(36)}_${Math.random()
+    .toString(36)
+    .slice(2, 10)}`;
+};
+
+const enqueueAuthCookieMutation = <T>(operation: () => Promise<T>): Promise<T> => {
+  const result = authCookieMutation.then(operation, operation);
+  authCookieMutation = result.then(
+    () => undefined,
+    () => undefined
+  );
+  return result;
+};
+
+const deleteGeneration = async (entry: AuthCookieGeneration): Promise<Error[]> => {
+  const errors: Error[] = [];
+  for (let index = 0; index < entry.count; index += 1) {
+    try {
+      await SecureStore.deleteItemAsync(generationKey(entry.generation, index));
+    } catch (error) {
+      errors.push(error instanceof Error ? error : new Error(String(error)));
+    }
+  }
+  return errors;
+};
+
+/** Save captured authentication cookies in atomically committed chunks. */
+export const saveAuthCookies = async (cookiesJson: string): Promise<void> =>
+  enqueueAuthCookieMutation(async () => {
+    const chunks = chunkString(toBase64(cookiesJson), AUTH_COOKIES_CHUNK_CHARS);
+    if (chunks.length > AUTH_COOKIES_MAX_CHUNKS) {
+      throw new Error('Auth cookie payload exceeds the supported SecureStore chunk count');
+    }
+
+    try {
+      const registry = parseGenerationRegistry(
+        await SecureStore.getItemAsync(AUTH_COOKIES_GENERATIONS_KEY)
+      );
+      const active = parseGeneration(await SecureStore.getItemAsync(AUTH_COOKIES_META_KEY));
+      if (active && !registry.some(entry => entry.generation === active.generation)) {
+        registry.push(active);
+      }
+
+      const knownIds = new Set(registry.map(entry => entry.generation));
+      let nextGeneration = createGeneration();
+      while (knownIds.has(nextGeneration)) nextGeneration = createGeneration();
+      const next: AuthCookieGeneration = {
+        generation: nextGeneration,
+        count: chunks.length,
+      };
+      const known = [...registry, next];
+      const serializedRegistry = JSON.stringify(known);
+      if (serializedRegistry.length > AUTH_COOKIES_REGISTRY_MAX_CHARS) {
+        throw new Error('Auth cookie generation registry is full; clear stored cookies and retry');
+      }
+
+      // Register before writing chunks so logout can clean an interrupted save.
+      await SecureStore.setItemAsync(AUTH_COOKIES_GENERATIONS_KEY, serializedRegistry);
+
+      for (let index = 0; index < chunks.length; index += 1) {
+        await SecureStore.setItemAsync(generationKey(next.generation, index), chunks[index]);
+      }
+
+      // This single SecureStore value is the commit point. Readers continue to
+      // use the previous generation until this write succeeds.
+      await SecureStore.setItemAsync(AUTH_COOKIES_META_KEY, JSON.stringify(next));
+
+      const failedCleanup: AuthCookieGeneration[] = [];
+      for (const previous of known) {
+        if (previous.generation === next.generation) continue;
+        const errors = await deleteGeneration(previous);
+        if (errors.length > 0) failedCleanup.push(previous);
+      }
+
+      try {
+        await SecureStore.deleteItemAsync(AUTH_COOKIES_STORAGE_KEY);
+      } catch (error) {
+        console.error('Failed to remove legacy auth cookie value after commit:', error);
+      }
+
+      // Failed deletions remain registered so a later save or logout retries.
+      try {
+        await SecureStore.setItemAsync(
+          AUTH_COOKIES_GENERATIONS_KEY,
+          JSON.stringify([...failedCleanup, next])
+        );
+      } catch (error) {
+        // The pre-commit registry still contains every generation, including
+        // the new one, so cleanup knowledge is preserved for logout.
+        console.error('Failed to compact auth cookie generation registry:', error);
+      }
+    } catch (error) {
+      console.error('Error saving auth cookies:', error);
+      throw error;
+    }
+  });
+
+/** Read only the generation named by the committed marker. */
+export const getAuthCookies = async (): Promise<string | null> =>
+  enqueueAuthCookieMutation(async () => {
+    try {
+      const active = parseGeneration(await SecureStore.getItemAsync(AUTH_COOKIES_META_KEY));
+      if (!active) return null;
+
+      const chunks: string[] = [];
+      for (let index = 0; index < active.count; index += 1) {
+        const chunk = await SecureStore.getItemAsync(generationKey(active.generation, index));
+        // Empty strings are valid stored values. SecureStore uses null—not an
+        // empty string—to report a missing key.
+        if (chunk === null) return null;
+        chunks.push(chunk);
+      }
+      return fromBase64(chunks.join(''));
+    } catch (error) {
+      console.error('Error getting auth cookies:', error);
+      return null;
+    }
+  });
+
+/** Remove every registered cookie generation, without short-circuiting. */
+export const clearAuthCookies = async (): Promise<void> =>
+  enqueueAuthCookieMutation(async () => {
+    const errors: Error[] = [];
+    let registry: AuthCookieGeneration[] = [];
+    let registryReadSucceeded = false;
+
+    try {
+      registry = parseGenerationRegistry(
+        await SecureStore.getItemAsync(AUTH_COOKIES_GENERATIONS_KEY)
+      );
+      registryReadSucceeded = true;
+    } catch (error) {
+      errors.push(error instanceof Error ? error : new Error(String(error)));
+    }
+
+    try {
+      const active = parseGeneration(await SecureStore.getItemAsync(AUTH_COOKIES_META_KEY));
+      if (active && !registry.some(entry => entry.generation === active.generation)) {
+        registry.push(active);
+      }
+    } catch (error) {
+      errors.push(error instanceof Error ? error : new Error(String(error)));
+    }
+
+    // Remove the commit marker first so no credential remains readable while
+    // best-effort deletion continues.
+    for (const key of [AUTH_COOKIES_META_KEY, AUTH_COOKIES_STORAGE_KEY]) {
+      try {
+        await SecureStore.deleteItemAsync(key);
+      } catch (error) {
+        errors.push(error instanceof Error ? error : new Error(String(error)));
+      }
+    }
+
+    const failedGenerations: AuthCookieGeneration[] = [];
+    for (const entry of registry) {
+      const generationErrors = await deleteGeneration(entry);
+      errors.push(...generationErrors);
+      if (generationErrors.length > 0) failedGenerations.push(entry);
+    }
+
+    try {
+      if (registryReadSucceeded) {
+        if (failedGenerations.length > 0) {
+          await SecureStore.setItemAsync(
+            AUTH_COOKIES_GENERATIONS_KEY,
+            JSON.stringify(failedGenerations)
+          );
+        } else {
+          await SecureStore.deleteItemAsync(AUTH_COOKIES_GENERATIONS_KEY);
+        }
+      }
+      // Otherwise preserve the unread registry so a later logout can retry
+      // orphaned generations rather than erasing the only record of their keys.
+    } catch (error) {
+      errors.push(error instanceof Error ? error : new Error(String(error)));
+    }
+
+    if (errors.length > 0) {
+      console.error('Error clearing auth cookies:', errors[0]);
+      throw errors[0];
+    }
+  });
+
 /**
  * Saves session data to secure storage
  * @param sessionData The session data to save

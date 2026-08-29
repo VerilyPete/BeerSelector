@@ -2,6 +2,7 @@ import { describe, it, expect, vi, type Mock } from 'vitest';
 import { migrateToVersion8 } from '../migrateToV8';
 import { databaseLockManager } from '../../DatabaseLockManager';
 import { recordMigration } from '../../schemaVersion';
+import { saveAuthCookies } from '../../../api/sessionManager';
 
 // The lock manager is deliberately NOT mocked, for the same reason as v7: with
 // the database mocked but the real manager, isLocked() asserts genuine lock
@@ -11,10 +12,15 @@ vi.mock('../../schemaVersion', () => ({
   recordMigration: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock('../../../api/sessionManager', () => ({
+  saveAuthCookies: vi.fn().mockResolvedValue(undefined),
+}));
+
 /** One write the migration made, and whether a transaction was open for it. */
 type WriteLogEntry = { readonly write: string; readonly transactionsOpen: number };
 
 type MockDb = {
+  getFirstAsync: Mock;
   getAllAsync: Mock;
   execAsync: Mock;
   runAsync: Mock;
@@ -36,11 +42,16 @@ function createMockMigrationDb(): MockDb {
   databaseLockManager.resetForTesting();
   vi.restoreAllMocks();
   (recordMigration as Mock).mockClear();
+  (saveAuthCookies as Mock).mockReset();
 
   // A depth count rather than a boolean, so a nested transaction still reads as
   // open and cannot be mistaken for the outer one having closed.
   let transactionsOpen = 0;
   const writeLog: WriteLogEntry[] = [];
+
+  (saveAuthCookies as Mock).mockImplementation(async () => {
+    writeLog.push({ write: 'SecureStore', transactionsOpen });
+  });
 
   // `recordMigration` is a module mock, so its position relative to the
   // transaction is only observable if it reports it here.
@@ -50,6 +61,7 @@ function createMockMigrationDb(): MockDb {
 
   return {
     getAllAsync: vi.fn().mockResolvedValue([]),
+    getFirstAsync: vi.fn().mockResolvedValue(null),
     execAsync: vi.fn().mockResolvedValue(undefined),
     runAsync: vi.fn(async (sql: string) => {
       writeLog.push({ write: sql.trim().split(/\s+/)[0].toUpperCase(), transactionsOpen });
@@ -72,15 +84,22 @@ function writes(db: MockDb): [string, unknown[]][] {
 }
 
 describe('migrateToVersion8', () => {
-  it('deletes the auth_cookies preference', async () => {
+  it('copies auth_cookies to SecureStore before deleting the plaintext row', async () => {
     // The point of the migration. Removing the write in LoginWebView stops new
     // devices storing a session cookie in plaintext, but does nothing for the
     // devices that already have one — those rows survive upgrade, backup and
     // restore until something deletes them.
     const db = createMockMigrationDb();
+    db.getFirstAsync.mockResolvedValue({ value: '{"PHPSESSID":"legacy"}' });
 
     await migrateToVersion8(db as never);
 
+    expect(saveAuthCookies).toHaveBeenCalledWith('{"PHPSESSID":"legacy"}');
+    expect(db.writeLog.map(entry => entry.write)).toEqual([
+      'SecureStore',
+      'DELETE',
+      'recordMigration',
+    ]);
     const deletes = writes(db).filter(([sql]) => /DELETE\s+FROM\s+preferences/i.test(sql));
     expect(deletes).toHaveLength(1);
     expect(deletes[0][1]).toEqual(['auth_cookies']);
@@ -129,7 +148,43 @@ describe('migrateToVersion8', () => {
     db.runAsync.mockResolvedValue({ changes: 0 });
 
     await expect(migrateToVersion8(db as never)).resolves.toBeUndefined();
+    expect(saveAuthCookies).not.toHaveBeenCalled();
     expect(recordMigration).toHaveBeenCalledWith(db, 8);
+  });
+
+  it('retains the plaintext row and schema version when SecureStore fails', async () => {
+    const db = createMockMigrationDb();
+    db.getFirstAsync.mockResolvedValue({ value: '{"PHPSESSID":"legacy"}' });
+    (saveAuthCookies as Mock).mockRejectedValueOnce(new Error('storage locked'));
+
+    await expect(migrateToVersion8(db as never)).rejects.toThrow('storage locked');
+
+    expect(writes(db)).toEqual([]);
+    expect(recordMigration).not.toHaveBeenCalled();
+  });
+
+  it('does not migrate or advance the schema when the strict row read fails', async () => {
+    const db = createMockMigrationDb();
+    db.getFirstAsync.mockRejectedValueOnce(new Error('database is locked'));
+
+    await expect(migrateToVersion8(db as never)).rejects.toThrow('database is locked');
+
+    expect(saveAuthCookies).not.toHaveBeenCalled();
+    expect(writes(db)).toEqual([]);
+    expect(recordMigration).not.toHaveBeenCalled();
+    expect(databaseLockManager.isLocked()).toBe(false);
+  });
+
+  it('retries the secure copy after a post-copy SQL failure', async () => {
+    const db = createMockMigrationDb();
+    db.getFirstAsync.mockResolvedValue({ value: '{"PHPSESSID":"legacy"}' });
+    db.runAsync.mockRejectedValueOnce(new Error('database is locked'));
+
+    await expect(migrateToVersion8(db as never)).rejects.toThrow('database is locked');
+    await expect(migrateToVersion8(db as never)).resolves.toBeUndefined();
+
+    expect(saveAuthCookies).toHaveBeenCalledTimes(2);
+    expect(recordMigration).toHaveBeenCalledTimes(1);
   });
 
   it('releases the lock when the delete fails', async () => {

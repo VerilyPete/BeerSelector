@@ -32,13 +32,26 @@ jest.mock('expo-sqlite', () => {
 // setItemAsync/getItemAsync round trip behaves like the real store.
 jest.mock('expo-secure-store', () => {
   const secureStore = {};
+  const assertValidKey = key => {
+    if (!/^[A-Za-z0-9._-]+$/.test(key)) {
+      throw new Error(`Invalid SecureStore key: ${key}`);
+    }
+  };
   return {
-    getItemAsync: jest.fn().mockImplementation(key => Promise.resolve(secureStore[key])),
+    getItemAsync: jest.fn().mockImplementation(key => {
+      assertValidKey(key);
+      return Promise.resolve(secureStore[key]);
+    }),
     setItemAsync: jest.fn().mockImplementation((key, value) => {
+      assertValidKey(key);
+      if (value.length > 2048) {
+        throw new Error(`SecureStore value too large: ${value.length}`);
+      }
       secureStore[key] = value;
       return Promise.resolve();
     }),
     deleteItemAsync: jest.fn().mockImplementation(key => {
+      assertValidKey(key);
       delete secureStore[key];
       return Promise.resolve();
     }),
