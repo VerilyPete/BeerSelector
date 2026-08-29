@@ -3,9 +3,13 @@ import * as SecureStore from 'expo-secure-store';
 import {
   captureStoredAuthCredentials,
   clearAuthCookies,
+  clearSessionData,
   getAuthCookies,
+  getSessionData,
   restoreStoredAuthCredentials,
+  saveAuthCredentials,
   saveAuthCookies,
+  saveSessionData,
 } from '../sessionManager';
 
 const { mockStore, mockState, assertSecureStoreKey } = vi.hoisted(() => {
@@ -106,7 +110,13 @@ describe('auth cookie SecureStore', () => {
 
   it('captures and restores the cookie and session as one credential pair', async () => {
     const oldCookies = JSON.stringify({ PHPSESSID: 'old' });
-    const oldSession = JSON.stringify({ sessionId: 'old' });
+    const oldSessionData = {
+      sessionId: 'old',
+      memberId: 'member-old',
+      storeId: 'store-old',
+      storeName: 'Old Store',
+    };
+    const oldSession = JSON.stringify(oldSessionData);
     await saveAuthCookies(oldCookies);
     mockStore.set('beerknurd_session', oldSession);
     const snapshot = await captureStoredAuthCredentials();
@@ -116,7 +126,71 @@ describe('auth cookie SecureStore', () => {
     await restoreStoredAuthCredentials(snapshot);
 
     await expect(getAuthCookies()).resolves.toBe(oldCookies);
-    expect(mockStore.get('beerknurd_session')).toBe(oldSession);
+    await expect(getSessionData()).resolves.toEqual(oldSessionData);
+  });
+
+  it('does not expose either half of a member credential pair before its marker commits', async () => {
+    const oldCookies = JSON.stringify({ PHPSESSID: 'old' });
+    const oldSession = {
+      sessionId: 'old',
+      memberId: 'member-old',
+      storeId: 'store-old',
+      storeName: 'Old Store',
+    };
+    const newCookies = JSON.stringify({ PHPSESSID: 'new' });
+    const newSession = {
+      sessionId: 'new',
+      memberId: 'member-new',
+      storeId: 'store-new',
+      storeName: 'New Store',
+    };
+    await saveAuthCredentials(oldCookies, oldSession);
+    mockState.failSetKey = META_KEY;
+
+    await expect(saveAuthCredentials(newCookies, newSession)).rejects.toThrow(
+      'SecureStore marker write failed'
+    );
+
+    await expect(getAuthCookies()).resolves.toBe(oldCookies);
+    await expect(getSessionData()).resolves.toEqual(oldSession);
+  });
+
+  it('writes the generated session before publishing the credential marker', async () => {
+    await saveAuthCredentials(JSON.stringify({ PHPSESSID: 'member' }), {
+      sessionId: 'session',
+      memberId: 'member',
+      storeId: 'store',
+      storeName: 'Store',
+    });
+
+    const writes = vi.mocked(SecureStore.setItemAsync).mock.calls;
+    const sessionWrite = writes.findIndex(([key]) => key.endsWith('_session'));
+    const markerWrite = writes.findIndex(([key]) => key === META_KEY);
+    expect(sessionWrite).toBeGreaterThan(-1);
+    expect(markerWrite).toBeGreaterThan(sessionWrite);
+  });
+
+  it('updates and clears a session through the active credential generation', async () => {
+    const cookies = JSON.stringify({ PHPSESSID: 'member' });
+    await saveAuthCredentials(cookies, {
+      sessionId: 'old',
+      memberId: 'member',
+      storeId: 'store',
+      storeName: 'Store',
+    });
+    const refreshed = {
+      sessionId: 'refreshed',
+      memberId: 'member',
+      storeId: 'store',
+      storeName: 'Store',
+    };
+
+    await saveSessionData(refreshed);
+    await expect(getSessionData()).resolves.toEqual(refreshed);
+    await expect(getAuthCookies()).resolves.toBe(cookies);
+
+    await clearSessionData();
+    await expect(getSessionData()).resolves.toBeNull();
   });
 
   it('keeps the prior generation readable when the commit marker write fails', async () => {
@@ -192,9 +266,7 @@ describe('auth cookie SecureStore', () => {
     mockStore.set('beerknurd_auth_cookies_known_0', 'YQ==');
     const before = new Map(mockStore);
 
-    await expect(saveAuthCookies('{"PHPSESSID":"new"}')).rejects.toThrow(
-      'registry is malformed'
-    );
+    await expect(saveAuthCookies('{"PHPSESSID":"new"}')).rejects.toThrow('registry is malformed');
 
     expect(mockStore).toEqual(before);
     expect(SecureStore.setItemAsync).not.toHaveBeenCalled();

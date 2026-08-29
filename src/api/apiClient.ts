@@ -15,6 +15,7 @@ export class ApiClient {
   private timeout: number;
   private sessionData: SessionData | null = null;
   private sessionPromise: Promise<SessionData> | null = null;
+  private sessionCacheGeneration = 0;
   private networkStatus: { isConnected: boolean; type: string } | null = null;
 
   private constructor(options: ApiClientOptions = {}) {
@@ -64,16 +65,28 @@ export class ApiClient {
     return ApiClient.instance;
   }
 
+  /** Immediately revoke any in-memory session retained between requests. */
+  public clearSessionCache(): void {
+    this.sessionCacheGeneration += 1;
+    this.sessionData = null;
+    this.sessionPromise = null;
+  }
+
   private async getSession(): Promise<SessionData> {
     // If we already have a session promise, return it
     if (this.sessionPromise) {
       return this.sessionPromise;
     }
 
-    // Create a new session promise
+    // Create a new session promise. A generation token prevents a session read
+    // already in flight during logout from repopulating the revoked cache.
+    const cacheGeneration = this.sessionCacheGeneration;
     this.sessionPromise = (async () => {
       try {
         const sessionData = await getCurrentSession();
+        if (this.sessionCacheGeneration !== cacheGeneration) {
+          throw new ApiError('Session was revoked', 401, false, false);
+        }
         if (!sessionData) {
           throw new ApiError('No valid session available', 401, false, false);
         }
@@ -94,7 +107,9 @@ export class ApiClient {
       } finally {
         // Clear the promise after a short delay to allow for retries
         setTimeout(() => {
-          this.sessionPromise = null;
+          if (this.sessionCacheGeneration === cacheGeneration) {
+            this.sessionPromise = null;
+          }
         }, 1000);
       }
     })();

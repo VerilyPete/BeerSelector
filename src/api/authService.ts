@@ -1,5 +1,5 @@
 import { saveSessionData, clearSessionData, clearAuthCookies } from './sessionManager';
-import { getApiClient } from './apiClientInstance';
+import { clearApiClientSessionCache, getApiClient } from './apiClientInstance';
 import { getPreference, setPreference } from '../database/preferences';
 import { refreshAllDataFromAPI } from '../services/dataUpdateService';
 import { SessionData, ApiError, LoginResult, LogoutResult } from '../types/api';
@@ -302,6 +302,11 @@ export async function logout(): Promise<LogoutResult> {
       };
     }
   }
+
+  // The logout request itself resolves and caches a session promise briefly.
+  // Revoke it before local deletion so no newly-started request can reuse the
+  // just-logged-out credentials from memory.
+  clearApiClientSessionCache();
 
   // Remote logout is best-effort. Each local operation is isolated so a
   // locked keychain item or database failure cannot retain the other local

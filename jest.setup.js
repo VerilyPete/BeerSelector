@@ -40,7 +40,7 @@ jest.mock('expo-secure-store', () => {
   return {
     getItemAsync: jest.fn().mockImplementation(key => {
       assertValidKey(key);
-      return Promise.resolve(secureStore[key]);
+      return Promise.resolve(secureStore[key] ?? null);
     }),
     setItemAsync: jest.fn().mockImplementation((key, value) => {
       assertValidKey(key);

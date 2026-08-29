@@ -19,6 +19,8 @@ const AUTH_COOKIES_REGISTRY_MAX_CHARS = 1500;
 type AuthCookieGeneration = {
   generation: string;
   count: number;
+  /** True when this generation atomically commits its matching session too. */
+  hasSession?: boolean;
 };
 
 export type StoredAuthCredentials = {
@@ -55,7 +57,8 @@ const isGeneration = (value: unknown): value is AuthCookieGeneration => {
     /^[A-Za-z0-9_-]+$/.test(candidate.generation) &&
     Number.isInteger(candidate.count) &&
     (candidate.count ?? 0) > 0 &&
-    (candidate.count ?? 0) <= AUTH_COOKIES_MAX_CHUNKS
+    (candidate.count ?? 0) <= AUTH_COOKIES_MAX_CHUNKS &&
+    (candidate.hasSession === undefined || typeof candidate.hasSession === 'boolean')
   );
 };
 
@@ -90,6 +93,9 @@ const parseGenerationRegistry = (value: string | null): ParsedGenerationRegistry
 const generationKey = (generation: string, index: number): string =>
   `${AUTH_COOKIES_STORAGE_KEY}_${generation}_${index}`;
 
+const generationSessionKey = (generation: string): string =>
+  `${AUTH_COOKIES_STORAGE_KEY}_${generation}_session`;
+
 const createGeneration = (): string => {
   generationSequence += 1;
   return `${Date.now().toString(36)}_${generationSequence.toString(36)}_${Math.random()
@@ -115,11 +121,15 @@ const deleteGeneration = async (entry: AuthCookieGeneration): Promise<Error[]> =
       errors.push(error instanceof Error ? error : new Error(String(error)));
     }
   }
+  try {
+    await SecureStore.deleteItemAsync(generationSessionKey(entry.generation));
+  } catch (error) {
+    errors.push(error instanceof Error ? error : new Error(String(error)));
+  }
   return errors;
 };
 
-/** Save captured authentication cookies in atomically committed chunks. */
-export const saveAuthCookies = async (cookiesJson: string): Promise<void> =>
+const saveAuthCookieGeneration = async (cookiesJson: string, sessionJson?: string): Promise<void> =>
   enqueueAuthCookieMutation(async () => {
     const chunks = chunkString(toBase64(cookiesJson), AUTH_COOKIES_CHUNK_CHARS);
     if (chunks.length > AUTH_COOKIES_MAX_CHUNKS) {
@@ -145,6 +155,7 @@ export const saveAuthCookies = async (cookiesJson: string): Promise<void> =>
       const next: AuthCookieGeneration = {
         generation: nextGeneration,
         count: chunks.length,
+        ...(sessionJson === undefined ? {} : { hasSession: true }),
       };
       const known = [...registry, next];
       const serializedRegistry = JSON.stringify(known);
@@ -159,9 +170,23 @@ export const saveAuthCookies = async (cookiesJson: string): Promise<void> =>
         await SecureStore.setItemAsync(generationKey(next.generation, index), chunks[index]);
       }
 
+      if (sessionJson !== undefined) {
+        await SecureStore.setItemAsync(generationSessionKey(next.generation), sessionJson);
+      }
+
       // This single SecureStore value is the commit point. Readers continue to
-      // use the previous generation until this write succeeds.
+      // use the previous cookie/session generation until this write succeeds.
       await SecureStore.setItemAsync(AUTH_COOKIES_META_KEY, JSON.stringify(next));
+
+      if (sessionJson !== undefined) {
+        try {
+          await SecureStore.deleteItemAsync(SESSION_STORAGE_KEY);
+        } catch (error) {
+          // Readers now follow the committed generation, so this stale
+          // compatibility value is unreachable and logout will retry it.
+          console.error('Failed to remove superseded standalone session value:', error);
+        }
+      }
 
       const failedCleanup: AuthCookieGeneration[] = [];
       for (const previous of known) {
@@ -192,6 +217,16 @@ export const saveAuthCookies = async (cookiesJson: string): Promise<void> =>
       throw error;
     }
   });
+
+/** Save captured authentication cookies in atomically committed chunks. */
+export const saveAuthCookies = async (cookiesJson: string): Promise<void> =>
+  saveAuthCookieGeneration(cookiesJson);
+
+/** Commit member cookies and their matching session behind one marker. */
+export const saveAuthCredentials = async (
+  cookiesJson: string,
+  sessionData: SessionData
+): Promise<void> => saveAuthCookieGeneration(cookiesJson, JSON.stringify(sessionData));
 
 const readAuthCookies = async (strict = false): Promise<string | null> => {
   const marker = await SecureStore.getItemAsync(AUTH_COOKIES_META_KEY);
@@ -302,11 +337,17 @@ export const clearAuthCookies = async (): Promise<void> =>
 
 /** Capture the exact credential pair so a multi-step login can roll it back. */
 export const captureStoredAuthCredentials = async (): Promise<StoredAuthCredentials> => {
-  // This is the production reader for the otherwise write-only cookie jar:
-  // failed member logins use it to restore the prior cookie/session pair.
-  const cookiesJson = await getAuthCookies({ throwOnError: true });
-  const sessionJson = await SecureStore.getItemAsync(SESSION_STORAGE_KEY);
-  return { cookiesJson, sessionJson };
+  return enqueueAuthCookieMutation(async () => {
+    const cookiesJson = await readAuthCookies(true);
+    const active = parseGeneration(await SecureStore.getItemAsync(AUTH_COOKIES_META_KEY));
+    const sessionJson = active?.hasSession
+      ? await SecureStore.getItemAsync(generationSessionKey(active.generation))
+      : await SecureStore.getItemAsync(SESSION_STORAGE_KEY);
+    if (active?.hasSession && sessionJson === null) {
+      throw new Error('Committed auth credential generation is missing its session');
+    }
+    return { cookiesJson, sessionJson };
+  });
 };
 
 /** Restore both halves of a previously captured credential pair. */
@@ -316,7 +357,9 @@ export const restoreStoredAuthCredentials = async (
   const errors: Error[] = [];
 
   try {
-    if (snapshot.cookiesJson === null) {
+    if (snapshot.cookiesJson !== null && snapshot.sessionJson !== null) {
+      await saveAuthCookieGeneration(snapshot.cookiesJson, snapshot.sessionJson);
+    } else if (snapshot.cookiesJson === null) {
       await clearAuthCookies();
     } else {
       await saveAuthCookies(snapshot.cookiesJson);
@@ -326,7 +369,9 @@ export const restoreStoredAuthCredentials = async (
   }
 
   try {
-    if (snapshot.sessionJson === null) {
+    if (snapshot.cookiesJson !== null && snapshot.sessionJson !== null) {
+      // The pair was already committed together above.
+    } else if (snapshot.sessionJson === null) {
       await SecureStore.deleteItemAsync(SESSION_STORAGE_KEY);
     } else {
       await SecureStore.setItemAsync(SESSION_STORAGE_KEY, snapshot.sessionJson);
@@ -346,7 +391,15 @@ export const restoreStoredAuthCredentials = async (
  */
 export const saveSessionData = async (sessionData: SessionData): Promise<void> => {
   try {
-    await SecureStore.setItemAsync(SESSION_STORAGE_KEY, JSON.stringify(sessionData));
+    await enqueueAuthCookieMutation(async () => {
+      const serialized = JSON.stringify(sessionData);
+      const active = parseGeneration(await SecureStore.getItemAsync(AUTH_COOKIES_META_KEY));
+      if (active?.hasSession) {
+        await SecureStore.setItemAsync(generationSessionKey(active.generation), serialized);
+      } else {
+        await SecureStore.setItemAsync(SESSION_STORAGE_KEY, serialized);
+      }
+    });
     console.log('Session data saved successfully');
   } catch (error) {
     console.error('Error saving session data:', error);
@@ -360,7 +413,13 @@ export const saveSessionData = async (sessionData: SessionData): Promise<void> =
  */
 export const getSessionData = async (): Promise<SessionData | null> => {
   try {
-    const sessionDataStr = await SecureStore.getItemAsync(SESSION_STORAGE_KEY);
+    const sessionDataStr = await enqueueAuthCookieMutation(async () => {
+      const active = parseGeneration(await SecureStore.getItemAsync(AUTH_COOKIES_META_KEY));
+      if (active?.hasSession) {
+        return SecureStore.getItemAsync(generationSessionKey(active.generation));
+      }
+      return SecureStore.getItemAsync(SESSION_STORAGE_KEY);
+    });
     if (!sessionDataStr) {
       return null;
     }
@@ -392,7 +451,21 @@ export const getSessionData = async (): Promise<SessionData | null> => {
  */
 export const clearSessionData = async (): Promise<void> => {
   try {
-    await SecureStore.deleteItemAsync(SESSION_STORAGE_KEY);
+    await enqueueAuthCookieMutation(async () => {
+      const errors: Error[] = [];
+      const active = parseGeneration(await SecureStore.getItemAsync(AUTH_COOKIES_META_KEY));
+      for (const key of [
+        SESSION_STORAGE_KEY,
+        ...(active?.hasSession ? [generationSessionKey(active.generation)] : []),
+      ]) {
+        try {
+          await SecureStore.deleteItemAsync(key);
+        } catch (error) {
+          errors.push(error instanceof Error ? error : new Error(String(error)));
+        }
+      }
+      if (errors.length > 0) throw errors[0];
+    });
     console.log('Session data cleared successfully');
   } catch (error) {
     console.error('Error clearing session data:', error);

@@ -8,8 +8,7 @@ import {
   clearAuthCookies,
   clearSessionData,
   restoreStoredAuthCredentials,
-  saveAuthCookies,
-  saveSessionData,
+  saveAuthCredentials,
   extractSessionDataFromResponse,
   type StoredAuthCredentials,
 } from '@/src/api/sessionManager';
@@ -201,9 +200,8 @@ export async function handleLoginMessage(raw: string, deps: LoginMessageDeps): P
           }
 
           previousCredentials = await captureStoredAuthCredentials();
-          await saveAuthCookies(JSON.stringify(cookies));
+          await saveAuthCredentials(JSON.stringify(cookies), sessionData);
           credentialsCommitted = true;
-          await saveSessionData(sessionData);
           console.log('Member credentials saved to SecureStore successfully');
 
           // Reopen the gate only now, with `all_beers_api_url` last — it is
@@ -215,7 +213,7 @@ export async function handleLoginMessage(raw: string, deps: LoginMessageDeps): P
           // (`dataUpdateService.ts`'s `taplistConfigurationHeld`/
           // `writeAllBeers`/`writeAllBeersOnLogin`), and only this burst —
           // not the gate-close above, not `recordUnreadLoginMetadata`, not
-          // `saveSessionData`. That guard re-reads `all_beers_api_url` while
+          // `saveAuthCredentials`. That guard re-reads `all_beers_api_url` while
           // holding the lock and compares it to the URL its rows were
           // fetched against; the comparison only means anything if the
           // write that could invalidate it cannot land mid-hold. Before
@@ -229,7 +227,7 @@ export async function handleLoginMessage(raw: string, deps: LoginMessageDeps): P
           // Scoped to just this burst on purpose. `LOCK_TIMEOUT_MS` is 15s
           // and a forced release does not hand the lock to the next
           // waiter — it blocks every database consumer until the
-          // abandoned holder itself returns. `saveSessionData` is
+          // abandoned holder itself returns. `saveAuthCredentials` is
           // uncontrolled Keychain I/O with no such bound, so it and
           // everything before it stay outside any hold.
           //
@@ -385,67 +383,91 @@ export async function handleLoginMessage(raw: string, deps: LoginMessageDeps): P
       }
 
       try {
-        const loginResult = await handleVisitorLogin(cookies);
-        console.log('Visitor login result:', loginResult);
+        const previousCredentials = await captureStoredAuthCredentials();
+        let credentialsChanged = true;
+        try {
+          // A visitor session must not retain the previous member's bearer
+          // cookie jar. Clear every local representation before committing the
+          // visitor session; restore the SecureStore snapshot if anything after
+          // this point fails.
+          await clearAuthCookies();
+          await clearSessionData();
+          await clearNativeCookies();
 
-        if (loginResult.success) {
-          // Same shape as the member branch above, and for the same reasons.
-          // Clearing `all_beers_api_url` closes the gate whichever branch
-          // `areApiUrlsConfigured` takes; the ETag is invalidated before the
-          // URL that orphans it; and the same key, written last, is the
-          // single point where this login becomes visible to routing.
-          // Under the SAME lock as the gate-open burst below. The docstring on
-          // `taplistConfigurationHeld` used to argue this write was exempt —
-          // "racing to '' unlocked only ever causes a safe, cheap abandon, never
-          // a bad commit" — which is true only if the '' lands BEFORE a writer's
-          // guard read. Landing after the guard and before the commit leaves the
-          // old store's rows, its ETag and a fresh timestamp committed under a
-          // configuration that no longer names it. Taking the lock removes the
-          // interleaving entirely: this now lands either before the guard (read
-          // as "changed", safe abandon) or after the commit completes.
-          await databaseLockManager.withDatabaseLock('login-config-commit', async () => {
-            await setPreference('all_beers_api_url', '', 'API endpoint for fetching all beers');
-          });
-          await commitTaplistWrite({ kind: 'cleared' });
+          const loginResult = await handleVisitorLogin(cookies);
+          console.log('Visitor login result:', loginResult);
 
-          // Same lock, same reasoning, as the member branch's gate-open
-          // burst above — see the comment there. No SecureStore step on
-          // this path (`handleVisitorLogin` already completed above,
-          // before the gate-close write), so there is nothing slow to keep
-          // out of the hold; the scoping still matches for consistency
-          // with the member branch and so a future addition here doesn't
-          // have to rediscover why it's scoped this way.
-          await databaseLockManager.withDatabaseLock('login-config-commit', async () => {
-            await setPreference(
-              'is_visitor_mode',
-              'true',
-              'Flag indicating whether the user is in visitor mode'
+          if (loginResult.success) {
+            // Same shape as the member branch above, and for the same reasons.
+            // Clearing `all_beers_api_url` closes the gate whichever branch
+            // `areApiUrlsConfigured` takes; the ETag is invalidated before the
+            // URL that orphans it; and the same key, written last, is the
+            // single point where this login becomes visible to routing.
+            // Under the SAME lock as the gate-open burst below. The docstring on
+            // `taplistConfigurationHeld` used to argue this write was exempt —
+            // "racing to '' unlocked only ever causes a safe, cheap abandon, never
+            // a bad commit" — which is true only if the '' lands BEFORE a writer's
+            // guard read. Landing after the guard and before the commit leaves the
+            // old store's rows, its ETag and a fresh timestamp committed under a
+            // configuration that no longer names it. Taking the lock removes the
+            // interleaving entirely: this now lands either before the guard (read
+            // as "changed", safe abandon) or after the commit completes.
+            await databaseLockManager.withDatabaseLock('login-config-commit', async () => {
+              await setPreference('all_beers_api_url', '', 'API endpoint for fetching all beers');
+            });
+            await commitTaplistWrite({ kind: 'cleared' });
+
+            // Same lock, same reasoning, as the member branch's gate-open
+            // burst above — see the comment there. Credential replacement and
+            // `handleVisitorLogin` both complete before this hold, so no
+            // Keychain I/O is allowed to extend the database critical section.
+            await databaseLockManager.withDatabaseLock('login-config-commit', async () => {
+              await setPreference(
+                'is_visitor_mode',
+                'true',
+                'Flag indicating whether the user is in visitor mode'
+              );
+              await setPreference(
+                'my_beers_api_url',
+                'none://visitor_mode',
+                'Placeholder URL for visitor mode (not a real endpoint)'
+              );
+
+              const storeJsonUrl = `https://fsbs.beerknurd.com/bk-store-json.php?sid=${storeId}`;
+              console.log('Setting all_beers_api_url to:', storeJsonUrl);
+              await setPreference(
+                'all_beers_api_url',
+                storeJsonUrl,
+                'API endpoint for fetching all beers'
+              );
+            });
+
+            deps.clearProcessedUrls();
+
+            deps.onLoginSuccess();
+            credentialsChanged = false;
+          } else {
+            await restoreStoredAuthCredentials(previousCredentials);
+            credentialsChanged = false;
+            Alert.alert(
+              'Visitor Login Failed',
+              loginResult.error || 'Could not log in as visitor. Please try again.',
+              [{ text: 'OK' }]
             );
-            await setPreference(
-              'my_beers_api_url',
-              'none://visitor_mode',
-              'Placeholder URL for visitor mode (not a real endpoint)'
-            );
-
-            const storeJsonUrl = `https://fsbs.beerknurd.com/bk-store-json.php?sid=${storeId}`;
-            console.log('Setting all_beers_api_url to:', storeJsonUrl);
-            await setPreference(
-              'all_beers_api_url',
-              storeJsonUrl,
-              'API endpoint for fetching all beers'
-            );
-          });
-
-          deps.clearProcessedUrls();
-
-          deps.onLoginSuccess();
-        } else {
-          Alert.alert(
-            'Visitor Login Failed',
-            loginResult.error || 'Could not log in as visitor. Please try again.',
-            [{ text: 'OK' }]
-          );
-          deps.onLoginCancel();
+            deps.onLoginCancel();
+          }
+        } catch (error) {
+          if (credentialsChanged) {
+            try {
+              await restoreStoredAuthCredentials(previousCredentials);
+            } catch (rollbackError) {
+              console.error(
+                'Failed to restore credentials after visitor login failure:',
+                rollbackError
+              );
+            }
+          }
+          throw error;
         }
       } catch (error) {
         console.error('Error during visitor login:', error);

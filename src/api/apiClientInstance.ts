@@ -7,4 +7,8 @@ export function getApiClient(): ApiClient {
     apiClientInstance = ApiClient.getInstance();
   }
   return apiClientInstance;
-} 
+}
+
+export function clearApiClientSessionCache(): void {
+  apiClientInstance?.clearSessionCache();
+}

@@ -10,6 +10,7 @@ import { getPreference, setPreference } from '@/src/database/preferences';
 import { commitTaplistWrite } from '@/src/services/taplistEtag';
 import { createMockSession } from '@/src/api/mockSession';
 import { clearAuthCookies, clearSessionData } from '@/src/api/sessionManager';
+import { clearNativeCookies } from '@/src/api/nativeCookieManager';
 import { databaseLockManager } from '@/src/database/DatabaseLockManager';
 import SettingsSection from './SettingsSection';
 import SettingsItem from './SettingsItem';
@@ -185,6 +186,7 @@ Tasted Beers: ${lastMyBeersRefresh ? new Date(parseInt(lastMyBeersRefresh)).toLo
               const credentialCleanup = await Promise.allSettled([
                 clearSessionData(),
                 clearAuthCookies(),
+                clearNativeCookies(),
               ]);
               const credentialCleanupFailure = credentialCleanup.find(
                 result => result.status === 'rejected'
@@ -318,6 +320,7 @@ Tasted Beers: ${lastMyBeersRefresh ? new Date(parseInt(lastMyBeersRefresh)).toLo
           disabled={isLoading}
           destructive
           showSeparator={false}
+          testID="reset-first-run-button"
         />
       </SettingsSection>
 

@@ -1,7 +1,7 @@
 import { vi, type Mock, describe, it, expect, beforeEach } from 'vitest';
 import { autoLogin, login, logout, handleTapThatAppLogin } from '../authService';
 import { saveSessionData, clearSessionData, clearAuthCookies } from '../sessionManager';
-import { getApiClient } from '../apiClientInstance';
+import { clearApiClientSessionCache, getApiClient } from '../apiClientInstance';
 import { ApiError, SessionData } from '../../types/api';
 import { getPreference, setPreference } from '../../database/preferences';
 import { refreshAllDataFromAPI } from '../../services/dataUpdateService';
@@ -16,6 +16,7 @@ vi.mock('../sessionManager', () => ({
 
 vi.mock('../apiClientInstance', () => ({
   getApiClient: vi.fn(),
+  clearApiClientSessionCache: vi.fn(),
 }));
 
 vi.mock('../nativeCookieManager', () => ({
@@ -57,6 +58,7 @@ describe('authService', () => {
     (clearSessionData as Mock).mockResolvedValue(undefined);
     (clearAuthCookies as Mock).mockResolvedValue(undefined);
     (clearNativeCookies as Mock).mockResolvedValue(undefined);
+    (clearApiClientSessionCache as Mock).mockReturnValue(undefined);
   });
 
   describe('autoLogin', () => {
@@ -245,6 +247,7 @@ describe('authService', () => {
       expect(clearSessionData).toHaveBeenCalled();
       expect(clearAuthCookies).toHaveBeenCalled();
       expect(clearNativeCookies).toHaveBeenCalled();
+      expect(clearApiClientSessionCache).toHaveBeenCalledTimes(1);
 
       // Check that the result is correct
       expect(result).toEqual({
