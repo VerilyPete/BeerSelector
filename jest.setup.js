@@ -58,6 +58,13 @@ jest.mock('expo-secure-store', () => {
   };
 });
 
+jest.mock('@preeternal/react-native-cookie-manager', () => ({
+  __esModule: true,
+  default: {
+    clearAllStores: jest.fn().mockResolvedValue(true),
+  },
+}));
+
 // Mock the expo-constants module
 jest.mock('expo-constants', () => ({
   expoConfig: {

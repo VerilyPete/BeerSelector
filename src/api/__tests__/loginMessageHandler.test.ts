@@ -4,11 +4,14 @@ import { handleLoginMessage, type LoginMessageDeps } from '../loginMessageHandle
 import { setPreference } from '@/src/database/preferences';
 import { commitTaplistWrite } from '@/src/services/taplistEtag';
 import {
+  captureStoredAuthCredentials,
+  restoreStoredAuthCredentials,
   saveAuthCookies,
   saveSessionData,
   extractSessionDataFromResponse,
 } from '@/src/api/sessionManager';
 import { handleVisitorLogin } from '@/src/api/authService';
+import { clearNativeCookies } from '@/src/api/nativeCookieManager';
 // Deliberately NOT mocked. The behaviour under test — that the gate-open
 // write genuinely queues behind a concurrent lock holder rather than merely
 // running after it in program order — only exists in the real FIFO queue.
@@ -41,6 +44,13 @@ vi.mock('@/src/services/taplistEtag', () => ({
 }));
 
 vi.mock('@/src/api/sessionManager', () => ({
+  captureStoredAuthCredentials: vi.fn().mockResolvedValue({
+    cookiesJson: '{"PHPSESSID":"previous"}',
+    sessionJson: '{"sessionId":"previous"}',
+  }),
+  restoreStoredAuthCredentials: vi.fn().mockResolvedValue(undefined),
+  clearAuthCookies: vi.fn().mockResolvedValue(undefined),
+  clearSessionData: vi.fn().mockResolvedValue(undefined),
   saveAuthCookies: vi.fn().mockResolvedValue(undefined),
   saveSessionData: vi.fn().mockResolvedValue(undefined),
   extractSessionDataFromResponse: vi.fn().mockReturnValue({
@@ -49,6 +59,10 @@ vi.mock('@/src/api/sessionManager', () => ({
     storeId: '67',
     storeName: 'Test Store',
   }),
+}));
+
+vi.mock('@/src/api/nativeCookieManager', () => ({
+  clearNativeCookies: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('@/src/api/authService', () => ({
@@ -117,6 +131,12 @@ describe('handleLoginMessage', () => {
     // -independent.
     (setPreference as Mock).mockResolvedValue(undefined);
     (commitTaplistWrite as Mock).mockResolvedValue(undefined);
+    (captureStoredAuthCredentials as Mock).mockResolvedValue({
+      cookiesJson: '{"PHPSESSID":"previous"}',
+      sessionJson: '{"sessionId":"previous"}',
+    });
+    (restoreStoredAuthCredentials as Mock).mockResolvedValue(undefined);
+    (clearNativeCookies as Mock).mockResolvedValue(undefined);
     (saveAuthCookies as Mock).mockResolvedValue(undefined);
     (saveSessionData as Mock).mockResolvedValue(undefined);
     (extractSessionDataFromResponse as Mock).mockReturnValue(defaultSessionData);
@@ -404,6 +424,32 @@ describe('handleLoginMessage', () => {
         ([key]) => key === 'all_beers_api_url'
       );
       expect(gateWrites.every(([, value]) => !value)).toBe(true);
+      expect(deps.onLoginSuccess).not.toHaveBeenCalled();
+      expect(restoreStoredAuthCredentials).toHaveBeenCalledWith({
+        cookiesJson: '{"PHPSESSID":"previous"}',
+        sessionJson: '{"sessionId":"previous"}',
+      });
+      expect(clearNativeCookies).toHaveBeenCalled();
+    });
+
+    it('restores the previous credential pair when configuration fails after storage', async () => {
+      (setPreference as Mock).mockImplementation((key: string, value: string) =>
+        key === 'all_beers_api_url' && value
+          ? Promise.reject(new Error('configuration write failed'))
+          : Promise.resolve(undefined)
+      );
+
+      const deps = createDeps();
+      await handleLoginMessage(memberLoginRaw, deps);
+
+      expect(saveAuthCookies).toHaveBeenCalled();
+      expect(saveSessionData).toHaveBeenCalled();
+      expect(restoreStoredAuthCredentials).toHaveBeenCalledWith({
+        cookiesJson: '{"PHPSESSID":"previous"}',
+        sessionJson: '{"sessionId":"previous"}',
+      });
+      expect(clearNativeCookies).toHaveBeenCalled();
+      expect(deps.onLoginCancel).toHaveBeenCalled();
       expect(deps.onLoginSuccess).not.toHaveBeenCalled();
     });
 

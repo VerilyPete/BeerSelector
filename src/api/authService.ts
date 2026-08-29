@@ -3,6 +3,7 @@ import { getApiClient } from './apiClientInstance';
 import { getPreference, setPreference } from '../database/preferences';
 import { refreshAllDataFromAPI } from '../services/dataUpdateService';
 import { SessionData, ApiError, LoginResult, LogoutResult } from '../types/api';
+import { clearNativeCookies } from './nativeCookieManager';
 
 // Using LoginResult interface from ../types/api
 
@@ -307,6 +308,7 @@ export async function logout(): Promise<LogoutResult> {
   // credentials/state.
   const cleanupErrors: Error[] = [];
   const cleanupOperations: (() => Promise<void>)[] = [
+    clearNativeCookies,
     clearSessionData,
     clearAuthCookies,
     () =>

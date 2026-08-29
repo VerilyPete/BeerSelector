@@ -4,12 +4,18 @@ import { commitTaplistWrite } from '@/src/services/taplistEtag';
 import { databaseLockManager } from '@/src/database/DatabaseLockManager';
 import { handleVisitorLogin } from '@/src/api/authService';
 import {
+  captureStoredAuthCredentials,
+  clearAuthCookies,
+  clearSessionData,
+  restoreStoredAuthCredentials,
   saveAuthCookies,
   saveSessionData,
   extractSessionDataFromResponse,
+  type StoredAuthCredentials,
 } from '@/src/api/sessionManager';
 import { isSessionData } from '@/src/types/api';
 import { createErrorResponse, getUserFriendlyErrorMessage } from '@/src/utils/notificationUtils';
+import { clearNativeCookies } from '@/src/api/nativeCookieManager';
 
 /**
  * The login WebView's message handling, lifted out of the component.
@@ -123,6 +129,8 @@ export async function handleLoginMessage(raw: string, deps: LoginMessageDeps): P
       console.log('Cookies received:', Object.keys(cookies || {}).join(', '));
 
       if (userJsonUrl && storeJsonUrl) {
+        let previousCredentials: StoredAuthCredentials | null = null;
+        let credentialsCommitted = false;
         try {
           // The ETag is scoped to a store; the preference key is not. The
           // rows and the stored ETag still correspond to each other — what
@@ -192,7 +200,9 @@ export async function handleLoginMessage(raw: string, deps: LoginMessageDeps): P
             );
           }
 
+          previousCredentials = await captureStoredAuthCredentials();
           await saveAuthCookies(JSON.stringify(cookies));
+          credentialsCommitted = true;
           await saveSessionData(sessionData);
           console.log('Member credentials saved to SecureStore successfully');
 
@@ -281,6 +291,34 @@ export async function handleLoginMessage(raw: string, deps: LoginMessageDeps): P
 
           deps.onLoginSuccess();
         } catch (error) {
+          try {
+            // The message is sent only after the WebView has authenticated.
+            // If any later commit fails, revoke that native/WebKit session as
+            // well as rolling back the SecureStore pair below.
+            await clearNativeCookies();
+          } catch (nativeCookieError) {
+            console.error(
+              'Failed to clear native cookies after member login failure:',
+              nativeCookieError
+            );
+          }
+          if (credentialsCommitted && previousCredentials) {
+            try {
+              await restoreStoredAuthCredentials(previousCredentials);
+            } catch (rollbackError) {
+              // The restore attempts both halves before rejecting. Keep the
+              // original login error user-facing and record the rollback
+              // failure separately for diagnosis.
+              console.error(
+                'Failed to restore credentials after member login failure:',
+                rollbackError
+              );
+            }
+          } else if (credentialsCommitted) {
+            // Defensive fallback: a committed cookie generation must never be
+            // retained if its matching pre-login state could not be captured.
+            await Promise.allSettled([clearAuthCookies(), clearSessionData()]);
+          }
           // The member branch used to be the only path here that said
           // nothing: the modal closed and the user was returned to Settings
           // with no indication that anything had failed. The visitor branch

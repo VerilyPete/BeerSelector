@@ -1,6 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as SecureStore from 'expo-secure-store';
-import { clearAuthCookies, getAuthCookies, saveAuthCookies } from '../sessionManager';
+import {
+  captureStoredAuthCredentials,
+  clearAuthCookies,
+  getAuthCookies,
+  restoreStoredAuthCredentials,
+  saveAuthCookies,
+} from '../sessionManager';
 
 const { mockStore, mockState, assertSecureStoreKey } = vi.hoisted(() => {
   const store = new Map<string, string>();
@@ -98,6 +104,21 @@ describe('auth cookie SecureStore', () => {
     await expect(getAuthCookies()).resolves.toBe(oldCookies);
   });
 
+  it('captures and restores the cookie and session as one credential pair', async () => {
+    const oldCookies = JSON.stringify({ PHPSESSID: 'old' });
+    const oldSession = JSON.stringify({ sessionId: 'old' });
+    await saveAuthCookies(oldCookies);
+    mockStore.set('beerknurd_session', oldSession);
+    const snapshot = await captureStoredAuthCredentials();
+
+    await saveAuthCookies(JSON.stringify({ PHPSESSID: 'new' }));
+    mockStore.set('beerknurd_session', JSON.stringify({ sessionId: 'new' }));
+    await restoreStoredAuthCredentials(snapshot);
+
+    await expect(getAuthCookies()).resolves.toBe(oldCookies);
+    expect(mockStore.get('beerknurd_session')).toBe(oldSession);
+  });
+
   it('keeps the prior generation readable when the commit marker write fails', async () => {
     const oldCookies = JSON.stringify({ PHPSESSID: 'old' });
     await saveAuthCookies(oldCookies);
@@ -164,6 +185,32 @@ describe('auth cookie SecureStore', () => {
     await expect(clearAuthCookies()).rejects.toThrow('registry read failed');
 
     expect(mockStore.get(REGISTRY_KEY)).toBe(registry);
+  });
+
+  it('refuses to overwrite a malformed registry or orphan its chunks', async () => {
+    mockStore.set(REGISTRY_KEY, '[{"generation":"known","count":1},{"bad":true}]');
+    mockStore.set('beerknurd_auth_cookies_known_0', 'YQ==');
+    const before = new Map(mockStore);
+
+    await expect(saveAuthCookies('{"PHPSESSID":"new"}')).rejects.toThrow(
+      'registry is malformed'
+    );
+
+    expect(mockStore).toEqual(before);
+    expect(SecureStore.setItemAsync).not.toHaveBeenCalled();
+    expect(SecureStore.deleteItemAsync).not.toHaveBeenCalled();
+  });
+
+  it('revokes the active generation but preserves a malformed registry for recovery', async () => {
+    mockStore.set(REGISTRY_KEY, '{bad json');
+    mockStore.set(META_KEY, JSON.stringify({ generation: 'known', count: 1 }));
+    mockStore.set('beerknurd_auth_cookies_known_0', 'YQ==');
+    await expect(clearAuthCookies()).rejects.toThrow('registry is malformed');
+
+    expect(mockStore.get(REGISTRY_KEY)).toBe('{bad json');
+    expect(mockStore.has(META_KEY)).toBe(false);
+    expect(mockStore.has('beerknurd_auth_cookies_known_0')).toBe(false);
+    expect(SecureStore.setItemAsync).not.toHaveBeenCalled();
   });
 
   it('keeps a committed generation usable when stale cleanup fails', async () => {

@@ -1,5 +1,5 @@
-import React, { useEffect } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, ScrollView } from 'react-native';
+import React, { useCallback, useEffect } from 'react';
+import { Alert, StyleSheet, View, Text, TouchableOpacity, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -17,6 +17,7 @@ import { useLoginFlow } from '@/hooks/useLoginFlow';
 import { useSettingsState } from '@/hooks/useSettingsState';
 import { useSettingsRefresh } from '@/hooks/useSettingsRefresh';
 import { useAppContext } from '@/context/AppContext';
+import { logout } from '@/src/api/authService';
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
@@ -50,6 +51,18 @@ export default function SettingsScreen() {
       startMemberLogin();
     }
   }, [action, startMemberLogin]);
+
+  const handleLogout = useCallback(async () => {
+    const result = await logout();
+    await refreshSession();
+
+    if (!result.success) {
+      Alert.alert(
+        'Logout Incomplete',
+        result.error || 'Your local session was cleared, but remote logout did not complete.'
+      );
+    }
+  }, [refreshSession]);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -106,6 +119,7 @@ export default function SettingsScreen() {
             onRefresh={handleRefresh}
             isFirstLogin={isFirstLogin}
             onLogin={startMemberLogin}
+            onLogout={handleLogout}
             canGoBack={canGoBack}
             onGoHome={() => router.replace('/(tabs)')}
           />

@@ -5,6 +5,7 @@ import { getApiClient } from '../apiClientInstance';
 import { ApiError, SessionData } from '../../types/api';
 import { getPreference, setPreference } from '../../database/preferences';
 import { refreshAllDataFromAPI } from '../../services/dataUpdateService';
+import { clearNativeCookies } from '../nativeCookieManager';
 
 // Mock dependencies
 vi.mock('../sessionManager', () => ({
@@ -15,6 +16,10 @@ vi.mock('../sessionManager', () => ({
 
 vi.mock('../apiClientInstance', () => ({
   getApiClient: vi.fn(),
+}));
+
+vi.mock('../nativeCookieManager', () => ({
+  clearNativeCookies: vi.fn().mockResolvedValue(undefined),
 }));
 
 // Mock database functions
@@ -51,6 +56,7 @@ describe('authService', () => {
     (refreshAllDataFromAPI as Mock).mockResolvedValue(undefined);
     (clearSessionData as Mock).mockResolvedValue(undefined);
     (clearAuthCookies as Mock).mockResolvedValue(undefined);
+    (clearNativeCookies as Mock).mockResolvedValue(undefined);
   });
 
   describe('autoLogin', () => {
@@ -238,6 +244,7 @@ describe('authService', () => {
       // Check that session data was cleared
       expect(clearSessionData).toHaveBeenCalled();
       expect(clearAuthCookies).toHaveBeenCalled();
+      expect(clearNativeCookies).toHaveBeenCalled();
 
       // Check that the result is correct
       expect(result).toEqual({
@@ -262,6 +269,7 @@ describe('authService', () => {
       });
       expect(clearSessionData).toHaveBeenCalled();
       expect(clearAuthCookies).toHaveBeenCalled();
+      expect(clearNativeCookies).toHaveBeenCalled();
       expect(setPreference).toHaveBeenCalledWith(
         'is_visitor_mode',
         'false',
@@ -340,6 +348,7 @@ describe('authService', () => {
     });
 
     it.each([
+      ['native cookie cleanup', clearNativeCookies as Mock],
       ['auth cookie cleanup', clearAuthCookies as Mock],
       ['visitor-mode cleanup', setPreference as Mock],
     ])('continues cleanup when %s fails', async (_label, failingCleanup) => {

@@ -21,6 +21,16 @@ type AuthCookieGeneration = {
   count: number;
 };
 
+export type StoredAuthCredentials = {
+  cookiesJson: string | null;
+  sessionJson: string | null;
+};
+
+type ParsedGenerationRegistry =
+  | { status: 'missing'; entries: AuthCookieGeneration[] }
+  | { status: 'valid'; entries: AuthCookieGeneration[] }
+  | { status: 'malformed' };
+
 let generationSequence = 0;
 let authCookieMutation: Promise<void> = Promise.resolve();
 
@@ -59,13 +69,21 @@ const parseGeneration = (value: string | null): AuthCookieGeneration | null => {
   }
 };
 
-const parseGenerationRegistry = (value: string | null): AuthCookieGeneration[] => {
-  if (!value) return [];
+const parseGenerationRegistry = (value: string | null): ParsedGenerationRegistry => {
+  if (value === null) return { status: 'missing', entries: [] };
   try {
     const parsed: unknown = JSON.parse(value);
-    return Array.isArray(parsed) ? parsed.filter(isGeneration) : [];
+    if (!Array.isArray(parsed) || !parsed.every(isGeneration)) {
+      return { status: 'malformed' };
+    }
+
+    const entries = parsed as AuthCookieGeneration[];
+    if (new Set(entries.map(entry => entry.generation)).size !== entries.length) {
+      return { status: 'malformed' };
+    }
+    return { status: 'valid', entries };
   } catch {
-    return [];
+    return { status: 'malformed' };
   }
 };
 
@@ -109,9 +127,13 @@ export const saveAuthCookies = async (cookiesJson: string): Promise<void> =>
     }
 
     try {
-      const registry = parseGenerationRegistry(
+      const parsedRegistry = parseGenerationRegistry(
         await SecureStore.getItemAsync(AUTH_COOKIES_GENERATIONS_KEY)
       );
+      if (parsedRegistry.status === 'malformed') {
+        throw new Error('Auth cookie generation registry is malformed; refusing to overwrite it');
+      }
+      const registry = parsedRegistry.entries;
       const active = parseGeneration(await SecureStore.getItemAsync(AUTH_COOKIES_META_KEY));
       if (active && !registry.some(entry => entry.generation === active.generation)) {
         registry.push(active);
@@ -171,24 +193,39 @@ export const saveAuthCookies = async (cookiesJson: string): Promise<void> =>
     }
   });
 
+const readAuthCookies = async (strict = false): Promise<string | null> => {
+  const marker = await SecureStore.getItemAsync(AUTH_COOKIES_META_KEY);
+  if (marker === null) return null;
+  const active = parseGeneration(marker);
+  if (!active) {
+    if (strict) throw new Error('Auth cookie commit marker is malformed');
+    return null;
+  }
+
+  const chunks: string[] = [];
+  for (let index = 0; index < active.count; index += 1) {
+    const chunk = await SecureStore.getItemAsync(generationKey(active.generation, index));
+    // Empty strings are valid stored values. SecureStore uses null—not an
+    // empty string—to report a missing key.
+    if (chunk === null) {
+      if (strict) throw new Error('Auth cookie generation is incomplete');
+      return null;
+    }
+    chunks.push(chunk);
+  }
+  return fromBase64(chunks.join(''));
+};
+
 /** Read only the generation named by the committed marker. */
-export const getAuthCookies = async (): Promise<string | null> =>
+export const getAuthCookies = async (
+  options: { throwOnError?: boolean } = {}
+): Promise<string | null> =>
   enqueueAuthCookieMutation(async () => {
     try {
-      const active = parseGeneration(await SecureStore.getItemAsync(AUTH_COOKIES_META_KEY));
-      if (!active) return null;
-
-      const chunks: string[] = [];
-      for (let index = 0; index < active.count; index += 1) {
-        const chunk = await SecureStore.getItemAsync(generationKey(active.generation, index));
-        // Empty strings are valid stored values. SecureStore uses null—not an
-        // empty string—to report a missing key.
-        if (chunk === null) return null;
-        chunks.push(chunk);
-      }
-      return fromBase64(chunks.join(''));
+      return await readAuthCookies(options.throwOnError);
     } catch (error) {
       console.error('Error getting auth cookies:', error);
+      if (options.throwOnError) throw error;
       return null;
     }
   });
@@ -201,9 +238,13 @@ export const clearAuthCookies = async (): Promise<void> =>
     let registryReadSucceeded = false;
 
     try {
-      registry = parseGenerationRegistry(
+      const parsedRegistry = parseGenerationRegistry(
         await SecureStore.getItemAsync(AUTH_COOKIES_GENERATIONS_KEY)
       );
+      if (parsedRegistry.status === 'malformed') {
+        throw new Error('Auth cookie generation registry is malformed; refusing to delete it');
+      }
+      registry = parsedRegistry.entries;
       registryReadSucceeded = true;
     } catch (error) {
       errors.push(error instanceof Error ? error : new Error(String(error)));
@@ -246,8 +287,9 @@ export const clearAuthCookies = async (): Promise<void> =>
           await SecureStore.deleteItemAsync(AUTH_COOKIES_GENERATIONS_KEY);
         }
       }
-      // Otherwise preserve the unread registry so a later logout can retry
-      // orphaned generations rather than erasing the only record of their keys.
+      // Otherwise preserve the unread/malformed registry so recovery still has
+      // the only record of interrupted generations. The active marker and any
+      // independently readable active generation are still removed above.
     } catch (error) {
       errors.push(error instanceof Error ? error : new Error(String(error)));
     }
@@ -257,6 +299,46 @@ export const clearAuthCookies = async (): Promise<void> =>
       throw errors[0];
     }
   });
+
+/** Capture the exact credential pair so a multi-step login can roll it back. */
+export const captureStoredAuthCredentials = async (): Promise<StoredAuthCredentials> => {
+  // This is the production reader for the otherwise write-only cookie jar:
+  // failed member logins use it to restore the prior cookie/session pair.
+  const cookiesJson = await getAuthCookies({ throwOnError: true });
+  const sessionJson = await SecureStore.getItemAsync(SESSION_STORAGE_KEY);
+  return { cookiesJson, sessionJson };
+};
+
+/** Restore both halves of a previously captured credential pair. */
+export const restoreStoredAuthCredentials = async (
+  snapshot: StoredAuthCredentials
+): Promise<void> => {
+  const errors: Error[] = [];
+
+  try {
+    if (snapshot.cookiesJson === null) {
+      await clearAuthCookies();
+    } else {
+      await saveAuthCookies(snapshot.cookiesJson);
+    }
+  } catch (error) {
+    errors.push(error instanceof Error ? error : new Error(String(error)));
+  }
+
+  try {
+    if (snapshot.sessionJson === null) {
+      await SecureStore.deleteItemAsync(SESSION_STORAGE_KEY);
+    } else {
+      await SecureStore.setItemAsync(SESSION_STORAGE_KEY, snapshot.sessionJson);
+    }
+  } catch (error) {
+    errors.push(error instanceof Error ? error : new Error(String(error)));
+  }
+
+  if (errors.length > 0) {
+    throw errors[0];
+  }
+};
 
 /**
  * Saves session data to secure storage

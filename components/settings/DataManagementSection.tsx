@@ -12,6 +12,7 @@ type DataManagementSectionProps = {
   onRefresh: () => Promise<void>;
   isFirstLogin: boolean;
   onLogin: () => void;
+  onLogout: () => void;
   canGoBack: boolean;
   onGoHome: () => void;
   style?: ViewStyle;
@@ -24,6 +25,7 @@ export default function DataManagementSection({
   onRefresh,
   isFirstLogin,
   onLogin,
+  onLogout,
   canGoBack,
   onGoHome,
   style,
@@ -106,7 +108,7 @@ export default function DataManagementSection({
               borderColor: 'rgba(255, 153, 153, 0.37)',
             },
           ]}
-          onPress={onLogin}
+          onPress={onLogout}
           activeOpacity={0.8}
           testID="logout-button"
         >

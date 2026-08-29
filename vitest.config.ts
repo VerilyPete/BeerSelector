@@ -43,6 +43,14 @@ export default defineConfig({
           .pathname,
       },
       {
+        // TurboModule-backed in production; logic suites use an observable stub.
+        find: /^@preeternal\/react-native-cookie-manager$/,
+        replacement: new URL(
+          './src/__vitest__/react-native-cookie-manager-stub.ts',
+          import.meta.url
+        ).pathname,
+      },
+      {
         // tsconfig's `@/*` -> `./*`; vite does not read tsconfig paths.
         find: /^@\//,
         replacement: new URL('./', import.meta.url).pathname,
