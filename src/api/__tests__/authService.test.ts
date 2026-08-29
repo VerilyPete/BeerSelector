@@ -6,6 +6,7 @@ import { ApiError, SessionData } from '../../types/api';
 import { getPreference, setPreference } from '../../database/preferences';
 import { refreshAllDataFromAPI } from '../../services/dataUpdateService';
 import { clearNativeCookies } from '../nativeCookieManager';
+import { Platform } from 'react-native';
 
 // Mock dependencies
 vi.mock('../sessionManager', () => ({
@@ -50,6 +51,7 @@ describe('authService', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    (Platform as { OS: string }).OS = 'ios';
     (getApiClient as Mock).mockReturnValue(mockApiClient);
     // Reset database mocks to default values
     (getPreference as Mock).mockResolvedValue(null);
@@ -255,6 +257,36 @@ describe('authService', () => {
         message: 'Logout successful',
         statusCode: 200,
       });
+    });
+
+    it('uses successful remote logout as the browser cookie revocation mechanism', async () => {
+      (Platform as { OS: string }).OS = 'web';
+      mockApiClient.post.mockResolvedValueOnce({ success: true, statusCode: 200 });
+
+      await expect(logout()).resolves.toMatchObject({ success: true });
+
+      expect(clearNativeCookies).not.toHaveBeenCalled();
+      expect(clearSessionData).toHaveBeenCalled();
+      expect(clearAuthCookies).toHaveBeenCalled();
+    });
+
+    it('reports that browser cookies cannot be locally revoked after remote failure', async () => {
+      (Platform as { OS: string }).OS = 'web';
+      mockApiClient.post.mockResolvedValueOnce({
+        success: false,
+        error: 'Remote logout failed',
+        statusCode: 503,
+      });
+      (clearNativeCookies as Mock).mockRejectedValueOnce(
+        new Error('Browser authentication cookies require a successful server-side logout')
+      );
+
+      await expect(logout()).resolves.toMatchObject({
+        success: false,
+        error: expect.stringContaining('Browser authentication cookies require'),
+      });
+
+      expect(clearNativeCookies).toHaveBeenCalledTimes(1);
     });
 
     it('should handle API errors during logout', async () => {

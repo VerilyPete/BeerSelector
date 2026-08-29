@@ -4,6 +4,7 @@ import { getPreference, setPreference } from '../database/preferences';
 import { refreshAllDataFromAPI } from '../services/dataUpdateService';
 import { SessionData, ApiError, LoginResult, LogoutResult } from '../types/api';
 import { clearNativeCookies } from './nativeCookieManager';
+import { Platform } from 'react-native';
 
 // Using LoginResult interface from ../types/api
 
@@ -313,7 +314,11 @@ export async function logout(): Promise<LogoutResult> {
   // credentials/state.
   const cleanupErrors: Error[] = [];
   const cleanupOperations: (() => Promise<void>)[] = [
-    clearNativeCookies,
+    // Browser code cannot delete HttpOnly or authentication-origin cookies.
+    // A successful remote response is the browser's revocation mechanism; if
+    // it failed, run the local helper so the result explicitly reports that
+    // browser-cookie cleanup could not be guaranteed.
+    ...(Platform.OS !== 'web' || remoteFailure ? [clearNativeCookies] : []),
     clearSessionData,
     clearAuthCookies,
     () =>

@@ -1,5 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
 import { SessionData, isSessionData } from '../types/api';
+import { invalidateSessionCache } from './sessionCacheEpoch';
 
 // Session storage key
 const SESSION_STORAGE_KEY = 'beerknurd_session';
@@ -179,6 +180,12 @@ const saveAuthCookieGeneration = async (cookiesJson: string, sessionJson?: strin
       await SecureStore.setItemAsync(AUTH_COOKIES_META_KEY, JSON.stringify(next));
 
       if (sessionJson !== undefined) {
+        // The marker made a different credential pair visible. Revoke cached
+        // and in-flight reads before any post-login refresh can start.
+        invalidateSessionCache();
+      }
+
+      if (sessionJson !== undefined) {
         try {
           await SecureStore.deleteItemAsync(SESSION_STORAGE_KEY);
         } catch (error) {
@@ -268,6 +275,9 @@ export const getAuthCookies = async (
 /** Remove every registered cookie generation, without short-circuiting. */
 export const clearAuthCookies = async (): Promise<void> =>
   enqueueAuthCookieMutation(async () => {
+    // A committed cookie generation may own the active session as well. Revoke
+    // the process cache before deleting its marker or session value.
+    invalidateSessionCache();
     const errors: Error[] = [];
     let registry: AuthCookieGeneration[] = [];
     let registryReadSucceeded = false;
@@ -277,10 +287,15 @@ export const clearAuthCookies = async (): Promise<void> =>
         await SecureStore.getItemAsync(AUTH_COOKIES_GENERATIONS_KEY)
       );
       if (parsedRegistry.status === 'malformed') {
-        throw new Error('Auth cookie generation registry is malformed; refusing to delete it');
+        // An unreadable registry cannot support a future cleanup retry. Record
+        // the incomplete cleanup, but remove/replace the poisoned value below
+        // so subsequent logout and login attempts can recover.
+        registryReadSucceeded = true;
+        errors.push(new Error('Auth cookie generation registry was malformed and has been reset'));
+      } else {
+        registry = parsedRegistry.entries;
+        registryReadSucceeded = true;
       }
-      registry = parsedRegistry.entries;
-      registryReadSucceeded = true;
     } catch (error) {
       errors.push(error instanceof Error ? error : new Error(String(error)));
     }
@@ -322,9 +337,9 @@ export const clearAuthCookies = async (): Promise<void> =>
           await SecureStore.deleteItemAsync(AUTH_COOKIES_GENERATIONS_KEY);
         }
       }
-      // Otherwise preserve the unread/malformed registry so recovery still has
-      // the only record of interrupted generations. The active marker and any
-      // independently readable active generation are still removed above.
+      // Otherwise preserve an unreadable registry: a transient keychain read
+      // failure may succeed on retry. A successfully read but malformed value
+      // is reset above because preserving it would permanently block all saves.
     } catch (error) {
       errors.push(error instanceof Error ? error : new Error(String(error)));
     }
@@ -400,6 +415,7 @@ export const saveSessionData = async (sessionData: SessionData): Promise<void> =
         await SecureStore.setItemAsync(SESSION_STORAGE_KEY, serialized);
       }
     });
+    invalidateSessionCache();
     console.log('Session data saved successfully');
   } catch (error) {
     console.error('Error saving session data:', error);
@@ -451,6 +467,8 @@ export const getSessionData = async (): Promise<SessionData | null> => {
  */
 export const clearSessionData = async (): Promise<void> => {
   try {
+    // Revoke immediately, before waiting behind another SecureStore mutation.
+    invalidateSessionCache();
     await enqueueAuthCookieMutation(async () => {
       const errors: Error[] = [];
       const active = parseGeneration(await SecureStore.getItemAsync(AUTH_COOKIES_META_KEY));

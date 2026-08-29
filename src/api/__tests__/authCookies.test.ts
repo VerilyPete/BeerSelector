@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as SecureStore from 'expo-secure-store';
+import { invalidateSessionCache } from '../sessionCacheEpoch';
 import {
   captureStoredAuthCredentials,
   clearAuthCookies,
@@ -54,6 +55,10 @@ vi.mock('expo-secure-store', () => ({
   }),
 }));
 
+vi.mock('../sessionCacheEpoch', () => ({
+  invalidateSessionCache: vi.fn(() => 1),
+}));
+
 const META_KEY = 'beerknurd_auth_cookies_meta';
 const REGISTRY_KEY = 'beerknurd_auth_cookies_generations';
 const chunkKeys = (): string[] =>
@@ -68,6 +73,31 @@ describe('auth cookie SecureStore', () => {
     mockState.failDeleteKey = '';
     mockState.failGetKey = '';
     mockState.failSetKey = '';
+  });
+
+  it('invalidates the API session cache whenever persisted session state changes', async () => {
+    await saveAuthCookies('{"PHPSESSID":"cookies-only"}');
+    expect(invalidateSessionCache).not.toHaveBeenCalled();
+
+    await saveAuthCredentials('{"PHPSESSID":"member"}', {
+      sessionId: 'member-session',
+      memberId: 'member',
+      storeId: 'store',
+      storeName: 'Store',
+    });
+    expect(invalidateSessionCache).toHaveBeenCalledTimes(1);
+
+    await saveSessionData({
+      sessionId: 'refreshed-session',
+      memberId: 'member',
+      storeId: 'store',
+      storeName: 'Store',
+    });
+    expect(invalidateSessionCache).toHaveBeenCalledTimes(2);
+
+    await clearSessionData();
+    await clearAuthCookies();
+    expect(invalidateSessionCache).toHaveBeenCalledTimes(4);
   });
 
   it('round-trips an empty value instead of treating its chunk as missing', async () => {
@@ -273,16 +303,19 @@ describe('auth cookie SecureStore', () => {
     expect(SecureStore.deleteItemAsync).not.toHaveBeenCalled();
   });
 
-  it('revokes the active generation but preserves a malformed registry for recovery', async () => {
+  it('revokes the active generation and resets a malformed registry so login can recover', async () => {
     mockStore.set(REGISTRY_KEY, '{bad json');
     mockStore.set(META_KEY, JSON.stringify({ generation: 'known', count: 1 }));
     mockStore.set('beerknurd_auth_cookies_known_0', 'YQ==');
-    await expect(clearAuthCookies()).rejects.toThrow('registry is malformed');
+    await expect(clearAuthCookies()).rejects.toThrow('registry was malformed and has been reset');
 
-    expect(mockStore.get(REGISTRY_KEY)).toBe('{bad json');
+    expect(mockStore.has(REGISTRY_KEY)).toBe(false);
     expect(mockStore.has(META_KEY)).toBe(false);
     expect(mockStore.has('beerknurd_auth_cookies_known_0')).toBe(false);
     expect(SecureStore.setItemAsync).not.toHaveBeenCalled();
+
+    await expect(saveAuthCookies('{"PHPSESSID":"replacement"}')).resolves.toBeUndefined();
+    await expect(getAuthCookies()).resolves.toBe('{"PHPSESSID":"replacement"}');
   });
 
   it('keeps a committed generation usable when stale cleanup fails', async () => {
