@@ -1,8 +1,10 @@
-import { saveSessionData, clearSessionData } from './sessionManager';
-import { getApiClient } from './apiClientInstance';
+import { saveSessionData, clearSessionData, clearAuthCookies } from './sessionManager';
+import { clearApiClientSessionCache, getApiClient } from './apiClientInstance';
 import { getPreference, setPreference } from '../database/preferences';
 import { refreshAllDataFromAPI } from '../services/dataUpdateService';
 import { SessionData, ApiError, LoginResult, LogoutResult } from '../types/api';
+import { clearNativeCookies } from './nativeCookieManager';
+import { Platform } from 'react-native';
 
 // Using LoginResult interface from ../types/api
 
@@ -273,40 +275,87 @@ export const handleTapThatAppLogin = async (
  * @returns A login result indicating success or failure
  */
 export async function logout(): Promise<LogoutResult> {
+  let remoteFailure: LogoutResult | null = null;
+
   try {
     const apiClient = getApiClient();
-    await apiClient.post('/logout.php', {});
-    await clearSessionData();
-
-    // Clear visitor mode flag on logout
-    await setPreference(
-      'is_visitor_mode',
-      'false',
-      'Flag indicating whether the user is in visitor mode'
-    );
-
-    return {
-      success: true,
-      message: 'Logout successful',
-      statusCode: 200,
-    };
+    const response = await apiClient.post('/logout.php', {});
+    if (!response.success) {
+      remoteFailure = {
+        success: false,
+        error: response.error || 'Remote logout failed',
+        statusCode: response.statusCode ?? 500,
+      };
+    }
   } catch (error) {
     console.error('Error during logout:', error);
-
     if (error instanceof ApiError) {
-      return {
+      remoteFailure = {
         success: false,
         error: error.message,
         statusCode: error.statusCode,
       };
+    } else {
+      remoteFailure = {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error during logout',
+        statusCode: 500,
+      };
     }
+  }
 
+  // The logout request itself resolves and caches a session promise briefly.
+  // Revoke it before local deletion so no newly-started request can reuse the
+  // just-logged-out credentials from memory.
+  clearApiClientSessionCache();
+
+  // Remote logout is best-effort. Each local operation is isolated so a
+  // locked keychain item or database failure cannot retain the other local
+  // credentials/state.
+  const cleanupErrors: Error[] = [];
+  const cleanupOperations: (() => Promise<void>)[] = [
+    // Browser code cannot delete HttpOnly or authentication-origin cookies.
+    // A successful remote response is the browser's revocation mechanism; if
+    // it failed, run the local helper so the result explicitly reports that
+    // browser-cookie cleanup could not be guaranteed.
+    ...(Platform.OS !== 'web' || remoteFailure ? [clearNativeCookies] : []),
+    clearSessionData,
+    clearAuthCookies,
+    () =>
+      setPreference(
+        'is_visitor_mode',
+        'false',
+        'Flag indicating whether the user is in visitor mode'
+      ),
+  ];
+
+  for (const cleanup of cleanupOperations) {
+    try {
+      await cleanup();
+    } catch (error) {
+      cleanupErrors.push(error instanceof Error ? error : new Error(String(error)));
+      console.error('Local logout cleanup failed:', error);
+    }
+  }
+
+  if (cleanupErrors.length > 0) {
+    const remoteSuffix = remoteFailure
+      ? `; remote logout also failed: ${remoteFailure.error || 'unknown error'}`
+      : '';
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error during logout',
+      error: `Local logout cleanup failed: ${cleanupErrors[0].message}${remoteSuffix}`,
       statusCode: 500,
     };
   }
+
+  if (remoteFailure) return remoteFailure;
+
+  return {
+    success: true,
+    message: 'Logout successful',
+    statusCode: 200,
+  };
 }
 
 /**

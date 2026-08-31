@@ -1,23 +1,22 @@
 import { SQLiteDatabase } from 'expo-sqlite';
 import { recordMigration } from '../schemaVersion';
 import { databaseLockManager } from '../DatabaseLockManager';
+import { saveAuthCookies } from '../../api/sessionManager';
 
 /**
- * Migration to version 8: Purge the `auth_cookies` preference
+ * Migration to version 8: Move `auth_cookies` from SQLite to SecureStore
  *
- * CANONICAL STATEMENT of why this migration exists. `LoginWebView.tsx` and
- * `LoginWebView.test.tsx` point here rather than restating it. They used to
+ * CANONICAL STATEMENT of why this migration exists. `loginMessageHandler.ts`
+ * and its tests point here rather than restating it. They used to
  * restate it, and all three copies carried the same false sentence — see the
  * history note below. That is what the duplication cost.
  *
  * `LoginWebView` used to write the member login's whole cookie jar — bearer
  * session cookies such as `PHPSESSID` included — into the ordinary
- * `preferences` table as a JSON string. That table is plain SQLite: readable
- * from an unencrypted device backup, from a filesystem extraction, and from
- * anything that can open `beers.db`. The same session is also stored in
- * SecureStore by `saveSessionData`, so at the point the write was removed
- * nothing in the tree needed the row. That is the whole justification, and it
- * is a claim about the tree as it stands, not about its history.
+ * `preferences` table as a JSON string. That table is plain SQLite. Version 8
+ * copies any legacy value to SecureStore and deletes the row only after the
+ * secure write commits. A failed secure write leaves both the row and schema
+ * version untouched so the migration can be retried without credential loss.
  *
  * HISTORY, corrected. The removal commit (`a3254636`) and the three comments it
  * touched all asserted "there has never been a `getPreference('auth_cookies')`
@@ -37,12 +36,11 @@ import { databaseLockManager } from '../DatabaseLockManager';
  * site" therefore never established "no reader", then or now.
  *
  * `a3254636`'s message is pushed and cannot be rewritten; this note is the
- * correction of record. The migration itself was never in question — both
- * readers predate the removal by a year, and neither exists today.
+ * correction of record. The current login path now stores the captured jar in
+ * SecureStore directly; this migration exists only for legacy SQLite rows.
  *
- * WHAT THIS DELETE DOES AND DOES NOT GUARANTEE. It unlinks the row: no query
- * returns the credential afterwards, which is what closes off every reader
- * reachable through the app. It does not erase the bytes. `PRAGMA
+ * WHAT THIS DELETE DOES AND DOES NOT GUARANTEE. It unlinks the plaintext row:
+ * no query returns the credential afterwards. It does not erase the bytes. `PRAGMA
  * secure_delete` is not set anywhere in this codebase, so SQLite frees the page
  * space without overwriting it; `connection.ts:25` enables WAL, so the
  * pre-delete page image can also persist in `beers.db-wal` until a checkpoint;
@@ -63,6 +61,19 @@ export async function migrateToVersion8(database: SQLiteDatabase): Promise<void>
   console.log('[Migration v8] Starting migration to schema version 8...');
 
   await databaseLockManager.withDatabaseLock('schema-migration-v8', async () => {
+    // Read strictly through the migration's database handle. The public
+    // preference helper deliberately turns read failures into null, which
+    // would make an unreadable credential indistinguishable from no row and
+    // allow the schema version to advance without migrating it.
+    const legacy = await database.getFirstAsync<{ value: string }>(
+      'SELECT value FROM preferences WHERE key = ?',
+      ['auth_cookies']
+    );
+
+    if (legacy?.value) {
+      await saveAuthCookies(legacy.value);
+    }
+
     await database.withTransactionAsync(async () => {
       // Parameterised rather than inlined, in keeping with every other write in
       // this codebase — the key is a literal here, but the habit is what stops
@@ -72,7 +83,7 @@ export async function migrateToVersion8(database: SQLiteDatabase): Promise<void>
       // Deliberately not logged with a row count. The count would say whether
       // this device had a session cookie exposed, which is not a fact worth
       // writing to a log that outlives the row.
-      console.log('[Migration v8] Purged auth_cookies preference if present');
+      console.log('[Migration v8] Migrated auth_cookies preference if present');
 
       await recordMigration(database, 8);
     });

@@ -3,6 +3,7 @@ import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { ApiClientOptions, SessionData, ApiResponse, ApiError } from '../types/api';
 import { config } from '@/src/config';
+import { getSessionCacheEpoch, invalidateSessionCache } from './sessionCacheEpoch';
 
 // Network detection is handled through fetch API error handling
 // No external network detection module is used
@@ -15,6 +16,7 @@ export class ApiClient {
   private timeout: number;
   private sessionData: SessionData | null = null;
   private sessionPromise: Promise<SessionData> | null = null;
+  private sessionCacheGeneration = getSessionCacheEpoch();
   private networkStatus: { isConnected: boolean; type: string } | null = null;
 
   private constructor(options: ApiClientOptions = {}) {
@@ -64,16 +66,41 @@ export class ApiClient {
     return ApiClient.instance;
   }
 
+  /** Immediately revoke any in-memory session retained between requests. */
+  public clearSessionCache(): void {
+    this.sessionCacheGeneration = invalidateSessionCache();
+    this.sessionData = null;
+    this.sessionPromise = null;
+  }
+
   private async getSession(): Promise<SessionData> {
+    // Credential writes can originate outside ApiClient (WebView login,
+    // migration, developer reset). Observe their process-wide epoch before
+    // reusing the short-lived promise cache.
+    const currentGeneration = getSessionCacheEpoch();
+    if (this.sessionCacheGeneration !== currentGeneration) {
+      this.sessionCacheGeneration = currentGeneration;
+      this.sessionData = null;
+      this.sessionPromise = null;
+    }
+
     // If we already have a session promise, return it
     if (this.sessionPromise) {
       return this.sessionPromise;
     }
 
-    // Create a new session promise
+    // Create a new session promise. A generation token prevents a session read
+    // already in flight during logout from repopulating the revoked cache.
+    const cacheGeneration = this.sessionCacheGeneration;
     this.sessionPromise = (async () => {
       try {
         const sessionData = await getCurrentSession();
+        if (
+          this.sessionCacheGeneration !== cacheGeneration ||
+          getSessionCacheEpoch() !== cacheGeneration
+        ) {
+          throw new ApiError('Session was revoked', 401, false, false);
+        }
         if (!sessionData) {
           throw new ApiError('No valid session available', 401, false, false);
         }
@@ -94,7 +121,12 @@ export class ApiClient {
       } finally {
         // Clear the promise after a short delay to allow for retries
         setTimeout(() => {
-          this.sessionPromise = null;
+          if (
+            this.sessionCacheGeneration === cacheGeneration &&
+            getSessionCacheEpoch() === cacheGeneration
+          ) {
+            this.sessionPromise = null;
+          }
         }, 1000);
       }
     })();

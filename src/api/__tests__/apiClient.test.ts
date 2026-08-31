@@ -3,6 +3,7 @@ import { ApiClient } from '../apiClient';
 import { ApiError } from '../../types/api';
 import { getCurrentSession } from '../sessionValidator';
 import { config } from '@/src/config';
+import { invalidateSessionCache } from '../sessionCacheEpoch';
 
 // Mock the sessionValidator
 vi.mock('../sessionValidator', () => ({
@@ -48,6 +49,74 @@ function createApiTestContext() {
 
 describe('ApiClient', () => {
   describe('get', () => {
+    it('reloads credentials immediately after the session cache is cleared', async () => {
+      const { apiClient } = createApiTestContext();
+      apiClient.clearSessionCache();
+      await apiClient.get('/before-logout');
+
+      (getCurrentSession as Mock).mockResolvedValue({
+        ...mockSessionData,
+        sessionId: 'replacement-session',
+      });
+      apiClient.clearSessionCache();
+      await apiClient.get('/after-logout');
+
+      const requestFor = (endpoint: string) =>
+        (global.fetch as Mock).mock.calls.find(([url]) => String(url).endsWith(endpoint))?.[1];
+      const firstHeaders = requestFor('/before-logout').headers;
+      const secondHeaders = requestFor('/after-logout').headers;
+      expect(firstHeaders.Cookie).toContain('PHPSESSID=test-session-id');
+      expect(secondHeaders.Cookie).toContain('PHPSESSID=replacement-session');
+      expect(getCurrentSession).toHaveBeenCalledTimes(2);
+    });
+
+    it('reloads credentials after storage invalidates the process-wide session epoch', async () => {
+      const { apiClient } = createApiTestContext();
+      apiClient.clearSessionCache();
+      await apiClient.get('/before-credential-write');
+
+      (getCurrentSession as Mock).mockResolvedValue({
+        ...mockSessionData,
+        sessionId: 'newly-committed-session',
+      });
+      invalidateSessionCache();
+      await apiClient.get('/after-credential-write');
+
+      const requestFor = (endpoint: string) =>
+        (global.fetch as Mock).mock.calls.find(([url]) => String(url).endsWith(endpoint))?.[1];
+      expect(requestFor('/before-credential-write').headers.Cookie).toContain(
+        'PHPSESSID=test-session-id'
+      );
+      expect(requestFor('/after-credential-write').headers.Cookie).toContain(
+        'PHPSESSID=newly-committed-session'
+      );
+      expect(getCurrentSession).toHaveBeenCalledTimes(2);
+    });
+
+    it('rejects a session read that finishes after the cache is cleared', async () => {
+      const { apiClient } = createApiTestContext();
+      apiClient.clearSessionCache();
+      let resolveSession!: (session: typeof mockSessionData) => void;
+      (getCurrentSession as Mock).mockImplementationOnce(
+        () =>
+          new Promise(resolve => {
+            resolveSession = resolve;
+          })
+      );
+
+      const request = apiClient.get('/in-flight-during-logout');
+      await Promise.resolve();
+      apiClient.clearSessionCache();
+      resolveSession(mockSessionData);
+
+      await expect(request).rejects.toMatchObject({ statusCode: 401 });
+      expect(
+        (global.fetch as Mock).mock.calls.some(([url]) =>
+          String(url).endsWith('/in-flight-during-logout')
+        )
+      ).toBe(false);
+    });
+
     it('should make a GET request and return data', async () => {
       const { apiClient } = createApiTestContext();
       const response = await apiClient.get('/test-endpoint');

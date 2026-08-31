@@ -3,8 +3,16 @@ import { Alert } from 'react-native';
 import { handleLoginMessage, type LoginMessageDeps } from '../loginMessageHandler';
 import { setPreference } from '@/src/database/preferences';
 import { commitTaplistWrite } from '@/src/services/taplistEtag';
-import { saveSessionData, extractSessionDataFromResponse } from '@/src/api/sessionManager';
+import {
+  captureStoredAuthCredentials,
+  clearAuthCookies,
+  clearSessionData,
+  restoreStoredAuthCredentials,
+  saveAuthCredentials,
+  extractSessionDataFromResponse,
+} from '@/src/api/sessionManager';
 import { handleVisitorLogin } from '@/src/api/authService';
+import { clearNativeCookies } from '@/src/api/nativeCookieManager';
 // Deliberately NOT mocked. The behaviour under test — that the gate-open
 // write genuinely queues behind a concurrent lock holder rather than merely
 // running after it in program order — only exists in the real FIFO queue.
@@ -37,6 +45,15 @@ vi.mock('@/src/services/taplistEtag', () => ({
 }));
 
 vi.mock('@/src/api/sessionManager', () => ({
+  captureStoredAuthCredentials: vi.fn().mockResolvedValue({
+    cookiesJson: '{"PHPSESSID":"previous"}',
+    sessionJson: '{"sessionId":"previous"}',
+  }),
+  restoreStoredAuthCredentials: vi.fn().mockResolvedValue(undefined),
+  clearAuthCookies: vi.fn().mockResolvedValue(undefined),
+  clearSessionData: vi.fn().mockResolvedValue(undefined),
+  saveAuthCookies: vi.fn().mockResolvedValue(undefined),
+  saveAuthCredentials: vi.fn().mockResolvedValue(undefined),
   saveSessionData: vi.fn().mockResolvedValue(undefined),
   extractSessionDataFromResponse: vi.fn().mockReturnValue({
     memberId: '12345',
@@ -44,6 +61,10 @@ vi.mock('@/src/api/sessionManager', () => ({
     storeId: '67',
     storeName: 'Test Store',
   }),
+}));
+
+vi.mock('@/src/api/nativeCookieManager', () => ({
+  clearNativeCookies: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('@/src/api/authService', () => ({
@@ -112,7 +133,15 @@ describe('handleLoginMessage', () => {
     // -independent.
     (setPreference as Mock).mockResolvedValue(undefined);
     (commitTaplistWrite as Mock).mockResolvedValue(undefined);
-    (saveSessionData as Mock).mockResolvedValue(undefined);
+    (captureStoredAuthCredentials as Mock).mockResolvedValue({
+      cookiesJson: '{"PHPSESSID":"previous"}',
+      sessionJson: '{"sessionId":"previous"}',
+    });
+    (restoreStoredAuthCredentials as Mock).mockResolvedValue(undefined);
+    (clearNativeCookies as Mock).mockResolvedValue(undefined);
+    (saveAuthCredentials as Mock).mockResolvedValue(undefined);
+    (clearAuthCookies as Mock).mockResolvedValue(undefined);
+    (clearSessionData as Mock).mockResolvedValue(undefined);
     (extractSessionDataFromResponse as Mock).mockReturnValue(defaultSessionData);
     (handleVisitorLogin as Mock).mockResolvedValue({ success: true });
   });
@@ -160,14 +189,14 @@ describe('handleLoginMessage', () => {
         testUserUrl,
         'API endpoint for fetching Beerfinder beers'
       );
-      expect(saveSessionData).toHaveBeenCalled();
+      expect(saveAuthCredentials).toHaveBeenCalled();
       // Not `onRefreshData`: this handler never calls it. `useLoginFlow`'s
       // `handleLoginSuccess` does, in response to `onLoginSuccess` below. The
       // assertion was testing the parent through the child.
       expect(deps.onLoginSuccess).toHaveBeenCalled();
     });
 
-    it('never writes session cookies to the preferences table', async () => {
+    it('stores session cookies only in SecureStore, never in the preferences table', async () => {
       // INVERTED. This used to assert the write. `auth_cookies` held the raw
       // cookie jar — PHPSESSID included — as plaintext in an ordinary SQLite
       // row, while the same session was already in SecureStore via
@@ -207,7 +236,10 @@ describe('handleLoginMessage', () => {
         deps
       );
 
-      expect(saveSessionData).toHaveBeenCalled();
+      expect(saveAuthCredentials).toHaveBeenCalledWith(
+        JSON.stringify(testCookies),
+        defaultSessionData
+      );
 
       const writes = (setPreference as Mock).mock.calls;
 
@@ -382,7 +414,7 @@ describe('handleLoginMessage', () => {
       // the session is persisted lets a failed login boot the app straight into
       // member mode with nothing in SecureStore — configured, unauthenticated,
       // and unable to explain itself. The gate must be the last thing to flip.
-      (saveSessionData as Mock).mockRejectedValueOnce(new Error('SecureStore unavailable'));
+      (saveAuthCredentials as Mock).mockRejectedValueOnce(new Error('SecureStore unavailable'));
 
       const deps = createDeps();
       await handleLoginMessage(memberLoginRaw, deps);
@@ -397,6 +429,28 @@ describe('handleLoginMessage', () => {
         ([key]) => key === 'all_beers_api_url'
       );
       expect(gateWrites.every(([, value]) => !value)).toBe(true);
+      expect(deps.onLoginSuccess).not.toHaveBeenCalled();
+      expect(restoreStoredAuthCredentials).not.toHaveBeenCalled();
+      expect(clearNativeCookies).toHaveBeenCalled();
+    });
+
+    it('restores the previous credential pair when configuration fails after storage', async () => {
+      (setPreference as Mock).mockImplementation((key: string, value: string) =>
+        key === 'all_beers_api_url' && value
+          ? Promise.reject(new Error('configuration write failed'))
+          : Promise.resolve(undefined)
+      );
+
+      const deps = createDeps();
+      await handleLoginMessage(memberLoginRaw, deps);
+
+      expect(saveAuthCredentials).toHaveBeenCalled();
+      expect(restoreStoredAuthCredentials).toHaveBeenCalledWith({
+        cookiesJson: '{"PHPSESSID":"previous"}',
+        sessionJson: '{"sessionId":"previous"}',
+      });
+      expect(clearNativeCookies).toHaveBeenCalled();
+      expect(deps.onLoginCancel).toHaveBeenCalled();
       expect(deps.onLoginSuccess).not.toHaveBeenCalled();
     });
 
@@ -433,12 +487,23 @@ describe('handleLoginMessage', () => {
       await handleLoginMessage(memberLoginRaw, deps);
 
       expect(deps.onLoginCancel).toHaveBeenCalled();
-      expect(saveSessionData).not.toHaveBeenCalled();
+      expect(saveAuthCredentials).not.toHaveBeenCalled();
       expect(deps.onLoginSuccess).not.toHaveBeenCalled();
       const gateWrites = (setPreference as Mock).mock.calls.filter(
         ([key]) => key === 'all_beers_api_url'
       );
       expect(gateWrites.every(([, value]) => !value)).toBe(true);
+    });
+
+    it('does not commit the session when secure cookie storage fails', async () => {
+      (saveAuthCredentials as Mock).mockRejectedValueOnce(new Error('storage locked'));
+      const deps = createDeps();
+
+      await handleLoginMessage(memberLoginRaw, deps);
+
+      expect(restoreStoredAuthCredentials).not.toHaveBeenCalled();
+      expect(deps.onLoginSuccess).not.toHaveBeenCalled();
+      expect(deps.onLoginCancel).toHaveBeenCalled();
     });
 
     it('completes the login when a preference nothing reads fails to write', async () => {
@@ -674,6 +739,9 @@ describe('handleLoginMessage', () => {
         'true',
         'Flag indicating whether the user is in visitor mode'
       );
+      expect(clearAuthCookies).toHaveBeenCalledTimes(1);
+      expect(clearSessionData).toHaveBeenCalledTimes(1);
+      expect(clearNativeCookies).toHaveBeenCalledTimes(1);
     });
 
     it('should set correct API URLs for visitor mode', async () => {
@@ -751,6 +819,10 @@ describe('handleLoginMessage', () => {
         'Failed to login',
         expect.any(Array)
       );
+      expect(restoreStoredAuthCredentials).toHaveBeenCalledWith({
+        cookiesJson: '{"PHPSESSID":"previous"}',
+        sessionJson: '{"sessionId":"previous"}',
+      });
     });
 
     it('should handle missing store ID in visitor login', async () => {

@@ -37,6 +37,9 @@ describe('sessionManager', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    (SecureStore.getItemAsync as Mock).mockResolvedValue(null);
+    (SecureStore.setItemAsync as Mock).mockResolvedValue(undefined);
+    (SecureStore.deleteItemAsync as Mock).mockResolvedValue(undefined);
 
     // Mock console methods to prevent noise in tests
     console.log = vi.fn();
@@ -71,7 +74,9 @@ describe('sessionManager', () => {
 
   describe('getSessionData', () => {
     it('should return session data from secure storage', async () => {
-      (SecureStore.getItemAsync as Mock).mockResolvedValueOnce(JSON.stringify(mockSessionData));
+      (SecureStore.getItemAsync as Mock).mockImplementation((key: string) =>
+        Promise.resolve(key === 'beerknurd_session' ? JSON.stringify(mockSessionData) : null)
+      );
 
       const result = await getSessionData();
 
@@ -88,11 +93,15 @@ describe('sessionManager', () => {
     });
 
     it('should return null when session data is invalid', async () => {
-      (SecureStore.getItemAsync as Mock).mockResolvedValueOnce(
-        JSON.stringify({
-          // Missing required fields
-          username: 'testuser',
-        })
+      (SecureStore.getItemAsync as Mock).mockImplementation((key: string) =>
+        Promise.resolve(
+          key === 'beerknurd_session'
+            ? JSON.stringify({
+                // Missing required fields
+                username: 'testuser',
+              })
+            : null
+        )
       );
 
       const result = await getSessionData();
@@ -127,7 +136,9 @@ describe('sessionManager', () => {
 
   describe('hasSession', () => {
     it('should return true when session data exists', async () => {
-      (SecureStore.getItemAsync as Mock).mockResolvedValueOnce(JSON.stringify(mockSessionData));
+      (SecureStore.getItemAsync as Mock).mockImplementation((key: string) =>
+        Promise.resolve(key === 'beerknurd_session' ? JSON.stringify(mockSessionData) : null)
+      );
 
       const result = await hasSession();
 

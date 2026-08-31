@@ -9,7 +9,8 @@ import { rewardsRepository } from '@/src/database/repositories/RewardsRepository
 import { getPreference, setPreference } from '@/src/database/preferences';
 import { commitTaplistWrite } from '@/src/services/taplistEtag';
 import { createMockSession } from '@/src/api/mockSession';
-import { clearSessionData } from '@/src/api/sessionManager';
+import { clearAuthCookies, clearSessionData } from '@/src/api/sessionManager';
+import { clearNativeCookies } from '@/src/api/nativeCookieManager';
 import { databaseLockManager } from '@/src/database/DatabaseLockManager';
 import SettingsSection from './SettingsSection';
 import SettingsItem from './SettingsItem';
@@ -182,8 +183,19 @@ Tasted Beers: ${lastMyBeersRefresh ? new Date(parseInt(lastMyBeersRefresh)).toLo
               await rewardsRepository.clear();
               console.log('Cleared rewards');
 
-              await clearSessionData();
+              const credentialCleanup = await Promise.allSettled([
+                clearSessionData(),
+                clearAuthCookies(),
+                clearNativeCookies(),
+              ]);
+              const credentialCleanupFailure = credentialCleanup.find(
+                result => result.status === 'rejected'
+              );
+              if (credentialCleanupFailure?.status === 'rejected') {
+                throw credentialCleanupFailure.reason;
+              }
               console.log('Cleared session data');
+              console.log('Cleared authentication cookies');
 
               // Locked, like the login's gate-close write. The previous comment
               // here argued the opposite — that writing '' rather than a real
@@ -308,6 +320,7 @@ Tasted Beers: ${lastMyBeersRefresh ? new Date(parseInt(lastMyBeersRefresh)).toLo
           disabled={isLoading}
           destructive
           showSeparator={false}
+          testID="reset-first-run-button"
         />
       </SettingsSection>
 
