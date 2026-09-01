@@ -1,6 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest';
 import { Alert } from 'react-native';
-import { handleLoginMessage, type LoginMessageDeps } from '../loginMessageHandler';
+import {
+  handleLoginMessage,
+  __resetLoginChallengeStateForTests,
+  type LoginMessageDeps,
+} from '../loginMessageHandler';
 import { setPreference } from '@/src/database/preferences';
 import { commitTaplistWrite } from '@/src/services/taplistEtag';
 import {
@@ -13,6 +17,7 @@ import {
 } from '@/src/api/sessionManager';
 import { handleVisitorLogin } from '@/src/api/authService';
 import { clearNativeCookies } from '@/src/api/nativeCookieManager';
+import { config } from '@/src/config';
 // Deliberately NOT mocked. The behaviour under test — that the gate-open
 // write genuinely queues behind a concurrent lock holder rather than merely
 // running after it in program order — only exists in the real FIFO queue.
@@ -23,6 +28,15 @@ import { databaseLockManager } from '@/src/database/DatabaseLockManager';
 
 const mockTestBaseUrl = 'https://test.beerknurd.com';
 const mockFsbsBaseUrl = 'https://fsbs.beerknurd.com';
+
+// The trusted login origin the real `config` module resolves to in this
+// (unmocked) test environment. `handleLoginMessage`'s origin gate checks
+// `event.nativeEvent.url` against exactly this — any of `kiosk`,
+// `memberDashboard` or `visitor` share the same origin, so one constant
+// covers every message type tested below.
+const trustedNativeUrl = config.api.getFullUrl('memberDashboard');
+const trustedVisitorUrl = config.api.getFullUrl('visitor');
+const untrustedNativeUrl = 'https://evil.example/member-dash.php';
 
 const defaultSessionData = {
   memberId: '12345',
@@ -151,6 +165,11 @@ describe('handleLoginMessage', () => {
     // lock deliberately: a test that fails mid-hold would otherwise leave the
     // singleton locked for every test that runs after it in this file.
     databaseLockManager.resetForTesting();
+    // The URL-verification challenge is module-level singleton state (there
+    // is only ever one WebView page at a time to track), so a test that
+    // issues one without consuming it would otherwise leak into whichever
+    // test runs next.
+    __resetLoginChallengeStateForTests();
   });
 
   describe('Member Login', () => {
@@ -171,6 +190,7 @@ describe('handleLoginMessage', () => {
             store: 'Test Store',
           },
         }),
+        trustedNativeUrl,
         deps
       );
 
@@ -233,6 +253,7 @@ describe('handleLoginMessage', () => {
           storeJsonUrl: `${mockTestBaseUrl}/store.php`,
           cookies: testCookies,
         }),
+        trustedNativeUrl,
         deps
       );
 
@@ -267,6 +288,7 @@ describe('handleLoginMessage', () => {
           storeJsonUrl: `${mockTestBaseUrl}/store.php`,
           cookies: {},
         }),
+        trustedNativeUrl,
         deps
       );
 
@@ -287,6 +309,7 @@ describe('handleLoginMessage', () => {
           storeJsonUrl: `${mockTestBaseUrl}/store.php`,
           cookies: {},
         }),
+        trustedNativeUrl,
         deps
       );
 
@@ -308,6 +331,7 @@ describe('handleLoginMessage', () => {
           storeJsonUrl: null,
           cookies: {},
         }),
+        trustedNativeUrl,
         deps
       );
 
@@ -348,7 +372,7 @@ describe('handleLoginMessage', () => {
       );
 
       const deps = createDeps();
-      const loginPromise = handleLoginMessage(memberLoginRaw, deps);
+      const loginPromise = handleLoginMessage(memberLoginRaw, trustedNativeUrl, deps);
 
       // `commitTaplistWrite` is the very first `await` in the handler's
       // member-login branch, so by the time the promise above has been
@@ -378,7 +402,7 @@ describe('handleLoginMessage', () => {
       (commitTaplistWrite as Mock).mockRejectedValueOnce(new Error('database is locked'));
 
       const deps = createDeps();
-      await handleLoginMessage(memberLoginRaw, deps);
+      await handleLoginMessage(memberLoginRaw, trustedNativeUrl, deps);
 
       expect(deps.onLoginCancel).toHaveBeenCalled();
       expect(deps.onLoginSuccess).not.toHaveBeenCalled();
@@ -393,7 +417,7 @@ describe('handleLoginMessage', () => {
       (commitTaplistWrite as Mock).mockRejectedValueOnce(new Error('database is locked'));
 
       const deps = createDeps();
-      await handleLoginMessage(memberLoginRaw, deps);
+      await handleLoginMessage(memberLoginRaw, trustedNativeUrl, deps);
 
       // Asserting only that SOME alert fired let a mutant through: routing the
       // catch to the close path tells the user they cancelled the login, which
@@ -417,7 +441,7 @@ describe('handleLoginMessage', () => {
       (saveAuthCredentials as Mock).mockRejectedValueOnce(new Error('SecureStore unavailable'));
 
       const deps = createDeps();
-      await handleLoginMessage(memberLoginRaw, deps);
+      await handleLoginMessage(memberLoginRaw, trustedNativeUrl, deps);
 
       expect(deps.onLoginCancel).toHaveBeenCalled();
 
@@ -442,7 +466,7 @@ describe('handleLoginMessage', () => {
       );
 
       const deps = createDeps();
-      await handleLoginMessage(memberLoginRaw, deps);
+      await handleLoginMessage(memberLoginRaw, trustedNativeUrl, deps);
 
       expect(saveAuthCredentials).toHaveBeenCalled();
       expect(restoreStoredAuthCredentials).toHaveBeenCalledWith({
@@ -460,7 +484,7 @@ describe('handleLoginMessage', () => {
       // login must leave all three keys `areApiUrlsConfigured` reads set, with
       // `all_beers_api_url` truthy.
       const deps = createDeps();
-      await handleLoginMessage(memberLoginRaw, deps);
+      await handleLoginMessage(memberLoginRaw, trustedNativeUrl, deps);
 
       expect(deps.onLoginSuccess).toHaveBeenCalled();
 
@@ -484,7 +508,7 @@ describe('handleLoginMessage', () => {
       });
 
       const deps = createDeps();
-      await handleLoginMessage(memberLoginRaw, deps);
+      await handleLoginMessage(memberLoginRaw, trustedNativeUrl, deps);
 
       expect(deps.onLoginCancel).toHaveBeenCalled();
       expect(saveAuthCredentials).not.toHaveBeenCalled();
@@ -499,7 +523,7 @@ describe('handleLoginMessage', () => {
       (saveAuthCredentials as Mock).mockRejectedValueOnce(new Error('storage locked'));
       const deps = createDeps();
 
-      await handleLoginMessage(memberLoginRaw, deps);
+      await handleLoginMessage(memberLoginRaw, trustedNativeUrl, deps);
 
       expect(restoreStoredAuthCredentials).not.toHaveBeenCalled();
       expect(deps.onLoginSuccess).not.toHaveBeenCalled();
@@ -521,7 +545,7 @@ describe('handleLoginMessage', () => {
       );
 
       const deps = createDeps();
-      await handleLoginMessage(memberLoginRaw, deps);
+      await handleLoginMessage(memberLoginRaw, trustedNativeUrl, deps);
 
       expect(deps.onLoginSuccess).toHaveBeenCalled();
       expect(Alert.alert).not.toHaveBeenCalled();
@@ -583,7 +607,7 @@ describe('handleLoginMessage', () => {
       expect(databaseLockManager.isLocked()).toBe(true);
 
       const deps = createDeps();
-      const loginPromise = handleLoginMessage(memberLoginRaw, deps);
+      const loginPromise = handleLoginMessage(memberLoginRaw, trustedNativeUrl, deps);
 
       // Deterministic rather than a tick count: the login's acquire call
       // enqueues synchronously the moment the handler reaches it, so waiting
@@ -655,7 +679,7 @@ describe('handleLoginMessage', () => {
       await holdTaskStartedPromise;
 
       const deps = createDeps();
-      const loginPromise = handleLoginMessage(memberLoginRaw, deps);
+      const loginPromise = handleLoginMessage(memberLoginRaw, trustedNativeUrl, deps);
 
       await waitFor(() => {
         expect(databaseLockManager.getQueueLength()).toBe(1);
@@ -690,6 +714,7 @@ describe('handleLoginMessage', () => {
           rawCookies: 'store__id=67; store=Test Store',
           url: `${mockTestBaseUrl}/visitor.php`,
         }),
+        trustedNativeUrl,
         deps
       );
 
@@ -713,6 +738,7 @@ describe('handleLoginMessage', () => {
           rawCookies: 'store__id=67; store=Test Store',
           url: `${mockTestBaseUrl}/visitor.php`,
         }),
+        trustedNativeUrl,
         deps
       );
 
@@ -731,6 +757,7 @@ describe('handleLoginMessage', () => {
           rawCookies: 'store__id=67',
           url: `${mockTestBaseUrl}/visitor.php`,
         }),
+        trustedNativeUrl,
         deps
       );
 
@@ -757,6 +784,7 @@ describe('handleLoginMessage', () => {
           rawCookies: `store__id=${testStoreId}`,
           url: `${mockTestBaseUrl}/visitor.php`,
         }),
+        trustedNativeUrl,
         deps
       );
 
@@ -784,6 +812,7 @@ describe('handleLoginMessage', () => {
           rawCookies: 'store__id=67',
           url: `${mockTestBaseUrl}/visitor.php`,
         }),
+        trustedNativeUrl,
         deps
       );
 
@@ -811,6 +840,7 @@ describe('handleLoginMessage', () => {
           rawCookies: 'store__id=67',
           url: `${mockTestBaseUrl}/visitor.php`,
         }),
+        trustedNativeUrl,
         deps
       );
 
@@ -835,6 +865,7 @@ describe('handleLoginMessage', () => {
           rawCookies: '',
           url: `${mockTestBaseUrl}/visitor.php`,
         }),
+        trustedNativeUrl,
         deps
       );
 
@@ -883,6 +914,7 @@ describe('handleLoginMessage', () => {
           rawCookies: 'store__id=67; store=Test Store',
           url: `${mockTestBaseUrl}/visitor.php`,
         }),
+        trustedNativeUrl,
         deps
       );
 
@@ -946,6 +978,7 @@ describe('handleLoginMessage', () => {
           rawCookies: 'store__id=67; store=Test Store',
           url: `${mockTestBaseUrl}/visitor.php`,
         }),
+        trustedNativeUrl,
         deps
       );
 
@@ -968,6 +1001,216 @@ describe('handleLoginMessage', () => {
     });
   });
 
+  describe('Origin validation', () => {
+    it('ignores a postMessage whose originating frame is not the trusted login host', async () => {
+      const deps = createDeps();
+
+      await handleLoginMessage(
+        JSON.stringify({
+          type: 'URLs',
+          userJsonUrl: `${mockFsbsBaseUrl}/bk-member-json.php?uid=12345`,
+          storeJsonUrl: `${mockFsbsBaseUrl}/bk-store-json.php?sid=67`,
+          cookies: { member: '12345', session: 'test-session', store__id: '67', store: 'x' },
+        }),
+        untrustedNativeUrl,
+        deps
+      );
+
+      // The cookie-harvest path never runs: no preference writes, no
+      // credential save, no success or cancel callback at all — the message
+      // is dropped before it is even parsed.
+      expect(setPreference).not.toHaveBeenCalled();
+      expect(saveAuthCredentials).not.toHaveBeenCalled();
+      expect(deps.onLoginSuccess).not.toHaveBeenCalled();
+      expect(deps.onLoginCancel).not.toHaveBeenCalled();
+    });
+
+    it('ignores a URL_CHECK from an untrusted frame without issuing a verification challenge', async () => {
+      const deps = createDeps();
+
+      await handleLoginMessage(
+        JSON.stringify({ type: 'URL_CHECK', url: trustedNativeUrl }),
+        untrustedNativeUrl,
+        deps
+      );
+
+      expect(deps.injectUrlVerification).not.toHaveBeenCalled();
+    });
+
+    it('ignores a VISITOR_LOGIN posted from an untrusted frame', async () => {
+      const deps = createDeps();
+
+      await handleLoginMessage(
+        JSON.stringify({
+          type: 'VISITOR_LOGIN',
+          cookies: { store__id: '67' },
+          rawCookies: 'store__id=67',
+          url: trustedVisitorUrl,
+        }),
+        untrustedNativeUrl,
+        deps
+      );
+
+      expect(handleVisitorLogin).not.toHaveBeenCalled();
+      expect(deps.onLoginSuccess).not.toHaveBeenCalled();
+      expect(deps.onLoginCancel).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('URL verification challenge', () => {
+    it('issues a nonce on URL_CHECK and injects the member-dashboard script once it is echoed back', async () => {
+      const deps = createDeps();
+
+      await handleLoginMessage(
+        JSON.stringify({ type: 'URL_CHECK', url: trustedNativeUrl }),
+        trustedNativeUrl,
+        deps
+      );
+
+      expect(deps.injectUrlVerification).toHaveBeenCalledWith(trustedNativeUrl, expect.any(String));
+      const [, nonce] = (deps.injectUrlVerification as Mock).mock.calls[0];
+
+      await handleLoginMessage(
+        JSON.stringify({ type: 'URL_VERIFIED', url: trustedNativeUrl, nonce }),
+        trustedNativeUrl,
+        deps
+      );
+
+      expect(deps.injectPageSpecificJavaScript).toHaveBeenCalledWith(trustedNativeUrl);
+    });
+
+    it('ignores URL_VERIFIED when no URL_CHECK challenge was ever issued', async () => {
+      // This is the vulnerability being closed: previously any script running
+      // in the WebView could send URL_VERIFIED directly, with no round trip
+      // through URL_CHECK at all, and the cookie-harvest injection would run.
+      const deps = createDeps();
+
+      await handleLoginMessage(
+        JSON.stringify({ type: 'URL_VERIFIED', url: trustedNativeUrl, nonce: 'guessed-nonce' }),
+        trustedNativeUrl,
+        deps
+      );
+
+      expect(deps.injectPageSpecificJavaScript).not.toHaveBeenCalled();
+    });
+
+    it('ignores URL_VERIFIED whose nonce does not match the outstanding challenge', async () => {
+      const deps = createDeps();
+
+      await handleLoginMessage(
+        JSON.stringify({ type: 'URL_CHECK', url: trustedNativeUrl }),
+        trustedNativeUrl,
+        deps
+      );
+
+      await handleLoginMessage(
+        JSON.stringify({ type: 'URL_VERIFIED', url: trustedNativeUrl, nonce: 'wrong-nonce' }),
+        trustedNativeUrl,
+        deps
+      );
+
+      expect(deps.injectPageSpecificJavaScript).not.toHaveBeenCalled();
+    });
+
+    it('ignores a correct nonce replayed after it has already been consumed', async () => {
+      const deps = createDeps();
+
+      await handleLoginMessage(
+        JSON.stringify({ type: 'URL_CHECK', url: trustedNativeUrl }),
+        trustedNativeUrl,
+        deps
+      );
+      const [, nonce] = (deps.injectUrlVerification as Mock).mock.calls[0];
+
+      await handleLoginMessage(
+        JSON.stringify({ type: 'URL_VERIFIED', url: trustedNativeUrl, nonce }),
+        trustedNativeUrl,
+        deps
+      );
+      expect(deps.injectPageSpecificJavaScript).toHaveBeenCalledTimes(1);
+
+      await handleLoginMessage(
+        JSON.stringify({ type: 'URL_VERIFIED', url: trustedNativeUrl, nonce }),
+        trustedNativeUrl,
+        deps
+      );
+
+      expect(deps.injectPageSpecificJavaScript).toHaveBeenCalledTimes(1);
+    });
+
+    it('ignores a correct nonce answered from a different URL than the one challenged', async () => {
+      const deps = createDeps();
+
+      await handleLoginMessage(
+        JSON.stringify({ type: 'URL_CHECK', url: trustedNativeUrl }),
+        trustedNativeUrl,
+        deps
+      );
+      const [, nonce] = (deps.injectUrlVerification as Mock).mock.calls[0];
+
+      // Same trusted origin, different page — the challenge was issued for
+      // `trustedNativeUrl`, not `trustedVisitorUrl`.
+      await handleLoginMessage(
+        JSON.stringify({ type: 'URL_VERIFIED', url: trustedVisitorUrl, nonce }),
+        trustedVisitorUrl,
+        deps
+      );
+
+      expect(deps.injectPageSpecificJavaScript).not.toHaveBeenCalled();
+    });
+
+    it('ignores a correctly-answered challenge once it has expired', async () => {
+      // Fake timers are already armed globally for this file (`setup.ts`),
+      // so `Date.now()` here tracks the fake clock without an explicit
+      // `vi.useFakeTimers()` — and correspondingly this must not call
+      // `vi.useRealTimers()`, which would disarm them for every test that
+      // runs after this one in the file.
+      const deps = createDeps();
+
+      await handleLoginMessage(
+        JSON.stringify({ type: 'URL_CHECK', url: trustedNativeUrl }),
+        trustedNativeUrl,
+        deps
+      );
+      const [, nonce] = (deps.injectUrlVerification as Mock).mock.calls[0];
+
+      vi.advanceTimersByTime(30_001);
+
+      await handleLoginMessage(
+        JSON.stringify({ type: 'URL_VERIFIED', url: trustedNativeUrl, nonce }),
+        trustedNativeUrl,
+        deps
+      );
+
+      expect(deps.injectPageSpecificJavaScript).not.toHaveBeenCalled();
+    });
+
+    it('a fresh URL_CHECK supersedes a previous unanswered challenge', async () => {
+      const deps = createDeps();
+
+      await handleLoginMessage(
+        JSON.stringify({ type: 'URL_CHECK', url: trustedNativeUrl }),
+        trustedNativeUrl,
+        deps
+      );
+      const [, staleNonce] = (deps.injectUrlVerification as Mock).mock.calls[0];
+
+      await handleLoginMessage(
+        JSON.stringify({ type: 'URL_CHECK', url: trustedNativeUrl }),
+        trustedNativeUrl,
+        deps
+      );
+
+      await handleLoginMessage(
+        JSON.stringify({ type: 'URL_VERIFIED', url: trustedNativeUrl, nonce: staleNonce }),
+        trustedNativeUrl,
+        deps
+      );
+
+      expect(deps.injectPageSpecificJavaScript).not.toHaveBeenCalled();
+    });
+  });
+
   describe('Error Handling', () => {
     it('should handle JS_INJECTION_ERROR message', async () => {
       const deps = createDeps();
@@ -978,6 +1221,7 @@ describe('handleLoginMessage', () => {
           error: 'JavaScript injection failed',
           location: 'member-dash',
         }),
+        trustedNativeUrl,
         deps
       );
 
@@ -997,6 +1241,7 @@ describe('handleLoginMessage', () => {
           error: 'JavaScript injection failed',
           location: 'member-dash',
         }),
+        trustedNativeUrl,
         deps
       );
 
@@ -1024,6 +1269,7 @@ describe('handleLoginMessage', () => {
           type: 'VISITOR_LOGIN_ERROR',
           error: 'Failed to extract store info',
         }),
+        trustedNativeUrl,
         deps
       );
 
@@ -1042,6 +1288,7 @@ describe('handleLoginMessage', () => {
           type: 'VISITOR_LOGIN_ERROR',
           error: 'Failed to extract store info',
         }),
+        trustedNativeUrl,
         deps
       );
 
@@ -1053,7 +1300,7 @@ describe('handleLoginMessage', () => {
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       const deps = createDeps();
 
-      await handleLoginMessage('invalid json {{{', deps);
+      await handleLoginMessage('invalid json {{{', trustedNativeUrl, deps);
 
       // Should log error but not crash
       expect(consoleErrorSpy).toHaveBeenCalled();
@@ -1065,7 +1312,7 @@ describe('handleLoginMessage', () => {
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       const deps = createDeps();
 
-      await handleLoginMessage('invalid json {{{', deps);
+      await handleLoginMessage('invalid json {{{', trustedNativeUrl, deps);
 
       // Should call onLoginCancel after error
       expect(deps.onLoginCancel).toHaveBeenCalled();
@@ -1087,6 +1334,7 @@ describe('handleLoginMessage', () => {
           rawCookies: 'store__id=67',
           url: `${mockTestBaseUrl}/visitor.php`,
         }),
+        trustedNativeUrl,
         deps
       );
 
@@ -1108,6 +1356,7 @@ describe('handleLoginMessage', () => {
             type: 'UNKNOWN_MESSAGE_TYPE',
             data: 'some data',
           }),
+          trustedNativeUrl,
           deps
         );
       }).not.toThrow();
