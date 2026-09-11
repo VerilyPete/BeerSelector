@@ -38,6 +38,7 @@ final class AppModel: ObservableObject {
     private var pendingURL: URL?
     private var started = false
     private var refreshTask: Task<Void, Never>?
+    private var refreshEpoch: UUID?
     var previewMode: Bool { session?.memberId == "preview" }
     var isMember: Bool { session?.valid == true && session?.isVisitor == false }
     var configured: Bool { session != nil && ((try? db?.preference("all_beers_api_url")) ?? "") != "" }
@@ -100,23 +101,25 @@ final class AppModel: ObservableObject {
         do { try reload(); error = nil } catch { self.error = error.localizedDescription }
     }
     func refresh() async {
-        if let refreshTask { await refreshTask.value; return }
+        if let refreshTask, refreshEpoch == epoch { await refreshTask.value; return }
+        let token = epoch
         // SwiftUI can cancel its refreshable action when the view changes. The
         // model owns this shared refresh so cached data still gets updated.
         let task = Task { @MainActor in
-            await performRefresh()
-            refreshTask = nil
+            await performRefresh(token:token)
+            if refreshEpoch == token { refreshTask = nil; refreshEpoch = nil }
         }
+        refreshEpoch = token
         refreshTask = task
         await task.value
     }
-    private func performRefresh() async {
-        guard !previewMode, !refreshing, let db, configured else { return }
-        refreshing = true; defer { refreshing = false }
+    private func performRefresh(token: UUID) async {
+        guard token == epoch, !previewMode, let db, configured else { return }
+        refreshing = true
+        defer { if token == epoch { refreshing = false } }
         let interval = Diagnostics.shared.begin(.refresh)
         var outcome = Diagnostics.Outcome.cancelled
         defer { interval.finish(outcome) }
-        let token = epoch
         var errors: [String] = []
         if let raw = try? db.preference("all_beers_api_url"), let url = URL(string:raw), APIConfiguration.dataURL(url) {
             do {
@@ -155,6 +158,8 @@ final class AppModel: ObservableObject {
                 errors.append(error.localizedDescription)
             }
         }
+        // An old store response must not start requests for the newly signed-in member.
+        guard token == epoch else { return }
         if isMember, let raw = try? db.preference("my_beers_api_url"), let url = URL(string:raw), APIConfiguration.dataURL(url) {
             do {
                 let (data,_) = try await api.request(url)
@@ -368,7 +373,7 @@ final class AppModel: ObservableObject {
     func logout() async {
         if previewMode { session = nil; allBeers = []; tastedBeers = []; rewards = []; queue = []; showSettings = true; return }
         let old = session; let saved = cookies
-        epoch = UUID(); session = nil; cookies = [:]; queue = []; queuedBeerIDs = []; tastedBeers = []; rewards = []
+        epoch = UUID(); refreshing = false; session = nil; cookies = [:]; queue = []; queuedBeerIDs = []; tastedBeers = []; rewards = []
         await liveActivity.endAll()
         var failures: [String] = []
         do { try credentials.clear() } catch { failures.append(error.localizedDescription) }

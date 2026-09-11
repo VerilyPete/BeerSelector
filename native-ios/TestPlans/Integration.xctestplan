@@ -33,6 +33,7 @@
       "selectedTests": [
         "PersistenceIntegrationTests",
         "NetworkTests",
+        "AccountSafetyTests",
         "DiagnosticJournalTests"
       ]
     }

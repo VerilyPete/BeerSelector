@@ -172,3 +172,11 @@ Attach-only phone follow-up: the user repeated refresh, scrolling and taps for 6
 ## Internal TestFlight diagnostic reporting — 2026-09-11
 
 Build 1.1.0 (38) uploaded successfully with Apple's internal-only restriction and app/widget symbols; no external beta groups or builds were changed. Added a bounded persistent event history, foreground main-thread delay monitor, and Release Settings report sharing. Full 49-test suite and final 5-test journal rerun pass. See [INTERNAL-TESTFLIGHT.md](INTERNAL-TESTFLIGHT.md) for archive/log evidence, tester steps, delivery limits and remaining verification. Earlier statements that reports reset on process exit describe the original aggregate store; the new local journal separately persists up to 128 fixed-label events across launches. No automatic custom telemetry backend was added.
+
+## Account safety — 2026-09-11
+
+AccountSafetyTests adds seven integration cases for late login/auto-login/taplist/queue responses after logout, check-in success/failure after account switching, and independent new-account refresh while the old response is withheld. Requests run entirely through HTTPFixture; each case owns real temporary SQLite and uniquely namespaced simulator Keychain entries. Login/logout use the production entry points. No sleep-based race ordering or live backend is used: the overlapping refresh case suspends its old HTTP response with a continuation and observes the session/list publications with XCTest expectations.
+
+The refresh-switch regression initially failed: login joined the old refresh and left the new taplist/tastings empty. Sharing is now scoped to the account epoch; stale task completion cannot clear the new task, and stale store responses cannot proceed into the new member's requests. Logout clears the refresh indicator. This does not establish the cause of the earlier physical-phone crash.
+
+Full correctness suite: **56/56 passed**, including **7/7 AccountSafetyTests**, log `/private/tmp/BeerSelectorNative-account-all.log`. Initial red evidence: `/private/tmp/BeerSelectorNative-account-red.log`. Integration explicitly includes the new class; All discovers it. No new performance measurement or live account test was needed. Keychain failure injection and further overlapping login/logout cleanup timing remain additional coverage opportunities.

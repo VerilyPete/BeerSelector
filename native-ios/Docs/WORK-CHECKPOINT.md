@@ -1,6 +1,14 @@
 # Migration checkpoint — 2026-09-11
 
-## CURRENT HANDOFF — TestFlight diagnostics verified; next build corrected to 60
+## CURRENT HANDOFF — account-safety regressions and refresh fix
+
+Added **7 AccountSafetyTests** with per-session HTTP fixtures, isolated real SQLite, unique real simulator Keychain namespaces, and connectivity monitoring disabled. Tests exercise real completeLogin/logout transitions: late login and auto-login after logout cannot restore credentials; taplist/queue responses after logout cannot restore member state; in-flight check-in success/failure after a switch cannot mutate the new account's queue or replay the remaining old-account operation. An ambiguous submitted operation stays available for review without automatic resubmission under the new account.
+
+Found and reproduced a refresh ownership bug: new login joined the previous account's in-flight refresh, which then rejected its old result and left the new lists empty. Red test failed with empty taplist/tastings and a withheld-response expectation. Fixed by associating the shared refresh task with its account epoch, capturing ownership before scheduling, protecting task/refresh-indicator cleanup, and stopping stale refreshes before starting member-data requests. Logout resets its refresh indicator. A new account can now finish refreshing before the old account's response is released. This is separate from the earlier unexplained phone exit; do not claim a crash fix.
+
+Full isolated-simulator correctness suite **56/56 passed**, including all 7 new cases. Log `/private/tmp/BeerSelectorNative-account-all.log`; initial red evidence `/private/tmp/BeerSelectorNative-account-red.log`, first six green cases `/private/tmp/BeerSelectorNative-account-green.log`. Integration plan includes AccountSafetyTests; All includes them automatically. No live HTTP requests, account mutations, phone installs or uploads. Source remains **1.1.0 (60)**; changes in this account-safety session are uncommitted, following `a7238d01`. Next: review/commit this fix, then consider an internal-only build 60 for phone testing. Keychain write-failure injection, full legacy schema-v8 upgrade, further overlapping login/logout cleanup races, physical MetricKit and actual TestFlight crash delivery remain separate work.
+
+## Previous checkpoint — TestFlight diagnostics verified; next build corrected to 60
 
 User confirmed **1.1.0 (38) installed through TestFlight** and successfully shared its diagnostic JSON. Report reviewed from `/Users/pete/Downloads/BeerSelector-diagnostics.json`: 128 entries from one session, September 11 09:26:43–09:28:50 CDT; all 49 completed operations succeeded; two refreshes took 2.034 s and 1.173 s; no main-thread delay events; all retained starts have completions. One completion's start had rotated out of the bounded history. This verifies on-device export/sharing, not crash delivery or resolution of the earlier exit.
 
