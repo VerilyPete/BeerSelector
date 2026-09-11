@@ -1,5 +1,13 @@
 # Internal TestFlight diagnostics
 
+## Build 61 uploaded — 2026-09-11
+
+User authorized completing the rollback task and proceeding to the next step while away. Committed the rollback guard as **35dab101**, then archived and uploaded **1.1.0 (61)** to internal-only TestFlight. Includes the credential-save fix from **f777ad21**. Full correctness suite **65/65 passed**; signed Release archive succeeded. Effective export flags verified: testFlightInternalTestingOnly=true, uploadSymbols=true, manageAppVersionAndBuildNumber=false. Xcode reported **Upload succeeded / EXPORT SUCCEEDED**; Apple processing has begun. Processing completion/internal-group assignment are not independently verified. No external testers, builds, groups or review submissions changed.
+
+Archive retained at `native-ios/.build/InternalTestFlight/BeerSelectorNative-1.1.0-61.xcarchive`, with source zip and `build61-evidence.json` alongside it, all ignored. App dSYM UUID **94D26D69-AE2A-33BF-9917-8C3CACC048E0**; widget **6C1D82BA-00D0-3D2B-8DFB-711F88B2A046**. Both archive bundle versions verified as 61 with matching binary/symbol UUIDs. Logs: `/private/tmp/BeerSelectorNative-internal61-archive.log` and `/private/tmp/BeerSelectorNative-internal61-upload.log`. Preserve separate symbols for builds 38 and 60.
+
+Next user check: install build 61 through TestFlight when ready, then normal login/logout, Refresh All Data and reopening cached lists. The user already confirmed these basic flows on build 60. No manual storage failure is needed; automated tests cover those cases. Updated local WhatToTest.en-US.txt notes were prepared after archiving and have not been applied to App Store Connect group metadata. Further development priorities remain overlapping logout/login cleanup and full legacy schema upgrade coverage. The earlier phone exit is still not attributed to these fixes. Next distribution number must be at least 62.
+
 ## Build 60 uploaded — 2026-09-11
 
 Committed account-safety fix as `3eb06ad0` and uploaded **1.1.0 (60)** successfully. Xcode reported **Upload succeeded / EXPORT SUCCEEDED** and Apple package processing began. Effective export settings verified: `testFlightInternalTestingOnly=true`, `uploadSymbols=true`, `manageAppVersionAndBuildNumber=false`. App and widget archive versions are both 1.1.0 (60), with matching executable/dSYM UUIDs. No external groups/builds/testers or beta review submissions were changed. Processing completion and internal-group assignment are not independently verified; use the existing internal group if manual assignment is needed.
