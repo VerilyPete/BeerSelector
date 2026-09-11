@@ -8,6 +8,10 @@ Requirements: preserve the custom Robocop design, iOS **17.6**, iPhone and iPad,
 
 This is a working parity ledger, not a release certification. “Implemented” means code exists; it does not mean live-account, upgrade, visual, or device verification has passed. `reference-symbols.json` inventories source symbols; `reference-interactions.json` inventories control/configuration references. Helper functions are translated by responsibility, not mechanically one Swift function per JS function.
 
+## Current verification status
+
+[RELEASE-READINESS.md](RELEASE-READINESS.md) consolidates the 2026-09-11 evidence and remaining gates. Historical pending labels below are superseded where that review records completed tests, the real iPad upgrade, and user-confirmed phone/Live Activity checks. Cloud execution and crash-report delivery remain unverified; distribution is paused.
+
 ## Screen and interaction map
 
 | Surface | Reference source | Behavior and controls | Native implementation | Verification |
@@ -83,11 +87,11 @@ Session requests contain PHPSESSID, store__id, member_id, store_name, and option
 
 - [x] Compile app and extension for simulator and device SDK (Debug; device build unsigned).
 - [x] Contract tests: decoding, invalid-vs-empty responses, sorting, set difference, form encoding, queue parser, origin validation.
-- [ ] Migration tests: old schemas, preserved preferences/data/operations, interrupted credential generation, Keychain failure, logout cleanup.
+- [x] Migration/account-safety regression coverage: exact legacy-v8 fixtures, preserved data/operations, interrupted credential generations, injected Keychain failures and logout/login cleanup (74-test suite; not exhaustive OS failure coverage).
 - [ ] iPhone/iPad screenshots compared to current app and the open pen.dev design.
 - [ ] Native rebuild of remaining behavior listed as partial/pending above.
 - [ ] Test-account member/visitor/login/logout/check-in/delete/reward flows, with user participating in authentication.
-- [ ] Upgrade existing signed React Native app to signed native app without uninstall; verify sessions/settings/data.
+- [x] Actual signed in-place upgrade: iPad legacy build 50/schema 7 → native 61, retained account and relaunch persistence; see UPGRADE-REHEARSAL.md.
 - [ ] Physical-device Live Activity lifecycle, disabled authorization, empty queue, logout, foreground, 3-hour stale/cleanup, deep links, force quit.
 - [ ] Offline/reconnect, slow network, 401, 429, 5xx, corrupt response, duplicate tap, account switch and interrupted persistence.
 - [ ] VoiceOver, Reduce Motion, large text and iPad rotation.
@@ -154,3 +158,5 @@ Internal-only TestFlight build 1.1.0 (38) uploaded with symbols. Added persisten
 - Legacy schema-v8 database compatibility is now fixture-verified: exact React Native tables/indexes, cached fields/settings/rewards/operation metadata and migration history survive native opening; subsequent native writes and failed-upgrade rollback/retry pass. Full suite 74/74. Actual signed old-binary-to-native update remains separate device evidence; see TESTING.md.
 
 - Real iPad upgrade verified (legacy 1.1.0 build 50/schema 7 → native build 61): installation preserved the database, a no-network probe preserved all original legacy values, user confirmed existing login survived, and native relaunch preserved the refreshed cache/settings. Initial refresh transport is unknown despite success diagnostics; user confirmed Wi-Fi off. See UPGRADE-REHEARSAL.md for scope and evidence.
+
+- User reports all basic Live Activity checks passed on a physical phone: Lock Screen/Dynamic Island appearance, queue updates, and removal on logout/empty queue. Exact build not restated (last confirmed phone build 61). No additional fixture/device run required for those checks. Long-duration expiry/background execution and crash/MetricKit delivery remain separate evidence.

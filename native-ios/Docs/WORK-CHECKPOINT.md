@@ -1,6 +1,18 @@
 # Migration checkpoint — 2026-09-11
 
-## CURRENT HANDOFF — actual iPad upgrade and relaunch verified
+## CURRENT HANDOFF — release-readiness review complete; distribution paused
+
+See [RELEASE-READINESS.md](RELEASE-READINESS.md) for the consolidated evidence and exact remaining acceptance criteria. Read-only GitHub checks confirmed repository access, but the migration branch is absent (404) and current commit c7ab30c7 is unavailable remotely (422). Current source therefore cannot yet run in Xcode Cloud through origin. Local scheme/plan/executable hook are prepared; no actual Cloud run or authenticated workflow inventory was obtained.
+
+No BeerSelector crash report was found in inspected local caches. Neither the supplied build-38 JSON nor retained iPad first-launch journal contains MetricKit events; bounded history does not establish nondelivery. Apple-side crash retrieval/symbolication remains unverified and the original phone exit unresolved. Next concrete steps: publish the reviewed branch to a verified test-only Cloud workflow, then inspect Organizer/TestFlight crash feedback. No push, Cloud mutation, new build, installation, forced crash or upload occurred. Documentation changes are uncommitted. Latest local correctness evidence remains 74/74 plus the separate real-database probe.
+
+## Previous checkpoint — physical Live Activity checks user-confirmed
+
+User reports all proposed Live Activity checks passed on their physical phone: queue appears on Lock Screen/Dynamic Island, updates correctly, and disappears on logout or when empty. This is user-reported device evidence; no agent recording or additional live mutation was performed. The exact build was not restated in this report (last confirmed phone installation was build 61). No fixture build or repeat of these basic checks is needed. Long-duration expiry/background scheduling and MetricKit/TestFlight crash delivery are not established by this report.
+
+Existing evidence: 74/74 automated correctness tests, 1/1 no-network probe of the real iPad legacy database, successful actual build-50-to-native-61 upgrade with user-confirmed account continuity and relaunch persistence. Original phone exit remains unresolved. Distribution stays paused; latest committed account-safety code after build 61 has not been uploaded. No external tester changes. Next useful step is review the remaining release checklist (including actual Xcode Cloud execution and crash/MetricKit delivery) before deciding whether to package internal build 62; do not upload without renewed distribution authorization.
+
+## Previous checkpoint — actual iPad upgrade and relaunch verified
 
 User confirmed Wi-Fi was off when native opened and their existing signed-in account/tastings/rewards appeared without another login. This establishes user-confirmed account continuity on the real **legacy build 50 → native build 61** in-place upgrade. Do not interpret successful request/refresh diagnostics as proof of live network access: cached responses or another transport cannot be distinguished from the retained numeric journal. The user's Wi-Fi report takes precedence over the earlier assumption that it was left on.
 
