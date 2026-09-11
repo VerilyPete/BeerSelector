@@ -1,5 +1,13 @@
 # Internal TestFlight diagnostics
 
+## Build 60 uploaded — 2026-09-11
+
+Committed account-safety fix as `3eb06ad0` and uploaded **1.1.0 (60)** successfully. Xcode reported **Upload succeeded / EXPORT SUCCEEDED** and Apple package processing began. Effective export settings verified: `testFlightInternalTestingOnly=true`, `uploadSymbols=true`, `manageAppVersionAndBuildNumber=false`. App and widget archive versions are both 1.1.0 (60), with matching executable/dSYM UUIDs. No external groups/builds/testers or beta review submissions were changed. Processing completion and internal-group assignment are not independently verified; use the existing internal group if manual assignment is needed.
+
+Full pre-upload correctness suite: **56/56 passed**, including seven account-safety cases. Signed Release archive passed. Retained archive: `native-ios/.build/InternalTestFlight/BeerSelectorNative-1.1.0-60.xcarchive`; source snapshot and `build60-evidence.json` alongside it are ignored. App dSYM UUID `CC76A5E4-9C6A-3E67-A4B7-4B8968030B4F`; widget UUID `6C1D82BA-00D0-3D2B-8DFB-711F88B2A046`. Logs: `/private/tmp/BeerSelectorNative-internal60-archive.log` and `/private/tmp/BeerSelectorNative-internal60-upload.log`. Preserve build 38's separate symbols for its reports.
+
+Next: install build 60 through TestFlight after processing and verify logout/login/refresh on the phone. The earlier freeze/Home Screen exit remains unexplained; this build fixes a separately reproduced account-switch refresh bug. External testing stays unchanged. Build 60 has now been used; reserve the next build using Scripts/bump-build-number.py before a subsequent distribution archive.
+
 ## Installed build and numbering correction — 2026-09-11
 
 User confirmed build **38** installed through TestFlight and shared its diagnostic report successfully. The retained 128 entries cover 09:26:43–09:28:50 CDT: 49 successful completions, refreshes of 2.034 s and 1.173 s, no main-thread delay events, and no unmatched retained operation starts. This verifies local export/sharing, not Apple's crash-report delivery.
@@ -46,7 +54,7 @@ The export should be combined with TestFlight feedback and the approximate event
 
 ## Future internal uploads
 
-The next distribution build is **60**. Before each later distribution archive, increment the shared CURRENT_PROJECT_VERSION in project.yml above the latest uploaded build (including legacy/external builds), regenerate with XcodeGen, run the correctness suite, and create a fresh Release archive through BeerSelectorProfile. Keep secrets in ignored Resources/ServiceConfiguration.plist.
+Build **60** has been uploaded. Before each later distribution archive, increment the shared CURRENT_PROJECT_VERSION in project.yml above the latest uploaded build (including legacy/external builds), regenerate with XcodeGen, run the correctness suite, and create a fresh Release archive through BeerSelectorProfile. Keep secrets in ignored Resources/ServiceConfiguration.plist.
 
 Upload with:
 
@@ -58,4 +66,4 @@ The script refuses to run without the internal-only option, symbol upload, the e
 
 ### Build-number maintenance
 
-Build 60 is already reserved. For the following distribution archive, run `native-ios/Scripts/bump-build-number.py` once from the repository root (or invoke its absolute path). It increments the single shared XcodeGen setting, enforces a floor of 60, and regenerates the project for both app and widget. XcodeGen must be installed; generation failure restores the prior source setting and attempts project restoration. Review and commit project.yml and project.pbxproj together. Check the latest uploaded build across native and legacy releases first; the local script does not query App Store Connect or coordinate concurrent release branches. Routine Run, Profile, Test and Archive actions do not mutate source versions. Failed archives can reuse their reserved number until it has been uploaded.
+Build 60 has been uploaded. For the following distribution archive, run `native-ios/Scripts/bump-build-number.py` once from the repository root (or invoke its absolute path). It increments the single shared XcodeGen setting, enforces a floor of 60, and regenerates the project for both app and widget. XcodeGen must be installed; generation failure restores the prior source setting and attempts project restoration. Review and commit project.yml and project.pbxproj together. Check the latest uploaded build across native and legacy releases first; the local script does not query App Store Connect or coordinate concurrent release branches. Routine Run, Profile, Test and Archive actions do not mutate source versions. Failed archives can reuse their reserved number until it has been uploaded.

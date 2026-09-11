@@ -1,6 +1,16 @@
 # Migration checkpoint — 2026-09-11
 
-## CURRENT HANDOFF — account-safety regressions and refresh fix
+## CURRENT HANDOFF — build 60 uploaded to internal TestFlight
+
+## Build 60 uploaded — 2026-09-11
+
+Committed account-safety fix as `3eb06ad0` and uploaded **1.1.0 (60)** successfully. Xcode reported **Upload succeeded / EXPORT SUCCEEDED** and Apple package processing began. Effective export settings verified: `testFlightInternalTestingOnly=true`, `uploadSymbols=true`, `manageAppVersionAndBuildNumber=false`. App and widget archive versions are both 1.1.0 (60), with matching executable/dSYM UUIDs. No external groups/builds/testers or beta review submissions were changed. Processing completion and internal-group assignment are not independently verified; use the existing internal group if manual assignment is needed.
+
+Full pre-upload correctness suite: **56/56 passed**, including seven account-safety cases. Signed Release archive passed. Retained archive: `native-ios/.build/InternalTestFlight/BeerSelectorNative-1.1.0-60.xcarchive`; source snapshot and `build60-evidence.json` alongside it are ignored. App dSYM UUID `CC76A5E4-9C6A-3E67-A4B7-4B8968030B4F`; widget UUID `6C1D82BA-00D0-3D2B-8DFB-711F88B2A046`. Logs: `/private/tmp/BeerSelectorNative-internal60-archive.log` and `/private/tmp/BeerSelectorNative-internal60-upload.log`. Preserve build 38's separate symbols for its reports.
+
+Next: install build 60 through TestFlight after processing and verify logout/login/refresh on the phone. The earlier freeze/Home Screen exit remains unexplained; this build fixes a separately reproduced account-switch refresh bug. External testing stays unchanged. Build 60 has now been used; reserve the next build using Scripts/bump-build-number.py before a subsequent distribution archive.
+
+## Previous checkpoint — account-safety regressions and refresh fix
 
 Added **7 AccountSafetyTests** with per-session HTTP fixtures, isolated real SQLite, unique real simulator Keychain namespaces, and connectivity monitoring disabled. Tests exercise real completeLogin/logout transitions: late login and auto-login after logout cannot restore credentials; taplist/queue responses after logout cannot restore member state; in-flight check-in success/failure after a switch cannot mutate the new account's queue or replay the remaining old-account operation. An ambiguous submitted operation stays available for review without automatic resubmission under the new account.
 
