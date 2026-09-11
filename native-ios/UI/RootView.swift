@@ -76,31 +76,14 @@ struct RootView: View {
 struct HomeView: View {
     @EnvironmentObject var model: AppModel
     @Environment(\.dynamicTypeSize) private var typeSize
-    @ScaledMetric(relativeTo:.body) private var minimumTabletHeight = 700.0
+    @State private var expandedHomeBeerID: String?
     var body: some View {
         GeometryReader { geometry in
             let tabletLayout = geometry.size.width >= 768 && !typeSize.isAccessibilitySize
             ScrollView {
                 if model.configured {
                     if tabletLayout {
-                        VStack(alignment:.leading,spacing:20) {
-                            HStack(alignment:.center,spacing:24) {
-                                accountHeader.frame(maxWidth:.infinity,alignment:.leading)
-                                if model.isMember { MetricPanel(count:model.tastedBeers.count).frame(maxWidth:.infinity) }
-                            }
-                            LabelPlate(title:"EXPLORE")
-                            VStack(spacing:20) {
-                                HStack(spacing:20) {
-                                    nav("All Beers","Browse the complete taplist","mug",roomy:true,value:model.allBeers.count,id:"nav-all-beers") { model.tab = .all }
-                                    nav("Beerfinder",model.isMember ? "Find beers you haven't tasted" : "Log in to find untasted beers","magnifyingglass",disabled:!model.isMember,roomy:true,value:model.isMember ? model.untasted.count : nil,id:"nav-beerfinder") { model.tab = .finder }
-                                }
-                                HStack(spacing:20) {
-                                    nav("Tasted Brews",model.isMember ? "View your tasting history" : "Log in to track your history","checkmark.circle",disabled:!model.isMember,roomy:true,value:model.isMember ? model.tastedBeers.count : nil,id:"nav-tasted-brews") { model.tab = .tasted }
-                                    nav("Rewards",model.isMember ? "View your UFO Club rewards" : "Log in to view rewards","gift",disabled:!model.isMember,roomy:true,value:model.isMember ? model.rewards.filter { !$0.redeemed }.count : nil,id:"nav-rewards") { model.showRewards = true }
-                                }
-                            }
-                        }.frame(height:max(minimumTabletHeight,geometry.size.height - 40),alignment:.top)
-                            .padding(.horizontal,24).padding(.vertical,20)
+                        tabletHome.padding(.horizontal,24).padding(.vertical,20)
                     } else {
                         VStack(alignment:.leading,spacing:20) {
                             accountHeader
@@ -120,6 +103,77 @@ struct HomeView: View {
             }
         }
     }
+    private var tabletHome: some View {
+        VStack(alignment:.leading,spacing:20) {
+            accountHeader
+            HStack(spacing:12) {
+                Button("ALL BEERS") { model.tab = .all }.accessibilityIdentifier("nav-all-beers")
+                Button("BEERFINDER") { model.tab = .finder }.disabled(!model.isMember).accessibilityIdentifier("nav-beerfinder")
+                Button("TASTED BREWS") { model.tab = .tasted }.disabled(!model.isMember).accessibilityIdentifier("nav-tasted-brews")
+                Button("REWARDS") { model.showRewards = true }.disabled(!model.isMember).accessibilityIdentifier("nav-rewards")
+            }.buttonStyle(BeerControlStyle())
+            HStack(alignment:.top,spacing:24) {
+                VStack(alignment:.leading,spacing:12) {
+                    sectionHeading("LATEST ON TAP","View all") { model.tab = .all }
+                    if model.allBeers.isEmpty {
+                        Text("No saved beers yet. Refresh from Settings to load the taplist.").font(Robo.mono()).foregroundStyle(Robo.steel)
+                    }
+                    ForEach(Array(BeerFilter().apply(model.allBeers).prefix(6))) { beer in
+                        BeerCard(beer:beer,expanded:expandedHomeBeerID == beer.id,dateLabel:"Added",checkIn:false) {
+                            expandedHomeBeerID = expandedHomeBeerID == beer.id ? nil : beer.id
+                        }
+                    }
+                }.frame(maxWidth:.infinity,alignment:.leading)
+                VStack(alignment:.leading,spacing:20) {
+                    if model.isMember {
+                        JourneyPanel(count:model.tastedBeers.count)
+                        VStack(alignment:.leading,spacing:12) {
+                            sectionHeading("RECENT TASTINGS","View all") { model.tab = .tasted }
+                            ChromePanel {
+                                VStack(alignment:.leading,spacing:12) {
+                                    if model.tastedBeers.isEmpty { Text("Your confirmed tastings will appear here.").font(Robo.mono()).foregroundStyle(Robo.steel) }
+                                    ForEach(Array(BeerFilter().apply(model.tastedBeers,tasted:true).prefix(3))) { beer in
+                                        VStack(alignment:.leading,spacing:4) {
+                                            Text(beer.brew_name).font(Robo.title(14)).foregroundStyle(Robo.cyan)
+                                            Text([beer.brewer,beer.tasted_date].filter { !$0.isEmpty }.joined(separator:" · ")).font(Robo.mono(11)).foregroundStyle(Robo.steel)
+                                        }.frame(maxWidth:.infinity,alignment:.leading)
+                                    }
+                                }
+                            }
+                        }
+                        VStack(alignment:.leading,spacing:12) {
+                            sectionHeading("AVAILABLE REWARDS","View all") { model.showRewards = true }
+                            ChromePanel {
+                                VStack(alignment:.leading,spacing:12) {
+                                    let available = model.rewards.filter { !$0.redeemed }
+                                    if available.isEmpty { Text("No unclaimed rewards. Keep tasting toward your next milestone.").font(Robo.mono()).foregroundStyle(Robo.steel) }
+                                    ForEach(Array(available.prefix(3))) { reward in
+                                        Label(reward.type,systemImage:"gift").font(Robo.title(14)).foregroundStyle(Robo.amber)
+                                    }
+                                }.frame(maxWidth:.infinity,alignment:.leading)
+                            }
+                        }
+                    } else {
+                        ChromePanel {
+                            VStack(alignment:.leading,spacing:12) {
+                                Text("YOUR UFO CLUB JOURNEY").font(Robo.title()).foregroundStyle(Robo.cyan)
+                                Text("Sign in to see your tasted beers, progress and rewards alongside the taplist.").font(Robo.mono()).foregroundStyle(Robo.steel)
+                                Button("SIGN IN") { model.showSettings = true; model.showLogin = true }.buttonStyle(BeerControlStyle(appearance:.amber))
+                            }
+                        }
+                    }
+                }.frame(maxWidth:.infinity,alignment:.leading)
+            }
+        }
+    }
+    private func sectionHeading(_ title: String,_ actionTitle: String,action: @escaping () -> Void) -> some View {
+        HStack {
+            LabelPlate(title:title)
+            Spacer(minLength:8)
+            Button(actionTitle,action:action).font(Robo.mono(11)).foregroundStyle(Robo.cyan).frame(minHeight:44)
+                .accessibilityLabel("\(actionTitle) \(title.lowercased())")
+        }
+    }
     private var accountHeader: some View {
         VStack(alignment:.leading,spacing:8) {
             HStack { LabelPlate(title:model.isMember ? "WELCOME BACK" : "GUEST MODE"); Spacer(); Button { model.showSettings = true } label: { IconWell(symbol:"gearshape").frame(width:44,height:44) }.accessibilityLabel("Open settings").accessibilityIdentifier("settings-nav-button") }
@@ -127,35 +181,20 @@ struct HomeView: View {
             if model.isMember { Label("Flying Saucer — \(model.session?.storeName ?? "")",systemImage:"location.fill").font(Robo.mono()).foregroundStyle(Robo.steel) }
         }
     }
-    private func exploration(roomy: Bool = false) -> some View {
-        VStack(alignment:.leading,spacing:roomy ? 14 : 10) {
+    private func exploration() -> some View {
+        VStack(alignment:.leading,spacing:10) {
             LabelPlate(title:"EXPLORE")
-            nav("All Beers","Browse the complete taplist","mug",roomy:roomy,id:"nav-all-beers") { model.tab = .all }
-            nav("Beerfinder",model.isMember ? "Find beers you haven't tasted" : "Log in to find untasted beers","magnifyingglass",disabled:!model.isMember,roomy:roomy,id:"nav-beerfinder") { model.tab = .finder }
-            nav("Tasted Brews",model.isMember ? "View your tasting history" : "Log in to track your history","checkmark.circle",disabled:!model.isMember,roomy:roomy,id:"nav-tasted-brews") { model.tab = .tasted }
-            nav("Rewards",model.isMember ? "View your UFO Club rewards" : "Log in to view rewards","gift",disabled:!model.isMember,roomy:roomy,id:"nav-rewards") { model.showRewards = true }
+            nav("All Beers","Browse the complete taplist","mug",id:"nav-all-beers") { model.tab = .all }
+            nav("Beerfinder",model.isMember ? "Find beers you haven't tasted" : "Log in to find untasted beers","magnifyingglass",disabled:!model.isMember,id:"nav-beerfinder") { model.tab = .finder }
+            nav("Tasted Brews",model.isMember ? "View your tasting history" : "Log in to track your history","checkmark.circle",disabled:!model.isMember,id:"nav-tasted-brews") { model.tab = .tasted }
+            nav("Rewards",model.isMember ? "View your UFO Club rewards" : "Log in to view rewards","gift",disabled:!model.isMember,id:"nav-rewards") { model.showRewards = true }
         }
     }
-    private func nav(_ title: String,_ subtitle: String,_ icon: String,disabled: Bool = false,roomy: Bool = false,value: Int? = nil,id: String,action: @escaping () -> Void) -> some View {
+    private func nav(_ title: String,_ subtitle: String,_ icon: String,disabled: Bool = false,id: String,action: @escaping () -> Void) -> some View {
         Button { UIImpactFeedbackGenerator(style:.light).impactOccurred(); action() } label: {
-            ChromePanel(padding:roomy ? 22 : 10) {
-                if roomy {
-                    VStack(alignment:.leading,spacing:12) {
-                        HStack {
-                            IconWell(symbol:icon,color:title == "Rewards" ? Robo.amber : Robo.cyan,etched:true)
-                            Spacer()
-                            if let value { Text(value.formatted()).font(Robo.bold(56)).foregroundStyle(title == "Rewards" ? Robo.amber : Robo.cyan).accessibilityLabel("\(value) \(title == "Rewards" ? "available rewards" : "beers")") }
-                        }
-                        Spacer(minLength:12)
-                        Text(title.uppercased()).font(Robo.title(24)).tracking(0.5).foregroundStyle(title == "Rewards" ? Robo.amber : Robo.cyan)
-                        Text(subtitle).font(Robo.mono(14)).foregroundStyle(Robo.steel)
-                    }.frame(maxWidth:.infinity,maxHeight:.infinity,alignment:.leading)
-                        .multilineTextAlignment(.leading)
-                } else {
-                    HStack(spacing:14) { IconWell(symbol:icon,color:title == "Rewards" ? Robo.amber : Robo.cyan,etched:true); VStack(alignment:.leading,spacing:2) { Text(title.uppercased()).font(Robo.title(13)).tracking(0.5).foregroundStyle(title == "Rewards" ? Robo.amber : Robo.cyan); Text(subtitle).font(Robo.mono(10)).foregroundStyle(Robo.steel).multilineTextAlignment(.leading) }; Spacer(); Image(systemName:"chevron.right").font(.system(size:16)).foregroundStyle(Robo.color(0x3A3F47)) }
-                }
+            ChromePanel(padding:10) {
+                HStack(spacing:14) { IconWell(symbol:icon,color:title == "Rewards" ? Robo.amber : Robo.cyan,etched:true); VStack(alignment:.leading,spacing:2) { Text(title.uppercased()).font(Robo.title(13)).tracking(0.5).foregroundStyle(title == "Rewards" ? Robo.amber : Robo.cyan); Text(subtitle).font(Robo.mono(10)).foregroundStyle(Robo.steel).multilineTextAlignment(.leading) }; Spacer(); Image(systemName:"chevron.right").font(.system(size:16)).foregroundStyle(Robo.color(0x3A3F47)) }
             }
-
         }.disabled(disabled).opacity(disabled ? 0.5 : 1).accessibilityIdentifier(id)
     }
 }
