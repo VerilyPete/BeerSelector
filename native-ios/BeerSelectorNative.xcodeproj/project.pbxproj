@@ -20,6 +20,7 @@
 		561F7AF9144662173620EFD7 /* Database.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9256858AED7E171B4D5226B9 /* Database.swift */; };
 		564E961552691B29F63ECC29 /* BeerRuleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADBF41D4275F957AAC3862E7 /* BeerRuleTests.swift */; };
 		570591A5120AC745E44163B7 /* BeerQueueSharedTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04EF71A9E599A4CB8CF189D6 /* BeerQueueSharedTypes.swift */; };
+		5A07C8B87E84C1EA9067756D /* PostLoginCleanupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1479E255579F402879E1A1B7 /* PostLoginCleanupTests.swift */; };
 		5BB735F66B33BB189D265529 /* EnrichmentService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E5B34BEE7B3C2A4705EEE76 /* EnrichmentService.swift */; };
 		5CA3B88967C4017D034E9162 /* RobocopTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6429D061EA9A5F096068E370 /* RobocopTheme.swift */; };
 		615100DCC5E4DE9764B66B4F /* BeerQueueWidgetBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 526FF0891078D8C9C66EBDA4 /* BeerQueueWidgetBundle.swift */; };
@@ -91,6 +92,7 @@
 		0EEB9B8BC25E938FB72A161E /* DiagnosticJournalTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticJournalTests.swift; sourceTree = "<group>"; };
 		11B1728CA71C2EC017ACBCD2 /* SpaceGrotesk-SemiBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "SpaceGrotesk-SemiBold.ttf"; sourceTree = "<group>"; };
 		12D771D46FDD13D0EE577B5A /* BeerSelectorNative.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = BeerSelectorNative.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		1479E255579F402879E1A1B7 /* PostLoginCleanupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostLoginCleanupTests.swift; sourceTree = "<group>"; };
 		2262BE1057E0A4E092166E62 /* BeerSelectorApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeerSelectorApp.swift; sourceTree = "<group>"; };
 		231ED53DBC183B5F36A1F3F5 /* BeerQueueWidgetLiveActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeerQueueWidgetLiveActivity.swift; sourceTree = "<group>"; };
 		2542046C9CA9DA793A61CAD4 /* Diagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Diagnostics.swift; sourceTree = "<group>"; };
@@ -174,6 +176,7 @@
 				065F304DB3C26F8D3AEB36DE /* NetworkTests.swift */,
 				06275F1DAE6CEEAFE3663883 /* PerformanceTests.swift */,
 				60DFA8A1CD16F264CE8F4909 /* PersistenceIntegrationTests.swift */,
+				1479E255579F402879E1A1B7 /* PostLoginCleanupTests.swift */,
 				72A6F305A3B035DABC4A4724 /* Support */,
 			);
 			path = Tests;
@@ -450,6 +453,7 @@
 				3E32F23BD6DF7BBE2F2DAF99 /* NetworkTests.swift in Sources */,
 				47A286345C3C1E452B1D6E39 /* PerformanceTests.swift in Sources */,
 				684DCAB1076A7DD06AD5B7ED /* PersistenceIntegrationTests.swift in Sources */,
+				5A07C8B87E84C1EA9067756D /* PostLoginCleanupTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

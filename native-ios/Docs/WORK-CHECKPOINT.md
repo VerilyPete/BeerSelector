@@ -1,6 +1,16 @@
 # Migration checkpoint — 2026-09-11
 
-## CURRENT HANDOFF — overlapping logout/login cleanup fixed
+## CURRENT HANDOFF — post-login cleanup guarded; distribution paused
+
+User requested keeping account-safety fixes committed and continuing development without another distribution. Build 61 remains the confirmed installed internal TestFlight build; no build-number bump or upload in this session.
+
+Added three PostLoginCleanupTests: member completion after logout, visitor completion after logout, and a new member login while visitor-cookie cleanup is suspended. All three failed before the fix: old completions could close Settings after logout, and the new member could commit while old visitor cleanup was still active. AppModel now shares accountCleanupTask across both login and logout; new login waits before committing, old login checks its committed epoch after cleanup and after subsequent refresh/queue awaits, and an obsolete completion cannot clear newer cleanup ownership or perform further UI work. Activity cleanup has a per-model injection boundary for deterministic async tests, alongside the existing browser-cookie boundary.
+
+Full suite **71/71 passed**, log `/private/tmp/BeerSelectorNative-postlogin-all.log`; red evidence `/private/tmp/BeerSelectorNative-postlogin-red.log`. HTTP is fixture-only, databases and Keychain namespaces are isolated, and no actual device/Live Activity timing guarantee is claimed. Integration and All include PostLoginCleanupTests. User authorization covers committing this follow-up after `76fc9626`. No live account mutation, phone installation or external tester change.
+
+Next development area: full legacy React Native schema-v8 upgrade fixtures and compatibility checks. Build 62 remains available for a later explicitly requested internal release. The original phone exit and actual TestFlight crash-report delivery remain unresolved/unverified; do not characterize these account fixes as its cause or resolution.
+
+## Previous checkpoint — overlapping logout/login cleanup fixed
 
 User confirmed internal build 61 installed and login/logout/refresh work on the phone, then authorized overlapping logout/login testing. Added LogoutRaceTests with controlled asynchronous local-cookie cleanup, per-session HTTP fixtures, real unique Keychain namespaces and isolated SQLite. The initial tests reproduced old local cleanup blanking the new account's URLs and reopening Settings, plus a delayed server logout failure leaking into the new session's error UI.
 

@@ -202,3 +202,9 @@ LogoutRaceTests covers login waiting for old local cleanup, a late old-session s
 Red regressions showed old local cleanup clearing the new account's data URLs and a late server failure leaking into the new session. Local cleanup now serializes with login commit; account-epoch guards protect final logout UI updates and reject superseded waiting logins. Remote logout still uses captured old credentials and does not delay new login after local cleanup completes.
 
 Full suite **67/67 passed** (`/private/tmp/BeerSelectorNative-logout-all.log`), followed by **3/3 focused race tests** after adding the second-logout case (`/private/tmp/BeerSelectorNative-logout-final.log`). Production code was unchanged between those green runs. Total correctness cases now 68; no full 68-case result is claimed. Further visitor/successful-login post-commit cleanup timing remains separate coverage.
+
+## Successful-login and visitor cleanup — 2026-09-11
+
+PostLoginCleanupTests adds three controlled async cases: logout while member activity cleanup is pending; logout while visitor cookie cleanup is pending; and a member login during old visitor cleanup. All failed before the fix. Login/logout now share local cleanup ownership; login checks its account epoch after cleanup, refresh and queue refresh. Obsolete completions cannot close the current Settings view, clear newer cleanup ownership or start further account work.
+
+Full suite **71/71 passed** (`/private/tmp/BeerSelectorNative-postlogin-all.log`), including the previous race and rollback tests. Red evidence: `/private/tmp/BeerSelectorNative-postlogin-red.log`. Test-only per-model cleanup callbacks control the async boundaries; HTTP/Keychain/SQLite remain isolated. These tests verify orchestration, not physical WebKit or Live Activity timing. No new distribution was made.

@@ -31,7 +31,8 @@ final class AppModel: ObservableObject {
     let credentials: CredentialStore
     let liveActivity = LiveActivityController()
     private var cookies: [String:String] = [:]
-    private var logoutCleanupTask: Task<[String], Never>?
+    private var accountCleanupTask: Task<[String], Never>?
+    var activityCleanup: (@MainActor () async -> Void)?
     var webCookieCleanup: (@MainActor () async -> Void)?
     private let monitor = NWPathMonitor()
     private var epoch = UUID()
@@ -236,9 +237,9 @@ final class AppModel: ObservableObject {
                 memberURL = try extract(#"https://[^"'\s]+bk-member-json\.php\?uid=\d+"#)
                 storeURL = try extract(#"https://[^"'\s]+bk-store-json\.php\?sid=\d+"#)
             }
-            // Local logout cleanup may still be deleting credentials or browser cookies.
-            // Wait before publishing a new account; the old server request is independent.
-            if let logoutCleanupTask { _ = await logoutCleanupTask.value }
+            // Prior login/logout cleanup may still be deleting browser cookies or activities.
+            // Wait before publishing a new account; old server requests are independent.
+            if let accountCleanupTask { _ = await accountCleanupTask.value }
             try Task.checkCancellation()
             guard loginEpoch == epoch else { throw BeerError.changedAccount }
             let previous = try credentials.load()
@@ -283,16 +284,30 @@ final class AppModel: ObservableObject {
                     epoch = UUID(); refreshing = false
                     session = nil; cookies = [:]; tastedBeers = []; rewards = []; queue = []; queuedBeerIDs = []
                     notice = nil; showSettings = true; showLogin = true
-                    await liveActivity.endAll()
+                    await endAccountActivities()
                     throw BeerError.storage("Account recovery could not finish. Please sign in again.")
                 }
                 throw error
             }
+            let committedEpoch = epoch
             session = next; cookies = visitor ? [:] : values
-            if visitor { await clearWebCookies() }
-            queue = []; queuedBeerIDs = []; await liveActivity.endAll()
+            queue = []; queuedBeerIDs = []
+            let previousCleanup = accountCleanupTask
+            let cleanup = Task { @MainActor () -> [String] in
+                if let previousCleanup { _ = await previousCleanup.value }
+                if visitor { await clearWebCookies() }
+                await endAccountActivities()
+                return []
+            }
+            accountCleanupTask = cleanup
+            _ = await cleanup.value
+            guard committedEpoch == epoch else { throw BeerError.changedAccount }
+            accountCleanupTask = nil
             showLogin = false; showSettings = false; tab = .home
-            try reload(); await refresh(); await refreshQueue()
+            try reload(); await refresh()
+            guard committedEpoch == epoch else { throw BeerError.changedAccount }
+            await refreshQueue()
+            guard committedEpoch == epoch else { throw BeerError.changedAccount }
             interval.finish(.success)
         } catch { interval.finish(Diagnostics.isCancellation(error) ? .cancelled : .failure); throw error }
     }
@@ -405,6 +420,10 @@ final class AppModel: ObservableObject {
             await refreshQueue(); await refresh()
         } catch { self.error = error.localizedDescription }
     }
+    private func endAccountActivities() async {
+        if let activityCleanup { await activityCleanup() }
+        else { await liveActivity.endAll() }
+    }
     func clearWebCookies() async {
         if let webCookieCleanup { await webCookieCleanup(); return }
         for cookie in HTTPCookieStorage.shared.cookies ?? [] { HTTPCookieStorage.shared.deleteCookie(cookie) }
@@ -416,10 +435,10 @@ final class AppModel: ObservableObject {
         let old = session; let saved = cookies
         epoch = UUID(); refreshing = false; session = nil; cookies = [:]; queue = []; queuedBeerIDs = []; tastedBeers = []; rewards = []
         let token = epoch
-        let previousCleanup = logoutCleanupTask
+        let previousCleanup = accountCleanupTask
         let cleanup = Task { @MainActor in
             if let previousCleanup { _ = await previousCleanup.value }
-            await liveActivity.endAll()
+            await endAccountActivities()
             var failures: [String] = []
             do { try credentials.clear() } catch { failures.append(error.localizedDescription) }
             await clearWebCookies()
@@ -430,10 +449,10 @@ final class AppModel: ObservableObject {
             } catch { failures.append(error.localizedDescription) }
             return failures
         }
-        logoutCleanupTask = cleanup
+        accountCleanupTask = cleanup
         var failures = await cleanup.value
         if token == epoch {
-            logoutCleanupTask = nil
+            accountCleanupTask = nil
             showSettings = true; tab = .home
         }
         if let old, !old.isVisitor {
