@@ -1,5 +1,15 @@
 # Internal TestFlight diagnostics
 
+## Apple crash retrieval verified — 2026-09-11
+
+Xcode Organizer → Crashes retrieved a real **TestFlight** report for legacy **1.1.0 (53)**, dated **2026-08-28 21:00:02.9519 CDT**, iPhone 17 Pro / iOS 26.6.1. EXC_BAD_ACCESS/SIGSEGV on thread 1: pthread mutex lock → exsqlite3_reset → Expo SQLiteModule.run(statement:database:bindParams:bindBlobParams:shouldPassAsArray:), SQLiteModule.swift:399. The stack suggests invalid SQLite statement/database state; the report alone does not establish the lifetime/concurrency cause.
+
+Verified crash binary UUID **333A00F9-EDB1-328F-8ABE-D9FF1026AFA2** matches the retained 2026-08-18 build-53 archive's app dSYM. Local `atos` resolves two crashed-thread addresses to SQLiteModule.run:399 and exsqlite3_reset:91594. This establishes Apple TestFlight crash delivery and matching-symbol analysis for the existing app's legacy build. It does not reproduce or explain the native phone exit and does not establish native MetricKit delivery.
+
+Explicit native **build 61, build 60 and build 38** filters each showed **No Crash Logs** for **Last Two Weeks**, version 1.1.0, all products/destinations/distributions. The unresolved-only filter was off. This is a bounded Organizer query, not proof that no native crash occurred or that none could arrive later.
+
+Raw downloaded report and checksum/analysis evidence are retained privately in ignored `native-ios/.build/CrashAnalysis/legacy53/`. No report was marked resolved, no feedback/tester message was sent, and no forced crash, device mutation or distribution was performed. Leave the original native incident unresolved; obtain its report if it recurs. No additional crash service or intentional crash build is justified by this check.
+
 ## Build 61 uploaded — 2026-09-11
 
 User authorized completing the rollback task and proceeding to the next step while away. Committed the rollback guard as **35dab101**, then archived and uploaded **1.1.0 (61)** to internal-only TestFlight. Includes the credential-save fix from **f777ad21**. Full correctness suite **65/65 passed**; signed Release archive succeeded. Effective export flags verified: testFlightInternalTestingOnly=true, uploadSymbols=true, manageAppVersionAndBuildNumber=false. Xcode reported **Upload succeeded / EXPORT SUCCEEDED**; Apple processing has begun. Processing completion/internal-group assignment are not independently verified. No external testers, builds, groups or review submissions changed.

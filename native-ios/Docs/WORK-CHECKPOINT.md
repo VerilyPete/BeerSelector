@@ -1,6 +1,12 @@
 # Migration checkpoint — 2026-09-11
 
-## CURRENT HANDOFF — actual Xcode Cloud build 22 passed 74/74
+## CURRENT HANDOFF — Cloud evidence committed; Apple crash retrieval verified for legacy build
+
+Committed Cloud verification notes as **89e8ed78** (not pushed; avoids an unnecessary documentation-only Cloud repeat). Actual Cloud build 22 remains green, 74/74. Continued read-only Organizer crash review: downloaded legacy build 53 TestFlight crash from 2026-08-28, verified its binary UUID matches the retained archive, and independently resolved app frames with atos. See INTERNAL-TESTFLIGHT.md for evidence and interpretation.
+
+Native build 61/60/38 filters each showed No Crash Logs in Last Two Weeks, with all distributions/destinations/products and resolved reports included. Apple delivery/symbolication is established for the existing app's legacy build; native crash delivery, original native phone exit and MetricKit remain unverified. No product fix is inferred from the legacy Expo SQLite stack. Raw report retained privately under ignored .build/CrashAnalysis/legacy53. Distribution stays paused. Next useful work: remaining accessibility/device lifecycle/parity checks; the basic Cloud gate and general Apple reporting-channel availability are no longer open setup tasks.
+
+## Previous checkpoint — actual Xcode Cloud build 22 passed 74/74
 
 User explicitly approved publishing native source/docs to the public GitHub origin. Commit **f11d8a79** is pushed on migration/native-swiftui. Created and saved **Native Correctness** through Xcode: native-ios/BeerSelectorNative.xcodeproj, BeerSelectorNative scheme, explicit All plan, required-to-pass Test action, single iPhone 17 Pro, pinned Xcode 26.3 (17C529), branch-change trigger restricted to migration/native-swiftui, no archive or post-actions. Existing Default workflow was left unchanged. Xcode crashed after Save; the workflow survived and was confirmed in Manage Workflows after reopening.
 

@@ -6,6 +6,10 @@ Reviewed source: `c7ab30c7` on `migration/native-swiftui`, plus documentation up
 
 [Native Correctness build 22](https://appstoreconnect.apple.com/teams/867cf0b5-1b9a-478f-b7df-8ce81f2ef11e/apps/6744178536/ci/builds/6f36cee7-d8cf-40b8-ae7d-c8a7ef805502) passed **74/74 tests** at pushed commit f11d8a79. Xcode 26.3; macOS 26.3; iPhone 17 Pro / iOS Simulator 26.3.1. Zero reported errors, failures or warnings. Workflow is testing only, restricted to migration/native-swiftui; distribution remains paused. User explicitly approved the public source push. This supersedes the pre-setup Cloud findings below. Build 23 was a canceled duplicate. See TESTING.md for artifact scope.
 
+## Crash-channel update — 2026-09-11
+
+Organizer retrieved a legacy build-53 TestFlight crash; matching archived dSYM and independent atos frame resolution verify Apple's delivery/symbolication channel for this app. Native builds 38/60/61 each show No Crash Logs in the selected two-week window. Native incident diagnosis and MetricKit delivery remain open; see INTERNAL-TESTFLIGHT.md. No forced crash or distribution occurred.
+
 ## Evidence and remaining gates
 
 | Area | Established evidence | Remaining acceptance evidence |
@@ -47,7 +51,7 @@ No forced crash, debugger termination, phone installation, or tester message was
 ## Recommended order
 
 1. Completed: published source and verified test-only Cloud build 22 (74/74).
-2. Inspect Apple's crash/feedback view for existing reports; retain the unresolved original incident if none is available.
+2. Completed Organizer inspection and legacy-report symbolication; retain the unresolved native incident and inspect any future report.
 3. Close accessibility/device lifecycle and remaining behavior gaps before external release. Package internal build 62 only after distribution resumes.
 
 Supporting records: [TESTING.md](TESTING.md), [UPGRADE-REHEARSAL.md](UPGRADE-REHEARSAL.md), [INTERNAL-TESTFLIGHT.md](INTERNAL-TESTFLIGHT.md), [PARITY.md](PARITY.md).
