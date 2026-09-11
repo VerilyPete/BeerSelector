@@ -229,19 +229,36 @@ struct Scanlines: View {
 }
 struct MetricPanel: View {
     let count: Int
+    private var displayDigits: [Character] {
+        let value = String(count)
+        return Array(String(repeating:" ",count:max(0,3-value.count)) + value)
+    }
     var body: some View {
-        ChromePanel(padding:20,riveted:true) {
-            VStack(alignment:.center,spacing:8) {
-                LabelPlate(title:"BEERS TASTED",cyan:true)
-                HStack(alignment:.bottom,spacing:4) {
-                    ZStack(alignment:.leading) {
-                        Text("888").foregroundStyle(Robo.cyan.opacity(0.12)).accessibilityHidden(true)
-                        Text("\(count)").foregroundStyle(Robo.cyan)
-                    }.font(Robo.bold(64)).minimumScaleFactor(0.6)
-                    Text("/200").font(Robo.title(22)).foregroundStyle(Robo.cyan.opacity(0.4)).padding(.bottom,4)
-                }.accessibilityElement(children:.ignore).accessibilityLabel("\(count) of 200 beers tasted")
+        ChromePanel(padding:14,riveted:true) {
+            VStack(alignment:.center,spacing:6) {
+                Text("BEERS TASTED")
+                    .font(Robo.bold(22)).tracking(2).lineLimit(1).minimumScaleFactor(0.7)
+                    .foregroundStyle(Robo.background)
+                    .frame(maxWidth:.infinity).padding(.vertical,6)
+                    .background(Robo.cyan,in:RoundedRectangle(cornerRadius:5))
+                HStack(alignment:.firstTextBaseline,spacing:6) {
+                    HStack(spacing:2) {
+                        ForEach(Array(displayDigits.enumerated()),id:\.offset) { _, digit in
+                            Text("8").foregroundStyle(Robo.cyan.opacity(0.12))
+                                .overlay {
+                                    if digit != " " { Text(String(digit)).foregroundStyle(Robo.cyan) }
+                                }
+                        }
+                    }.font(.custom("DSEG7Classic-Bold",size:88,relativeTo:.largeTitle))
+                        .accessibilityHidden(true).layoutPriority(1)
+                    Text("/200").font(Robo.title(30)).foregroundStyle(Robo.cyan.opacity(0.65))
+                        .lineLimit(1).minimumScaleFactor(0.7)
+                }.frame(maxWidth:.infinity).padding(.vertical,6)
+                    .accessibilityElement(children:.ignore).accessibilityLabel("\(count) of 200 beers tasted")
                 ProgressView(value:Double(min(count,200)),total:200).tint(Robo.cyan)
-                Text(String(format:"%.1f%% UFO CLUB PROGRESS",min(Double(count)/200,1)*100)).font(Robo.mono(9)).tracking(1).foregroundStyle(Robo.steel)
+                Text(String(format:"%.1f%% UFO CLUB PROGRESS",min(Double(count)/200,1)*100))
+                    .font(Robo.mono(11)).tracking(0.5).foregroundStyle(Robo.steel)
+                    .lineLimit(1).minimumScaleFactor(0.7)
             }.overlay(Scanlines())
         }
     }

@@ -5,6 +5,9 @@ import ActivityKit
 final class AppDelegate: NSObject, UIApplicationDelegate {
     static let cleanupIdentifier = "org.verily.FSbeerselector.liveactivity.cleanup"
     func application(_ application: UIApplication,didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey:Any]? = nil) -> Bool {
+        guard ProcessInfo.processInfo.environment["BEERSELECTOR_TEST_HOST"] != "1",
+              ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else { return true }
+        DeviceMetrics.shared.start()
         BGTaskScheduler.shared.register(forTaskWithIdentifier:Self.cleanupIdentifier,using:nil) { task in
             let work = Task {
                 for activity in Activity<BeerQueueAttributes>.activities where activity.content.staleDate.map({ $0 <= Date() }) == true {

@@ -130,3 +130,18 @@ On 2026-09-10 the user accepted the revised chrome (“it's good”) and request
 Missing beers now receive one batch lookup after a valid successful sync, merged before returning to the existing account-guarded persistence flow. Still-missing results cannot start another sync. Sync validates required response fields, rejects invalid input identities/names, deduplicates IDs and retains the 50-row chunk limit. Invalid or zero-success sync responses preserve upstream data without a follow-up.
 
 25/25 tests pass on the isolated review simulator, including three new post-sync regression cases; unsigned device SDK build passes. Logs: `/private/tmp/BeerSelectorNative-enrichment-test.log` and `/private/tmp/BeerSelectorNative-enrichment-device.log`. No original simulator data or live account actions were touched. Full batch/proxy/health schema checks, configurable rate/chunk reservation policy, and delayed cleanup polling remain open; this change does not certify completion of asynchronous Worker cleanup.
+
+### Physical iPhone retention and refresh cancellation
+
+User confirmed the existing account appeared after the signed native in-place installation. This establishes observed credential retention on that phone, not every upgrade gate. Beerfinder pull-to-refresh reported duplicate “cancelled” errors; refresh now runs in an AppModel-owned task and stops quietly on cancellation without proxy fallback or subsequent source requests. 27/27 simulator tests pass, including two cancellation regressions. User confirmed the physical iPhone pull-to-refresh retest passes.
+
+### Test suite and Cloud preparation — 2026-09-10
+
+34 tests pass: 11 unit rules and 23 HTTP/persistence integrations, independently selectable via shared Xcode test plans. Parallel randomized runs with fresh processes passed twice (68 executions). HTTP scripts are scoped per session; connectivity monitoring and app lifecycle startup are disabled in tests. Added direct Expo legacy service compatibility and foreign account/store operation rejection coverage. The missing-chunk case now exercises missing chunks rather than failing earlier on the session.
+
+Four deliberate regression probes are killed by the expected tests after repairing an initially surviving ABV-order probe. A secret-free temporary checkout also passes. Cloud preparation and setup instructions are in [TESTING.md](TESTING.md); no actual Xcode Cloud run is claimed, and remaining migration gates stay open.
+
+
+## Profiling follow-up — 2026-09-11
+
+Implemented validated enrichment outcome counters, fixed-label signposts/logging, URLSession task timing aggregation, a MetricKit subscriber, and Debug Settings diagnostics display/share. Added a coverage-free profiling scheme plus isolated performance plan. Measured SQLite contention led to zero busy wait while retaining serialized transactions and cache/account guards. Correctness: 43/43; performance: 2/2; unsigned Release device build passes with optimized coverage-free compiler flags and dSYM. See TESTING.md for evidence and limits. Physical Instruments/MetricKit delivery, Cloud execution, and migration release gates remain unverified.

@@ -29,3 +29,7 @@ Component IDs from the source document:
 Validation uses isolated offline fixture screenshots on simulator `6CC9C856-7049-4BC3-82EE-E67ADB1F5BD3`; the user's signed-in simulator is updated in place only after review. A Pen MCP connection was attempted again but timed out, so source properties are read from the saved design JSON; do not describe this as a rendered pixel comparison against Pen.
 
 Status-bar styling follows [Apple's status-bar customization guidance](https://developer.apple.com/documentation/technotes/tn3105-customizing-uistatusbar-syle): dark system content on the light metal band.
+
+## Home metric user correction — 2026-09-10
+
+The user explicitly requires ghost seven-segment markings. Use DSEG7Classic-Bold for lit digits and underlying ghost 8s, aligned per digit, with ghost cyan opacity 0.12. Retain the larger full-width BEERS TASTED label and tighter counter layout. This overrides the earlier Space Grotesk metric-font choice and subsequent ghost removal.

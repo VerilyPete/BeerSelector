@@ -2,14 +2,14 @@ import Foundation
 
 @MainActor
 final class EnrichmentService {
-    struct Metrics { var requests = 0; var successes = 0; var failures = 0; var rateLimited = 0; var cacheHits = 0; var fallbacks = 0 }
+    struct Metrics { var requests = 0; var successes = 0; var failures = 0; var cancellations = 0; var rateLimited = 0; var cacheHits = 0; var fallbacks = 0 }
     private(set) var metrics = Metrics()
     private var requests: [Date] = []
     private var blockedUntil = Date.distantPast
     let api: BeerAPI
     init(api: BeerAPI) { self.api = api }
     var configured: Bool { api.configuration.enrichmentURL?.scheme == "https" && api.configuration.enrichmentKey?.isEmpty == false }
-    private func call(_ path: String,query: [URLQueryItem] = [],json: Data? = nil,etag: String? = nil) async throws -> (Data,HTTPURLResponse) {
+    private func call<Value>(_ path: String,query: [URLQueryItem] = [],json: Data? = nil,etag: String? = nil, decode: (Data, HTTPURLResponse) throws -> Value) async throws -> Value {
         guard configured, let base = api.configuration.enrichmentURL, let key = api.configuration.enrichmentKey else { throw BeerError.invalidResponse("Enrichment is not configured") }
         let now = Date(); requests.removeAll { now.timeIntervalSince($0) >= 60 }
         guard requests.count < 10, now >= blockedUntil else { metrics.rateLimited += 1; throw HTTPFailure(status:429) }
@@ -20,23 +20,27 @@ final class EnrichmentService {
         if let etag { headers["If-None-Match"] = etag }
         do {
             let result = try await api.request(url.url!,method:json == nil ? "GET" : "POST",headers:headers,retry:false,json:json)
+            try Task.checkCancellation()
+            let value = try decode(result.0, result.1)
             metrics.successes += 1
             if result.1.statusCode == 304 { metrics.cacheHits += 1 }
-            return result
+            return value
         } catch {
-            metrics.failures += 1
+            if Diagnostics.isCancellation(error) { metrics.cancellations += 1 }
+            else { metrics.failures += 1 }
             if (error as? HTTPFailure)?.status == 429 { blockedUntil = Date().addingTimeInterval(60); metrics.rateLimited += 1 }
             throw error
         }
     }
     func taplist(storeID: String,etag: String?) async throws -> (beers:[Beer]?,etag:String?) {
-        let (data,response) = try await call("beers",query:[.init(name:"sid",value:storeID)],etag:etag)
-        if response.statusCode == 304 {
-            guard etag != nil else { throw BeerError.invalidResponse("Unexpected cache response") }
-            return (nil,etag)
+        return try await call("beers",query:[.init(name:"sid",value:storeID)],etag:etag) { data, response in
+            if response.statusCode == 304 {
+                guard etag != nil else { throw BeerError.invalidResponse("Unexpected cache response") }
+                return (nil,etag)
+            }
+            guard let object = try JSONSerialization.jsonObject(with:data) as? [String:Any], object["storeId"] as? String == storeID else { throw BeerError.invalidResponse("Taplist store does not match the selected store") }
+            return (try BeerAPI.parseBeers(data,proxy:true),response.value(forHTTPHeaderField:"ETag"))
         }
-        guard let object = try JSONSerialization.jsonObject(with:data) as? [String:Any], object["storeId"] as? String == storeID else { throw BeerError.invalidResponse("Taplist store does not match the selected store") }
-        return (try BeerAPI.parseBeers(data,proxy:true),response.value(forHTTPHeaderField:"ETag"))
     }
     func enrich(_ beers: [Beer]) async -> [Beer] {
         await enrich(beers, allowSync: true)
@@ -50,8 +54,10 @@ final class EnrichmentService {
         for offset in stride(from:0,to:ids.count,by:100) {
             do {
                 let chunk = Array(ids[offset..<min(offset+100,ids.count)])
-                let (data,_) = try await call("beers/batch",json:JSONEncoder().encode(["ids":chunk]))
-                guard let object = try JSONSerialization.jsonObject(with:data) as? [String:Any], let rows = object["enrichments"] as? [String:[String:Any]], let absent = object["missing"] as? [String] else { throw BeerError.invalidResponse("Invalid enrichment batch") }
+                let (rows, absent) = try await call("beers/batch",json:JSONEncoder().encode(["ids":chunk])) { data, _ in
+                    guard let object = try JSONSerialization.jsonObject(with:data) as? [String:Any], let rows = object["enrichments"] as? [String:[String:Any]], let absent = object["missing"] as? [String] else { throw BeerError.invalidResponse("Invalid enrichment batch") }
+                    return (rows, absent)
+                }
                 let allowed = Set(chunk)
                 for (id,row) in rows where allowed.contains(id) { enriched[id] = row }
                 missing.formUnion(absent.filter(allowed.contains))
@@ -94,10 +100,13 @@ final class EnrichmentService {
             let chunk = valid[offset..<min(offset+50,valid.count)]
             let rows = chunk.map { ["id":$0.id,"brew_name":$0.brew_name,"brewer":$0.brewer,"brew_description":String($0.brew_description.prefix(2000))] }
             do {
-                let (data,_) = try await call("beers/sync",json:JSONEncoder().encode(["beers":rows]))
-                let response = try JSONDecoder().decode(SyncResponse.self,from:data)
-                guard response.synced.isFinite, response.synced > 0,
-                      response.queued_for_cleanup.isFinite, response.queued_for_cleanup >= 0 else { continue }
+                let response = try await call("beers/sync",json:JSONEncoder().encode(["beers":rows])) { data, _ in
+                    let response = try JSONDecoder().decode(SyncResponse.self,from:data)
+                    guard response.synced.isFinite, response.synced >= 0,
+                          response.queued_for_cleanup.isFinite, response.queued_for_cleanup >= 0 else { throw BeerError.invalidResponse("Invalid sync counts") }
+                    return response
+                }
+                guard response.synced > 0 else { continue }
                 syncedIDs.formUnion(chunk.map(\.id))
             } catch {
                 if error is DecodingError { continue }
@@ -107,9 +116,10 @@ final class EnrichmentService {
         return syncedIDs
     }
     func health() async throws -> String {
-        let (data,_) = try await call("health")
-        guard let object = try JSONSerialization.jsonObject(with:data) as? [String:Any], let status = object["status"] as? String, ["ok","error"].contains(status) else { throw BeerError.invalidResponse("Invalid enrichment health") }
-        return status
+        return try await call("health") { data, _ in
+            guard let object = try JSONSerialization.jsonObject(with:data) as? [String:Any], let status = object["status"] as? String, ["ok","error"].contains(status) else { throw BeerError.invalidResponse("Invalid enrichment health") }
+            return status
+        }
     }
     func recordFallback() { metrics.fallbacks += 1 }
     func resetMetrics() { metrics = Metrics() }

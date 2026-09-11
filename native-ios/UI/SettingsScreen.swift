@@ -3,6 +3,7 @@ import SwiftUI
 struct SettingsScreen: View {
     @EnvironmentObject var model: AppModel
     @Environment(\.dismiss) var dismiss
+    @State private var diagnosticsReport: String?
     @State private var confirmLogout = false
     @State private var confirmReset = false
     @State private var confirmTimestamps = false
@@ -32,6 +33,14 @@ struct SettingsScreen: View {
                     row("Create Mock Session","Open isolated offline sample data","flask.fill") {
                         do { try model.loadPreviewFixtures(); dismiss() } catch { model.error = error.localizedDescription }
                     }.accessibilityIdentifier("create-mock-session-button")
+                    row("Performance Diagnostics","View and share numeric session aggregates","waveform.path.ecg") {
+                        let m = model.enrichment.metrics
+                        diagnosticsReport = Diagnostics.shared.report() + "\nEnrichment requests=\(m.requests) ok=\(m.successes) failed=\(m.failures) cancelled=\(m.cancellations) limited=\(m.rateLimited) cache=\(m.cacheHits) fallback=\(m.fallbacks)"
+                    }
+                    if let diagnosticsReport {
+                        Text(diagnosticsReport).font(Robo.mono()).textSelection(.enabled)
+                        ShareLink(item: diagnosticsReport) { Label("Share Diagnostics", systemImage: "square.and.arrow.up") }
+                    }
                     row("Database Statistics","View database counts and refresh times","chart.bar.fill") {
                         model.notice = "All Beers: \(model.allBeers.count)\nTasted Beers: \(model.tastedBeers.count)\nRewards: \(model.rewards.count)\nPending operations: \(model.operations.count)"
                     }

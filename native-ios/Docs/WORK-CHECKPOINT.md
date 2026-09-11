@@ -1,4 +1,126 @@
-# Migration checkpoint — 2026-09-10
+# Migration checkpoint — 2026-09-11
+
+## CURRENT HANDOFF — profiling fixes implemented and validated
+
+Resumed the authorized profiling fixes. **43/43 correctness tests and 2/2 opt-in performance tests pass.** No build/test processes remain after validation. User requested a commit after validation. This checkpoint is included with the accumulated phone/UI/testing and profiling fixes on `migration/native-swiftui`. No push, phone reinstall, or live account mutations were performed in the profiling/commit sessions.
+
+- Fixed enrichment accounting with a generic request/decode boundary: malformed payloads fail; cancellations have their own count; cache hits require validated 304 semantics. Tests cover server/local rate-limit accounting and redirect protection.
+- Added `Core/Diagnostics.swift`: bounded, thread-safe operation aggregates; balanced OSSignposter intervals and structured Logger outcomes for refresh, parsing, transactions, login, queue processing and HTTP requests. Existing RedirectPolicy collects task timings without weakening cross-origin rejection. Retained MetricKit subscriber collects only report counts and CPU seconds. Debug Settings displays/shares numeric diagnostics; no sensitive input or raw reports enter telemetry.
+- Added shared **BeerSelectorProfile** scheme and **Performance** test plan/configuration. Profile/Run use Release; optimized tests enable testability. Actual unsigned device Release build passes with `-O`, whole-module optimization, `-g`, dSYM, and **no coverage flags**. Debug correctness coverage remains enabled. Use this dedicated scheme for profiling, not the original coverage scheme.
+- Measured a contended SQLite write at **5.162 seconds** before changing busy timeout from 5000ms to zero. After: **0.00069 seconds**. MainActor serialization remains; no detached database work. New real-connection refresh regression verifies cache/timestamp preservation and successful retry after unlock. The 1,000-beer parse/write/read experiment averaged **17ms** before and after; simulator observations are not device budgets.
+- `Scripts/run-tests.sh` now accepts `BEERSELECTOR_TEST_SCHEME`; default remains BeerSelectorNative. Performance runs separately with no coverage/parallel workers/timing gate. Unit includes DiagnosticsTests; All excludes PerformanceTests. Project regenerated using XcodeGen.
+
+Evidence and exact commands/semantics: [TESTING.md](TESTING.md), section “Profiling fixes and measurements”. Logs: `/private/tmp/BeerSelectorNative-profiling-final.log` (43 tests), `BeerSelectorNative-performance-before.log` / `BeerSelectorNative-performance-after.log` (2 tests each), `BeerSelectorNative-profile-clean.log` (unsigned device build). Isolated simulator remains `6CC9C856-7049-4BC3-82EE-E67ADB1F5BD3`; test derived data `/private/tmp/BeerSelectorNative-testing` and `/private/tmp/BeerSelectorNative-performance`.
+
+Remaining validation requires a physical-device Instruments trace, real task-metric and MetricKit delivery, and the earlier migration release gates. Actual Xcode Cloud workflow execution and full RN upgrade/device Live Activity coverage are still unverified. Prior 4/4 mutation smoke result was not rerun or expanded in this profiling session. Do not claim the entire migration complete. Preserve the approved ghost DSEG7 counters/chrome and ignored configuration; never print credentials.
+
+---
+
+## Previous handoff — resolved by the profiling fixes above (historical)
+
+Latest user: **“compact or handoff”**. Stop here and resume the authorized fixes from this entry next session.
+
+### Active objective
+
+User said **“ok, fix those issues”** after the instrumentation/profiling audit. Implement the fixes; do not stop at another audit. Their earlier request requires meaningful unit/integration tests for Xcode Cloud, consideration of mutation testing, and Farley's eight properties. No subagents unless explicitly requested.
+
+### Exact stopping point
+
+- Added **two regression tests** in `Tests/NetworkTests.swift`: `testMalformedEnrichmentIsAFailureNotASuccess` (line 140) and `testCancelledEnrichmentDoesNotCountAsFailure` (line 154).
+- Ran ONLY these two against unchanged enrichment code: **both fail, 3 expected assertion failures**. Log `/private/tmp/BeerSelectorNative-metrics-red.log`.
+- Malformed HTTP-200 taplist currently increments successes and not failures. Cancelled request currently increments failures. Tests establish the intended behavior before implementation.
+- **No production profiling fixes have been implemented yet.** No telemetry file, Release config fix, database timeout/concurrency change, or new performance suite exists. The current overall suite must be considered red until these two cases are fixed. Last green full suite before these additions: **34/34**, also **68/68** repeated parallel executions.
+- No running build or test process remains from this turn.
+
+### Findings to fix
+
+1. **Coverage contaminates Release builds through the shared scheme.** Actual unsigned Release audit compiler commands contain `-O`, `-whole-module-optimization`, `-g` AND `-profile-generate` / `-profile-coverage-mapping`. Release dSYM is configured. Log `/private/tmp/BeerSelectorNative-profile-audit.log`, settings `/private/tmp/BeerSelectorNative-profile-settings.json`; build passed. Explicitly disable coverage in a profiling configuration/scheme, preserve Debug unit-test coverage, and verify actual emitted flags rather than relying on configuration names.
+2. **Enrichment counters have wrong semantics and no consumer.** `Core/EnrichmentService.swift` increments successes in `call` before parsing/validation. Cancellation counts as failure. Proposed approach: validate within a generic request/decode helper so each request records exactly one validated success/failure/cancellation; keep rate-limit/cache-hit semantics explicit. Add safe diagnostics display/export through Debug Settings. No credentials, URLs/query values, cookies, bodies, member names/IDs in telemetry.
+3. **Missing operation instrumentation.** No OSSignposter, structured Logger, URLSessionTaskMetrics collection, MetricKit subscriber or XCTest performance measurements. Proposed initial intervals: refresh, parsing, persistence/transactions, login, queue processing; outcome-aware completion on success/failure/cancel and balanced begin/end. Add URLSessionTaskMetrics collection while preserving `RedirectPolicy` cross-origin protection. Consider bounded, thread-safe aggregates with fixed operation names; avoid an unbounded event store. Add useful diagnostics consumer and focused performance plan rather than putting noisy timing gates into the fast unit gate.
+4. **MainActor synchronous SQLite/parsing risk.** `AppModel` is MainActor; `Database.swift` uses synchronous calls and `sqlite3_busy_timeout(handle,5000)`. This is a measured-code-location risk, NOT a proven production hitch. Assistant told user: measure first before changing database concurrency. Suggested next experiment: isolated realistic snapshot workload and lock-contention test; if retaining synchronous access, bound main-thread lock waits and preserve cache on busy failures. Do not blindly move SQLite to detached tasks without serialization and account-epoch safety. No experiment/change for this has been made yet.
+
+### Tools and validation commands
+
+- Worktree `/Users/pete/claude/BeerSelector-native`, branch `migration/native-swiftui`, base native commit `014e173c`. Many subsequent phone/UI/testing edits are **uncommitted**; preserve them. No push requested.
+- Graph query for native Swift symbols returned zero; use known-file reads after that fallback. Graph project `Users-pete-claude-BeerSelector-native`.
+- Xcode 26.3; review simulator `6CC9C856-7049-4BC3-82EE-E67ADB1F5BD3`, iOS 26.3.1. Keep fixture/testing activity isolated from user's signed-in simulator and physical phone.
+- Last red command from repo root:
+  `BEERSELECTOR_TEST_DESTINATION='platform=iOS Simulator,id=6CC9C856-7049-4BC3-82EE-E67ADB1F5BD3' BEERSELECTOR_TEST_PARALLEL=NO BEERSELECTOR_TEST_BUILD_DIR=/private/tmp/BeerSelectorNative-testing native-ios/Scripts/run-tests.sh -only-testing:BeerSelectorNativeTests/NetworkTests/testMalformedEnrichmentIsAFailureNotASuccess -only-testing:BeerSelectorNativeTests/NetworkTests/testCancelledEnrichmentDoesNotCountAsFailure`
+- Reuse `Scripts/run-tests.sh` and shared All/Unit/Integration plans; see TESTING.md. Simulator tests require ad hoc signing; unsigned host breaks Keychain. Regenerate project with XcodeGen after new Swift files/plans.
+- Local Instruments templates available: Time Profiler, SwiftUI, Swift Concurrency, Allocations, Network, Animation Hitches, etc. No actual trace has been recorded.
+- Primary docs read: Apple OSSignposter (`https://developer.apple.com/documentation/os/ossignposter`), Recording Performance Data (`https://developer.apple.com/documentation/os/recording-performance-data`), MXMetricManager (`https://developer.apple.com/documentation/metrickit/mxmetricmanager`). Website exposes newer deprecations; use SDK-available API compatible with app minimum iOS 17.6. MetricKit real delivery requires physical-device validation; do not claim simulator compilation proves it.
+
+### Preserve prior accepted work
+
+- User confirmed physical-phone existing account survived the in-place update and Beerfinder cancellation fix works.
+- Home counter must retain **ghost seven-segment markings**, DSEG7Classic-Bold, enlarged full-width title, tighter layout, approved chrome. User specifically rejected ghost removal. Latest screenshot `Docs/Screenshots/iphone-home-segments.png`.
+- Physical iPhone device ID `66EAEFE2-8C90-54FC-8F07-447104BECB2B`, Xcode UDID `00008150-00060C9C2247801C`. Last ghost update installed; reopening failed only because phone was locked. No profiling/test changes installed on phone afterward.
+- All configuration secrets stay in ignored `Resources/ServiceConfiguration.plist`; never print values. Cloud post-clone supplies an empty plist only when absent. Real Xcode Cloud workflow/run remains unconfigured/unverified.
+- Muter config is prepared but Muter is NOT installed/validated. Actual tested mutation runner is `Scripts/mutation-smoke.py`, with four seeded mutations in temporary secret-free copies. All four killed after fixing an ABV-input-order test gap. Preserve distinction from a whole-project mutation score.
+
+---
+
+
+## Profiling wiring inspection — 2026-09-10
+
+User asked to inspect the wiring. Audited Profile scheme, effective Release settings, local Instruments templates, telemetry call sites, and an actual unsigned Release build. Findings recorded at the end of TESTING.md.
+
+Release build succeeds with optimization and dSYM, **but includes coverage compiler instrumentation** (`-profile-generate`, `-profile-coverage-mapping`), so a clean profiling configuration is needed before measuring. Enrichment counters are unconsumed and count HTTP success before payload validation. No signposts, task metrics, MetricKit, structured logs or performance tests. MainActor SQLite/parsing is a profiling target, not a proven performance defect. No app behavior changes or device trace in this inspection. Build log `/private/tmp/BeerSelectorNative-profile-audit.log`.
+
+---
+
+## Unit/integration testing and Cloud preparation — 2026-09-10
+
+User requested meaningful unit/integration tests aimed at Xcode Cloud, mutation testing consideration, and Farley's eight properties. See [TESTING.md](TESTING.md) for strategy, commands, evidence, remaining gaps and Cloud setup. User also asked about instrumentation/profiling: current Profile action, coverage, basic enrichment counters exist; structured signposts/performance baseline remain absent. No profiling implementation was requested or added.
+
+- Retained XCTest. Split pure rules into `BeerRuleTests`, persistence/resources into `PersistenceIntegrationTests`, and kept `NetworkTests`. Fixed misleading names and the missing-chunk test that actually failed on missing session first. Added direct Expo legacy Keychain fixtures across all three services.
+- Replaced global HTTP script with per-session fixture routing; unscripted requests fail locally. AppModel accepts connectivity monitoring disabled for tests; test host suppresses startup/foreground/background registration. SQLite and Keychain remain real, uniquely namespaced integrations.
+- Added contract cases for description-only ABV, stable equal-key order, foreign member/store pending operation rejection, malformed taplist preserving cache while member data refreshes, and malformed rewards preserving rewards while authoritative empty tastings clear.
+- Added shared `All`, `Unit`, `Integration` test plans: random order, coverage, timeouts, parallel eligibility. Generated Xcode project updated. Cloud post-clone hook creates an empty ignored config only when absent; no Node/Pods/XcodeGen install required in Cloud.
+- **34/34 tests pass**: Unit **11**, Integration **23**, independently validated. All plan passed twice with parallel workers and process relaunch: **68/68 executions**. Results `/private/tmp/BeerSelectorNative-parallel-repeat.xcresult`, `BeerSelectorNative-unit-plan.xcresult`, `BeerSelectorNative-integration-plan.xcresult`. Unit execution ~0.01s; integration ~2.2s, excluding build/host startup. Xcode 26.3, simulator iOS 26.3.1.
+- Four seeded mutation probes run against disposable secret-free copies. First unknown-ABV mutant survived; strengthening all six input permutations in both sort directions killed it. Final **4/4 killed**, each by its intended test; **34/34 baseline**. Report `/var/folders/qf/fq1jmj9n3y10c_sw_nr1_9jh0000gn/T/beerselector-mutations-brgi9fu0/report.json`. Runner `Scripts/mutation-smoke.py` preserves checkout, excludes production config, separates test failures from compile/launch errors/timeouts. This is not a whole-project mutation score.
+- Muter investigated from primary docs; config prepared but tool not installed/validated. Semicolon-compressed Swift may require transformation cleanup before broad Muter use.
+- Cloud hook exercised for absent and existing files; temporary secret-free checkout baseline built successfully. **Actual Cloud workflow/run is not created or certified.** Activation instructions are in TESTING.md; commit/push and connect workflow remain. Changes from this work and previous phone fixes remain uncommitted. No phone reinstall in this testing session.
+- Next risk-based testing priorities: precise login/account-switch races, Keychain write-failure injection, full RN schema-v8 upgrade, enrichment rate/polling contracts and physical Live Activities. AppModel line coverage ~50%, LiveActivity ~19%; higher coverage elsewhere is not a correctness guarantee.
+
+---
+
+## Restore ghost seven-segment styling — 2026-09-10
+
+User explicitly requested restoring ghost seven-segment markings as part of the Robocop styling. This supersedes the preceding removal. MetricPanel now uses DSEG7Classic-Bold for both lit digits and aligned cyan 12%-opacity ghost 8s, with three right-aligned slots. Keep this styling. The enlarged full-width title and tighter layout remain.
+
+Simulator and signed phone builds pass (`/private/tmp/BeerSelectorNative-segments-simulator.log`, `/private/tmp/BeerSelectorNative-segments-phone.log`). Visually reviewed `Docs/Screenshots/iphone-home-segments.png`; installed in place on the paired iPhone for user review.
+
+---
+
+## Home counter revision — 2026-09-10
+
+User requested less black space, larger count and larger BEERS TASTED label. MetricPanel now has a full-width cyan 22-point bold title, 112-point count (previously 64), clearer 30-point /200, larger progress caption, tighter inset/vertical spacing, and no ghost 888 digits. Approved surrounding chrome remains.
+
+Simulator and signed phone builds pass (`/private/tmp/BeerSelectorNative-counter-simulator.log`, `/private/tmp/BeerSelectorNative-counter-phone.log`). Final isolated fixture screenshot reviewed: `Docs/Screenshots/iphone-home-counter.png`. Installed on paired iPhone in place for review. User acceptance and large-text/iPad review remain pending. No new unit tests for this layout-only revision; previous logic suite passed 27/27.
+
+---
+
+## Phone refresh cancellation fix — 2026-09-10
+
+User confirmed their existing account appeared on the physical iPhone after the in-place install; saved credential retention is user-confirmed. They reported Beerfinder pull-to-refresh showing “cancelled cancelled”.
+
+Refresh previously ran directly in the caller's task, treated cancellation as a source failure, attempted proxy fallback, and continued to the next source. AppModel now owns a shared refresh task so cancellation of a SwiftUI refresh action does not abort its work. Network/Swift cancellation exits quietly before fallback/subsequent sources. Existing account epoch guards remain.
+
+27/27 isolated simulator tests pass, including cancelled-caller cache completion and cancelled-proxy preservation/no fallback/subsequent successful retry. Log `/private/tmp/BeerSelectorNative-cancellation-test.log`. Signed phone build passed (`/private/tmp/BeerSelectorNative-phone-cancellation-build.log`); updated the paired iPhone in place. User confirmed the physical iPhone pull-to-refresh retest is fixed.
+
+---
+
+## Paired iPhone run — 2026-09-10
+
+User requested step-by-step tests for signed-in/cache/navigation/offline behavior and login/account/enrichment/statistics, and requested running on the paired phone. See [PHONE-TESTS.md](PHONE-TESTS.md) for 16 ordered steps and expected outcomes.
+
+- Signed Debug build succeeded with the existing team and automatic provisioning. Log `/private/tmp/BeerSelectorNative-phone-build.log`; derived data `/private/tmp/BeerSelectorNative-phone`.
+- Installed `org.verily.FSbeerselector` in place on Pete's paired iPhone 17 Pro and successfully launched via devicectl. Existing installed app reported version 1.1.0 build 59; native build is 1.1.0 build 37. No uninstall, reset, or fixture launch.
+- Installation/launch success does not establish session/data retention or complete RN upgrade parity; user must report what appeared. No agent-selected check-in/reward/delete action. Normal startup/reconnect can process pre-existing pending operations.
+- Migration implementation committed as `014e173c`; this phone checklist and checkpoint update are subsequent documentation changes, not yet committed.
+
+---
 
 ## Commit checkpoint — 2026-09-10
 

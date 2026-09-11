@@ -11,7 +11,9 @@ final class BeerDatabase {
         self.url = url ?? documents.appendingPathComponent("SQLite/beers.db")
         try FileManager.default.createDirectory(at: self.url.deletingLastPathComponent(), withIntermediateDirectories: true)
         guard sqlite3_open_v2(self.url.path, &handle, SQLITE_OPEN_CREATE | SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX, nil) == SQLITE_OK else { throw BeerError.storage("Could not open beers.db") }
-        sqlite3_busy_timeout(handle, 5000)
+        // AppModel calls synchronously on MainActor. Never sleep waiting for another
+        // writer: let the transaction fail, retain the snapshot, and allow a later retry.
+        sqlite3_busy_timeout(handle, 0)
         try execute("PRAGMA journal_mode=WAL")
         try execute("PRAGMA synchronous=NORMAL")
         try setup()
@@ -50,9 +52,11 @@ final class BeerDatabase {
         }
     }
     func transaction(_ work: () throws -> Void) throws {
-        try execute("BEGIN IMMEDIATE")
-        do { try work(); try execute("COMMIT") }
-        catch { try? execute("ROLLBACK"); throw error }
+        try Diagnostics.shared.measure(.transaction) {
+            try execute("BEGIN IMMEDIATE")
+            do { try work(); try execute("COMMIT") }
+            catch { try? execute("ROLLBACK"); throw error }
+        }
     }
     func preference(_ key: String) throws -> String? { try rows("SELECT value FROM preferences WHERE key=?", [key]).first?["value"] }
     func setPreference(_ key: String, _ value: String?) throws {

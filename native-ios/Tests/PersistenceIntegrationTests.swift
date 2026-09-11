@@ -1,75 +1,17 @@
 import XCTest
 import UIKit
 import SQLite3
+import Security
 @testable import BeerSelectorNative
 
-final class ParityTests: XCTestCase {
+final class PersistenceIntegrationTests: XCTestCase {
     func testCustomFontsAreBundledAndRegistered() {
         for name in ["SpaceGrotesk-Regular","SpaceGrotesk-SemiBold","SpaceGrotesk-Bold","SpaceMono-Regular","DSEG7Classic-Bold","BeerIcons"] {
             XCTAssertNotNil(Bundle.main.url(forResource:name,withExtension:"ttf"),name)
             XCTAssertNotNil(UIFont(name:name == "BeerIcons" ? Robo.beerIconFont : name,size:14),name)
         }
     }
-    func testUntastedIsSetDifferenceNotCountSubtraction() {
-        let all = [Beer(id:"1",name:"One"),Beer(id:"2",name:"Two")]
-        let tasted = [Beer(id:"1",name:"One"),Beer(id:"elsewhere",name:"Another location")]
-        XCTAssertEqual(BeerFilter.untasted(all:all,tasted:tasted).map(\.id),["2"])
-    }
-    func testMissingABVSortsLastInBothDirections() {
-        var a = Beer(id:"a",name:"A"); a.abv = 8
-        var b = Beer(id:"b",name:"B"); b.abv = 4
-        let unknown = Beer(id:"c",name:"C")
-        var filter = BeerFilter(); filter.sort = .abv
-        XCTAssertEqual(filter.apply([unknown,a,b]).map(\.id),["a","b","c"])
-        filter.ascending = true
-        XCTAssertEqual(filter.apply([unknown,a,b]).map(\.id),["b","a","c"])
-    }
-    func testFilterMatchesLocationAndContainer() {
-        var beer = Beer(id:"1",name:"Porter"); beer.brewer_loc = "Austin, TX"; beer.brew_container = "Draught"
-        var filter = BeerFilter(); filter.search = "austin"; filter.container = .draft
-        XCTAssertEqual(filter.apply([beer]).count,1)
-        filter.container = .cans; XCTAssertTrue(filter.apply([beer]).isEmpty)
-    }
-    func testTastedDateSortUsesCalendarDates() {
-        var a = Beer(id:"a",name:"A"); a.tasted_date = "12/31/2025"
-        var b = Beer(id:"b",name:"B"); b.tasted_date = "01/01/2026"
-        XCTAssertEqual(BeerFilter().apply([a,b],tasted:true).map(\.id),["b","a"])
-    }
-    func testContainerPriority() throws {
-        let beer = try Beer(row:["id":"1","brew_name":"Flight","brew_container":"16 oz draft","brew_style":"Lager","abv":"9"])
-        XCTAssertEqual(beer.container_type,"flight")
-        let bottle = try Beer(row:["id":"2","brew_name":"Flight","brew_container":"Bottle"])
-        XCTAssertEqual(bottle.container_type,"bottle")
-        let size = try Beer(row:["id":"3","brew_name":"Strong","brew_container":"16 oz draft","abv":"9"])
-        XCTAssertEqual(size.container_type,"pint")
-    }
-    func testMalformedPayloadDoesNotBecomeEmptySnapshot() throws {
-        XCTAssertThrowsError(try BeerAPI.parseBeers(Data(#"[{}, {"brewInStock": "broken"}]"#.utf8)))
-        XCTAssertThrowsError(try BeerAPI.parseBeers(Data(#"[{}, {"brewInStock": []}]"#.utf8)))
-        XCTAssertThrowsError(try BeerAPI.parseBeers(Data(#"[{}, {"tasted_brew_current_round": {}}]"#.utf8),tasted:true))
-        XCTAssertTrue(try BeerAPI.parseBeers(Data(#"[{}, {"tasted_brew_current_round": []}]"#.utf8),tasted:true).isEmpty)
-        XCTAssertThrowsError(try BeerAPI.parseRewards(Data(#"[{},{},{"reward":"broken"}]"#.utf8)))
-        XCTAssertTrue(try BeerAPI.parseRewards(Data(#"[{},{},{"reward":[]}]"#.utf8)).isEmpty)
-    }
-    func testProxyNormalizationAndNullABV() throws {
-        let data = Data(#"{"beers":[{"id":"1","brew_name":"Test","enriched_abv":5.2,"enrichment_source":"description-fallback"},{"id":"2","brew_name":"Unknown","enriched_abv":null}]}"#.utf8)
-        let beers = try BeerAPI.parseBeers(data,proxy:true)
-        XCTAssertEqual(beers[0].abv,5.2); XCTAssertEqual(beers[0].enrichment_source,"description"); XCTAssertNil(beers[1].abv)
-    }
-    func testQueueHTMLAndFormEscaping() throws {
-        let html = #"<h3 class="brewName">A &amp; B (Draft)<div class="brew_added_date">Sep 10, 2026</div></h3><a href="deleteQueuedBrew.php?cid=123">Delete</a>"#
-        let queue = try BeerAPI.parseQueue(Data(html.utf8))
-        XCTAssertEqual(queue,[QueueEntry(id:"123",name:"A & B (Draft)",date:"Sep 10, 2026")])
-        XCTAssertEqual(String(decoding:BeerAPI.form(["name":"A&B + 5%"]),as:UTF8.self),"name=A%26B%20%2B%205%25")
-    }
-    func testTrustChecksRejectLookalikesAndQuerySpoofing() {
-        let c = APIConfiguration()
-        XCTAssertTrue(c.trustedLogin(URL(string:"https://tapthatapp.beerknurd.com/member-dash.php")!))
-        XCTAssertFalse(c.trustedLogin(URL(string:"https://tapthatapp.beerknurd.com.evil.test/member-dash.php")!))
-        XCTAssertFalse(c.trustedLogin(URL(string:"http://tapthatapp.beerknurd.com/member-dash.php")!))
-        XCTAssertFalse(APIConfiguration.dataURL(URL(string:"https://evil.test/bk-member-json.php?uid=1")!))
-    }
-    func testMigrationPreservesSettingsBeersRewardsAndOperations() throws {
+    func testNativeDatabaseReopenPreservesDataAndRecoversInterruptedOperations() throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at:folder) }
         let url = folder.appendingPathComponent("beers.db")
@@ -118,7 +60,7 @@ final class ParityTests: XCTestCase {
         XCTAssertEqual(try db.preference("custom"),"original value")
         XCTAssertTrue(try db.rows("PRAGMA table_info(allbeers)").contains { $0["name"] == "enrichment_source" })
     }
-    func testLegacyKeychainChunksRetainSessionAndCleanup() throws {
+    func testNativeKeychainGenerationsRetainSessionAndCleanup() throws {
         let unique = "native_test_" + UUID().uuidString
         let store = CredentialStore(prefix:unique,sessionStorageKey:unique + "_legacy_session")
         defer { try? store.clear() }
@@ -137,8 +79,14 @@ final class ParityTests: XCTestCase {
         let store = CredentialStore(prefix:unique,sessionStorageKey:unique + "_legacy_session")
         defer { try? store.clear() }
         try store.write(unique + "_meta",Data(#"{"generation":"interrupted","count":2,"hasSession":true}"#.utf8))
-        try store.write(unique + "_interrupted_0",Data("e30=".utf8))
+        let session = MemberSession(memberId:"fixture",storeId:"1",storeName:"Fixture",sessionId:"fixture")
+        try store.write(unique + "_interrupted_session",JSONEncoder().encode(session))
+        try store.write(unique + "_interrupted_0",Data("e3".utf8))
         XCTAssertThrowsError(try store.load())
+        // Supplying the missing chunk repairs this generation without changing its session.
+        try store.write(unique + "_interrupted_1",Data("0=".utf8))
+        XCTAssertEqual(try store.load().0,session)
+        XCTAssertEqual(try store.load().1,[:])
     }
 
     func testCommittedCookiesWithoutMatchingSessionFailClosed() throws {
@@ -158,7 +106,7 @@ final class ParityTests: XCTestCase {
         try db.replaceBeers([Beer(id:"tasted",name:"Saved tasting")],tasted:true)
         try db.replaceRewards([Reward(id:"reward",type:"Shirt",redeemed:false)])
         try db.enqueue(type:"CHECK_IN_BEER",payload:["beerId":"pending"])
-        let model = AppModel(); model.db = db
+        let model = AppModel(api:BeerAPI(configuration:APIConfiguration()),monitorConnectivity:false); model.db = db
         model.session = MemberSession(memberId:"fixture",storeId:"1",storeName:"Fixture",sessionId:"fixture")
         model.allBeers = [Beer(id:"retained",name:"Already displayed")]
         XCTAssertThrowsError(try model.reload())
@@ -181,4 +129,36 @@ final class ParityTests: XCTestCase {
         XCTAssertEqual(try db.rewards(),[reward])
     }
 
+    func testReadsExpoLegacySessionFromEachSupportedKeychainService() throws {
+        for service in ["app:no-auth","app","app:auth"] {
+            let unique = "native_test_" + UUID().uuidString
+            let store = CredentialStore(prefix:unique,sessionStorageKey:unique + "_session")
+            defer { try? store.clear() }
+            let member = MemberSession(memberId:"legacy",storeId:"1",storeName:"Fixture",sessionId:"fixture")
+            let cookies = ["PHPSESSID":"fixture"]
+            // Write the old Expo wire format directly, without using the native save implementation.
+            let values: [String:Data] = [
+                unique + "_session": try JSONEncoder().encode(member),
+                unique + "_meta": Data(#"{"generation":"legacy","count":1}"#.utf8),
+                unique + "_legacy_0": Data(try JSONEncoder().encode(cookies).base64EncodedString().utf8)
+            ]
+            for (key,data) in values {
+                let query: [String:Any] = [
+                    kSecClass as String:kSecClassGenericPassword,
+                    kSecAttrService as String:service,
+                    kSecAttrAccount as String:Data(key.utf8),
+                    kSecAttrGeneric as String:Data(key.utf8),
+                    kSecAttrAccessible as String:kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
+                    kSecValueData as String:data
+                ]
+                let status = SecItemAdd(query as CFDictionary,nil)
+                guard status == errSecSuccess else { throw NSError(domain:NSOSStatusErrorDomain,code:Int(status)) }
+            }
+            let restored = try store.load()
+            XCTAssertEqual(restored.0,member,service)
+            XCTAssertEqual(restored.1,cookies,service)
+            try store.clear()
+            XCTAssertNil(try store.load().0,service)
+        }
+    }
 }

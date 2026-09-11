@@ -17,6 +17,8 @@ Regenerate after adding source or resource files. Fonts, icons, and optional ser
 
 ## Build and test
 
+See [the test strategy and Xcode Cloud setup](Docs/TESTING.md) for the Unit, Integration and All plans, isolated fixtures, parallel runs, and mutation probes.
+
 Use an available simulator ID from `xcrun simctl list devices available` if the one below differs on your machine. Simulator tests need ad hoc signing for Keychain access; `CODE_SIGNING_ALLOWED=NO` produces Keychain error -34018.
 
 ```sh

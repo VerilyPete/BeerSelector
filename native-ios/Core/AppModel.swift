@@ -37,11 +37,12 @@ final class AppModel: ObservableObject {
     private var lastFocusRefresh = Date.distantPast
     private var pendingURL: URL?
     private var started = false
+    private var refreshTask: Task<Void, Never>?
     var previewMode: Bool { session?.memberId == "preview" }
     var isMember: Bool { session?.valid == true && session?.isVisitor == false }
     var configured: Bool { session != nil && ((try? db?.preference("all_beers_api_url")) ?? "") != "" }
     var untasted: [Beer] { BeerFilter.untasted(all:allBeers,tasted:tastedBeers).filter { !queuedBeerIDs.contains($0.id) } }
-    init(api: BeerAPI = BeerAPI(), credentials: CredentialStore = CredentialStore()) {
+    init(api: BeerAPI = BeerAPI(), credentials: CredentialStore = CredentialStore(), monitorConnectivity: Bool = true) {
         self.api = api
         self.credentials = credentials
         monitor.pathUpdateHandler = { [weak self] path in
@@ -55,7 +56,7 @@ final class AppModel: ObservableObject {
                 }
             }
         }
-        monitor.start(queue:DispatchQueue(label:"BeerSelector.connectivity"))
+        if monitorConnectivity { monitor.start(queue:DispatchQueue(label:"BeerSelector.connectivity")) }
     }
     deinit { monitor.cancel() }
     #if DEBUG
@@ -99,8 +100,22 @@ final class AppModel: ObservableObject {
         do { try reload(); error = nil } catch { self.error = error.localizedDescription }
     }
     func refresh() async {
+        if let refreshTask { await refreshTask.value; return }
+        // SwiftUI can cancel its refreshable action when the view changes. The
+        // model owns this shared refresh so cached data still gets updated.
+        let task = Task { @MainActor in
+            await performRefresh()
+            refreshTask = nil
+        }
+        refreshTask = task
+        await task.value
+    }
+    private func performRefresh() async {
         guard !previewMode, !refreshing, let db, configured else { return }
         refreshing = true; defer { refreshing = false }
+        let interval = Diagnostics.shared.begin(.refresh)
+        var outcome = Diagnostics.Outcome.cancelled
+        defer { interval.finish(outcome) }
         let token = epoch
         var errors: [String] = []
         if let raw = try? db.preference("all_beers_api_url"), let url = URL(string:raw), APIConfiguration.dataURL(url) {
@@ -116,6 +131,7 @@ final class AppModel: ObservableObject {
                         beers = response.beers ?? allBeers
                         etag = response.etag
                     } catch {
+                        if Self.isRefreshCancellation(error) { return }
                         enrichment.recordFallback()
                         let (data,_) = try await api.request(url)
                         beers = await enrichment.enrich(try BeerAPI.parseBeers(data))
@@ -134,7 +150,10 @@ final class AppModel: ObservableObject {
                     if !notModified { try db.replaceBeers(beers); try db.setPreference("native_taplist_etag",etag) }
                     try db.setPreference("last_all_beers_refresh",String(Date().timeIntervalSince1970 * 1000))
                 }
-            } catch { errors.append(error.localizedDescription) }
+            } catch {
+                if Self.isRefreshCancellation(error) { return }
+                errors.append(error.localizedDescription)
+            }
         }
         if isMember, let raw = try? db.preference("my_beers_api_url"), let url = URL(string:raw), APIConfiguration.dataURL(url) {
             do {
@@ -145,15 +164,28 @@ final class AppModel: ObservableObject {
                     let tasted = await enrichment.enrich(try BeerAPI.parseBeers(data,tasted:true))
                     guard token == epoch else { throw BeerError.changedAccount }
                     try db.transaction { try db.replaceBeers(tasted,tasted:true); try db.setPreference("last_my_beers_refresh",String(Date().timeIntervalSince1970 * 1000)) }
-                } catch { errors.append(error.localizedDescription) }
+                } catch {
+                    if Self.isRefreshCancellation(error) { return }
+                    errors.append(error.localizedDescription)
+                }
                 guard token == epoch else { return }
                 do { let rewards = try BeerAPI.parseRewards(data); try db.transaction { try db.replaceRewards(rewards) } }
-                catch { errors.append(error.localizedDescription) }
-            } catch { errors.append(error.localizedDescription) }
+                catch {
+                    if Self.isRefreshCancellation(error) { return }
+                    errors.append(error.localizedDescription)
+                }
+            } catch {
+                if Self.isRefreshCancellation(error) { return }
+                errors.append(error.localizedDescription)
+            }
         }
         guard token == epoch else { return }
         do { try reload() } catch { errors.append(error.localizedDescription) }
+        outcome = errors.isEmpty ? .success : .failure
         error = errors.isEmpty ? nil : errors.joined(separator:"\n")
+    }
+    private static func isRefreshCancellation(_ error: Error) -> Bool {
+        error is CancellationError || (error as? URLError)?.code == .cancelled || Task.isCancelled
     }
     func foreground() async {
         await liveActivity.expireIfNeeded()
@@ -162,58 +194,62 @@ final class AppModel: ObservableObject {
         await refresh(); await refreshQueue(); await processOperations()
     }
     func completeLogin(url: URL, nativeCookies: [HTTPCookie]) async throws {
-        let loginEpoch = epoch
-        guard api.configuration.trustedLogin(url), ["/member-dash.php","/visitor.php"].contains(url.path), let db else { throw BeerError.sessionExpired }
-        var values: [String:String] = [:]
-        for cookie in nativeCookies {
-            let domain = cookie.domain.trimmingCharacters(in:CharacterSet(charactersIn:"."))
-            guard let host = api.configuration.baseURL.host, host == domain || host.hasSuffix("." + domain) else { continue }
-            values[cookie.name] = cookie.value.removingPercentEncoding ?? cookie.value
-        }
-        let visitor = url.path == "/visitor.php"
-        guard let sid = values["store__id"] ?? values["store"], !sid.isEmpty else { throw BeerError.invalidResponse("Missing store information") }
-        let next = MemberSession(memberId:visitor ? "visitor" : values["member_id"] ?? "",storeId:sid,storeName:values["store_name"] ?? "Flying Saucer",sessionId:values["PHPSESSID"] ?? (visitor ? "visitor_session" : ""),username:values["username"],firstName:values["first_name"],lastName:values["last_name"],email:values["email"],cardNum:values["cardNum"])
-        guard next.valid else { throw BeerError.invalidResponse("Incomplete account details") }
-        var memberURL = "none://visitor_mode"
-        var storeURL = "https://fsbs.beerknurd.com/bk-store-json.php?sid=\(sid)"
-        if !visitor {
-            let (data,_) = try await api.request(url,member:next,cookies:values)
-            let html = String(decoding:data,as:UTF8.self)
-            func extract(_ pattern: String) throws -> String {
-                guard let range = html.range(of:pattern,options:.regularExpression), let found = URL(string:String(html[range])), APIConfiguration.dataURL(found) else { throw BeerError.invalidResponse("Could not read the account data links") }
-                return found.absoluteString
-            }
-            memberURL = try extract(#"https://[^"'\s]+bk-member-json\.php\?uid=\d+"#)
-            storeURL = try extract(#"https://[^"'\s]+bk-store-json\.php\?sid=\d+"#)
-        }
-        try Task.checkCancellation()
-        guard loginEpoch == epoch else { throw BeerError.changedAccount }
-        let previous = try credentials.load()
-        let oldConfiguration = try db.preference("all_beers_api_url")
-        epoch = UUID()
-        try db.setPreference("all_beers_api_url","")
+        let interval = Diagnostics.shared.begin(.login)
         do {
-        try credentials.save(session:next,cookies:visitor ? [:] : values)
-        try db.transaction {
-            if session?.identity != next.identity {
-                try db.execute("DELETE FROM allbeers"); try db.execute("DELETE FROM tasted_brew_current_round"); try db.execute("DELETE FROM rewards")
+            let loginEpoch = epoch
+            guard api.configuration.trustedLogin(url), ["/member-dash.php","/visitor.php"].contains(url.path), let db else { throw BeerError.sessionExpired }
+            var values: [String:String] = [:]
+            for cookie in nativeCookies {
+                let domain = cookie.domain.trimmingCharacters(in:CharacterSet(charactersIn:"."))
+                guard let host = api.configuration.baseURL.host, host == domain || host.hasSuffix("." + domain) else { continue }
+                values[cookie.name] = cookie.value.removingPercentEncoding ?? cookie.value
             }
-            try db.setPreference("native_taplist_etag",nil)
-            try db.setPreference("is_visitor_mode",visitor ? "true" : "false")
-            try db.setPreference("my_beers_api_url",memberURL)
-            try db.setPreference("first_launch","false")
-            try db.setPreference("all_beers_api_url",storeURL)
-        }
-        } catch {
-            if let old = previous.0 { try credentials.save(session:old,cookies:previous.1) } else { try credentials.clear() }
-            try db.setPreference("all_beers_api_url",oldConfiguration)
-            throw error
-        }
-        session = next; cookies = visitor ? [:] : values
-        if visitor { await clearWebCookies() }
-        queue = []; queuedBeerIDs = []; await liveActivity.endAll()
-        showLogin = false; showSettings = false; tab = .home
-        try reload(); await refresh(); await refreshQueue()
+            let visitor = url.path == "/visitor.php"
+            guard let sid = values["store__id"] ?? values["store"], !sid.isEmpty else { throw BeerError.invalidResponse("Missing store information") }
+            let next = MemberSession(memberId:visitor ? "visitor" : values["member_id"] ?? "",storeId:sid,storeName:values["store_name"] ?? "Flying Saucer",sessionId:values["PHPSESSID"] ?? (visitor ? "visitor_session" : ""),username:values["username"],firstName:values["first_name"],lastName:values["last_name"],email:values["email"],cardNum:values["cardNum"])
+            guard next.valid else { throw BeerError.invalidResponse("Incomplete account details") }
+            var memberURL = "none://visitor_mode"
+            var storeURL = "https://fsbs.beerknurd.com/bk-store-json.php?sid=\(sid)"
+            if !visitor {
+                let (data,_) = try await api.request(url,member:next,cookies:values)
+                let html = String(decoding:data,as:UTF8.self)
+                func extract(_ pattern: String) throws -> String {
+                    guard let range = html.range(of:pattern,options:.regularExpression), let found = URL(string:String(html[range])), APIConfiguration.dataURL(found) else { throw BeerError.invalidResponse("Could not read the account data links") }
+                    return found.absoluteString
+                }
+                memberURL = try extract(#"https://[^"'\s]+bk-member-json\.php\?uid=\d+"#)
+                storeURL = try extract(#"https://[^"'\s]+bk-store-json\.php\?sid=\d+"#)
+            }
+            try Task.checkCancellation()
+            guard loginEpoch == epoch else { throw BeerError.changedAccount }
+            let previous = try credentials.load()
+            let oldConfiguration = try db.preference("all_beers_api_url")
+            epoch = UUID()
+            try db.setPreference("all_beers_api_url","")
+            do {
+            try credentials.save(session:next,cookies:visitor ? [:] : values)
+            try db.transaction {
+                if session?.identity != next.identity {
+                    try db.execute("DELETE FROM allbeers"); try db.execute("DELETE FROM tasted_brew_current_round"); try db.execute("DELETE FROM rewards")
+                }
+                try db.setPreference("native_taplist_etag",nil)
+                try db.setPreference("is_visitor_mode",visitor ? "true" : "false")
+                try db.setPreference("my_beers_api_url",memberURL)
+                try db.setPreference("first_launch","false")
+                try db.setPreference("all_beers_api_url",storeURL)
+            }
+            } catch {
+                if let old = previous.0 { try credentials.save(session:old,cookies:previous.1) } else { try credentials.clear() }
+                try db.setPreference("all_beers_api_url",oldConfiguration)
+                throw error
+            }
+            session = next; cookies = visitor ? [:] : values
+            if visitor { await clearWebCookies() }
+            queue = []; queuedBeerIDs = []; await liveActivity.endAll()
+            showLogin = false; showSettings = false; tab = .home
+            try reload(); await refresh(); await refreshQueue()
+            interval.finish(.success)
+        } catch { interval.finish(Diagnostics.isCancellation(error) ? .cancelled : .failure); throw error }
     }
     func autoLogin() async throws {
         guard let member = session, !member.isVisitor else { throw BeerError.sessionExpired }
@@ -252,10 +288,13 @@ final class AppModel: ObservableObject {
     func processOperations() async {
         guard !previewMode, !processing, !offline, isMember, let db else { return }
         processing = true; defer { processing = false }
+        let interval = Diagnostics.shared.begin(.queue)
+        var outcome = Diagnostics.Outcome.success
+        defer { interval.finish(outcome) }
         let token = epoch
         do {
             for op in try db.operations() where op.status == "pending" {
-                guard !offline, !Task.isCancelled, let member = session, token == epoch else { return }
+                guard !offline, !Task.isCancelled, let member = session, token == epoch else { outcome = .cancelled; return }
                 guard try db.operations().contains(where: { $0.id == op.id && $0.status == "pending" }) else { continue }
                 // Never replay a previous account's or location's write under a new session.
                 if let owner = op.payload["memberId"], owner != member.memberId { continue }
@@ -268,13 +307,14 @@ final class AppModel: ObservableObject {
                     let fields = ["chitCode":"\(beerID)-\(member.storeId)-\(member.memberId)","chitBrewId":beerID,"chitBrewName":name,"chitStoreName":member.storeName]
                     let (data,_) = try await api.request(api.configuration.endpoint("addToQueue.php"),method:"POST",fields:fields,member:member,cookies:cookies,retry:false)
                     if let object = try? JSONSerialization.jsonObject(with:data) as? [String:Any], object["success"] as? Bool == false { throw BeerError.invalidResponse(object["error"] as? String ?? "Check-in rejected") }
-                    guard token == epoch else { return }
+                    guard token == epoch else { outcome = .cancelled; return }
                     try db.execute("DELETE FROM operation_queue WHERE id=?",[op.id])
                     queuedBeerIDs.insert(beerID)
                     notice = "\(name) has been added to your queue!"
                     UINotificationFeedbackGenerator().notificationOccurred(.success)
                 } catch {
-                    guard token == epoch else { return }
+                    outcome = Diagnostics.isCancellation(error) ? .cancelled : .failure
+                    guard token == epoch else { outcome = .cancelled; return }
                     // Match the reference: failed check-ins remain pending for up to three retries.
                     if op.retryCount < 3 {
                         try db.execute("UPDATE operation_queue SET status='pending',retry_count=retry_count+1,error_message=? WHERE id=?",[error.localizedDescription,op.id])
@@ -287,7 +327,7 @@ final class AppModel: ObservableObject {
                 if op.retryCount > 0 { try await Task.sleep(for:.seconds(min(pow(2,Double(op.retryCount)),30))) }
             }
             await refreshQueue()
-        } catch { self.error = error.localizedDescription }
+        } catch { outcome = Diagnostics.isCancellation(error) ? .cancelled : .failure; self.error = error.localizedDescription }
     }
     func retryOperation(_ id: String) async {
         guard !processing else { return }
