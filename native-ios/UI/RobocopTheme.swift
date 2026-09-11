@@ -174,6 +174,7 @@ struct BeerIconWell: View {
         }.font(.custom(Robo.beerIconFont,size:22)).frame(width:40,height:40)
             .background(Robo.iconSteel,in:RoundedRectangle(cornerRadius:10))
             .overlay(RoundedRectangle(cornerRadius:10).strokeBorder(Robo.cyan,lineWidth:1.5))
+            .accessibilityElement(children:.ignore)
     }
 }
 struct RoboButtonStyle: ButtonStyle {

@@ -94,7 +94,7 @@ Session requests contain PHPSESSID, store__id, member_id, store_name, and option
 - [x] Actual signed in-place upgrade: iPad legacy build 50/schema 7 → native 61, retained account and relaunch persistence; see UPGRADE-REHEARSAL.md.
 - [ ] Physical-device Live Activity lifecycle, disabled authorization, empty queue, logout, foreground, 3-hour stale/cleanup, deep links, force quit.
 - [ ] Offline/reconnect, slow network, 401, 429, 5xx, corrupt response, duplicate tap, account switch and interrupted persistence.
-- [ ] VoiceOver, Reduce Motion, large text and iPad rotation.
+- [ ] VoiceOver, Reduce Motion and remaining large-text screens. Initial Home/beer-list large-text fixture review and expanded-card action reachability passed on 2026-09-11; tablet grid restored and portrait/landscape navigation/expansion verified on isolated iPad simulator. Split View and physical-device accessibility remain open.
 
 ## Native framework references
 
@@ -160,3 +160,13 @@ Internal-only TestFlight build 1.1.0 (38) uploaded with symbols. Added persisten
 - Real iPad upgrade verified (legacy 1.1.0 build 50/schema 7 → native build 61): installation preserved the database, a no-network probe preserved all original legacy values, user confirmed existing login survived, and native relaunch preserved the refreshed cache/settings. Initial refresh transport is unknown despite success diagnostics; user confirmed Wi-Fi off. See UPGRADE-REHEARSAL.md for scope and evidence.
 
 - User reports all basic Live Activity checks passed on a physical phone: Lock Screen/Dynamic Island appearance, queue updates, and removal on logout/empty queue. Exact build not restated (last confirmed phone build 61). No additional fixture/device run required for those checks. Long-duration expiry/background execution and crash/MetricKit delivery remain separate evidence.
+
+### Accessibility and lifecycle follow-up — 2026-09-11
+
+76/76 correctness tests pass, including foreground refresh throttling and member-aware deep-link routing. Rewards ring labels now move below the ring at accessibility sizes; queue Delete labels identify their beer. Maximum-text Rewards confirmation now uses an alert with reachable Queue/Cancel choices. Offline Maestro checks passed reward scrolling/cancel and Settings refresh/diagnostic-control reachability. Spoken VoiceOver, runtime Reduce Motion, physical Live Activity expiry/authorization/force-quit, Split View and minimum OS remain open; these simulator checks do not close those gates.
+
+Reduce Motion follow-up: actual iOS setting visibly enabled on the isolated simulator; card expansion/collapse, filtering/sorting, tabs and Settings navigation all passed. This is interaction coverage, not a frame-by-frame motion audit. Remaining hands-on checklist: [DEVICE-ACCESSIBILITY-CHECKS.md](DEVICE-ACCESSIBILITY-CHECKS.md).
+
+Tablet Home follow-up: account/progress and Explore now occupy two columns from 768 points, with larger navigation cards; phone/narrow/accessibility layouts stay stacked. Offline simulator portrait/landscape navigation and phone screenshot checked; build passed.
+
+Tablet Home revision: user rejected the side-by-side stack as still half empty. Current design is an account/progress row plus four navigation tiles in a 2×2 grid that fills the remaining height, with existing local counts. User subsequently rejected the oversized tiles as empty in a different way; retain as unfinished checkpoint work. Content-focused redesign proposed but not implemented. No distribution.

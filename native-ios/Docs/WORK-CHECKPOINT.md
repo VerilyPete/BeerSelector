@@ -1,6 +1,38 @@
 # Migration checkpoint — 2026-09-11
 
-## CURRENT HANDOFF — Cloud evidence committed; Apple crash retrieval verified for legacy build
+## CURRENT HANDOFF — checkpoint commit; tablet Home design unfinished
+
+User rejected the first two-column Home arrangement because half the iPad remained empty. Replaced it with an account/progress row above a 2×2 navigation tile grid. Tiles share the remaining viewport height, use the approved chrome, larger labels and existing local-data counts (All Beers, untasted, tasted, available rewards). A Dynamic Type-scaled minimum content height permits scrolling on short windows instead of squeezing controls. Tablet breakpoint stays 768 points; phone/accessibility layouts stay stacked. No new fetching or account actions.
+
+Final simulator build passed (`/private/tmp/BeerSelectorNative-tablet-home-build.log`). Offline tablet navigation/rotation checked; final screenshots in `/private/tmp/beerselector-home-dashboard-*.png`. User rejected the oversized tile design too: filling the screen with larger boxes still feels empty. Current code is retained as work in progress in this checkpoint commit, not an accepted design. Proposed next direction is actual new-arrival/queue/recent-tasting/reward content with compact navigation; that proposal is not implemented or approved yet. No push, upload or version bump. Model suite last passed 76/76 before these UI-only refinements.
+
+## Previous checkpoint — Reduce Motion interaction check passed; hands-on device checks remain
+
+On the isolated iPhone simulator, enabled the actual iOS Reduce Motion switch and confirmed its green/on state in `/private/tmp/beerselector-motion-on-verified.png`. Repeated Maestro card expansion/collapse, container/sort controls, tabs and Settings open/close; all passed. Initial label-only tap left the switch off and was not counted as enabled coverage. This establishes usable interactions with Reduce Motion on, not frame-by-frame animation measurement or spoken VoiceOver quality. Reduce Motion restored to its original off state and visually confirmed. No product changes this pass; existing 76/76 correctness evidence remains.
+
+Remaining hands-on steps are in [DEVICE-ACCESSIBILITY-CHECKS.md](DEVICE-ACCESSIBILITY-CHECKS.md): VoiceOver focus/labels and physical Live Activity disabled authorization, force-quit/deep link and long-duration expiry. Use code containing the local fixes; TestFlight 61 predates them. Existing user-confirmed basic queue checks need not be repeated. No phone installation, upload, build-number change or live queue mutation occurred. Distribution remains paused; work remains local/uncommitted.
+
+## Previous checkpoint — Rewards accessibility fixes and lifecycle regression coverage
+
+Continued the isolated-simulator review: Rewards percentage/COMPLETE text overflowed its fixed 130-point ring at maximum Dynamic Type. Accessibility sizes now place those labels below the ring; regular-size ring design remains. Reward card text aligns leading, and queue Delete controls name their beer for accessibility. Reward confirmation now uses a concise alert with explicit Queue/Cancel actions: the system confirmation dialog did not expose Cancel at maximum text size, even with an explicit cancel-role action. Final alert passed the same Maestro test. Largest-text Rewards scrolling/confirmation/cancel and Settings refresh/diagnostic-control reachability passed with offline fixtures. Background/foreground retained the same process (99539), Settings sheet and scroll position; Maestro verified the diagnostic control was still visible and Home remained reachable. Phone simulator text size restored to Large. Final UI-only alert change built successfully (`/private/tmp/BeerSelectorNative-rewards-build.log`).
+
+Added two regression tests covering repeat-foreground refresh throttling and deep-link routing/member guards/foreign-scheme rejection. All **76 tests passed**, log `/private/tmp/BeerSelectorNative-lifecycle-tests.log`. These verify model behavior, not OS background scheduling or physical Live Activity delivery. Existing source honors Reduce Motion for card expansion and button scale; runtime motion/spoken VoiceOver are still unverified. Distribution paused, build 61, local uncommitted changes.
+
+## Previous checkpoint — tablet grid restored; initial large-text checks passed
+
+Restored shared All Beers/Finder/Tasted grids: one column below 768 points, two from 768, three from 1024, measured from available window width. Accessibility Dynamic Type sizes use one column. Beer card headings stack and text wraps at accessibility sizes; tabs become two rows to avoid clipped labels; settings hit area is 44 points; icon/check-in/queue accessibility labels improved.
+
+Offline fixtures only: isolated iPad Pro 11-inch simulator `B5273553-AD73-44EA-9A2A-3BC8D6286E6D` showed two portrait/three landscape columns. Maestro verified expansion survives rotation and navigation through all three beer tabs. Largest accessibility size on isolated iPhone `6CC9C856-7049-4BC3-82EE-E67ADB1F5BD3`: expanded Finder card can scroll to Check In and Untappd, and tab navigation/search remain reachable. Normal phone single-column screenshot reviewed; phone text size restored to Large. Screenshots and Maestro flows are in `/private/tmp/beerselector-*`; no live account actions or device installations.
+
+Simulator build and all 74 correctness tests passed (zero failures); log `/private/tmp/BeerSelectorNative-grid-tests.log`. Changes remain local/uncommitted, build number 61 unchanged; distribution paused. Still open: spoken VoiceOver/focus order, broader Rewards/Settings large-text review, Reduce Motion, Split View runtime, minimum OS runtime and remaining physical Live Activity expiry/disabled/force-quit checks. Basic physical Live Activity checks previously passed per user; do not repeat them without reason. Lifecycle source review found no new demonstrated defect.
+
+## Previous checkpoint — build-53 crash investigation complete; resume accessibility/device checks
+
+See [LEGACY-53-CRASH.md](LEGACY-53-CRASH.md). Full crash report shows thread 1 resetting an Expo SQLite statement while thread 9 closes an Expo SQLite database. Reviewed legacy background shutdown still closes after its wait times out and does not track all queries. Lockfile-pinned Expo implementation allows close/finalization to overlap asynchronous statement use. Actual archived JS bundle contains the matching shutdown messages. Leading explanation is a close/query lifetime race, not a proven exact interleaving or background trigger.
+
+Native has no background database close and scopes statements to synchronous calls under AppModel's MainActor use. The concrete legacy failure path is absent. No code fix/rebuild/forced crash needed; user explicitly requested not spending further time reproducing obsolete behavior. Original native phone exit remains unresolved. Existing Cloud/local 74/74 evidence unchanged. Next: accessibility and remaining device lifecycle checks; distribution remains paused.
+
+## Previous checkpoint — Cloud evidence committed; Apple crash retrieval verified for legacy build
 
 Committed Cloud verification notes as **89e8ed78** (not pushed; avoids an unnecessary documentation-only Cloud repeat). Actual Cloud build 22 remains green, 74/74. Continued read-only Organizer crash review: downloaded legacy build 53 TestFlight crash from 2026-08-28, verified its binary UUID matches the retained archive, and independently resolved app frames with atos. See INTERNAL-TESTFLIGHT.md for evidence and interpretation.
 

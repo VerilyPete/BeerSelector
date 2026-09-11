@@ -21,16 +21,22 @@ struct JourneyPanel: View {
         }.frame(minWidth:typeSize.isAccessibilitySize ? 220 : 130,maxWidth:.infinity,alignment:.leading)
     }
     private var ring: some View {
-        ZStack {
-            Circle().stroke(Robo.metal([(0xE8ECF0,0),(0x6B727B,0.5),(0xD4D8DD,1)]),lineWidth:4).padding(5)
-            Circle().stroke(Robo.border,lineWidth:2).padding(9)
-            Circle().stroke(Robo.cyan.opacity(0.12),lineWidth:10).padding(15)
-            Circle().trim(from:0,to:progress).stroke(Robo.cyan,style:StrokeStyle(lineWidth:10,lineCap:.round)).rotationEffect(.degrees(-90)).padding(15)
-            VStack(spacing:2) {
-                Text("\(Int(progress * 100))%").font(Robo.bold(28))
-                Text("COMPLETE").font(Robo.mono(8)).tracking(1)
-            }.foregroundStyle(Robo.cyan)
-        }.frame(width:130,height:130)
+        VStack(spacing:12) {
+            ZStack {
+                Circle().stroke(Robo.metal([(0xE8ECF0,0),(0x6B727B,0.5),(0xD4D8DD,1)]),lineWidth:4).padding(5)
+                Circle().stroke(Robo.border,lineWidth:2).padding(9)
+                Circle().stroke(Robo.cyan.opacity(0.12),lineWidth:10).padding(15)
+                Circle().trim(from:0,to:progress).stroke(Robo.cyan,style:StrokeStyle(lineWidth:10,lineCap:.round)).rotationEffect(.degrees(-90)).padding(15)
+                if !typeSize.isAccessibilitySize { progressLabel }
+            }.frame(width:130,height:130)
+            if typeSize.isAccessibilitySize { progressLabel }
+        }
+    }
+    private var progressLabel: some View {
+        VStack(spacing:2) {
+            Text("\(Int(progress * 100))%").font(Robo.bold(28))
+            Text("COMPLETE").font(Robo.mono(8)).tracking(1)
+        }.foregroundStyle(Robo.cyan).fixedSize(horizontal:false,vertical:true)
     }
 }
 
@@ -79,7 +85,7 @@ struct RewardsScreen: View {
                                     .background(Robo.metal([(0x2A2E35,0),(0x1A1D22,1)]),in:RoundedRectangle(cornerRadius:14))
                                     .overlay(RoundedRectangle(cornerRadius:14).strokeBorder(reward.redeemed ? Robo.color(0x3A3F47) : Robo.cyan.opacity(0.267),lineWidth:1))
                                     .opacity(reward.redeemed ? 0.5 : 1)
-                        }.disabled(model.busyIDs.contains(reward.id)).accessibilityIdentifier("reward-\(reward.id)")
+                        }.multilineTextAlignment(.leading).disabled(model.busyIDs.contains(reward.id)).accessibilityIdentifier("reward-\(reward.id)")
                     }
                 }.padding(18).frame(maxWidth:760).frame(maxWidth:.infinity)
             }.refreshable { await model.refresh() }.background(Robo.background).foregroundStyle(Robo.text)
@@ -87,9 +93,10 @@ struct RewardsScreen: View {
                 .safeAreaInset(edge:.top,spacing:0) { ChromeScreenHeader(title:"Rewards",close:{ dismiss() }) }
                 .toolbar(.hidden,for:.navigationBar)
                 .toolbar { ToolbarItem(placement:.cancellationAction) { Button("Done") { dismiss() } } }
-                .confirmationDialog("Queue Reward",isPresented:Binding(get:{ selected != nil },set:{ if !$0 { selected = nil } }),titleVisibility:.visible) {
+                .alert("Queue Reward",isPresented:Binding(get:{ selected != nil },set:{ if !$0 { selected = nil } })) {
                     if let reward = selected { Button("Queue It!") { Task { await model.queueReward(reward) }; selected = nil } }
-                } message: { Text("Would you like to add \"\(selected?.type ?? "")\" to your queue?") }
+                    Button("Cancel",role:.cancel) { selected = nil }
+                } message: { Text(selected?.type ?? "") }
         }.tint(Robo.cyan)
     }
     private func empty(_ title: String,_ message: String) -> some View { VStack(spacing:12) { Image(systemName:"gift").font(.system(size:48)); Text(title).font(Robo.bold(20)); Text(message).font(Robo.mono()).multilineTextAlignment(.center) }.frame(maxWidth:.infinity).padding(.vertical,40) }
@@ -108,7 +115,7 @@ struct QueueScreen: View {
                             VStack(alignment:.leading,spacing:12) {
                                 Text(entry.name).font(Robo.title()).foregroundStyle(Robo.cyan)
                                 Text(entry.date).font(Robo.mono()).foregroundStyle(Robo.steel)
-                                Button("DELETE") { deletion = entry }.buttonStyle(RoboButtonStyle(color:Robo.red)).disabled(model.busyIDs.contains(entry.id))
+                                Button("DELETE") { deletion = entry }.buttonStyle(RoboButtonStyle(color:Robo.red)).disabled(model.busyIDs.contains(entry.id)).accessibilityLabel("Delete \(entry.name) from queue")
                             }
                         }
                     }

@@ -1,5 +1,7 @@
 # Internal TestFlight diagnostics
 
+The bounded follow-up investigation is in [LEGACY-53-CRASH.md](LEGACY-53-CRASH.md): concurrent Expo query/close is the leading explanation; the native app does not carry over that lifecycle path. No native fix is inferred from the legacy incident.
+
 ## Apple crash retrieval verified — 2026-09-11
 
 Xcode Organizer → Crashes retrieved a real **TestFlight** report for legacy **1.1.0 (53)**, dated **2026-08-28 21:00:02.9519 CDT**, iPhone 17 Pro / iOS 26.6.1. EXC_BAD_ACCESS/SIGSEGV on thread 1: pthread mutex lock → exsqlite3_reset → Expo SQLiteModule.run(statement:database:bindParams:bindBlobParams:shouldPassAsArray:), SQLiteModule.swift:399. The stack suggests invalid SQLite statement/database state; the report alone does not establish the lifetime/concurrency cause.

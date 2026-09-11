@@ -23,6 +23,43 @@ final class AccountSafetyTests: XCTestCase {
         try await body(model,db,fixture,credentials)
     }
 
+    @MainActor func testRepeatedForegroundRefreshIsThrottled() async throws {
+        try await withModel { model,_,fixture,_ in
+            model.loading = false
+            var requests = 0
+            fixture.handler = { request in
+                requests += 1
+                return try self.response(request)
+            }
+            await model.foreground()
+            let firstRefreshRequests = requests
+            XCTAssertGreaterThan(firstRefreshRequests,0)
+            await model.foreground()
+            XCTAssertEqual(requests,firstRefreshRequests,"Repeated activation must not duplicate refresh requests within 30 seconds")
+        }
+    }
+
+    @MainActor func testDeepLinksRespectMembershipAndIgnoreOtherSchemes() async throws {
+        try await withModel { model,_,_,_ in
+            model.loading = false
+            for (host,tab) in [("mybeers",AppTab.finder),("beerfinder",.finder),("beerlist",.all),("tastedbrews",.tasted)] {
+                model.handleURL(URL(string:"beerselector://" + host)!)
+                XCTAssertEqual(model.tab,tab)
+            }
+            model.handleURL(URL(string:"https://beerlist")!)
+            XCTAssertEqual(model.tab,.tasted)
+            model.session = nil
+            model.tab = .home
+            model.handleURL(URL(string:"beerselector://mybeers")!)
+            XCTAssertEqual(model.tab,.home)
+            XCTAssertTrue(model.showSettings)
+            model.handleURL(URL(string:"beerselector://tastedbrews")!)
+            XCTAssertEqual(model.tab,.home)
+            model.handleURL(URL(string:"beerselector://settings?action=login")!)
+            XCTAssertTrue(model.showLogin)
+        }
+    }
+
     @MainActor private func login(_ model: AppModel, member: String = "2") async throws {
         let url = model.api.configuration.endpoint("member-dash.php")
         let values = ["member_id":member,"store__id":member,"PHPSESSID":"new-session"]
