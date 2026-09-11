@@ -42,6 +42,7 @@
 		BBFA8BBB2E9846885AAC0FC3 /* SpaceGrotesk-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 11B1728CA71C2EC017ACBCD2 /* SpaceGrotesk-SemiBold.ttf */; };
 		BD13675C3EBFBD8056382B73 /* BeerQueueSharedTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04EF71A9E599A4CB8CF189D6 /* BeerQueueSharedTypes.swift */; };
 		BFDDDC8BE0F8DB61145E70EA /* AccountSafetyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B50B9A0FA412F25DC622856F /* AccountSafetyTests.swift */; };
+		D1FCE96FA3AF027AD6B6DB9F /* LoginRollbackTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A32675D183666346B091FCD /* LoginRollbackTests.swift */; };
 		DF2549E5A606C5401EEE8AEA /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = A91D8CD4FA476DD360093BB1 /* Models.swift */; };
 		E247DB8C7A6E89EE447E8ABB /* BeerListScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 448C8B937564D5D9D30A96A6 /* BeerListScreen.swift */; };
 		F16A6A4D9383A7F8B68A89E1 /* PreviewFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55ABEB8230853D84BFBC6BA6 /* PreviewFixtures.swift */; };
@@ -108,6 +109,7 @@
 		6429D061EA9A5F096068E370 /* RobocopTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RobocopTheme.swift; sourceTree = "<group>"; };
 		6F2621505752CA74526D3DBA /* BeerQueueWidget.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = BeerQueueWidget.entitlements; sourceTree = "<group>"; };
 		72706E1596E156A1A349320B /* BeerSelector.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = BeerSelector.entitlements; sourceTree = "<group>"; };
+		7A32675D183666346B091FCD /* LoginRollbackTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginRollbackTests.swift; sourceTree = "<group>"; };
 		8B6299340A9333EDD4581FB9 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		8E5B34BEE7B3C2A4705EEE76 /* EnrichmentService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnrichmentService.swift; sourceTree = "<group>"; };
 		9256858AED7E171B4D5226B9 /* Database.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Database.swift; sourceTree = "<group>"; };
@@ -165,6 +167,7 @@
 				2E4302E4D060DAE06B9571EB /* CredentialFailureTests.swift */,
 				0EEB9B8BC25E938FB72A161E /* DiagnosticJournalTests.swift */,
 				C009F862A33114679B004770 /* DiagnosticsTests.swift */,
+				7A32675D183666346B091FCD /* LoginRollbackTests.swift */,
 				065F304DB3C26F8D3AEB36DE /* NetworkTests.swift */,
 				06275F1DAE6CEEAFE3663883 /* PerformanceTests.swift */,
 				60DFA8A1CD16F264CE8F4909 /* PersistenceIntegrationTests.swift */,
@@ -439,6 +442,7 @@
 				F2F49D6CDEAD90715177C9A5 /* DiagnosticJournalTests.swift in Sources */,
 				2F4EFDF00B0041D481937040 /* DiagnosticsTests.swift in Sources */,
 				02E29FEF72BA21373F843C2E /* HTTPFixture.swift in Sources */,
+				D1FCE96FA3AF027AD6B6DB9F /* LoginRollbackTests.swift in Sources */,
 				3E32F23BD6DF7BBE2F2DAF99 /* NetworkTests.swift in Sources */,
 				47A286345C3C1E452B1D6E39 /* PerformanceTests.swift in Sources */,
 				684DCAB1076A7DD06AD5B7ED /* PersistenceIntegrationTests.swift in Sources */,
@@ -546,7 +550,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 60;
+				CURRENT_PROJECT_VERSION = 61;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = N9F7839KSX;
 				ENABLE_NS_ASSERTIONS = NO;
@@ -607,7 +611,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 60;
+				CURRENT_PROJECT_VERSION = 61;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = N9F7839KSX;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -745,7 +749,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 60;
+				CURRENT_PROJECT_VERSION = 61;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = N9F7839KSX;
 				ENABLE_NS_ASSERTIONS = NO;

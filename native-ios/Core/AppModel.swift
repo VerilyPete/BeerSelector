@@ -75,7 +75,7 @@ final class AppModel: ObservableObject {
         do {
             db = try BeerDatabase()
             var failures: [String] = []
-            do { let loaded = try credentials.load(); session = loaded.0; cookies = loaded.1 }
+            do { try restoreCredentials() }
             catch { failures.append(error.localizedDescription) }
             do { try reload() } catch { failures.append(error.localizedDescription) }
             if !configured { showSettings = true }
@@ -87,6 +87,15 @@ final class AppModel: ObservableObject {
             if isMember && !offline { do { try await autoLogin() } catch { /* Cached lists stay available when reauthentication fails. */ } }
             await refresh(); await refreshQueue(); await processOperations()
         }
+    }
+    func restoreCredentials() throws {
+        guard let db else { throw BeerError.storage("Database is not open") }
+        guard try db.preference("native_account_transition") == nil else {
+            session = nil; cookies = [:]; tastedBeers = []; rewards = []; queue = []; queuedBeerIDs = []
+            throw BeerError.storage("An account change was interrupted. Please sign in again.")
+        }
+        let loaded = try credentials.load()
+        session = loaded.0; cookies = loaded.1
     }
     func reload() throws {
         guard let db else { throw BeerError.storage("Database is not open") }
@@ -229,7 +238,13 @@ final class AppModel: ObservableObject {
             guard loginEpoch == epoch else { throw BeerError.changedAccount }
             let previous = try credentials.load()
             let oldConfiguration = try db.preference("all_beers_api_url")
-            try db.setPreference("all_beers_api_url","")
+            let previousTransition = try db.preference("native_account_transition")
+            // Persist before touching Keychain so an interrupted or failed rollback
+            // cannot pair the new credentials with the previous member's cache.
+            try db.transaction {
+                try db.setPreference("native_account_transition","pending")
+                try db.setPreference("all_beers_api_url","")
+            }
             var credentialsCommitted = false
             do {
             // save publishes its new generation only after every required write succeeds.
@@ -246,12 +261,26 @@ final class AppModel: ObservableObject {
                 try db.setPreference("my_beers_api_url",memberURL)
                 try db.setPreference("first_launch","false")
                 try db.setPreference("all_beers_api_url",storeURL)
+                try db.setPreference("native_account_transition",nil)
             }
             } catch {
-                if credentialsCommitted {
-                    if let old = previous.0 { try credentials.save(session:old,cookies:previous.1) } else { try credentials.clear() }
+                do {
+                    if credentialsCommitted {
+                        if let old = previous.0 { try credentials.save(session:old,cookies:previous.1) } else { try credentials.clear() }
+                    }
+                    try db.transaction {
+                        try db.setPreference("all_beers_api_url",oldConfiguration)
+                        try db.setPreference("native_account_transition",previousTransition)
+                    }
+                } catch {
+                    // Leave the persistent transition marker in place until a full
+                    // login succeeds. Do not expose either member's state meanwhile.
+                    epoch = UUID(); refreshing = false
+                    session = nil; cookies = [:]; tastedBeers = []; rewards = []; queue = []; queuedBeerIDs = []
+                    notice = nil; showSettings = true; showLogin = true
+                    await liveActivity.endAll()
+                    throw BeerError.storage("Account recovery could not finish. Please sign in again.")
                 }
-                try db.setPreference("all_beers_api_url",oldConfiguration)
                 throw error
             }
             session = next; cookies = visitor ? [:] : values

@@ -1,6 +1,16 @@
 # Migration checkpoint — 2026-09-11
 
-## CURRENT HANDOFF — credential-save failure tests and rollback fix
+## CURRENT HANDOFF — database/credential rollback safety verified
+
+Added three LoginRollbackTests for database failure after credential commit: existing-account rollback, first-login rollback, and a second Keychain failure while restoring the old credentials. Tests use a real SQLite trigger that aborts reward deletion after earlier cache deletes, proving partial transaction rollback. HTTP remains fixture-only, Keychain namespaces are unique, and the second failure is injected at the rollback commit marker.
+
+The combined-failure regression initially exposed mixed account state: the running app retained the old account, while a fresh model loaded the new credentials with old tastings/rewards. Fixed with a durable `native_account_transition` preference written transactionally with the disabled data URL before credential changes. It is cleared in the successful account database transaction, or restored to its previous value only after rollback succeeds. A rollback failure clears active member state and requires sign-in again; persisted cache and operations remain intact. Startup now calls restoreCredentials(), which rejects a pending transition before exposing member data. A failed recovery retry preserves that marker; a later full successful login clears it with the replacement cache/configuration.
+
+Full isolated-simulator correctness suite **65/65 passed**. Logs: `/private/tmp/BeerSelectorNative-rollback-red.log` (combined failure regression), `/private/tmp/BeerSelectorNative-rollback-green.log` (nine rollback/credential cases), `/private/tmp/BeerSelectorNative-rollback-all.log` (full suite including failed retry and successful recovery). Fresh-model/fresh-database checks exercise startup credential restoration; this is not a literal device process-kill test or a guarantee against hardware/power-loss durability failures.
+
+User authorized finishing this work and proceeding to the next step while away. Committing this fix after `f777ad21` and reserving internal build **61** for upload, including the earlier credential-save fix. Build 60 remains the last confirmed phone installation. No live account calls or external tester changes. Broader overlapping logout/login cleanup races, full legacy upgrade testing and actual TestFlight crash delivery remain separate verification items.
+
+## Previous checkpoint — credential-save failure tests and rollback fix
 
 User confirmed build 60's logout/login/refresh work on the phone, then authorized credential-save failure testing. Added CredentialFailureTests with six tests (nine failure scenarios): existing-account registry, second cookie chunk, session and commit-marker failures; first-login failures at all four stages; and auto-login marker failure. CredentialStore exposes instance-local SecItemUpdate/SecItemAdd call boundaries for deterministic `errSecInteractionNotAllowed` injection; unblocked operations, reads, cleanup and recovery use real uniquely namespaced simulator Keychain entries. SQLite and HTTP fixtures are isolated; no live account calls.
 
