@@ -156,3 +156,19 @@ Implementation follows Apple's [OSSignposter interval API](https://developer.app
 ### Remaining device validation
 
 No Instruments recording or phone installation was performed in this fix session. Record Time Profiler/Points of Interest and SwiftUI hitches with BeerSelectorProfile on a physical device during refresh, login, and queue use. Confirm balanced intervals and real URLSession metrics. Verify MetricKit report delivery on device; simulator compilation cannot establish daily report delivery. No live queue/reward mutations are authorized by these automated tests. Xcode Cloud workflow execution, full RN upgrade compatibility, and the existing device release gates remain pending.
+
+
+## Physical profiling follow-up — 2026-09-11
+
+A signed Release build and 45-second physical iPhone trace now verify real URLSessionTaskMetrics callbacks and three successful refreshes (842–906 ms). All 39 operation intervals balance; no hang/hitch rows were reported. User-reported apparent crashes remain unresolved: no app crash report was found and a process change after the recording needs explanation. See [PHONE-PROFILING.md](PHONE-PROFILING.md) for evidence and next reproduction steps. The preceding “no phone installation/recording” statement describes the earlier fix session, not this follow-up. MetricKit daily delivery remains unverified.
+
+
+Follow-up: the phone trace motivated a synthetic tasted-date sorting measurement. Precomputed date keys reduced the 200-row optimized simulator mean from 87.449 ms to 2.838 ms; the view also avoids repeated sorting within each body evaluation. All 44 correctness tests pass, including date tie/missing-value ordering. The scrolling crash and initial refresh freeze remain unconfirmed; the optimization is not labeled a crash fix. See PHONE-PROFILING.md.
+
+
+Attach-only phone follow-up: the user repeated refresh, scrolling and taps for 60 seconds and reported normal behavior. Two refreshes succeeded (1,069.745/625.499 ms), six real network metric callbacks arrived, all 18 operation intervals balanced, and hang/hitch tables were empty. The app retained the same PID during/after recording. No new app crash report was found. The earlier Home Screen exit remains unexplained. This used the pre-sorting-fix phone build and is not validation of the local optimization; see PHONE-PROFILING.md.
+
+
+## Internal TestFlight diagnostic reporting — 2026-09-11
+
+Build 1.1.0 (38) uploaded successfully with Apple's internal-only restriction and app/widget symbols; no external beta groups or builds were changed. Added a bounded persistent event history, foreground main-thread delay monitor, and Release Settings report sharing. Full 49-test suite and final 5-test journal rerun pass. See [INTERNAL-TESTFLIGHT.md](INTERNAL-TESTFLIGHT.md) for archive/log evidence, tester steps, delivery limits and remaining verification. Earlier statements that reports reset on process exit describe the original aggregate store; the new local journal separately persists up to 128 fixed-label events across launches. No automatic custom telemetry backend was added.

@@ -7,6 +7,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication,didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey:Any]? = nil) -> Bool {
         guard ProcessInfo.processInfo.environment["BEERSELECTOR_TEST_HOST"] != "1",
               ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else { return true }
+        DiagnosticJournal.shared.record(.launch)
         DeviceMetrics.shared.start()
         BGTaskScheduler.shared.register(forTaskWithIdentifier:Self.cleanupIdentifier,using:nil) { task in
             let work = Task {

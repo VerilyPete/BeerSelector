@@ -4,6 +4,8 @@ struct SettingsScreen: View {
     @EnvironmentObject var model: AppModel
     @Environment(\.dismiss) var dismiss
     @State private var diagnosticsReport: String?
+    @State private var diagnosticFile: URL?
+    @State private var preparingDiagnostics = false
     @State private var confirmLogout = false
     @State private var confirmReset = false
     @State private var confirmTimestamps = false
@@ -28,6 +30,27 @@ struct SettingsScreen: View {
                     }
                     LabelPlate(title:"ABOUT")
                     ChromePanel { HStack { IconWell(symbol:"info.circle.fill"); VStack(alignment:.leading,spacing:4) { Text("Beer Selector").font(Robo.title()); Text("Version \(Bundle.main.object(forInfoDictionaryKey:"CFBundleShortVersionString") as? String ?? "") (\(Bundle.main.object(forInfoDictionaryKey:"CFBundleVersion") as? String ?? ""))").font(Robo.mono()).foregroundStyle(Robo.steel) } } }
+                    LabelPlate(title:"SUPPORT")
+                    Text("After a freeze or unexpected exit, reopen the app and prepare a diagnostic report. It includes recent operation timings and build details, without account or request contents. Reports stay on this device until you share them.")
+                        .font(Robo.mono()).foregroundStyle(Robo.steel)
+                    row(preparingDiagnostics ? "Preparing Report…" : "Prepare Diagnostic Report","Includes recent activity across app restarts","doc.text.magnifyingglass") {
+                        preparingDiagnostics = true; diagnosticFile = nil
+                        Task {
+                            defer { preparingDiagnostics = false }
+                            do { diagnosticFile = try await DiagnosticJournal.shared.export() }
+                            catch { model.error = "Could not prepare the diagnostic report. Please try again." }
+                        }
+                    }.disabled(preparingDiagnostics).accessibilityIdentifier("prepare-diagnostics-button")
+                    if let diagnosticFile {
+                        ShareLink(item:diagnosticFile) { Label("Share Diagnostic Report",systemImage:"square.and.arrow.up") }
+                    }
+                    row("Clear Diagnostic History","Remove saved reports from this device","trash") {
+                        diagnosticFile = nil
+                        Task {
+                            do { try await DiagnosticJournal.shared.clear(); model.notice = "Diagnostic history cleared" }
+                            catch { model.error = "Could not clear diagnostic history. Please try again." }
+                        }
+                    }.disabled(preparingDiagnostics)
                     #if DEBUG
                     LabelPlate(title:"DEVELOPER TOOLS")
                     row("Create Mock Session","Open isolated offline sample data","flask.fill") {

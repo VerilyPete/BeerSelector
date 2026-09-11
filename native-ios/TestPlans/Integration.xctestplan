@@ -32,7 +32,8 @@
       "parallelizable": true,
       "selectedTests": [
         "PersistenceIntegrationTests",
-        "NetworkTests"
+        "NetworkTests",
+        "DiagnosticJournalTests"
       ]
     }
   ]

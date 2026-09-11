@@ -15,6 +15,7 @@
 		341BC4C35D81DF2E14EFD856 /* BeerQueueWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 3EB46E74F9A0312EDB8BC823 /* BeerQueueWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		35D8BD1935114A6F706FFD1E /* RewardsAndQueue.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DD0CF4E1F891B774336B50E /* RewardsAndQueue.swift */; };
 		3E32F23BD6DF7BBE2F2DAF99 /* NetworkTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 065F304DB3C26F8D3AEB36DE /* NetworkTests.swift */; };
+		432C2CC8386BDB8B6C3613DE /* DiagnosticJournal.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39F2059F3B66AECF52036DDA /* DiagnosticJournal.swift */; };
 		47A286345C3C1E452B1D6E39 /* PerformanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06275F1DAE6CEEAFE3663883 /* PerformanceTests.swift */; };
 		561F7AF9144662173620EFD7 /* Database.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9256858AED7E171B4D5226B9 /* Database.swift */; };
 		564E961552691B29F63ECC29 /* BeerRuleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADBF41D4275F957AAC3862E7 /* BeerRuleTests.swift */; };
@@ -42,6 +43,7 @@
 		DF2549E5A606C5401EEE8AEA /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = A91D8CD4FA476DD360093BB1 /* Models.swift */; };
 		E247DB8C7A6E89EE447E8ABB /* BeerListScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 448C8B937564D5D9D30A96A6 /* BeerListScreen.swift */; };
 		F16A6A4D9383A7F8B68A89E1 /* PreviewFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55ABEB8230853D84BFBC6BA6 /* PreviewFixtures.swift */; };
+		F2F49D6CDEAD90715177C9A5 /* DiagnosticJournalTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0EEB9B8BC25E938FB72A161E /* DiagnosticJournalTests.swift */; };
 		FD817B18BD78C68C1BDBAF2C /* DSEG7Classic-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 941743B005963BF3442CB79D /* DSEG7Classic-Bold.ttf */; };
 		FFE24E92D7BED5A2B9B29CC7 /* Diagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2542046C9CA9DA793A61CAD4 /* Diagnostics.swift */; };
 /* End PBXBuildFile section */
@@ -82,11 +84,13 @@
 		06275F1DAE6CEEAFE3663883 /* PerformanceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformanceTests.swift; sourceTree = "<group>"; };
 		065F304DB3C26F8D3AEB36DE /* NetworkTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkTests.swift; sourceTree = "<group>"; };
 		09F1A509A9E3EDA4041AAB69 /* libsqlite3.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libsqlite3.tbd; path = usr/lib/libsqlite3.tbd; sourceTree = SDKROOT; };
+		0EEB9B8BC25E938FB72A161E /* DiagnosticJournalTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticJournalTests.swift; sourceTree = "<group>"; };
 		11B1728CA71C2EC017ACBCD2 /* SpaceGrotesk-SemiBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "SpaceGrotesk-SemiBold.ttf"; sourceTree = "<group>"; };
 		12D771D46FDD13D0EE577B5A /* BeerSelectorNative.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = BeerSelectorNative.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		2262BE1057E0A4E092166E62 /* BeerSelectorApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeerSelectorApp.swift; sourceTree = "<group>"; };
 		231ED53DBC183B5F36A1F3F5 /* BeerQueueWidgetLiveActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeerQueueWidgetLiveActivity.swift; sourceTree = "<group>"; };
 		2542046C9CA9DA793A61CAD4 /* Diagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Diagnostics.swift; sourceTree = "<group>"; };
+		39F2059F3B66AECF52036DDA /* DiagnosticJournal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticJournal.swift; sourceTree = "<group>"; };
 		3EB46E74F9A0312EDB8BC823 /* BeerQueueWidget.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = BeerQueueWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		448C8B937564D5D9D30A96A6 /* BeerListScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeerListScreen.swift; sourceTree = "<group>"; };
 		45EE3296A115D128B8EA9CBE /* SpaceMono-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "SpaceMono-Regular.ttf"; sourceTree = "<group>"; };
@@ -153,6 +157,7 @@
 			isa = PBXGroup;
 			children = (
 				ADBF41D4275F957AAC3862E7 /* BeerRuleTests.swift */,
+				0EEB9B8BC25E938FB72A161E /* DiagnosticJournalTests.swift */,
 				C009F862A33114679B004770 /* DiagnosticsTests.swift */,
 				065F304DB3C26F8D3AEB36DE /* NetworkTests.swift */,
 				06275F1DAE6CEEAFE3663883 /* PerformanceTests.swift */,
@@ -193,6 +198,7 @@
 				B010A4CE7BBD5260A19D613B /* AppModel.swift */,
 				555FA9F91FB5176D6A0195F0 /* Credentials.swift */,
 				9256858AED7E171B4D5226B9 /* Database.swift */,
+				39F2059F3B66AECF52036DDA /* DiagnosticJournal.swift */,
 				2542046C9CA9DA793A61CAD4 /* Diagnostics.swift */,
 				8E5B34BEE7B3C2A4705EEE76 /* EnrichmentService.swift */,
 				A081906E69E0D85E2F77D6CD /* LiveActivityController.swift */,
@@ -404,6 +410,7 @@
 				967B5899D82AF14A464B3CC8 /* Browsers.swift in Sources */,
 				85DDB24E735C4CF5A75F68A8 /* Credentials.swift in Sources */,
 				561F7AF9144662173620EFD7 /* Database.swift in Sources */,
+				432C2CC8386BDB8B6C3613DE /* DiagnosticJournal.swift in Sources */,
 				FFE24E92D7BED5A2B9B29CC7 /* Diagnostics.swift in Sources */,
 				5BB735F66B33BB189D265529 /* EnrichmentService.swift in Sources */,
 				61C50A59CCC2A359CF4D1EC5 /* LiveActivityController.swift in Sources */,
@@ -421,6 +428,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				564E961552691B29F63ECC29 /* BeerRuleTests.swift in Sources */,
+				F2F49D6CDEAD90715177C9A5 /* DiagnosticJournalTests.swift in Sources */,
 				2F4EFDF00B0041D481937040 /* DiagnosticsTests.swift in Sources */,
 				02E29FEF72BA21373F843C2E /* HTTPFixture.swift in Sources */,
 				3E32F23BD6DF7BBE2F2DAF99 /* NetworkTests.swift in Sources */,
@@ -530,7 +538,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 37;
+				CURRENT_PROJECT_VERSION = 60;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = N9F7839KSX;
 				ENABLE_NS_ASSERTIONS = NO;
@@ -591,7 +599,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 37;
+				CURRENT_PROJECT_VERSION = 60;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = N9F7839KSX;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -729,7 +737,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 37;
+				CURRENT_PROJECT_VERSION = 60;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = N9F7839KSX;
 				ENABLE_NS_ASSERTIONS = NO;

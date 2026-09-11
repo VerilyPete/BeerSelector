@@ -119,12 +119,26 @@ struct BeerFilter {
     var ascending = false
     func apply(_ beers: [Beer], tasted: Bool = false) -> [Beer] {
         let query = search.lowercased()
-        let dateFormatter = DateFormatter(); dateFormatter.dateFormat = "MM/dd/yyyy"; dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+        let dateFormatter: DateFormatter?
+        if sort == .date && tasted {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "MM/dd/yyyy"
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            dateFormatter = formatter
+        } else { dateFormatter = nil }
         return beers.filter { b in
             let c = b.brew_container.lowercased()
             return (query.isEmpty || [b.brew_name, b.brewer, b.brew_style, b.brewer_loc].contains { $0.lowercased().contains(query) }) &&
                 (container == .all || (container == .draft && (c.contains("draft") || c.contains("draught"))) || (container == .cans && (c.contains("can") || c.contains("bottle"))))
-        }.enumerated().sorted { a, b in
+        }.enumerated().map { offset, beer in
+            // DateFormatter parsing is expensive; calculate each key once, outside
+            // the O(n log n) comparisons, while preserving original tie order.
+            let date: TimeInterval
+            if sort == .date {
+                date = tasted ? dateFormatter?.date(from:beer.tasted_date)?.timeIntervalSince1970 ?? 0 : Double(beer.added_date) ?? 0
+            } else { date = 0 }
+            return (offset:offset, element:beer, date:date)
+        }.sorted { a, b in
             var comparison: ComparisonResult = .orderedSame
             switch sort {
             case .name: comparison = a.element.brew_name.localizedCompare(b.element.brew_name)
@@ -134,8 +148,7 @@ struct BeerFilter {
                 let lhs = a.element.abv ?? 0, rhs = b.element.abv ?? 0
                 comparison = lhs == rhs ? .orderedSame : lhs < rhs ? .orderedAscending : .orderedDescending
             case .date:
-                let lhs = tasted ? dateFormatter.date(from: a.element.tasted_date)?.timeIntervalSince1970 ?? 0 : Double(a.element.added_date) ?? 0
-                let rhs = tasted ? dateFormatter.date(from: b.element.tasted_date)?.timeIntervalSince1970 ?? 0 : Double(b.element.added_date) ?? 0
+                let lhs = a.date, rhs = b.date
                 comparison = lhs == rhs ? .orderedSame : lhs < rhs ? .orderedAscending : .orderedDescending
             }
             if comparison == .orderedSame { return a.offset < b.offset }

@@ -145,3 +145,8 @@ Four deliberate regression probes are killed by the expected tests after repairi
 ## Profiling follow-up — 2026-09-11
 
 Implemented validated enrichment outcome counters, fixed-label signposts/logging, URLSession task timing aggregation, a MetricKit subscriber, and Debug Settings diagnostics display/share. Added a coverage-free profiling scheme plus isolated performance plan. Measured SQLite contention led to zero busy wait while retaining serialized transactions and cache/account guards. Correctness: 43/43; performance: 2/2; unsigned Release device build passes with optimized coverage-free compiler flags and dSYM. See TESTING.md for evidence and limits. Physical Instruments/MetricKit delivery, Cloud execution, and migration release gates remain unverified.
+
+
+## Internal beta diagnostics — 2026-09-11
+
+Internal-only TestFlight build 1.1.0 (38) uploaded with symbols. Added persistent local operation/lifecycle/delay history and user-initiated Release Settings JSON export, separate from TestFlight's crash-report channel. External beta distribution is unchanged. 49 correctness tests pass, plus final targeted persistence checks. See INTERNAL-TESTFLIGHT.md; actual TestFlight installation/crash-report delivery and MetricKit delivery remain unverified.

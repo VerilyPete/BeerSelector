@@ -31,6 +31,19 @@ final class BeerRuleTests: XCTestCase {
         var b = Beer(id:"b",name:"B"); b.tasted_date = "01/01/2026"
         XCTAssertEqual(BeerFilter().apply([a,b],tasted:true).map(\.id),["b","a"])
     }
+    func testTastedDateSortPreservesTiesAndMissingDateOrder() {
+        var older = Beer(id:"older",name:"Older"); older.tasted_date = "12/31/2025"
+        var newer = Beer(id:"newer",name:"Newer"); newer.tasted_date = "01/01/2026"
+        var same = Beer(id:"same",name:"Same date"); same.tasted_date = older.tasted_date
+        let missing = Beer(id:"missing",name:"Missing date")
+        var malformed = Beer(id:"malformed",name:"Malformed date"); malformed.tasted_date = "not a date"
+        let input = [older,missing,newer,same,malformed]
+        var filter = BeerFilter()
+        XCTAssertEqual(filter.apply(input,tasted:true).map(\.id),["newer","older","same","missing","malformed"])
+        filter.ascending = true
+        XCTAssertEqual(filter.apply(input,tasted:true).map(\.id),["missing","malformed","older","same","newer"])
+    }
+
     func testContainerPriority() throws {
         let beer = try Beer(row:["id":"1","brew_name":"Flight","brew_container":"16 oz draft","brew_style":"Lager","abv":"9"])
         XCTAssertEqual(beer.container_type,"flight")

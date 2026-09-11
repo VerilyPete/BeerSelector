@@ -1,6 +1,42 @@
 # Migration checkpoint — 2026-09-11
 
-## CURRENT HANDOFF — profiling fixes implemented and validated
+## CURRENT HANDOFF — TestFlight diagnostics verified; next build corrected to 60
+
+User confirmed **1.1.0 (38) installed through TestFlight** and successfully shared its diagnostic JSON. Report reviewed from `/Users/pete/Downloads/BeerSelector-diagnostics.json`: 128 entries from one session, September 11 09:26:43–09:28:50 CDT; all 49 completed operations succeeded; two refreshes took 2.034 s and 1.173 s; no main-thread delay events; all retained starts have completions. One completion's start had rotated out of the bounded history. This verifies on-device export/sharing, not crash delivery or resolution of the earlier exit.
+
+User clarified the previous 1.1.0 build was **59**. The legacy React Native Xcode project has an Increment Build Number phase that mutates its Info.plist on Release builds; the native project did not inherit it. Native `project.yml` and generated project now use **60** for app/widget. Native numbering is explicit: increment the shared value before each subsequent distribution archive and regenerate with XcodeGen. Export-time renumbering is disabled and the internal upload script rejects archives below 60. No build 60 archive/upload or external distribution change was performed. Build 38's retained archive, source snapshot and symbols remain associated with 38.
+
+Numbering validation: Xcode resolves 1.1.0 (60) for both app and widget; upload preflight rejects 38/59 and accepts 60/61; temporary bump-script fixtures verify the minimum, normal increment, and source rollback on generator failure. Prior app validation remains 49/49 plus 5/5 journal refinement tests; no app logic changed during numbering maintenance.
+
+User authorized committing the accumulated sorting, diagnostics, internal distribution and numbering work. Continue normal internal testing; export promptly if a failure recurs. Actual TestFlight crash delivery and physical MetricKit delivery remain unverified.
+
+## Previous checkpoint — internal-only TestFlight build uploaded
+
+User authorized internal TestFlight plus persistent diagnostic export and explicitly required **no disruption to external beta testers**. Uploaded **1.1.0 (38)** to App Store Connect app **6744178536** using `testFlightInternalTestingOnly=true` and symbol upload. Effective options and actual uploaded version/build were verified; Xcode reports **Upload succeeded / EXPORT SUCCEEDED**, package processing begun. Existing external builds/groups/testers were not changed. No beta review or App Store submission. Internal group assignment/processing completion are not yet independently verified; see [INTERNAL-TESTFLIGHT.md](INTERNAL-TESTFLIGHT.md) and its direct TestFlight link for the final internal installation step. Do not claim the user's phone was updated by this upload.
+
+Added bounded persistent DiagnosticJournal history (128 fixed-label entries across launches), off-main atomic/coalesced writes, foreground main-thread delay/recovery monitor, and Release Settings → Support → Prepare/Share Diagnostic Report plus Clear History. No account/request data, raw errors or raw MetricKit payloads enter the history; no custom backend/automatic telemetry upload. TestFlight provides crash stacks; MetricKit handler remains numeric-only. Prepared tester notes in TestFlight/WhatToTest.en-US.txt are not uploaded group metadata.
+
+Validation: full **49/49** tests passed; after flush/background refinement **5/5 journal tests** passed. Optimized coverage-free signed archive and matching app/widget dSYMs verified. Includes prior measured sorting improvement. Archive retained in ignored `native-ios/.build/InternalTestFlight/BeerSelectorNative-1.1.0-38.xcarchive`; app/dSYM UUID `B4A2F4C7-0157-3D10-A0D3-3F57FC906FFD`. Build source version is 38. Upload log `/private/tmp/BeerSelectorNative-internal-upload-retry.log`. Initial packaging failed from mismatched rsync on PATH; upload script now pins Apple system tools. No external distribution changes occurred.
+
+The prior phone freeze/Home Screen exit remains unexplained; normal attach-only reproduction is not a crash fix. Physical MetricKit delivery, a true full-download performance pass, actual TestFlight crash delivery, and on-device diagnostic sharing remain verification items. No need to repeat old readiness questions. See INTERNAL-TESTFLIGHT.md for exact evidence, retained artifacts and future internal-only upload safeguards.
+
+---
+
+## Previous checkpoint — physical profiling complete for this pass; earlier exit unresolved
+
+User clarified the earlier refresh appeared frozen (they manually exited/reopened), and a separate scrolling/tapping event returned to the iPhone Home Screen. A new **60-second attach-only reproduction behaved normally**, explicitly confirmed by the user. Do not treat delayed replies to prior readiness questions as a new request to record.
+
+The attach run used the existing installed phone build (base `0e64a6d7` plus numeric URLSession Task signpost), not the locally optimized sorting build. PID 24609 stayed alive through seven periodic checks and after detaching. Two refreshes succeeded in **1,069.745 ms and 625.499 ms**; six real task-metric callbacks; all 18 operation intervals balanced; max parsing 2.408 ms and transaction 1.115 ms; zero Hangs/Hitches rows. No new BeerSelector crash or contemporaneous Jetsam report was found. Earlier 45-second launch recording had three successful refreshes and real task metrics too. The earlier Home Screen exit and initial full-fetch freeze remain unexplained, not dismissed or marked fixed. MetricKit daily delivery and a true cold/full taplist profiling pass remain unverified.
+
+A separate measured responsiveness fix is prepared locally: tasted-date sorting now precomputes per-row keys and BeerListScreen evaluates its filtered list once per body. Synthetic optimized 200-row mean improved **87.449 ms → 2.838 ms** (~31x). **44/44 correctness tests pass**, performance case passes before/after, signed Release phone build passes without coverage flags. The optimized build is **not installed**; current phone remains on the version used for reproduction. Code/tests/docs after `0e64a6d7` remain uncommitted; no new commit/push requested.
+
+See [PHONE-PROFILING.md](PHONE-PROFILING.md) for evidence and limits. Latest trace `/private/tmp/BeerSelectorNative-phone-attach-repro.trace`; fixed-label exports/process observations `BeerSelectorNative-attach-*` under `/private/tmp`. Previous valid trace `/private/tmp/BeerSelectorNative-phone-refresh-ready.trace`; initial locked-phone `BeerSelectorNative-phone-refresh.trace` is empty/invalid. Mac xctrace exports crashed repeatedly but allocator/zombie workarounds recovered tables; these host crashes are distinct from phone exits. No running recording/build/test process remains. No live check-in/reward/delete or account reset was performed.
+
+Next concrete options: commit the measured sorting/diagnostics follow-up, install the tested sorting build for a separate phone comparison, or proceed to planned account-safety tests. If the Home Screen exit recurs, obtain its exact time and fresh device reports and reproduce by attaching to the running process. Do not claim a crash fix from the sorting change.
+
+---
+
+## Previous checkpoint — profiling fixes implemented and validated
 
 Resumed the authorized profiling fixes. **43/43 correctness tests and 2/2 opt-in performance tests pass.** No build/test processes remain after validation. User requested a commit after validation. This checkpoint is included with the accumulated phone/UI/testing and profiling fixes on `migration/native-swiftui`. No push, phone reinstall, or live account mutations were performed in the profiling/commit sessions.
 
@@ -277,3 +313,7 @@ Discover tool metadata via ALL_TOOLS only when necessary; use structuredContent 
 - Final chrome validation: **22/22 tests pass** (`/private/tmp/BeerSelectorNative-chrome-test.log`); unsigned device SDK build also passes (`/private/tmp/BeerSelectorNative-chrome-device.log`).
 - Final fixture screenshots captured: six `iphone-*-chrome.png` screens plus `ipad-home-chrome.png` and `ipad-finder-chrome.png`. Reviewed safe-area bands, glyphs, panels, search, header, tab and Rewards materials on iPhone/iPad. Updated user's original simulator app in place and reopened it; no uninstall or live account mutation was performed.
 - Remaining visual work includes exact full layout/type-size/rotation comparison; the Pen renderer remains unavailable. Do not equate matching saved material values with complete pixel parity.
+
+### Build-number maintenance
+
+Build 60 is already reserved. For the following distribution archive, run `native-ios/Scripts/bump-build-number.py` once from the repository root (or invoke its absolute path). It increments the single shared XcodeGen setting, enforces a floor of 60, and regenerates the project for both app and widget. XcodeGen must be installed; generation failure restores the prior source setting and attempts project restoration. Review and commit project.yml and project.pbxproj together. Check the latest uploaded build across native and legacy releases first; the local script does not query App Store Connect or coordinate concurrent release branches. Routine Run, Profile, Test and Archive actions do not mutate source versions. Failed archives can reuse their reserved number until it has been uploaded.

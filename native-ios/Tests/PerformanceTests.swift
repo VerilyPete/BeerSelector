@@ -17,6 +17,19 @@ final class PerformanceTests: XCTestCase {
             } catch { XCTFail("Snapshot failed: \(error)") }
         }
     }
+    func testTastedDateSorting() {
+        let beers = (0..<200).map { index in
+            var beer = Beer(id:String(index),name:"Fixture beer \(index)")
+            beer.tasted_date = String(format:"%02d/%02d/2026",1 + index % 9,1 + (index * 13) % 28)
+            return beer
+        }
+        let filter = BeerFilter()
+        measure(metrics:[XCTClockMetric(),XCTCPUMetric()]) {
+            let sorted = filter.apply(beers,tasted:true)
+            XCTAssertEqual(sorted.count,200)
+        }
+    }
+
     func testContendedWriterPreservesSnapshot() throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: folder) }

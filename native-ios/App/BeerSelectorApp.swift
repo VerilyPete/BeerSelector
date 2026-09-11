@@ -14,7 +14,20 @@ struct BeerSelectorApp: App {
             RootView().environmentObject(model).preferredColorScheme(.dark)
                 .task { if !Self.isTestHost { await model.start() } }
                 .onOpenURL { model.handleURL($0) }
-                .onChange(of:scenePhase) { _,phase in if !Self.isTestHost && phase == .active { Task { await model.foreground() } } }
+                .onChange(of:scenePhase,initial:true) { _,phase in
+                    guard !Self.isTestHost else { return }
+                    MainThreadMonitor.shared.setActive(phase == .active)
+                    switch phase {
+                    case .active:
+                        DiagnosticJournal.shared.record(.active)
+                        Task { await model.foreground() }
+                    case .inactive: DiagnosticJournal.shared.record(.inactive)
+                    case .background:
+                        DiagnosticJournal.shared.record(.background)
+                        Task { try? await DiagnosticJournal.shared.flush() }
+                    @unknown default: break
+                    }
+                }
         }
     }
 }

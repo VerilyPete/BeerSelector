@@ -10,7 +10,8 @@ struct BeerListScreen: View {
     private var beers: [Beer] { switch kind { case .finder:model.untasted; case .tasted:model.tastedBeers; default:model.allBeers } }
     private var filtered: [Beer] { filter.apply(beers,tasted:kind == .tasted) }
     var body: some View {
-        VStack(spacing:12) {
+        let filtered = self.filtered
+        return VStack(spacing:12) {
             HStack {
                 DisplayTitle(title:kind.title); Spacer()
                 if model.refreshing { ProgressView().tint(Robo.cyan) }

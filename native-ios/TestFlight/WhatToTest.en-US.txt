@@ -1,0 +1,7 @@
+Internal native SwiftUI build — refresh, scrolling and crash diagnosis.
+
+Verify your existing login and cached beers survive the update. Refresh All Data, scroll All Beers and Tasted Brews, change filters, and expand/collapse rows. Do not create check-ins, redeem rewards, or delete queue entries just for this diagnostic pass.
+
+If the app closes unexpectedly, submit TestFlight crash feedback with the time and last action. For a freeze or unexplained exit, reopen the app, go to Settings → Support → Prepare Diagnostic Report → Share Diagnostic Report, and send the JSON report for analysis. Reports contain recent operation timings and build details, not account data or request contents. Preparing a report does not send it automatically.
+
+The earlier intermittent freeze/Home Screen exit remains under investigation. This build includes a measured date-sorting optimization, persistent diagnostic history, and foreground main-thread delay detection. A successful repeat run does not prove the earlier crash is fixed.

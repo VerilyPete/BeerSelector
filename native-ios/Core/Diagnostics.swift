@@ -5,9 +5,12 @@ import MetricKit
 /// Only fixed labels and numeric aggregates enter this store. Never retain requests,
 /// payloads, errors, account data, or raw MetricKit reports.
 final class Diagnostics: @unchecked Sendable {
-    static let shared = Diagnostics()
-    enum Operation: String, CaseIterable { case refresh, parsing, transaction, login, queue, network }
-    enum Outcome: String { case success, failure, cancelled }
+    static let shared = Diagnostics(journal: ProcessInfo.processInfo.environment["BEERSELECTOR_TEST_HOST"] == "1" ||
+        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil ? nil : .shared)
+    private let journal: DiagnosticJournal?
+    init(journal: DiagnosticJournal? = nil) { self.journal = journal }
+    enum Operation: String, CaseIterable, Codable { case refresh, parsing, transaction, login, queue, network }
+    enum Outcome: String, Codable { case success, failure, cancelled }
     struct Aggregate {
         var count = 0
         var successes = 0
@@ -34,18 +37,22 @@ final class Diagnostics: @unchecked Sendable {
         private let owner: Diagnostics
         private let operation: Operation
         private let state: OSSignpostIntervalState
+        private let identifier = UUID()
         private let start = ProcessInfo.processInfo.systemUptime
         private let lock = NSLock()
         private var ended = false
         fileprivate init(owner: Diagnostics, operation: Operation) {
             self.owner = owner; self.operation = operation
+            owner.journal?.record(.operationBegan,operation:operation,interval:identifier)
             state = owner.signposter.beginInterval("Operation", id: owner.signposter.makeSignpostID(), "\(operation.rawValue, privacy: .public)")
         }
         func finish(_ outcome: Outcome) {
             lock.lock(); defer { lock.unlock() }
             guard !ended else { return }; ended = true
             owner.signposter.endInterval("Operation", state, "\(self.operation.rawValue, privacy: .public) \(outcome.rawValue, privacy: .public)")
-            owner.record(operation, outcome: outcome, seconds: ProcessInfo.processInfo.systemUptime - start)
+            let duration = ProcessInfo.processInfo.systemUptime - start
+            owner.record(operation, outcome: outcome, seconds: duration)
+            owner.journal?.record(.operationEnded,operation:operation,interval:identifier,outcome:outcome,seconds:duration)
         }
         deinit { finish(.cancelled) }
     }
@@ -73,10 +80,13 @@ final class Diagnostics: @unchecked Sendable {
         guard seconds.isFinite, seconds >= 0, redirects >= 0 else { return }
         lock.lock(); defer { lock.unlock() }
         taskCount += 1; taskSeconds += seconds; self.redirects += redirects
+        journal?.record(.networkMetrics,seconds:seconds,count:redirects)
+        signposter.emitEvent("URLSession Task", "seconds=\(seconds) redirects=\(redirects)")
     }
     func recordReports(metrics: Int = 0, diagnostics: Int = 0, cpuSeconds: Double = 0) {
         lock.lock(); defer { lock.unlock() }
         metricReports += metrics; diagnosticReports += diagnostics
+        journal?.record(.metricReports,seconds:cpuSeconds,count:diagnostics)
         if cpuSeconds.isFinite, cpuSeconds >= 0 { self.cpuSeconds += cpuSeconds }
     }
     func report() -> String {
