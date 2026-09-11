@@ -1,6 +1,16 @@
 # Migration checkpoint — 2026-09-11
 
-## CURRENT HANDOFF — release-readiness review complete; distribution paused
+## CURRENT HANDOFF — actual Xcode Cloud build 22 passed 74/74
+
+User explicitly approved publishing native source/docs to the public GitHub origin. Commit **f11d8a79** is pushed on migration/native-swiftui. Created and saved **Native Correctness** through Xcode: native-ios/BeerSelectorNative.xcodeproj, BeerSelectorNative scheme, explicit All plan, required-to-pass Test action, single iPhone 17 Pro, pinned Xcode 26.3 (17C529), branch-change trigger restricted to migration/native-swiftui, no archive or post-actions. Existing Default workflow was left unchanged. Xcode crashed after Save; the workflow survived and was confirmed in Manage Workflows after reopening.
+
+Actual [Cloud build 22](https://appstoreconnect.apple.com/teams/867cf0b5-1b9a-478f-b7df-8ce81f2ef11e/apps/6744178536/ci/builds/6f36cee7-d8cf-40b8-ae7d-c8a7ef805502) **succeeded: 74 tests, 74 passed**, iOS Simulator 26.3.1, macOS 26.3 (25D125), about four minutes. GitHub final check 103347140826 reports success with zero errors, test failures, analysis issues or warnings. Evidence JSON retained in ignored native-ios/.build/XcodeCloud/build22/github-checks.json. Cloud lists build/test logs and per-destination/combined XCResult artifacts; local bundle retention and coverage extraction were not verified. A simulator crash-log bundle is listed too; its existence alone does not establish an app crash. This is unrelated to TestFlight crash delivery.
+
+The run dialog also started duplicate build 23; canceled only that duplicate and confirmed its canceled GitHub result. Original build 22 completed successfully. No build-number bump, app archive/upload, tester changes, or external distribution occurred. Cloud run numbers 22/23 are separate from app versions; next app distribution remains 62. Distribution stays paused. Current documentation evidence updates are uncommitted to avoid triggering an unnecessary repeat run; source worktree has no code changes.
+
+Cloud execution is now verified and no longer an outstanding gate. Next release evidence remains actual Apple crash-report retrieval/symbolication, accessibility/device lifecycle and remaining parity gaps. No need to rerun the completed account, upgrade or basic Live Activity checks.
+
+## Previous checkpoint — release-readiness review complete; distribution paused
 
 See [RELEASE-READINESS.md](RELEASE-READINESS.md) for the consolidated evidence and exact remaining acceptance criteria. Read-only GitHub checks confirmed repository access, but the migration branch is absent (404) and current commit c7ab30c7 is unavailable remotely (422). Current source therefore cannot yet run in Xcode Cloud through origin. Local scheme/plan/executable hook are prepared; no actual Cloud run or authenticated workflow inventory was obtained.
 

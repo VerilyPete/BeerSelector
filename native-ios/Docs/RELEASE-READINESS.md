@@ -2,11 +2,15 @@
 
 Reviewed source: `c7ab30c7` on `migration/native-swiftui`, plus documentation updates. Distribution remains paused. Installed internal build 61 predates the later logout/login cleanup fixes; the next distribution number is 62. This review neither certifies an external release nor requires repeating user-confirmed device checks.
 
+## Cloud gate closed — 2026-09-11
+
+[Native Correctness build 22](https://appstoreconnect.apple.com/teams/867cf0b5-1b9a-478f-b7df-8ce81f2ef11e/apps/6744178536/ci/builds/6f36cee7-d8cf-40b8-ae7d-c8a7ef805502) passed **74/74 tests** at pushed commit f11d8a79. Xcode 26.3; macOS 26.3; iPhone 17 Pro / iOS Simulator 26.3.1. Zero reported errors, failures or warnings. Workflow is testing only, restricted to migration/native-swiftui; distribution remains paused. User explicitly approved the public source push. This supersedes the pre-setup Cloud findings below. Build 23 was a canceled duplicate. See TESTING.md for artifact scope.
+
 ## Evidence and remaining gates
 
 | Area | Established evidence | Remaining acceptance evidence |
 | --- | --- | --- |
-| Correctness/account safety | 74/74 local tests, including credential failure/rollback, account refresh isolation, serialized logout/login and visitor cleanup | Actual Cloud run on the reviewed source; device smoke check of the newer cleanup code when distribution resumes |
+| Correctness/account safety | 74/74 local tests, including credential failure/rollback, account refresh isolation, serialized logout/login and visitor cleanup | Cloud run passed; device smoke check of the newer cleanup code when distribution resumes |
 | Upgrade | Exact schema-v8 fixtures; actual iPad build 50/schema 7 → native 61 in-place upgrade; user-confirmed retained account; separate real-database no-network probe; persistent relaunch | No repeat of the basic upgrade rehearsal needed; evidence does not certify every historical schema |
 | Phone behavior | User-confirmed login/logout/refresh; basic Live Activity appearance, updates, removal on logout/empty | Disabled activity authorization, long-duration/background cleanup, force-quit/foreground and deep-link cases are not all established by that report |
 | Crash reporting | Internal TestFlight installation and JSON sharing confirmed; symbols retained for builds 38/60/61 | Retrieve a real Apple report for a known event/build and resolve its app frames with matching symbols; original Home Screen exit remains unexplained |
@@ -42,7 +46,7 @@ No forced crash, debugger termination, phone installation, or tester message was
 
 ## Recommended order
 
-1. Make the current source available to a verified test-only Cloud workflow and obtain its first recorded result.
+1. Completed: published source and verified test-only Cloud build 22 (74/74).
 2. Inspect Apple's crash/feedback view for existing reports; retain the unresolved original incident if none is available.
 3. Close accessibility/device lifecycle and remaining behavior gaps before external release. Package internal build 62 only after distribution resumes.
 

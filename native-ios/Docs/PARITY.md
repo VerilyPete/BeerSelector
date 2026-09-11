@@ -10,7 +10,7 @@ This is a working parity ledger, not a release certification. “Implemented” 
 
 ## Current verification status
 
-[RELEASE-READINESS.md](RELEASE-READINESS.md) consolidates the 2026-09-11 evidence and remaining gates. Historical pending labels below are superseded where that review records completed tests, the real iPad upgrade, and user-confirmed phone/Live Activity checks. Cloud execution and crash-report delivery remain unverified; distribution is paused.
+[RELEASE-READINESS.md](RELEASE-READINESS.md) consolidates the 2026-09-11 evidence and remaining gates. Historical pending labels below are superseded where that review records completed tests, the real iPad upgrade, and user-confirmed phone/Live Activity checks. Cloud build 22 now passes 74/74 tests; crash-report delivery remains unverified and distribution is paused.
 
 ## Screen and interaction map
 

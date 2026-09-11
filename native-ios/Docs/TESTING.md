@@ -52,7 +52,9 @@ The generated project and shared plans are checked in. If you add/remove source 
 
 ## Xcode Cloud
 
-Repository preparation is implemented; an actual Cloud workflow/run has not been created or certified.
+Actual execution verified on 2026-09-11: [Native Correctness build 22](https://appstoreconnect.apple.com/teams/867cf0b5-1b9a-478f-b7df-8ce81f2ef11e/apps/6744178536/ci/builds/6f36cee7-d8cf-40b8-ae7d-c8a7ef805502) passed **74/74 tests** at f11d8a79, using Xcode 26.3 (17C529), macOS 26.3 (25D125), and iPhone 17 Pro / iOS Simulator 26.3.1. GitHub reports zero errors, test failures, analysis issues and warnings. Workflow uses the native project, BeerSelectorNative scheme, explicit All plan, required Test action and migration/native-swiftui branch trigger. No archive/distribution/post-actions. Build 23 was a duplicate manually canceled; build 22 is the successful evidence.
+
+Cloud lists build/test logs and XCResult artifacts. Local result-bundle retention and coverage extraction have not been verified. The setup instructions below are retained for reference; creating another workflow is unnecessary.
 
 1. Commit and push the native project, shared scheme, test plans, tests, and `native-ios/ci_scripts/ci_post_clone.sh` to the connected repository.
 2. Open the native project in Xcode and use Product → Xcode Cloud → Create Workflow, selecting the existing BeerSelector product/team and repository when prompted.
