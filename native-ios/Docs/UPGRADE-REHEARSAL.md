@@ -29,3 +29,17 @@ Both archives are device builds and cannot run in an iOS simulator. The checkout
 6. Save version/build and pass/fail evidence. Compare against the 74-test synthetic-schema suite. A simulator fixture check, archive entitlement match or previously confirmed native login is not a substitute for this old-binary-to-native run.
 
 No rehearsal device has been selected and no real binary upgrade is claimed. Automated complete-v8 schema and Expo Keychain-format checks are already green; this is the remaining installation-level evidence.
+
+## Actual iPad run — 2026-09-11 (in progress)
+
+The user supplied iPPPPPPad with legacy 1.1.0 (50), schema 7. Documents/Library backup succeeded; the full root copy was denied for iOS-protected metadata. The database passed integrity checks and held 195 beers, 175 tastings, 13 rewards and no pending operations. Build 61 was installed over it without uninstalling; a before-first-launch copy matched every legacy table. Keychain was not backed up.
+
+First launch required user developer-profile verification. The subsequent successful launch recorded a successful refresh, yielding 188 beers/12 tastings/14 rewards and advanced refresh timestamps. It cannot be called an offline cache-preservation check. A no-network native database probe on a disposable copy of the original real database passed all original-column comparisons, integrity and expected plaintext-cookie purge (1/1, /private/tmp/BeerSelectorNative-ipad-local-upgrade-probe.log). No personal database was added to the repository. Existing-account UI confirmation and a controlled offline relaunch remain pending.
+
+## Completed result — 2026-09-11
+
+User confirmed the original account and tasted/reward data appeared without logging in again, with Wi-Fi off. Native build 61 then relaunched successfully; all six tables match the post-first-launch snapshot exactly (188 beers, 12 tastings, 14 rewards, zero operations, unchanged preferences and schema history), integrity OK. Evidence: /private/tmp/BeerSelectorNative-ipad-relaunch-result.json and BeerSelectorNative-ipad-offline-relaunch.json.
+
+The first launch did record successful refresh work; that numeric journal does not identify live versus cached responses or prove Wi-Fi was enabled. Do not contradict the user's Wi-Fi-off confirmation. Initial container preservation and the separate no-network probe of the real original database establish migration preservation despite first-launch refresh changes. Account continuity is user-confirmed, not a raw Keychain export comparison.
+
+The basic actual build-50-to-native-61 upgrade rehearsal is complete. No uninstall, live check-in, phone modification or TestFlight distribution change occurred. Original private backup remains available; it excludes Keychain. Physical Live Activity behavior and actual crash delivery remain separate checks.

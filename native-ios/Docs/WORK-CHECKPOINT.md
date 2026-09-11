@@ -1,6 +1,34 @@
 # Migration checkpoint — 2026-09-11
 
-## CURRENT HANDOFF — legacy tests committed; binary-upgrade preflight complete
+## CURRENT HANDOFF — actual iPad upgrade and relaunch verified
+
+User confirmed Wi-Fi was off when native opened and their existing signed-in account/tastings/rewards appeared without another login. This establishes user-confirmed account continuity on the real **legacy build 50 → native build 61** in-place upgrade. Do not interpret successful request/refresh diagnostics as proof of live network access: cached responses or another transport cannot be distinguished from the retained numeric journal. The user's Wi-Fi report takes precedence over the earlier assumption that it was left on.
+
+Final native process restart succeeded. A post-relaunch database copy matches all six post-first-launch tables exactly, including preferences/timestamps/schema history: **188 beers, 12 tastings, 14 rewards, zero operations**, integrity OK. Evidence `/private/tmp/BeerSelectorNative-ipad-offline-relaunch.json`, `/private/tmp/BeerSelectorNative-ipad-relaunch-result.json`, private copied SQLite folder `/private/tmp/BeerSelectorNative-ipad-after-relaunch` (mode 700). User's existing-account confirmation also remained consistent in their follow-up.
+
+The initial installed-container copy preserved the original six tables (195 beers/175 tastings/13 rewards). Native first launch then recorded successful refresh work and changed those counts. A separate no-network migration probe of the actual original database preserved every legacy value, with only expected native metadata/plaintext-cookie removal. Combined evidence: installation container preservation, actual-database migration compatibility, user-confirmed credential continuity, native startup and relaunch persistence. It does not identify the source of refresh responses, prove all Keychain entries survived byte-for-byte, or resolve the original phone crash.
+
+No new TestFlight upload, phone change, uninstall or pending check-in occurred. iPad now runs native build 61; original Documents/Library backup remains private in /private/tmp and is not a Keychain backup. Distribution remains paused. Automated suite remains 74/74 plus the separate 1/1 real-database probe. Next release evidence areas are physical Live Activity behavior and actual crash-report delivery; the basic real upgrade rehearsal is no longer an outstanding item.
+
+## Previous checkpoint — actual iPad upgrade launched; account UI confirmation pending
+
+After user resolved developer trust, native build 61 launched successfully over legacy build 50. Installation preserved the original six database tables byte-for-value before native launch. Post-launch diagnostics recorded a successful refresh and advanced both refresh timestamps: 188 beers, 12 tastings, 14 rewards. This launch was not an offline preservation proof despite the intended offline setup. User was asked whether Wi-Fi stayed on after trust verification and whether the original account appeared without login; await their response before claiming Keychain continuity or performing a controlled offline relaunch.
+
+Independently ran native migration on a disposable copy of the actual pre-upgrade iPad database with no AppModel/networking. **1/1 local probe passed**: all original selected columns/rows of all six tables preserved, 195 beers/175 tastings/13 rewards/zero operations, integrity OK, native schema marker added and legacy plaintext-cookie preference removed. This separates migration behavior from the successful refresh on the device. Log `/private/tmp/BeerSelectorNative-ipad-local-upgrade-probe.log`. Temporary probe source moved out of the test target into ignored `native-ios/.build/UpgradeRehearsal/LocalUpgradeProbeTests.swift`; no personal fixture data committed. Xcode project regenerated after removal and matches committed source.
+
+Pre-upgrade Documents/Library backup remains `/private/tmp/BeerSelectorNative-ipad-legacy50-backup` (mode 700, not a Keychain backup). Device post-launch database `/private/tmp/BeerSelectorNative-ipad-after-native-launch` (mode 700); numeric diagnostics `/private/tmp/BeerSelectorNative-ipad-upgrade-diagnostics.json`; comparison `/private/tmp/BeerSelectorNative-ipad-upgrade-result.json` accurately records changed post-refresh values. Do not restore older data over the refreshed iPad without a concrete reason. No uninstall, user check-in, phone change or TestFlight upload was performed.
+
+## Previous checkpoint — iPad upgrade installed; first launch awaiting developer trust
+
+User authorized the attached unlocked iPPPPPPad for the real upgrade rehearsal, then confirmed Airplane Mode on/Wi-Fi off. Target CoreDevice `36906F49-69D1-58FF-A29D-760588D6074A`, UDID `00008103-000D241222D0801E`, iOS 26.6.2. It had legacy **1.1.0 (50)**, schema **7**, with **195 beers, 175 tastings, 13 rewards, zero pending operations**, and a legacy plaintext auth_cookies preference. No credential values were printed.
+
+Backed up Documents and Library to private `/private/tmp/BeerSelectorNative-ipad-legacy50-backup` (directory mode 700). Full-root copy was denied for iOS container-manager metadata; both app folders copied successfully. Backup SQLite integrity passes. Keychain is not part of this backup. Saved non-content baseline hashes/columns/counts in `/private/tmp/BeerSelectorNative-ipad-upgrade-baseline.json` (mode 600).
+
+Installed the preserved signed native **build 61** in-place, without uninstalling; device profile includes the iPad. Installation succeeded. First launch was denied by iOS security (signature/entitlements/profile trust); **native has not run yet**. User was asked to trust/verify the Developer App profile in Settings → General → VPN & Device Management, briefly enabling Wi-Fi if needed, then disable Wi-Fi again without opening the app. Await their readiness/message before launch.
+
+A post-install/pre-launch copy proves all six tables' legacy data unchanged: beers/tastings/rewards/operations/preferences/schema history hashes match (auth_cookies excluded from reported preference hash; expected native purge is still pending). Evidence copy `/private/tmp/BeerSelectorNative-ipad-postinstall-beforelaunch` (mode 700), install/launch JSON/logs `BeerSelectorNative-ipad-install61.*` and `BeerSelectorNative-ipad-launch61.*` in /private/tmp. App-data replacement preservation is verified; native migration, Keychain continuity and UI/relaunch checks remain pending. Do not confuse build 50/schema 7 on this device with the separately inspected archive59/synthetic-v8 checks.
+
+## Previous checkpoint — legacy tests committed; binary-upgrade preflight complete
 
 Committed the 74-test legacy compatibility work as **fa28f317**. Continued with read-only inspection of the actual legacy build-59 archive and native build-61 archive. Their app/team/application/shared-group identities, minimum iOS and device-only platform match; no explicit keychain group override in either inspected signature. This does not prove runtime upgrade behavior.
 
