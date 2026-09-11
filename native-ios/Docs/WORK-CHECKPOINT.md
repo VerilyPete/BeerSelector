@@ -1,6 +1,16 @@
 # Migration checkpoint — 2026-09-11
 
-## CURRENT HANDOFF — build 60 uploaded to internal TestFlight
+## CURRENT HANDOFF — credential-save failure tests and rollback fix
+
+User confirmed build 60's logout/login/refresh work on the phone, then authorized credential-save failure testing. Added CredentialFailureTests with six tests (nine failure scenarios): existing-account registry, second cookie chunk, session and commit-marker failures; first-login failures at all four stages; and auto-login marker failure. CredentialStore exposes instance-local SecItemUpdate/SecItemAdd call boundaries for deterministic `errSecInteractionNotAllowed` injection; unblocked operations, reads, cleanup and recovery use real uniquely namespaced simulator Keychain entries. SQLite and HTTP fixtures are isolated; no live account calls.
+
+Four new tests failed against the old login path. Persistent registry/session/marker write failure also broke the attempted credential rollback, leaving the previous account's all_beers_api_url blank. A partial chunk failure unnecessarily rewrote the previous committed generation. Login now tracks whether the credential save actually committed: a pre-commit failure retains the existing generation and restores the configuration without another Keychain write. Epoch invalidation follows successful credential commit, preserving in-flight work for an account that never changed. Successful credential commit followed by database failure still uses the existing credential rollback path; failures in that separate rollback and broader crash-between-stores atomicity remain unverified.
+
+Full correctness suite **62/62 passed**, including 6/6 CredentialFailureTests and all prior account-race tests. Logs: `/private/tmp/BeerSelectorNative-credentials-red.log` (four failing tests) and `/private/tmp/BeerSelectorNative-credentials-all.log` (full green). Integration includes the new class; All discovers it. Tests verify persisted credentials through a fresh store value, unchanged commit marker/configuration/cache/pending operations, no follow-up HTTP on failure, and successful credential-save recovery without resetting storage.
+
+User authorized committing this credential-save fix and its tests after `81ea29a5`. Next account-safety coverage: database failure after successful credential commit, including failure while restoring the previous credentials. No new archive/upload; installed TestFlight build remains 60. Before another distribution archive, reserve **61** using Scripts/bump-build-number.py. External testers remain unchanged. The earlier phone exit is not claimed fixed by this rollback change.
+
+## Previous checkpoint — build 60 uploaded to internal TestFlight
 
 ## Build 60 uploaded — 2026-09-11
 

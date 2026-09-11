@@ -33,6 +33,7 @@
 		85DDB24E735C4CF5A75F68A8 /* Credentials.swift in Sources */ = {isa = PBXBuildFile; fileRef = 555FA9F91FB5176D6A0195F0 /* Credentials.swift */; };
 		88EAEFD0D3C559B91A939BAA /* API.swift in Sources */ = {isa = PBXBuildFile; fileRef = E094A5FAACE12510FD992EEA /* API.swift */; };
 		8A37C0484CADD56BEA9CD29F /* SpaceMono-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 45EE3296A115D128B8EA9CBE /* SpaceMono-Regular.ttf */; };
+		8C57235B60F471A426387173 /* CredentialFailureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E4302E4D060DAE06B9571EB /* CredentialFailureTests.swift */; };
 		91433AAB667AA652E3C52911 /* SpaceGrotesk-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = B805244B88340CB922AB51D0 /* SpaceGrotesk-Bold.ttf */; };
 		967B5899D82AF14A464B3CC8 /* Browsers.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF251A68A999FE16B881F31D /* Browsers.swift */; };
 		B08DF96FC8102EB1D5184E0C /* ServiceConfiguration.plist in Resources */ = {isa = PBXBuildFile; fileRef = 96F09E56159F3CC65095E4AE /* ServiceConfiguration.plist */; };
@@ -91,6 +92,7 @@
 		2262BE1057E0A4E092166E62 /* BeerSelectorApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeerSelectorApp.swift; sourceTree = "<group>"; };
 		231ED53DBC183B5F36A1F3F5 /* BeerQueueWidgetLiveActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeerQueueWidgetLiveActivity.swift; sourceTree = "<group>"; };
 		2542046C9CA9DA793A61CAD4 /* Diagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Diagnostics.swift; sourceTree = "<group>"; };
+		2E4302E4D060DAE06B9571EB /* CredentialFailureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialFailureTests.swift; sourceTree = "<group>"; };
 		39F2059F3B66AECF52036DDA /* DiagnosticJournal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticJournal.swift; sourceTree = "<group>"; };
 		3EB46E74F9A0312EDB8BC823 /* BeerQueueWidget.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = BeerQueueWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		448C8B937564D5D9D30A96A6 /* BeerListScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeerListScreen.swift; sourceTree = "<group>"; };
@@ -160,6 +162,7 @@
 			children = (
 				B50B9A0FA412F25DC622856F /* AccountSafetyTests.swift */,
 				ADBF41D4275F957AAC3862E7 /* BeerRuleTests.swift */,
+				2E4302E4D060DAE06B9571EB /* CredentialFailureTests.swift */,
 				0EEB9B8BC25E938FB72A161E /* DiagnosticJournalTests.swift */,
 				C009F862A33114679B004770 /* DiagnosticsTests.swift */,
 				065F304DB3C26F8D3AEB36DE /* NetworkTests.swift */,
@@ -432,6 +435,7 @@
 			files = (
 				BFDDDC8BE0F8DB61145E70EA /* AccountSafetyTests.swift in Sources */,
 				564E961552691B29F63ECC29 /* BeerRuleTests.swift in Sources */,
+				8C57235B60F471A426387173 /* CredentialFailureTests.swift in Sources */,
 				F2F49D6CDEAD90715177C9A5 /* DiagnosticJournalTests.swift in Sources */,
 				2F4EFDF00B0041D481937040 /* DiagnosticsTests.swift in Sources */,
 				02E29FEF72BA21373F843C2E /* HTTPFixture.swift in Sources */,

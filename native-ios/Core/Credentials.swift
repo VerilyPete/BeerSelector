@@ -6,6 +6,9 @@ struct CredentialStore {
     struct Generation: Codable { var generation: String; var count: Int; var hasSession: Bool? }
     var prefix = "beerknurd_auth_cookies"
     var sessionStorageKey = "beerknurd_session"
+    // Injectable OS write boundary; reads and successful writes still use the real Keychain.
+    var updateItem: (CFDictionary, CFDictionary) -> OSStatus = { SecItemUpdate($0,$1) }
+    var addItem: (CFDictionary) -> OSStatus = { SecItemAdd($0,nil) }
     private func query(_ key: String, service: String) -> [String: Any] {
         [kSecClass as String:kSecClassGenericPassword,kSecAttrService as String:service,kSecAttrAccount as String:Data(key.utf8),kSecAttrGeneric as String:Data(key.utf8)]
     }
@@ -21,11 +24,11 @@ struct CredentialStore {
     }
     func write(_ key: String, _ data: Data) throws {
         let q = query(key,service:"app:no-auth")
-        let updated = SecItemUpdate(q as CFDictionary,[kSecValueData as String:data] as CFDictionary)
+        let updated = updateItem(q as CFDictionary,[kSecValueData as String:data] as CFDictionary)
         if updated == errSecSuccess { return }
         guard updated == errSecItemNotFound else { throw BeerError.storage("Keychain error \(updated)") }
         var add = q; add[kSecValueData as String] = data; add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
-        let status = SecItemAdd(add as CFDictionary,nil)
+        let status = addItem(add as CFDictionary)
         guard status == errSecSuccess else { throw BeerError.storage("Keychain error \(status)") }
     }
     func delete(_ key: String) throws {

@@ -229,10 +229,14 @@ final class AppModel: ObservableObject {
             guard loginEpoch == epoch else { throw BeerError.changedAccount }
             let previous = try credentials.load()
             let oldConfiguration = try db.preference("all_beers_api_url")
-            epoch = UUID()
             try db.setPreference("all_beers_api_url","")
+            var credentialsCommitted = false
             do {
+            // save publishes its new generation only after every required write succeeds.
+            // Until then the existing credentials remain authoritative; do not rewrite them.
             try credentials.save(session:next,cookies:visitor ? [:] : values)
+            credentialsCommitted = true
+            epoch = UUID()
             try db.transaction {
                 if session?.identity != next.identity {
                     try db.execute("DELETE FROM allbeers"); try db.execute("DELETE FROM tasted_brew_current_round"); try db.execute("DELETE FROM rewards")
@@ -244,7 +248,9 @@ final class AppModel: ObservableObject {
                 try db.setPreference("all_beers_api_url",storeURL)
             }
             } catch {
-                if let old = previous.0 { try credentials.save(session:old,cookies:previous.1) } else { try credentials.clear() }
+                if credentialsCommitted {
+                    if let old = previous.0 { try credentials.save(session:old,cookies:previous.1) } else { try credentials.clear() }
+                }
                 try db.setPreference("all_beers_api_url",oldConfiguration)
                 throw error
             }
