@@ -1,6 +1,16 @@
 # Migration checkpoint — 2026-09-11
 
-## CURRENT HANDOFF — post-login cleanup guarded; distribution paused
+## CURRENT HANDOFF — legacy schema-v8 compatibility verified with fixtures
+
+Added LegacyV8Fixture using the exact six CREATE TABLE statements from React Native `src/database/schema.ts` / `schemaVersion.ts` at 363ac3ef, plus both operation-queue indexes and synthetic data. Raw SQLite builds the database before native BeerDatabase opens it. Tests cover a fresh v8 history and a migrated 3–8 history, all legacy beer/enrichment/review/tasting fields, redeemed/unredeemed rewards, preference values/descriptions, and all queued-operation states/payloads/retry metadata.
+
+Three LegacyUpgradeTests pass: complete v8 preservation over repeated native opens; native replacement/enqueue writes against old tables; and a forced failure at the native-version preference write that rolls back schema additions plus row changes and succeeds after removing the fault. Legacy schema history and indexes remain intact. Interrupted retrying operations become pending as intentionally implemented; successful operations remain stored but are excluded from pending-operation reads.
+
+Full suite **74/74 passed**, including all three compatibility tests, log `/private/tmp/BeerSelectorNative-legacy-all.log`. The first focused run had a test-only ORDER BY projection mistake, corrected before the full pass; no production migration bug was found and no production code changed. This verifies exact-schema synthetic fixtures, not an actual installation of the previous binary followed by a signed native update. Existing separate Expo Keychain service compatibility tests remain green.
+
+Changes are uncommitted after `363ac3ef`. No build-number bump, archive, upload or external tester changes; build 61 remains installed and distribution remains paused. Next: commit these compatibility tests/docs. Remaining release evidence includes a real old-binary-to-native upgrade with an appropriate fixture account, physical Live Activity behavior, actual crash-report delivery, and the unresolved original phone exit. Do not repeat synthetic schema-v8 coverage as an outstanding gap.
+
+## Previous checkpoint — post-login cleanup guarded; distribution paused
 
 User requested keeping account-safety fixes committed and continuing development without another distribution. Build 61 remains the confirmed installed internal TestFlight build; no build-number bump or upload in this session.
 

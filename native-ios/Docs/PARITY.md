@@ -150,3 +150,5 @@ Implemented validated enrichment outcome counters, fixed-label signposts/logging
 ## Internal beta diagnostics — 2026-09-11
 
 Internal-only TestFlight build 1.1.0 (38) uploaded with symbols. Added persistent local operation/lifecycle/delay history and user-initiated Release Settings JSON export, separate from TestFlight's crash-report channel. External beta distribution is unchanged. 49 correctness tests pass, plus final targeted persistence checks. See INTERNAL-TESTFLIGHT.md; actual TestFlight installation/crash-report delivery and MetricKit delivery remain unverified.
+
+- Legacy schema-v8 database compatibility is now fixture-verified: exact React Native tables/indexes, cached fields/settings/rewards/operation metadata and migration history survive native opening; subsequent native writes and failed-upgrade rollback/retry pass. Full suite 74/74. Actual signed old-binary-to-native update remains separate device evidence; see TESTING.md.
