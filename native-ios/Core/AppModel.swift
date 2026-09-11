@@ -31,6 +31,8 @@ final class AppModel: ObservableObject {
     let credentials: CredentialStore
     let liveActivity = LiveActivityController()
     private var cookies: [String:String] = [:]
+    private var logoutCleanupTask: Task<[String], Never>?
+    var webCookieCleanup: (@MainActor () async -> Void)?
     private let monitor = NWPathMonitor()
     private var epoch = UUID()
     @Published private(set) var processing = false
@@ -234,6 +236,9 @@ final class AppModel: ObservableObject {
                 memberURL = try extract(#"https://[^"'\s]+bk-member-json\.php\?uid=\d+"#)
                 storeURL = try extract(#"https://[^"'\s]+bk-store-json\.php\?sid=\d+"#)
             }
+            // Local logout cleanup may still be deleting credentials or browser cookies.
+            // Wait before publishing a new account; the old server request is independent.
+            if let logoutCleanupTask { _ = await logoutCleanupTask.value }
             try Task.checkCancellation()
             guard loginEpoch == epoch else { throw BeerError.changedAccount }
             let previous = try credentials.load()
@@ -401,6 +406,7 @@ final class AppModel: ObservableObject {
         } catch { self.error = error.localizedDescription }
     }
     func clearWebCookies() async {
+        if let webCookieCleanup { await webCookieCleanup(); return }
         for cookie in HTTPCookieStorage.shared.cookies ?? [] { HTTPCookieStorage.shared.deleteCookie(cookie) }
         let store = WKWebsiteDataStore.default().httpCookieStore
         for cookie in await store.allCookies() { await store.deleteCookie(cookie) }
@@ -409,17 +415,32 @@ final class AppModel: ObservableObject {
         if previewMode { session = nil; allBeers = []; tastedBeers = []; rewards = []; queue = []; showSettings = true; return }
         let old = session; let saved = cookies
         epoch = UUID(); refreshing = false; session = nil; cookies = [:]; queue = []; queuedBeerIDs = []; tastedBeers = []; rewards = []
-        await liveActivity.endAll()
-        var failures: [String] = []
-        do { try credentials.clear() } catch { failures.append(error.localizedDescription) }
-        await clearWebCookies()
-        do { try db?.setPreference("is_visitor_mode","false"); try db?.setPreference("all_beers_api_url",""); try db?.setPreference("my_beers_api_url","") } catch { failures.append(error.localizedDescription) }
-        showSettings = true; tab = .home
+        let token = epoch
+        let previousCleanup = logoutCleanupTask
+        let cleanup = Task { @MainActor in
+            if let previousCleanup { _ = await previousCleanup.value }
+            await liveActivity.endAll()
+            var failures: [String] = []
+            do { try credentials.clear() } catch { failures.append(error.localizedDescription) }
+            await clearWebCookies()
+            do {
+                try db?.setPreference("is_visitor_mode","false")
+                try db?.setPreference("all_beers_api_url","")
+                try db?.setPreference("my_beers_api_url","")
+            } catch { failures.append(error.localizedDescription) }
+            return failures
+        }
+        logoutCleanupTask = cleanup
+        var failures = await cleanup.value
+        if token == epoch {
+            logoutCleanupTask = nil
+            showSettings = true; tab = .home
+        }
         if let old, !old.isVisitor {
             do { _ = try await api.request(api.configuration.endpoint("logout.php"),method:"POST",fields:[:],member:old,cookies:saved,retry:false) }
             catch { failures.append("Signed out locally; server logout could not be confirmed.") }
         }
-        if !failures.isEmpty { error = failures.joined(separator:"\n") }
+        if token == epoch, !failures.isEmpty { error = failures.joined(separator:"\n") }
     }
     func openUntappd(_ beer: Beer) {
         let name = beer.brew_name.replacingOccurrences(of:#"\s*\([^)]*\)\s*"#,with:" ",options:.regularExpression).trimmingCharacters(in:.whitespaces)

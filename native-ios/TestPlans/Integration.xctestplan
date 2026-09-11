@@ -36,6 +36,7 @@
         "AccountSafetyTests",
         "CredentialFailureTests",
         "LoginRollbackTests",
+        "LogoutRaceTests",
         "DiagnosticJournalTests"
       ]
     }

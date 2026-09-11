@@ -43,6 +43,7 @@
 		BD13675C3EBFBD8056382B73 /* BeerQueueSharedTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04EF71A9E599A4CB8CF189D6 /* BeerQueueSharedTypes.swift */; };
 		BFDDDC8BE0F8DB61145E70EA /* AccountSafetyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B50B9A0FA412F25DC622856F /* AccountSafetyTests.swift */; };
 		D1FCE96FA3AF027AD6B6DB9F /* LoginRollbackTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A32675D183666346B091FCD /* LoginRollbackTests.swift */; };
+		D8797792D124509C81D07486 /* LogoutRaceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3523CE0692640E98D7A7D92 /* LogoutRaceTests.swift */; };
 		DF2549E5A606C5401EEE8AEA /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = A91D8CD4FA476DD360093BB1 /* Models.swift */; };
 		E247DB8C7A6E89EE447E8ABB /* BeerListScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 448C8B937564D5D9D30A96A6 /* BeerListScreen.swift */; };
 		F16A6A4D9383A7F8B68A89E1 /* PreviewFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55ABEB8230853D84BFBC6BA6 /* PreviewFixtures.swift */; };
@@ -121,6 +122,7 @@
 		ADBF41D4275F957AAC3862E7 /* BeerRuleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeerRuleTests.swift; sourceTree = "<group>"; };
 		AF251A68A999FE16B881F31D /* Browsers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Browsers.swift; sourceTree = "<group>"; };
 		B010A4CE7BBD5260A19D613B /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
+		B3523CE0692640E98D7A7D92 /* LogoutRaceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogoutRaceTests.swift; sourceTree = "<group>"; };
 		B50B9A0FA412F25DC622856F /* AccountSafetyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountSafetyTests.swift; sourceTree = "<group>"; };
 		B805244B88340CB922AB51D0 /* SpaceGrotesk-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "SpaceGrotesk-Bold.ttf"; sourceTree = "<group>"; };
 		BE1F74F45E480DB31BBAADE5 /* BeerIcons.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = BeerIcons.ttf; sourceTree = "<group>"; };
@@ -168,6 +170,7 @@
 				0EEB9B8BC25E938FB72A161E /* DiagnosticJournalTests.swift */,
 				C009F862A33114679B004770 /* DiagnosticsTests.swift */,
 				7A32675D183666346B091FCD /* LoginRollbackTests.swift */,
+				B3523CE0692640E98D7A7D92 /* LogoutRaceTests.swift */,
 				065F304DB3C26F8D3AEB36DE /* NetworkTests.swift */,
 				06275F1DAE6CEEAFE3663883 /* PerformanceTests.swift */,
 				60DFA8A1CD16F264CE8F4909 /* PersistenceIntegrationTests.swift */,
@@ -443,6 +446,7 @@
 				2F4EFDF00B0041D481937040 /* DiagnosticsTests.swift in Sources */,
 				02E29FEF72BA21373F843C2E /* HTTPFixture.swift in Sources */,
 				D1FCE96FA3AF027AD6B6DB9F /* LoginRollbackTests.swift in Sources */,
+				D8797792D124509C81D07486 /* LogoutRaceTests.swift in Sources */,
 				3E32F23BD6DF7BBE2F2DAF99 /* NetworkTests.swift in Sources */,
 				47A286345C3C1E452B1D6E39 /* PerformanceTests.swift in Sources */,
 				684DCAB1076A7DD06AD5B7ED /* PersistenceIntegrationTests.swift in Sources */,

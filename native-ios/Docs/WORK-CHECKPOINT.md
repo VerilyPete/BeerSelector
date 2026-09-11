@@ -1,6 +1,16 @@
 # Migration checkpoint — 2026-09-11
 
-## CURRENT HANDOFF — internal build 61 uploaded
+## CURRENT HANDOFF — overlapping logout/login cleanup fixed
+
+User confirmed internal build 61 installed and login/logout/refresh work on the phone, then authorized overlapping logout/login testing. Added LogoutRaceTests with controlled asynchronous local-cookie cleanup, per-session HTTP fixtures, real unique Keychain namespaces and isolated SQLite. The initial tests reproduced old local cleanup blanking the new account's URLs and reopening Settings, plus a delayed server logout failure leaking into the new session's error UI.
+
+AppModel now owns a shared local logout-cleanup task. Concurrent logout cleanups serialize; completeLogin waits for local cleanup before committing and rechecks its account epoch after waiting. The old remote logout request is independent and still uses captured old credentials; its completion cannot publish errors or navigation changes after the account epoch changes. A test-only injectable cleanup closure suspends the same production cleanup call boundary; no OS WebKit timing guarantees are claimed.
+
+Validation: full suite **67/67 passed** with the first two race tests (`/private/tmp/BeerSelectorNative-logout-all.log`); then a third test verified that another logout invalidates a login waiting on cleanup. All **3/3 LogoutRaceTests passed** (`/private/tmp/BeerSelectorNative-logout-final.log`), with no further production changes after the full pass. There are now 68 tests in the correctness plan, but no full 68-test rerun was needed. Initial red evidence: `/private/tmp/BeerSelectorNative-logout-red.log` (also contained an unwaited test expectation, corrected before green). Integration and All include the class.
+
+User authorized committing the logout/login race fixes after `16d168b6`. Next account-safety step: test successful-login and visitor cleanup that resumes after a newer account change. No new archive/upload or external tester changes; installed internal build remains 61. Next distribution number is 62. Remaining areas include successful-login/visitor post-commit asynchronous cleanup timing, full legacy schema upgrade, and real crash delivery; do not claim every account interleaving or the original phone exit is resolved.
+
+## Previous checkpoint — internal build 61 uploaded
 
 ## Build 61 uploaded — 2026-09-11
 
