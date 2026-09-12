@@ -63,11 +63,20 @@ struct RewardsScreen: View {
                         }
                     }
                     LabelPlate(title:"REWARD LOG")
+                    if model.refreshing { ProgressView("Loading rewards…").font(Robo.mono()).accessibilityIdentifier("rewards-loading") }
+                    if let error = model.rewardsError {
+                        VStack(alignment:.leading,spacing:12) {
+                            Text(error).font(Robo.mono())
+                            if !model.rewards.isEmpty { Text("Showing saved rewards.").font(Robo.mono()).foregroundStyle(Robo.steel) }
+                            Button("Refresh Rewards") { Task { await model.refreshRewards() } }.buttonStyle(BeerControlStyle()).disabled(model.refreshing)
+                            Button("Read Saved Rewards") { model.retrySavedRewards() }.buttonStyle(BeerControlStyle())
+                        }.padding(12).background(Robo.panel,in:RoundedRectangle(cornerRadius:12)).accessibilityIdentifier("rewards-error")
+                    }
                     if !model.isMember { empty("Members Only","Rewards are exclusive to UFO Club members. Log in to view and claim your rewards!") }
-                    else if model.rewards.isEmpty { empty("No Rewards Yet","Keep tasting new beers to earn rewards!") }
+                    else if model.rewards.isEmpty && model.rewardsLoaded && !model.refreshing && model.rewardsError == nil { empty("No Rewards Yet","Keep tasting new beers to earn rewards!") }
                     ForEach(model.rewards) { reward in
                         Button {
-                            if reward.redeemed { model.notice = "This reward has already been claimed." }
+                            if reward.redeemed { model.rewardsNotice = "This reward has already been claimed." }
                             else { selected = reward }
                         } label: {
                                 HStack(spacing:14) {
@@ -88,15 +97,18 @@ struct RewardsScreen: View {
                         }.multilineTextAlignment(.leading).disabled(model.busyIDs.contains(reward.id)).accessibilityIdentifier("reward-\(reward.id)")
                     }
                 }.padding(18).frame(maxWidth:760).frame(maxWidth:.infinity)
-            }.refreshable { await model.refresh() }.background(Robo.background).foregroundStyle(Robo.text)
+            }.refreshable { await model.refreshRewards() }.background(Robo.background).foregroundStyle(Robo.text)
                 .navigationTitle("Rewards").navigationBarTitleDisplayMode(.inline)
-                .safeAreaInset(edge:.top,spacing:0) { ChromeScreenHeader(title:"Rewards",close:{ dismiss() }) }
+                .safeAreaInset(edge:.top,spacing:0) { ChromeScreenHeader(title:"Rewards",close:{ dismiss() },refresh:{ Task { await model.refreshRewards() } },refreshing:model.refreshing) }
+                .task { if !model.rewardsLoaded { await model.refreshRewards() } }
                 .toolbar(.hidden,for:.navigationBar)
                 .toolbar { ToolbarItem(placement:.cancellationAction) { Button("Done") { dismiss() } } }
-                .alert("Queue Reward",isPresented:Binding(get:{ selected != nil },set:{ if !$0 { selected = nil } })) {
-                    if let reward = selected { Button("Queue It!") { Task { await model.queueReward(reward) }; selected = nil } }
-                    Button("Cancel",role:.cancel) { selected = nil }
-                } message: { Text(selected?.type ?? "") }
+                .alert(selected == nil ? "Rewards" : "Queue Reward",isPresented:Binding(get:{ selected != nil || model.rewardsNotice != nil },set:{ if !$0 { selected = nil; model.rewardsNotice = nil } })) {
+                    if let reward = selected {
+                        Button("Queue It!") { selected = nil; Task { await model.queueReward(reward) } }
+                        Button("Cancel",role:.cancel) { selected = nil }
+                    } else { Button("OK") { model.rewardsNotice = nil } }
+                } message: { Text(selected?.type ?? model.rewardsNotice ?? "") }
         }.tint(Robo.cyan)
     }
     private func empty(_ title: String,_ message: String) -> some View { VStack(spacing:12) { Image(systemName:"gift").font(.system(size:48)); Text(title).font(Robo.bold(20)); Text(message).font(Robo.mono()).multilineTextAlignment(.center) }.frame(maxWidth:.infinity).padding(.vertical,40) }
@@ -109,7 +121,23 @@ struct QueueScreen: View {
         NavigationStack {
             ScrollView {
                 LazyVStack(spacing:12) {
-                    if model.queue.isEmpty { Text("No beers in your queue").font(Robo.title(18)).padding(40) }
+                    if model.loadingQueue {
+                        ProgressView("Loading your queue…").font(Robo.mono()).tint(Robo.cyan).padding()
+                            .accessibilityIdentifier("queue-loading")
+                    }
+                    if let error = model.queueError {
+                        VStack(alignment:.leading,spacing:12) {
+                            Text(error).font(Robo.mono()).foregroundStyle(Robo.text)
+                            if !model.queue.isEmpty { Text("Showing the last loaded queue.").font(Robo.mono()).foregroundStyle(Robo.steel) }
+                            Button("Refresh Queue") { Task { await model.refreshQueue() } }
+                                .buttonStyle(BeerControlStyle()).disabled(model.loadingQueue)
+                                .accessibilityIdentifier("queue-retry")
+                        }.frame(maxWidth:.infinity,alignment:.leading).padding()
+                            .background(Robo.panel,in:RoundedRectangle(cornerRadius:12)).accessibilityIdentifier("queue-error")
+                    }
+                    if model.queue.isEmpty && model.queueLoaded && !model.loadingQueue && model.queueError == nil {
+                        Text("No beers in your queue").font(Robo.title(18)).padding(40).accessibilityIdentifier("queue-empty")
+                    }
                     ForEach(model.queue) { entry in
                         ChromePanel {
                             VStack(alignment:.leading,spacing:12) {
@@ -122,9 +150,14 @@ struct QueueScreen: View {
                 }.padding(18).frame(maxWidth:760).frame(maxWidth:.infinity)
             }.refreshable { await model.refreshQueue() }.background(Robo.background).foregroundStyle(Robo.text)
                 .navigationTitle("Your Beer Queue").navigationBarTitleDisplayMode(.inline)
-                .toolbar { ToolbarItem(placement:.cancellationAction) { Button("Close") { dismiss() } }; ToolbarItem(placement:.primaryAction) { Button { Task { await model.refreshQueue() } } label: { Image(systemName:"arrow.clockwise") }.accessibilityLabel("Refresh queue") } }
-                .confirmationDialog("Delete queued beer?",isPresented:Binding(get:{ deletion != nil },set:{ if !$0 { deletion = nil } }),titleVisibility:.visible) {
+                .safeAreaInset(edge:.top,spacing:0) {
+                    ChromeScreenHeader(title:"Queue",close:{ dismiss() },refresh:{ Task { await model.refreshQueue() } },refreshing:model.loadingQueue)
+                }
+                .toolbar(.hidden,for:.navigationBar)
+                .task { await model.refreshQueue() }
+                .alert("Delete queued beer?",isPresented:Binding(get:{ deletion != nil },set:{ if !$0 { deletion = nil } })) {
                     if let entry = deletion { Button("Delete",role:.destructive) { Task { await model.deleteQueueEntry(entry) }; deletion = nil } }
+                    Button("Cancel",role:.cancel) { deletion = nil }
                 } message: { Text(deletion?.name ?? "") }
         }.tint(Robo.cyan)
     }
@@ -132,6 +165,7 @@ struct QueueScreen: View {
 struct OperationsScreen: View {
     @EnvironmentObject var model: AppModel
     @Environment(\.dismiss) var dismiss
+    @Environment(\.dynamicTypeSize) private var typeSize
     @State private var retry: PendingOperation?
     @State private var removal: PendingOperation?
     @State private var confirmClear = false
@@ -146,9 +180,12 @@ struct OperationsScreen: View {
                                 Text(operation.payload["beerName"] ?? operation.payload["rewardType"] ?? operation.type).font(Robo.title()).foregroundStyle(Robo.cyan)
                                 Text("\(operation.status.uppercased()) · \(operation.retryCount) retries").font(Robo.mono()).foregroundStyle(Robo.amber)
                                 Text(Date(timeIntervalSince1970:operation.timestamp / 1000).formatted()).font(Robo.mono()).foregroundStyle(Robo.steel)
+                                if let store = operation.payload["storeName"] { Text("Location: " + store).font(Robo.mono()).foregroundStyle(Robo.steel) }
+                                if let restriction = model.operationRestriction(operation) { Text(restriction).font(Robo.mono()).foregroundStyle(Robo.amber) }
                                 if let error = operation.error { Text(error).font(Robo.mono()).foregroundStyle(Robo.steel) }
-                                HStack {
-                                    Button("RETRY") { retry = operation }.buttonStyle(RoboButtonStyle()).disabled(model.offline || model.processing)
+                                (typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment:.leading,spacing:12)) : AnyLayout(HStackLayout())) {
+                                    Button("RETRY") { retry = operation }.buttonStyle(RoboButtonStyle()).disabled(model.offline || model.processing || model.operationRestriction(operation) != nil)
+                                        .opacity(model.offline || model.processing || model.operationRestriction(operation) != nil ? 0.45 : 1)
                                     Button("REMOVE") { removal = operation }.buttonStyle(RoboButtonStyle(color:Robo.red)).disabled(operation.status == "retrying")
                                 }
                             }

@@ -28,7 +28,7 @@ final class PostLoginCleanupTests: XCTestCase {
                 return (200,Data("https://fsbs.beerknurd.com/bk-member-json.php?uid=\(id) https://fsbs.beerknurd.com/bk-store-json.php?sid=\(id)".utf8))
             case "/bk-store-json.php": return (200,Data(#"[{"id":"beer","brew_name":"Beer"}]"#.utf8))
             case "/bk-member-json.php": return (200,Data(#"[{},{"tasted_brew_current_round":[]},{"reward":[]}]"#.utf8))
-            case "/memberQueues.php": return (200,Data("<html></html>".utf8))
+            case "/memberQueues.php": return (200,Data("<p>No beers currently in your queue.</p>".utf8))
             case "/logout.php": return (200,Data())
             default: throw URLError(.unsupportedURL)
             }

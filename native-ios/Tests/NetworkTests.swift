@@ -213,6 +213,60 @@ final class NetworkTests: XCTestCase {
         do { _ = try await service.health() } catch {}
         XCTAssertEqual(calls,3)
     }
+    @MainActor func testQueueFailurePreservesSavedEntriesAndRecoveryClearsLocalError() async throws {
+        let model = AppModel(api:api(),monitorConnectivity:false)
+        model.activityUpdate = { _,_ in }
+        model.session = MemberSession(memberId:"1",storeId:"1",storeName:"Fixture",sessionId:"fixture")
+        let saved = QueueEntry(id:"saved",name:"Saved beer",date:"")
+        model.queue = [saved]; model.queueLoaded = true
+        model.error = "Unrelated error"
+        fixture.handler = { _ in
+            XCTAssertTrue(model.loadingQueue)
+            throw URLError(.cannotParseResponse)
+        }
+        defer { fixture.handler = nil }
+        await model.refreshQueue()
+        XCTAssertEqual(model.queue,[saved])
+        XCTAssertTrue(model.queueLoaded)
+        XCTAssertNotNil(model.queueError)
+        XCTAssertFalse(model.loadingQueue)
+        XCTAssertEqual(model.error,"Unrelated error")
+        fixture.handler = { _ in
+            XCTAssertTrue(model.loadingQueue)
+            XCTAssertNil(model.queueError)
+            return (200,Data("<p>No beers currently in your queue.</p>".utf8))
+        }
+        await model.refreshQueue()
+        XCTAssertTrue(model.queue.isEmpty)
+        XCTAssertTrue(model.queueLoaded,"Only successful loading can establish an empty queue")
+        XCTAssertNil(model.queueError)
+        XCTAssertFalse(model.loadingQueue)
+        XCTAssertEqual(model.error,"Unrelated error")
+    }
+    @MainActor func testFirstQueueFailureDoesNotEstablishEmptyQueue() async throws {
+        let model = AppModel(api:api(),monitorConnectivity:false)
+        model.session = MemberSession(memberId:"1",storeId:"1",storeName:"Fixture",sessionId:"fixture")
+        fixture.handler = { _ in throw URLError(.cannotParseResponse) }
+        defer { fixture.handler = nil }
+        await model.refreshQueue()
+        XCTAssertFalse(model.queueLoaded)
+        XCTAssertNotNil(model.queueError)
+        XCTAssertFalse(model.loadingQueue)
+        XCTAssertNil(model.error)
+    }
+    @MainActor func testQueueDeletionFailureIsVisibleLocallyAndKeepsEntry() async throws {
+        let model = AppModel(api:api(),monitorConnectivity:false)
+        model.session = MemberSession(memberId:"1",storeId:"1",storeName:"Fixture",sessionId:"fixture")
+        let entry = QueueEntry(id:"1",name:"Saved beer",date:"")
+        model.queue = [entry]; model.queueLoaded = true
+        fixture.handler = { _ in throw URLError(.cannotParseResponse) }
+        defer { fixture.handler = nil }
+        await model.deleteQueueEntry(entry)
+        XCTAssertEqual(model.queue,[entry])
+        XCTAssertTrue(model.queueError?.contains("Couldn’t confirm deletion") == true)
+        XCTAssertNil(model.error)
+        XCTAssertFalse(model.busyIDs.contains(entry.id))
+    }
     @MainActor func testEnrichmentChunkLimitsAndPostSyncMergeAcrossChunks() async throws {
         let service = EnrichmentService(api:api(configuration:enrichmentConfiguration))
         let beers = (0..<101).map { Beer(id:String($0),name:"Beer \($0)") }
@@ -533,7 +587,7 @@ final class NetworkTests: XCTestCase {
         var submissions = 0
         fixture.handler = { request in
             if request.url!.path == "/addToQueue.php" { submissions += 1 }
-            return (200,Data("<html></html>".utf8))
+            return (200,Data("<p>No beers currently in your queue.</p>".utf8))
         }
         await model.processOperations()
         XCTAssertEqual(submissions,0,"An account/store mismatch must not submit a live operation")
@@ -786,7 +840,7 @@ final class NetworkTests: XCTestCase {
                 if fail { throw URLError(.networkConnectionLost) }
                 return (200,Data())
             }
-            return (200,Data("<html></html>".utf8))
+            return (200,Data("<p>No beers currently in your queue.</p>".utf8))
         }
         model.offline = false
         await model.processOperations()

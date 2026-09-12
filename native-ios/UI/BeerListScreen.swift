@@ -52,7 +52,7 @@ struct BeerListScreen: View {
                             }
                         }
                     }.padding(.bottom,20)
-                }.refreshable { await model.refresh() }
+                }.refreshable { if kind == .finder { await model.refreshFinder() } else { await model.refresh() } }
             }.padding(.horizontal,18).padding(.top,8)
         }
             .task(id:search) { do { try await Task.sleep(for:.milliseconds(300)); filter.search = search; expandedID = nil } catch {} }
@@ -99,7 +99,7 @@ struct BeerListScreen: View {
     }
     private var queueControls: some View {
         Group {
-            Button { model.showQueue = true; Task { await model.refreshQueue() } } label: {
+            Button { model.showQueue = true } label: {
                 if model.loadingQueue { ProgressView().tint(Robo.amber) } else { Text("QUEUE") }
             }.buttonStyle(BeerControlStyle(appearance:.amber,compact:true)).disabled(model.loadingQueue).accessibilityIdentifier("view-queue-button").accessibilityLabel("View beer queue").accessibilityValue(model.loadingQueue ? "Loading" : "")
             Button("REWARDS") { model.showRewards = true }.buttonStyle(BeerControlStyle(appearance:.amber,compact:true)).accessibilityIdentifier("finder-rewards-button")
@@ -114,7 +114,7 @@ struct BeerCard: View {
     let checkIn: Bool
     let toggle: () -> Void
     @EnvironmentObject var model: AppModel
-    private var pending: Bool { model.operations.contains { $0.payload["beerId"] == beer.id && $0.payload["memberId"] == model.session?.memberId } }
+    private var pending: Bool { model.hasSavedCheckIn(beer.id) }
     var body: some View {
         ChromePanel(padding:10) {
             VStack(alignment:.leading,spacing:10) {
@@ -138,7 +138,7 @@ struct BeerCard: View {
                     }
                     HStack {
                         if checkIn {
-                            Button { Task { await model.checkIn(beer) } } label: { if model.busyIDs.contains(beer.id) { ProgressView().tint(Robo.amber) } else { Text(pending ? "QUEUED" : "CHECK IN") } }.buttonStyle(BeerControlStyle(appearance:.amber)).disabled(pending || model.busyIDs.contains(beer.id)).accessibilityIdentifier("check-in-\(beer.id)").accessibilityLabel("Check in \(beer.brew_name)").accessibilityValue(pending ? "Queued" : model.busyIDs.contains(beer.id) ? "Submitting" : "")
+                            Button { if pending { model.showOperations = true } else { Task { await model.checkIn(beer) } } } label: { if model.busyIDs.contains(beer.id) { ProgressView().tint(Robo.amber) } else { Text(pending ? "REVIEW REQUEST" : "CHECK IN") } }.buttonStyle(BeerControlStyle(appearance:.amber)).disabled(model.busyIDs.contains(beer.id)).accessibilityIdentifier("check-in-\(beer.id)").accessibilityLabel(pending ? "Review saved request for \(beer.brew_name)" : "Check in \(beer.brew_name)").accessibilityValue(pending ? "Saved request" : model.busyIDs.contains(beer.id) ? "Submitting" : "")
                         }
                         if dateLabel != "Tasted" { Button("UNTAPPD") { model.openUntappd(beer) }.buttonStyle(BeerControlStyle(appearance:checkIn ? .amber : .outline)).accessibilityIdentifier("untappd-\(beer.id)") }
                     }

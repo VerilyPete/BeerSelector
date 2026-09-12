@@ -25,6 +25,148 @@ final class AccountSafetyTests: XCTestCase {
         try await body(model,db,fixture,credentials)
     }
 
+    @MainActor func testOfflineCheckInHidesBeerUntilSavedRequestIsRemoved() async throws {
+        try await withModel { model,db,_,_ in
+            let beer = Beer(id:"offline",name:"Offline beer")
+            try db.replaceBeers([beer]); try model.reload(); model.offline = true
+            await model.checkIn(beer)
+            XCTAssertTrue(model.untasted.isEmpty)
+            let operation = try XCTUnwrap(model.operations.first)
+            try db.execute("UPDATE operation_queue SET status='failed' WHERE id=?",[operation.id]); try model.reload()
+            XCTAssertEqual(model.untasted.map(\.id),[beer.id],"A permanently failed request must return to Finder for review")
+            XCTAssertTrue(model.hasSavedCheckIn(beer.id),"Review the saved failure before submitting a duplicate")
+            model.removeOperation(operation.id)
+            XCTAssertEqual(model.untasted.map(\.id),[beer.id])
+        }
+    }
+    @MainActor func testSavedCheckInAtAnotherStoreDoesNotBlockCurrentStore() async throws {
+        try await withModel { model,db,_,_ in
+            let beer = Beer(id:"shared",name:"Shared beer")
+            try db.replaceBeers([beer])
+            try db.enqueue(type:"CHECK_IN_BEER",payload:["beerId":beer.id,"beerName":beer.brew_name,"memberId":"1","storeId":"2","storeName":"Other store"])
+            try model.reload(); model.offline = true
+            await model.checkIn(beer)
+            XCTAssertEqual(model.operations.count,2)
+            XCTAssertEqual(Set(model.operations.compactMap { $0.payload["storeId"] }),["1","2"])
+        }
+    }
+    @MainActor func testRewardWriteDuringRefreshRequiresFreshMemberSnapshot() async throws {
+        try await withModel { model,_,fixture,_ in
+            let started = self.expectation(description:"Old member snapshot paused")
+            var release: CheckedContinuation<Void,Never>?
+            var memberReads = 0
+            fixture.handler = { request in
+                if request.url!.path == "/bk-member-json.php" {
+                    memberReads += 1
+                    let redeemed = memberReads == 1 ? "0" : "1"
+                    if memberReads == 1 { await withCheckedContinuation { release = $0; started.fulfill() } }
+                    return (200,Data("[{},{\"tasted_brew_current_round\":[]},{\"reward\":[{\"reward_id\":\"r\",\"reward_type\":\"Reward\",\"redeemed\":\"\(redeemed)\"}]}]".utf8))
+                }
+                if request.url!.path == "/addToRewardQueue.php" { return (200,Data()) }
+                if request.url!.path == "/memberQueues.php" {
+                    // Releasing here guarantees the write completed during the older refresh.
+                    release?.resume(); release = nil
+                }
+                return try self.response(request)
+            }
+            let refresh = Task { await model.refresh() }
+            await fulfillment(of:[started],timeout:3)
+            await model.queueReward(Reward(id:"r",type:"Reward",redeemed:false))
+            await refresh.value
+            XCTAssertEqual(memberReads,2)
+            XCTAssertEqual(model.rewards.first?.redeemed,true)
+        }
+    }
+
+    @MainActor func testFinderRefreshReconcilesRemoteDeletionWithoutLosingOfflineRequest() async throws {
+        try await withModel { model,db,fixture,_ in
+            let beer = Beer(id:"new-store",name:"New store beer")
+            try db.replaceBeers([beer]); try model.reload()
+            model.queuedBeerIDs = [beer.id]
+            fixture.handler = { try self.response($0) }
+            await model.refreshFinder()
+            XCTAssertEqual(model.untasted.map(\.id),[beer.id])
+            model.offline = true; await model.checkIn(beer)
+            await model.refreshFinder()
+            XCTAssertTrue(model.untasted.isEmpty,"Remote empty queue must not unhide a saved offline check-in")
+        }
+    }
+    @MainActor func testRewardsFailureAndRecoveryAreAvailableInsideRewardsScreen() async throws {
+        try await withModel { model,db,fixture,_ in
+            fixture.handler = { request in
+                if request.url!.path == "/bk-member-json.php" { return (200,Data("malformed".utf8)) }
+                return try self.response(request)
+            }
+            await model.refreshRewards()
+            XCTAssertFalse(model.rewardsLoaded)
+            XCTAssertNotNil(model.rewardsError)
+            try db.replaceRewards([Reward(id:"saved",type:"Saved",redeemed:false)])
+            model.retrySavedRewards()
+            XCTAssertEqual(model.rewards.map(\.id),["saved"])
+            XCTAssertTrue(model.rewardsLoaded)
+            XCTAssertNil(model.rewardsError)
+            await model.refreshRewards()
+            XCTAssertEqual(model.rewards.map(\.id),["saved"])
+            XCTAssertNotNil(model.rewardsError)
+            fixture.handler = { try self.response($0) }
+            await model.refreshRewards()
+            XCTAssertTrue(model.rewards.isEmpty)
+            XCTAssertTrue(model.rewardsLoaded)
+            XCTAssertNil(model.rewardsError)
+        }
+    }
+    @MainActor func testRewardSubmissionFailureHasLocalFeedbackAndNoSuccess() async throws {
+        try await withModel { model,_,fixture,_ in
+            fixture.handler = { _ in throw URLError(.networkConnectionLost) }
+            await model.queueReward(Reward(id:"r",type:"Reward",redeemed:false))
+            XCTAssertNotNil(model.rewardsError)
+            XCTAssertNil(model.rewardsNotice)
+            XCTAssertTrue(model.busyIDs.isEmpty)
+        }
+    }
+    @MainActor func testForeignOperationRetryIsExplainedAndDoesNotChangeSavedRequest() async throws {
+        try await withModel { model,db,fixture,_ in
+            try db.enqueue(type:"CHECK_IN_BEER",payload:["beerId":"b","beerName":"Beer","memberId":"2","storeId":"2","storeName":"Other store"])
+            try model.reload()
+            let operation = try XCTUnwrap(model.operations.first)
+            XCTAssertNotNil(model.operationRestriction(operation))
+            var requests = 0
+            fixture.handler = { request in requests += 1; return try self.response(request) }
+            await model.retryOperation(operation.id)
+            XCTAssertEqual(requests,0)
+            XCTAssertEqual(try db.operations().first?.status,operation.status)
+            XCTAssertEqual(try db.operations().first?.retryCount,0)
+        }
+    }
+    @MainActor func testMalformedQueuePreservesQueueFinderAndActivity() async throws {
+        try await withModel { model,_,fixture,_ in
+            let saved = QueueEntry(id:"1",name:"Saved",date:"")
+            model.queue = [saved]; model.queueLoaded = true; model.queuedBeerIDs = ["beer"]
+            var activityUpdates = 0
+            model.activityUpdate = { _,_ in activityUpdates += 1 }
+            fixture.handler = { _ in (200,Data("<html>Service unavailable</html>".utf8)) }
+            await model.refreshQueue()
+            XCTAssertEqual(model.queue,[saved]); XCTAssertEqual(model.queuedBeerIDs,["beer"])
+            XCTAssertEqual(activityUpdates,0); XCTAssertNotNil(model.queueError)
+        }
+    }
+
+    @MainActor func testOldMemberResponseCannotReplaceNewRewardsFeedback() async throws {
+        try await withModel { model,_,fixture,_ in
+            fixture.handler = { request in
+                if request.url!.query == "uid=1" {
+                    try await self.login(model)
+                    model.rewardsError = "New account feedback"
+                    return (200,Data("old response".utf8))
+                }
+                return try self.response(request)
+            }
+            await model.refresh()
+            XCTAssertEqual(model.session?.memberId,"2")
+            XCTAssertEqual(model.rewardsError,"New account feedback")
+        }
+    }
+
     @MainActor func testRepeatedForegroundRefreshIsThrottled() async throws {
         try await withModel { model,_,fixture,_ in
             model.loading = false
@@ -77,7 +219,7 @@ final class AccountSafetyTests: XCTestCase {
             return (200,Data("https://fsbs.beerknurd.com/bk-member-json.php?uid=2 https://fsbs.beerknurd.com/bk-store-json.php?sid=2".utf8))
         case "/bk-store-json.php": return (200,Data(#"[{"id":"new-store","brew_name":"New store beer"}]"#.utf8))
         case "/bk-member-json.php": return (200,Data(#"[{},{"tasted_brew_current_round":[{"id":"new-tasting","brew_name":"New tasting"}]},{"reward":[]}]"#.utf8))
-        case "/memberQueues.php": return (200,Data("<html></html>".utf8))
+        case "/memberQueues.php": return (200,Data("<p>No beers currently in your queue.</p>".utf8))
         case "/logout.php": return (200,Data())
         default: throw URLError(.unsupportedURL)
         }
@@ -232,6 +374,7 @@ final class AccountSafetyTests: XCTestCase {
             XCTAssertEqual(try credentials.load().0?.memberId,"2")
             XCTAssertEqual(model.notice,"New account notice")
             XCTAssertEqual(model.error,"New account error")
+            XCTAssertNil(model.queueError,"Old failures cannot appear in the new account’s queue")
             XCTAssertEqual(lateRequests,0,"Old completion must not trigger new-account refreshes")
         }
     }

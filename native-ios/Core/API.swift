@@ -175,15 +175,56 @@ final class BeerAPI {
         }
     }
     static func parseQueue(_ data: Data) throws -> [QueueEntry] {
-        return try Diagnostics.shared.measure(.parsing) {
-            let html = String(decoding:data,as:UTF8.self)
-            guard !html.contains("name=\"password\"") else { throw BeerError.sessionExpired }
-            let pattern = #"<h3\s+class=["']brewName["']\s*>\s*(.*?)\s*<div\s+class=["']brew_added_date["']\s*>(.*?)</div>\s*</h3>.*?deleteQueuedBrew\.php\?cid=(\d+)"#
-            let regex = try NSRegularExpression(pattern:pattern,options:[.dotMatchesLineSeparators,.caseInsensitive])
-            return regex.matches(in:html,range:NSRange(html.startIndex...,in:html)).map { match in
-                func value(_ index: Int) -> String { String(html[Range(match.range(at:index),in:html)!]).trimmingCharacters(in:.whitespacesAndNewlines).replacingOccurrences(of:"&amp;",with:"&") }
-                return QueueEntry(id:value(3),name:value(1),date:value(2))
+        try Diagnostics.shared.measure(.parsing) {
+            guard let html = String(data:data,encoding:.utf8) else { throw BeerError.invalidResponse("Unreadable queue page") }
+            func matches(_ pattern: String, in text: String) throws -> [NSTextCheckingResult] {
+                try NSRegularExpression(pattern:pattern,options:[.dotMatchesLineSeparators,.caseInsensitive])
+                    .matches(in:text,range:NSRange(text.startIndex...,in:text))
             }
+            func capture(_ match: NSTextCheckingResult, _ group: Int, in text: String) -> String {
+                guard let range = Range(match.range(at:group),in:text) else { return "" }
+                return String(text[range])
+            }
+            func plain(_ text: String) -> String {
+                var value = text.replacingOccurrences(of:"<[^>]+>",with:"",options:.regularExpression)
+                for (entity,replacement) in [("&quot;","\""),("&#39;","'"),("&apos;","'"),("&lt;","<"),("&gt;",">"),("&nbsp;"," "),("&amp;","&")] {
+                    value = value.replacingOccurrences(of:entity,with:replacement)
+                }
+                return value.trimmingCharacters(in:.whitespacesAndNewlines)
+            }
+            if try !matches(#"<input\b[^>]*(?:type|name)\s*=\s*["']?password\b"#,in:html).isEmpty {
+                throw BeerError.sessionExpired
+            }
+            let headers = try matches(#"<h3\b[^>]*class\s*=\s*["'][^"']*\bbrewName\b[^"']*["'][^>]*>(.*?)</h3\s*>"#,in:html)
+            let openingHeaders = try matches(#"<h3\b[^>]*class\s*=\s*["'][^"']*\bbrewName\b[^"']*["'][^>]*>"#,in:html)
+            guard headers.count == openingHeaders.count else { throw BeerError.invalidResponse("Incomplete queue heading") }
+            let links = try matches(#"deleteQueuedBrew\.php\?cid=(\d+)"#,in:html)
+            if headers.isEmpty {
+                // An arbitrary HTTP 200 page is not proof that the member's queue is empty.
+                let text = plain(html).lowercased()
+                let empty = try !matches(#"\b(?:no beers (?:currently )?in (?:your |the )?queue|(?:your |the )?queue is empty|empty queue)\b"#,in:text).isEmpty
+                guard empty, links.isEmpty, !html.localizedCaseInsensitiveContains("brewName"), !html.localizedCaseInsensitiveContains("deleteQueuedBrew") else {
+                    throw BeerError.invalidResponse("Queue page was not recognized")
+                }
+                return []
+            }
+            var entries: [QueueEntry] = []
+            for (index,header) in headers.enumerated() {
+                let end = index + 1 < headers.count ? headers[index+1].range.location : (html as NSString).length
+                let segment = (html as NSString).substring(with:NSRange(location:header.range.location,length:end-header.range.location))
+                let rowLinks = try matches(#"deleteQueuedBrew\.php\?cid=(\d+)"#,in:segment)
+                guard rowLinks.count == 1 else { throw BeerError.invalidResponse("Incomplete queue entry") }
+                var name = capture(header,1,in:html)
+                let dates = try matches(#"<div\b[^>]*class\s*=\s*["'][^"']*\bbrew_added_date\b[^"']*["'][^>]*>(.*?)</div\s*>"#,in:name)
+                let date = dates.first.map { plain(capture($0,1,in:name)) } ?? "Date unavailable"
+                if let dateMatch = dates.first, let range = Range(dateMatch.range,in:name) { name.removeSubrange(range) }
+                if dates.isEmpty { name = name.replacingOccurrences(of:"(?is)<div\\b[^>]*>.*?</div\\s*>",with:"",options:.regularExpression) }
+                name = plain(name)
+                guard !name.isEmpty else { throw BeerError.invalidResponse("Unnamed queue entry") }
+                entries.append(QueueEntry(id:capture(rowLinks[0],1,in:segment),name:name,date:date.isEmpty ? "Date unavailable" : date))
+            }
+            guard entries.count == links.count, Set(entries.map(\.id)).count == entries.count else { throw BeerError.invalidResponse("Incomplete queue page") }
+            return entries
         }
     }
 }

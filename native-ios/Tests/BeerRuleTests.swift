@@ -65,6 +65,17 @@ final class BeerRuleTests: XCTestCase {
         let beers = try BeerAPI.parseBeers(data,proxy:true)
         XCTAssertEqual(beers[0].abv,5.2); XCTAssertEqual(beers[0].enrichment_source,"description"); XCTAssertNil(beers[1].abv)
     }
+    func testQueueParserRecoversMissingDateAndRejectsUnrecognizedOrPartialPages() throws {
+        let html = #"<h3 class='brewName'>Undated Beer</h3><a href='deleteQueuedBrew.php?cid=42'>Delete</a>"#
+        XCTAssertEqual(try BeerAPI.parseQueue(Data(html.utf8)),[QueueEntry(id:"42",name:"Undated Beer",date:"Date unavailable")])
+        let changedDate = #"<h3 class='brewName'>Undated Beer<div class='changed-date'>Yesterday</div></h3><a href='deleteQueuedBrew.php?cid=42'>Delete</a>"#
+        XCTAssertEqual(try BeerAPI.parseQueue(Data(changedDate.utf8)),[QueueEntry(id:"42",name:"Undated Beer",date:"Date unavailable")])
+        for bad in ["<html>Service unavailable</html>", "<html></html>", html + "<h3 class='brewName'>Broken row</h3>", "<input TYPE='password'>"] {
+            XCTAssertThrowsError(try BeerAPI.parseQueue(Data(bad.utf8)))
+        }
+        XCTAssertEqual(try BeerAPI.parseQueue(Data("<p>No beers currently in your queue.</p>".utf8)),[])
+    }
+
     func testQueueHTMLAndFormEscaping() throws {
         let html = #"<h3 class="brewName">A &amp; B (Draft)<div class="brew_added_date">Sep 10, 2026</div></h3><a href="deleteQueuedBrew.php?cid=123">Delete</a>"#
         let queue = try BeerAPI.parseQueue(Data(html.utf8))

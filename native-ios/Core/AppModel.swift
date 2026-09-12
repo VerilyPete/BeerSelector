@@ -14,6 +14,11 @@ final class AppModel: ObservableObject {
     @Published var loading = true
     @Published var refreshing = false
     @Published var loadingQueue = false
+    @Published var queueLoaded = false
+    @Published var queueError: String?
+    @Published var rewardsLoaded = false
+    @Published var rewardsError: String?
+    @Published var rewardsNotice: String?
     @Published var offline = false
     @Published var error: String?
     @Published var notice: String?
@@ -36,20 +41,42 @@ final class AppModel: ObservableObject {
     var activityUpdate: (@MainActor (MemberSession, [QueueEntry]) async -> Void)?
     var webCookieCleanup: (@MainActor () async -> Void)?
     private let monitor = NWPathMonitor()
-    private var epoch = UUID() { didSet { cancelEnrichmentUpdates() } }
+    private var epoch = UUID() { didSet { cancelEnrichmentUpdates(); queueLoaded = false; queueError = nil; loadingQueue = false; rewardsLoaded = false; rewardsError = nil; rewardsNotice = nil } }
     @Published private(set) var processing = false
     private var lastFocusRefresh = Date.distantPast
     private var pendingURL: URL?
     private var started = false
     private var refreshTask: Task<Void, Never>?
     private var refreshEpoch: UUID?
+    private var refreshAgain = false
     private var queueEpoch: UUID?
     private(set) var enrichmentTask: Task<Void,Never>?
     private var enrichmentGeneration = UUID()
     var previewMode: Bool { session?.memberId == "preview" }
     var isMember: Bool { session?.valid == true && session?.isVisitor == false }
     var configured: Bool { session != nil && ((try? db?.preference("all_beers_api_url")) ?? "") != "" }
-    var untasted: [Beer] { BeerFilter.untasted(all:allBeers,tasted:tastedBeers).filter { !queuedBeerIDs.contains($0.id) } }
+    func ownsOperation(_ operation: PendingOperation) -> Bool {
+        isMember && operation.payload["memberId"] == session?.memberId && operation.payload["storeId"] == session?.storeId
+    }
+    func operationRestriction(_ operation: PendingOperation) -> String? {
+        guard isMember else { return "Sign in to the account and location that saved this request to retry it." }
+        guard operation.payload["memberId"] != nil, operation.payload["storeId"] != nil else {
+            return "This request has no account or location information. Remove it and check your queue before submitting again."
+        }
+        guard operation.payload["memberId"] == session?.memberId else { return "Saved by another account. Sign in to that account to retry." }
+        guard operation.payload["storeId"] == session?.storeId else { return "Saved at another location. Sign in at that location to retry." }
+        guard operation.type == "CHECK_IN_BEER", operation.payload["beerId"] != nil, operation.payload["beerName"] != nil else {
+            return "This request cannot be retried. Remove it and check your queue before submitting again."
+        }
+        return nil
+    }
+    func hasSavedCheckIn(_ beerID: String) -> Bool {
+        operations.contains { ownsOperation($0) && $0.type == "CHECK_IN_BEER" && $0.payload["beerId"] == beerID }
+    }
+    var untasted: [Beer] {
+        let pending = Set(operations.filter { ownsOperation($0) && $0.type == "CHECK_IN_BEER" && ["pending","retrying"].contains($0.status) }.compactMap { $0.payload["beerId"] })
+        return BeerFilter.untasted(all:allBeers,tasted:tastedBeers).filter { !queuedBeerIDs.contains($0.id) && !pending.contains($0.id) }
+    }
     init(api: BeerAPI = BeerAPI(), credentials: CredentialStore = CredentialStore(), monitorConnectivity: Bool = true) {
         self.api = api
         self.credentials = credentials
@@ -109,20 +136,45 @@ final class AppModel: ObservableObject {
         var failures: [String] = []
         do { allBeers = try db.beers() } catch { failures.append("Taplist: " + error.localizedDescription) }
         do { tastedBeers = isMember ? try db.beers(tasted:true) : [] } catch { failures.append("Tastings: " + error.localizedDescription) }
-        do { rewards = isMember ? try db.rewards() : [] } catch { failures.append("Rewards: " + error.localizedDescription) }
+        do {
+            rewards = isMember ? try db.rewards() : []
+            if !rewards.isEmpty { rewardsLoaded = true }
+        } catch {
+            rewardsError = "Couldn’t read saved rewards. Please try again."
+            failures.append("Rewards: " + error.localizedDescription)
+        }
         do { operations = try db.operations() } catch { failures.append("Pending operations: " + error.localizedDescription) }
         if !failures.isEmpty { throw BeerError.storage(failures.joined(separator:"\n")) }
     }
     func localRetry() {
         do { try reload(); error = nil } catch { self.error = error.localizedDescription }
     }
-    func refresh() async {
-        if let refreshTask, refreshEpoch == epoch { await refreshTask.value; return }
+    func retrySavedRewards() {
+        guard isMember, let db else { return }
+        do { rewards = try db.rewards(); rewardsLoaded = true; rewardsError = nil }
+        catch { rewardsError = "Couldn’t read saved rewards. Please try again." }
+    }
+    func refreshRewards() async { await refresh(requireNewPass:true) }
+    func refreshFinder() async {
+        let token = epoch
+        await refresh()
+        guard token == epoch else { return }
+        await refreshQueue()
+    }
+    func refresh(requireNewPass: Bool = false) async {
+        if let refreshTask, refreshEpoch == epoch {
+            if requireNewPass { refreshAgain = true }
+            await refreshTask.value; return
+        }
         let token = epoch
         // SwiftUI can cancel its refreshable action when the view changes. The
         // model owns this shared refresh so cached data still gets updated.
         let task = Task { @MainActor in
-            await performRefresh(token:token)
+            repeat {
+                guard token == epoch else { return }
+                refreshAgain = false
+                await performRefresh(token:token)
+            } while token == epoch && refreshAgain
             if refreshEpoch == token { refreshTask = nil; refreshEpoch = nil }
         }
         refreshEpoch = token
@@ -134,6 +186,7 @@ final class AppModel: ObservableObject {
         cancelEnrichmentUpdates()
         var pendingEnrichment = EnrichmentService.Pending()
         refreshing = true
+        rewardsError = nil
         defer { if token == epoch { refreshing = false } }
         let interval = Diagnostics.shared.begin(.refresh)
         var outcome = Diagnostics.Outcome.cancelled
@@ -197,15 +250,23 @@ final class AppModel: ObservableObject {
                     errors.append(error.localizedDescription)
                 }
                 guard token == epoch else { return }
-                do { let rewards = try BeerAPI.parseRewards(data); try db.transaction { try db.replaceRewards(rewards) } }
+                do {
+                    let rewards = try BeerAPI.parseRewards(data)
+                    try db.transaction { try db.replaceRewards(rewards) }
+                    rewardsLoaded = true
+                }
                 catch {
-                    if Self.isRefreshCancellation(error) { return }
+                    if Self.isRefreshCancellation(error) || token != epoch { return }
+                    rewardsError = "Couldn’t refresh your rewards. Please try again."
                     errors.append(error.localizedDescription)
                 }
             } catch {
-                if Self.isRefreshCancellation(error) { return }
+                if Self.isRefreshCancellation(error) || token != epoch { return }
+                rewardsError = "Couldn’t refresh your rewards. Please try again."
                 errors.append(error.localizedDescription)
             }
+        } else if isMember {
+            rewardsError = "Rewards are unavailable. Sign in again to restore access."
         }
         guard token == epoch else { return }
         do { try reload() } catch { errors.append(error.localizedDescription) }
@@ -385,21 +446,21 @@ final class AppModel: ObservableObject {
     func refreshQueue() async {
         guard !previewMode, (!loadingQueue || queueEpoch != epoch), isMember, let member = session else { return }
         let token = epoch
-        queueEpoch = token; loadingQueue = true
+        queueEpoch = token; loadingQueue = true; queueError = nil
         defer { if queueEpoch == token { queueEpoch = nil; loadingQueue = false } }
         do {
             let (data,_) = try await api.request(api.configuration.endpoint("memberQueues.php"),member:member,cookies:cookies)
             let next = try BeerAPI.parseQueue(data)
             guard token == epoch else { return }
-            queue = next
+            queue = next; queueLoaded = true
             queuedBeerIDs = Set(next.compactMap { entry in allBeers.first { entry.name.contains($0.brew_name) || $0.brew_name.contains(entry.name) }?.id })
             if let activityUpdate { await activityUpdate(member,next) }
             else { await liveActivity.update(member:member,queue:next) }
-        } catch { if showQueue && token == epoch { self.error = error.localizedDescription } }
+        } catch { if token == epoch, !Diagnostics.isCancellation(error) { queueError = "Couldn’t refresh your queue. Please try again." } }
     }
     func checkIn(_ beer: Beer) async {
         guard !previewMode, isMember, let member = session, let db, !busyIDs.contains(beer.id) else { return }
-        guard !tastedBeers.contains(where: { $0.id == beer.id }), !operations.contains(where: { $0.payload["beerId"] == beer.id && $0.payload["memberId"] == member.memberId }) else { return }
+        guard !tastedBeers.contains(where: { $0.id == beer.id }), !hasSavedCheckIn(beer.id) else { return }
         busyIDs.insert(beer.id); defer { busyIDs.remove(beer.id) }
         let payload = ["beerId":beer.id,"beerName":beer.brew_name,"storeId":member.storeId,"storeName":member.storeName,"memberId":member.memberId]
         do {
@@ -454,6 +515,7 @@ final class AppModel: ObservableObject {
     }
     func retryOperation(_ id: String) async {
         guard !processing else { return }
+        guard let operation = operations.first(where: { $0.id == id }), operationRestriction(operation) == nil else { return }
         do { try db?.execute("UPDATE operation_queue SET status='pending',error_message=NULL WHERE id=?",[id]); try reload(); await processOperations() }
         catch { self.error = error.localizedDescription }
     }
@@ -474,20 +536,21 @@ final class AppModel: ObservableObject {
             _ = try await api.request(url.url!,member:member,cookies:cookies,referer:"memberQueues.php",retry:false)
             guard token == epoch else { return }
             await refreshQueue()
-        } catch { if token == epoch { self.error = error.localizedDescription } }
+        } catch { if token == epoch { queueError = "Couldn’t confirm deletion. Refresh your queue before trying again." } }
     }
     func queueReward(_ reward: Reward) async {
         guard !previewMode, let member = session, isMember, !reward.redeemed, !busyIDs.contains(reward.id) else { return }
+        rewardsError = nil; rewardsNotice = nil
         let token = epoch
         busyIDs.insert(reward.id); defer { busyIDs.remove(reward.id) }
         do {
             _ = try await api.request(api.configuration.endpoint("addToRewardQueue.php"),method:"POST",fields:["chitCode":reward.id,"chitRewardType":reward.type,"chitStoreName":member.storeName,"chitUserId":member.memberId],member:member,cookies:cookies,referer:"memberRewards.php",retry:false)
             guard token == epoch else { return }
-            notice = "\(reward.type) has been added to your queue!"
+            rewardsNotice = "\(reward.type) has been added to your queue!"
             await refreshQueue()
             guard token == epoch else { return }
-            await refresh()
-        } catch { if token == epoch { self.error = error.localizedDescription } }
+            await refresh(requireNewPass:true)
+        } catch { if token == epoch { rewardsError = "Couldn’t confirm that the reward was queued. Check your queue before trying again." } }
     }
     private func endAccountActivities() async {
         if let activityCleanup { await activityCleanup() }

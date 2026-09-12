@@ -97,12 +97,18 @@ struct DisplayTitle: View {
 struct ChromeScreenHeader: View {
     let title: String
     let close: () -> Void
+    var refresh: (() -> Void)? = nil
+    var refreshing = false
     var body: some View {
         HStack(spacing:12) {
             Button(action:close) { IconWell(symbol:"arrow.left").frame(width:44,height:44) }
                 .buttonStyle(.plain).accessibilityLabel("Close \(title)")
             DisplayTitle(title:title)
             Spacer(minLength:0)
+            if let refresh {
+                Button(action:refresh) { IconWell(symbol:"arrow.clockwise").frame(width:44,height:44) }
+                    .buttonStyle(.plain).disabled(refreshing).accessibilityLabel("Refresh queue")
+            }
         }.padding(.horizontal,18).padding(.vertical,8).background(Robo.background)
     }
 }
@@ -198,23 +204,21 @@ struct BeerControlStyle: ButtonStyle {
     private var amber: Bool { appearance == .amber }
     private var selected: Bool { appearance == .selected }
     private var bezel: LinearGradient {
-        amber ? Robo.amberChrome : Robo.chrome
+        amber ? Robo.metal([(0xB99742,0),(0x927020,0.3),(0x725719,1)]) : Robo.chrome
     }
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(Robo.mono(amber ? 11 : 10).weight(amber ? .bold : .semibold)).tracking(0.5)
-            .foregroundStyle(selected ? Robo.background : amber ? Robo.amber : Robo.cyan)
+            .foregroundStyle(selected ? Robo.background : amber ? Robo.color(0xD4AB50) : Robo.cyan)
             .padding(.horizontal,amber && !compact ? 14 : 10).padding(.vertical,amber && !compact ? 6 : 4).frame(minHeight:amber && !compact ? 32 : 28)
             .background(selected ? Robo.cyan : amber ? Robo.color(0x1A1200) : Robo.display,in:RoundedRectangle(cornerRadius:8))
             .overlay(RoundedRectangle(cornerRadius:8).strokeBorder(amber ? Robo.color(0x332800).opacity(0.5) : Robo.border,lineWidth:selected ? 0 : 1))
             .padding(2)
             .background(bezel,in:RoundedRectangle(cornerRadius:10))
-            .overlay(RoundedRectangle(cornerRadius:10).strokeBorder(amber ? Robo.color(0xFFE082).opacity(0.5) : .white.opacity(0.188),lineWidth:1))
+            .overlay(RoundedRectangle(cornerRadius:10).strokeBorder(amber ? Robo.color(0xFFE082).opacity(0.18) : .white.opacity(0.188),lineWidth:1))
             .overlay {
                 if selected || appearance == .outline { RoundedRectangle(cornerRadius:10).strokeBorder(Robo.cyan,lineWidth:1.5) }
             }
-            .shadow(color:amber ? Robo.amber.opacity(0.4) : .clear,radius:12)
-            .shadow(color:amber ? Robo.amber.opacity(0.267) : .clear,radius:4)
             .opacity(enabled ? (configuration.isPressed ? 0.7 : 1) : 0.45)
             .frame(minWidth:44,minHeight:44).contentShape(Rectangle())
     }

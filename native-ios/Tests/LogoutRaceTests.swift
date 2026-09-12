@@ -34,7 +34,7 @@ final class LogoutRaceTests: XCTestCase {
                 return (200,Data("https://fsbs.beerknurd.com/bk-member-json.php?uid=2 https://fsbs.beerknurd.com/bk-store-json.php?sid=2".utf8))
             case "/bk-store-json.php": return (200,Data(#"[{"id":"new","brew_name":"New"}]"#.utf8))
             case "/bk-member-json.php": return (200,Data(#"[{},{"tasted_brew_current_round":[]},{"reward":[]}]"#.utf8))
-            case "/memberQueues.php": return (200,Data("<html></html>".utf8))
+            case "/memberQueues.php": return (200,Data("<p>No beers currently in your queue.</p>".utf8))
             default: throw URLError(.unsupportedURL)
             }
         }

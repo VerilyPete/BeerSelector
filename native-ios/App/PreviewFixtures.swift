@@ -21,16 +21,43 @@ extension AppModel {
             try db?.setPreference("all_beers_api_url","preview://taplist"); try db?.setPreference("my_beers_api_url","preview://member"); try db?.setPreference("is_visitor_mode","false")
         }
         queue = [QueueEntry(id:"q1",name:"Bell's Two Hearted (Draft)",date:"Sep 10, 2026")]
+        queueLoaded = true; queueError = nil; loadingQueue = false
+        rewardsLoaded = true; rewardsError = nil; rewardsNotice = nil
         queuedBeerIDs = ["1"]
         try reload(); loading = false; showSettings = false
         let arguments = ProcessInfo.processInfo.arguments
+        if let index = arguments.firstIndex(of:"--preview-queue-state"), arguments.indices.contains(index+1) {
+            switch arguments[index+1] {
+            case "loading": queue = []; queueLoaded = false; loadingQueue = true
+            case "empty": queue = []
+            case "error": queue = []; queueLoaded = false; queueError = "Couldn’t refresh your queue. Please try again."
+            case "cached-error": queueError = "Couldn’t refresh your queue. Please try again."
+            default: break
+            }
+        }
+        if let index = arguments.firstIndex(of:"--preview-rewards-state"), arguments.indices.contains(index+1) {
+            switch arguments[index+1] {
+            case "loading": rewards = []; rewardsLoaded = false; refreshing = true
+            case "empty": rewards = []
+            case "error": rewards = []; rewardsLoaded = false; rewardsError = "Couldn’t refresh your rewards. Please try again."
+            case "cached-error": rewardsError = "Couldn’t refresh your rewards. Please try again."
+            default: break
+            }
+        }
         if let index = arguments.firstIndex(of:"--preview-screen"), arguments.indices.contains(index+1) {
             switch arguments[index+1] {
             case "beers": tab = .all
             case "finder": tab = .finder
             case "tasted": tab = .tasted
+            case "queue": showQueue = true
             case "rewards": showRewards = true
             case "settings": showSettings = true
+            case "operations":
+                operations = [
+                    PendingOperation(id:"foreign",type:"CHECK_IN_BEER",payload:["beerId":"1","beerName":"Saved at another location","memberId":"preview","storeId":"other","storeName":"Other Flying Saucer"],timestamp:Date().timeIntervalSince1970 * 1000,retryCount:0,status:"pending",error:nil),
+                    PendingOperation(id:"failed",type:"CHECK_IN_BEER",payload:["beerId":"2","beerName":"Request needs review","memberId":"preview","storeId":"preview","storeName":"Fort Worth"],timestamp:Date().timeIntervalSince1970 * 1000,retryCount:3,status:"failed",error:"Check-in could not be confirmed.")
+                ]
+                showOperations = true
             default: tab = .home
             }
         }
