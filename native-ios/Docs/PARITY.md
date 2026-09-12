@@ -206,3 +206,15 @@ Queue now has a chrome header and explicit Delete/Cancel alert, visible loading/
 ### Critical parity audit fixes — 2026-09-12
 
 All six requested code gaps addressed locally: Rewards sheet-owned loading/error/recovery and alerts; fresh refresh pass after an overlapping reward write; Finder queue synchronization on pull-to-refresh; account/store-aware offline Finder exclusions and failed-request review; flexible queue date parsing with rejection of unrecognized/partial pages; operation ownership explanations, guarded retries and store-scoped duplicate checks. 117/117 correctness tests pass, including four regressions demonstrated against the old behavior. Normal/max-text offline Rewards recovery/alerts and operation-ownership UI checks pass. Approved Tablet Home/inactive tabs preserved; no live mutations or distribution. See the current WORK-CHECKPOINT.md entry for evidence and limits, including explicit-empty queue recognition requiring real-page verification.
+
+### Live empty-queue wording correction — 2026-09-12
+
+User reports Flying Saucer’s empty page says “No brew in queue.” Native now recognizes that exact text, strips non-rendered template code and normalizes HTML whitespace. Regression coverage reproduces failed empty refresh and retained final row after deletion; corrected code clears queue/Finder state and updates the activity. 120/120 tests pass. Fixture wording is user-confirmed; markup is synthetic and the physical retest remains pending. Changes are local/uncommitted after 5c6cf6f7.
+
+### Live Activity styling and live-check acceptance — 2026-09-12
+
+User reports all supplied live checks pass after the empty-queue wording fix. Native Live Activity now uses dark chrome/cyan, bundled app fonts, explicit counts and overflow, responsive numbered rows, dedicated Island regions and stale/reduced-luminance treatment. Shared-view previews across 36 width/type-size cases stay under 160 points (max 157); 120/120 tests and simulator/device Release builds pass. Actual OS-hosted styling/Always-On acceptance remains a phone check. See LIVE-ACTIVITY-DESIGN.md. No schema/lifecycle changes, physical installs or distribution.
+
+### In-app queue card refinement — 2026-09-12
+
+After accepting the Live Activity design, user requested a matching improvement to Queue cards. Cards now separate full beer names, recognized serving labels and dates, with subdued steel edges and a small trash control retaining a 44-point hit target and confirmation. Busy state and large-text layout supported. Simulator build plus normal/max-text Delete/Cancel/long-name UI checks pass; model/parser behavior unchanged. Screenshot: Screenshots/queue-cards-chrome.png. Local/uncommitted; no live deletion or distribution.

@@ -234,7 +234,7 @@ final class NetworkTests: XCTestCase {
         fixture.handler = { _ in
             XCTAssertTrue(model.loadingQueue)
             XCTAssertNil(model.queueError)
-            return (200,Data("<p>No beers currently in your queue.</p>".utf8))
+            return (200,Data("<p>No brew in queue</p>".utf8))
         }
         await model.refreshQueue()
         XCTAssertTrue(model.queue.isEmpty)
@@ -254,6 +254,32 @@ final class NetworkTests: XCTestCase {
         XCTAssertFalse(model.loadingQueue)
         XCTAssertNil(model.error)
     }
+    @MainActor func testDeletingLastBeerPublishesEmptyQueueAndClearsFinderAndActivity() async throws {
+        let model = AppModel(api:api(),monitorConnectivity:false)
+        model.session = MemberSession(memberId:"1",storeId:"1",storeName:"Fixture",sessionId:"fixture")
+        let beer = Beer(id:"beer",name:"Last beer")
+        let entry = QueueEntry(id:"123",name:beer.brew_name,date:"")
+        model.allBeers = [beer]; model.queue = [entry]; model.queueLoaded = true; model.queuedBeerIDs = [beer.id]
+        var activityQueues: [[QueueEntry]] = []
+        model.activityUpdate = { _,queue in activityQueues.append(queue) }
+        var paths: [String] = []
+        fixture.handler = { request in
+            paths.append(request.url!.path)
+            if request.url!.path == "/deleteQueuedBrew.php" { return (200,Data()) }
+            let html = #"<html><style>.brewName { color: white }</style><body><p>No brew in queue</p><script>const route='deleteQueuedBrew.php';</script></body></html>"#
+            return (200,Data(html.utf8))
+        }
+        defer { fixture.handler = nil }
+        await model.deleteQueueEntry(entry)
+        XCTAssertEqual(paths,["/deleteQueuedBrew.php","/memberQueues.php"])
+        XCTAssertTrue(model.queue.isEmpty)
+        XCTAssertTrue(model.queueLoaded)
+        XCTAssertNil(model.queueError)
+        XCTAssertTrue(model.queuedBeerIDs.isEmpty)
+        XCTAssertEqual(model.untasted.map(\.id),[beer.id])
+        XCTAssertEqual(activityQueues,[[]])
+    }
+
     @MainActor func testQueueDeletionFailureIsVisibleLocallyAndKeepsEntry() async throws {
         let model = AppModel(api:api(),monitorConnectivity:false)
         model.session = MemberSession(memberId:"1",storeId:"1",storeName:"Fixture",sessionId:"fixture")

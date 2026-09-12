@@ -41,7 +41,15 @@ targets:
   BeerQueueWidget:
     type: app-extension
     platform: iOS
-    sources: [Widget, Shared]
+    sources:
+      - Widget
+      - Shared
+      - path: Resources/SpaceGrotesk-SemiBold.ttf
+        buildPhase: resources
+      - path: Resources/SpaceGrotesk-Bold.ttf
+        buildPhase: resources
+      - path: Resources/SpaceMono-Regular.ttf
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: org.verily.FSbeerselector.BeerQueueWidget

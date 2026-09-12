@@ -76,6 +76,33 @@ final class BeerRuleTests: XCTestCase {
         XCTAssertEqual(try BeerAPI.parseQueue(Data("<p>No beers currently in your queue.</p>".utf8)),[])
     }
 
+    func testReportedLiveEmptyQueueWording() throws {
+        // Exact visible wording reported by the user; markup variants are synthetic.
+        for html in ["No brew in queue", "<p>No brew in queue</p>", "<div>No <strong>brew</strong> in\n queue</div>"] {
+            XCTAssertEqual(try BeerAPI.parseQueue(Data(html.utf8)),[])
+        }
+        for html in [
+            #"<input type="password"><p>No brew in queue</p>"#,
+            #"<h3 class="brewName">Unreadable beer</h3><p>No brew in queue</p>"#,
+            #"<a href="deleteQueuedBrew.php?cid=42">Delete</a><p>No brew in queue</p>"#
+        ] {
+            XCTAssertThrowsError(try BeerAPI.parseQueue(Data(html.utf8)))
+        }
+    }
+
+    func testEmptyQueueRecognitionIgnoresTemplateCodeAndHTMLSpacing() throws {
+        let html = #"""
+        <html><head><style>.brewName { color: white; }</style></head><body>
+        <script>const deletePath = 'deleteQueuedBrew.php'; const template = '<h3 class="brewName">Example</h3>';</script>
+        <p>No beers <strong>currently</strong> in your
+        queue.</p>
+        </body></html>
+        """#
+        XCTAssertEqual(try BeerAPI.parseQueue(Data(html.utf8)),[])
+        let scriptOnly = #"<html><script>const text = 'No beers currently in your queue.';</script><p>Service unavailable</p></html>"#
+        XCTAssertThrowsError(try BeerAPI.parseQueue(Data(scriptOnly.utf8)))
+    }
+
     func testQueueHTMLAndFormEscaping() throws {
         let html = #"<h3 class="brewName">A &amp; B (Draft)<div class="brew_added_date">Sep 10, 2026</div></h3><a href="deleteQueuedBrew.php?cid=123">Delete</a>"#
         let queue = try BeerAPI.parseQueue(Data(html.utf8))

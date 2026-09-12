@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		02E29FEF72BA21373F843C2E /* HTTPFixture.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1DED3AF0CCC6D6BF93C0751 /* HTTPFixture.swift */; };
+		13C2A40F3A44AC5A17FC49AB /* SpaceGrotesk-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = B805244B88340CB922AB51D0 /* SpaceGrotesk-Bold.ttf */; };
 		21C81A0473B8079CB1CD3BAB /* BeerQueueWidgetLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 231ED53DBC183B5F36A1F3F5 /* BeerQueueWidgetLiveActivity.swift */; };
 		22C5E9232F83C985BFA468D2 /* BeerIcons.ttf in Resources */ = {isa = PBXBuildFile; fileRef = BE1F74F45E480DB31BBAADE5 /* BeerIcons.ttf */; };
 		2F4EFDF00B0041D481937040 /* DiagnosticsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C009F862A33114679B004770 /* DiagnosticsTests.swift */; };
@@ -17,6 +18,7 @@
 		3E32F23BD6DF7BBE2F2DAF99 /* NetworkTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 065F304DB3C26F8D3AEB36DE /* NetworkTests.swift */; };
 		428B290F54EA0A76BF71EF3C /* LegacyV8Fixture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 519B25AA761BE6CCB3B46152 /* LegacyV8Fixture.swift */; };
 		432C2CC8386BDB8B6C3613DE /* DiagnosticJournal.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39F2059F3B66AECF52036DDA /* DiagnosticJournal.swift */; };
+		455F755F9063B40BE8DA26B9 /* BeerQueueActivityViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83FD24EAC5B6F54E73B67A8C /* BeerQueueActivityViews.swift */; };
 		47A286345C3C1E452B1D6E39 /* PerformanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06275F1DAE6CEEAFE3663883 /* PerformanceTests.swift */; };
 		561F7AF9144662173620EFD7 /* Database.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9256858AED7E171B4D5226B9 /* Database.swift */; };
 		564E961552691B29F63ECC29 /* BeerRuleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADBF41D4275F957AAC3862E7 /* BeerRuleTests.swift */; };
@@ -37,8 +39,10 @@
 		8A37C0484CADD56BEA9CD29F /* SpaceMono-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 45EE3296A115D128B8EA9CBE /* SpaceMono-Regular.ttf */; };
 		8C57235B60F471A426387173 /* CredentialFailureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E4302E4D060DAE06B9571EB /* CredentialFailureTests.swift */; };
 		91433AAB667AA652E3C52911 /* SpaceGrotesk-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = B805244B88340CB922AB51D0 /* SpaceGrotesk-Bold.ttf */; };
+		926942991661B8B08D7DB203 /* SpaceMono-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 45EE3296A115D128B8EA9CBE /* SpaceMono-Regular.ttf */; };
 		967B5899D82AF14A464B3CC8 /* Browsers.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF251A68A999FE16B881F31D /* Browsers.swift */; };
 		989D48595EE3778CCCD6F878 /* LegacyUpgradeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C98504B0A11A7E166148C48 /* LegacyUpgradeTests.swift */; };
+		AD4A8CDCFCE6ED49EE41D511 /* SpaceGrotesk-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 11B1728CA71C2EC017ACBCD2 /* SpaceGrotesk-SemiBold.ttf */; };
 		B08DF96FC8102EB1D5184E0C /* ServiceConfiguration.plist in Resources */ = {isa = PBXBuildFile; fileRef = 96F09E56159F3CC65095E4AE /* ServiceConfiguration.plist */; };
 		B63F07A0E1BB27FA642C1554 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 8B6299340A9333EDD4581FB9 /* Assets.xcassets */; };
 		B9F1E99666E50F95C9C0D6EC /* libsqlite3.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 09F1A509A9E3EDA4041AAB69 /* libsqlite3.tbd */; };
@@ -46,7 +50,9 @@
 		BD13675C3EBFBD8056382B73 /* BeerQueueSharedTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04EF71A9E599A4CB8CF189D6 /* BeerQueueSharedTypes.swift */; };
 		BFDDDC8BE0F8DB61145E70EA /* AccountSafetyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B50B9A0FA412F25DC622856F /* AccountSafetyTests.swift */; };
 		D1FCE96FA3AF027AD6B6DB9F /* LoginRollbackTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A32675D183666346B091FCD /* LoginRollbackTests.swift */; };
+		D31A431016E9E38C7EF56CA5 /* BeerQueueActivityViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83FD24EAC5B6F54E73B67A8C /* BeerQueueActivityViews.swift */; };
 		D8797792D124509C81D07486 /* LogoutRaceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3523CE0692640E98D7A7D92 /* LogoutRaceTests.swift */; };
+		DA827164DE0713370B96A33B /* ActivityStylePreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D64E9C6BDD780C0A805A3C2 /* ActivityStylePreview.swift */; };
 		DF2549E5A606C5401EEE8AEA /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = A91D8CD4FA476DD360093BB1 /* Models.swift */; };
 		E247DB8C7A6E89EE447E8ABB /* BeerListScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 448C8B937564D5D9D30A96A6 /* BeerListScreen.swift */; };
 		F16A6A4D9383A7F8B68A89E1 /* PreviewFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55ABEB8230853D84BFBC6BA6 /* PreviewFixtures.swift */; };
@@ -95,6 +101,7 @@
 		11B1728CA71C2EC017ACBCD2 /* SpaceGrotesk-SemiBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "SpaceGrotesk-SemiBold.ttf"; sourceTree = "<group>"; };
 		12D771D46FDD13D0EE577B5A /* BeerSelectorNative.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = BeerSelectorNative.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		1479E255579F402879E1A1B7 /* PostLoginCleanupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostLoginCleanupTests.swift; sourceTree = "<group>"; };
+		1D64E9C6BDD780C0A805A3C2 /* ActivityStylePreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityStylePreview.swift; sourceTree = "<group>"; };
 		2262BE1057E0A4E092166E62 /* BeerSelectorApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeerSelectorApp.swift; sourceTree = "<group>"; };
 		231ED53DBC183B5F36A1F3F5 /* BeerQueueWidgetLiveActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeerQueueWidgetLiveActivity.swift; sourceTree = "<group>"; };
 		2542046C9CA9DA793A61CAD4 /* Diagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Diagnostics.swift; sourceTree = "<group>"; };
@@ -117,6 +124,7 @@
 		6F2621505752CA74526D3DBA /* BeerQueueWidget.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = BeerQueueWidget.entitlements; sourceTree = "<group>"; };
 		72706E1596E156A1A349320B /* BeerSelector.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = BeerSelector.entitlements; sourceTree = "<group>"; };
 		7A32675D183666346B091FCD /* LoginRollbackTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginRollbackTests.swift; sourceTree = "<group>"; };
+		83FD24EAC5B6F54E73B67A8C /* BeerQueueActivityViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeerQueueActivityViews.swift; sourceTree = "<group>"; };
 		8B6299340A9333EDD4581FB9 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		8E5B34BEE7B3C2A4705EEE76 /* EnrichmentService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnrichmentService.swift; sourceTree = "<group>"; };
 		9256858AED7E171B4D5226B9 /* Database.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Database.swift; sourceTree = "<group>"; };
@@ -230,6 +238,7 @@
 		5F025D585CE5B9134B7CDCE6 /* App */ = {
 			isa = PBXGroup;
 			children = (
+				1D64E9C6BDD780C0A805A3C2 /* ActivityStylePreview.swift */,
 				977A45B968518D8C39648777 /* AppDelegate.swift */,
 				72706E1596E156A1A349320B /* BeerSelector.entitlements */,
 				2262BE1057E0A4E092166E62 /* BeerSelectorApp.swift */,
@@ -269,6 +278,7 @@
 		A2C666ACA715D7BFD6A3EA51 /* Shared */ = {
 			isa = PBXGroup;
 			children = (
+				83FD24EAC5B6F54E73B67A8C /* BeerQueueActivityViews.swift */,
 				04EF71A9E599A4CB8CF189D6 /* BeerQueueSharedTypes.swift */,
 			);
 			path = Shared;
@@ -336,6 +346,7 @@
 			buildConfigurationList = 159929C8F29B1D34A10BEBEC /* Build configuration list for PBXNativeTarget "BeerQueueWidget" */;
 			buildPhases = (
 				33D6E4CE233620C435105A07 /* Sources */,
+				6B71CE753CC380A1255B8912 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -390,6 +401,16 @@
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		6B71CE753CC380A1255B8912 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				13C2A40F3A44AC5A17FC49AB /* SpaceGrotesk-Bold.ttf in Resources */,
+				AD4A8CDCFCE6ED49EE41D511 /* SpaceGrotesk-SemiBold.ttf in Resources */,
+				926942991661B8B08D7DB203 /* SpaceMono-Regular.ttf in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		AEF9DA056C794A41F91934CC /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -412,6 +433,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D31A431016E9E38C7EF56CA5 /* BeerQueueActivityViews.swift in Sources */,
 				570591A5120AC745E44163B7 /* BeerQueueSharedTypes.swift in Sources */,
 				615100DCC5E4DE9764B66B4F /* BeerQueueWidgetBundle.swift in Sources */,
 				21C81A0473B8079CB1CD3BAB /* BeerQueueWidgetLiveActivity.swift in Sources */,
@@ -423,9 +445,11 @@
 			buildActionMask = 2147483647;
 			files = (
 				88EAEFD0D3C559B91A939BAA /* API.swift in Sources */,
+				DA827164DE0713370B96A33B /* ActivityStylePreview.swift in Sources */,
 				31C2EA469B5E74A8E7F2E300 /* AppDelegate.swift in Sources */,
 				7EFE54903CD9DB4C33D13E68 /* AppModel.swift in Sources */,
 				E247DB8C7A6E89EE447E8ABB /* BeerListScreen.swift in Sources */,
+				455F755F9063B40BE8DA26B9 /* BeerQueueActivityViews.swift in Sources */,
 				BD13675C3EBFBD8056382B73 /* BeerQueueSharedTypes.swift in Sources */,
 				7126A95F569EF50365CF1F5D /* BeerSelectorApp.swift in Sources */,
 				967B5899D82AF14A464B3CC8 /* Browsers.swift in Sources */,

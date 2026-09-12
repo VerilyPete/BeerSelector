@@ -138,14 +138,13 @@ struct QueueScreen: View {
                     if model.queue.isEmpty && model.queueLoaded && !model.loadingQueue && model.queueError == nil {
                         Text("No beers in your queue").font(Robo.title(18)).padding(40).accessibilityIdentifier("queue-empty")
                     }
-                    ForEach(model.queue) { entry in
-                        ChromePanel {
-                            VStack(alignment:.leading,spacing:12) {
-                                Text(entry.name).font(Robo.title()).foregroundStyle(Robo.cyan)
-                                Text(entry.date).font(Robo.mono()).foregroundStyle(Robo.steel)
-                                Button("DELETE") { deletion = entry }.buttonStyle(RoboButtonStyle(color:Robo.red)).disabled(model.busyIDs.contains(entry.id)).accessibilityLabel("Delete \(entry.name) from queue")
-                            }
-                        }
+                    if !model.queue.isEmpty {
+                        Text("\(model.queue.count) \(model.queue.count == 1 ? "BEER" : "BEERS") QUEUED")
+                            .font(Robo.mono(10)).tracking(1.4).foregroundStyle(QueueChrome.secondary)
+                            .frame(maxWidth:.infinity,alignment:.leading).padding(.vertical,4)
+                    }
+                    ForEach(Array(model.queue.enumerated()),id:\.element.id) { index,entry in
+                        QueueBeerCard(entry:entry,position:index + 1,busy:model.busyIDs.contains(entry.id)) { deletion = entry }
                     }
                 }.padding(18).frame(maxWidth:760).frame(maxWidth:.infinity)
             }.refreshable { await model.refreshQueue() }.background(Robo.background).foregroundStyle(Robo.text)
@@ -162,6 +161,71 @@ struct QueueScreen: View {
         }.tint(Robo.cyan)
     }
 }
+private struct QueueBeerCard: View {
+    let entry: QueueEntry
+    let position: Int
+    let busy: Bool
+    let remove: () -> Void
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    // Separate only recognized serving labels; parentheses in a beer's actual name stay intact.
+    private var details: (name: String,container: String?) {
+        guard let range = entry.name.range(of:#"(?i)\s+\((draft|can|cans|btl|bottle|bottles|flight)\)$"#,options:.regularExpression) else {
+            return (entry.name,nil)
+        }
+        let suffix = entry.name[range].trimmingCharacters(in:.whitespaces)
+        let container = String(suffix.dropFirst().dropLast())
+        return (String(entry.name[..<range.lowerBound]),container.lowercased() == "btl" ? "Bottle" : container)
+    }
+    var body: some View {
+        let details = details
+        HStack(alignment:.top,spacing:12) {
+            if !typeSize.isAccessibilitySize {
+                Text(String(format:"%02d",position)).font(Robo.mono(11))
+                    .foregroundStyle(QueueChrome.secondary)
+                    .frame(width:32,height:32)
+                    .background(QueueChrome.background,in:RoundedRectangle(cornerRadius:10))
+                    .overlay(RoundedRectangle(cornerRadius:10).strokeBorder(QueueChrome.metal.opacity(0.4),lineWidth:1))
+                    .padding(.top,2).accessibilityHidden(true)
+            }
+            VStack(alignment:.leading,spacing:10) {
+                Text(details.name).font(Robo.title(17)).foregroundStyle(QueueChrome.text)
+                    .fixedSize(horizontal:false,vertical:true)
+                (typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment:.leading,spacing:8)) : AnyLayout(HStackLayout(alignment:.firstTextBaseline,spacing:9))) {
+                    if let container = details.container {
+                        Text(container.uppercased()).font(Robo.mono(9)).tracking(0.6)
+                            .foregroundStyle(QueueChrome.cyan).padding(.horizontal,7).padding(.vertical,4)
+                            .background(QueueChrome.cyan.opacity(0.07),in:RoundedRectangle(cornerRadius:5))
+                            .fixedSize(horizontal:!typeSize.isAccessibilitySize,vertical:true)
+                    }
+                    Text(entry.date.isEmpty ? "Date unavailable" : entry.date)
+                        .font(Robo.mono(10)).foregroundStyle(QueueChrome.secondary)
+                        .fixedSize(horizontal:false,vertical:true)
+                }
+            }.frame(maxWidth:.infinity,alignment:.leading)
+                .accessibilityElement(children:.combine)
+            Button(action:remove) {
+                Group {
+                    if busy { ProgressView().tint(QueueChrome.secondary) }
+                    else { Image(systemName:"trash").font(.system(size:16,weight:.medium)).foregroundStyle(Robo.color(0xDB8F91)) }
+                }
+                .frame(width:32,height:32)
+                .background(Robo.color(0x241C20),in:RoundedRectangle(cornerRadius:9))
+                .overlay(RoundedRectangle(cornerRadius:9).strokeBorder(Robo.color(0x614044).opacity(0.6),lineWidth:1))
+                .frame(width:44,height:44).contentShape(Rectangle())
+            }.buttonStyle(.plain).disabled(busy)
+                .accessibilityLabel("Delete \(entry.name) from queue")
+                .accessibilityHint("Asks for confirmation")
+                .accessibilityValue(busy ? "Removing" : "")
+                .accessibilityIdentifier("queue-delete-\(entry.id)")
+        }
+        .padding(14)
+        .background(LinearGradient(colors:[Robo.color(0x202830),QueueChrome.background],startPoint:.topLeading,endPoint:.bottomTrailing),in:RoundedRectangle(cornerRadius:17))
+        .overlay(RoundedRectangle(cornerRadius:17).strokeBorder(QueueChrome.metal.opacity(0.45),lineWidth:1))
+        .accessibilityIdentifier("queue-card-\(entry.id)")
+    }
+}
+
 struct OperationsScreen: View {
     @EnvironmentObject var model: AppModel
     @Environment(\.dismiss) var dismiss

@@ -1,6 +1,30 @@
 # Migration checkpoint — 2026-09-12
 
-## CURRENT RESUME — six native/Expo parity findings fixed locally
+## CURRENT RESUME — in-app queue cards restyled locally
+
+User accepted the Live Activity preview (“looks great”), then requested smaller delete controls and better text arrangement in the in-app Queue. Queue cards now use the same subdued steel treatment, a small ordinal, prominent multiline beer name, separate serving-type badge and secondary date. Only recognized trailing serving labels are separated; actual name parentheses such as “(2026)” remain. A muted 32-point trash well has a 44-point hit target, accessible beer-specific label, disabled/progress state and the existing Delete/Cancel confirmation. Accessibility sizes omit the decorative ordinal and stack metadata. Queue fetching/deletion/empty-error behavior is unchanged.
+
+Simulator build passes (`/private/tmp/BeerSelectorNative-queue-card-build.log`). Normal and maximum Dynamic Type Maestro checks passed (`/private/tmp/queue-card-review.log`, `/private/tmp/queue-card-large.log`): three-card layout, long name/serving badge, Delete/Cancel and retained rows after cancellation. Screenshots visually reviewed; `Screenshots/queue-cards-chrome.png` retains the normal layout. Isolated simulator restored to Large text and left on the offline Queue fixture. No live deletion or physical installation. This is a UI-only follow-up; prior full 120-test evidence below applies to the unchanged model/parser logic, with the new UI validated by build and interaction checks.
+
+User accepted the in-app Queue cards and Live Activity styling and requested committing this work. This checkpoint accompanies that commit, including the empty-queue correction, following 5c6cf6f7. No push/upload. Tablet Home and inactive tabs preserve their accepted styling.
+
+## Previous resume — Live Activity restyled locally
+
+User reports all supplied live checks pass after the empty-queue correction, then requested a richer Live Activity design. Replaced the legacy plain list/pink icons with dark chrome, subdued cyan, the app’s Space Grotesk/Space Mono fonts, mug emblem, a clear queue count, numbered rows and an overflow/open-queue footer. Compact Island shows mug/count; expanded Island uses leading/trailing header regions and bottom queue content. Stale content has an amber refresh cue, and reduced luminance softens chrome/accent. Data schema, deep link and lifecycle logic are unchanged. Shared views support an isolated Debug gallery without account loading or actual activity creation.
+
+**120/120 correctness tests pass** (`/private/tmp/BeerSelectorNative-activity-style-tests.log`). Simulator Debug and unsigned device Release builds pass (`/private/tmp/BeerSelectorNative-activity-style-build.log`, `/private/tmp/BeerSelectorNative-activity-style-device.log`); custom font registration/resource presence verified in the built extension. All 36 ImageRenderer size cases (320/353/390 points × all 12 Dynamic Type sizes) fit below 160 points; maximum 157. Simulator gallery screenshots reviewed for one/three/seven beers, compact/expanded Island content and stale state. These are shared-view renderings, not actual OS-hosted Island or physical Always-On verification.
+
+See [LIVE-ACTIVITY-DESIGN.md](LIVE-ACTIVITY-DESIGN.md) and `Screenshots/live-activity-chrome.png` / `Screenshots/live-activity-island-preview.png`. The new design is ready for a local phone rebuild and user visual acceptance. No installation on a physical device, live queue mutation, push or upload occurred. New style and the earlier empty-queue fix remain uncommitted after 5c6cf6f7; Tablet Home and inactive tabs retain their accepted appearance. Advanced device lifecycle/accessibility/Worker checks remain separate from the user-confirmed live workflow checks.
+
+## Previous resume — reported empty-queue wording recognized
+
+User confirmed the live empty-queue message is exactly **“No brew in queue”**. The whitelist introduced in 5c6cf6f7 omitted it, explaining both the failed empty-queue refresh and the retained last row after deletion. The native parser now recognizes that exact wording. The earlier local fixes also strip scripts/styles/comments and normalize HTML whitespace so template code and formatting cannot defeat empty-state recognition.
+
+Regression fixtures use the user-reported text; their surrounding HTML is synthetic, not a captured production page. Three targeted tests failed before the wording fix: exact empty-message parsing, recovery to an empty queue, and deletion of the final beer. The deletion test asserts the row and queued IDs disappear, Finder availability returns, the queue error clears and the Live Activity receives an empty queue. Login and partial-row rejection remain covered. **120/120 correctness tests pass**. Test evidence: `/private/tmp/BeerSelectorNative-live-empty-wording-red.log` and `/private/tmp/BeerSelectorNative-live-empty-wording-tests.log`.
+
+User subsequently reports all supplied live checks pass, following the empty-queue correction. This closes the reported empty-load/last-beer-deletion regression; no repeat of those checks is requested. Changes remain uncommitted after 5c6cf6f7. No live account requests, mutations, push or upload were performed. Full production HTML has not been captured; no physical retest is claimed.
+
+## Previous resume — six native/Expo parity findings fixed locally
 
 User requested fixes for all six findings from the critical parity audit. Rewards now owns loading/loaded/error state, local saved-data recovery and its own confirmation/success/redeemed alerts inside the sheet. Refresh failure preserves saved rewards. Overlapping explicit Rewards refreshes and post-write refreshes request a fresh pass after the current pass; account guards also protect the new feedback. Finder pull-to-refresh now reconciles the remote queue. Current-account/current-store pending and retrying check-ins are excluded from Finder even after remote queue refresh; permanently failed requests return with a Review Request action, and removing a saved request releases its local exclusion. Duplicate detection includes store. Operations explain foreign-account/location or unsupported payload restrictions and disable/refuse incompatible retries without changing the stored operation.
 

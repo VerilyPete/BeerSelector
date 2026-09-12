@@ -176,7 +176,10 @@ final class BeerAPI {
     }
     static func parseQueue(_ data: Data) throws -> [QueueEntry] {
         try Diagnostics.shared.measure(.parsing) {
-            guard let html = String(data:data,encoding:.utf8) else { throw BeerError.invalidResponse("Unreadable queue page") }
+            guard let rawHTML = String(data:data,encoding:.utf8) else { throw BeerError.invalidResponse("Unreadable queue page") }
+            // Shared page templates may mention beer rows/delete URLs even when the queue is empty.
+            // Inspect rendered markup, not comments, styles or JavaScript templates.
+            let html = rawHTML.replacingOccurrences(of:#"(?is)<!--.*?-->|<(script|style)\b[^>]*>.*?</\1\s*>"#,with:"",options:.regularExpression)
             func matches(_ pattern: String, in text: String) throws -> [NSTextCheckingResult] {
                 try NSRegularExpression(pattern:pattern,options:[.dotMatchesLineSeparators,.caseInsensitive])
                     .matches(in:text,range:NSRange(text.startIndex...,in:text))
@@ -186,11 +189,11 @@ final class BeerAPI {
                 return String(text[range])
             }
             func plain(_ text: String) -> String {
-                var value = text.replacingOccurrences(of:"<[^>]+>",with:"",options:.regularExpression)
+                var value = text.replacingOccurrences(of:"<[^>]+>",with:" ",options:.regularExpression)
                 for (entity,replacement) in [("&quot;","\""),("&#39;","'"),("&apos;","'"),("&lt;","<"),("&gt;",">"),("&nbsp;"," "),("&amp;","&")] {
                     value = value.replacingOccurrences(of:entity,with:replacement)
                 }
-                return value.trimmingCharacters(in:.whitespacesAndNewlines)
+                return value.replacingOccurrences(of:#"\s+"#,with:" ",options:.regularExpression).trimmingCharacters(in:.whitespacesAndNewlines)
             }
             if try !matches(#"<input\b[^>]*(?:type|name)\s*=\s*["']?password\b"#,in:html).isEmpty {
                 throw BeerError.sessionExpired
@@ -202,7 +205,7 @@ final class BeerAPI {
             if headers.isEmpty {
                 // An arbitrary HTTP 200 page is not proof that the member's queue is empty.
                 let text = plain(html).lowercased()
-                let empty = try !matches(#"\b(?:no beers (?:currently )?in (?:your |the )?queue|(?:your |the )?queue is empty|empty queue)\b"#,in:text).isEmpty
+                let empty = try !matches(#"\b(?:no brew in queue|no beers (?:currently )?in (?:your |the )?queue|(?:your |the )?queue is empty|empty queue)\b"#,in:text).isEmpty
                 guard empty, links.isEmpty, !html.localizedCaseInsensitiveContains("brewName"), !html.localizedCaseInsensitiveContains("deleteQueuedBrew") else {
                     throw BeerError.invalidResponse("Queue page was not recognized")
                 }

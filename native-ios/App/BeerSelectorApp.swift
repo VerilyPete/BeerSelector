@@ -7,15 +7,29 @@ struct BeerSelectorApp: App {
         ProcessInfo.processInfo.environment["BEERSELECTOR_TEST_HOST"] == "1" ||
         ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
     }
-    @StateObject private var model = AppModel(monitorConnectivity: !Self.isTestHost)
+    private static var isStylePreview: Bool {
+        #if DEBUG
+        ProcessInfo.processInfo.arguments.contains("--preview-activity-style")
+        #else
+        false
+        #endif
+    }
+    @ViewBuilder private var rootView: some View {
+        #if DEBUG
+        if Self.isStylePreview { ActivityStylePreview() } else { RootView() }
+        #else
+        RootView()
+        #endif
+    }
+    @StateObject private var model = AppModel(monitorConnectivity: !Self.isTestHost && !Self.isStylePreview)
     @Environment(\.scenePhase) private var scenePhase
     var body: some Scene {
         WindowGroup {
-            RootView().environmentObject(model).preferredColorScheme(.dark)
-                .task { if !Self.isTestHost { await model.start() } }
-                .onOpenURL { model.handleURL($0) }
+            rootView.environmentObject(model).preferredColorScheme(.dark)
+                .task { if !Self.isTestHost && !Self.isStylePreview { await model.start() } }
+                .onOpenURL { if !Self.isStylePreview { model.handleURL($0) } }
                 .onChange(of:scenePhase,initial:true) { _,phase in
-                    guard !Self.isTestHost else { return }
+                    guard !Self.isTestHost && !Self.isStylePreview else { return }
                     MainThreadMonitor.shared.setActive(phase == .active)
                     switch phase {
                     case .active:

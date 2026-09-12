@@ -26,10 +26,18 @@ extension AppModel {
         queuedBeerIDs = ["1"]
         try reload(); loading = false; showSettings = false
         let arguments = ProcessInfo.processInfo.arguments
+        if arguments.contains("--preview-queue-style") {
+            queue = [
+                QueueEntry(id:"q1",name:"Bell's Two Hearted (Draft)",date:"Sep 12, 2026 · 12:51pm"),
+                QueueEntry(id:"q2",name:"Firestone Walker Parabola (2026) (BTL)",date:"Sep 12, 2026 · 12:52pm"),
+                QueueEntry(id:"q3",name:"Weihenstephaner Hefeweissbier (Draft)",date:"Sep 12, 2026 · 12:53pm")
+            ]
+        }
         if let index = arguments.firstIndex(of:"--preview-queue-state"), arguments.indices.contains(index+1) {
             switch arguments[index+1] {
             case "loading": queue = []; queueLoaded = false; loadingQueue = true
             case "empty": queue = []
+            case "busy": if let entry = queue.first { busyIDs.insert(entry.id) }
             case "error": queue = []; queueLoaded = false; queueError = "Couldn’t refresh your queue. Please try again."
             case "cached-error": queueError = "Couldn’t refresh your queue. Please try again."
             default: break
