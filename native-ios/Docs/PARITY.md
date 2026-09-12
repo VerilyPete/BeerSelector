@@ -60,9 +60,9 @@ All live URLs below come from the reference; no production writes were used to d
 | Queue delete | **GET** /deleteQueuedBrew.php?cid={id}; reference production implementation uses GET even though mock/graph route says POST | AppModel.deleteQueueEntry |
 | Reward queue | POST /addToRewardQueue.php; chitCode=reward ID, chitRewardType, chitStoreName, chitUserId; empty/non-JSON HTTP success accepted | AppModel.queueReward |
 | Enriched taplist | GET {enrichmentURL}/beers?sid={store}; X-API-Key, If-None-Match; 304 only useful with matching nonempty cache; validate store ID, response, enrichment; fallback direct | EnrichmentService; imported ignored production configuration, store/ETag checks implemented; live verification pending |
-| Batch enrichment | POST /beers/batch; chunked lookup, missing IDs; description/source normalization | EnrichmentService.enrich; contract edge cases and live verification pending |
-| Missing beer sync | POST /beers/sync, max 50 beers; then enriched fetch | Sync response validation and bounded immediate post-sync batch re-fetch implemented; delayed cleanup polling pending |
-| Enrichment health/metrics | GET /health; rate-window handling, metrics/reset; service helpers | EnrichmentService implemented; rate policy and public contract verification pending |
+| Batch enrichment | POST /beers/batch; chunked lookup, missing IDs; description/source normalization | EnrichmentService.enrich; 100-ID chunking, upfront budget reservation, typed nullable row contract, and cross-chunk immediate merge fixture-tested; live verification pending |
+| Missing beer sync | POST /beers/sync, max 50 beers; then enriched fetch | Validated sync, immediate post-sync re-fetch and model-owned bounded delayed cleanup polling implemented; local fixture-tested, live Worker verification pending |
+| Enrichment health/metrics | GET /health; rate-window handling, metrics/reset; service helpers | Default 10/60-second shared budget, upfront reservations, 429 blocking and reset/window behavior fixture-tested; health database required; environment overrides/full quota contract remain |
 | Untappd search | https://untappd.com/search?q={clean name}; system browser | AppModel.openUntappd |
 
 Session requests contain PHPSESSID, store__id, member_id, store_name, and optional username/first_name/last_name/email/cardNum. Never forward member cookies or enrichment headers across origins. Reference's removed X-Client-ID must stay removed. Credential values must not appear in logs or checked-in fixtures.
@@ -172,3 +172,11 @@ Tablet Home follow-up: account/progress and Explore now occupy two columns from 
 Tablet Home revision: user rejected the side-by-side stack as still half empty. Current design is an account/progress row plus four navigation tiles in a 2×2 grid that fills the remaining height, with existing local counts. User subsequently rejected the oversized tiles as empty in a different way; retain as unfinished checkpoint work. Content-focused redesign proposed but not implemented. No distribution.
 
 Tablet Home content revision: removed oversized tiles/fixed height. Displays six latest taplist beers with expandable details, journey progress, three recent tastings and up to three unclaimed rewards, with compact navigation and full-list links. Uses current local model data; visitor prompt and phone/accessibility layouts retained. User accepted this layout and requested leaving it in this shape. Hands-on checks deferred at user request; distribution remains paused.
+
+### Enrichment review — 2026-09-11
+
+82/82 local tests pass after upfront lookup/sync request reservations and typed batch payload validation. Tested 101 unique beers plus duplicate preservation through seven lookup/sync/follow-up requests; sync never starts if the whole sync chunk set exceeds the remaining budget. Concurrent callers cannot steal reserved slots. Invalid payloads preserve upstream fields, valid nulls remain accepted, and health requires database status. No live Worker verification. Delayed cleanup polling remains open and must not block foreground refresh or bypass the shared rate budget.
+
+### Delayed enrichment handoff — 2026-09-11
+
+88/88 local tests pass. After initial refresh publication/completion, optional polling follows successfully synced pending IDs with at most seven attempts inside a two-minute scheduling window, shared rate budget and 100-ID chunks. Queued cleanup remains pending after ABV-only responses. Current-row enrichment-only writes preserve names/reviews/tasting metadata and timestamps; removed rows are not inserted. Account/store/URL/database/generation guards and cancellation stop stale work. Polling state is not persisted across app restarts and a new refresh supersedes the old task. This is not an OS background execution or live Worker delivery guarantee.

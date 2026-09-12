@@ -1,6 +1,28 @@
 # Migration checkpoint — 2026-09-11
 
-## CURRENT HANDOFF — tablet Home accepted; hands-on checks deferred
+## CURRENT HANDOFF — enrichment work complete locally; ready to hand off
+
+User asked to reach a stopping point for handoff. Completed and tested enrichment reservations/payload validation plus bounded delayed-cleanup polling; stop here rather than starting another feature. Accepted tablet Home is committed as 75e5f8ec and must retain its current shape. Hands-on VoiceOver/physical Live Activity checks remain explicitly deferred. Distribution paused, build 61 unchanged; no push, upload or physical installation.
+
+Refresh publishes its initial data and completes before optional polling. Successfully synced beers still awaiting ABV/cleanup get read-only batch lookups with 5/10/15/20-second capped delays, at most seven attempts, and no new attempts after a two-minute scheduling window. An already-running HTTP request retains its normal API timeout; this is not a hard two-minute execution deadline. Polls use the same 10-request/60-second budget and 100-ID chunks, never re-sync or bypass limits. If the Worker reports cleanup queued, an ABV-only response can update the UI while polling continues for the cleaned description.
+
+AppModel owns/cancels the task on a new refresh, account epoch change (login/logout/preview) and deinit. Before requests and writes, validate epoch, poll generation, database identity, member/store IDs and source URLs. Update only enrichment columns of currently existing database rows in one transaction; preserve current beer names, review/tasting metadata and refresh timestamps. Publish snapshots only after the transaction succeeds. Optional failures leave usable data intact and do not replace foreground error state.
+
+**88/88 local correctness tests passed**, log `/private/tmp/BeerSelectorNative-enrichment-poll-tests.log`, result `/private/tmp/BeerSelectorNative-testing/Logs/Test/Test-BeerSelectorNative-2026.09.11_22-45-05--0500.xcresult`. Tests cover multi-chunk immediate merging, reservations/concurrent budget use, malformed/null payloads, polling bounds/budget, ABV-before-cleanup, ownership changes during response, refresh completion while polling waits, preservation of current metadata/timestamps, no resurrection of removed beers, store changes and superseding refresh cancellation. Prior source review/fixture evidence remains; no live Worker verification is claimed.
+
+Remaining work for a later session: configuration override parity, fuller proxy/health quota validation and Retry-After behavior; live Worker verification and deferred hands-on checks when user chooses. Polling is opportunistic in-process work, not an OS background-job guarantee, and currently follows successful syncs from the current refresh. A superseding refresh cancels the previous poll; pending cleanup is not persisted across restarts. Resume from this section rather than the older chronological notes below.
+
+## Previous checkpoint — enrichment chunk/rate and payload review
+
+User authorized a local enrichment review; hands-on checks remain deferred, tablet Home accepted, distribution paused. Native now reserves all lookup chunks (100 IDs each) and sync chunks (50 rows each) before the first await, matching the RN default 10-request/60-second reservation policy. Concurrent health/taplist work cannot consume a batch's reserved slots; server 429 cooldown still blocks reserved work. Diagnostic reset does not reset rate state. Clock injection allows deterministic window-expiry tests without sleeps.
+
+Batch decoding now requires the contract's requestId and complete nullable enrichment fields, rejects booleans masquerading as ABV, wrong types/unknown sources/out-of-range ABV, and counts invalid responses as failures while preserving usable upstream data. Valid null fields remain supported; description-fallback normalization and cleaned-description guards remain. Health requires its documented database string. Existing immediate post-sync lookup was already implemented; now verified across 101 unique beers plus a duplicate input, with exact 100/1 lookup and 50/50/1 sync boundaries and seven total requests.
+
+Full local correctness suite **82/82 passed**, log `/private/tmp/BeerSelectorNative-enrichment-review-tests.log`. Includes budget exhaustion/concurrent competition, sync reservation, expiry/reset behavior, malformed and nullable response checks, plus existing account-change/post-sync tests. No live network requests, device changes, commit, push or upload. Changes currently uncommitted.
+
+Remaining enrichment gaps: delayed Worker cleanup polling (RN waits with 5/10/15/20-second backoff, up to two minutes, using a rate-check bypass); do not transplant that into the foreground refresh or bypass the shared budget. Any follow-up implementation must publish the initial refresh first, bound/cancel polling, and guard account/store ownership before persistence. Configurable RN environment overrides, fuller proxy/health quota schema parity, Retry-After semantics and live Worker verification remain separate from the default-policy fixes. The one immediate post-sync fetch does not prove eventual asynchronous cleanup delivery.
+
+## Previous checkpoint — tablet Home accepted; hands-on checks deferred
 
 Resumed after checkpoint commit 78909f2a. Removed the rejected oversized navigation tiles and fixed-height filler. Tablet Home now has the account header, compact navigation, and two content columns: six latest taplist beers (existing date sort, expandable BeerCards) alongside journey progress, three recent tastings and up to three unclaimed rewards. Section links open the complete lists/Rewards. Uses current in-memory model data only; no new requests or queue mutations. Queue summary omitted because Home's loaded data does not guarantee a current queue. Visitor mode shows taplist plus a sign-in prompt; member actions disabled. Phone/narrow/accessibility stacked Home remains.
 

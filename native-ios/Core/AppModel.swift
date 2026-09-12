@@ -35,13 +35,15 @@ final class AppModel: ObservableObject {
     var activityCleanup: (@MainActor () async -> Void)?
     var webCookieCleanup: (@MainActor () async -> Void)?
     private let monitor = NWPathMonitor()
-    private var epoch = UUID()
+    private var epoch = UUID() { didSet { cancelEnrichmentUpdates() } }
     @Published private(set) var processing = false
     private var lastFocusRefresh = Date.distantPast
     private var pendingURL: URL?
     private var started = false
     private var refreshTask: Task<Void, Never>?
     private var refreshEpoch: UUID?
+    private(set) var enrichmentTask: Task<Void,Never>?
+    private var enrichmentGeneration = UUID()
     var previewMode: Bool { session?.memberId == "preview" }
     var isMember: Bool { session?.valid == true && session?.isVisitor == false }
     var configured: Bool { session != nil && ((try? db?.preference("all_beers_api_url")) ?? "") != "" }
@@ -62,7 +64,7 @@ final class AppModel: ObservableObject {
         }
         if monitorConnectivity { monitor.start(queue:DispatchQueue(label:"BeerSelector.connectivity")) }
     }
-    deinit { monitor.cancel() }
+    deinit { monitor.cancel(); enrichmentTask?.cancel() }
     #if DEBUG
     func invalidatePreviewWork() { epoch = UUID() }
     #endif
@@ -127,6 +129,8 @@ final class AppModel: ObservableObject {
     }
     private func performRefresh(token: UUID) async {
         guard token == epoch, !previewMode, let db, configured else { return }
+        cancelEnrichmentUpdates()
+        var pendingEnrichment = EnrichmentService.Pending()
         refreshing = true
         defer { if token == epoch { refreshing = false } }
         let interval = Diagnostics.shared.begin(.refresh)
@@ -138,6 +142,7 @@ final class AppModel: ObservableObject {
                 var beers: [Beer]
                 var etag: String?
                 var notModified = false
+                var pending = EnrichmentService.Pending()
                 if enrichment.configured, let sid = session?.storeId {
                     do {
                         let stored = allBeers.isEmpty ? nil : try db.preference("native_taplist_etag")
@@ -149,7 +154,8 @@ final class AppModel: ObservableObject {
                         if Self.isRefreshCancellation(error) { return }
                         enrichment.recordFallback()
                         let (data,_) = try await api.request(url)
-                        beers = await enrichment.enrich(try BeerAPI.parseBeers(data))
+                        let enriched = await enrichment.enrichWithPending(try BeerAPI.parseBeers(data))
+                        beers = enriched.beers; pending = enriched.pending
                     }
                 } else {
                     let (data,_) = try await api.request(url)
@@ -165,6 +171,7 @@ final class AppModel: ObservableObject {
                     if !notModified { try db.replaceBeers(beers); try db.setPreference("native_taplist_etag",etag) }
                     try db.setPreference("last_all_beers_refresh",String(Date().timeIntervalSince1970 * 1000))
                 }
+                pendingEnrichment.merge(pending)
             } catch {
                 if Self.isRefreshCancellation(error) { return }
                 errors.append(error.localizedDescription)
@@ -178,9 +185,11 @@ final class AppModel: ObservableObject {
                 guard epoch == token, try db.preference("my_beers_api_url") == raw else { throw BeerError.changedAccount }
                 // Each source validates before its own replacement; malformed rewards cannot erase tastings.
                 do {
-                    let tasted = await enrichment.enrich(try BeerAPI.parseBeers(data,tasted:true))
+                    let enriched = await enrichment.enrichWithPending(try BeerAPI.parseBeers(data,tasted:true))
+                    let tasted = enriched.beers
                     guard token == epoch else { throw BeerError.changedAccount }
                     try db.transaction { try db.replaceBeers(tasted,tasted:true); try db.setPreference("last_my_beers_refresh",String(Date().timeIntervalSince1970 * 1000)) }
+                    pendingEnrichment.merge(enriched.pending)
                 } catch {
                     if Self.isRefreshCancellation(error) { return }
                     errors.append(error.localizedDescription)
@@ -200,6 +209,56 @@ final class AppModel: ObservableObject {
         do { try reload() } catch { errors.append(error.localizedDescription) }
         outcome = errors.isEmpty ? .success : .failure
         error = errors.isEmpty ? nil : errors.joined(separator:"\n")
+        startEnrichmentUpdates(pendingEnrichment,token:token,database:db)
+    }
+    private func cancelEnrichmentUpdates() {
+        enrichmentTask?.cancel(); enrichmentTask = nil
+        enrichmentGeneration = UUID()
+    }
+    private func startEnrichmentUpdates(_ pending: EnrichmentService.Pending,token: UUID,database: BeerDatabase) {
+        guard !pending.ids.isEmpty else { return }
+        let generation = enrichmentGeneration
+        let memberID = session?.memberId, storeID = session?.storeId
+        let taplistURL = try? database.preference("all_beers_api_url")
+        let memberURL = try? database.preference("my_beers_api_url")
+        let service = enrichment
+        let current: () -> Bool = { [weak self] in
+            guard let self else { return false }
+            return self.epoch == token && self.enrichmentGeneration == generation && self.db === database &&
+                self.session?.memberId == memberID && self.session?.storeId == storeID && !self.previewMode &&
+                (try? database.preference("all_beers_api_url")) == taplistURL &&
+                (try? database.preference("my_beers_api_url")) == memberURL
+        }
+        enrichmentTask = Task { @MainActor [weak self] in
+            await service.poll(pending,isCurrent:current) { [weak self] updates in
+                guard let self, current(), !self.refreshing else { return }
+                try self.applyEnrichmentUpdates(updates,database:database)
+            }
+            if let self, self.enrichmentGeneration == generation { self.enrichmentTask = nil }
+        }
+    }
+    private func applyEnrichmentUpdates(_ updates: [String:EnrichmentService.EnrichmentRow],database: BeerDatabase) throws {
+        // Read the current rows, not a captured refresh snapshot. Never insert a
+        // removed beer, overwrite tasting metadata, or advance refresh timestamps.
+        var currentAll: [Beer] = [], currentTasted: [Beer] = []
+        try database.transaction {
+            for tasted in [false,true] {
+                let current = try database.beers(tasted:tasted)
+                let merged = try current.map { beer -> Beer in
+                    guard let update = updates[beer.id] else { return beer }
+                    let value = update.applying(to:beer)
+                    if value != beer {
+                        let table = tasted ? "tasted_brew_current_round" : "allbeers"
+                        try database.execute("UPDATE \(table) SET abv=?,enrichment_confidence=?,enrichment_source=?,brew_description=?,container_type=? WHERE id=?",
+                            [value.abv.map { String($0) },value.enrichment_confidence.map { String($0) },value.enrichment_source,value.brew_description,value.container_type,value.id])
+                    }
+                    return value
+                }
+                if tasted { currentTasted = merged } else { currentAll = merged }
+            }
+        }
+        allBeers = currentAll
+        tastedBeers = isMember ? currentTasted : []
     }
     private static func isRefreshCancellation(_ error: Error) -> Bool {
         error is CancellationError || (error as? URLError)?.code == .cancelled || Task.isCancelled
