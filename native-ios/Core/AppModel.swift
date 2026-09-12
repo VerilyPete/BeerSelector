@@ -33,6 +33,7 @@ final class AppModel: ObservableObject {
     private var cookies: [String:String] = [:]
     private var accountCleanupTask: Task<[String], Never>?
     var activityCleanup: (@MainActor () async -> Void)?
+    var activityUpdate: (@MainActor (MemberSession, [QueueEntry]) async -> Void)?
     var webCookieCleanup: (@MainActor () async -> Void)?
     private let monitor = NWPathMonitor()
     private var epoch = UUID() { didSet { cancelEnrichmentUpdates() } }
@@ -42,6 +43,7 @@ final class AppModel: ObservableObject {
     private var started = false
     private var refreshTask: Task<Void, Never>?
     private var refreshEpoch: UUID?
+    private var queueEpoch: UUID?
     private(set) var enrichmentTask: Task<Void,Never>?
     private var enrichmentGeneration = UUID()
     var previewMode: Bool { session?.memberId == "preview" }
@@ -381,16 +383,18 @@ final class AppModel: ObservableObject {
         try credentials.save(session:next,cookies:cookies); session = next
     }
     func refreshQueue() async {
-        guard !previewMode, !loadingQueue, isMember, let member = session else { return }
-        loadingQueue = true; defer { loadingQueue = false }
+        guard !previewMode, (!loadingQueue || queueEpoch != epoch), isMember, let member = session else { return }
         let token = epoch
+        queueEpoch = token; loadingQueue = true
+        defer { if queueEpoch == token { queueEpoch = nil; loadingQueue = false } }
         do {
             let (data,_) = try await api.request(api.configuration.endpoint("memberQueues.php"),member:member,cookies:cookies)
             let next = try BeerAPI.parseQueue(data)
             guard token == epoch else { return }
             queue = next
             queuedBeerIDs = Set(next.compactMap { entry in allBeers.first { entry.name.contains($0.brew_name) || $0.brew_name.contains(entry.name) }?.id })
-            await liveActivity.update(member:member,queue:next)
+            if let activityUpdate { await activityUpdate(member,next) }
+            else { await liveActivity.update(member:member,queue:next) }
         } catch { if showQueue && token == epoch { self.error = error.localizedDescription } }
     }
     func checkIn(_ beer: Beer) async {
@@ -462,22 +466,28 @@ final class AppModel: ObservableObject {
     }
     func deleteQueueEntry(_ entry: QueueEntry) async {
         guard !previewMode, let member = session, isMember, !busyIDs.contains(entry.id) else { return }
+        let token = epoch
         busyIDs.insert(entry.id); defer { busyIDs.remove(entry.id) }
         var url = URLComponents(url:api.configuration.endpoint("deleteQueuedBrew.php"),resolvingAgainstBaseURL:false)!
         url.queryItems = [.init(name:"cid",value:entry.id)]
         do {
             _ = try await api.request(url.url!,member:member,cookies:cookies,referer:"memberQueues.php",retry:false)
+            guard token == epoch else { return }
             await refreshQueue()
-        } catch { self.error = error.localizedDescription }
+        } catch { if token == epoch { self.error = error.localizedDescription } }
     }
     func queueReward(_ reward: Reward) async {
         guard !previewMode, let member = session, isMember, !reward.redeemed, !busyIDs.contains(reward.id) else { return }
+        let token = epoch
         busyIDs.insert(reward.id); defer { busyIDs.remove(reward.id) }
         do {
             _ = try await api.request(api.configuration.endpoint("addToRewardQueue.php"),method:"POST",fields:["chitCode":reward.id,"chitRewardType":reward.type,"chitStoreName":member.storeName,"chitUserId":member.memberId],member:member,cookies:cookies,referer:"memberRewards.php",retry:false)
+            guard token == epoch else { return }
             notice = "\(reward.type) has been added to your queue!"
-            await refreshQueue(); await refresh()
-        } catch { self.error = error.localizedDescription }
+            await refreshQueue()
+            guard token == epoch else { return }
+            await refresh()
+        } catch { if token == epoch { self.error = error.localizedDescription } }
     }
     private func endAccountActivities() async {
         if let activityCleanup { await activityCleanup() }

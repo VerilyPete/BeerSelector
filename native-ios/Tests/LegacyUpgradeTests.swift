@@ -1,7 +1,78 @@
 import XCTest
+import Security
 @testable import BeerSelectorNative
 
 final class LegacyUpgradeTests: XCTestCase {
+    @MainActor func testLegacyDatabaseAndChunkedExpoCredentialsRestoreTogetherAcrossServices() async throws {
+        for service in ["app:no-auth","app","app:auth"] {
+            for generationSession in [false,true] {
+                let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+                let key = "legacy_combined_" + UUID().uuidString
+                let store = CredentialStore(prefix:key,sessionStorageKey:key + "_session")
+                defer { try? store.clear(); try? FileManager.default.removeItem(at:folder) }
+                let url = folder.appendingPathComponent("beers.db")
+                try LegacyV8Fixture.create(url,migrated:true)
+                let member = MemberSession(memberId:"42",storeId:"1",storeName:"Fixture",sessionId:"legacy-session")
+                let cookies = ["PHPSESSID":"legacy-session","payload":String(repeating:"ø=",count:1500)]
+                let encoded = Array(try JSONEncoder().encode(cookies).base64EncodedString())
+                let chunks = stride(from:0,to:encoded.count,by:1500).map { String(encoded[$0..<min($0+1500,encoded.count)]) }
+                XCTAssertGreaterThan(chunks.count,1)
+                var marker: [String:Any] = ["generation":"expo","count":chunks.count]
+                if generationSession { marker["hasSession"] = true }
+                var values: [String:Data] = [
+                    key + "_meta": try JSONSerialization.data(withJSONObject:marker),
+                    generationSession ? key + "_expo_session" : key + "_session": try JSONEncoder().encode(member)
+                ]
+                for (index,chunk) in chunks.enumerated() { values[key + "_expo_" + String(index)] = Data(chunk.utf8) }
+                for (name,data) in values {
+                    let query: [String:Any] = [kSecClass as String:kSecClassGenericPassword,
+                        kSecAttrService as String:service,kSecAttrAccount as String:Data(name.utf8),
+                        kSecAttrGeneric as String:Data(name.utf8),kSecValueData as String:data,
+                        kSecAttrAccessible as String:kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly]
+                    XCTAssertEqual(SecItemAdd(query as CFDictionary,nil),errSecSuccess)
+                }
+                let db = try BeerDatabase(url:url)
+                let fixture = HTTPFixture()
+                let api = fixture.api(configuration:APIConfiguration())
+                var requests = 0
+                fixture.handler = { _ in requests += 1; throw URLError(.unsupportedURL) }
+                defer { fixture.handler = nil }
+                let model = AppModel(api:api,credentials:store,monitorConnectivity:false); model.db = db
+                try model.restoreCredentials(); try model.reload()
+                XCTAssertEqual(model.session,member)
+                XCTAssertTrue(model.configured)
+                XCTAssertEqual(model.allBeers.map(\.id),["101"])
+                XCTAssertEqual(model.tastedBeers.map(\.id),["102"])
+                XCTAssertEqual(model.rewards.count,2)
+                XCTAssertEqual(model.operations.count,3)
+                XCTAssertEqual(try store.load().1,cookies)
+                // Native credential rotation must preserve restored legacy caches/settings.
+                var renewed = member; renewed.sessionId = "native-session"
+                fixture.handler = { request in
+                    requests += 1
+                    XCTAssertEqual(request.url!.path,"/auto-login.php")
+                    let object = try JSONSerialization.jsonObject(with:JSONEncoder().encode(renewed))
+                    return (200,try JSONSerialization.data(withJSONObject:["session":object]))
+                }
+                XCTAssertEqual(requests,0,"Restore must be usable without network refresh")
+                try await model.autoLogin()
+                XCTAssertEqual(requests,1)
+                let restarted = AppModel(api:api,credentials:store,monitorConnectivity:false)
+                restarted.db = try BeerDatabase(url:url)
+                try restarted.restoreCredentials(); try restarted.reload()
+                XCTAssertEqual(restarted.session,renewed)
+                XCTAssertEqual(restarted.tastedBeers,model.tastedBeers)
+                XCTAssertEqual(restarted.rewards,model.rewards)
+                XCTAssertEqual(restarted.operations.map(\.id),model.operations.map(\.id))
+                XCTAssertEqual(try restarted.db?.preference("custom_setting"),"preserve me")
+                XCTAssertEqual(try restarted.db?.preference("last_my_beers_refresh"),"1700000000100")
+                XCTAssertEqual(try store.load().1,cookies)
+                try store.clear()
+                XCTAssertNil(try store.load().0)
+                for name in values.keys { XCTAssertNil(try store.read(name),"Logout must clear legacy-format keys from every supported service") }
+            }
+        }
+    }
     func testCompleteV8DatabasePreservesLegacyRowsAndHistory() throws {
         for migrated in [false,true] {
             let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)

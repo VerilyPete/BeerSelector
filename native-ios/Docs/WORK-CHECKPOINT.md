@@ -1,6 +1,18 @@
 # Migration checkpoint — 2026-09-11
 
-## CURRENT RESUME — proxy/health validation and Retry-After complete locally
+## CURRENT RESUME — compatibility follow-up complete; live Worker blocked by Cloudflare
+
+User asked to do live Worker verification and migration compatibility in one continuous pass. Live Worker access was attempted once against the locally verified configured endpoint (`https://ufobeer.app`, matching tracked `.env.example`). Authenticated health returned HTTP 403 / Cloudflare 1010 `browser_signature_banned`, requiring owner action. No further network probes or live account mutations were sent. No credentials were printed. See [WORKER-VERIFICATION.md](WORKER-VERIFICATION.md) for the exact scope, approval-review history and resume requirements. Live contract/polling delivery remains unverified.
+
+Compatibility follow-up found and fixed five reproduced account-boundary regressions: old reward/delete completions could overwrite new-account feedback or trigger new-account refreshes, and an in-flight old queue request prevented the new login from loading its queue. Mutation completions now check account epoch; queue loading and cleanup are owned by their epoch. Added cancellation checks and a combined full-v8 database + multi-chunk Expo Keychain migration test across all three services and both session formats. Existing login rollback and logout-cleanup coverage passes.
+
+**104/104 correctness tests passed**, `/private/tmp/BeerSelectorNative-compatibility-final.log`. Final signed Release device SDK build passed, `/private/tmp/BeerSelectorNative-compatibility-device-final.log`. Legacy/current signing identity comparison passed. Earlier suite attempts exposed a test fixture starting real Live Activities and hitting an unregistered BGTaskScheduler assertion; the account fixture now injects that OS boundary, and the final run is clean. No physical Live Activity behavior is claimed.
+
+The actual build-50-to-native-61 iPad upgrade, account continuity and relaunch were already verified earlier; do not repeat them or list the basic rehearsal as outstanding. [UPGRADE-REHEARSAL.md](UPGRADE-REHEARSAL.md) now reconciles that evidence with this pass. Minimum-17.6 runtime and deferred hands-on checks remain separate. This checkpoint accompanies the user-requested compatibility commit following 1beba5bc. Tablet Home unchanged; build 61 unchanged; no push, upload, install or provisioning change.
+
+Next: site-owner action to unblock the intended Worker verification client, then resume live proxy/batch/cache/cleanup checks. Hands-on VoiceOver and physical Live Activity checks remain deferred. Resume here rather than older chronological notes.
+
+## Previous resume — proxy/health validation and Retry-After complete locally
 
 Continued at the user's request after the configuration override pass. Proxy responses now validate the checked-in `src/contracts/enrichment.ts` envelope and row fields before parsing or publishing: required brewer and nullable enrichment fields, known source values, optional field types and store identity. Booleans/string numbers are rejected for numeric enrichment; ABV retains native's 0–100 bound. Health validates the entire optional enrichment quota object (enabled plus daily/monthly used/limit/remaining); absent quota details remain valid, malformed/null details do not. Existing proxy fixtures now supply the complete contract.
 

@@ -192,3 +192,9 @@ The importer supports EXPO_PUBLIC_ENRICHMENT_TIMEOUT, EXPO_PUBLIC_ENRICHMENT_BAT
 96/96 local correctness tests passed (`/private/tmp/BeerSelectorNative-enrichment-contract-tests.log`). Proxy validation now requires the checked-in contract's brewer and nullable enrichment fields and validates optional envelope/row fields before parsing; native retains its ABV range guard. Health accepts absent quota details and validates complete, correctly typed details when present. Quota values are not newly displayed in Settings.
 
 Enrichment honors Retry-After seconds or HTTP dates on 429 and on 503 with a valid header ([HTTP semantics, RFC 9110 §10.2.3](https://www.rfc-editor.org/rfc/rfc9110.html#name-retry-after)). Invalid/missing 429 values fall back to the configured rate window; zero/past dates do not bypass local reservations. Concurrent responses cannot shorten an existing cooldown; reset does not clear it. Fixture tests cover these rules without real sleeps or live requests. Other API retry behavior is unchanged. Live Worker verification and deferred migration/device gates remain open.
+
+### Live Worker attempt and compatibility follow-up — 2026-09-11
+
+Live health request blocked by Cloudflare HTTP 403/error 1010 before Worker contract verification. No live proxy/batch/sync/polling claim; site-owner action required. See WORKER-VERIFICATION.md.
+
+104/104 local correctness tests and the signed Release device build pass. Account epoch guards protect reward/delete completions; queue request ownership permits a new login's queue to load independently of the previous account. Cancellation and combined schema-v8/Expo Keychain fixtures extend existing migration coverage. Final fixtures isolate Live Activity updates after initial runs exposed an unregistered-background-task assertion. UPGRADE-REHEARSAL.md retains the already-completed physical build-50 upgrade and documents current signing identity continuity; a new physical rehearsal was not performed.

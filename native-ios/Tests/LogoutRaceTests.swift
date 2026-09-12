@@ -3,7 +3,7 @@ import Combine
 @testable import BeerSelectorNative
 
 final class LogoutRaceTests: XCTestCase {
-    @MainActor private func exercise(holdCleanup: Bool, cancelLogin: Bool = false) async throws {
+    @MainActor private func exercise(holdCleanup: Bool, cancelLogin: Bool = false, cancelTask: Bool = false) async throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         let prefix = "logout_race_" + UUID().uuidString
         let credentials = CredentialStore(prefix:prefix,sessionStorageKey:prefix + "_session")
@@ -61,6 +61,7 @@ final class LogoutRaceTests: XCTestCase {
             await fulfillment(of:[signedOut],timeout:3)
             secondObservation.cancel()
         }
+        if cancelTask { login.cancel() }
         release?.resume(); release = nil
         await logout.value
         if let secondLogout {
@@ -70,6 +71,15 @@ final class LogoutRaceTests: XCTestCase {
             XCTAssertNil(model.session)
             XCTAssertNil(try credentials.load().0)
             XCTAssertFalse(model.configured)
+            return
+        }
+        if cancelTask {
+            do { try await login.value; XCTFail("Cancelled waiting login must not commit") }
+            catch { XCTAssertTrue(Diagnostics.isCancellation(error)) }
+            XCTAssertNil(model.session)
+            XCTAssertNil(try credentials.load().0)
+            XCTAssertFalse(model.configured)
+            XCTAssertNil(try db.preference("native_account_transition"))
             return
         }
         try await login.value
@@ -85,6 +95,7 @@ final class LogoutRaceTests: XCTestCase {
         XCTAssertEqual(fresh.session?.memberId,"2")
         XCTAssertTrue(fresh.configured)
     }
+    @MainActor func testCancelledLoginWaitingForCleanupCannotCommit() async throws { try await exercise(holdCleanup:true,cancelTask:true) }
     @MainActor func testLoginWaitsForOldLocalCleanup() async throws { try await exercise(holdCleanup:true) }
     @MainActor func testSecondLogoutInvalidatesLoginWaitingForCleanup() async throws { try await exercise(holdCleanup:true,cancelLogin:true) }
     @MainActor func testOldServerLogoutFailureCannotOverwriteNewSession() async throws { try await exercise(holdCleanup:false) }

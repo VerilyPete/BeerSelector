@@ -14,6 +14,8 @@ final class AccountSafetyTests: XCTestCase {
         let model = AppModel(api:fixture.api(configuration:configuration),credentials:credentials,monitorConnectivity:false)
         let db = try BeerDatabase(url:folder.appendingPathComponent("beers.db"))
         model.db = db
+        // Account tests verify queue ownership without starting OS Live Activities.
+        model.activityUpdate = { _,_ in }
         let member = MemberSession(memberId:"1",storeId:"1",storeName:"Fixture",sessionId:"old-session")
         model.session = member
         try credentials.save(session:member,cookies:[:])
@@ -205,6 +207,88 @@ final class AccountSafetyTests: XCTestCase {
     @MainActor func testCheckInSuccessAfterSwitchCannotAlterNewAccountsQueue() async throws { try await checkInAcrossSwitch(fails:false) }
     @MainActor func testCheckInFailureAfterSwitchCannotAlterNewAccountsQueue() async throws { try await checkInAcrossSwitch(fails:true) }
 
+    @MainActor private func mutationAcrossSwitch(reward: Bool, fails: Bool) async throws {
+        try await withModel { model,_,fixture,credentials in
+            var switched = false
+            var lateRequests = 0
+            var submissions = 0
+            fixture.handler = { request in
+                if request.url!.path == (reward ? "/addToRewardQueue.php" : "/deleteQueuedBrew.php") {
+                    submissions += 1
+                    try await self.login(model)
+                    model.notice = "New account notice"
+                    model.error = "New account error"
+                    switched = true
+                    if fails { throw URLError(.networkConnectionLost) }
+                    return (200,Data())
+                }
+                if switched { lateRequests += 1 }
+                return try self.response(request)
+            }
+            if reward { await model.queueReward(Reward(id:"reward",type:"Old reward",redeemed:false)) }
+            else { await model.deleteQueueEntry(QueueEntry(id:"entry",name:"Old beer",date:"")) }
+            XCTAssertEqual(submissions,1)
+            XCTAssertEqual(model.session?.memberId,"2")
+            XCTAssertEqual(try credentials.load().0?.memberId,"2")
+            XCTAssertEqual(model.notice,"New account notice")
+            XCTAssertEqual(model.error,"New account error")
+            XCTAssertEqual(lateRequests,0,"Old completion must not trigger new-account refreshes")
+        }
+    }
+    @MainActor func testRewardSuccessAfterSwitchCannotAlterNewAccount() async throws { try await mutationAcrossSwitch(reward:true,fails:false) }
+    @MainActor func testRewardFailureAfterSwitchCannotAlterNewAccount() async throws { try await mutationAcrossSwitch(reward:true,fails:true) }
+    @MainActor func testDeleteSuccessAfterSwitchCannotRefreshNewAccount() async throws { try await mutationAcrossSwitch(reward:false,fails:false) }
+    @MainActor func testDeleteFailureAfterSwitchCannotAlterNewAccount() async throws { try await mutationAcrossSwitch(reward:false,fails:true) }
+
+    @MainActor func testCancelledDashboardLoginPreservesPreviousCommittedAccount() async throws {
+        try await withModel { model,db,fixture,credentials in
+            let old = model.session
+            try db.replaceBeers([Beer(id:"saved",name:"Saved")],tasted:true)
+            let reached = self.expectation(description:"Login dashboard request suspended")
+            var release: CheckedContinuation<Void,Never>?
+            fixture.handler = { request in
+                XCTAssertEqual(request.url!.path,"/member-dash.php")
+                await withCheckedContinuation { release = $0; reached.fulfill() }
+                return try self.response(request)
+            }
+            let login = Task { try await self.login(model) }
+            await self.fulfillment(of:[reached],timeout:3)
+            login.cancel()
+            release?.resume(); release = nil
+            do { try await login.value; XCTFail("Cancelled login must not commit") }
+            catch { XCTAssertTrue(Diagnostics.isCancellation(error)) }
+            XCTAssertEqual(model.session,old)
+            XCTAssertEqual(try credentials.load().0,old)
+            XCTAssertEqual(try db.preference("all_beers_api_url"),"https://fsbs.beerknurd.com/bk-store-json.php?sid=1")
+            XCTAssertNil(try db.preference("native_account_transition"))
+            XCTAssertEqual(try db.beers(tasted:true).map(\.id),["saved"])
+        }
+    }
+    @MainActor func testNewLoginLoadsQueueWhilePreviousAccountsRequestIsStillRunning() async throws {
+        try await withModel { model,_,fixture,_ in
+            let reached = self.expectation(description:"Old queue request suspended")
+            var release: CheckedContinuation<Void,Never>?
+            fixture.handler = { request in
+                if request.url!.path == "/memberQueues.php" {
+                    if request.value(forHTTPHeaderField:"Cookie")?.contains("member_id=1") == true {
+                        await withCheckedContinuation { release = $0; reached.fulfill() }
+                        return (200,Data(#"<h3 class="brewName">Old beer<div class="brew_added_date">Sep 11, 2026</div></h3><a href="deleteQueuedBrew.php?cid=old">Delete</a>"#.utf8))
+                    }
+                    return (200,Data(#"<h3 class="brewName">New beer<div class="brew_added_date">Sep 11, 2026</div></h3><a href="deleteQueuedBrew.php?cid=222">Delete</a>"#.utf8))
+                }
+                return try self.response(request)
+            }
+            defer { release?.resume() }
+            let old = Task { await model.refreshQueue() }
+            await self.fulfillment(of:[reached],timeout:3)
+            try await self.login(model)
+            XCTAssertEqual(model.queue.map(\.id),["222"],"New login must load its queue without waiting for the old account")
+            release?.resume(); release = nil
+            await old.value
+            XCTAssertEqual(model.queue.map(\.id),["222"])
+            XCTAssertFalse(model.loadingQueue)
+        }
+    }
     @MainActor func testQueueResponseAfterLogoutCannotRestoreQueue() async throws {
         try await withModel { model,_,fixture,_ in
             fixture.handler = { request in
