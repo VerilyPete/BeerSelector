@@ -9,7 +9,11 @@ for line in source.read_text().splitlines():
         continue
     key, value = line.removeprefix('export ').split('=', 1)
     values[key.strip()] = value.strip().strip('"\'')
-mapping = {'EXPO_PUBLIC_API_BASE_URL': 'BeerAPIBaseURL', 'EXPO_PUBLIC_ENRICHMENT_API_URL': 'EnrichmentURL', 'EXPO_PUBLIC_ENRICHMENT_API_KEY': 'EnrichmentKey'}
+mapping = {'EXPO_PUBLIC_API_BASE_URL': 'BeerAPIBaseURL', 'EXPO_PUBLIC_ENRICHMENT_API_URL': 'EnrichmentURL', 'EXPO_PUBLIC_ENRICHMENT_API_KEY': 'EnrichmentKey',
+           'EXPO_PUBLIC_ENRICHMENT_TIMEOUT': 'EnrichmentTimeout',
+           'EXPO_PUBLIC_ENRICHMENT_BATCH_SIZE': 'EnrichmentBatchSize',
+           'EXPO_PUBLIC_ENRICHMENT_RATE_WINDOW': 'EnrichmentRateWindow',
+           'EXPO_PUBLIC_ENRICHMENT_RATE_MAX': 'EnrichmentRateMax'}
 config = {target: values[key] for key, target in mapping.items() if values.get(key)}
 target = pathlib.Path(__file__).resolve().parents[1] / 'Resources/ServiceConfiguration.plist'
 target.write_bytes(plistlib.dumps(config))

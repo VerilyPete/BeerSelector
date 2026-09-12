@@ -1,6 +1,24 @@
 # Migration checkpoint — 2026-09-11
 
-## CURRENT HANDOFF — enrichment work complete locally; ready to hand off
+## CURRENT RESUME — proxy/health validation and Retry-After complete locally
+
+Continued at the user's request after the configuration override pass. Proxy responses now validate the checked-in `src/contracts/enrichment.ts` envelope and row fields before parsing or publishing: required brewer and nullable enrichment fields, known source values, optional field types and store identity. Booleans/string numbers are rejected for numeric enrichment; ABV retains native's 0–100 bound. Health validates the entire optional enrichment quota object (enabled plus daily/monthly used/limit/remaining); absent quota details remain valid, malformed/null details do not. Existing proxy fixtures now supply the complete contract.
+
+HTTP failures retain Retry-After. Enrichment honors nonnegative integer seconds and HTTP dates on 429 and on 503 with a valid header; invalid/missing 429 headers use the configured rate window. Past dates/zero mean no extra server delay, but local reservations still apply. Concurrent responses can extend, never shorten, the cooldown; diagnostic reset leaves it intact. Enrichment performs no automatic HTTP retry or new foreground sleep. Other API retry behavior remains unchanged.
+
+**96/96 local correctness tests passed**, log `/private/tmp/BeerSelectorNative-enrichment-contract-tests.log`. Added six cases covering malformed/valid proxy and quota payload matrices, Retry-After formats, expiry/reset, 503 handling, local budget preservation and concurrent cooldown ordering. No live Worker verification is claimed. This checkpoint accompanies the user-requested commit of the configuration overrides, proxy/health validation and Retry-After changes. Tablet Home unchanged; hands-on checks deferred; distribution paused, build 61 unchanged; no push, upload or physical installation.
+
+Remaining: live Worker verification when directed; deferred hands-on checks and migration release gates from the broader checkpoint. Optional quota values are validated but not newly displayed in Settings. Resume here rather than older chronological notes.
+
+## Previous resume — enrichment configuration overrides complete locally
+
+Resumed from cece9878 at the user's request. Native now imports and applies the RN enrichment timeout, lookup batch size, rate window and request maximum overrides. Millisecond durations become seconds; invalid/nonpositive/nonfinite inputs fall back to defaults, integer counts are validated, and lookup batches are capped at 100 IDs. Sync retains its separate 50-row Worker limit. Foreground lookups, immediate post-sync fetches and delayed polls use the same configured reservation policy; fallback 429 cooldown uses the configured window. A dedicated enrichment URLSession applies its resource timeout without changing member request timeouts. No exact wall-clock timeout equivalence to RN's abort timer is claimed.
+
+**90/90 local correctness tests passed**, log `/private/tmp/BeerSelectorNative-enrichment-config-final-tests.log`. New fixtures verify configuration parsing/defaults/Worker cap, effective request timeout, custom chunking and budget expiry. An isolated temporary importer fixture verified all four mappings and exclusion of unrelated keys. The actual ignored service configuration was neither read nor regenerated; re-import the selected environment to adopt its overrides. Source changes and documentation remain uncommitted.
+
+Next local work: fuller proxy/health quota validation and Retry-After behavior. Live Worker verification and hands-on VoiceOver/physical Live Activity checks remain deferred. Tablet Home unchanged; distribution paused, build 61 unchanged; no push, upload or physical installation. Resume here rather than older chronological notes.
+
+## Previous handoff — enrichment work complete locally; ready to hand off
 
 User asked to reach a stopping point for handoff. Completed and tested enrichment reservations/payload validation plus bounded delayed-cleanup polling; stop here rather than starting another feature. Accepted tablet Home is committed as 75e5f8ec and must retain its current shape. Hands-on VoiceOver/physical Live Activity checks remain explicitly deferred. Distribution paused, build 61 unchanged; no push, upload or physical installation.
 

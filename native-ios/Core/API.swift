@@ -5,10 +5,35 @@ struct APIConfiguration {
     var enrichmentURL: URL?
     var enrichmentKey: String?
     var timeout: TimeInterval = 15
+    var enrichment = EnrichmentPolicy()
+    struct EnrichmentPolicy {
+        let timeout: TimeInterval
+        let batchSize: Int
+        let rateWindow: TimeInterval
+        let rateMax: Int
+        init(values: [String:String] = [:]) {
+            func milliseconds(_ key: String, fallback: Double) -> Double {
+                guard let text = values[key], let value = Double(text), value.isFinite, value / 1000 > 0 else { return fallback }
+                return value / 1000
+            }
+            func positiveInteger(_ key: String, fallback: Int) -> Int {
+                guard let text = values[key], let value = Int(text), value > 0 else { return fallback }
+                return value
+            }
+            timeout = milliseconds("EnrichmentTimeout",fallback:15)
+            batchSize = min(100,positiveInteger("EnrichmentBatchSize",fallback:100))
+            rateWindow = milliseconds("EnrichmentRateWindow",fallback:60)
+            rateMax = positiveInteger("EnrichmentRateMax",fallback:10)
+        }
+    }
     static func bundled() -> Self {
-        var c = Self()
         let url = Bundle.main.url(forResource:"ServiceConfiguration",withExtension:"plist")
         let values = url.flatMap { try? Data(contentsOf:$0) }.flatMap { try? PropertyListSerialization.propertyList(from:$0,format:nil) as? [String:String] } ?? [:]
+        return Self.from(values:values)
+    }
+    static func from(values: [String:String]) -> Self {
+        var c = Self()
+        c.enrichment = EnrichmentPolicy(values:values)
         if let value = values["BeerAPIBaseURL"], let url = URL(string:value), url.scheme == "https" { c.baseURL = url }
         if let value = values["EnrichmentURL"] { c.enrichmentURL = URL(string:value) }
         c.enrichmentKey = values["EnrichmentKey"]
@@ -30,14 +55,38 @@ final class RedirectPolicy: NSObject, URLSessionTaskDelegate, @unchecked Sendabl
         completionHandler(request)
     }
 }
-struct HTTPFailure: LocalizedError { var status: Int; var errorDescription: String? { "Server request failed (\(status))." } }
+struct HTTPFailure: LocalizedError {
+    var status: Int
+    var retryAfter: String? = nil
+    var errorDescription: String? { "Server request failed (\(status))." }
+    func retryDelay(now: Date) -> TimeInterval? {
+        guard let value = retryAfter?.trimmingCharacters(in:.whitespacesAndNewlines), !value.isEmpty else { return nil }
+        if value.utf8.allSatisfy({ (48...57).contains($0) }) {
+            guard let seconds = Double(value), seconds.isFinite else { return nil }
+            return seconds
+        }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier:"en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT:0)
+        formatter.isLenient = false
+        for format in ["EEE, dd MMM yyyy HH:mm:ss 'GMT'", "EEEE, dd-MMM-yy HH:mm:ss 'GMT'", "EEE MMM d HH:mm:ss yyyy"] {
+            formatter.dateFormat = format
+            if let date = formatter.date(from:value) { return max(0,date.timeIntervalSince(now)) }
+        }
+        return nil
+    }
+}
 final class BeerAPI {
     let configuration: APIConfiguration
     private let session: URLSession
+    private let enrichmentSession: URLSession
     init(configuration: APIConfiguration = .bundled(), session: URLSession? = nil) {
         self.configuration = configuration
         let c = URLSessionConfiguration.ephemeral; c.httpShouldSetCookies = false; c.timeoutIntervalForRequest = configuration.timeout; c.timeoutIntervalForResource = 45
         self.session = session ?? URLSession(configuration:c,delegate:RedirectPolicy(),delegateQueue:nil)
+        c.timeoutIntervalForRequest = configuration.enrichment.timeout
+        c.timeoutIntervalForResource = configuration.enrichment.timeout
+        self.enrichmentSession = session ?? URLSession(configuration:c,delegate:RedirectPolicy(),delegateQueue:nil)
     }
     static func form(_ fields: [String:String]) -> Data {
         let allowed = CharacterSet(charactersIn:"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~")
@@ -49,10 +98,10 @@ final class BeerAPI {
         let allowed = CharacterSet(charactersIn:"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~")
         return values.sorted { $0.key < $1.key }.filter { $0.key.range(of:#"^[A-Za-z0-9_\-]+$"#,options:.regularExpression) != nil }.map { "\($0.key)=\($0.value.addingPercentEncoding(withAllowedCharacters:allowed)!)" }.joined(separator:"; ")
     }
-    func request(_ url: URL, method: String = "GET", fields: [String:String]? = nil, member: MemberSession? = nil, cookies: [String:String] = [:], referer: String = "member-dash.php", headers: [String:String] = [:], retry: Bool = true, json: Data? = nil) async throws -> (Data, HTTPURLResponse) {
+    func request(_ url: URL, method: String = "GET", fields: [String:String]? = nil, member: MemberSession? = nil, cookies: [String:String] = [:], referer: String = "member-dash.php", headers: [String:String] = [:], retry: Bool = true, json: Data? = nil, timeout: TimeInterval? = nil) async throws -> (Data, HTTPURLResponse) {
         let interval = Diagnostics.shared.begin(.network)
         do {
-            var request = URLRequest(url:url); request.httpMethod = method; request.timeoutInterval = configuration.timeout
+            var request = URLRequest(url:url); request.httpMethod = method; request.timeoutInterval = timeout ?? configuration.timeout
             request.setValue("BeerSelector/1.1.0 (iOS; Native)",forHTTPHeaderField:"User-Agent")
             if let member {
                 guard member.valid, configuration.trustedLogin(url) else { throw BeerError.sessionExpired }
@@ -66,10 +115,10 @@ final class BeerAPI {
             for (key,value) in headers { request.setValue(value,forHTTPHeaderField:key) }
             for attempt in 0...3 {
                 do {
-                    let (data,response) = try await session.data(for:request)
+                    let (data,response) = try await (timeout == nil ? session : enrichmentSession).data(for:request)
                     guard let response = response as? HTTPURLResponse else { throw BeerError.invalidResponse("No HTTP response") }
                     if response.statusCode == 401 || response.statusCode == 403 { throw BeerError.sessionExpired }
-                    guard (200...299).contains(response.statusCode) || response.statusCode == 304 else { throw HTTPFailure(status:response.statusCode) }
+                    guard (200...299).contains(response.statusCode) || response.statusCode == 304 else { throw HTTPFailure(status:response.statusCode,retryAfter:response.value(forHTTPHeaderField:"Retry-After")) }
                     if member != nil, let final = response.url, ["/kiosk.php","/login.php"].contains(final.path) { throw BeerError.sessionExpired }
                     interval.finish(.success)
                     return (data,response)

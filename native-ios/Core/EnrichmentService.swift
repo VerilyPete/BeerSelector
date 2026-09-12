@@ -24,11 +24,13 @@ final class EnrichmentService {
         var readyIDs: Set<String> = []
         var cleanedIDs: Set<String> = []
     }
+    private var policy: APIConfiguration.EnrichmentPolicy { api.configuration.enrichment }
+    private func lookupCount(_ count: Int) -> Int { count / policy.batchSize + (count % policy.batchSize == 0 ? 0 : 1) }
     private func reserve(_ count: Int) throws {
         try Task.checkCancellation()
         let time = now()
-        requests.removeAll { time.timeIntervalSince($0) >= 60 }
-        guard time >= blockedUntil, count <= 10 - requests.count else {
+        requests.removeAll { time.timeIntervalSince($0) >= policy.rateWindow }
+        guard time >= blockedUntil, count <= policy.rateMax - requests.count else {
             metrics.rateLimited += 1
             throw HTTPFailure(status:429)
         }
@@ -47,7 +49,7 @@ final class EnrichmentService {
         var headers = ["X-API-Key":key]
         if let etag { headers["If-None-Match"] = etag }
         do {
-            let result = try await api.request(url.url!,method:json == nil ? "GET" : "POST",headers:headers,retry:false,json:json)
+            let result = try await api.request(url.url!,method:json == nil ? "GET" : "POST",headers:headers,retry:false,json:json,timeout:policy.timeout)
             try Task.checkCancellation()
             let value = try decode(result.0, result.1)
             metrics.successes += 1
@@ -56,7 +58,15 @@ final class EnrichmentService {
         } catch {
             if Diagnostics.isCancellation(error) { metrics.cancellations += 1 }
             else { metrics.failures += 1 }
-            if (error as? HTTPFailure)?.status == 429 { blockedUntil = now().addingTimeInterval(60); metrics.rateLimited += 1 }
+            if let failure = error as? HTTPFailure {
+                let time = now()
+                let delay = failure.retryDelay(now:time)
+                if failure.status == 429 || (failure.status == 503 && delay != nil) {
+                    // Concurrent responses may extend a cooldown, never shorten it.
+                    blockedUntil = max(blockedUntil,time.addingTimeInterval(delay ?? policy.rateWindow))
+                    if failure.status == 429 { metrics.rateLimited += 1 }
+                }
+            }
             throw error
         }
     }
@@ -66,7 +76,8 @@ final class EnrichmentService {
                 guard etag != nil else { throw BeerError.invalidResponse("Unexpected cache response") }
                 return (nil,etag)
             }
-            guard let object = try JSONSerialization.jsonObject(with:data) as? [String:Any], object["storeId"] as? String == storeID else { throw BeerError.invalidResponse("Taplist store does not match the selected store") }
+            let payload = try JSONDecoder().decode(ProxyResponse.self,from:data)
+            guard payload.storeId == storeID else { throw BeerError.invalidResponse("Taplist store does not match the selected store") }
             return (try BeerAPI.parseBeers(data,proxy:true),response.value(forHTTPHeaderField:"ETag"))
         }
     }
@@ -82,10 +93,10 @@ final class EnrichmentService {
         var missing: Set<String> = []
         // Reserve the entire operation before its first await so concurrent callers
         // cannot consume slots needed by its remaining chunks.
-        do { try reserve((ids.count + 99) / 100) } catch { return Result(beers:beers) }
-        for offset in stride(from:0,to:ids.count,by:100) {
+        do { try reserve(lookupCount(ids.count)) } catch { return Result(beers:beers) }
+        for offset in stride(from:0,to:ids.count,by:policy.batchSize) {
             do {
-                let chunk = Array(ids[offset..<min(offset+100,ids.count)])
+                let chunk = Array(ids[offset..<min(offset+policy.batchSize,ids.count)])
                 let (rows, absent) = try await call("beers/batch",json:JSONEncoder().encode(["ids":chunk]),reserved:true) { data, _ in
                     let response = try JSONDecoder().decode(BatchResponse.self,from:data)
                     return (response.enrichments,response.missing)
@@ -127,13 +138,13 @@ final class EnrichmentService {
             do { try await sleep(delay); try Task.checkCancellation() } catch { return }
             guard isCurrent(), now() < deadline else { return }
             let ids = remaining.sorted()
-            do { try reserve((ids.count + 99) / 100) } catch {
+            do { try reserve(lookupCount(ids.count)) } catch {
                 if Task.isCancelled { return }
                 continue
             }
-            for offset in stride(from:0,to:ids.count,by:100) {
+            for offset in stride(from:0,to:ids.count,by:policy.batchSize) {
                 guard !Task.isCancelled, isCurrent(), now() < deadline else { return }
-                let chunk = Array(ids[offset..<min(offset+100,ids.count)])
+                let chunk = Array(ids[offset..<min(offset+policy.batchSize,ids.count)])
                 let rows: [String:EnrichmentRow]
                 do {
                     rows = try await call("beers/batch",json:JSONEncoder().encode(["ids":chunk]),reserved:true) { data,_ in
@@ -227,11 +238,73 @@ final class EnrichmentService {
         }
         return synced
     }
-    func health() async throws -> String {
-        return try await call("health") { data, _ in
-            guard let object = try JSONSerialization.jsonObject(with:data) as? [String:Any], let status = object["status"] as? String, ["ok","error"].contains(status), object["database"] is String else { throw BeerError.invalidResponse("Invalid enrichment health") }
-            return status
+    private struct ProxyResponse: Decodable {
+        let storeId: String
+        let beers: [ProxyBeer]
+        enum CodingKeys: String, CodingKey { case storeId, beers, requestId, source, cached_at }
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy:CodingKeys.self)
+            storeId = try c.decode(String.self,forKey:.storeId)
+            beers = try c.decode([ProxyBeer].self,forKey:.beers)
+            for key in [CodingKeys.requestId,.cached_at] where c.contains(key) { _ = try c.decode(String.self,forKey:key) }
+            if c.contains(.source), !["live","cache","stale"].contains(try c.decode(String.self,forKey:.source)) {
+                throw BeerError.invalidResponse("Invalid proxy source")
+            }
         }
+    }
+    private struct ProxyBeer: Decodable {
+        enum CodingKeys: String, CodingKey {
+            case id, brew_name, brewer, brewer_loc, brew_style, brew_container, review_count, review_rating
+            case brew_description, added_date, enriched_abv, enrichment_confidence, enrichment_source
+        }
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy:CodingKeys.self)
+            for key in [CodingKeys.id,.brew_name,.brewer] { _ = try c.decode(String.self,forKey:key) }
+            for key in [CodingKeys.brewer_loc,.brew_style,.brew_container,.brew_description,.added_date] where c.contains(key) {
+                _ = try c.decode(String.self,forKey:key)
+            }
+            for key in [CodingKeys.review_count,.review_rating] { _ = try c.decodeIfPresent(String.self,forKey:key) }
+            guard [CodingKeys.enriched_abv,.enrichment_confidence,.enrichment_source].allSatisfy(c.contains) else {
+                throw BeerError.invalidResponse("Incomplete proxy enrichment")
+            }
+            let abv = try c.decodeIfPresent(Double.self,forKey:.enriched_abv)
+            let confidence = try c.decodeIfPresent(Double.self,forKey:.enrichment_confidence)
+            let source = try c.decodeIfPresent(String.self,forKey:.enrichment_source)
+            guard abv.map({ $0.isFinite && (0...100).contains($0) }) ?? true,
+                  confidence.map(\.isFinite) ?? true,
+                  source.map({ ["description","description-fallback","perplexity","manual"].contains($0) }) ?? true else {
+                throw BeerError.invalidResponse("Invalid proxy enrichment")
+            }
+        }
+    }
+    private struct HealthResponse: Decodable {
+        let status: String
+        enum CodingKeys: String, CodingKey { case status, database, enrichment }
+        struct Quotas: Decodable {
+            let enabled: Bool
+            let daily: Quota
+            let monthly: Quota
+        }
+        struct Quota: Decodable {
+            let used: Double
+            let limit: Double
+            let remaining: Double
+        }
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy:CodingKeys.self)
+            status = try c.decode(String.self,forKey:.status)
+            _ = try c.decode(String.self,forKey:.database)
+            guard ["ok","error"].contains(status) else { throw BeerError.invalidResponse("Invalid enrichment health") }
+            if c.contains(.enrichment) {
+                let quotas = try c.decode(Quotas.self,forKey:.enrichment)
+                guard [quotas.daily,quotas.monthly].allSatisfy({ $0.used.isFinite && $0.limit.isFinite && $0.remaining.isFinite }) else {
+                    throw BeerError.invalidResponse("Invalid enrichment quota")
+                }
+            }
+        }
+    }
+    func health() async throws -> String {
+        try await call("health") { data, _ in try JSONDecoder().decode(HealthResponse.self,from:data).status }
     }
     func recordFallback() { metrics.fallbacks += 1 }
     func resetMetrics() { metrics = Metrics() }

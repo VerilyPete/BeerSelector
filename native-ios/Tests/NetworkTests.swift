@@ -27,6 +27,192 @@ final class NetworkTests: XCTestCase {
         c.enrichmentKey = "fixture"
         return c
     }
+    func testEnrichmentConfigurationOverridesAndInvalidFallbacks() {
+        let configured = APIConfiguration.from(values:[
+            "EnrichmentTimeout":"2300", "EnrichmentBatchSize":"3",
+            "EnrichmentRateWindow":"12500", "EnrichmentRateMax":"4"
+        ])
+        XCTAssertEqual(configured.enrichment.timeout,2.3)
+        XCTAssertEqual(configured.enrichment.batchSize,3)
+        XCTAssertEqual(configured.enrichment.rateWindow,12.5)
+        XCTAssertEqual(configured.enrichment.rateMax,4)
+        XCTAssertEqual(configured.timeout,15)
+        for invalid in ["", "garbage", "0", "-1", "nan", "inf", "1e999"] {
+            let policy = APIConfiguration.EnrichmentPolicy(values:[
+                "EnrichmentTimeout":invalid, "EnrichmentBatchSize":invalid,
+                "EnrichmentRateWindow":invalid, "EnrichmentRateMax":invalid
+            ])
+            XCTAssertEqual(policy.timeout,15)
+            XCTAssertEqual(policy.batchSize,100)
+            XCTAssertEqual(policy.rateWindow,60)
+            XCTAssertEqual(policy.rateMax,10)
+        }
+        XCTAssertEqual(APIConfiguration.EnrichmentPolicy(values:["EnrichmentBatchSize":"101"]).batchSize,100)
+        XCTAssertEqual(APIConfiguration.EnrichmentPolicy(values:["EnrichmentRateMax":"2.5"]).rateMax,10)
+    }
+    @MainActor func testEnrichmentOverridesControlChunksTimeoutAndBudgetExpiry() async throws {
+        var configuration = enrichmentConfiguration
+        configuration.enrichment = .init(values:["EnrichmentTimeout":"2500", "EnrichmentBatchSize":"2",
+                                                "EnrichmentRateWindow":"3000", "EnrichmentRateMax":"3"])
+        var time = Date(timeIntervalSince1970:100)
+        let service = EnrichmentService(api:api(configuration:configuration),now:{ time })
+        var chunks: [Int] = []
+        fixture.handler = { request in
+            XCTAssertEqual(request.timeoutInterval,2.5)
+            if request.url!.path == "/health" { return (200,Data(#"{"status":"ok","database":"connected"}"#.utf8)) }
+            let ids = try XCTUnwrap(self.enrichmentJSON(request)["ids"] as? [String])
+            chunks.append(ids.count)
+            return (200,Data(#"{"enrichments":{},"missing":[],"requestId":"fixture"}"#.utf8))
+        }
+        defer { fixture.handler = nil }
+        _ = await service.enrich((0..<5).map { Beer(id:String($0),name:"Fixture") })
+        XCTAssertEqual(chunks,[2,2,1])
+        time.addTimeInterval(2.99)
+        do { _ = try await service.health(); XCTFail("Budget must remain exhausted") } catch {}
+        XCTAssertEqual(service.metrics.requests,3)
+        time.addTimeInterval(0.02)
+        _ = try await service.health()
+        XCTAssertEqual(service.metrics.requests,4)
+    }
+    @MainActor func testProxyContractRejectsMalformedFieldsAndAcceptsNullableEnrichment() async throws {
+        let row: [String:Any] = ["id":"1","brew_name":"Fixture","brewer":"Brewery",
+                               "enriched_abv":NSNull(),"enrichment_confidence":NSNull(),"enrichment_source":NSNull()]
+        let valid: [String:Any] = ["storeId":"1","beers":[row]]
+        var invalid: [[String:Any]] = []
+        for key in ["brewer","enriched_abv","enrichment_confidence","enrichment_source"] {
+            var changed = row; changed.removeValue(forKey:key)
+            invalid.append(["storeId":"1","beers":[changed]])
+        }
+        for (key,value) in [("id",1 as Any),("enriched_abv",true),("enriched_abv",101),
+                            ("enrichment_confidence","0.9"),("enrichment_source","unknown"),
+                            ("review_rating",4),("brew_style",NSNull())] {
+            var changed = row; changed[key] = value
+            invalid.append(["storeId":"1","beers":[row,changed]])
+        }
+        for (key,value) in [("source","unknown" as Any),("requestId",NSNull()),("cached_at",5),("storeId","2")] {
+            var changed = valid; changed[key] = value; invalid.append(changed)
+        }
+        defer { fixture.handler = nil }
+        for payload in invalid {
+            let service = EnrichmentService(api:api(configuration:enrichmentConfiguration))
+            fixture.handler = { _ in (200,try JSONSerialization.data(withJSONObject:payload)) }
+            do { _ = try await service.taplist(storeID:"1",etag:nil); XCTFail("Malformed proxy accepted") } catch {}
+            XCTAssertEqual(service.metrics.failures,1)
+            XCTAssertEqual(service.metrics.successes,0)
+        }
+        for source in ["live","cache","stale"] {
+            var payload = valid; payload["source"] = source
+            var enriched = row; enriched["enriched_abv"] = 6.5
+            enriched["enrichment_source"] = "description-fallback"; enriched["review_count"] = NSNull()
+            payload["beers"] = [row,enriched]
+            let service = EnrichmentService(api:api(configuration:enrichmentConfiguration))
+            fixture.handler = { _ in (200,try JSONSerialization.data(withJSONObject:payload)) }
+            let beers = try await service.taplist(storeID:"1",etag:nil).beers
+            XCTAssertEqual(beers?.count,2)
+            XCTAssertNil(beers?.first?.abv)
+            XCTAssertEqual(beers?.last?.abv,6.5)
+            XCTAssertEqual(beers?.last?.enrichment_source,"description")
+        }
+    }
+    @MainActor func testHealthQuotaContractRejectsPartialOrMistypedDetails() async throws {
+        let quota: [String:Any] = ["used":2,"limit":10,"remaining":8]
+        let details: [String:Any] = ["enabled":true,"daily":quota,"monthly":quota]
+        var invalid: [Any] = [NSNull(),["enabled":true],["enabled":"true","daily":quota,"monthly":quota]]
+        for period in ["daily","monthly"] {
+            for key in ["used","limit","remaining"] {
+                for value in [NSNull(),true,"2"] as [Any] {
+                    var changed = quota; changed[key] = value
+                    var enriched = details; enriched[period] = changed; invalid.append(enriched)
+                }
+            }
+        }
+        defer { fixture.handler = nil }
+        for detail in invalid {
+            let service = EnrichmentService(api:api(configuration:enrichmentConfiguration))
+            fixture.handler = { _ in (200,try JSONSerialization.data(withJSONObject:["status":"ok","database":"connected","enrichment":detail])) }
+            do { _ = try await service.health(); XCTFail("Malformed health accepted") } catch {}
+            XCTAssertEqual(service.metrics.failures,1)
+        }
+        for status in ["ok","error"] {
+            let service = EnrichmentService(api:api(configuration:enrichmentConfiguration))
+            fixture.handler = { _ in (200,try JSONSerialization.data(withJSONObject:["status":status,"database":"connected","enrichment":details])) }
+            let result = try await service.health()
+            XCTAssertEqual(result,status)
+        }
+    }
+    func testRetryAfterParsesSecondsAndHTTPDates() {
+        let date = Date(timeIntervalSince1970:784111777) // Sun, 06 Nov 1994 08:49:37 GMT
+        for value in ["Sun, 06 Nov 1994 08:49:37 GMT","Sunday, 06-Nov-94 08:49:37 GMT","Sun Nov  6 08:49:37 1994"] {
+            XCTAssertEqual(HTTPFailure(status:429,retryAfter:value).retryDelay(now:date.addingTimeInterval(-120)),120)
+            XCTAssertEqual(HTTPFailure(status:429,retryAfter:value).retryDelay(now:date.addingTimeInterval(1)),0)
+        }
+        XCTAssertEqual(HTTPFailure(status:429,retryAfter:" 120 ").retryDelay(now:date),120)
+        XCTAssertEqual(HTTPFailure(status:429,retryAfter:"0").retryDelay(now:date),0)
+        for value in ["", "-1", "1.5", "+2", "NaN", "tomorrow", "60, 120"] {
+            XCTAssertNil(HTTPFailure(status:429,retryAfter:value).retryDelay(now:date))
+        }
+    }
+    @MainActor func testServerRetryAfterControlsCooldownWithoutAutomaticRetries() async throws {
+        for (status,header,delay) in [(429,"120",120.0),(429,"5",5),(429,"invalid",60),
+                                      (429,"Sun, 06 Nov 1994 08:49:37 GMT",120),(503,"120",120)] {
+            var time = Date(timeIntervalSince1970:784111657)
+            let service = EnrichmentService(api:api(configuration:enrichmentConfiguration),now:{ time })
+            var calls = 0
+            fixture.responseHeaders = ["Retry-After":header]
+            fixture.handler = { _ in
+                calls += 1
+                return calls == 1 ? (status,Data()) : (200,Data(#"{"status":"ok","database":"connected"}"#.utf8))
+            }
+            do { _ = try await service.health(); XCTFail("Expected HTTP failure") } catch {}
+            XCTAssertEqual(calls,1)
+            time.addTimeInterval(delay - 0.01)
+            service.resetMetrics()
+            do { _ = try await service.health(); XCTFail("Cooldown must survive reset") } catch {}
+            XCTAssertEqual(calls,1)
+            time.addTimeInterval(0.02)
+            _ = try await service.health()
+            XCTAssertEqual(calls,2)
+        }
+        fixture.handler = nil; fixture.responseHeaders = [:]
+    }
+    @MainActor func testShortRetryAfterCannotBypassLocalBudget() async throws {
+        var configuration = enrichmentConfiguration
+        configuration.enrichment = .init(values:["EnrichmentRateMax":"1"])
+        var time = Date(timeIntervalSince1970:100)
+        let service = EnrichmentService(api:api(configuration:configuration),now:{ time })
+        fixture.responseHeaders = ["Retry-After":"0"]
+        fixture.handler = { _ in (429,Data()) }
+        defer { fixture.handler = nil; fixture.responseHeaders = [:] }
+        do { _ = try await service.health() } catch {}
+        time.addTimeInterval(59)
+        do { _ = try await service.health(); XCTFail("Local budget must still apply") } catch {}
+        XCTAssertEqual(service.metrics.requests,1)
+        time.addTimeInterval(2)
+        do { _ = try await service.health() } catch {}
+        XCTAssertEqual(service.metrics.requests,2)
+    }
+    @MainActor func testConcurrentShortRetryAfterCannotShortenExistingCooldown() async throws {
+        var time = Date(timeIntervalSince1970:100)
+        let service = EnrichmentService(api:api(configuration:enrichmentConfiguration),now:{ time })
+        var calls = 0
+        fixture.handler = { _ in
+            calls += 1
+            if calls == 1 {
+                do { _ = try await service.health() } catch {}
+                self.fixture.responseHeaders = ["Retry-After":"5"]
+            } else { self.fixture.responseHeaders = ["Retry-After":"120"] }
+            return (429,Data())
+        }
+        defer { fixture.handler = nil; fixture.responseHeaders = [:] }
+        do { _ = try await service.health() } catch {}
+        XCTAssertEqual(calls,2)
+        time.addTimeInterval(61)
+        do { _ = try await service.health(); XCTFail("Longer cooldown must survive") } catch {}
+        XCTAssertEqual(calls,2)
+        time.addTimeInterval(60)
+        do { _ = try await service.health() } catch {}
+        XCTAssertEqual(calls,3)
+    }
     @MainActor func testEnrichmentChunkLimitsAndPostSyncMergeAcrossChunks() async throws {
         let service = EnrichmentService(api:api(configuration:enrichmentConfiguration))
         let beers = (0..<101).map { Beer(id:String($0),name:"Beer \($0)") }
@@ -217,7 +403,7 @@ final class NetworkTests: XCTestCase {
         var batches = 0
         fixture.handler = { request in
             switch request.url!.path {
-            case "/beers": return (200,Data(#"{"storeId":"1","beers":[{"id":"1","brew_name":"Tap beer"}]}"#.utf8))
+            case "/beers": return (200,Data(#"{"storeId":"1","beers":[{"id":"1","brew_name":"Tap beer","brewer":"Fixture","enriched_abv":null,"enrichment_confidence":null,"enrichment_source":null}]}"#.utf8))
             case "/bk-member-json.php": return (200,Data(#"[{},{"tasted_brew_current_round":[{"id":"1","brew_name":"Tasted beer","tasted_date":"09/01/2026","review_rating":"4"}]},{"reward":[]}]"#.utf8))
             case "/beers/sync": return (200,Data(#"{"synced":1,"queued_for_cleanup":1,"requestId":"fixture"}"#.utf8))
             case "/beers/batch":
@@ -326,7 +512,7 @@ final class NetworkTests: XCTestCase {
         XCTAssertFalse(model.refreshing)
         fixture.handler = { request in
             if request.url!.path == "/beers" {
-                return (200,Data(#"{"storeId":"1","beers":[{"id":"fresh","brew_name":"Fresh beer"}]}"#.utf8))
+                return (200,Data(#"{"storeId":"1","beers":[{"id":"fresh","brew_name":"Fresh beer","brewer":"Fixture","enriched_abv":null,"enrichment_confidence":null,"enrichment_source":null}]}"#.utf8))
             }
             return (200,Data(#"[{},{"tasted_brew_current_round":[]},{"reward":[]}]"#.utf8))
         }
@@ -630,7 +816,7 @@ final class NetworkTests: XCTestCase {
         fixture.handler = { request in
             switch request.url!.path {
             case "/beers":
-                return (200,Data(#"{"storeId":"1","beers":[{"id":"1","brew_name":"Beer"}]}"#.utf8))
+                return (200,Data(#"{"storeId":"1","beers":[{"id":"1","brew_name":"Beer","brewer":"Fixture","enriched_abv":null,"enrichment_confidence":null,"enrichment_source":null}]}"#.utf8))
             case "/bk-member-json.php":
                 return (200,Data(#"[{},{"tasted_brew_current_round":[{"id":"tasted","brew_name":"Old tasting"}]},{"reward":[{"reward_id":"stale","reward_type":"Stale reward"}]}]"#.utf8))
             case "/beers/batch":

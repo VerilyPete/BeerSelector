@@ -10,6 +10,10 @@ final class HTTPFixture {
         get { FixtureProtocol.handlers[id] }
         set { FixtureProtocol.handlers[id] = newValue }
     }
+    var responseHeaders: [String:String] {
+        get { FixtureProtocol.responseHeaders[id] ?? [:] }
+        set { FixtureProtocol.responseHeaders[id] = newValue }
+    }
     func api(configuration: APIConfiguration) -> BeerAPI {
         let config = URLSessionConfiguration.ephemeral
         config.protocolClasses = [FixtureProtocol.self]
@@ -21,6 +25,7 @@ final class HTTPFixture {
 
 private final class FixtureProtocol: URLProtocol {
     @MainActor static var handlers: [String: HTTPFixture.Handler] = [:]
+    @MainActor static var responseHeaders: [String:[String:String]] = [:]
     private let lock = NSRecursiveLock()
     private var stopped = false
     private var work: Task<Void, Never>?
@@ -35,7 +40,7 @@ private final class FixtureProtocol: URLProtocol {
                 let (status,data) = try await handler(request)
                 try Task.checkCancellation()
                 deliver {
-                    let response = HTTPURLResponse(url:request.url!,statusCode:status,httpVersion:nil,headerFields:nil)!
+                    let response = HTTPURLResponse(url:request.url!,statusCode:status,httpVersion:nil,headerFields:Self.responseHeaders[id])!
                     client?.urlProtocol(self,didReceive:response,cacheStoragePolicy:.notAllowed)
                     client?.urlProtocol(self,didLoad:data)
                     client?.urlProtocolDidFinishLoading(self)
