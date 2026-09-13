@@ -81,24 +81,29 @@ struct HomeView: View {
         GeometryReader { geometry in
             let tabletLayout = geometry.size.width >= 768 && !typeSize.isAccessibilitySize
             ScrollView {
-                if model.configured {
-                    if tabletLayout {
-                        tabletHome.padding(.horizontal,24).padding(.vertical,20)
+                Group {
+                    if model.configured {
+                        if tabletLayout {
+                            tabletHome.padding(.horizontal,24).padding(.vertical,20)
+                        } else {
+                            VStack(alignment:.leading,spacing:20) {
+                                accountHeader
+                                if model.isMember { MetricPanel(count:model.tastedBeers.count) }
+                                exploration()
+                            }.padding(.horizontal,18).padding(.top,8).padding(.bottom,18)
+                                .frame(maxWidth:760).frame(maxWidth:.infinity)
+                        }
                     } else {
-                        VStack(alignment:.leading,spacing:20) {
-                            accountHeader
-                            if model.isMember { MetricPanel(count:model.tastedBeers.count) }
-                            exploration()
-                        }.padding(.horizontal,18).padding(.top,8).padding(.bottom,18)
-                            .frame(maxWidth:760).frame(maxWidth:.infinity)
+                        VStack(spacing:24) {
+                            Image(systemName:"mug.fill").font(.system(size:48)).foregroundStyle(Robo.cyan)
+                            Text("Beer Selector").font(Robo.bold())
+                            Text("Log in to your UFO Club account or browse as a visitor.").font(Robo.mono()).multilineTextAlignment(.center)
+                            Button("Get Started") { model.showSettings = true }.buttonStyle(RoboButtonStyle(color:Robo.cyan))
+                        }.frame(maxWidth:760).padding(.horizontal,18).padding(.vertical,60).frame(maxWidth:.infinity)
                     }
-                } else {
-                    VStack(spacing:24) {
-                        Image(systemName:"mug.fill").font(.system(size:48)).foregroundStyle(Robo.cyan)
-                        Text("Beer Selector").font(Robo.bold())
-                        Text("Log in to your UFO Club account or browse as a visitor.").font(Robo.mono()).multilineTextAlignment(.center)
-                        Button("Get Started") { model.showSettings = true }.buttonStyle(RoboButtonStyle(color:Robo.cyan))
-                    }.frame(maxWidth:760).padding(.horizontal,18).padding(.vertical,60).frame(maxWidth:.infinity)
+                }
+                .background {
+                    if !tabletLayout { HomeScrollBoundary() }
                 }
             }
         }
@@ -196,5 +201,44 @@ struct HomeView: View {
                 HStack(spacing:14) { IconWell(symbol:icon,color:title == "Rewards" ? Robo.amber : Robo.cyan,etched:true); VStack(alignment:.leading,spacing:2) { Text(title.uppercased()).font(Robo.title(13)).tracking(0.5).foregroundStyle(title == "Rewards" ? Robo.amber : Robo.cyan); Text(subtitle).font(Robo.mono(10)).foregroundStyle(Robo.steel).multilineTextAlignment(.leading) }; Spacer(); Image(systemName:"chevron.right").font(.system(size:16)).foregroundStyle(Robo.color(0x3A3F47)) }
             }
         }.disabled(disabled).opacity(disabled ? 0.5 : 1).accessibilityIdentifier(id)
+    }
+}
+
+/// SwiftUI's basedOnSize still rubber-bands when content exceeds the viewport by
+/// even one point. Configure only Home's enclosing scroll view, never appearance
+/// defaults, so tall content can scroll without elastic movement at either end.
+private struct HomeScrollBoundary: UIViewRepresentable {
+    func makeUIView(context: Context) -> BoundaryView { BoundaryView() }
+    func updateUIView(_ uiView: BoundaryView, context: Context) { uiView.applyBoundary() }
+    static func dismantleUIView(_ uiView: BoundaryView, coordinator: ()) { uiView.restoreBoundary() }
+
+    final class BoundaryView: UIView {
+        private weak var scrollView: UIScrollView?
+        private var originalBounces = true
+
+        override func didMoveToWindow() { super.didMoveToWindow(); applyBoundary() }
+        override func didMoveToSuperview() { super.didMoveToSuperview(); applyBoundary() }
+        override func layoutSubviews() { super.layoutSubviews(); applyBoundary() }
+
+        func applyBoundary() {
+            var ancestor = superview
+            while let view = ancestor {
+                if let enclosingScrollView = view as? UIScrollView {
+                    if scrollView !== enclosingScrollView {
+                        restoreBoundary()
+                        scrollView = enclosingScrollView
+                        originalBounces = enclosingScrollView.bounces
+                    }
+                    enclosingScrollView.bounces = false
+                    return
+                }
+                ancestor = view.superview
+            }
+        }
+
+        func restoreBoundary() {
+            scrollView?.bounces = originalBounces
+            scrollView = nil
+        }
     }
 }
