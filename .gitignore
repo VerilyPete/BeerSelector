@@ -103,13 +103,9 @@ junit.xml
 mybeers.json
 allbeers.json
 
-# Committed test fixtures. Nine test files reference these two datasets and two
-# of them read from disk; before this, both lived only as untracked files at the
-# repo root, so the suite passed on developer machines that happened to have
-# them and failed anywhere else. CI's first run lost a whole suite (15 tests) to
-# ENOENT because of it.
-!src/services/__tests__/fixtures/mybeers.json
-!src/services/__tests__/fixtures/allbeers.json
-
-# Planning documents — working notes, not repo content
+# Retired checkout artifacts and local agent preferences
 plans/
+Pods/
+ios/
+android/
+.claude/settings.local.json*

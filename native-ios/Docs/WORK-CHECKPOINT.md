@@ -1,5 +1,17 @@
 # Migration checkpoint — 2026-09-12
 
+## Latest work — native-only repository cleanup prepared
+
+Native cutover PR #27 merged into main at daa5456e after all GitHub checks and Native Correctness passed. The first Native External Beta build reported successful All tests and Archive actions; external tester availability was not independently verified here.
+
+Cleanup branch: cleanup/native-only. Removed 511 tracked legacy files (including the retired Vitest config, replaced by a minimal .mts config), React/Expo runtime, Android and generated iOS/CocoaPods projects, obsolete tooling/tests/docs, and React-specific agent instructions. Root docs now describe the native app. No native app, widget, resources, test, or project code changed. Ignored private settings, archives, crash evidence, and local tool preferences remain intact.
+
+Root Node dependencies reduced from 1,390 to 73 packages. Retained only the consumer contract package because ufobeer main imports its schemas, adapter, and Beer type and runs npm ci here. Do not delete those files or manifests until coordinating the backend contract migration. Golden Taproom CI remains; obsolete ESLint/React tests are replaced by native CI. The required GitHub Actions context remains named Jest Unit Tests to preserve existing protection, but now executes the native All plan and Cloud configuration tests. Remote branch protection was not changed.
+
+Validation: fresh exported checkout without ignored files or production credentials built successfully; native All plan passed 120/120 tests with no skips. Contract package passed 15 tests and TypeScript checking; ufobeer origin/main exported into a temporary sibling checkout passed contract typechecking and all 15 worker/consumer contract tests against the reduced package. Three Cloud configuration tests, actionlint on both workflows, and git diff --check passed. Logs/results: /private/tmp/beerselector-native-cleanup-tests.xcresult and /private/tmp/beerselector-cleanup-contract.log. Replacement GitHub workflow has not run remotely yet.
+
+Cleanup changes are staged for review, not committed, pushed, or merged. See [LEGACY-RETIREMENT.md](LEGACY-RETIREMENT.md) for recovery and retained-dependency details.
+
 ## Latest work — main to external TestFlight workflow and secret saved
 
 Created **Native External Beta** in Xcode Cloud: exact main branch-change trigger, auto-cancel, pinned Xcode 26.3, required All tests on iPhone 17 Pro, Release archive prepared for App Store Connect, external post-action targeting existing **Beta testers** (six members). Xcode crashed after Save; reopening Xcode and checking App Store Connect both confirmed the saved workflow. Xcode required Admin/App Manager editing restriction; applied. Cloud next build number changed from 24 to **62** and verified on App Store Connect. No build started, source pushed, PR merged, or app uploaded.
