@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi, type Mock } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 /**
  * Unit tests for enrichmentService.ts
  *
@@ -23,11 +23,9 @@ import {
   fetchEnrichmentBatchWithMissing,
   syncBeersToWorker,
   pollForEnrichmentUpdates,
-  getClientId,
   EnrichmentData,
 } from '../enrichmentService';
 import { Beerfinder, BeerWithContainerType, BeerfinderWithContainerType } from '@/src/types/beer';
-import { getPreference, setPreference } from '@/src/database/preferences';
 
 // Mock the config module
 vi.mock('@/src/config', () => ({
@@ -48,13 +46,6 @@ vi.mock('@/src/config', () => ({
       throw new Error('Enrichment service is not configured: missing API key');
     }
   }),
-}));
-
-// Mock preferences
-vi.mock('@/src/database/preferences', () => ({
-  getPreference: vi.fn(),
-
-  setPreference: vi.fn(),
 }));
 
 // Mock error logger
@@ -543,35 +534,6 @@ describe('enrichmentService', () => {
   });
 
   describe('API Functions', () => {
-    const mockGetPreference = getPreference as Mock;
-    const mockSetPreference = setPreference as Mock;
-
-    beforeEach(async () => {
-      // Setup mock for client ID - cached value is used
-      mockGetPreference.mockResolvedValue('test-client-id');
-      mockSetPreference.mockResolvedValue(undefined);
-    });
-
-    describe('getClientId', () => {
-      it('should return cached client ID when available', async () => {
-        // First call caches the ID
-        const id1 = await getClientId();
-        // Second call should return cached value
-        const id2 = await getClientId();
-
-        expect(id1).toBe(id2);
-      });
-
-      it('should return existing client ID from preferences', async () => {
-        mockGetPreference.mockResolvedValueOnce('existing-client-id');
-
-        // Note: Once cached, getClientId returns the cached value
-        // This test verifies that the function structure is correct
-        const id = await getClientId();
-        expect(id).toBeDefined();
-      });
-    });
-
     describe('fetchBeersFromProxy', () => {
       it('should throw when enrichment is not configured', async () => {
         const { config } = await import('@/src/config');
@@ -1110,12 +1072,6 @@ describe('enrichmentService', () => {
   });
 
   describe('syncBeersToWorker', () => {
-    const mockGetPreference = getPreference as Mock;
-
-    beforeEach(async () => {
-      mockGetPreference.mockResolvedValue('test-client-id');
-    });
-
     it('should return null when not configured', async () => {
       const { config } = await import('@/src/config');
       (config.enrichment.isConfigured as unknown as import('vitest').Mock).mockReturnValueOnce(
@@ -1272,12 +1228,6 @@ describe('enrichmentService', () => {
   });
 
   describe('fetchEnrichmentBatchWithMissing', () => {
-    const mockGetPreference = getPreference as Mock;
-
-    beforeEach(async () => {
-      mockGetPreference.mockResolvedValue('test-client-id');
-    });
-
     it('should return empty when not configured', async () => {
       const { config } = await import('@/src/config');
       (config.enrichment.isConfigured as unknown as import('vitest').Mock).mockReturnValueOnce(
@@ -1411,11 +1361,8 @@ describe('enrichmentService', () => {
   });
 
   describe('pollForEnrichmentUpdates', () => {
-    const mockGetPreference = getPreference as Mock;
-
     beforeEach(async () => {
       vi.useFakeTimers();
-      mockGetPreference.mockResolvedValue('test-client-id');
     });
 
     afterEach(async () => {
@@ -1629,11 +1576,6 @@ describe('enrichmentService', () => {
   });
 
   describe('fetchBeersFromProxy response validation', () => {
-    beforeEach(async () => {
-      const mockGetPreference = getPreference as Mock;
-      mockGetPreference.mockResolvedValue('test-client-id');
-    });
-
     it('throws descriptive error when proxy response has wrong shape', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
@@ -1746,11 +1688,6 @@ describe('enrichmentService', () => {
   });
 
   describe('fetchEnrichmentBatch response validation', () => {
-    beforeEach(async () => {
-      const mockGetPreference = getPreference as Mock;
-      mockGetPreference.mockResolvedValue('test-client-id');
-    });
-
     it('returns empty object when batch response is malformed', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
@@ -1765,11 +1702,6 @@ describe('enrichmentService', () => {
   });
 
   describe('syncBeersToWorker response validation', () => {
-    beforeEach(async () => {
-      const mockGetPreference = getPreference as Mock;
-      mockGetPreference.mockResolvedValue('test-client-id');
-    });
-
     it('returns null-equivalent result when sync response is malformed', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,

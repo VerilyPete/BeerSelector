@@ -5,7 +5,6 @@
  * beer enrichment data (ABV, confidence scores, and source information).
  *
  * Features:
- * - Client ID management for per-device rate limiting
  * - Batch lookups with automatic chunking
  * - Client-side rate limiting to prevent API abuse
  * - Health checks and cache busting
@@ -15,7 +14,6 @@
  */
 
 import { config, assertEnrichmentConfigured } from '@/src/config';
-import { getPreference, setPreference } from '@/src/database/preferences';
 import { logWarning } from '@/src/utils/errorLogger';
 import { Beer } from '@/src/types/beer';
 import {
@@ -40,16 +38,6 @@ export type {
   SyncBeersRequest,
   SyncBeersResponse,
 } from '../contracts/enrichment';
-
-// Conditionally import expo-application only in React Native environment
-let Application: { applicationId: string | null } | undefined;
-try {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  Application = require('expo-application');
-} catch {
-  // expo-application not available (e.g., in Node.js tests)
-  Application = undefined;
-}
 
 /**
  * Response from GET /beers?sid={storeId}
@@ -239,68 +227,6 @@ export function __resetRateLimitStateForTests(): void {
 }
 
 // ============================================================================
-// Client ID Management
-// ============================================================================
-
-/**
- * Preference key for storing the client ID
- * Uses the existing preferences table via getPreference/setPreference
- */
-const CLIENT_ID_PREFERENCE_KEY = 'enrichment_client_id';
-let cachedClientId: string | null = null;
-
-/**
- * Get or create a persistent client ID for rate limiting.
- *
- * Format: {appId}-{uuid}
- * Example: org.verily.FSbeerselector-a1b2c3d4-e5f6-7890-abcd-ef1234567890
- *
- * The client ID persists across app restarts and is used by the Worker
- * to track rate limits per device.
- *
- * Uses the existing preferences table (via getPreference/setPreference)
- * instead of adding a new AsyncStorage dependency.
- */
-export async function getClientId(): Promise<string> {
-  if (cachedClientId) {
-    return cachedClientId;
-  }
-
-  try {
-    let clientId = await getPreference(CLIENT_ID_PREFERENCE_KEY);
-
-    if (!clientId) {
-      // Generate UUID v4
-      const uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
-        const r = (Math.random() * 16) | 0;
-        const v = c === 'x' ? r : (r & 0x3) | 0x8;
-        return v.toString(16);
-      });
-
-      const appId = Application?.applicationId || 'beerselector';
-      clientId = `${appId}-${uuid}`;
-
-      await setPreference(
-        CLIENT_ID_PREFERENCE_KEY,
-        clientId,
-        'Unique client ID for enrichment service rate limiting'
-      );
-      console.log('[EnrichmentService] Generated new client ID');
-    }
-
-    cachedClientId = clientId;
-    return clientId;
-  } catch {
-    logWarning('Failed to get/create client ID, using fallback', {
-      operation: 'getClientId',
-      component: 'enrichmentService',
-    });
-    // Fallback if preferences access fails
-    return `unknown-client-${Date.now()}`;
-  }
-}
-
-// ============================================================================
 // API Functions
 // ============================================================================
 
@@ -338,7 +264,6 @@ export async function fetchBeersFromProxy(
   }
 
   metrics.proxyRequests++;
-  const clientId = await getClientId();
   const url = `${enrichment.getFullUrl('beers')}?sid=${storeId}`;
 
   const controller = new AbortController();
@@ -346,7 +271,6 @@ export async function fetchBeersFromProxy(
 
   const headers: Record<string, string> = {
     'X-API-Key': enrichment.apiKey,
-    'X-Client-ID': clientId,
     Accept: 'application/json',
   };
 
@@ -508,7 +432,6 @@ export async function fetchEnrichmentBatch(
   }
 
   const results: Record<string, EnrichmentData> = {};
-  const clientId = await getClientId();
   let successCount = 0;
   let failureCount = 0;
 
@@ -524,7 +447,6 @@ export async function fetchEnrichmentBatch(
         headers: {
           'Content-Type': 'application/json',
           'X-API-Key': enrichment.apiKey,
-          'X-Client-ID': clientId,
         },
         body: JSON.stringify({ ids: chunk }),
         signal: controller.signal,
@@ -676,7 +598,6 @@ export async function fetchEnrichmentBatchWithMissing(
 
   const results: Record<string, EnrichmentData> = {};
   const allMissing: string[] = [];
-  const clientId = await getClientId();
   let successCount = 0;
   let failureCount = 0;
 
@@ -692,7 +613,6 @@ export async function fetchEnrichmentBatchWithMissing(
         headers: {
           'Content-Type': 'application/json',
           'X-API-Key': enrichment.apiKey,
-          'X-Client-ID': clientId,
         },
         body: JSON.stringify({ ids: chunk }),
         signal: controller.signal,
@@ -841,7 +761,6 @@ export async function syncBeersToWorker(
     return null;
   }
 
-  const clientId = await getClientId();
   let totalSynced = 0;
   let totalQueuedForCleanup = 0;
   const allErrors: string[] = [];
@@ -868,7 +787,6 @@ export async function syncBeersToWorker(
         headers: {
           'Content-Type': 'application/json',
           'X-API-Key': enrichment.apiKey,
-          'X-Client-ID': clientId,
         },
         body: JSON.stringify(requestBody),
         signal: controller.signal,
@@ -1078,7 +996,6 @@ async function fetchEnrichmentBatchInternal(
 
   assertEnrichmentConfigured(enrichment);
 
-  const clientId = await getClientId();
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), enrichment.timeout);
 
@@ -1088,7 +1005,6 @@ async function fetchEnrichmentBatchInternal(
       headers: {
         'Content-Type': 'application/json',
         'X-API-Key': enrichment.apiKey,
-        'X-Client-ID': clientId,
       },
       body: JSON.stringify({ ids: beerIds }),
       signal: controller.signal,

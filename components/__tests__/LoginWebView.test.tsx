@@ -1,6 +1,7 @@
 import React from 'react';
 import { render, fireEvent, waitFor } from '@testing-library/react-native';
 import { Alert, Modal } from 'react-native';
+import type { ReactTestInstance } from 'react-test-renderer';
 import { config } from '@/src/config';
 
 // Import after mocks
@@ -140,6 +141,50 @@ jest.mock('react-native-webview', () => {
     },
   };
 });
+
+/**
+ * Fires the URL_CHECK message the app sends on every page load, waits for
+ * the resulting verification-script injection, and extracts the nonce it
+ * embedded — everything a real page's injected script would need in order
+ * to answer with a legitimate URL_VERIFIED.
+ *
+ * Posting URL_VERIFIED directly, with no prior URL_CHECK, is exactly the
+ * forged-message shape `handleLoginMessage`'s challenge tracking now
+ * rejects — see `src/api/__tests__/loginMessageHandler.test.ts`'s "URL
+ * verification challenge" suite for that behaviour covered at the logic
+ * layer. This helper exists so the component tests below can still exercise
+ * the WebView-facing injection they always covered, through the real
+ * challenge/response flow rather than a shape the app no longer accepts.
+ */
+async function issueUrlCheckChallenge(webview: ReactTestInstance, url: string): Promise<string> {
+  const callsBefore = mockWebViewRef.current.injectJavaScript.mock.calls.length;
+
+  fireEvent(webview, 'onMessage', {
+    nativeEvent: { data: JSON.stringify({ type: 'URL_CHECK', url }), url },
+  });
+
+  await waitFor(() => {
+    expect(mockWebViewRef.current.injectJavaScript.mock.calls.length).toBeGreaterThan(callsBefore);
+  });
+
+  const calls = mockWebViewRef.current.injectJavaScript.mock.calls;
+  const lastInjectedScript = calls[calls.length - 1][0] as string;
+  const nonceMatch = /nonce:\s*"([^"]+)"/.exec(lastInjectedScript);
+  if (!nonceMatch) {
+    throw new Error('URL_CHECK injection did not embed a verification nonce');
+  }
+  return nonceMatch[1];
+}
+
+/** Answers an `issueUrlCheckChallenge` challenge, as the real page would. */
+function sendUrlVerified(webview: ReactTestInstance, url: string, nonce: string): void {
+  fireEvent(webview, 'onMessage', {
+    nativeEvent: {
+      data: JSON.stringify({ type: 'URL_VERIFIED', url, nonce }),
+      url,
+    },
+  });
+}
 
 // Mock database functions
 jest.mock('@/src/database/preferences', () => ({
@@ -379,6 +424,10 @@ describe('LoginWebView', () => {
             type: 'URL_CHECK',
             url: config.api.getFullUrl('memberDashboard'),
           }),
+          // The trust signal is `nativeEvent.url`, not the page-supplied
+          // `data.url` above — `handleLoginMessage` ignores a message whose
+          // native URL is not the configured login origin.
+          url: config.api.getFullUrl('memberDashboard'),
         },
       };
 
@@ -401,21 +450,21 @@ describe('LoginWebView', () => {
       );
 
       const webview = getByTestId('webview-mock');
+      const url = config.api.getFullUrl('memberDashboard');
 
-      const message = {
-        nativeEvent: {
-          data: JSON.stringify({
-            type: 'URL_VERIFIED',
-            url: config.api.getFullUrl('memberDashboard'),
-          }),
-        },
-      };
+      // A bare URL_VERIFIED with no prior URL_CHECK is exactly the forged
+      // -message shape the challenge tracking rejects; issue a real
+      // challenge first, as the injected verification script would.
+      const nonce = await issueUrlCheckChallenge(webview, url);
+      const callsBeforeVerification = mockWebViewRef.current.injectJavaScript.mock.calls.length;
 
-      fireEvent(webview, 'onMessage', message);
+      sendUrlVerified(webview, url, nonce);
 
       // Should inject page-specific JavaScript for member-dash.php
       await waitFor(() => {
-        expect(mockWebViewRef.current.injectJavaScript).toHaveBeenCalled();
+        expect(mockWebViewRef.current.injectJavaScript.mock.calls.length).toBeGreaterThan(
+          callsBeforeVerification
+        );
       });
     });
 
@@ -430,20 +479,17 @@ describe('LoginWebView', () => {
       );
 
       const webview = getByTestId('webview-mock');
+      const url = config.api.getFullUrl('memberDashboard');
 
-      const message = {
-        nativeEvent: {
-          data: JSON.stringify({
-            type: 'URL_VERIFIED',
-            url: config.api.getFullUrl('memberDashboard'),
-          }),
-        },
-      };
+      const nonce = await issueUrlCheckChallenge(webview, url);
+      const callsBeforeVerification = mockWebViewRef.current.injectJavaScript.mock.calls.length;
 
-      fireEvent(webview, 'onMessage', message);
+      sendUrlVerified(webview, url, nonce);
 
       await waitFor(() => {
-        expect(mockWebViewRef.current.injectJavaScript).toHaveBeenCalled();
+        expect(mockWebViewRef.current.injectJavaScript.mock.calls.length).toBeGreaterThan(
+          callsBeforeVerification
+        );
       });
     });
 
@@ -458,24 +504,60 @@ describe('LoginWebView', () => {
       );
 
       const webview = getByTestId('webview-mock');
+      const url = config.api.getFullUrl('visitor');
 
-      const message = {
-        nativeEvent: {
-          data: JSON.stringify({
-            type: 'URL_VERIFIED',
-            url: config.api.getFullUrl('visitor'),
-          }),
-        },
-      };
+      const nonce = await issueUrlCheckChallenge(webview, url);
+      const callsBeforeVerification = mockWebViewRef.current.injectJavaScript.mock.calls.length;
 
-      fireEvent(webview, 'onMessage', message);
+      sendUrlVerified(webview, url, nonce);
 
       await waitFor(() => {
-        expect(mockWebViewRef.current.injectJavaScript).toHaveBeenCalled();
+        expect(mockWebViewRef.current.injectJavaScript.mock.calls.length).toBeGreaterThan(
+          callsBeforeVerification
+        );
       });
     });
 
-    it('should not inject JavaScript twice for same URL', async () => {
+    it('should not inject the page-specific script twice for the same URL', async () => {
+      const { getByTestId } = render(
+        <LoginWebView
+          visible={true}
+          onLoginSuccess={mockOnLoginSuccess}
+          onLoginCancel={mockOnLoginCancel}
+          onRefreshData={mockOnRefreshData}
+        />
+      );
+
+      const webview = getByTestId('webview-mock');
+      const url = config.api.getFullUrl('memberDashboard');
+
+      // First round trip: verification script, then the member-dashboard
+      // script — two injections.
+      const firstNonce = await issueUrlCheckChallenge(webview, url);
+      sendUrlVerified(webview, url, firstNonce);
+      await waitFor(() => {
+        expect(mockWebViewRef.current.injectJavaScript).toHaveBeenCalledTimes(2);
+      });
+
+      // Second round trip for the SAME url: a fresh URL_CHECK always
+      // re-injects the verification script (that is the challenge/response
+      // itself), but `processedUrlsRef` already has this URL, so the
+      // member-dashboard script must not be injected again.
+      const secondNonce = await issueUrlCheckChallenge(webview, url);
+      expect(mockWebViewRef.current.injectJavaScript).toHaveBeenCalledTimes(3);
+
+      sendUrlVerified(webview, url, secondNonce);
+
+      // `handleWebViewMessage` is async but does no awaited work on this
+      // branch (JSON.parse and synchronous ref calls only), so it settles on
+      // the microtask queue rather than a real timer — flush that queue
+      // before asserting the count never moved past the verification script.
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(mockWebViewRef.current.injectJavaScript).toHaveBeenCalledTimes(3);
+    });
+
+    it('does not trigger the cookie-harvest injection for a message whose frame is not the trusted login host', async () => {
       const { getByTestId } = render(
         <LoginWebView
           visible={true}
@@ -487,24 +569,51 @@ describe('LoginWebView', () => {
 
       const webview = getByTestId('webview-mock');
 
-      const message = {
+      // `data.url` claims to be the real member dashboard; `nativeEvent.url`
+      // — the value the WebView itself reports, and the one that matters —
+      // is not the trusted login origin at all.
+      fireEvent(webview, 'onMessage', {
         nativeEvent: {
           data: JSON.stringify({
             type: 'URL_VERIFIED',
             url: config.api.getFullUrl('memberDashboard'),
+            nonce: 'irrelevant',
           }),
+          url: 'https://evil.example/member-dash.php',
         },
-      };
+      });
 
-      // Send same message twice
-      fireEvent(webview, 'onMessage', message);
-      const firstCallCount = mockWebViewRef.current.injectJavaScript.mock.calls.length;
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(mockWebViewRef.current.injectJavaScript).not.toHaveBeenCalled();
+    });
 
-      fireEvent(webview, 'onMessage', message);
-      const secondCallCount = mockWebViewRef.current.injectJavaScript.mock.calls.length;
+    it('rejects the substring-bypass shape: member-dash.php only appearing in the query string', async () => {
+      const { getByTestId } = render(
+        <LoginWebView
+          visible={true}
+          onLoginSuccess={mockOnLoginSuccess}
+          onLoginCancel={mockOnLoginCancel}
+          onRefreshData={mockOnRefreshData}
+        />
+      );
 
-      // Should not inject again for the same URL
-      expect(secondCallCount).toBe(firstCallCount);
+      const webview = getByTestId('webview-mock');
+      // Trusted origin, but a path the old `url.includes('member-dash.php')`
+      // gate would have matched and the new exact-path check must not.
+      const bypassUrl = `${mockTestBaseUrl}/x?q=member-dash.php`;
+
+      const nonce = await issueUrlCheckChallenge(webview, bypassUrl);
+      const callsAfterChallenge = mockWebViewRef.current.injectJavaScript.mock.calls.length;
+
+      sendUrlVerified(webview, bypassUrl, nonce);
+
+      // The challenge itself succeeds (trusted origin, matching nonce), so
+      // `injectPageSpecificJavaScript` runs — it is the exact-path check
+      // inside that function that must reject this URL and stay a no-op.
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(mockWebViewRef.current.injectJavaScript).toHaveBeenCalledTimes(callsAfterChallenge);
     });
   });
 
@@ -549,6 +658,9 @@ describe('LoginWebView', () => {
             error: 'Error occurred',
             location: 'test',
           }),
+          // Any page on the trusted login origin; `JS_INJECTION_ERROR`
+          // isn't tied to a specific path.
+          url: config.api.getFullUrl('memberDashboard'),
         },
       };
 
@@ -869,19 +981,15 @@ describe('LoginWebView', () => {
         // Test navigation to member dashboard (uses config URL)
         const memberDashUrl = config.api.getFullUrl('memberDashboard');
 
-        const message = {
-          nativeEvent: {
-            data: JSON.stringify({
-              type: 'URL_VERIFIED',
-              url: memberDashUrl,
-            }),
-          },
-        };
+        const nonce = await issueUrlCheckChallenge(webview, memberDashUrl);
+        const callsBeforeVerification = mockWebViewRef.current.injectJavaScript.mock.calls.length;
 
-        fireEvent(webview, 'onMessage', message);
+        sendUrlVerified(webview, memberDashUrl, nonce);
 
         await waitFor(() => {
-          expect(mockWebViewRef.current.injectJavaScript).toHaveBeenCalled();
+          expect(mockWebViewRef.current.injectJavaScript.mock.calls.length).toBeGreaterThan(
+            callsBeforeVerification
+          );
         });
 
         // Verify the URL came from config
@@ -902,19 +1010,15 @@ describe('LoginWebView', () => {
 
         const visitorUrl = config.api.getFullUrl('visitor');
 
-        const message = {
-          nativeEvent: {
-            data: JSON.stringify({
-              type: 'URL_VERIFIED',
-              url: visitorUrl,
-            }),
-          },
-        };
+        const nonce = await issueUrlCheckChallenge(webview, visitorUrl);
+        const callsBeforeVerification = mockWebViewRef.current.injectJavaScript.mock.calls.length;
 
-        fireEvent(webview, 'onMessage', message);
+        sendUrlVerified(webview, visitorUrl, nonce);
 
         await waitFor(() => {
-          expect(mockWebViewRef.current.injectJavaScript).toHaveBeenCalled();
+          expect(mockWebViewRef.current.injectJavaScript.mock.calls.length).toBeGreaterThan(
+            callsBeforeVerification
+          );
         });
 
         // Verify config was used for visitor endpoint

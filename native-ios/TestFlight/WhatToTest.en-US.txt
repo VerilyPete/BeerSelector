@@ -1,0 +1,9 @@
+Internal testing — build 61
+
+This build fixes account recovery when credential saves or the account database update fail. It includes the account-switch refresh fix from build 60.
+
+Please verify normal logout, login, Refresh All Data, and cached lists after reopening the app. If you use multiple accounts, check that each account shows its own tastings and rewards after switching.
+
+If the app freezes or closes, note the time and action, then reopen Settings → Support → Prepare Diagnostic Report → Share Diagnostic Report. Submit any TestFlight feedback prompt as well.
+
+Controlled storage failures are covered by automated tests; no manual storage corruption or forced crash is needed.

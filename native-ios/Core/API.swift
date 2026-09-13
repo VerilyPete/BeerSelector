@@ -1,0 +1,233 @@
+import Foundation
+
+struct APIConfiguration {
+    var baseURL = URL(string:"https://tapthatapp.beerknurd.com")!
+    var enrichmentURL: URL?
+    var enrichmentKey: String?
+    var timeout: TimeInterval = 15
+    var enrichment = EnrichmentPolicy()
+    struct EnrichmentPolicy {
+        let timeout: TimeInterval
+        let batchSize: Int
+        let rateWindow: TimeInterval
+        let rateMax: Int
+        init(values: [String:String] = [:]) {
+            func milliseconds(_ key: String, fallback: Double) -> Double {
+                guard let text = values[key], let value = Double(text), value.isFinite, value / 1000 > 0 else { return fallback }
+                return value / 1000
+            }
+            func positiveInteger(_ key: String, fallback: Int) -> Int {
+                guard let text = values[key], let value = Int(text), value > 0 else { return fallback }
+                return value
+            }
+            timeout = milliseconds("EnrichmentTimeout",fallback:15)
+            batchSize = min(100,positiveInteger("EnrichmentBatchSize",fallback:100))
+            rateWindow = milliseconds("EnrichmentRateWindow",fallback:60)
+            rateMax = positiveInteger("EnrichmentRateMax",fallback:10)
+        }
+    }
+    static func bundled() -> Self {
+        let url = Bundle.main.url(forResource:"ServiceConfiguration",withExtension:"plist")
+        let values = url.flatMap { try? Data(contentsOf:$0) }.flatMap { try? PropertyListSerialization.propertyList(from:$0,format:nil) as? [String:String] } ?? [:]
+        return Self.from(values:values)
+    }
+    static func from(values: [String:String]) -> Self {
+        var c = Self()
+        c.enrichment = EnrichmentPolicy(values:values)
+        if let value = values["BeerAPIBaseURL"], let url = URL(string:value), url.scheme == "https" { c.baseURL = url }
+        if let value = values["EnrichmentURL"] { c.enrichmentURL = URL(string:value) }
+        c.enrichmentKey = values["EnrichmentKey"]
+        return c
+    }
+    func endpoint(_ path: String) -> URL { baseURL.appendingPathComponent(path) }
+    func trustedLogin(_ url: URL) -> Bool { url.scheme == baseURL.scheme && url.host == baseURL.host && url.port == baseURL.port && url.user == nil && url.password == nil }
+    static func dataURL(_ url: URL) -> Bool { url.scheme == "https" && url.host == "fsbs.beerknurd.com" && ["/bk-store-json.php","/bk-member-json.php"].contains(url.path) && url.user == nil && url.password == nil }
+}
+
+/// Reject cross-origin redirects before URLSession can forward authentication headers.
+final class RedirectPolicy: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+    func urlSession(_ session: URLSession, task: URLSessionTask, didFinishCollecting metrics: URLSessionTaskMetrics) {
+        Diagnostics.shared.recordTask(seconds: metrics.taskInterval.duration, redirects: metrics.redirectCount)
+    }
+    func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse, newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) {
+        guard let original = task.originalRequest?.url, let next = request.url,
+              original.scheme == next.scheme, original.host == next.host, original.port == next.port else { completionHandler(nil); return }
+        completionHandler(request)
+    }
+}
+struct HTTPFailure: LocalizedError {
+    var status: Int
+    var retryAfter: String? = nil
+    var errorDescription: String? { "Server request failed (\(status))." }
+    func retryDelay(now: Date) -> TimeInterval? {
+        guard let value = retryAfter?.trimmingCharacters(in:.whitespacesAndNewlines), !value.isEmpty else { return nil }
+        if value.utf8.allSatisfy({ (48...57).contains($0) }) {
+            guard let seconds = Double(value), seconds.isFinite else { return nil }
+            return seconds
+        }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier:"en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT:0)
+        formatter.isLenient = false
+        for format in ["EEE, dd MMM yyyy HH:mm:ss 'GMT'", "EEEE, dd-MMM-yy HH:mm:ss 'GMT'", "EEE MMM d HH:mm:ss yyyy"] {
+            formatter.dateFormat = format
+            if let date = formatter.date(from:value) { return max(0,date.timeIntervalSince(now)) }
+        }
+        return nil
+    }
+}
+final class BeerAPI {
+    let configuration: APIConfiguration
+    private let session: URLSession
+    private let enrichmentSession: URLSession
+    init(configuration: APIConfiguration = .bundled(), session: URLSession? = nil) {
+        self.configuration = configuration
+        let c = URLSessionConfiguration.ephemeral; c.httpShouldSetCookies = false; c.timeoutIntervalForRequest = configuration.timeout; c.timeoutIntervalForResource = 45
+        self.session = session ?? URLSession(configuration:c,delegate:RedirectPolicy(),delegateQueue:nil)
+        c.timeoutIntervalForRequest = configuration.enrichment.timeout
+        c.timeoutIntervalForResource = configuration.enrichment.timeout
+        self.enrichmentSession = session ?? URLSession(configuration:c,delegate:RedirectPolicy(),delegateQueue:nil)
+    }
+    static func form(_ fields: [String:String]) -> Data {
+        let allowed = CharacterSet(charactersIn:"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~")
+        return Data(fields.sorted { $0.key < $1.key }.map { "\($0.key.addingPercentEncoding(withAllowedCharacters:allowed)!)=\($0.value.addingPercentEncoding(withAllowedCharacters:allowed)!)" }.joined(separator:"&").utf8)
+    }
+    static func cookies(_ member: MemberSession, saved: [String:String]) -> String {
+        var values = saved
+        values.merge(["member_id":member.memberId,"store__id":member.storeId,"store_name":member.storeName,"PHPSESSID":member.sessionId,"username":member.username ?? "","first_name":member.firstName ?? "","last_name":member.lastName ?? "","email":member.email ?? "","cardNum":member.cardNum ?? ""],uniquingKeysWith: { _,new in new })
+        let allowed = CharacterSet(charactersIn:"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~")
+        return values.sorted { $0.key < $1.key }.filter { $0.key.range(of:#"^[A-Za-z0-9_\-]+$"#,options:.regularExpression) != nil }.map { "\($0.key)=\($0.value.addingPercentEncoding(withAllowedCharacters:allowed)!)" }.joined(separator:"; ")
+    }
+    func request(_ url: URL, method: String = "GET", fields: [String:String]? = nil, member: MemberSession? = nil, cookies: [String:String] = [:], referer: String = "member-dash.php", headers: [String:String] = [:], retry: Bool = true, json: Data? = nil, timeout: TimeInterval? = nil) async throws -> (Data, HTTPURLResponse) {
+        let interval = Diagnostics.shared.begin(.network)
+        do {
+            var request = URLRequest(url:url); request.httpMethod = method; request.timeoutInterval = timeout ?? configuration.timeout
+            request.setValue("BeerSelector/1.1.0 (iOS; Native)",forHTTPHeaderField:"User-Agent")
+            if let member {
+                guard member.valid, configuration.trustedLogin(url) else { throw BeerError.sessionExpired }
+                request.setValue(Self.cookies(member,saved:cookies),forHTTPHeaderField:"Cookie")
+                request.setValue(configuration.endpoint(referer).absoluteString,forHTTPHeaderField:"Referer")
+                request.setValue(configuration.baseURL.absoluteString,forHTTPHeaderField:"Origin")
+                request.setValue("XMLHttpRequest",forHTTPHeaderField:"X-Requested-With")
+            }
+            if let fields { request.httpBody = Self.form(fields); request.setValue("application/x-www-form-urlencoded; charset=UTF-8",forHTTPHeaderField:"Content-Type") }
+            if let json { request.httpBody = json; request.setValue("application/json",forHTTPHeaderField:"Content-Type") }
+            for (key,value) in headers { request.setValue(value,forHTTPHeaderField:key) }
+            for attempt in 0...3 {
+                do {
+                    let (data,response) = try await (timeout == nil ? session : enrichmentSession).data(for:request)
+                    guard let response = response as? HTTPURLResponse else { throw BeerError.invalidResponse("No HTTP response") }
+                    if response.statusCode == 401 || response.statusCode == 403 { throw BeerError.sessionExpired }
+                    guard (200...299).contains(response.statusCode) || response.statusCode == 304 else { throw HTTPFailure(status:response.statusCode,retryAfter:response.value(forHTTPHeaderField:"Retry-After")) }
+                    if member != nil, let final = response.url, ["/kiosk.php","/login.php"].contains(final.path) { throw BeerError.sessionExpired }
+                    interval.finish(.success)
+                    return (data,response)
+                } catch {
+                    let http = error as? HTTPFailure
+                    let transient = (error as? URLError).map { [.timedOut,.networkConnectionLost,.notConnectedToInternet,.cannotConnectToHost,.cannotFindHost].contains($0.code) } ?? (http.map { $0.status >= 500 || $0.status == 429 || $0.status == 408 } ?? false)
+                    guard retry, method == "GET", transient, attempt < 3 else { throw error }
+                    try await Task.sleep(for:.seconds(pow(2,Double(attempt))))
+                }
+            }
+            throw BeerError.invalidResponse("Request exhausted")
+        } catch { interval.finish(Diagnostics.isCancellation(error) ? .cancelled : .failure); throw error }
+    }
+    static func scalarRow(_ row: [String:Any]) throws -> [String:String] {
+        var result: [String:String] = [:]
+        for (key,value) in row {
+            if value is NSNull { continue }
+            if let string = value as? String { result[key] = string }
+            else if let n = value as? NSNumber { result[key] = n.stringValue }
+            else { throw BeerError.invalidResponse("Unexpected field type: \(key)") }
+        }
+        return result
+    }
+    static func parseBeers(_ data: Data, tasted: Bool = false, proxy: Bool = false) throws -> [Beer] {
+        return try Diagnostics.shared.measure(.parsing) {
+            let object = try JSONSerialization.jsonObject(with:data)
+            var entries: [Any]?
+            if proxy { entries = (object as? [String:Any])?["beers"] as? [Any] }
+            else if let array = object as? [Any] {
+                if array.count > 1, let envelope = array[1] as? [String:Any] { entries = envelope[tasted ? "tasted_brew_current_round" : "brewInStock"] as? [Any] }
+                if entries == nil && !tasted && (array.first as? [String:Any])?["id"] != nil { entries = array }
+            } else if !tasted, let dict = object as? [String:Any] { entries = (dict["brewInStock"] ?? dict["beers"] ?? dict["beer_list"]) as? [Any] }
+            guard let entries else { throw BeerError.invalidResponse("Missing beer array") }
+            if entries.isEmpty && !tasted { throw BeerError.invalidResponse("An empty taplist cannot replace saved beers.") }
+            return try entries.map {
+                guard let row = $0 as? [String:Any] else { throw BeerError.invalidResponse("Invalid beer row") }
+                var values = try scalarRow(row)
+                if proxy { values["abv"] = values["enriched_abv"] }
+                if values["enrichment_source"] == "description-fallback" { values["enrichment_source"] = "description" }
+                return try Beer(row:values)
+            }
+        }
+    }
+    static func parseRewards(_ data: Data) throws -> [Reward] {
+        return try Diagnostics.shared.measure(.parsing) {
+            guard let array = try JSONSerialization.jsonObject(with:data) as? [Any], array.count > 2, let dict = array[2] as? [String:Any], let entries = dict["reward"] as? [Any] else { throw BeerError.invalidResponse("Missing reward array") }
+            let rewards = try entries.compactMap { value -> Reward? in
+                guard let row = value as? [String:Any], let id = row["reward_id"] as? String, !id.isEmpty else { return nil }
+                let values = try scalarRow(row)
+                return Reward(id:id,type:values["reward_type"] ?? "",redeemed:values["redeemed"] == "1")
+            }
+            if !entries.isEmpty && rewards.isEmpty { throw BeerError.invalidResponse("No readable rewards") }
+            return rewards
+        }
+    }
+    static func parseQueue(_ data: Data) throws -> [QueueEntry] {
+        try Diagnostics.shared.measure(.parsing) {
+            guard let rawHTML = String(data:data,encoding:.utf8) else { throw BeerError.invalidResponse("Unreadable queue page") }
+            // Shared page templates may mention beer rows/delete URLs even when the queue is empty.
+            // Inspect rendered markup, not comments, styles or JavaScript templates.
+            let html = rawHTML.replacingOccurrences(of:#"(?is)<!--.*?-->|<(script|style)\b[^>]*>.*?</\1\s*>"#,with:"",options:.regularExpression)
+            func matches(_ pattern: String, in text: String) throws -> [NSTextCheckingResult] {
+                try NSRegularExpression(pattern:pattern,options:[.dotMatchesLineSeparators,.caseInsensitive])
+                    .matches(in:text,range:NSRange(text.startIndex...,in:text))
+            }
+            func capture(_ match: NSTextCheckingResult, _ group: Int, in text: String) -> String {
+                guard let range = Range(match.range(at:group),in:text) else { return "" }
+                return String(text[range])
+            }
+            func plain(_ text: String) -> String {
+                var value = text.replacingOccurrences(of:"<[^>]+>",with:" ",options:.regularExpression)
+                for (entity,replacement) in [("&quot;","\""),("&#39;","'"),("&apos;","'"),("&lt;","<"),("&gt;",">"),("&nbsp;"," "),("&amp;","&")] {
+                    value = value.replacingOccurrences(of:entity,with:replacement)
+                }
+                return value.replacingOccurrences(of:#"\s+"#,with:" ",options:.regularExpression).trimmingCharacters(in:.whitespacesAndNewlines)
+            }
+            if try !matches(#"<input\b[^>]*(?:type|name)\s*=\s*["']?password\b"#,in:html).isEmpty {
+                throw BeerError.sessionExpired
+            }
+            let headers = try matches(#"<h3\b[^>]*class\s*=\s*["'][^"']*\bbrewName\b[^"']*["'][^>]*>(.*?)</h3\s*>"#,in:html)
+            let openingHeaders = try matches(#"<h3\b[^>]*class\s*=\s*["'][^"']*\bbrewName\b[^"']*["'][^>]*>"#,in:html)
+            guard headers.count == openingHeaders.count else { throw BeerError.invalidResponse("Incomplete queue heading") }
+            let links = try matches(#"deleteQueuedBrew\.php\?cid=(\d+)"#,in:html)
+            if headers.isEmpty {
+                // An arbitrary HTTP 200 page is not proof that the member's queue is empty.
+                let text = plain(html).lowercased()
+                let empty = try !matches(#"\b(?:no brew in queue|no beers (?:currently )?in (?:your |the )?queue|(?:your |the )?queue is empty|empty queue)\b"#,in:text).isEmpty
+                guard empty, links.isEmpty, !html.localizedCaseInsensitiveContains("brewName"), !html.localizedCaseInsensitiveContains("deleteQueuedBrew") else {
+                    throw BeerError.invalidResponse("Queue page was not recognized")
+                }
+                return []
+            }
+            var entries: [QueueEntry] = []
+            for (index,header) in headers.enumerated() {
+                let end = index + 1 < headers.count ? headers[index+1].range.location : (html as NSString).length
+                let segment = (html as NSString).substring(with:NSRange(location:header.range.location,length:end-header.range.location))
+                let rowLinks = try matches(#"deleteQueuedBrew\.php\?cid=(\d+)"#,in:segment)
+                guard rowLinks.count == 1 else { throw BeerError.invalidResponse("Incomplete queue entry") }
+                var name = capture(header,1,in:html)
+                let dates = try matches(#"<div\b[^>]*class\s*=\s*["'][^"']*\bbrew_added_date\b[^"']*["'][^>]*>(.*?)</div\s*>"#,in:name)
+                let date = dates.first.map { plain(capture($0,1,in:name)) } ?? "Date unavailable"
+                if let dateMatch = dates.first, let range = Range(dateMatch.range,in:name) { name.removeSubrange(range) }
+                if dates.isEmpty { name = name.replacingOccurrences(of:"(?is)<div\\b[^>]*>.*?</div\\s*>",with:"",options:.regularExpression) }
+                name = plain(name)
+                guard !name.isEmpty else { throw BeerError.invalidResponse("Unnamed queue entry") }
+                entries.append(QueueEntry(id:capture(rowLinks[0],1,in:segment),name:name,date:date.isEmpty ? "Date unavailable" : date))
+            }
+            guard entries.count == links.count, Set(entries.map(\.id)).count == entries.count else { throw BeerError.invalidResponse("Incomplete queue page") }
+            return entries
+        }
+    }
+}

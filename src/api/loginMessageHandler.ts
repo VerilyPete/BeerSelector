@@ -15,6 +15,7 @@ import {
 import { isSessionData } from '@/src/types/api';
 import { createErrorResponse, getUserFriendlyErrorMessage } from '@/src/utils/notificationUtils';
 import { clearNativeCookies } from '@/src/api/nativeCookieManager';
+import { isTrustedLoginUrl } from '@/src/api/loginOrigin';
 
 /**
  * The login WebView's message handling, lifted out of the component.
@@ -38,13 +39,84 @@ export type LoginMessageDeps = {
   readonly onLoginCancel: () => void;
   /** Clear the component's processed-URL set so a retry can re-inject. */
   readonly clearProcessedUrls: () => void;
-  /** Ask the WebView to confirm it is still on `url` before injecting. */
-  readonly injectUrlVerification: (url: string) => void;
+  /**
+   * Ask the WebView to confirm it is still on `url` before injecting, and
+   * embed `nonce` in that check so the reply can be tied back to this
+   * specific challenge (see `issueUrlVerificationChallenge` below).
+   */
+  readonly injectUrlVerification: (url: string, nonce: string) => void;
   /** Inject the member-dashboard or visitor script for a verified `url`. */
   readonly injectPageSpecificJavaScript: (url: string) => void;
   /** Injection failed; run the component's cancel-and-close path. */
   readonly onInjectionError: () => void;
 };
+
+/**
+ * Outstanding URL-verification challenge, tracked here in app state rather
+ * than in the page.
+ *
+ * Before this existed, `URL_VERIFIED` was trusted on receipt alone: the
+ * verification script injected into the page was the only thing that ever
+ * checked `window.location.href === url`, and the page itself is what sends
+ * the `URL_VERIFIED` reply — so any script running in the WebView could skip
+ * the check entirely and just post the reply. Recording the nonce issued for
+ * the most recent `URL_CHECK` here, and requiring an exact match (plus the
+ * app's own origin check on the *reply's* native URL) before honouring
+ * `URL_VERIFIED`, means a reply that was never actually challenged — or that
+ * answers a stale challenge — is ignored rather than acted on.
+ *
+ * Single most-recent challenge only: the WebView holds one page at a time,
+ * and each `onLoadEnd` issues a fresh `URL_CHECK`/challenge that supersedes
+ * whatever came before.
+ */
+type UrlVerificationChallenge = {
+  readonly url: string;
+  readonly nonce: string;
+  readonly issuedAt: number;
+};
+
+/** How long an issued challenge remains answerable. */
+const URL_VERIFICATION_CHALLENGE_TTL_MS = 30_000;
+
+let outstandingChallenge: UrlVerificationChallenge | null = null;
+
+function generateChallengeNonce(): string {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+}
+
+function issueUrlVerificationChallenge(url: string): string {
+  const nonce = generateChallengeNonce();
+  outstandingChallenge = { url, nonce, issuedAt: Date.now() };
+  return nonce;
+}
+
+/**
+ * Consume the outstanding challenge if `nativeUrl`/`nonce` answer it.
+ *
+ * One-shot regardless of outcome: a wrong or expired answer also clears the
+ * outstanding challenge, so a hostile page cannot use a rejected guess to
+ * keep probing against the same live challenge.
+ *
+ * Returns the challenge's own recorded URL on success — never the caller's
+ * `nativeUrl` or any page-supplied value — so downstream injection is keyed
+ * on a URL this module captured itself, not one echoed back by the page.
+ */
+function consumeUrlVerificationChallenge(nativeUrl: string, nonce: unknown): string | null {
+  const challenge = outstandingChallenge;
+  outstandingChallenge = null;
+
+  if (!challenge) {
+    return null;
+  }
+  const expired = Date.now() - challenge.issuedAt > URL_VERIFICATION_CHALLENGE_TTL_MS;
+  const matches = !expired && challenge.url === nativeUrl && challenge.nonce === nonce;
+  return matches ? challenge.url : null;
+}
+
+/** Test-only reset for the module-level challenge state. */
+export function __resetLoginChallengeStateForTests(): void {
+  outstandingChallenge = null;
+}
 
 /**
  * Write the login preferences that nothing reads.
@@ -95,7 +167,28 @@ async function recordUnreadLoginMetadata({
   }
 }
 
-export async function handleLoginMessage(raw: string, deps: LoginMessageDeps): Promise<void> {
+/**
+ * Handle one `postMessage` from the login WebView.
+ *
+ * @param raw - The message body, `event.nativeEvent.data`. Page-supplied and
+ *   untrusted — parsed but never used for a security decision.
+ * @param nativeEventUrl - `event.nativeEvent.url`, the URL the WebView
+ *   itself reports the sending frame as being on. This is the trust signal:
+ *   unlike anything inside `raw`, the page cannot set it. Every message is
+ *   gated on this being the trusted login origin before any of it is acted
+ *   on.
+ * @param deps - The component's seams; see `LoginMessageDeps`.
+ */
+export async function handleLoginMessage(
+  raw: string,
+  nativeEventUrl: string,
+  deps: LoginMessageDeps
+): Promise<void> {
+  if (!isTrustedLoginUrl(nativeEventUrl)) {
+    console.warn('Ignoring WebView message from untrusted origin:', nativeEventUrl);
+    return;
+  }
+
   try {
     const data = JSON.parse(raw);
 
@@ -110,14 +203,24 @@ export async function handleLoginMessage(raw: string, deps: LoginMessageDeps): P
     }
 
     if (data.type === 'URL_CHECK') {
-      // The verification script itself stays in the component: it is a
-      // WebView concern, and its only observable effect is the ref call.
-      deps.injectUrlVerification(data.url);
+      // `nativeEventUrl`, not `data.url`: the WebView already told us where
+      // this message came from, and it is what the challenge is recorded
+      // against. The verification script itself stays in the component — it
+      // is a WebView concern, and its only observable effect is the ref call.
+      const nonce = issueUrlVerificationChallenge(nativeEventUrl);
+      deps.injectUrlVerification(nativeEventUrl, nonce);
       return;
     }
 
     if (data.type === 'URL_VERIFIED') {
-      deps.injectPageSpecificJavaScript(data.url);
+      const verifiedUrl = consumeUrlVerificationChallenge(nativeEventUrl, data.nonce);
+      if (!verifiedUrl) {
+        console.warn('Ignoring URL_VERIFIED message with no matching outstanding challenge');
+        return;
+      }
+      // The challenge's own recorded URL, not `data.url` — see
+      // `consumeUrlVerificationChallenge`.
+      deps.injectPageSpecificJavaScript(verifiedUrl);
       return;
     }
 

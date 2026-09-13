@@ -8,6 +8,7 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 import { Colors } from '@/constants/Colors';
 import { config } from '@/src/config';
 import { handleLoginMessage } from '@/src/api/loginMessageHandler';
+import { getLoginOrigin, matchesExactPath } from '@/src/api/loginOrigin';
 
 type LoginWebViewProps = {
   visible: boolean;
@@ -99,7 +100,12 @@ export default function LoginWebView({
       return;
     }
 
-    if (url.includes('member-dash.php')) {
+    // Exact origin + path, not `url.includes(...)`: a substring match lets
+    // `https://host/x?q=member-dash.php` through. `url` here is already the
+    // app-recorded, challenge-verified URL from `handleLoginMessage` — never
+    // a page-supplied one — but the exact-path check stays a second,
+    // independent gate rather than trusting that alone.
+    if (matchesExactPath(url, config.api.endpoints.memberDashboard)) {
       processedUrlsRef.current.add(urlKey);
 
       if (webViewRef.current) {
@@ -151,7 +157,7 @@ export default function LoginWebView({
           })();
         `);
       }
-    } else if (url.includes('visitor.php')) {
+    } else if (matchesExactPath(url, config.api.endpoints.visitor)) {
       processedUrlsRef.current.add(urlKey);
 
       console.log('Visitor mode detected in WebView at URL:', url);
@@ -201,9 +207,12 @@ export default function LoginWebView({
   }, []);
 
   // The WebView asks the page to confirm it is still on `url` before anything
-  // is injected into it. Kept here rather than in the handler module: it is
-  // the one branch whose entire effect is a ref call.
-  const injectUrlVerification = useCallback((url: string) => {
+  // is injected into it, embedding the app-issued `nonce` so the reply can be
+  // tied back to this specific challenge (see `loginMessageHandler.ts`'s
+  // `issueUrlVerificationChallenge`/`consumeUrlVerificationChallenge`) rather
+  // than accepted on receipt alone. Kept here rather than in the handler
+  // module: it is the one branch whose entire effect is a ref call.
+  const injectUrlVerification = useCallback((url: string, nonce: string) => {
     if (!webViewRef.current) {
       return;
     }
@@ -213,7 +222,8 @@ export default function LoginWebView({
                 if (window.location.href === ${JSON.stringify(url)}) {
                   window.ReactNativeWebView.postMessage(JSON.stringify({
                     type: 'URL_VERIFIED',
-                    url: window.location.href
+                    url: window.location.href,
+                    nonce: ${JSON.stringify(nonce)}
                   }));
                 } else {
                   console.warn('URL changed during load, skipping injection');
@@ -231,7 +241,10 @@ export default function LoginWebView({
   // need this component's refs and modal, passed in as seams.
   const handleWebViewMessage = useCallback(
     async (event: WebViewMessageEvent) => {
-      await handleLoginMessage(event.nativeEvent.data, {
+      // `event.nativeEvent.url` is the WebView's own report of which frame
+      // sent this message — the trust signal `handleLoginMessage` gates on.
+      // It is never the page-supplied `data.url` inside `event.nativeEvent.data`.
+      await handleLoginMessage(event.nativeEvent.data, event.nativeEvent.url, {
         onLoginSuccess,
         onLoginCancel,
         clearProcessedUrls: () => processedUrlsRef.current.clear(),
@@ -298,12 +311,42 @@ export default function LoginWebView({
           style={{ flex: 1 }}
           javaScriptEnabled={true}
           domStorageEnabled={true}
+          // Load-bearing: this is how the app captures the real Flying
+          // Saucer session cookie iOS's WebKit puts in the shared cookie
+          // store, which is the entire point of this WebView. Without it the
+          // injected script's `document.cookie` read comes back empty.
           sharedCookiesEnabled={true}
-          thirdPartyCookiesEnabled={true}
-          originWhitelist={['https://*.beerknurd.com']}
+          // The login flow is entirely same-origin (kiosk, member-dash and
+          // visitor all resolve under `config.api.baseUrl` — see
+          // `src/api/loginOrigin.ts`), with no cross-site iframes or
+          // requests in it. `thirdPartyCookiesEnabled` governs cookies set
+          // by a DIFFERENT origin than the top-level page, which this flow
+          // never involves, so disabling it should not affect login.
+          //
+          // Android-only prop (`@platform android` in WebViewTypes.d.ts), so
+          // it is inert on the current iOS-only ship target — kept set
+          // correctly for whenever Android is revived. Verify login on a real
+          // Android device at that point; it has never been exercised there.
+          thirdPartyCookiesEnabled={false}
+          // Narrowed from `https://*.beerknurd.com`: every URL the login
+          // flow itself navigates to (kiosk, member-dash, visitor) resolves
+          // under this one origin (`config.api.baseUrl`), so the wildcard
+          // bought no functionality, only a larger set of subdomains this
+          // WebView would render. This is defense in depth, not the primary
+          // control — `originWhitelist` pattern matching is a regex PREFIX
+          // test with no end anchor (`react-native-webview`'s
+          // `WebViewShared.tsx`), so it cannot fully rule out a host merely
+          // prefixed by this origin. The real boundary is the app-side
+          // `isTrustedLoginUrl` check in `loginMessageHandler.ts`, which
+          // compares parsed `URL#origin` values exactly.
+          originWhitelist={[getLoginOrigin()]}
           allowsInlineMediaPlayback={true}
           mediaPlaybackRequiresUserAction={false}
           applicationNameForUserAgent="BeerSelector/1.0"
+          // Required for `sharedCookiesEnabled` / persistent session capture
+          // above to mean anything: `incognito={true}` would use an
+          // ephemeral session that does not share cookies with the rest of
+          // the app.
           incognito={false}
           scalesPageToFit={true}
           scrollEnabled={true}
@@ -311,7 +354,12 @@ export default function LoginWebView({
           allowsBackForwardNavigationGestures={false}
           androidLayerType="hardware"
           cacheEnabled={true}
-          cacheMode="LOAD_CACHE_ELSE_NETWORK"
+          // Was `LOAD_CACHE_ELSE_NETWORK` (Android-only): preferring a cached
+          // response on a credential-entry page risks serving a stale login
+          // form or CSRF token instead of the current one. The login flow is
+          // a handful of small requests, not heavy assets, so there is no
+          // performance case for preferring cache over network here. Default
+          // (`LOAD_DEFAULT`) lets normal HTTP caching semantics apply.
           startInLoadingState={true}
           renderLoading={() => (
             <View style={[styles.webViewLoadingContainer, { backgroundColor: colors.background }]}>
