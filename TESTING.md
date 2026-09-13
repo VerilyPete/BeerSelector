@@ -1,129 +1,31 @@
-# TESTING.md
+# Testing
 
-Refer to this file when writing tests, debugging test failures, or setting up test infrastructure.
+## Native app
 
-## Testing Strategy
+Use Xcode 26.3 and an isolated simulator, never a personal device or live account for automated tests:
 
-- **Jest**: Unit tests only (functions, utilities, pure logic)
-- **Maestro/Flashlight**: ALL integration and E2E tests
-- **DO NOT** use Jest for integration tests - React Native environment causes timeouts
-- **DO NOT** write unit tests for React Native hooks using `renderHook()` - they hang
+~~~sh
+sh native-ios/ci_scripts/ci_post_clone.sh
+BEERSELECTOR_TEST_DESTINATION='platform=iOS Simulator,name=iPhone 17 Pro' sh native-ios/Scripts/run-tests.sh
+python3 native-ios/Scripts/test-cloud-configuration.py
+~~~
 
-## Test Organization
+The All plan covers native unit, network, account-safety, persistence, and legacy-upgrade behavior. Performance has its own plan and scheme; see [PHONE-TESTS.md](native-ios/Docs/PHONE-TESTS.md). Legacy schema-v8 fixtures remain in the native suite even though the Expo source is retired.
 
-- `__tests__/` - Component snapshot tests
-- `src/api/__tests__/` - API service tests
-- `src/database/__tests__/` - Database operation tests
-- `src/services/__tests__/` - Service function tests (unit tests only)
-- `context/__tests__/` - Context and state management tests
+GitHub Actions runs the native All plan and Cloud configuration tests on macOS with Xcode 26.3. Its required job retains the name **Jest Unit Tests** solely because main branch protection requires that exact GitHub Actions context. It executes Swift/Python, not Jest. Rename the job and protection together in a separate change after the replacement has passed remotely. No protection was weakened by this cleanup.
 
-## Safe Patterns (Use Jest)
+Xcode Cloud's Native External Beta workflow tests and archives main changes for external TestFlight distribution. The older Native Correctness workflow is scoped to the migration branch; GitHub's native PR job covers cleanup and future branches.
 
-**Pure Function Tests:**
+## Backend contract compatibility
 
-```typescript
-it('filters beers correctly', () => {
-  const filtered = applyFilters(beers, { style: 'IPA' });
-  expect(filtered).toHaveLength(5);
-});
-```
+~~~sh
+npm ci
+npm test
+npm run typecheck
+~~~
 
-**Database Operations:**
+These commands validate only the retained enrichment contracts. Golden Taproom Contract additionally checks out ufobeer and tests the real worker against the legacy consumer contract. This is backend compatibility coverage; it does not execute the Swift client. Native NetworkTests cover Swift decoding and request behavior.
 
-```typescript
-it('inserts beer into database', async () => {
-  await beerRepository.insertBeer(mockBeer);
-  const result = await beerRepository.getBeer(mockBeer.id);
-  expect(result).toEqual(mockBeer);
-});
-```
+## Device checks
 
-**API Service Tests:**
-
-```typescript
-it('fetches beers from API', async () => {
-  mockFetch.mockResolvedValue({ json: () => mockBeers });
-  const result = await beerApi.getBeers();
-  expect(result).toEqual(mockBeers);
-});
-```
-
-**Simple Components (no RN hook dependencies):**
-
-```typescript
-it('renders beer name', () => {
-  render(<BeerName name="IPA" />);
-  expect(screen.getByText('IPA')).toBeTruthy();
-});
-```
-
-## Unsafe Patterns (Will Hang - Use Maestro Instead)
-
-| Pattern                                          | Problem                                  | Fix                               |
-| ------------------------------------------------ | ---------------------------------------- | --------------------------------- |
-| `renderHook()` with RN context                   | Alert, Appearance, NetInfo never resolve | Test through component or Maestro |
-| Components with `useThemeColor`/`useColorScheme` | Even mocked, causes hangs                | Migrate to Maestro E2E            |
-| Performance/Profiler tests                       | Profiler API doesn't work in jsdom       | Use Maestro/Flashlight            |
-| Fake timers + renderHook + RN hook               | Timer + hook combination hangs           | Test timer logic separately       |
-| Integration tests (multi-async)                  | Too many RN dependencies                 | Use Maestro                       |
-| Native module tests (NetInfo)                    | Requires native runtime                  | Use Maestro E2E                   |
-| WebView tests                                    | Navigation/cookies don't resolve         | Use Maestro E2E                   |
-
-## Prevention Checklist
-
-Before writing a test, ask:
-
-1. **Uses `renderHook()`?** → Does hook use RN context? → Will hang
-2. **Renders component?** → Uses `useThemeColor()`/`useColorScheme()`? → Will hang
-3. **Performance test?** → Measures render times? → Will hang
-4. **Fake timers?** → Combined with renderHook + RN hook? → Will hang
-5. **Integration test?** → Multiple async ops in RN context? → Will hang
-
-## Quick Reference
-
-| Test Type                  | Jest | Maestro |
-| -------------------------- | ---- | ------- |
-| Pure functions             | ✅   | ❌      |
-| API services               | ✅   | ❌      |
-| Database operations        | ✅   | ❌      |
-| RN hooks (direct)          | ❌   | ✅      |
-| Component integration      | ❌   | ✅      |
-| E2E flows                  | ❌   | ✅      |
-| Performance tests          | ❌   | ✅      |
-| Simple components          | ✅   | ❌      |
-| Theme-dependent components | ❌   | ✅      |
-
-## Mock Strategy
-
-- Expo modules mocked in `__mocks__/` directory
-- SQLite operations mocked in database tests
-- API calls mocked with `jest.fn()`
-- Real data from `allbeers.json` and `mybeers.json` for service-level tests
-
-## Running Tests
-
-Two runners, split by file extension: `.test.ts` is vitest's (logic, node
-environment), `.test.tsx` is jest-expo's (components, renderer). `npx jest` on a
-`.test.ts` matches nothing — `jest.config.js` ignores them all.
-
-```bash
-npm test                 # vitest, watch mode
-npm run test:rn          # jest-expo, watch mode
-npm run test:ci          # both, in sequence, with coverage
-
-# Logic suites (.test.ts -> vitest)
-npx vitest run src/services/__tests__/dataUpdateService.test.ts
-npx vitest run src/utils/__tests__/beerGlassType.test.ts
-
-# Component suites (.test.tsx -> jest-expo)
-npx jest --config=jest.config.js components/beer/__tests__/BeerItem.test.tsx
-```
-
-Check `$?` rather than the summary line: vitest reports every test green and
-still exits non-zero on an unhandled rejection, and `test:ci` chains on `&&`.
-
-## Pre-commit Hook
-
-A Git hook at `.husky/pre-commit` prevents committing new hanging test patterns.
-
-See `JEST_HANGING_TESTS_FINAL_REPORT.md` for detailed analysis of 27 hanging test patterns.
+See [DEVICE-ACCESSIBILITY-CHECKS.md](native-ios/Docs/DEVICE-ACCESSIBILITY-CHECKS.md) for evidence and remaining hands-on work. Simulator tests do not establish physical Live Activity expiry or spoken VoiceOver behavior. Retired Maestro flows targeted the old React UI and are available in Git at daa5456e.
