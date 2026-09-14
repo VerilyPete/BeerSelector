@@ -26,6 +26,30 @@ final class RecommendationIntegrationTests: XCTestCase {
         defer { fixture.handler = nil; try? credentials.clear(); try? FileManager.default.removeItem(at:folder) }
         try await body(model,db,fixture)
     }
+    @MainActor func testTextRequestWaitsForGenerationAndReportsUninterpretedFallback() async throws {
+        try await withModel { model,_,_ in
+            let fake = FakeProvider()
+            fake.action = { throw URLError(.notConnectedToInternet) }
+            let controller = RecommendationController(model:model,provider:fake)
+            controller.setPreferences(.init(request:"crisp and refreshing"))
+            XCTAssertEqual(fake.calls,0)
+            await controller.generate()
+            XCTAssertFalse(controller.usedModel)
+            XCTAssertEqual(controller.suggestions.map(\.id),["new"])
+            XCTAssertTrue(controller.message?.contains("couldn’t interpret") == true)
+            controller.setPreferences(.init(request:"IPA"))
+            XCTAssertTrue(controller.suggestions.isEmpty)
+            XCTAssertEqual(fake.calls,1)
+            await controller.generate()
+            XCTAssertEqual(controller.suggestions.map(\.id),["new"])
+            XCTAssertNil(controller.message,"Simple style filters work without AI")
+            controller.setPreferences(.init(request:"stout"))
+            await controller.generate()
+            XCTAssertTrue(controller.suggestions.isEmpty)
+            XCTAssertEqual(fake.calls,2,"No eligible style match must not invoke AI or widen filters")
+        }
+    }
+
     @MainActor func testFirstRefreshArchivesPreviousRoundBeforeEmptyReplacement() async throws {
         try await withModel { model,db,_ in
             var old = Beer(id:"old",name:"Old beer"); old.roh_lap = "7"; old.tasted_date = "09/12/2026"

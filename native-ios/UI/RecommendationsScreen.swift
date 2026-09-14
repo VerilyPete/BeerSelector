@@ -55,7 +55,8 @@ struct RecommendationsScreen: View {
                     Text("Recent history stays on this device and survives a new UFO round. Clear it in Settings. Signing out removes it.")
                         .font(Robo.mono(10)).foregroundStyle(QueueChrome.secondary)
                 }.padding(18).frame(maxWidth:760).frame(maxWidth:.infinity)
-            }.background(Robo.background).foregroundStyle(QueueChrome.text)
+            }.scrollDismissesKeyboard(.interactively)
+                .background(Robo.background).foregroundStyle(QueueChrome.text)
                 .safeAreaInset(edge:.bottom) {
                     if !controller.suggestions.isEmpty {
                         VStack(spacing:8) {
@@ -152,10 +153,51 @@ private struct SuggestionPreferenceControls: View {
             Picker("ABV",selection:$preferences.abv) {
                 ForEach(SuggestionABV.allCases,id:\.self) { Text($0.rawValue).tag($0) }
             }.pickerStyle(.segmented).accessibilityIdentifier("suggestion-abv")
+            SuggestionRequestField(preferences:$preferences)
             Text("Lower and higher compare known ABVs among matching beers. Unknown ABVs are omitted unless you choose Any.")
                 .font(Robo.mono(10)).foregroundStyle(QueueChrome.secondary)
                 .fixedSize(horizontal:false,vertical:true)
         }.padding(14).background(QueueChrome.background,in:RoundedRectangle(cornerRadius:16))
             .tint(QueueChrome.cyan)
+    }
+}
+
+// A nominal view keeps the Settings-era generic metadata failure pattern out
+// of the preference card as its controls grow.
+private struct SuggestionRequestField: View {
+    @FocusState private var editing: Bool
+    @Binding var preferences: SuggestionPreferences
+    private let examples = ["IPA", "Stout", "Crisp and refreshing", "Malty and smooth", "Something adventurous"]
+    var body: some View {
+        VStack(alignment:.leading,spacing:10) {
+            Text("Style or mood (optional)").font(Robo.mono(12)).foregroundStyle(QueueChrome.text)
+            TextField("IPA, dry stout, crisp and refreshing…",text:$preferences.request)
+                .font(Robo.mono(13)).padding(10)
+                .background(Robo.background,in:RoundedRectangle(cornerRadius:8))
+                .autocorrectionDisabled().submitLabel(.done).focused($editing)
+                .onSubmit { editing = false }
+                .accessibilityLabel("Style or mood")
+                .accessibilityIdentifier("suggestion-request")
+            ScrollView(.horizontal,showsIndicators:false) {
+                HStack(spacing:8) {
+                    ForEach(examples,id:\.self) { example in
+                        Button(example) { editing = false; preferences.request = example }
+                            .font(Robo.mono(11)).padding(.horizontal,10).padding(.vertical,8)
+                            .background(Robo.background,in:Capsule()).buttonStyle(.plain)
+                    }
+                }
+            }
+            if !preferences.request.isEmpty {
+                Text(preferences.styleRequest.summary)
+                    .font(Robo.mono(10)).foregroundStyle(QueueChrome.secondary)
+                    .fixedSize(horizontal:false,vertical:true)
+                    .accessibilityIdentifier("suggestion-request-interpretation")
+                Button("Clear style or mood") { editing = false; preferences.request = "" }
+                    .font(Robo.mono(11))
+            }
+            Text("Style names filter the taplist. Other wording guides Apple Intelligence. Up to 160 characters.")
+                .font(Robo.mono(10)).foregroundStyle(QueueChrome.secondary)
+                .fixedSize(horizontal:false,vertical:true)
+        }
     }
 }

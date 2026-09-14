@@ -6,12 +6,17 @@ appId: org.verily.FSbeerselector
 - assertVisible: Find suggestions
 - assertNotVisible:
     id: recommendation-select-5
+- scrollUntilVisible:
+    element:
+      id: recommendation-generate
+    direction: DOWN
 - tapOn:
     id: recommendation-generate
-- extendedWaitUntil:
-    visible:
+- scrollUntilVisible:
+    element:
       id: recommendation-select-5
-    timeout: 15000
+    direction: DOWN
+    centerElement: true
 - tapOn:
     id: recommendation-select-5
 - assertVisible: Add 1 to queue

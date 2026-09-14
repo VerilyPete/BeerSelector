@@ -4,6 +4,10 @@ appId: org.verily.FSbeerselector
 - assertVisible: Find suggestions
 - assertNotVisible:
     id: recommendation-card-2
+- scrollUntilVisible:
+    element:
+      id: suggestion-container
+    direction: UP
 - tapOn:
     id: suggestion-container
 - tapOn: Bottles only
@@ -11,10 +15,22 @@ appId: org.verily.FSbeerselector
 - assertVisible: Find suggestions
 - assertNotVisible:
     id: recommendation-card-2
+- scrollUntilVisible:
+    element:
+      id: recommendation-generate
+    direction: DOWN
 - tapOn:
     id: recommendation-generate
+- scrollUntilVisible:
+    element:
+      id: recommendation-card-2
+    direction: DOWN
 - assertVisible:
     id: recommendation-card-2
+- scrollUntilVisible:
+    element:
+      id: suggestion-container
+    direction: UP
 - tapOn:
     id: suggestion-container
 - tapOn: Draft only
@@ -22,8 +38,16 @@ appId: org.verily.FSbeerselector
 - assertVisible: Find suggestions
 - assertNotVisible:
     id: recommendation-card-3
+- scrollUntilVisible:
+    element:
+      id: recommendation-generate
+    direction: DOWN
 - tapOn:
     id: recommendation-generate
+- scrollUntilVisible:
+    element:
+      id: recommendation-card-3
+    direction: DOWN
 - assertVisible:
     id: recommendation-card-3
 - assertNotVisible:

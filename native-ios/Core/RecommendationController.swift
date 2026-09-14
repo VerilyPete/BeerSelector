@@ -102,7 +102,7 @@ struct RecommendationSnapshot: Equatable {
                 candidates += fallback.filter { !unseenIDs.contains($0.id) }.prefix(3-candidates.count)
             }
         }
-        guard !candidates.isEmpty else { message = "No eligible beers match these preferences. Try another container or ABV preference."; return }
+        guard !candidates.isEmpty else { message = "No eligible beers match these preferences. Try adjusting your style request, container, or ABV preference."; return }
         let provider = provider
         // Preview is deterministic and never invokes a model or a network write.
         let shortlist = candidates
@@ -122,7 +122,12 @@ struct RecommendationSnapshot: Equatable {
         }
         if let ids, let ranked = RecommendationRules.choose(ids:ids,from:candidates) {
             suggestions = ranked; usedModel = true
-        } else { suggestions = Array(candidates.prefix(3)); usedModel = false }
+        } else {
+            suggestions = Array(candidates.prefix(3)); usedModel = false
+            if preferences.styleRequest.needsModel {
+                message = "Local matching applied your filters, but couldn’t interpret the additional style or mood wording. Try a simple style such as IPA or stout."
+            }
+        }
         if let account = model.recommendationAccount {
             let choice = BeerChoiceContext(taplist:current.taplist,shown:suggestions.map(\.id),preferences:preferences,usedModel:usedModel,taplistValidation:current.taplistValidation)
             do { try model.db?.saveChoicePresentation(choice,account:account); choiceID = choice.id }

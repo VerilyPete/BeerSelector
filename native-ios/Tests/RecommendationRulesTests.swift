@@ -5,6 +5,50 @@ final class RecommendationRulesTests: XCTestCase {
     private func beer(_ id: String, style: String = "", brewer: String = "") -> Beer {
         var b = Beer(id:id,name:"Beer \(id)"); b.brew_style = style; b.brewer = brewer; return b
     }
+    func testStyleRequestsFilterFamiliesAndNegationWithoutNameMatches() throws {
+        func selection(_ text: String) throws -> SuggestionPreferences {
+            let data = try JSONSerialization.data(withJSONObject:["container":"Any","abv":"Any","request":text])
+            return try JSONDecoder().decode(SuggestionPreferences.self,from:data)
+        }
+        let beers = [beer("ipa",style:"American IPA"),beer("hazy",style:"New England India Pale Ale"),
+                     beer("stout",style:"Imperial Stout"),beer("porter",style:"Porter"),beer("unknown")]
+        XCTAssertEqual(try selection("IPA").candidates(from:beers).map(\.id),["ipa","hazy"])
+        XCTAssertEqual(try selection("IPA, not hazy").candidates(from:beers).map(\.id),["ipa"])
+        XCTAssertEqual(try selection("hazy IPA").candidates(from:beers + [beer("pale",style:"Hazy Pale Ale")]).map(\.id),["hazy"])
+        XCTAssertEqual(try selection("stout").candidates(from:beers).map(\.id),["stout"])
+        XCTAssertEqual(try selection("no stout or porter").candidates(from:beers).map(\.id),["ipa","hazy"])
+        XCTAssertEqual(try selection("stout or porter").candidates(from:beers).map(\.id),["stout","porter"])
+        XCTAssertEqual(try selection("pilsner").candidates(from:beers).count,0)
+        XCTAssertEqual(try selection("something like an IPA but lighter").candidates(from:beers).count,5,
+                       "Comparisons are model preferences, not silently converted to strict style filters")
+    }
+
+    func testStyleRequestSurvivesEveryPromptTierAndLegacyPreferencesDecode() throws {
+        let old = try JSONDecoder().decode(SuggestionPreferences.self,from:Data(#"{"container":"Draft only","abv":"Lower"}"#.utf8))
+        XCTAssertEqual(old.container,.draft)
+        XCTAssertEqual(old,SuggestionPreferences(container:.draft,abv:.lower))
+        let selection = try JSONDecoder().decode(SuggestionPreferences.self,from:Data(#"{"container":"Any","abv":"Any","request":"crisp and refreshing"}"#.utf8))
+        let full = try RecommendationModelInput.prompt(history:[],candidates:[],feedback:[],preferences:selection)
+        XCTAssertTrue(full.contains("crisp and refreshing"))
+        for lean in [false,true] {
+            let prompt = try RecommendationPromptBudget.compact(history:[],candidates:[],feedback:[],preferences:selection,context:[],lean:lean)
+            XCTAssertTrue(prompt.contains("crisp and refreshing"))
+        }
+    }
+
+    func testStyleRequestCannotOverrideFeedbackRepeatsOrContainerAndIsBounded() {
+        var recent = beer("recent",style:"IPA",brewer:"Brewery")
+        recent.brew_container = "Draft"
+        var disliked = beer("disliked",style:"IPA"); disliked.brew_container = "Draft"
+        var bottle = beer("bottle",style:"IPA"); bottle.brew_container = "Bottle"
+        let preferences = SuggestionPreferences(container:.draft,request:"IPA")
+        XCTAssertTrue(RecommendationRules.eligible(taplist:[recent,disliked,bottle],history:[recent],excluded:[],feedback:[BeerFeedback(beer:disliked,rating:.notForMe)],preferences:preferences).isEmpty)
+        XCTAssertEqual(SuggestionPreferences(request:String(repeating:"x",count:500)).request.count,160)
+        XCTAssertTrue(SuggestionPreferences(request:"IPA, not hazy").styleRequest.summary.contains("Exclude: Hazy"))
+        XCTAssertFalse(SuggestionPreferences(request:"IPA").styleRequest.needsModel)
+        XCTAssertTrue(SuggestionPreferences(request:"something like an IPA").styleRequest.needsModel)
+    }
+
     func testChoicePromptIsBoundedAndOmitsPrivateUpstreamMetadata() throws {
         var beer = Beer(id:"1",name:"Beer"); beer.chit_code = "PRIVATE-RECEIPT"
         beer.brew_description = "PRIVATE-DESCRIPTION"; beer.brew_style = "IPA"

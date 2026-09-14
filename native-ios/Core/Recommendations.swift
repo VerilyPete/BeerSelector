@@ -14,6 +14,23 @@ enum SuggestionABV: String, CaseIterable, Codable {
 struct SuggestionPreferences: Equatable, Codable {
     var container: SuggestionContainer = .any
     var abv: SuggestionABV = .any
+    // Optional storage preserves choice contexts saved before text requests existed.
+    private var requestText: String? = nil
+    var request: String {
+        get { requestText ?? "" }
+        set { requestText = newValue.isEmpty ? nil : String(newValue.prefix(160)) }
+    }
+    init(container: SuggestionContainer = .any, abv: SuggestionABV = .any, request: String = "") {
+        self.container = container; self.abv = abv; self.request = request
+    }
+    enum CodingKeys: String, CodingKey { case container, abv; case requestText = "request" }
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy:CodingKeys.self)
+        container = try values.decode(SuggestionContainer.self,forKey:.container)
+        abv = try values.decode(SuggestionABV.self,forKey:.abv)
+        request = try values.decodeIfPresent(String.self,forKey:.requestText) ?? ""
+    }
+    var styleRequest: SuggestionStyleRequest { SuggestionStyleRequest(request) }
     func allows(_ beer: Beer) -> Bool {
         let container = beer.brew_container.lowercased()
         switch self.container {
@@ -23,7 +40,8 @@ struct SuggestionPreferences: Equatable, Codable {
         }
     }
     func candidates(from beers: [Beer]) -> [Beer] {
-        let matching = beers.filter(allows)
+        let style = styleRequest
+        let matching = beers.filter { allows($0) && style.allows($0) }
         guard abv != .any else { return matching }
         let known = matching.filter { $0.abv.map { $0.isFinite && $0 >= 0 } == true }.sorted {
             if $0.abv == $1.abv { return $0.id < $1.id }
@@ -35,6 +53,73 @@ struct SuggestionPreferences: Equatable, Codable {
         return Array(known.prefix(max(3,(known.count+1)/2)))
     }
 }
+/// Deliberately small grammar: exact style names, alternatives, and explicit
+/// exclusions. Comparisons and unknown wording stay model preferences, not guesses.
+struct SuggestionStyleRequest {
+    private struct Style {
+        let label: String
+        let aliases: [String]
+        let pattern: String
+    }
+    private static let styles: [Style] = [
+        .init(label:"IPA",aliases:["ipa","ipas","india pale ale"],pattern:#"\b(?:ipas?|india pale ale|neipa|dipa)\b"#),
+        .init(label:"Stout",aliases:["stout","stouts"],pattern:#"\bstouts?\b"#),
+        .init(label:"Porter",aliases:["porter","porters"],pattern:#"\bporters?\b"#),
+        .init(label:"Lager",aliases:["lager","lagers"],pattern:#"\b(?:lager|pilsner|pilsener|helles|bock|marzen|märzen|schwarzbier)\b"#),
+        .init(label:"Pilsner",aliases:["pilsner","pils","pilsener"],pattern:#"\b(?:pilsner|pilsener|pils)\b"#),
+        .init(label:"Wheat",aliases:["wheat","wheat beer","hefeweizen","witbier"],pattern:#"\b(?:wheat|hefeweizen|weissbier|witbier)\b"#),
+        .init(label:"Sour",aliases:["sour","sours"],pattern:#"\b(?:sour|gose|lambic|gueuze|berliner weisse)\b"#),
+        .init(label:"Saison",aliases:["saison","saisons"],pattern:#"\bsaison\b"#),
+        .init(label:"Pale ale",aliases:["pale ale"],pattern:#"^(?!.*\b(?:india|ipa)\b).*\bpale ale\b"#),
+        .init(label:"Amber ale",aliases:["amber","amber ale"],pattern:#"\bamber\b"#),
+        .init(label:"Brown ale",aliases:["brown","brown ale"],pattern:#"\bbrown\b"#),
+        .init(label:"Hazy",aliases:["hazy"],pattern:#"\b(?:hazy|new england|neipa)\b"#),
+        .init(label:"Hazy IPA",aliases:["hazy ipa","new england ipa","neipa"],pattern:#"^(?=.*\b(?:hazy|new england|neipa)\b)(?=.*\b(?:ipa|india pale ale|neipa)\b).*"#),
+        .init(label:"Double IPA",aliases:["double ipa","imperial ipa","dipa"],pattern:#"\b(?:(?:double|imperial) (?:ipa|india pale ale)|dipa)\b"#),
+        .init(label:"Dry stout",aliases:["dry stout","irish stout"],pattern:#"\b(?:dry|irish).*\bstout\b"#),
+        .init(label:"Imperial stout",aliases:["imperial stout"],pattern:#"\bimperial.*\bstout\b"#)
+    ]
+    private var included: [Style] = []
+    private var excluded: [Style] = []
+    private(set) var needsModel = false
+    var hasFilters: Bool { !included.isEmpty || !excluded.isEmpty }
+    var summary: String {
+        var parts: [String] = []
+        if !included.isEmpty { parts.append("Style: " + included.map(\.label).joined(separator:" or ")) }
+        if !excluded.isEmpty { parts.append("Exclude: " + excluded.map(\.label).joined(separator:", ")) }
+        if needsModel { parts.append("Additional wording: Apple Intelligence preference") }
+        return parts.joined(separator:" · ")
+    }
+    init(_ text: String) {
+        let normalized = text.lowercased().trimmingCharacters(in:.whitespacesAndNewlines)
+            .replacingOccurrences(of:#"\s+"#,with:" ",options:.regularExpression)
+            .replacingOccurrences(of:#"\s+(?:but )?(?=not |no |without |exclude )"#,with:",",options:.regularExpression)
+        guard !normalized.isEmpty else { return }
+        var negative = false
+        for raw in normalized.components(separatedBy:",") {
+            var clause = raw.trimmingCharacters(in:.whitespacesAndNewlines)
+            if let prefix = ["not ","no ","without ","exclude "].first(where:{ clause.hasPrefix($0) }) {
+                negative = true; clause.removeFirst(prefix.count)
+            } else { negative = false }
+            let alternatives = clause.replacingOccurrences(of:" or ",with:"|").components(separatedBy:"|")
+            // Resolve the entire clause before applying it, so partial recognition
+            // cannot turn "IPA or something refreshing" into an IPA-only search.
+            let matches = alternatives.compactMap { value in
+                Self.styles.first { $0.aliases.contains(value.trimmingCharacters(in:.whitespacesAndNewlines)) }
+            }
+            guard matches.count == alternatives.count else { needsModel = true; continue }
+            if negative { excluded += matches } else { included += matches }
+        }
+    }
+    func allows(_ beer: Beer) -> Bool {
+        guard hasFilters else { return true }
+        let style = beer.brew_style.lowercased().trimmingCharacters(in:.whitespacesAndNewlines)
+        guard !style.isEmpty else { return false } // Unknown style cannot establish a match or exclusion.
+        func matches(_ rule: Style) -> Bool { style.range(of:rule.pattern,options:.regularExpression) != nil }
+        return (included.isEmpty || included.contains(where:matches)) && !excluded.contains(where:matches)
+    }
+}
+
 enum RecommendationRules {
     private static func beerIdentity(_ beer: Beer) -> String? {
         func normalized(_ value: String) -> String {

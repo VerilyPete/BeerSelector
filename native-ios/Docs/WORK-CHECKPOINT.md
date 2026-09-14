@@ -1,3 +1,11 @@
+## Style or mood requests — September 14, 2026
+
+Suggestions now has an optional 160-character Style or mood field, editable example chips, a clear action, and a visible interpretation before Find suggestions. Simple style names, alternatives (`stout or porter`), and exclusions (`IPA, not hazy`) filter the live eligible pool locally before relative ABV selection. Unknown style metadata is omitted when a style filter is active. More complex wording is passed as a taste preference to Apple Intelligence; local fallback explicitly reports when it could not interpret that wording. Editing never initiates generation and invalidates old cards through the existing preference path. Repeats, dislikes, container constraints, and submission revalidation remain enforced.
+
+Requests survive all prompt tiers and saved choice contexts; pre-feature contexts decode with an empty request. The lean model input retains candidate names for nuanced requests. Input remains untrusted data; prompt budgets still account for instructions, schema, and output without dropping the last 100 tasting observations.
+
+Validation: regression tests failed before implementation (`/private/tmp/style-request-red.xcresult`). Final full suite passed 182 tests with zero skips (`/private/tmp/style-request-verified.xcresult`). The typed-stout and mood-fallback simulator flow passed (`/private/tmp/style-request-ui-final.log`); visual review captured `/private/tmp/style-request-ui-reviewed.png`. Existing container/ABV and multi-selection/confirmation flows also passed (`/private/tmp/style-request-preferences-ui.log`, `/private/tmp/style-request-selection-ui.log`). This change has not yet been exercised with real Apple Intelligence on an iPhone. Local parser recognition is intentionally limited to supported style phrases; the interpretation distinguishes other wording as a model preference.
+
 ## iPhone validation — September 14, 2026
 
 User confirmed the preference-first suggestion flow and Home chrome changes work on their iPhone, including suggestions using Apple Intelligence. Their device testing covered the Apple Intelligence path only; this does not establish device fallback-path coverage or a comprehensive recommendation-quality assessment.
