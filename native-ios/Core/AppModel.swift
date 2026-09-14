@@ -5,6 +5,61 @@ import WebKit
 @MainActor
 final class AppModel: ObservableObject {
     @Published var session: MemberSession?
+    @Published var beerFeedback: [BeerFeedback] = []
+    @Published var recentTastings: [Beer] = []
+    @Published var showRecommendations = false
+    lazy var recommendations = RecommendationController(model:self)
+    private var taplistValidation: UUID?
+    private var tastingValidation: UUID?
+    private var queueValidation: UUID?
+    var recommendationAccount: String? {
+        guard isMember, let member = session else { return nil }
+        // Member IDs are not proven globally unique across Saucer locations.
+        return (api.configuration.baseURL.host ?? "") + ":" + member.identity
+    }
+    var recommendationSnapshot: RecommendationSnapshot {
+        RecommendationSnapshot(epoch:epoch,identity:session?.identity,offline:offline,
+            taplist:allBeers,history:recentTastings,excluded:recommendationExcludedIDs,feedback:beerFeedback,repeatHistory:tastedBeers,
+            taplistValidation:taplistValidation,tastingValidation:tastingValidation,queueValidation:queueValidation)
+    }
+    var recommendationExcludedIDs: Set<String> {
+        Set(tastedBeers.map(\.id)).union(beerFeedback.filter { $0.rating == .notForMe }.map(\.id)).union(queuedBeerIDs).union(busyIDs)
+            .union(operations.filter { ownsOperation($0) }.compactMap { $0.payload["beerId"] })
+            .union(allBeers.filter { beer in queue.contains { $0.name.localizedCaseInsensitiveContains(beer.brew_name) } }.map(\.id))
+    }
+    func setBeerRating(_ beer: Beer, rating: BeerRating, account: String?) {
+        guard let account, account == recommendationAccount, let db,
+              tastedBeers.contains(where:{ $0.id == beer.id }) || beerFeedback.contains(where:{ $0.id == beer.id }) else { return }
+        do {
+            try db.saveBeerFeedback(BeerFeedback(beer:beer,rating:rating),account:account)
+            beerFeedback = try db.beerFeedback(account:account); recommendations.cancel()
+        } catch { self.error = error.localizedDescription }
+    }
+    func deleteCachedBeerFeedback(account: String?) {
+        guard let account, account == recommendationAccount, let db else { return }
+        do {
+            try db.deleteCachedBeerFeedback(account:account)
+            beerFeedback = try db.beerFeedback(account:account); recommendations.cancel()
+        } catch { self.error = error.localizedDescription }
+    }
+    func clearRecommendationHistory() {
+        guard let db, let account = recommendationAccount else { return }
+        do {
+            try db.transaction { try db.clearRecentTastings(account:account,baseline:tastedBeers) }
+            recentTastings = []; recommendations.cancel()
+        } catch { self.error = error.localizedDescription }
+    }
+    /// A failed source or a queue request already in progress cannot certify freshness.
+    func validateRecommendationSources() async -> Bool {
+        let token = epoch
+        guard isMember, !offline, !previewMode, !processing else { return false }
+        let previousQueue = queueValidation
+        await refresh(requireNewPass:true)
+        guard token == epoch, !Task.isCancelled, !offline, taplistValidation != nil, tastingValidation != nil else { return false }
+        await refreshQueue()
+        return token == epoch && !Task.isCancelled && !offline && !processing && queueError == nil &&
+            !loadingQueue && queueValidation != nil && queueValidation != previousQueue
+    }
     @Published var allBeers: [Beer] = []
     @Published var tastedBeers: [Beer] = []
     @Published var rewards: [Reward] = []
@@ -41,7 +96,7 @@ final class AppModel: ObservableObject {
     var activityUpdate: (@MainActor (MemberSession, [QueueEntry]) async -> Void)?
     var webCookieCleanup: (@MainActor () async -> Void)?
     private let monitor = NWPathMonitor()
-    private var epoch = UUID() { didSet { cancelEnrichmentUpdates(); queueLoaded = false; queueError = nil; loadingQueue = false; rewardsLoaded = false; rewardsError = nil; rewardsNotice = nil } }
+    private var epoch = UUID() { didSet { recommendations.cancel(); recentTastings = []; beerFeedback = []; taplistValidation = nil; tastingValidation = nil; queueValidation = nil; cancelEnrichmentUpdates(); queueLoaded = false; queueError = nil; loadingQueue = false; rewardsLoaded = false; rewardsError = nil; rewardsNotice = nil } }
     @Published private(set) var processing = false
     private var lastFocusRefresh = Date.distantPast
     private var pendingURL: URL?
@@ -134,6 +189,15 @@ final class AppModel: ObservableObject {
     func reload() throws {
         guard let db else { throw BeerError.storage("Database is not open") }
         var failures: [String] = []
+        do {
+            if let account = recommendationAccount {
+                if try db.preference("recent_tastings_owner") == nil {
+                    try db.transaction { try db.recordTastings(db.beers(tasted:true),account:account) }
+                }
+                recentTastings = try db.recentTastings(account:account)
+                beerFeedback = try db.beerFeedback(account:account)
+            } else { recentTastings = []; beerFeedback = [] }
+        } catch { failures.append("Recent tastings: " + error.localizedDescription) }
         do { allBeers = try db.beers() } catch { failures.append("Taplist: " + error.localizedDescription) }
         do { tastedBeers = isMember ? try db.beers(tasted:true) : [] } catch { failures.append("Tastings: " + error.localizedDescription) }
         do {
@@ -184,6 +248,7 @@ final class AppModel: ObservableObject {
     private func performRefresh(token: UUID) async {
         guard token == epoch, !previewMode, let db, configured else { return }
         cancelEnrichmentUpdates()
+        taplistValidation = nil; tastingValidation = nil
         var pendingEnrichment = EnrichmentService.Pending()
         refreshing = true
         rewardsError = nil
@@ -226,6 +291,7 @@ final class AppModel: ObservableObject {
                     if !notModified { try db.replaceBeers(beers); try db.setPreference("native_taplist_etag",etag) }
                     try db.setPreference("last_all_beers_refresh",String(Date().timeIntervalSince1970 * 1000))
                 }
+                taplistValidation = UUID()
                 pendingEnrichment.merge(pending)
             } catch {
                 if Self.isRefreshCancellation(error) { return }
@@ -243,7 +309,17 @@ final class AppModel: ObservableObject {
                     let enriched = await enrichment.enrichWithPending(try BeerAPI.parseBeers(data,tasted:true))
                     let tasted = enriched.beers
                     guard token == epoch else { throw BeerError.changedAccount }
-                    try db.transaction { try db.replaceBeers(tasted,tasted:true); try db.setPreference("last_my_beers_refresh",String(Date().timeIntervalSince1970 * 1000)) }
+                    try db.transaction {
+                        if let account = recommendationAccount {
+                            // Archive the old round before the authoritative empty/new round replaces it.
+                            try db.recordTastings(db.beers(tasted:true),account:account)
+                            try db.observeChoiceTastings(tasted,previous:db.beers(tasted:true),account:account)
+                            try db.recordTastings(tasted,account:account)
+                        }
+                        try db.replaceBeers(tasted,tasted:true)
+                        try db.setPreference("last_my_beers_refresh",String(Date().timeIntervalSince1970 * 1000))
+                    }
+                    tastingValidation = UUID()
                     pendingEnrichment.merge(enriched.pending)
                 } catch {
                     if Self.isRefreshCancellation(error) { return }
@@ -381,6 +457,7 @@ final class AppModel: ObservableObject {
             credentialsCommitted = true
             epoch = UUID()
             try db.transaction {
+                if session?.identity != next.identity { try db.forgetRecentTastings() }
                 if session?.identity != next.identity {
                     try db.execute("DELETE FROM allbeers"); try db.execute("DELETE FROM tasted_brew_current_round"); try db.execute("DELETE FROM rewards")
                 }
@@ -452,33 +529,54 @@ final class AppModel: ObservableObject {
             let (data,_) = try await api.request(api.configuration.endpoint("memberQueues.php"),member:member,cookies:cookies)
             let next = try BeerAPI.parseQueue(data)
             guard token == epoch else { return }
-            queue = next; queueLoaded = true
+            queue = next; queueLoaded = true; queueValidation = UUID()
             queuedBeerIDs = Set(next.compactMap { entry in allBeers.first { entry.name.contains($0.brew_name) || $0.brew_name.contains(entry.name) }?.id })
             if let activityUpdate { await activityUpdate(member,next) }
             else { await liveActivity.update(member:member,queue:next) }
         } catch { if token == epoch, !Diagnostics.isCancellation(error) { queueError = "Couldn’t refresh your queue. Please try again." } }
     }
-    func checkIn(_ beer: Beer) async {
-        guard !previewMode, isMember, let member = session, let db, !busyIDs.contains(beer.id) else { return }
-        guard !tastedBeers.contains(where: { $0.id == beer.id }), !hasSavedCheckIn(beer.id) else { return }
-        busyIDs.insert(beer.id); defer { busyIDs.remove(beer.id) }
-        let payload = ["beerId":beer.id,"beerName":beer.brew_name,"storeId":member.storeId,"storeName":member.storeName,"memberId":member.memberId]
+    @discardableResult func checkIn(_ beer: Beer, recommendation: Bool = false, choiceContextID: String? = nil) async -> CheckInResult {
+        guard !previewMode, isMember, let member = session, let db, !busyIDs.contains(beer.id) else { return .unavailable }
+        guard !tastedBeers.contains(where: { $0.id == beer.id }), !hasSavedCheckIn(beer.id) else { return .unavailable }
+        if recommendation && (offline || processing || recommendationExcludedIDs.contains(beer.id) || !allBeers.contains(where: { $0.id == beer.id })) { return .unavailable }
+        let token = epoch
+        busyIDs.insert(beer.id); defer { if token == epoch { busyIDs.remove(beer.id) } }
+        var payload = ["beerId":beer.id,"beerName":beer.brew_name,"storeId":member.storeId,"storeName":member.storeName,"memberId":member.memberId]
+        if recommendation { payload["recommendation"] = "true" }
+        if let choiceContextID { payload["choiceContextID"] = choiceContextID }
         do {
-            try db.enqueue(type:"CHECK_IN_BEER",payload:payload); try reload()
+            let id: String
+            var manualChoice: BeerChoiceContext?
+            if !recommendation, recommendationAccount != nil {
+                // Capture intent even offline; acknowledgement is recorded only after delivery.
+                var choice = BeerChoiceContext(taplist:allBeers.contains(where:{ $0.id == beer.id }) ? allBeers : allBeers + [beer],shown:[],preferences:.init(),usedModel:false,taplistValidation:taplistValidation)
+                choice.selected = [beer.id]
+                payload["choiceContextID"] = choice.id
+                manualChoice = choice
+            }
+            id = try db.enqueue(type:"CHECK_IN_BEER",payload:payload); try reload()
+            if let choice = manualChoice, let account = recommendationAccount {
+                do { try db.saveChoicePresentation(choice,account:account) }
+                catch { self.error = error.localizedDescription }
+            }
             notice = offline ? "Check-in saved. It will retry when you’re connected." : nil
-            if !offline { await processOperations() }
-        } catch { self.error = error.localizedDescription }
+            if offline { return .savedForRetry }
+            let results = await processOperations(only:recommendation ? id : nil)
+            guard token == epoch else { return .unavailable }
+            return results[id] ?? .savedForRetry
+        } catch { if token == epoch { self.error = error.localizedDescription }; return .failed }
     }
-    func processOperations() async {
-        guard !previewMode, !processing, !offline, isMember, let db else { return }
+    @discardableResult func processOperations(only operationID: String? = nil) async -> [String:CheckInResult] {
+        var results: [String:CheckInResult] = [:]
+        guard !previewMode, !processing, !offline, isMember, let db else { return results }
         processing = true; defer { processing = false }
         let interval = Diagnostics.shared.begin(.queue)
         var outcome = Diagnostics.Outcome.success
         defer { interval.finish(outcome) }
         let token = epoch
         do {
-            for op in try db.operations() where op.status == "pending" {
-                guard !offline, !Task.isCancelled, let member = session, token == epoch else { outcome = .cancelled; return }
+            for op in try db.operations() where op.status == "pending" && (operationID == nil || operationID == op.id) {
+                guard !offline, !Task.isCancelled, let member = session, token == epoch else { outcome = .cancelled; return results }
                 guard try db.operations().contains(where: { $0.id == op.id && $0.status == "pending" }) else { continue }
                 // Never replay a previous account's or location's write under a new session.
                 if let owner = op.payload["memberId"], owner != member.memberId { continue }
@@ -491,16 +589,30 @@ final class AppModel: ObservableObject {
                     let fields = ["chitCode":"\(beerID)-\(member.storeId)-\(member.memberId)","chitBrewId":beerID,"chitBrewName":name,"chitStoreName":member.storeName]
                     let (data,_) = try await api.request(api.configuration.endpoint("addToQueue.php"),method:"POST",fields:fields,member:member,cookies:cookies,retry:false)
                     if let object = try? JSONSerialization.jsonObject(with:data) as? [String:Any], object["success"] as? Bool == false { throw BeerError.invalidResponse(object["error"] as? String ?? "Check-in rejected") }
-                    guard token == epoch else { outcome = .cancelled; return }
+                    if op.payload["recommendation"] == "true",
+                       !String(decoding:data,as:UTF8.self).trimmingCharacters(in:.whitespacesAndNewlines).isEmpty {
+                        guard let object = try? JSONSerialization.jsonObject(with:data) as? [String:Any],
+                              object["success"] as? Bool == true else {
+                            throw BeerError.invalidResponse("Check-in could not be confirmed")
+                        }
+                    }
+                    guard token == epoch else { outcome = .cancelled; return results }
                     try db.execute("DELETE FROM operation_queue WHERE id=?",[op.id])
+                    results[op.id] = .added
+                    if let choiceID = op.payload["choiceContextID"], let account = recommendationAccount {
+                        // A cache failure must never turn a delivered check-in into a retry.
+                        do { try db.updateChoice(id:choiceID,account:account,beerID:beerID,outcome:.added) }
+                        catch { self.error = error.localizedDescription }
+                    }
                     queuedBeerIDs.insert(beerID)
-                    notice = "\(name) has been added to your queue!"
+                    if operationID == nil { notice = "\(name) has been added to your queue!" }
                     UINotificationFeedbackGenerator().notificationOccurred(.success)
                 } catch {
                     outcome = Diagnostics.isCancellation(error) ? .cancelled : .failure
-                    guard token == epoch else { outcome = .cancelled; return }
+                    guard token == epoch else { outcome = .cancelled; return results }
                     // Match the reference: failed check-ins remain pending for up to three retries.
-                    if op.retryCount < 3 {
+                    results[op.id] = .needsReview
+                    if op.retryCount < 3 && op.payload["recommendation"] != "true" {
                         try db.execute("UPDATE operation_queue SET status='pending',retry_count=retry_count+1,error_message=? WHERE id=?",[error.localizedDescription,op.id])
                     } else {
                         try db.execute("UPDATE operation_queue SET status='failed',error_message=? WHERE id=?",[error.localizedDescription,op.id])
@@ -511,7 +623,8 @@ final class AppModel: ObservableObject {
                 if op.retryCount > 0 { try await Task.sleep(for:.seconds(min(pow(2,Double(op.retryCount)),30))) }
             }
             await refreshQueue()
-        } catch { outcome = Diagnostics.isCancellation(error) ? .cancelled : .failure; self.error = error.localizedDescription }
+        } catch { outcome = Diagnostics.isCancellation(error) ? .cancelled : .failure; if token == epoch { self.error = error.localizedDescription } }
+        return results
     }
     func retryOperation(_ id: String) async {
         guard !processing else { return }
@@ -575,6 +688,7 @@ final class AppModel: ObservableObject {
             do { try credentials.clear() } catch { failures.append(error.localizedDescription) }
             await clearWebCookies()
             do {
+                try db?.transaction { try db?.forgetRecentTastings() }
                 try db?.setPreference("is_visitor_mode","false")
                 try db?.setPreference("all_beers_api_url","")
                 try db?.setPreference("my_beers_api_url","")

@@ -26,6 +26,10 @@ extension AppModel {
         queuedBeerIDs = ["1"]
         try reload(); loading = false; showSettings = false
         let arguments = ProcessInfo.processInfo.arguments
+        if arguments.contains("--preview-recommendations") {
+            UserDefaults.standard.set(true,forKey:"recommendations_enabled")
+            showRecommendations = true
+        }
         if arguments.contains("--preview-queue-style") {
             queue = [
                 QueueEntry(id:"q1",name:"Bell's Two Hearted (Draft)",date:"Sep 12, 2026 · 12:51pm"),

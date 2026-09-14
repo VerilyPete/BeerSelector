@@ -77,7 +77,8 @@ final class BeerDatabase {
             try execute("UPDATE operation_queue SET status='pending' WHERE status='retrying'")
             // Credentials are read only from Keychain. Never resurrect the removed plaintext credential preference.
             try execute("DELETE FROM preferences WHERE key='auth_cookies'")
-            try setPreference("native_schema_version", "1")
+            try setupRecentTastings()
+            try setPreference("native_schema_version", "2")
         }
     }
     func beers(tasted: Bool = false) throws -> [Beer] {
@@ -101,8 +102,10 @@ final class BeerDatabase {
             return PendingOperation(id:r["id"] ?? "",type:r["type"] ?? "",payload:dict.mapValues { String(describing:$0) },timestamp:Double(r["timestamp"] ?? "0") ?? 0,retryCount:Int(r["retry_count"] ?? "0") ?? 0,status:r["status"] ?? "pending",error:r["error_message"])
         }
     }
-    func enqueue(type: String, payload: [String: String]) throws {
+    @discardableResult func enqueue(type: String, payload: [String: String]) throws -> String {
+        let id = UUID().uuidString
         let encoded = String(decoding:try JSONEncoder().encode(payload),as:UTF8.self)
-        try execute("INSERT INTO operation_queue(id,type,payload,timestamp) VALUES(?,?,?,?)",[UUID().uuidString,type,encoded,String(Date().timeIntervalSince1970 * 1000)])
+        try execute("INSERT INTO operation_queue(id,type,payload,timestamp) VALUES(?,?,?,?)",[id,type,encoded,String(Date().timeIntervalSince1970 * 1000)])
+        return id
     }
 }

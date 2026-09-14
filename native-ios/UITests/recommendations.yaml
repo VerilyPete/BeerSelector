@@ -1,0 +1,28 @@
+# Run only on an isolated simulator with the Debug app already launched using:
+# xcrun simctl launch <simulator-id> org.verily.FSbeerselector --preview-fixtures --preview-recommendations
+# These IDs belong to the offline fixture. The final dialog is dismissed, never confirmed.
+appId: org.verily.FSbeerselector
+---
+- extendedWaitUntil:
+    visible:
+      id: recommendation-select-5
+    timeout: 15000
+- tapOn:
+    id: recommendation-select-5
+- assertVisible: Add 1 to queue
+- scrollUntilVisible:
+    element:
+      id: recommendation-select-6
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: recommendation-select-6
+- assertVisible: Add 2 to queue
+- tapOn:
+    id: recommendation-add-selected
+- assertVisible: Add these beers to your queue?
+# iOS 26 may present a popover without an explicit Cancel button.
+- tapOn:
+    point: "8%,70%"
+- assertNotVisible: Add these beers to your queue?
+- assertVisible: Add 2 to queue

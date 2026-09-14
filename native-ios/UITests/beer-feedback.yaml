@@ -1,0 +1,23 @@
+# Isolated fixture app launched with --preview-fixtures --preview-screen tasted.
+appId: org.verily.FSbeerselector
+---
+- scrollUntilVisible:
+    element:
+      id: beer-item-tasted-0
+    direction: DOWN
+- tapOn:
+    id: beer-item-tasted-0
+- tapOn:
+    id: beer-feedback-tasted-0-liked
+- tapOn:
+    id: beer-feedback-tasted-0-notForMe
+- tapOn: Open settings
+- scrollUntilVisible:
+    element:
+      id: delete-cached-beer-feedback
+    direction: DOWN
+- tapOn:
+    id: delete-cached-beer-feedback
+- assertVisible: 'Delete cached beer feedback\?'
+- tapOn: Delete feedback
+- assertNotVisible: 'Delete cached beer feedback\?'

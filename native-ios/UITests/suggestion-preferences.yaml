@@ -1,0 +1,21 @@
+# Isolated preview fixtures; no queue confirmation or live writes.
+appId: org.verily.FSbeerselector
+---
+- tapOn:
+    id: suggestion-container
+- tapOn: Bottles only
+- tapOn: Higher
+- tapOn:
+    id: recommendation-generate
+- assertVisible:
+    id: recommendation-card-2
+- tapOn:
+    id: suggestion-container
+- tapOn: Draft only
+- tapOn: Lower
+- tapOn:
+    id: recommendation-generate
+- assertVisible:
+    id: recommendation-card-3
+- assertNotVisible:
+    id: recommendation-card-2

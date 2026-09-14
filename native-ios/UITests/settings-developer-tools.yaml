@@ -1,0 +1,29 @@
+# Isolated Debug fixture only; launch with --preview-fixtures --preview-screen settings.
+appId: org.verily.FSbeerselector
+---
+- extendedWaitUntil:
+    visible:
+      id: login-button
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      id: developer-tools
+    direction: DOWN
+- tapOn:
+    id: developer-tools
+- scrollUntilVisible:
+    element:
+      text: Performance Diagnostics
+    direction: DOWN
+- tapOn: Performance Diagnostics
+- scrollUntilVisible:
+    element:
+      text: Share Diagnostics
+    direction: DOWN
+- assertVisible: Share Diagnostics
+- scrollUntilVisible:
+    element:
+      id: reset-first-run-button
+    direction: DOWN
+- assertVisible:
+    id: reset-first-run-button

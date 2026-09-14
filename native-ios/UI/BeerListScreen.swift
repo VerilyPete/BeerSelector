@@ -136,6 +136,7 @@ struct BeerCard: View {
                         Text("Description").font(Robo.title(13))
                         Text(beer.plainDescription).font(Robo.mono()).foregroundStyle(Robo.steel).lineSpacing(5).accessibilityIdentifier("beer-description-\(beer.id)")
                     }
+                    if dateLabel == "Tasted", model.isMember { BeerFeedbackControls(beer:beer) }
                     HStack {
                         if checkIn {
                             Button { if pending { model.showOperations = true } else { Task { await model.checkIn(beer) } } } label: { if model.busyIDs.contains(beer.id) { ProgressView().tint(Robo.amber) } else { Text(pending ? "REVIEW REQUEST" : "CHECK IN") } }.buttonStyle(BeerControlStyle(appearance:.amber)).disabled(model.busyIDs.contains(beer.id)).accessibilityIdentifier("check-in-\(beer.id)").accessibilityLabel(pending ? "Review saved request for \(beer.brew_name)" : "Check in \(beer.brew_name)").accessibilityValue(pending ? "Saved request" : model.busyIDs.contains(beer.id) ? "Submitting" : "")
@@ -147,4 +148,26 @@ struct BeerCard: View {
         }
     }
     private var glyph: String { ["tulip":"\u{f000}","pint":"\u{f001}","can":"\u{f002}","bottle":"\u{f003}","flight":"\u{f004}"][beer.container_type ?? ""] ?? "?" }
+}
+
+struct BeerFeedbackControls: View {
+    let beer: Beer
+    @EnvironmentObject var model: AppModel
+    var body: some View {
+        let account = model.recommendationAccount
+        let rating = model.beerFeedback.first { $0.id == beer.id }?.rating
+        ViewThatFits(in:.horizontal) {
+            HStack { buttons(rating:rating,account:account) }
+            VStack(alignment:.leading) { buttons(rating:rating,account:account) }
+        }
+    }
+    @ViewBuilder private func buttons(rating: BeerRating?, account: String?) -> some View {
+        ForEach(BeerRating.allCases,id:\.self) { choice in
+            Button { model.setBeerRating(beer,rating:choice,account:account) } label: {
+                Label(choice.label,systemImage:choice == .liked ? "hand.thumbsup" : "hand.thumbsdown")
+            }.buttonStyle(BeerControlStyle(appearance:rating == choice ? .selected : .outline))
+                .accessibilityIdentifier("beer-feedback-\(beer.id)-\(choice.rawValue)")
+                .accessibilityAddTraits(rating == choice ? .isSelected : [])
+        }
+    }
 }

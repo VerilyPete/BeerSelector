@@ -97,8 +97,9 @@ final class LegacyUpgradeTests: XCTestCase {
                     let key = table == "preferences" ? "key" : table == "schema_version" ? "version" : table == "rewards" ? "reward_id" : "id"
                     XCTAssertEqual(try db.rows("SELECT \(columns) FROM \(table)\(filter) ORDER BY \(key)"),old,table)
                 }
-                XCTAssertEqual(try db.rows("SELECT name,sql FROM sqlite_master WHERE type='index' ORDER BY name"),indexes)
-                XCTAssertEqual(try db.preference("native_schema_version"),"1")
+                // Additive recommendation tables may add their own indexes; legacy indexes must survive.
+                XCTAssertEqual(try db.rows("SELECT name,sql FROM sqlite_master WHERE type='index' AND tbl_name NOT IN ('recent_tastings','tasting_baseline','beer_feedback','beer_choices') ORDER BY name"),indexes)
+                XCTAssertEqual(try db.preference("native_schema_version"),"2")
                 XCTAssertEqual(try db.beers().first?.abv,8.2)
                 XCTAssertEqual(try db.beers().first?.container_type,"tulip")
                 XCTAssertEqual(try db.beers(tasted:true).first?.chit_code,"102-1-42")
@@ -150,7 +151,7 @@ final class LegacyUpgradeTests: XCTestCase {
         for (table,rows) in snapshots { XCTAssertEqual(try LegacyV8Fixture.rows(url,"SELECT * FROM \(table) ORDER BY 1"),rows,table) }
         try LegacyV8Fixture.execute(url,"DROP TRIGGER reject_native_version")
         let db = try BeerDatabase(url:url)
-        XCTAssertEqual(try db.preference("native_schema_version"),"1")
+        XCTAssertEqual(try db.preference("native_schema_version"),"2")
         XCTAssertEqual(try db.beers().map(\.id),["101"])
         XCTAssertEqual(try db.operations().first { $0.id == "retrying" }?.status,"pending")
     }
