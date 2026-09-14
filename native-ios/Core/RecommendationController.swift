@@ -91,9 +91,16 @@ struct RecommendationSnapshot: Equatable {
         let context: [BeerChoiceContext]
         do { context = try model.recommendationAccount.map { try model.db?.choiceContexts(account:$0) ?? [] } ?? [] }
         catch { model.error = error.localizedDescription; context = [] }
-        var candidates = RecommendationRules.shortlist(taplist:RecommendationRules.excludingRecent(current.taplist,history:current.repeatHistory),history:current.history,excluded:current.excluded.union(previousIDs),feedback:current.feedback,preferences:preferences,context:context)
+        var candidates = RecommendationRules.shortlist(taplist:RecommendationRules.excludingRecent(current.taplist,history:current.repeatHistory),history:current.history,excluded:current.excluded,feedback:current.feedback,preferences:preferences,context:context,presentationExcluded:previousIDs)
         if candidates.count < min(3,current.taplist.count) {
-            candidates = RecommendationRules.shortlist(taplist:RecommendationRules.excludingRecent(current.taplist,history:current.repeatHistory),history:current.history,excluded:current.excluded,feedback:current.feedback,preferences:preferences,context:context)
+            let fallback = RecommendationRules.shortlist(taplist:RecommendationRules.excludingRecent(current.taplist,history:current.repeatHistory),history:current.history,excluded:current.excluded,feedback:current.feedback,preferences:preferences,context:context)
+            if candidates.isEmpty { candidates = fallback }
+            else {
+                // Keep the unseen choices when the preference band cannot supply
+                // three new beers; fill remaining cards from previous choices.
+                let unseenIDs = Set(candidates.map(\.id))
+                candidates += fallback.filter { !unseenIDs.contains($0.id) }.prefix(3-candidates.count)
+            }
         }
         guard !candidates.isEmpty else { message = "No eligible beers match these preferences. Try another container or ABV preference."; return }
         let provider = provider
@@ -147,9 +154,7 @@ struct RecommendationSnapshot: Equatable {
                 if token == generation { message = "Submission stopped. Review the per-beer results before trying again." }
                 return
             }
-            let matching = preferences.candidates(from:RecommendationRules.excludingRecent(current.taplist,history:current.repeatHistory + current.history).filter {
-                !current.excluded.contains($0.id)
-            })
+            let matching = RecommendationRules.eligible(taplist:current.taplist,history:current.repeatHistory + current.history,excluded:current.excluded,feedback:current.feedback,preferences:preferences)
             guard matching.contains(where:{ $0.id == suggestion.id }), !current.excluded.contains(suggestion.id),
                   let beer = current.taplist.first(where:{ $0.id == suggestion.id }), preferences.allows(beer),
                   preferences.abv == .any || beer.abv.map({ $0.isFinite && $0 >= 0 }) == true else {

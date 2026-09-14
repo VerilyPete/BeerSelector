@@ -74,7 +74,18 @@ final class BeerDatabase {
             }
             try execute("CREATE TABLE IF NOT EXISTS rewards(reward_id TEXT PRIMARY KEY,redeemed TEXT,reward_type TEXT)")
             try execute("CREATE TABLE IF NOT EXISTS operation_queue(id TEXT PRIMARY KEY,type TEXT NOT NULL,payload TEXT NOT NULL,timestamp INTEGER NOT NULL,retry_count INTEGER DEFAULT 0,status TEXT DEFAULT 'pending',error_message TEXT,last_retry_timestamp INTEGER)")
-            try execute("UPDATE operation_queue SET status='pending' WHERE status='retrying'")
+            // Recover older interrupted dispatches conservatively. Ordinary check-ins retain
+            // their legacy retry policy; recommendations always require explicit review.
+            for row in try rows("SELECT id,payload,error_message FROM operation_queue WHERE status='retrying'") {
+                let payload = row["payload"].flatMap { $0.data(using:.utf8) }
+                    .flatMap { try? JSONSerialization.jsonObject(with:$0) as? [String:Any] }
+                let needsReview = payload == nil || payload?["recommendation"].map { String(describing:$0) } == "true"
+                try execute("UPDATE operation_queue SET status=?,error_message=? WHERE id=?", [
+                    needsReview ? "failed" : "pending",
+                    needsReview ? "Check-in may have been sent. Review your beer queue before retrying." : row["error_message"],
+                    row["id"]
+                ])
+            }
             // Credentials are read only from Keychain. Never resurrect the removed plaintext credential preference.
             try execute("DELETE FROM preferences WHERE key='auth_cookies'")
             try setupRecentTastings()

@@ -106,6 +106,42 @@ final class RecommendationIntegrationTests: XCTestCase {
             XCTAssertEqual(writes,0); XCTAssertEqual(controller.outcomes["new"],.unavailable)
         }
     }
+    @MainActor func testAnotherSelectionKeepsLowerAndHigherBandsSubmittable() async throws {
+        for preference in [SuggestionABV.lower,.higher] {
+            try await withModel { model,db,fixture in
+                let beers = (1...8).map { value -> Beer in
+                    var beer = Beer(id:String(value),name:"Beer \(value)"); beer.abv = Double(value); return beer
+                }
+                try db.replaceBeers(beers)
+                let data = try JSONSerialization.data(withJSONObject:beers.map { ["id":$0.id,"brew_name":$0.brew_name,"abv":String($0.abv!)] })
+                var writes = 0
+                fixture.handler = { request in
+                    switch request.url!.path {
+                    case "/bk-store-json.php": return (200,data)
+                    case "/bk-member-json.php": return (200,Data(#"[{},{"tasted_brew_current_round":[]},{"reward":[]}]"#.utf8))
+                    case "/addToQueue.php": writes += 1; return (200,Data())
+                    default: return (200,Data("No brew in queue".utf8))
+                    }
+                }
+                let provider = FakeProvider()
+                let controller = RecommendationController(model:model,provider:provider)
+                controller.setPreferences(.init(abv:preference))
+                await controller.generate()
+                let firstIDs = controller.suggestions.map(\.id)
+                provider.action = { firstIDs }
+                await controller.generate()
+                XCTAssertFalse(controller.usedModel,"A model repeating the entire previous selection must fail closed to the refreshed shortlist")
+                let expected = Set(preference == .lower ? ["1","2","3","4"] : ["5","6","7","8"])
+                XCTAssertEqual(controller.suggestions.count,3)
+                XCTAssertTrue(controller.suggestions.contains { $0.id == (preference == .lower ? "4" : "5") },"Another selection must preserve the remaining unseen eligible beer")
+                XCTAssertTrue(Set(controller.suggestions.map(\.id)).isSubset(of:expected))
+                let ids = Set(controller.suggestions.map(\.id))
+                await controller.submit(ids:ids)
+                XCTAssertEqual(writes,3)
+                for id in ids { XCTAssertEqual(controller.outcomes[id],.added) }
+            }
+        }
+    }
     @MainActor func testPreferenceChangeRejectsOldGenerationAndClearsActionableCards() async throws {
         try await withModel { model,_,_ in
             let fake = FakeProvider()

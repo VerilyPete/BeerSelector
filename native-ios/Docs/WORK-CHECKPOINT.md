@@ -1,3 +1,17 @@
+## Adversarial review repairs — September 14, 2026
+
+All six findings from the review of `19e8e987` are repaired. Four implementation agents and two independent review agents handled the fixes and re-review. See `RECOMMENDATION-REVIEW-FIXES.md` for decisions and evidence.
+
+- Interrupted recommendation dispatches persist review-required state before the POST. Legacy interrupted recommendation operations also recover into review, while ordinary check-in retry behavior remains. Explicit retry still works; account transitions release busy state without allowing old callbacks to release a new account’s marker.
+- Generation and submission share the ABV eligibility pool. “Show another selection” preserves unseen eligible beers and fills remaining slots from eligible previous choices; it never broadens the ABV band. Stale model IDs are rejected.
+- Explicit recipe feedback applies across packaging, uses newest timestamps with conservative dislike ties, and preserves every stored rating. Precomputed feedback indexes avoid repeated scans of uncapped feedback.
+- Day-only tasting dates use a documented timezone uncertainty interval. Valid new feed evidence can attach after selection before acknowledgement, without inventing queue acceptance; old/repeated feed events stay excluded.
+- Model requests budget instructions, prompt, generated schema, output and headroom. Full/compact/lean tiers preserve all 100 tasting preference observations. Lean input omits names/brewery metadata to remain useful under the older compiler/iOS conservative budget. Context-budget fallback has a non-sensitive diagnostic log.
+- Validation: **178/178 tests pass, zero skipped** (`/private/tmp/review-fixes-final.xcresult`). Real Apple tokenizer: representative 100 tastings / 50 breweries / 20 styles / 12 candidates / 4 choice cohorts use **2,510/4,096 tokens** in compact form and **1,801/4,096** in lean form, including schema/output/headroom. The lean input also passes the conservative legacy byte budget (`/private/tmp/fixed-prompt-budget.log`).
+- Offline selection/confirmation and container/ABV UI flows passed (`/private/tmp/review-fixes-ui.log`, `/private/tmp/review-fixes-preferences-ui.log`); reset fixtures between independent flows.
+- The actual local provider returned three validated IDs on the Mac’s Apple Intelligence model in **2.06 seconds**, under the eight-second deadline (`/private/tmp/final-provider-smoke.log`). This does not replace physical iPhone UI or recommendation-quality testing. Xcode 26.3 is not installed locally; its older-compiler branch was reviewed and the conservative budget exercised.
+- Independent re-review found and resolved an acknowledgement/feed-order race, exact-three instruction mismatch, repeated-selection no-op, and a feedback indexing performance issue. Both reviewers now report no remaining actionable findings in their assigned scopes.
+
 ## Choice context and unconfirmed check-in signals — September 13, 2026
 
 Implemented on the current feature branch; not committed or pushed. Validation: **161/161 tests passed, zero skipped** (`/private/tmp/choice-final.xcresult`). Recommendation selection/confirmation UI smoke test passed (`/private/tmp/choice-ui2.log`); fixed the smoke test to scroll its second selection button into view. Real Apple Intelligence quality still needs a supported-device check.

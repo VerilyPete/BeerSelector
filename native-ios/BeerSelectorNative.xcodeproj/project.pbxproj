@@ -11,10 +11,12 @@
 		122C661C28FDB4ED200E7B04 /* OnDeviceRecommendationProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 929A8D429AB19073FB74ABF7 /* OnDeviceRecommendationProvider.swift */; };
 		13C2A40F3A44AC5A17FC49AB /* SpaceGrotesk-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = B805244B88340CB922AB51D0 /* SpaceGrotesk-Bold.ttf */; };
 		21C81A0473B8079CB1CD3BAB /* BeerQueueWidgetLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 231ED53DBC183B5F36A1F3F5 /* BeerQueueWidgetLiveActivity.swift */; };
+		226774B4011D14AB247BD8F5 /* RecommendationQueueRecoveryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2519E9671028138C5AF46063 /* RecommendationQueueRecoveryTests.swift */; };
 		22C5E9232F83C985BFA468D2 /* BeerIcons.ttf in Resources */ = {isa = PBXBuildFile; fileRef = BE1F74F45E480DB31BBAADE5 /* BeerIcons.ttf */; };
 		2C4A9F7386119974C4E0EC7A /* RecommendationRulesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D50BDD33CAF7819DE7F567C4 /* RecommendationRulesTests.swift */; };
 		2F4EFDF00B0041D481937040 /* DiagnosticsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C009F862A33114679B004770 /* DiagnosticsTests.swift */; };
 		31C2EA469B5E74A8E7F2E300 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 977A45B968518D8C39648777 /* AppDelegate.swift */; };
+		31D9024A0E75E296E679419B /* RecommendationPromptBudget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A145926EE52FA2DFB121CAE /* RecommendationPromptBudget.swift */; };
 		341BC4C35D81DF2E14EFD856 /* BeerQueueWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 3EB46E74F9A0312EDB8BC823 /* BeerQueueWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		35D8BD1935114A6F706FFD1E /* RewardsAndQueue.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DD0CF4E1F891B774336B50E /* RewardsAndQueue.swift */; };
 		3E32F23BD6DF7BBE2F2DAF99 /* NetworkTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 065F304DB3C26F8D3AEB36DE /* NetworkTests.swift */; };
@@ -41,6 +43,7 @@
 		85DDB24E735C4CF5A75F68A8 /* Credentials.swift in Sources */ = {isa = PBXBuildFile; fileRef = 555FA9F91FB5176D6A0195F0 /* Credentials.swift */; };
 		88EAEFD0D3C559B91A939BAA /* API.swift in Sources */ = {isa = PBXBuildFile; fileRef = E094A5FAACE12510FD992EEA /* API.swift */; };
 		8A37C0484CADD56BEA9CD29F /* SpaceMono-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 45EE3296A115D128B8EA9CBE /* SpaceMono-Regular.ttf */; };
+		8AAFFFABC89B73E0C52F0879 /* RecommendationPromptBudgetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA3563287832C27CDA5FF36A /* RecommendationPromptBudgetTests.swift */; };
 		8C57235B60F471A426387173 /* CredentialFailureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E4302E4D060DAE06B9571EB /* CredentialFailureTests.swift */; };
 		91433AAB667AA652E3C52911 /* SpaceGrotesk-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = B805244B88340CB922AB51D0 /* SpaceGrotesk-Bold.ttf */; };
 		926942991661B8B08D7DB203 /* SpaceMono-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 45EE3296A115D128B8EA9CBE /* SpaceMono-Regular.ttf */; };
@@ -113,6 +116,7 @@
 		1D64E9C6BDD780C0A805A3C2 /* ActivityStylePreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityStylePreview.swift; sourceTree = "<group>"; };
 		2262BE1057E0A4E092166E62 /* BeerSelectorApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeerSelectorApp.swift; sourceTree = "<group>"; };
 		231ED53DBC183B5F36A1F3F5 /* BeerQueueWidgetLiveActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeerQueueWidgetLiveActivity.swift; sourceTree = "<group>"; };
+		2519E9671028138C5AF46063 /* RecommendationQueueRecoveryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecommendationQueueRecoveryTests.swift; sourceTree = "<group>"; };
 		2542046C9CA9DA793A61CAD4 /* Diagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Diagnostics.swift; sourceTree = "<group>"; };
 		2E4302E4D060DAE06B9571EB /* CredentialFailureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialFailureTests.swift; sourceTree = "<group>"; };
 		39F2059F3B66AECF52036DDA /* DiagnosticJournal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticJournal.swift; sourceTree = "<group>"; };
@@ -135,6 +139,7 @@
 		6F2621505752CA74526D3DBA /* BeerQueueWidget.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = BeerQueueWidget.entitlements; sourceTree = "<group>"; };
 		72706E1596E156A1A349320B /* BeerSelector.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = BeerSelector.entitlements; sourceTree = "<group>"; };
 		794E775E77D32DD31139982E /* BeerChoiceContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeerChoiceContext.swift; sourceTree = "<group>"; };
+		7A145926EE52FA2DFB121CAE /* RecommendationPromptBudget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecommendationPromptBudget.swift; sourceTree = "<group>"; };
 		7A32675D183666346B091FCD /* LoginRollbackTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginRollbackTests.swift; sourceTree = "<group>"; };
 		7AD02B1FB60CBF54DDE5CCA1 /* RecentTastings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecentTastings.swift; sourceTree = "<group>"; };
 		83FD24EAC5B6F54E73B67A8C /* BeerQueueActivityViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeerQueueActivityViews.swift; sourceTree = "<group>"; };
@@ -154,6 +159,7 @@
 		B3523CE0692640E98D7A7D92 /* LogoutRaceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogoutRaceTests.swift; sourceTree = "<group>"; };
 		B50B9A0FA412F25DC622856F /* AccountSafetyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountSafetyTests.swift; sourceTree = "<group>"; };
 		B805244B88340CB922AB51D0 /* SpaceGrotesk-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "SpaceGrotesk-Bold.ttf"; sourceTree = "<group>"; };
+		BA3563287832C27CDA5FF36A /* RecommendationPromptBudgetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecommendationPromptBudgetTests.swift; sourceTree = "<group>"; };
 		BB4644FFEEA985EC780F8C88 /* RecentTastingsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecentTastingsTests.swift; sourceTree = "<group>"; };
 		BE1F74F45E480DB31BBAADE5 /* BeerIcons.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = BeerIcons.ttf; sourceTree = "<group>"; };
 		C009F862A33114679B004770 /* DiagnosticsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsTests.swift; sourceTree = "<group>"; };
@@ -210,6 +216,8 @@
 				1479E255579F402879E1A1B7 /* PostLoginCleanupTests.swift */,
 				BB4644FFEEA985EC780F8C88 /* RecentTastingsTests.swift */,
 				D99E97C828BEAA679849A34A /* RecommendationIntegrationTests.swift */,
+				BA3563287832C27CDA5FF36A /* RecommendationPromptBudgetTests.swift */,
+				2519E9671028138C5AF46063 /* RecommendationQueueRecoveryTests.swift */,
 				D50BDD33CAF7819DE7F567C4 /* RecommendationRulesTests.swift */,
 				72A6F305A3B035DABC4A4724 /* Support */,
 			);
@@ -257,6 +265,7 @@
 				929A8D429AB19073FB74ABF7 /* OnDeviceRecommendationProvider.swift */,
 				7AD02B1FB60CBF54DDE5CCA1 /* RecentTastings.swift */,
 				84E5F25A1B083C820E9C620D /* RecommendationController.swift */,
+				7A145926EE52FA2DFB121CAE /* RecommendationPromptBudget.swift */,
 				488BD3B8D6C35DF8DA421A6F /* Recommendations.swift */,
 			);
 			path = Core;
@@ -492,6 +501,7 @@
 				F16A6A4D9383A7F8B68A89E1 /* PreviewFixtures.swift in Sources */,
 				E778BE813FC58BEEC73E3DF7 /* RecentTastings.swift in Sources */,
 				70F74BE0AFB5B1D921D092AC /* RecommendationController.swift in Sources */,
+				31D9024A0E75E296E679419B /* RecommendationPromptBudget.swift in Sources */,
 				63D8420840DAAAB8E7ECF4AC /* Recommendations.swift in Sources */,
 				9A2B1A92E4D73F7355FEC806 /* RecommendationsScreen.swift in Sources */,
 				35D8BD1935114A6F706FFD1E /* RewardsAndQueue.swift in Sources */,
@@ -521,6 +531,8 @@
 				5A07C8B87E84C1EA9067756D /* PostLoginCleanupTests.swift in Sources */,
 				B1918265B3C709FE6E2B1C29 /* RecentTastingsTests.swift in Sources */,
 				FACCDC3606786FEA3DB21DE1 /* RecommendationIntegrationTests.swift in Sources */,
+				8AAFFFABC89B73E0C52F0879 /* RecommendationPromptBudgetTests.swift in Sources */,
+				226774B4011D14AB247BD8F5 /* RecommendationQueueRecoveryTests.swift in Sources */,
 				2C4A9F7386119974C4E0EC7A /* RecommendationRulesTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

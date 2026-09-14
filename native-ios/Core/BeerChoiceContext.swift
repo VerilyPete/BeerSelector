@@ -27,6 +27,8 @@ struct BeerChoiceContext: Codable, Equatable, Identifiable {
     var laterTasted: Set<String> = []
     var outcomes: [String:String] = [:]
     var queuedAt: [String:Date] = [:]
+    // Optional for compatibility with choices saved before intent timestamps existed.
+    var selectedAt: [String:Date]? = [:]
     init(taplist: [Beer], shown: [String], preferences: SuggestionPreferences, usedModel: Bool, taplistValidation: UUID? = nil) {
         self.taplist = taplist.map(ChoiceBeer.init); self.shown = shown
         self.preferences = preferences; self.usedModel = usedModel; self.taplistValidation = taplistValidation
@@ -54,29 +56,48 @@ extension BeerDatabase {
         let json = String(decoding:try JSONEncoder().encode(choice),as:UTF8.self)
         try execute("UPDATE beer_choices SET context=? WHERE account=? AND id=?",[json,account,choice.id])
     }
-    func updateChoice(id: String, account: String, beerID: String, selected: Bool? = nil, outcome: CheckInResult? = nil) throws {
+    func updateChoice(id: String, account: String, beerID: String, selected: Bool? = nil, outcome: CheckInResult? = nil, now: Date = Date()) throws {
         guard var choice = try choiceContexts(account:account).first(where:{ $0.id == id }), (choice.shown.contains(beerID) || choice.selected.contains(beerID)) else { return }
         if let selected {
-            if selected { choice.selected.insert(beerID) } else { choice.selected.remove(beerID) }
+            if selected {
+                choice.selected.insert(beerID)
+                var dates = choice.selectedAt ?? [:]
+                dates[beerID] = dates[beerID] ?? now
+                choice.selectedAt = dates
+            } else {
+                choice.selected.remove(beerID)
+                choice.selectedAt?.removeValue(forKey:beerID)
+            }
         }
         if let outcome {
             choice.outcomes[beerID] = outcome.rawValue
-            if outcome == .added { choice.queued.insert(beerID); choice.queuedAt[beerID] = choice.queuedAt[beerID] ?? Date() }
+            if outcome == .added { choice.queued.insert(beerID); choice.queuedAt[beerID] = choice.queuedAt[beerID] ?? now }
         }
         try storeChoice(choice,account:account)
     }
     /// Evidence of later feed appearance, not proof that a particular queue entry was claimed.
-    func observeChoiceTastings(_ beers: [Beer], previous: [Beer], account: String) throws {
+    func observeChoiceTastings(_ beers: [Beer], previous: [Beer], account: String, now: Date = Date()) throws {
         let previousEvents = Set(previous.map { [$0.id,$0.roh_lap,$0.tasted_date] })
         let newBeers = beers.filter { !previousEvents.contains([$0.id,$0.roh_lap,$0.tasted_date]) }
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier:"en_US_POSIX"); formatter.timeZone = TimeZone(secondsFromGMT:0)
         formatter.dateFormat = "MM/dd/yyyy"; formatter.isLenient = false
         for var choice in try choiceContexts(account:account) {
-            for beer in newBeers where choice.queued.contains(beer.id) && !choice.laterTasted.contains(beer.id) {
-                guard let queued = choice.queuedAt[beer.id], let day = formatter.date(from:beer.tasted_date),
+            // A feed refresh may finish before the POST acknowledgement. Preserve
+            // that independent evidence without inventing queue acceptance.
+            for beer in newBeers where (choice.selected.contains(beer.id) || choice.queued.contains(beer.id)) && !choice.laterTasted.contains(beer.id) {
+                guard let intent = choice.selectedAt?[beer.id] ?? choice.queuedAt[beer.id],
+                      let day = formatter.date(from:beer.tasted_date),
                       formatter.string(from:day) == beer.tasted_date,
-                      let queuedDay = formatter.date(from:formatter.string(from:queued)), day >= queuedDay, day <= Date() else { continue }
+                      intent <= now else { continue }
+                // The feed supplies a calendar date without a timezone. Treat that
+                // date as the union of possible venue days (UTC+14 through UTC−12),
+                // rather than pretending it is midnight UTC. This also avoids DST
+                // assumptions. We still require a newly observed, valid feed event;
+                // overlap means compatible timing, not proof of a claimed queue entry.
+                let earliest = day.addingTimeInterval(-14 * 60 * 60)
+                let latest = day.addingTimeInterval(36 * 60 * 60)
+                guard earliest <= now, latest > intent else { continue }
                 choice.laterTasted.insert(beer.id)
             }
             try storeChoice(choice,account:account)

@@ -40,6 +40,86 @@ final class RecentTastingsTests: XCTestCase {
             XCTAssertEqual(try db.choiceContexts(account:"a").first?.laterTasted,[b.id])
         }
     }
+    func testChoiceTastingDatesRespectUnknownVenueCalendar() throws {
+        let iso = ISO8601DateFormatter()
+        let cases: [(String,String,String,Bool)] = [
+            // Central evening, local midnight, spring DST, fall DST.
+            ("2026-09-12T01:00:00Z", "2026-09-12T02:00:00Z", "09/11/2026", true),
+            ("2026-09-12T05:00:00Z", "2026-09-12T06:00:00Z", "09/12/2026", true),
+            ("2026-03-09T01:00:00Z", "2026-03-09T02:00:00Z", "03/08/2026", true),
+            ("2026-11-02T02:00:00Z", "2026-11-02T03:00:00Z", "11/01/2026", true),
+            // A venue ahead of UTC can already have tomorrow's calendar date.
+            ("2026-09-12T11:00:00Z", "2026-09-12T12:00:00Z", "09/13/2026", true),
+            ("2026-09-12T01:00:00Z", "2026-09-12T02:00:00Z", "09/14/2026", false),
+            ("2026-09-12T13:00:00Z", "2026-09-12T14:00:00Z", "09/11/2026", false),
+            ("2026-09-12T01:00:00Z", "2026-09-12T02:00:00Z", "02/30/2026", false),
+            ("2026-09-12T01:00:00Z", "2026-09-12T02:00:00Z", "", false)
+        ]
+        for (queuedString, nowString, day, expected) in cases {
+            try withDB { db,_ in
+                let b = beer(1,date:day)
+                var choice = BeerChoiceContext(taplist:[b],shown:[b.id],preferences:.init(),usedModel:false)
+                choice.queued = [b.id]; choice.queuedAt = [b.id:try XCTUnwrap(iso.date(from:queuedString))]
+                try db.saveChoicePresentation(choice,account:"a")
+                try db.observeChoiceTastings([b],previous:[],account:"a",now:try XCTUnwrap(iso.date(from:nowString)))
+                XCTAssertEqual(try db.choiceContexts(account:"a").first?.laterTasted.contains(b.id),expected, "\(queuedString), \(day)")
+                XCTAssertTrue(try db.recentTastings(account:"a").isEmpty,"Observational linkage cannot create a confirmed tasting")
+            }
+        }
+    }
+    func testChoiceDelayedAcknowledgementUsesDurableIntentAndIgnoresRepeatedFeedEvents() throws {
+        try withDB { db,url in
+            let iso = ISO8601DateFormatter()
+            let intent = try XCTUnwrap(iso.date(from:"2026-09-11T20:00:00Z"))
+            let acknowledgement = try XCTUnwrap(iso.date(from:"2026-09-14T20:00:00Z"))
+            let b = beer(1,date:"09/11/2026")
+            let choice = BeerChoiceContext(taplist:[b],shown:[b.id],preferences:.init(),usedModel:false)
+            try db.saveChoicePresentation(choice,account:"a")
+            try db.updateChoice(id:choice.id,account:"a",beerID:b.id,selected:true,now:intent)
+            try db.updateChoice(id:choice.id,account:"a",beerID:b.id,selected:true,now:acknowledgement)
+            try db.updateChoice(id:choice.id,account:"a",beerID:b.id,outcome:.added,now:acknowledgement)
+            let reopened = try BeerDatabase(url:url)
+            XCTAssertEqual(try reopened.choiceContexts(account:"a").first?.selectedAt?[b.id],intent)
+            try reopened.observeChoiceTastings([b],previous:[b],account:"a",now:acknowledgement)
+            XCTAssertEqual(try reopened.choiceContexts(account:"a").first?.laterTasted,[])
+            var old = b; old.tasted_date = "09/09/2026"
+            try reopened.observeChoiceTastings([old],previous:[],account:"a",now:acknowledgement)
+            XCTAssertEqual(try reopened.choiceContexts(account:"a").first?.laterTasted,[])
+            try reopened.observeChoiceTastings([b],previous:[],account:"a",now:acknowledgement)
+            XCTAssertEqual(try reopened.choiceContexts(account:"a").first?.laterTasted,[b.id])
+            var legacy = try XCTUnwrap(JSONSerialization.jsonObject(with:JSONEncoder().encode(choice)) as? [String:Any])
+            legacy.removeValue(forKey:"selectedAt")
+            XCTAssertNil(try JSONDecoder().decode(BeerChoiceContext.self,from:JSONSerialization.data(withJSONObject:legacy)).selectedAt)
+        }
+    }
+    func testTastingBeforeQueueAcknowledgementIsPreservedWithoutInventingAcceptance() throws {
+        try withDB { db,url in
+            let iso = ISO8601DateFormatter()
+            let intent = try XCTUnwrap(iso.date(from:"2026-09-12T01:00:00Z"))
+            let observed = intent.addingTimeInterval(60)
+            let b = beer(1,date:"09/11/2026")
+            let choice = BeerChoiceContext(taplist:[b],shown:[b.id],preferences:.init(),usedModel:false)
+            try db.saveChoicePresentation(choice,account:"a")
+            try db.updateChoice(id:choice.id,account:"a",beerID:b.id,selected:true,now:intent)
+            try db.observeChoiceTastings([b],previous:[b],account:"a",now:observed)
+            XCTAssertEqual(try db.choiceContexts(account:"a").first?.laterTasted,[])
+            var old = b; old.tasted_date = "09/09/2026"
+            try db.observeChoiceTastings([old],previous:[],account:"a",now:observed)
+            XCTAssertEqual(try db.choiceContexts(account:"a").first?.laterTasted,[])
+            try db.observeChoiceTastings([b],previous:[],account:"a",now:observed)
+            let pending = try XCTUnwrap(BeerDatabase(url:url).choiceContexts(account:"a").first)
+            XCTAssertEqual(pending.laterTasted,[b.id])
+            XCTAssertTrue(pending.queued.isEmpty)
+            XCTAssertTrue(pending.queuedAt.isEmpty)
+            XCTAssertTrue(pending.outcomes.isEmpty)
+            XCTAssertTrue(try db.recentTastings(account:"a").isEmpty)
+            try db.updateChoice(id:choice.id,account:"a",beerID:b.id,outcome:.added,now:observed.addingTimeInterval(60))
+            try db.observeChoiceTastings([b],previous:[b],account:"a",now:observed.addingTimeInterval(120))
+            let saved = try XCTUnwrap(db.choiceContexts(account:"a").first)
+            XCTAssertEqual(saved.laterTasted,[b.id])
+            XCTAssertEqual(saved.queued,[b.id])
+        }
+    }
     func testChoiceRetentionAndHistoryClearNeverDeleteFeedback() throws {
         try withDB { db,_ in
             try db.saveBeerFeedback(.init(beer:beer(1),rating:.liked),account:"a")

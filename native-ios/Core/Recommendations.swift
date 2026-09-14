@@ -49,6 +49,54 @@ enum RecommendationRules {
         guard !name.isEmpty else { return nil }
         return brewery + "|" + name
     }
+    // Ratings remain durable per upstream ID. Resolve packaging duplicates only
+    // when reading them: newest explicit intent wins; legacy/tied timestamps
+    // conservatively favor dislike, then ID for order-independent results.
+    private static func newerFeedback(_ lhs: BeerFeedback, than rhs: BeerFeedback) -> Bool {
+        let left = lhs.ratedAt ?? .distantPast, right = rhs.ratedAt ?? .distantPast
+        if left != right { return left > right }
+        if lhs.rating != rhs.rating { return lhs.rating == .notForMe }
+        return lhs.id < rhs.id
+    }
+    struct FeedbackIndex {
+        private var byID: [String:BeerFeedback] = [:]
+        private var byRecipe: [String:BeerFeedback] = [:]
+        private var effective: [String:BeerFeedback] = [:]
+        init(_ feedback: [BeerFeedback]) {
+            func retainLatest(_ item: BeerFeedback, key: String, in values: inout [String:BeerFeedback]) {
+                if let previous = values[key], !newerFeedback(item,than:previous) { return }
+                values[key] = item
+            }
+            for item in feedback {
+                let identity = beerIdentity(item.beer)
+                retainLatest(item,key:item.id,in:&byID)
+                if let identity { retainLatest(item,key:identity,in:&byRecipe) }
+                retainLatest(item,key:identity.map { "recipe:" + $0 } ?? "id:" + item.id,in:&effective)
+            }
+        }
+        var resolved: [BeerFeedback] { effective.keys.sorted().compactMap { effective[$0] } }
+        func rating(for beer: Beer) -> BeerRating? {
+            let exact = byID[beer.id]
+            let recipe = beerIdentity(beer).flatMap { byRecipe[$0] }
+            if let exact, let recipe { return newerFeedback(exact,than:recipe) ? exact.rating : recipe.rating }
+            return (exact ?? recipe)?.rating
+        }
+    }
+    static func resolvedFeedback(_ feedback: [BeerFeedback]) -> [BeerFeedback] { FeedbackIndex(feedback).resolved }
+    static func rating(for beer: Beer, feedback: [BeerFeedback]) -> BeerRating? { FeedbackIndex(feedback).rating(for:beer) }
+    static func dislikedIDs(in beers: [Beer], feedback: [BeerFeedback]) -> Set<String> {
+        let index = FeedbackIndex(feedback)
+        return Set(beers.filter { index.rating(for:$0) == .notForMe }.map(\.id))
+    }
+    /// Relative strength is calculated before presentation-only variety rules.
+    /// Generation and submission share this eligibility policy.
+    static func eligible(taplist: [Beer], history: [Beer], excluded: Set<String>, feedback: [BeerFeedback], preferences: SuggestionPreferences) -> [Beer] {
+        var seen: Set<String> = []
+        let ratings = FeedbackIndex(feedback)
+        return preferences.candidates(from:excludingRecent(taplist,history:history).filter {
+            !$0.id.isEmpty && !excluded.contains($0.id) && ratings.rating(for:$0) != .notForMe && seen.insert($0.id).inserted
+        })
+    }
     /// Upstream tasting dates have day precision. Use today plus the previous
     /// 29 UTC calendar dates; undated entries are conservatively excluded.
     static func repeatWindow(_ history: [Beer], now: Date = Date()) -> [Beer] {
@@ -81,17 +129,16 @@ enum RecommendationRules {
         if text.split(whereSeparator:{ !$0.isLetter }).contains("ipa") || text.contains("india pale ale") { return "ipa" }
         return text
     }
-    static func shortlist(taplist: [Beer], history: [Beer], excluded: Set<String>, feedback: [BeerFeedback] = [], preferences: SuggestionPreferences = .init(), context: [BeerChoiceContext] = []) -> [BeerSuggestion] {
-        let excluded = excluded.union(feedback.filter { $0.rating == .notForMe }.map(\.id))
+    static func shortlist(taplist: [Beer], history: [Beer], excluded: Set<String>, feedback: [BeerFeedback] = [], preferences: SuggestionPreferences = .init(), context: [BeerChoiceContext] = [], presentationExcluded: Set<String> = []) -> [BeerSuggestion] {
+        let effectiveFeedback = resolvedFeedback(feedback)
         func normalized(_ value: String) -> String { value.trimmingCharacters(in:.whitespacesAndNewlines).lowercased() }
         let styles = Set(history.map { styleFamily($0.brew_style) }.filter { !$0.isEmpty })
         let breweries = Set(history.map { normalized($0.brewer) }.filter { !$0.isEmpty })
-        let likedStyles = Set(feedback.filter { $0.rating == .liked }.map { styleFamily($0.beer.brew_style) }.filter { !$0.isEmpty })
-        let dislikedStyles = Set(feedback.filter { $0.rating == .notForMe }.map { styleFamily($0.beer.brew_style) }.filter { !$0.isEmpty })
+        let likedStyles = Set(effectiveFeedback.filter { $0.rating == .liked }.map { styleFamily($0.beer.brew_style) }.filter { !$0.isEmpty })
+        let dislikedStyles = Set(effectiveFeedback.filter { $0.rating == .notForMe }.map { styleFamily($0.beer.brew_style) }.filter { !$0.isEmpty })
         let queuedStyles = Set(context.flatMap { choice in choice.taplist.filter { choice.queued.contains($0.id) }.map { styleFamily($0.style) } }.filter { !$0.isEmpty })
         let selectedStyles = Set(context.flatMap { choice in choice.taplist.filter { choice.selected.contains($0.id) }.map { styleFamily($0.style) } }.filter { !$0.isEmpty })
-        var seen: Set<String> = []
-        var pool = preferences.candidates(from:excludingRecent(taplist,history:history).filter { !$0.id.isEmpty && !excluded.contains($0.id) && seen.insert($0.id).inserted })
+        var pool = eligible(taplist:taplist,history:history,excluded:excluded,feedback:feedback,preferences:preferences).filter { !presentationExcluded.contains($0.id) }
         var result: [BeerSuggestion] = []
         var chosenStyles: Set<String> = [], chosenBreweries: Set<String> = []
         func score(_ beer: Beer) -> Int {
@@ -149,24 +196,25 @@ extension RecommendationProvider {
 /// repeating JSON field names or full descriptions for every beer.
 enum RecommendationModelInput {
     static func prompt(history: [Beer], candidates: [BeerSuggestion], feedback: [BeerFeedback], preferences selection: SuggestionPreferences = .init(), context: [BeerChoiceContext] = []) throws -> String {
+        let feedbackIndex = RecommendationRules.FeedbackIndex(feedback)
+        let effectiveFeedback = feedbackIndex.resolved
         var styles: [String] = [], breweries: [String] = []
         func index(_ value: String, in values: inout [String]) -> String {
             if let i = values.firstIndex(of:value) { return String(i) }
             values.append(value); return String(values.count-1)
         }
         let repeatIDs = Set(RecommendationRules.repeatWindow(history).map(\.id))
-        let ratings = Dictionary(feedback.map { ($0.id,$0.rating.rawValue) },uniquingKeysWith:{ _,new in new })
         func row(_ beer: Beer, candidate: Bool) -> [String] {
             [candidate ? beer.id : "",String(beer.brew_name.prefix(60)),
              index(String(beer.brew_style.prefix(32)),in:&styles),
-             index(String(beer.brewer.prefix(40)),in:&breweries),ratings[beer.id] ?? "unrated",candidate ? (beer.abv.map { String($0) } ?? "unknown") : "",beer.brew_container,beer.tasted_date,repeatIDs.contains(beer.id) ? "yes" : "no"]
+             index(String(beer.brewer.prefix(40)),in:&breweries),feedbackIndex.rating(for:beer)?.rawValue ?? "unrated",candidate ? (beer.abv.map { String($0) } ?? "unknown") : "",beer.brew_container,beer.tasted_date,repeatIDs.contains(beer.id) ? "yes" : "no"]
         }
         let recent = history.prefix(100).map { row($0,candidate:false) }
         let choices = candidates.prefix(12).map { row($0.beer,candidate:true) }
         // Feedback outside the rolling cache still influences candidate ranking
         // and this bounded style summary. No feedback records are deleted here.
         var totals: [String:[Int]] = [:]
-        for item in feedback {
+        for item in effectiveFeedback {
             let style = String(item.beer.brew_style.prefix(32)).lowercased()
             guard !style.isEmpty else { continue }
             var counts = totals[style] ?? [0,0]; counts[item.rating == .liked ? 0 : 1] += 1; totals[style] = counts

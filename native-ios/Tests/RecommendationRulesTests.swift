@@ -50,6 +50,59 @@ final class RecommendationRulesTests: XCTestCase {
         XCTAssertFalse(choices.contains { $0.id == "no" })
         XCTAssertTrue(choices.first?.reason.contains("you liked") == true)
     }
+    func testExplicitDislikeFollowsRecipeAcrossPackagesButNotVariantsOrBreweries() {
+        var draft = beer("draft",style:"IPA",brewer:"Example"); draft.brew_name = "Example IPA"
+        var bottle = draft; bottle.id = "bottle"; bottle.brew_name += " (BTL)"
+        var can = draft; can.id = "can"; can.brew_name += " - Can"
+        var variant = bottle; variant.id = "variant"; variant.brew_name = "Example IPA Barrel Aged (BTL)"
+        var other = bottle; other.id = "other"; other.brewer = "Other Brewery"
+        let feedback = [BeerFeedback(beer:draft,rating:.notForMe)]
+        let choices = RecommendationRules.shortlist(taplist:[bottle,can,variant,other],history:[],excluded:[],feedback:feedback)
+        XCTAssertEqual(Set(choices.map(\.id)),["variant","other"])
+        XCTAssertEqual(RecommendationRules.rating(for:bottle,feedback:feedback),.notForMe)
+        var unknown = bottle; unknown.brewer = ""
+        XCTAssertNil(RecommendationRules.rating(for:unknown,feedback:feedback),"Missing brewery must not imply a recipe match")
+    }
+    func testPackageFeedbackUsesLatestIntentWithConservativeStableTies() {
+        var draft = beer("draft",brewer:"Example"); draft.brew_name = "Example IPA"
+        var bottle = draft; bottle.id = "bottle"; bottle.brew_name += " (BTL)"
+        let old = BeerFeedback(beer:draft,rating:.notForMe,ratedAt:Date(timeIntervalSince1970:1))
+        let recent = BeerFeedback(beer:bottle,rating:.liked,ratedAt:Date(timeIntervalSince1970:2))
+        for feedback in [[old,recent],[recent,old]] {
+            XCTAssertEqual(RecommendationRules.rating(for:draft,feedback:feedback),.liked)
+            XCTAssertEqual(RecommendationRules.resolvedFeedback(feedback),[recent])
+            XCTAssertEqual(RecommendationRules.shortlist(taplist:[draft],history:[],excluded:[],feedback:feedback).map(\.id),["draft"])
+        }
+        let legacy = BeerFeedback(beer:draft,rating:.notForMe,ratedAt:nil)
+        XCTAssertEqual(RecommendationRules.rating(for:draft,feedback:[legacy,recent]),.liked)
+        var tied = old; tied.ratedAt = recent.ratedAt
+        XCTAssertEqual(RecommendationRules.rating(for:bottle,feedback:[recent,tied]),.notForMe)
+        XCTAssertEqual(RecommendationRules.rating(for:bottle,feedback:[tied,recent]),.notForMe)
+    }
+    func testFeedbackIndexPreservesExactIDFallbackAndLatestRecipeRating() {
+        var old = beer("same-id",brewer:"Original"); old.brew_name = "Original IPA"
+        var corrected = old; corrected.brewer = "Corrected"; corrected.brew_name = "Corrected IPA"
+        var bottle = corrected; bottle.id = "bottle-id"; bottle.brew_name += " (BTL)"
+        let exact = BeerFeedback(beer:old,rating:.liked,ratedAt:Date(timeIntervalSince1970:3))
+        let recipe = BeerFeedback(beer:bottle,rating:.notForMe,ratedAt:Date(timeIntervalSince1970:2))
+        for records in [[exact,recipe],[recipe,exact]] {
+            let index = RecommendationRules.FeedbackIndex(records)
+            XCTAssertEqual(index.rating(for:corrected),.liked,"Newest exact-ID feedback survives metadata corrections")
+            XCTAssertEqual(index.rating(for:bottle),.notForMe,"Different recipes must not merge via unrelated IDs")
+            XCTAssertEqual(RecommendationRules.dislikedIDs(in:[corrected,bottle],feedback:records),["bottle-id"])
+        }
+    }
+    func testPresentationVarietyNeverChangesRelativeStrengthEligibility() {
+        let taplist = (1...8).map { value -> Beer in var b = beer(String(value)); b.abv = Double(value); return b }
+        for preference in [SuggestionABV.lower,.higher] {
+            let selection = SuggestionPreferences(abv:preference)
+            let eligible = RecommendationRules.eligible(taplist:taplist,history:[],excluded:[],feedback:[],preferences:selection)
+            let first = RecommendationRules.shortlist(taplist:taplist,history:[],excluded:[],preferences:selection)
+            let another = RecommendationRules.shortlist(taplist:taplist,history:[],excluded:[],preferences:selection,presentationExcluded:Set(first.prefix(3).map(\.id)))
+            XCTAssertEqual(another.count,1)
+            XCTAssertTrue(Set(another.map(\.id)).isSubset(of:Set(eligible.map(\.id))))
+        }
+    }
     func testContainerPreferencesAreStrictAndNeverWidenToFillThree() {
         var draft = beer("draft"); draft.brew_container = "16oz Draught"
         var bottle = beer("bottle"); bottle.brew_container = "Bottle"

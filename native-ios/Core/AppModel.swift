@@ -23,7 +23,7 @@ final class AppModel: ObservableObject {
             taplistValidation:taplistValidation,tastingValidation:tastingValidation,queueValidation:queueValidation)
     }
     var recommendationExcludedIDs: Set<String> {
-        Set(tastedBeers.map(\.id)).union(beerFeedback.filter { $0.rating == .notForMe }.map(\.id)).union(queuedBeerIDs).union(busyIDs)
+        Set(tastedBeers.map(\.id)).union(RecommendationRules.dislikedIDs(in:allBeers,feedback:beerFeedback)).union(queuedBeerIDs).union(busyIDs)
             .union(operations.filter { ownsOperation($0) }.compactMap { $0.payload["beerId"] })
             .union(allBeers.filter { beer in queue.contains { $0.name.localizedCaseInsensitiveContains(beer.brew_name) } }.map(\.id))
     }
@@ -96,7 +96,7 @@ final class AppModel: ObservableObject {
     var activityUpdate: (@MainActor (MemberSession, [QueueEntry]) async -> Void)?
     var webCookieCleanup: (@MainActor () async -> Void)?
     private let monitor = NWPathMonitor()
-    private var epoch = UUID() { didSet { recommendations.cancel(); recentTastings = []; beerFeedback = []; taplistValidation = nil; tastingValidation = nil; queueValidation = nil; cancelEnrichmentUpdates(); queueLoaded = false; queueError = nil; loadingQueue = false; rewardsLoaded = false; rewardsError = nil; rewardsNotice = nil } }
+    private var epoch = UUID() { didSet { busyIDs = []; recommendations.cancel(); recentTastings = []; beerFeedback = []; taplistValidation = nil; tastingValidation = nil; queueValidation = nil; cancelEnrichmentUpdates(); queueLoaded = false; queueError = nil; loadingQueue = false; rewardsLoaded = false; rewardsError = nil; rewardsNotice = nil } }
     @Published private(set) var processing = false
     private var lastFocusRefresh = Date.distantPast
     private var pendingURL: URL?
@@ -551,6 +551,7 @@ final class AppModel: ObservableObject {
                 // Capture intent even offline; acknowledgement is recorded only after delivery.
                 var choice = BeerChoiceContext(taplist:allBeers.contains(where:{ $0.id == beer.id }) ? allBeers : allBeers + [beer],shown:[],preferences:.init(),usedModel:false,taplistValidation:taplistValidation)
                 choice.selected = [beer.id]
+                choice.selectedAt = [beer.id:choice.presentedAt]
                 payload["choiceContextID"] = choice.id
                 manualChoice = choice
             }
@@ -584,7 +585,11 @@ final class AppModel: ObservableObject {
                 guard op.type == "CHECK_IN_BEER", let beerID = op.payload["beerId"], let name = op.payload["beerName"], op.payload["memberId"] != nil, op.payload["storeId"] != nil else {
                     try db.execute("UPDATE operation_queue SET status='failed',error_message=? WHERE id=?",["This saved operation requires review before retrying.",op.id]); continue
                 }
-                try db.execute("UPDATE operation_queue SET status='retrying',last_retry_timestamp=? WHERE id=?",[String(Date().timeIntervalSince1970 * 1000),op.id]); try reload()
+                // Persist the ambiguous state before dispatch. A crash or account change may
+                // prevent receipt handling; recommendations must then require explicit retry.
+                let dispatchStatus = op.payload["recommendation"] == "true" ? "failed" : "retrying"
+                let dispatchError: String? = dispatchStatus == "failed" ? "Check-in may have been sent. Review your beer queue before retrying." : nil
+                try db.execute("UPDATE operation_queue SET status=?,error_message=?,last_retry_timestamp=? WHERE id=?",[dispatchStatus,dispatchError,String(Date().timeIntervalSince1970 * 1000),op.id]); try reload()
                 do {
                     let fields = ["chitCode":"\(beerID)-\(member.storeId)-\(member.memberId)","chitBrewId":beerID,"chitBrewName":name,"chitStoreName":member.storeName]
                     let (data,_) = try await api.request(api.configuration.endpoint("addToQueue.php"),method:"POST",fields:fields,member:member,cookies:cookies,retry:false)
@@ -633,6 +638,7 @@ final class AppModel: ObservableObject {
         catch { self.error = error.localizedDescription }
     }
     func removeOperation(_ id: String) {
+        guard !processing else { return }
         do { try db?.execute("DELETE FROM operation_queue WHERE id=?",[id]); try reload() } catch { self.error = error.localizedDescription }
     }
     func clearOperations() {
@@ -642,7 +648,7 @@ final class AppModel: ObservableObject {
     func deleteQueueEntry(_ entry: QueueEntry) async {
         guard !previewMode, let member = session, isMember, !busyIDs.contains(entry.id) else { return }
         let token = epoch
-        busyIDs.insert(entry.id); defer { busyIDs.remove(entry.id) }
+        busyIDs.insert(entry.id); defer { if token == epoch { busyIDs.remove(entry.id) } }
         var url = URLComponents(url:api.configuration.endpoint("deleteQueuedBrew.php"),resolvingAgainstBaseURL:false)!
         url.queryItems = [.init(name:"cid",value:entry.id)]
         do {
@@ -655,7 +661,7 @@ final class AppModel: ObservableObject {
         guard !previewMode, let member = session, isMember, !reward.redeemed, !busyIDs.contains(reward.id) else { return }
         rewardsError = nil; rewardsNotice = nil
         let token = epoch
-        busyIDs.insert(reward.id); defer { busyIDs.remove(reward.id) }
+        busyIDs.insert(reward.id); defer { if token == epoch { busyIDs.remove(reward.id) } }
         do {
             _ = try await api.request(api.configuration.endpoint("addToRewardQueue.php"),method:"POST",fields:["chitCode":reward.id,"chitRewardType":reward.type,"chitStoreName":member.storeName,"chitUserId":member.memberId],member:member,cookies:cookies,referer:"memberRewards.php",retry:false)
             guard token == epoch else { return }
