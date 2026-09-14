@@ -67,7 +67,9 @@ struct SuggestionStyleRequest {
         .init(label:"Porter",aliases:["porter","porters"],pattern:#"\bporters?\b"#),
         .init(label:"Lager",aliases:["lager","lagers"],pattern:#"\b(?:lager|pilsner|pilsener|helles|bock|marzen|märzen|schwarzbier)\b"#),
         .init(label:"Pilsner",aliases:["pilsner","pils","pilsener"],pattern:#"\b(?:pilsner|pilsener|pils)\b"#),
-        .init(label:"Wheat",aliases:["wheat","wheat beer","hefeweizen","witbier"],pattern:#"\b(?:wheat|hefeweizen|weissbier|witbier)\b"#),
+        .init(label:"Wheat",aliases:["wheat","wheat beer"],pattern:#"\b(?:wheat|hefe\s?weizen|weissbier|witbier)\b"#),
+        .init(label:"Hefeweizen",aliases:["hefeweizen"],pattern:#"\bhefe\s?weizen\b"#),
+        .init(label:"Witbier",aliases:["witbier"],pattern:#"\bwitbier\b"#),
         .init(label:"Sour",aliases:["sour","sours"],pattern:#"\b(?:sour|gose|lambic|gueuze|berliner weisse)\b"#),
         .init(label:"Saison",aliases:["saison","saisons"],pattern:#"\bsaison\b"#),
         .init(label:"Pale ale",aliases:["pale ale"],pattern:#"^(?!.*\b(?:india|ipa)\b).*\bpale ale\b"#),
@@ -75,10 +77,40 @@ struct SuggestionStyleRequest {
         .init(label:"Brown ale",aliases:["brown","brown ale"],pattern:#"\bbrown\b"#),
         .init(label:"Hazy",aliases:["hazy"],pattern:#"\b(?:hazy|new england|neipa)\b"#),
         .init(label:"Hazy IPA",aliases:["hazy ipa","new england ipa","neipa"],pattern:#"^(?=.*\b(?:hazy|new england|neipa)\b)(?=.*\b(?:ipa|india pale ale|neipa)\b).*"#),
-        .init(label:"Double IPA",aliases:["double ipa","imperial ipa","dipa"],pattern:#"\b(?:(?:double|imperial) (?:ipa|india pale ale)|dipa)\b"#),
-        .init(label:"Dry stout",aliases:["dry stout","irish stout"],pattern:#"\b(?:dry|irish).*\bstout\b"#),
-        .init(label:"Imperial stout",aliases:["imperial stout"],pattern:#"\bimperial.*\bstout\b"#)
+        .init(label:"Double IPA",aliases:["double ipa","imperial ipa","dipa"],pattern:#"^(?:(?=.*\b(?:double|imperial)\b)(?=.*\b(?:ipa|india pale ale)\b).*|.*\bdipa\b.*)$"#),
+        .init(label:"Dry stout",aliases:["dry stout","irish stout"],pattern:#"^(?=.*\b(?:dry|irish)\b)(?=.*\bstout\b).*"#),
+        .init(label:"Imperial stout",aliases:["imperial stout"],pattern:#"^(?=.*\bimperial\b)(?=.*\bstout\b).*"#)
     ]
+    private static func normalized(_ value: String) -> String {
+        value.folding(options:[.caseInsensitive,.diacriticInsensitive],locale:Locale(identifier:"en_US_POSIX"))
+            .replacingOccurrences(of:#"[^a-z0-9]+"#,with:" ",options:.regularExpression)
+            .trimmingCharacters(in:.whitespaces)
+    }
+    private var positiveTerms: Set<String> = []
+    private var negativeTerms: Set<String> = []
+    private static func terms(_ value: String) -> Set<String> {
+        let stop: Set<String> = ["a","an","the","i","me","my","you","your","want","please","beer","beers","something","some","with","without","not","no","or","and","but","like","than","to","for","of","it","is"]
+        let variants = ["roasty":"roast","roasted":"roast","roasting":"roast","refreshing":"refresh","refreshingly":"refresh","hoppy":"hop","hops":"hop","malty":"malt","malts":"malt","fruity":"fruit","fruits":"fruit","chocolaty":"chocolate","chocolatey":"chocolate","citrusy":"citrus"]
+        return Set(normalized(value).split(separator:" ").map(String.init).filter { !stop.contains($0) }.map { variants[$0] ?? $0 })
+    }
+    /// Retrieval hints, not semantic interpretation or hard eligibility. Score the
+    /// whole eligible pool before capping it; negative wording never earns a boost.
+    func relevance(of beer: Beer) -> Int {
+        guard needsModel else { return 0 }
+        let identity = Self.terms(beer.brew_name + " " + beer.brew_style + " " + beer.brewer)
+        let description = Self.terms(beer.plainDescription)
+        return 3 * positiveTerms.intersection(identity).count + positiveTerms.intersection(description).count
+            - 3 * negativeTerms.intersection(identity.union(description)).count
+    }
+    func evidence(in candidates: [BeerSuggestion]) -> [String:[String]]? {
+        guard needsModel else { return nil }
+        let requested = positiveTerms.union(negativeTerms)
+        return Dictionary(uniqueKeysWithValues:candidates.prefix(12).map { suggestion in
+            let beer = suggestion.beer
+            let metadata = Self.terms(beer.brew_name + " " + beer.brew_style + " " + beer.brewer + " " + beer.plainDescription)
+            return (beer.id,requested.intersection(metadata).sorted())
+        })
+    }
     private var included: [Style] = []
     private var excluded: [Style] = []
     private(set) var needsModel = false
@@ -93,14 +125,16 @@ struct SuggestionStyleRequest {
     init(_ text: String) {
         let normalized = text.lowercased().trimmingCharacters(in:.whitespacesAndNewlines)
             .replacingOccurrences(of:#"\s+"#,with:" ",options:.regularExpression)
-            .replacingOccurrences(of:#"\s+(?:but )?(?=not |no |without |exclude )"#,with:",",options:.regularExpression)
+            .replacingOccurrences(of:#"\s+(?:but )?(?=not |no |without |exclude |nothing )"#,with:",",options:.regularExpression)
         guard !normalized.isEmpty else { return }
         var negative = false
         for raw in normalized.components(separatedBy:",") {
             var clause = raw.trimmingCharacters(in:.whitespacesAndNewlines)
-            if let prefix = ["not ","no ","without ","exclude "].first(where:{ clause.hasPrefix($0) }) {
+            if let prefix = ["not ","no ","without ","exclude ","nothing "].first(where:{ clause.hasPrefix($0) }) {
                 negative = true; clause.removeFirst(prefix.count)
             } else { negative = false }
+            if negative { negativeTerms.formUnion(Self.terms(clause)) }
+            else { positiveTerms.formUnion(Self.terms(clause)) }
             let alternatives = clause.replacingOccurrences(of:" or ",with:"|").components(separatedBy:"|")
             // Resolve the entire clause before applying it, so partial recognition
             // cannot turn "IPA or something refreshing" into an IPA-only search.
@@ -113,7 +147,7 @@ struct SuggestionStyleRequest {
     }
     func allows(_ beer: Beer) -> Bool {
         guard hasFilters else { return true }
-        let style = beer.brew_style.lowercased().trimmingCharacters(in:.whitespacesAndNewlines)
+        let style = Self.normalized(beer.brew_style)
         guard !style.isEmpty else { return false } // Unknown style cannot establish a match or exclusion.
         func matches(_ rule: Style) -> Bool { style.range(of:rule.pattern,options:.regularExpression) != nil }
         return (included.isEmpty || included.contains(where:matches)) && !excluded.contains(where:matches)
@@ -224,6 +258,8 @@ enum RecommendationRules {
         let queuedStyles = Set(context.flatMap { choice in choice.taplist.filter { choice.queued.contains($0.id) }.map { styleFamily($0.style) } }.filter { !$0.isEmpty })
         let selectedStyles = Set(context.flatMap { choice in choice.taplist.filter { choice.selected.contains($0.id) }.map { styleFamily($0.style) } }.filter { !$0.isEmpty })
         var pool = eligible(taplist:taplist,history:history,excluded:excluded,feedback:feedback,preferences:preferences).filter { !presentationExcluded.contains($0.id) }
+        let request = preferences.styleRequest
+        let relevance = Dictionary(uniqueKeysWithValues:pool.map { ($0.id,request.relevance(of:$0)) })
         var result: [BeerSuggestion] = []
         var chosenStyles: Set<String> = [], chosenBreweries: Set<String> = []
         func score(_ beer: Beer) -> Int {
@@ -234,6 +270,15 @@ enum RecommendationRules {
         }
         while !pool.isEmpty && result.count < 12 {
             pool.sort {
+                // With nuanced requests, reserve coverage for other eligible
+                // styles before filling the remaining slots with repeats. This
+                // also gives the model options for moods without literal matches.
+                if request.needsModel {
+                    let leftSeen = chosenStyles.contains(styleFamily($0.brew_style))
+                    let rightSeen = chosenStyles.contains(styleFamily($1.brew_style))
+                    if leftSeen != rightSeen { return !leftSeen }
+                }
+                if relevance[$0.id] != relevance[$1.id] { return relevance[$0.id]! > relevance[$1.id]! }
                 if preferences.abv != .any, $0.abv != $1.abv {
                     return preferences.abv == .lower ? $0.abv! < $1.abv! : $0.abv! > $1.abv!
                 }
@@ -314,9 +359,10 @@ enum RecommendationModelInput {
             let feedbackStyleColumns: [String]; let feedbackByStyle: [[String]]
             let selectionPreferences: SuggestionPreferences
             let choiceExamples: [ChoiceModelInput.Example]
+            let candidateRequestTerms: [String:[String]]?
         }
         let input = Input(columns:["candidateID","name","styleIndex","breweryIndex","explicitRating","abvPercent","container","tastedDate","avoidRepeat"],styles:styles,breweries:breweries,
-                          recentTastings:recent,candidates:choices,feedbackStyleColumns:["style","liked","notForMe"],feedbackByStyle:preferences,selectionPreferences:selection,choiceExamples:ChoiceModelInput.examples(context))
+                          recentTastings:recent,candidates:choices,feedbackStyleColumns:["style","liked","notForMe"],feedbackByStyle:preferences,selectionPreferences:selection,choiceExamples:ChoiceModelInput.examples(context),candidateRequestTerms:selection.styleRequest.evidence(in:candidates))
         return String(decoding:try JSONEncoder().encode(input),as:UTF8.self)
     }
 }

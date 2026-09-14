@@ -61,6 +61,7 @@ enum RecommendationPromptBudget {
             "styles":styles,"breweries":breweries,"candidateColumns":["id","name","styleIndex","breweryIndex","rating","abv","container"],"candidates":rows,
             "feedbackColumns":["style","liked","notForMe"],"feedback":feedbackRows,
             "preferences":["container":preferences.container.rawValue,"abv":preferences.abv.rawValue,"request":preferences.request],"choices":examples]
+        if let evidence = preferences.styleRequest.evidence(in:candidates) { input["candidateRequestTerms"] = evidence }
         if lean {
             input.removeValue(forKey:"breweries")
             input["tastingFormat"] = "Space-separated styleIndex/rating, newest first; L=liked,N=notForMe,empty=unrated"

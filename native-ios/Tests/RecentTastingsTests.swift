@@ -13,6 +13,21 @@ final class RecentTastingsTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at:folder) }
         try body(BeerDatabase(url:folder.appendingPathComponent("beers.db")),folder.appendingPathComponent("beers.db"))
     }
+    func testReviewUnusedPresentationsDoNotEvictActualChoiceEvidence() throws {
+        try withDB { db,_ in
+            var chosen = BeerChoiceContext(taplist:[beer(1)],shown:["1"],preferences:.init(),usedModel:false)
+            chosen.presentedAt = Date(timeIntervalSince1970:1)
+            chosen.selected = ["1"]; chosen.queued = ["1"]
+            try db.saveChoicePresentation(chosen,account:"a")
+            for value in 2...101 {
+                var unused = BeerChoiceContext(taplist:[beer(value)],shown:[String(value)],preferences:.init(),usedModel:false)
+                unused.presentedAt = Date(timeIntervalSince1970:Double(value))
+                try db.saveChoicePresentation(unused,account:"a")
+            }
+            XCTAssertTrue(try db.choiceContexts(account:"a").contains { $0.id == chosen.id },"Unselected suggestions should not erase the only actual check-in signal")
+        }
+    }
+
     func testChoiceContextIsImmutableScopedAndSeparatesQueueFromTasting() throws {
         try withDB { db,url in
             var b = beer(1)
@@ -120,12 +135,48 @@ final class RecentTastingsTests: XCTestCase {
             XCTAssertEqual(saved.queued,[b.id])
         }
     }
+    func testChoiceRetentionSeparatesUnusedAndIntentAndMigratesOldRecords() throws {
+        try withDB { db,url in
+            // Recreate the previous schema to exercise real upgrade/backfill.
+            try db.execute("DROP TABLE beer_choices")
+            try db.execute("CREATE TABLE beer_choices(account TEXT NOT NULL,id TEXT NOT NULL,day REAL NOT NULL,context TEXT NOT NULL,PRIMARY KEY(account,id))")
+            var old = BeerChoiceContext(taplist:[beer(1)],shown:["1"],preferences:.init(),usedModel:false)
+            old.selected = ["1"]; old.presentedAt = Date(timeIntervalSince1970:1)
+            try db.execute("INSERT INTO beer_choices VALUES(?,?,?,?)",["a",old.id,"1",String(decoding:try JSONEncoder().encode(old),as:UTF8.self)])
+            let upgraded = try BeerDatabase(url:url)
+            XCTAssertEqual(try upgraded.rows("SELECT has_intent FROM beer_choices").first?["has_intent"],"1")
+            for i in 2...100 {
+                var choice = BeerChoiceContext(taplist:[beer(i)],shown:[String(i)],preferences:.init(),usedModel:false)
+                choice.selected = [String(i)]; choice.presentedAt = Date(timeIntervalSince1970:Double(i))
+                try upgraded.saveChoicePresentation(choice,account:"a")
+            }
+            var displayed = BeerChoiceContext(taplist:[beer(101)],shown:["101"],preferences:.init(),usedModel:false)
+            displayed.presentedAt = Date(timeIntervalSince1970:101)
+            try upgraded.saveChoicePresentation(displayed,account:"a")
+            XCTAssertEqual(try upgraded.choiceContexts(account:"a").count,101)
+            XCTAssertTrue(try upgraded.choiceContexts(account:"a").contains { $0.id == old.id })
+            try upgraded.updateChoice(id:displayed.id,account:"b",beerID:"101",selected:true)
+            XCTAssertFalse(try XCTUnwrap(upgraded.choiceContexts(account:"a").first).hasIntent)
+            try upgraded.updateChoice(id:displayed.id,account:"a",beerID:"101",selected:true)
+            XCTAssertEqual(try upgraded.choiceContexts(account:"a").count,100)
+            XCTAssertFalse(try upgraded.choiceContexts(account:"a").contains { $0.id == old.id })
+            try upgraded.updateChoice(id:displayed.id,account:"a",beerID:"101",selected:false)
+            XCTAssertEqual(try upgraded.choiceContexts(account:"a").filter(\.hasIntent).count,99)
+            try upgraded.updateChoice(id:displayed.id,account:"a",beerID:"101",selected:true)
+            try upgraded.updateChoice(id:displayed.id,account:"a",beerID:"101",outcome:.added)
+            let saved = try XCTUnwrap(BeerDatabase(url:url).choiceContexts(account:"a").first)
+            XCTAssertEqual(saved.taplist,displayed.taplist)
+            XCTAssertEqual(saved.queued,["101"])
+        }
+    }
+
     func testChoiceRetentionAndHistoryClearNeverDeleteFeedback() throws {
         try withDB { db,_ in
             try db.saveBeerFeedback(.init(beer:beer(1),rating:.liked),account:"a")
             for i in 0..<105 {
                 var choice = BeerChoiceContext(taplist:[beer(i)],shown:[String(i)],preferences:.init(),usedModel:false)
                 choice.presentedAt = Date(timeIntervalSince1970:Double(i))
+                choice.selected = [String(i)]
                 try db.saveChoicePresentation(choice,account:"a")
             }
             XCTAssertEqual(try db.choiceContexts(account:"a").count,100)

@@ -49,6 +49,63 @@ final class RecommendationRulesTests: XCTestCase {
         XCTAssertTrue(SuggestionPreferences(request:"something like an IPA").styleRequest.needsModel)
     }
 
+    func testReviewSpecificWheatSubstyleDoesNotBroadenToOtherWheatBeers() {
+        let taplist = [beer("hefe",style:"Hefeweizen"),beer("wit",style:"Witbier"),beer("wheat",style:"American Wheat")]
+        XCTAssertEqual(SuggestionPreferences(request:"hefeweizen").candidates(from:taplist).map(\.id),["hefe"])
+        XCTAssertEqual(SuggestionPreferences(request:"witbier").candidates(from:taplist).map(\.id),["wit"])
+    }
+    func testReviewSubstyleMatchesBothMetadataWordOrders() {
+        let taplist = [beer("prefix",style:"Imperial Stout"),beer("suffix",style:"Stout - Imperial")]
+        XCTAssertEqual(SuggestionPreferences(request:"imperial stout").candidates(from:taplist).map(\.id),["prefix","suffix"])
+        XCTAssertEqual(SuggestionPreferences(request:"double IPA").candidates(from:[beer("double",style:"IPA - Imperial / Double")]).map(\.id),["double"])
+    }
+    func testReviewMoodMatchingCandidateReachesModelShortlist() {
+        var history = beer("old",style:"IPA",brewer:"Brewery"); history.tasted_date = "01/01/2000"
+        let taplist = (0..<13).map { beer(String($0),style:"IPA",brewer:"Brewery") } + [beer("stout",style:"Stout",brewer:"Other")]
+        let result = RecommendationRules.shortlist(taplist:taplist,history:[history],excluded:[],preferences:.init(request:"a roasty stout"))
+        XCTAssertTrue(result.contains { $0.id == "stout" },"The model cannot honor the request if its only matching option is removed before inference")
+    }
+
+    func testMoodWithoutLiteralMatchesStillOffersTheModelStyleVariety() {
+        var old = beer("old",style:"IPA",brewer:"Brewery"); old.tasted_date = "01/01/2000"
+        let taplist = (0..<20).map { beer(String($0),style:"IPA",brewer:"Brewery") }
+            + [beer("stout",style:"Stout"),beer("lager",style:"Lager")]
+        let result = RecommendationRules.shortlist(taplist:taplist,history:[old],excluded:[],preferences:.init(request:"Something adventurous"))
+        XCTAssertEqual(result.count,12)
+        XCTAssertTrue(result.contains { $0.id == "stout" })
+        XCTAssertTrue(result.contains { $0.id == "lager" })
+    }
+
+    func testRequestRetrievalUsesDescriptionAndHonorsNegativeWordsAndHardEligibility() throws {
+        var wanted = beer("wanted",style:"Stout"); wanted.brew_description = "Roasted coffee, dry finish"; wanted.abv = 5; wanted.brew_container = "Draft"
+        var sweet = beer("sweet",style:"Stout"); sweet.brew_description = "Sweet chocolate"; sweet.abv = 5; sweet.brew_container = "Draft"
+        var excluded = wanted; excluded.id = "excluded"
+        var bottle = wanted; bottle.id = "bottle"; bottle.brew_container = "Bottle"
+        var unknown = wanted; unknown.id = "unknown"; unknown.abv = nil
+        let preferences = SuggestionPreferences(container:.draft,abv:.lower,request:"roasty, nothing sweet")
+        let result = RecommendationRules.shortlist(taplist:[sweet,wanted,excluded,bottle,unknown],history:[],excluded:["excluded"],preferences:preferences)
+        XCTAssertEqual(result.map(\.id),["wanted","sweet"])
+        for prompt in [try RecommendationModelInput.prompt(history:[],candidates:result,feedback:[],preferences:preferences),
+                       try RecommendationPromptBudget.compact(history:[],candidates:result,feedback:[],preferences:preferences,context:[]),
+                       try RecommendationPromptBudget.compact(history:[],candidates:result,feedback:[],preferences:preferences,context:[],lean:true)] {
+            let json = try XCTUnwrap(JSONSerialization.jsonObject(with:Data(prompt.utf8)) as? [String:Any])
+            let evidence = try XCTUnwrap(json["candidateRequestTerms"] as? [String:[String]])
+            XCTAssertEqual(evidence["wanted"],["roast"])
+            XCTAssertEqual(evidence["sweet"],["sweet"])
+            XCTAssertFalse(prompt.contains("Roasted coffee"),"Only bounded matching terms are added to the prompt")
+        }
+    }
+    func testSpecificStyleExclusionsAndPunctuationKeepTheirMeaning() {
+        let beers = [beer("hefe",style:"Hefe-Weizen"),beer("wit",style:"Witbier"),beer("wheat",style:"American Wheat")]
+        XCTAssertEqual(SuggestionPreferences(request:"wheat").candidates(from:beers).count,3)
+        XCTAssertEqual(SuggestionPreferences(request:"not hefeweizen").candidates(from:beers).map(\.id),["wit","wheat"])
+        XCTAssertEqual(SuggestionPreferences(request:"not witbier").candidates(from:beers).map(\.id),["hefe","wheat"])
+        let stouts = [beer("dry",style:"Stout - Irish Dry"),beer("imperial",style:"Stout / Imperial"),beer("oatmeal",style:"Oatmeal Stout")]
+        XCTAssertEqual(SuggestionPreferences(request:"dry stout").candidates(from:stouts).map(\.id),["dry"])
+        XCTAssertEqual(SuggestionPreferences(request:"stout, not imperial stout").candidates(from:stouts).map(\.id),["dry","oatmeal"])
+        XCTAssertEqual(SuggestionPreferences(request:"IPA, not double IPA").candidates(from:[beer("double",style:"IPA - Imperial / Double"),beer("session",style:"Session IPA")]).map(\.id),["session"])
+    }
+
     func testChoicePromptIsBoundedAndOmitsPrivateUpstreamMetadata() throws {
         var beer = Beer(id:"1",name:"Beer"); beer.chit_code = "PRIVATE-RECEIPT"
         beer.brew_description = "PRIVATE-DESCRIPTION"; beer.brew_style = "IPA"

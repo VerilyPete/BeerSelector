@@ -1,3 +1,14 @@
+**Review repairs for `46e62900` — September 14, 2026**
+
+The four follow-up PR review findings are resolved:
+
+1. Request-aware retrieval scores matching metadata terms across the eligible pool before the 12-candidate cap, and reserves style variety for nuanced moods without literal matches. It leaves all hard filters intact. Bounded matched terms accompany candidates in full, compact, and lean prompts; the provider-input regression proves the relevant stout actually reaches inference.
+2. Hefeweizen and witbier remain specific styles; only a wheat-family request includes both. Positive and negative cases are covered.
+3. Normalized family/modifier matching accepts both “Imperial Stout” and “Stout - Imperial,” and equivalent double-IPA/dry-stout labels. Exclusions use the same matching rules.
+4. An additive `has_intent` migration backfills existing contexts. Independent quotas retain 100 actual selections/check-ins and the latest unused presentation. Empty searches no longer evict actual choices. Selection/deselection, acknowledgement, account scope, immutable facts, and the 100-to-101 boundary are tested. Refresh keeps ownership of its existing database transaction; direct selection updates establish their own.
+
+All four original review probes failed before implementation. The final suite passed **191 tests, zero failures or skips**. The existing-cache simulator style/fallback flow also passed. Evidence: `/private/tmp/four-fixes-verified.xcresult`, `/private/tmp/four-fixes-summary.json`, `/private/tmp/four-fixes-ui.log`. Re-review found no remaining actionable issue in these four repaired areas. Keyword retrieval does not guarantee semantic understanding of arbitrary prose; real-device AI quality and the Cloud toolchain remain separate validation tasks.
+
 **Review repairs for `19e8e987` — September 14, 2026**
 
 All six original findings are resolved. Four implementation agents worked on independent concerns; two separate agents re-reviewed state/recovery and ranking/model behavior. The root integrated and tested the result. No remaining actionable findings were reported in those review scopes.

@@ -29,6 +29,7 @@ struct BeerChoiceContext: Codable, Equatable, Identifiable {
     var queuedAt: [String:Date] = [:]
     // Optional for compatibility with choices saved before intent timestamps existed.
     var selectedAt: [String:Date]? = [:]
+    var hasIntent: Bool { !selected.isEmpty || !queued.isEmpty || !laterTasted.isEmpty }
     init(taplist: [Beer], shown: [String], preferences: SuggestionPreferences, usedModel: Bool, taplistValidation: UUID? = nil) {
         self.taplist = taplist.map(ChoiceBeer.init); self.shown = shown
         self.preferences = preferences; self.usedModel = usedModel; self.taplistValidation = taplistValidation
@@ -36,10 +37,17 @@ struct BeerChoiceContext: Codable, Equatable, Identifiable {
 }
 extension BeerDatabase {
     func setupChoiceContexts() throws {
-        try execute("CREATE TABLE IF NOT EXISTS beer_choices(account TEXT NOT NULL,id TEXT NOT NULL,day REAL NOT NULL,context TEXT NOT NULL,PRIMARY KEY(account,id))")
+        try execute("CREATE TABLE IF NOT EXISTS beer_choices(account TEXT NOT NULL,id TEXT NOT NULL,day REAL NOT NULL,context TEXT NOT NULL,has_intent INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(account,id))")
+        if try !rows("PRAGMA table_info(beer_choices)").contains(where:{ $0["name"] == "has_intent" }) {
+            try execute("ALTER TABLE beer_choices ADD COLUMN has_intent INTEGER NOT NULL DEFAULT 0")
+            for row in try rows("SELECT account,id,context FROM beer_choices") {
+                let choice = try JSONDecoder().decode(BeerChoiceContext.self,from:Data((row["context"] ?? "").utf8))
+                try execute("UPDATE beer_choices SET has_intent=? WHERE account=? AND id=?",[choice.hasIntent ? "1" : "0",row["account"],row["id"]])
+            }
+        }
     }
     func choiceContexts(account: String) throws -> [BeerChoiceContext] {
-        try rows("SELECT context FROM beer_choices WHERE account=? ORDER BY day DESC,id DESC LIMIT 100",[account]).map {
+        try rows("SELECT context FROM beer_choices WHERE account=? ORDER BY day DESC,id DESC LIMIT 101",[account]).map {
             try JSONDecoder().decode(BeerChoiceContext.self,from:Data(($0["context"] ?? "").utf8))
         }
     }
@@ -48,13 +56,23 @@ extension BeerDatabase {
         try transaction {
             let json = String(decoding:try JSONEncoder().encode(choice),as:UTF8.self)
             // A duplicate presentation ID must never replace its original taplist.
-            try execute("INSERT OR IGNORE INTO beer_choices(account,id,day,context) VALUES(?,?,?,?)",[account,choice.id,String(choice.presentedAt.timeIntervalSince1970),json])
-            try execute("DELETE FROM beer_choices WHERE account=? AND id NOT IN (SELECT id FROM beer_choices WHERE account=? ORDER BY day DESC,id DESC LIMIT 100)",[account,account])
+            try execute("INSERT OR IGNORE INTO beer_choices(account,id,day,context,has_intent) VALUES(?,?,?,?,?)",[account,choice.id,String(choice.presentedAt.timeIntervalSince1970),json,choice.hasIntent ? "1" : "0"])
+            try pruneChoiceContexts(account:account)
+        }
+    }
+    private func pruneChoiceContexts(account: String) throws {
+        // A displayed but unused presentation must remain selectable, without
+        // consuming any of the 100 retained intent records.
+        for (intent,limit) in [("1",100),("0",1)] {
+            try execute("DELETE FROM beer_choices WHERE account=? AND has_intent=? AND id NOT IN (SELECT id FROM beer_choices WHERE account=? AND has_intent=? ORDER BY day DESC,id DESC LIMIT \(limit))",[account,intent,account,intent])
         }
     }
     private func storeChoice(_ choice: BeerChoiceContext, account: String) throws {
         let json = String(decoding:try JSONEncoder().encode(choice),as:UTF8.self)
-        try execute("UPDATE beer_choices SET context=? WHERE account=? AND id=?",[json,account,choice.id])
+        // Caller owns the transaction: refresh already wraps feed observation,
+        // while direct selection/outcome updates establish their own below.
+        try execute("UPDATE beer_choices SET context=?,has_intent=? WHERE account=? AND id=?",[json,choice.hasIntent ? "1" : "0",account,choice.id])
+        try pruneChoiceContexts(account:account)
     }
     func updateChoice(id: String, account: String, beerID: String, selected: Bool? = nil, outcome: CheckInResult? = nil, now: Date = Date()) throws {
         guard var choice = try choiceContexts(account:account).first(where:{ $0.id == id }), (choice.shown.contains(beerID) || choice.selected.contains(beerID)) else { return }
@@ -73,7 +91,7 @@ extension BeerDatabase {
             choice.outcomes[beerID] = outcome.rawValue
             if outcome == .added { choice.queued.insert(beerID); choice.queuedAt[beerID] = choice.queuedAt[beerID] ?? now }
         }
-        try storeChoice(choice,account:account)
+        try transaction { try storeChoice(choice,account:account) }
     }
     /// Evidence of later feed appearance, not proof that a particular queue entry was claimed.
     func observeChoiceTastings(_ beers: [Beer], previous: [Beer], account: String, now: Date = Date()) throws {

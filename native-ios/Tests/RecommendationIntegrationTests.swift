@@ -26,6 +26,31 @@ final class RecommendationIntegrationTests: XCTestCase {
         defer { fixture.handler = nil; try? credentials.clear(); try? FileManager.default.removeItem(at:folder) }
         try await body(model,db,fixture)
     }
+    @MainActor func testRequestRelevantBeerReachesProviderAndCanBeSelected() async throws {
+        try await withModel { model,db,fixture in
+            var old = Beer(id:"old",name:"Old IPA"); old.brew_style = "IPA"; old.brewer = "Brewery"; old.tasted_date = "01/01/2000"
+            try db.replaceBeers([old],tasted:true)
+            let taplist = (0..<13).map { ["id":String($0),"brew_name":"IPA \($0)","brew_style":"IPA","brewer":"Brewery"] }
+                + [["id":"stout","brew_name":"Roast","brew_style":"Stout","brewer":"Other"]]
+            let data = try JSONSerialization.data(withJSONObject:taplist)
+            fixture.handler = { request in
+                switch request.url!.path {
+                case "/bk-store-json.php": return (200,data)
+                case "/bk-member-json.php": return (200,Data(#"[{},{"tasted_brew_current_round":[]},{"reward":[]}]"#.utf8))
+                default: return (200,Data("No brew in queue".utf8))
+                }
+            }
+            let fake = FakeProvider(); fake.action = { ["stout","0","1"] }
+            let controller = RecommendationController(model:model,provider:fake)
+            controller.setPreferences(.init(request:"a roasty stout"))
+            await controller.generate()
+            XCTAssertTrue(fake.candidateIDs.contains("stout"))
+            XCTAssertEqual(fake.candidateIDs.count,12)
+            XCTAssertTrue(controller.usedModel)
+            XCTAssertEqual(controller.suggestions.first?.id,"stout")
+        }
+    }
+
     @MainActor func testTextRequestWaitsForGenerationAndReportsUninterpretedFallback() async throws {
         try await withModel { model,_,_ in
             let fake = FakeProvider()
@@ -293,9 +318,10 @@ final class RecommendationIntegrationTests: XCTestCase {
 }
 @MainActor private final class FakeProvider: RecommendationProvider {
     var calls = 0
+    var candidateIDs: [String] = []
     var action: (() async throws -> [String])?
     func rank(history: [Beer], candidates: [BeerSuggestion]) async throws -> [String] {
-        calls += 1
+        calls += 1; candidateIDs = candidates.map(\.id)
         if let action { return try await action() }
         throw RecommendationUnavailable.model
     }
