@@ -110,6 +110,9 @@ struct HomeView: View {
                 }
             }
         }
+        // The chrome lives outside this safe-area viewport. Explicitly clip the
+        // entire Home scroll surface so cards and their shadows stay beneath it.
+        .clipped()
     }
     @ViewBuilder private var recommendationEntry: some View {
         if recommendationsEnabled && model.isMember {

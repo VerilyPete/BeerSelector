@@ -1,3 +1,15 @@
+## iPhone validation — September 14, 2026
+
+User confirmed the preference-first suggestion flow and Home chrome changes work on their iPhone, including suggestions using Apple Intelligence. Their device testing covered the Apple Intelligence path only; this does not establish device fallback-path coverage or a comprehensive recommendation-quality assessment.
+
+## Home scroll beneath chrome — September 14, 2026
+
+Home’s geometry viewport is explicitly clipped so scrolling cards, account titles and shadows cannot paint over the status-bar chrome or outside the content area. The existing phone bounce behavior remains. Reproduced the title overlapping chrome in the simulator before the change; the same swipe after rebuilding leaves the chrome unobscured. Visual evidence: `/private/tmp/home-chrome-before.png` and `/private/tmp/home-chrome-after.png`. Simulator build passed (`/private/tmp/home-chrome-build.log`).
+
+## Preference-first suggestions — September 14, 2026
+
+Opening Suggestions no longer triggers generation. Users choose container and ABV preferences, then explicitly tap **Find suggestions**; changing preferences also waits for that action. The empty-state copy explains the order. Generation has a single UI entry point: the button. Simulator build passed; preference and selection UI flows now assert the initial ungenerated state before requesting results. The preference flow passed, including no results on open or preference changes until Find suggestions is tapped (`/private/tmp/preferences-first-ui.log`).
+
 ## Adversarial review repairs — September 14, 2026
 
 All six findings from the review of `19e8e987` are repaired. Four implementation agents and two independent review agents handled the fixes and re-review. See `RECOMMENDATION-REVIEW-FIXES.md` for decisions and evidence.

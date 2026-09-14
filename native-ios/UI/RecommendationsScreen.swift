@@ -20,7 +20,8 @@ struct RecommendationsScreen: View {
                     VStack(alignment:.leading,spacing:8) {
                         Text("SOMETHING TO TRY").font(Robo.mono(10)).tracking(1.5).foregroundStyle(QueueChrome.cyan)
                         Text("Your next discovery").font(Robo.title(25)).foregroundStyle(QueueChrome.text)
-                        Text(controller.historyCount == 0 ? "Explore a few choices from your location’s taplist." :
+                        Text(controller.suggestions.isEmpty && !busy ? "Choose your preferences, then tap Find suggestions." :
+                             controller.historyCount == 0 ? "Explore a few choices from your location’s taplist." :
                              "Based on \(controller.historyCount) recent tasted beers, here are some you might enjoy.")
                             .font(Robo.mono(12)).foregroundStyle(QueueChrome.secondary)
                             .fixedSize(horizontal:false,vertical:true)
@@ -80,9 +81,6 @@ struct RecommendationsScreen: View {
                 }
                 .onChange(of:model.recommendationSnapshot) { _,_ in controller.invalidateIfChanged() }
                 .onChange(of:controller.suggestions) { _,_ in selected = []; expanded = [] }
-                .task {
-                    if controller.suggestions.isEmpty && controller.message == nil { await controller.generate() }
-                }
                 .onDisappear { controller.cancel() }
                 .interactiveDismissDisabled(controller.submitting)
         }.tint(QueueChrome.cyan)

@@ -3,6 +3,11 @@
 # These IDs belong to the offline fixture. The final dialog is dismissed, never confirmed.
 appId: org.verily.FSbeerselector
 ---
+- assertVisible: Find suggestions
+- assertNotVisible:
+    id: recommendation-select-5
+- tapOn:
+    id: recommendation-generate
 - extendedWaitUntil:
     visible:
       id: recommendation-select-5
