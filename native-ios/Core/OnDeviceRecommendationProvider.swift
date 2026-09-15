@@ -67,12 +67,15 @@ enum RecommendationUnavailable: Error { case model, contextBudget }
 /// An uncooperative model must not hold the UI open after timeout/cancellation.
 /// Only this MainActor owner can resume the continuation; late completions are ignored.
 @MainActor
-final class RecommendationDeadline {
-    private var continuation: CheckedContinuation<[String]?,Never>?
+final class RecommendationDeadline<Value> {
+    private var continuation: CheckedContinuation<Value?,Never>?
+    private var expires = ContinuousClock.now
     private var worker: Task<Void,Never>?
     private var timer: Task<Void,Never>?
-    static func run(seconds: Double, operation: @escaping @MainActor () async throws -> [String]) async -> [String]? {
+    static func run(seconds: Double, operation: @escaping @MainActor () async throws -> Value) async -> Value? {
+        guard seconds.isFinite, seconds > 0 else { return nil }
         let race = RecommendationDeadline()
+        race.expires = .now.advanced(by:.seconds(seconds))
         return await withTaskCancellationHandler {
             await withCheckedContinuation { continuation in
                 race.continuation = continuation
@@ -87,10 +90,10 @@ final class RecommendationDeadline {
             Task { @MainActor in race.finish(nil) }
         }
     }
-    private func finish(_ ids: [String]?) {
+    private func finish(_ ids: Value?) {
         guard let continuation else { return }
         self.continuation = nil
         worker?.cancel(); timer?.cancel(); worker = nil; timer = nil
-        continuation.resume(returning:ids)
+        continuation.resume(returning:ContinuousClock.now <= expires ? ids : nil)
     }
 }

@@ -207,7 +207,7 @@ private struct SettingsActionStyle: ButtonStyle {
     @Environment(\.isEnabled) private var isEnabled
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .background(QueueChrome.metal.opacity(configuration.isPressed ? 0.15 : 0))
+            .background { Rectangle().fill(QueueChrome.metal).opacity(configuration.isPressed ? 0.15 : 0) }
             .opacity(isEnabled ? 1 : 0.5)
     }
 }

@@ -26,6 +26,181 @@ final class RecommendationIntegrationTests: XCTestCase {
         defer { fixture.handler = nil; try? credentials.clear(); try? FileManager.default.removeItem(at:folder) }
         try await body(model,db,fixture)
     }
+    @MainActor func testSemanticRetrieverFeedsFreshEvidenceToRankingAndFailureUsesLocalOrder() async throws {
+        try await withModel { model,_,fixture in
+            let rows = (0..<14).map { ["id":String(format:"%02d",$0),"brew_name":"Beer \($0)","brew_style":"IPA"] }
+                + [["id":"zz","brew_name":"Last beer","brew_style":"IPA","brew_description":"Fresh authoritative description"]]
+            let data = try JSONSerialization.data(withJSONObject:rows)
+            fixture.handler = { request in
+                if request.url!.path == "/bk-store-json.php" { return (200,data) }
+                if request.url!.path == "/bk-member-json.php" { return (200,Data(#"[{},{"tasted_brew_current_round":[]},{"reward":[]}]"#.utf8)) }
+                return (200,Data("No brew in queue".utf8))
+            }
+            let provider = FakeProvider()
+            provider.action = { ["zz","00","01"] }
+            let semantic = FakeSemanticRetriever(); semantic.action = { _ in ["zz","forbidden","zz"] }
+            let controller = RecommendationController(model:model,provider:provider)
+            controller.semanticRetriever = semantic
+            controller.setPreferences(.init(request:"coffee"))
+            await controller.generate()
+            XCTAssertTrue(controller.usedModel)
+            XCTAssertEqual(controller.suggestions.first?.id,"zz")
+            XCTAssertEqual(provider.candidateEvidence["zz"],"Fresh authoritative description")
+            XCTAssertFalse(provider.candidateIDs.contains("forbidden"))
+            XCTAssertEqual(controller.retrievalSource,.mixed)
+            provider.action = { throw RecommendationUnavailable.model }
+            controller.cancel()
+            await controller.generate()
+            XCTAssertTrue(provider.candidateIDs.contains("zz"))
+            XCTAssertEqual(controller.suggestions.map(\.id),["00","01","02"])
+            XCTAssertFalse(controller.usedModel)
+            XCTAssertEqual(controller.retrievalSource,.local)
+        }
+    }
+    @MainActor func testChangesDuringRetrievalPreventRankingIncludingChoiceContextChanges() async throws {
+        for mutation in ["account","feedback","history","taplist","choices","preferences"] {
+            try await withModel { model,db,_ in
+                let provider = FakeProvider(), semantic = FakeSemanticRetriever()
+                let controller = RecommendationController(model:model,provider:provider)
+                controller.semanticRetriever = semantic
+                controller.setPreferences(.init(request:"coffee"))
+                semantic.action = { _ in
+                    switch mutation {
+                    case "account": model.session = MemberSession(memberId:"other",storeId:"2",storeName:"Other",sessionId:"other")
+                    case "feedback": model.beerFeedback.append(BeerFeedback(beer:Beer(id:"new",name:"New beer"),rating:.notForMe))
+                    case "history": model.recentTastings.append(Beer(id:"tasted",name:"Tasted"))
+                    case "taplist": model.allBeers.append(Beer(id:"later",name:"Later"))
+                    case "choices":
+                        let account = try XCTUnwrap(model.recommendationAccount)
+                        try db.saveChoicePresentation(BeerChoiceContext(taplist:model.allBeers,shown:["new"],preferences:.init(),usedModel:false,taplistValidation:nil),account:account)
+                    default: controller.setPreferences(.init(request:"stout"))
+                    }
+                    return ["new"]
+                }
+                await controller.generate()
+                XCTAssertEqual(provider.calls,0,mutation)
+                XCTAssertTrue(controller.suggestions.isEmpty,mutation)
+            }
+        }
+    }
+    @MainActor func testRetrievalTimeoutUsesLocalAIAndLateCompletionCannotReplaceIt() async throws {
+        try await withModel { model,_,_ in
+            let provider = FakeProvider(), semantic = FakeSemanticRetriever()
+            provider.action = { ["new"] }
+            var release: CheckedContinuation<[String]?,Never>?
+            semantic.action = { _ in await withCheckedContinuation { release = $0 } }
+            let controller = RecommendationController(model:model,provider:provider)
+            controller.semanticRetriever = semantic; controller.retrievalTimeout = 0.01
+            controller.setPreferences(.init(request:"coffee"))
+            await controller.generate()
+            XCTAssertTrue(controller.usedModel)
+            XCTAssertEqual(controller.retrievalSource,.local)
+            XCTAssertEqual(provider.calls,1)
+            release?.resume(returning:["forbidden"])
+            for _ in 0..<5 { await Task.yield() }
+            XCTAssertEqual(provider.calls,1)
+            XCTAssertEqual(controller.suggestions.map(\.id),["new"])
+        }
+    }
+    @MainActor func testRetrievalAndRankingShareOneDeadline() async throws {
+        try await withModel { model,_,_ in
+            let provider = FakeProvider(), semantic = FakeSemanticRetriever()
+            semantic.action = { _ in try await Task.sleep(for:.milliseconds(30)); return ["new"] }
+            provider.action = { try await Task.sleep(for:.milliseconds(30)); return ["new"] }
+            let controller = RecommendationController(model:model,provider:provider)
+            controller.semanticRetriever = semantic; controller.timeout = 0.04; controller.retrievalTimeout = 0.035
+            controller.setPreferences(.init(request:"coffee"))
+            await controller.generate()
+            XCTAssertFalse(controller.usedModel,"Ranking cannot start a fresh timeout after retrieval")
+            XCTAssertEqual(controller.suggestions.map(\.id),["new"])
+        }
+    }
+    @MainActor func testRetrievalInvalidationPreventsRankingAndPublication() async throws {
+        for phase in ["retrieval", "ranking"] {
+            try await withModel { model,_,_ in
+                let provider = FakeProvider(), semantic = FakeSemanticRetriever()
+                semantic.validityToken = UUID()
+                var release: CheckedContinuation<Void,Never>?
+                semantic.action = { _ in
+                    if phase == "retrieval" { await withCheckedContinuation { release = $0 } }
+                    return ["new"]
+                }
+                provider.action = {
+                    if phase == "ranking" { await withCheckedContinuation { release = $0 } }
+                    return ["new"]
+                }
+                let controller = RecommendationController(model:model,provider:provider)
+                controller.semanticRetriever = semantic
+                controller.setPreferences(.init(request:"coffee"))
+                let work = Task { await controller.generate() }
+                while release == nil { await Task.yield() }
+                semantic.validityToken = UUID()
+                release?.resume()
+                await work.value
+                XCTAssertEqual(provider.calls,phase == "retrieval" ? 0 : 1,phase)
+                XCTAssertTrue(controller.suggestions.isEmpty,phase)
+                XCTAssertFalse(controller.usedModel,phase)
+            }
+        }
+    }
+    @MainActor func testSemanticContextOverflowRetriesLocalCandidatesWithAI() async throws {
+        try await withModel { model,_,_ in
+            let provider = FakeProvider(), semantic = FakeSemanticRetriever()
+            semantic.action = { _ in ["new"] }
+            provider.action = {
+                if provider.calls == 1 {
+                    XCTAssertNotNil(provider.candidateEvidence["new"])
+                    throw RecommendationUnavailable.contextBudget
+                }
+                XCTAssertTrue(provider.candidateEvidence.isEmpty)
+                return ["new"]
+            }
+            let controller = RecommendationController(model:model,provider:provider)
+            controller.semanticRetriever = semantic
+            controller.setPreferences(.init(request:"coffee"))
+            await controller.generate()
+            XCTAssertEqual(provider.calls,2)
+            XCTAssertTrue(controller.usedModel)
+            XCTAssertEqual(controller.retrievalSource,.local)
+            XCTAssertEqual(controller.suggestions.map(\.id),["new"])
+        }
+    }
+    @MainActor func testContextOverflowRetryDoesNotResetGlobalDeadline() async throws {
+        try await withModel { model,_,_ in
+            let provider = FakeProvider(), semantic = FakeSemanticRetriever()
+            semantic.action = { _ in ["new"] }
+            provider.action = {
+                try await Task.sleep(for:.milliseconds(60))
+                if provider.calls == 1 { throw RecommendationUnavailable.contextBudget }
+                return ["new"]
+            }
+            let controller = RecommendationController(model:model,provider:provider)
+            controller.semanticRetriever = semantic; controller.timeout = 0.1
+            controller.setPreferences(.init(request:"coffee"))
+            await controller.generate()
+            XCTAssertEqual(provider.calls,2)
+            XCTAssertFalse(controller.usedModel)
+            XCTAssertEqual(controller.retrievalSource,.local)
+        }
+    }
+
+    @MainActor func testExactStyleAndPreviewDoNotInvokeSemanticRetriever() async throws {
+        try await withModel { model,_,_ in
+            let provider = FakeProvider(), semantic = FakeSemanticRetriever()
+            let controller = RecommendationController(model:model,provider:provider)
+            controller.semanticRetriever = semantic
+            controller.setPreferences(.init(request:"IPA"))
+            await controller.generate()
+            XCTAssertEqual(semantic.calls,0)
+            let calls = provider.calls
+            model.session = MemberSession(memberId:"preview",storeId:"1",storeName:"Fixture",sessionId:"preview")
+            controller.setPreferences(.init(request:"coffee"))
+            await controller.generate()
+            XCTAssertEqual(semantic.calls,0)
+            XCTAssertEqual(provider.calls,calls)
+        }
+    }
+
     @MainActor func testRequestRelevantBeerReachesProviderAndCanBeSelected() async throws {
         try await withModel { model,db,fixture in
             var old = Beer(id:"old",name:"Old IPA"); old.brew_style = "IPA"; old.brewer = "Brewery"; old.tasted_date = "01/01/2000"
@@ -319,11 +494,23 @@ final class RecommendationIntegrationTests: XCTestCase {
 @MainActor private final class FakeProvider: RecommendationProvider {
     var calls = 0
     var candidateIDs: [String] = []
+    var candidateEvidence: [String:String] = [:]
     var action: (() async throws -> [String])?
     func rank(history: [Beer], candidates: [BeerSuggestion]) async throws -> [String] {
         calls += 1; candidateIDs = candidates.map(\.id)
+        candidateEvidence = SemanticCandidates.evidence(candidates) ?? [:]
         if let action { return try await action() }
         throw RecommendationUnavailable.model
     }
 }
 
+
+@MainActor private final class FakeSemanticRetriever: SemanticRetrieving {
+    var validityToken: UUID?
+    var calls = 0
+    var action: ((SemanticRetrievalRequest) async throws -> [String]?)?
+    func retrieve(_ request: SemanticRetrievalRequest) async -> [String]? {
+        calls += 1
+        return try? await action?(request)
+    }
+}

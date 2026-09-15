@@ -4,10 +4,11 @@ import WebKit
 
 @MainActor
 final class AppModel: ObservableObject {
-    @Published var session: MemberSession?
+    @Published var session: MemberSession? { didSet { if oldValue?.identity != session?.identity { semanticIndex.invalidate() } } }
     @Published var beerFeedback: [BeerFeedback] = []
     @Published var recentTastings: [Beer] = []
     @Published var showRecommendations = false
+    let semanticIndex = SemanticTaplistIndex()
     lazy var recommendations = RecommendationController(model:self)
     private var taplistValidation: UUID?
     private var tastingValidation: UUID?
@@ -60,7 +61,12 @@ final class AppModel: ObservableObject {
         return token == epoch && !Task.isCancelled && !offline && !processing && queueError == nil &&
             !loadingQueue && queueValidation != nil && queueValidation != previousQueue
     }
-    @Published var allBeers: [Beer] = []
+    @Published var allBeers: [Beer] = [] {
+        didSet {
+            if previewMode { semanticIndex.invalidate() }
+            else { semanticIndex.schedule(epoch:epoch,account:recommendationAccount,taplist:allBeers) }
+        }
+    }
     @Published var tastedBeers: [Beer] = []
     @Published var rewards: [Reward] = []
     @Published var queue: [QueueEntry] = []
@@ -96,7 +102,7 @@ final class AppModel: ObservableObject {
     var activityUpdate: (@MainActor (MemberSession, [QueueEntry]) async -> Void)?
     var webCookieCleanup: (@MainActor () async -> Void)?
     private let monitor = NWPathMonitor()
-    private var epoch = UUID() { didSet { busyIDs = []; recommendations.cancel(); recentTastings = []; beerFeedback = []; taplistValidation = nil; tastingValidation = nil; queueValidation = nil; cancelEnrichmentUpdates(); queueLoaded = false; queueError = nil; loadingQueue = false; rewardsLoaded = false; rewardsError = nil; rewardsNotice = nil } }
+    private var epoch = UUID() { didSet { semanticIndex.invalidate(); busyIDs = []; recommendations.cancel(); recentTastings = []; beerFeedback = []; taplistValidation = nil; tastingValidation = nil; queueValidation = nil; cancelEnrichmentUpdates(); queueLoaded = false; queueError = nil; loadingQueue = false; rewardsLoaded = false; rewardsError = nil; rewardsNotice = nil } }
     @Published private(set) var processing = false
     private var lastFocusRefresh = Date.distantPast
     private var pendingURL: URL?

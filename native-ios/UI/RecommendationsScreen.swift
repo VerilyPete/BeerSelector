@@ -43,7 +43,7 @@ struct RecommendationsScreen: View {
                         card(suggestion)
                     }
                     if !controller.suggestions.isEmpty {
-                        Text(controller.usedModel ? "Selected with Apple Intelligence. Reasons use your saved beer data." :
+                        Text(controller.usedModel ? (controller.retrievalSource == .local ? "Selected with Apple Intelligence. Reasons use your saved beer data." : "Matched descriptions by meaning and selected with Apple Intelligence. Reasons use your saved beer data.") :
                              "Selected using local matching. Based on your recent tastings and taplist.")
                             .font(Robo.mono(10)).foregroundStyle(QueueChrome.secondary)
 

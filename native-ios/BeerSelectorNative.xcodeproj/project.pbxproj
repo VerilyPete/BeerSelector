@@ -10,9 +10,11 @@
 		02E29FEF72BA21373F843C2E /* HTTPFixture.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1DED3AF0CCC6D6BF93C0751 /* HTTPFixture.swift */; };
 		122C661C28FDB4ED200E7B04 /* OnDeviceRecommendationProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 929A8D429AB19073FB74ABF7 /* OnDeviceRecommendationProvider.swift */; };
 		13C2A40F3A44AC5A17FC49AB /* SpaceGrotesk-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = B805244B88340CB922AB51D0 /* SpaceGrotesk-Bold.ttf */; };
+		1E160E38DC63E7960572F3FB /* LocalTaplistRetriever.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CD51C287E5612314E62CE27 /* LocalTaplistRetriever.swift */; };
 		21C81A0473B8079CB1CD3BAB /* BeerQueueWidgetLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 231ED53DBC183B5F36A1F3F5 /* BeerQueueWidgetLiveActivity.swift */; };
 		226774B4011D14AB247BD8F5 /* RecommendationQueueRecoveryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2519E9671028138C5AF46063 /* RecommendationQueueRecoveryTests.swift */; };
 		22C5E9232F83C985BFA468D2 /* BeerIcons.ttf in Resources */ = {isa = PBXBuildFile; fileRef = BE1F74F45E480DB31BBAADE5 /* BeerIcons.ttf */; };
+		25693E40E1E7237661F11F45 /* SemanticRetrievalTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8908EDC8CA61A8E3B0CF5B05 /* SemanticRetrievalTests.swift */; };
 		2C4A9F7386119974C4E0EC7A /* RecommendationRulesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D50BDD33CAF7819DE7F567C4 /* RecommendationRulesTests.swift */; };
 		2F4EFDF00B0041D481937040 /* DiagnosticsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C009F862A33114679B004770 /* DiagnosticsTests.swift */; };
 		31C2EA469B5E74A8E7F2E300 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 977A45B968518D8C39648777 /* AppDelegate.swift */; };
@@ -24,6 +26,7 @@
 		432C2CC8386BDB8B6C3613DE /* DiagnosticJournal.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39F2059F3B66AECF52036DDA /* DiagnosticJournal.swift */; };
 		455F755F9063B40BE8DA26B9 /* BeerQueueActivityViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83FD24EAC5B6F54E73B67A8C /* BeerQueueActivityViews.swift */; };
 		47A286345C3C1E452B1D6E39 /* PerformanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06275F1DAE6CEEAFE3663883 /* PerformanceTests.swift */; };
+		495F33EDE1084543E8365250 /* SemanticTaplistCorpus.json in Resources */ = {isa = PBXBuildFile; fileRef = 3CDCE901C7628CA70367C6E2 /* SemanticTaplistCorpus.json */; };
 		561F7AF9144662173620EFD7 /* Database.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9256858AED7E171B4D5226B9 /* Database.swift */; };
 		564E961552691B29F63ECC29 /* BeerRuleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADBF41D4275F957AAC3862E7 /* BeerRuleTests.swift */; };
 		570591A5120AC745E44163B7 /* BeerQueueSharedTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04EF71A9E599A4CB8CF189D6 /* BeerQueueSharedTypes.swift */; };
@@ -33,7 +36,9 @@
 		615100DCC5E4DE9764B66B4F /* BeerQueueWidgetBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 526FF0891078D8C9C66EBDA4 /* BeerQueueWidgetBundle.swift */; };
 		61C50A59CCC2A359CF4D1EC5 /* LiveActivityController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A081906E69E0D85E2F77D6CD /* LiveActivityController.swift */; };
 		63D8420840DAAAB8E7ECF4AC /* Recommendations.swift in Sources */ = {isa = PBXBuildFile; fileRef = 488BD3B8D6C35DF8DA421A6F /* Recommendations.swift */; };
+		66D9087E994B5028BC8AD5FB /* SemanticCandidates.swift in Sources */ = {isa = PBXBuildFile; fileRef = 424B0ACDBEBAFA81CC5C4EC7 /* SemanticCandidates.swift */; };
 		684DCAB1076A7DD06AD5B7ED /* PersistenceIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60DFA8A1CD16F264CE8F4909 /* PersistenceIntegrationTests.swift */; };
+		6C595FE0B800D34E9795D8A8 /* LocalTaplistRetrieverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 061741BFC4807C8D22222187 /* LocalTaplistRetrieverTests.swift */; };
 		6E642B0185ECEC17229C546F /* SettingsScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F4F76A78D135333F65E55D2 /* SettingsScreen.swift */; };
 		70F74BE0AFB5B1D921D092AC /* RecommendationController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84E5F25A1B083C820E9C620D /* RecommendationController.swift */; };
 		7126A95F569EF50365CF1F5D /* BeerSelectorApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2262BE1057E0A4E092166E62 /* BeerSelectorApp.swift */; };
@@ -50,7 +55,9 @@
 		967B5899D82AF14A464B3CC8 /* Browsers.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF251A68A999FE16B881F31D /* Browsers.swift */; };
 		989D48595EE3778CCCD6F878 /* LegacyUpgradeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C98504B0A11A7E166148C48 /* LegacyUpgradeTests.swift */; };
 		9A2B1A92E4D73F7355FEC806 /* RecommendationsScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61010CDB8794FD1EE8B8C975 /* RecommendationsScreen.swift */; };
+		A3190B10CB2A81DC9F0D21D0 /* SemanticIndexTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5055EFC9C7ECD886C2F7EEF2 /* SemanticIndexTests.swift */; };
 		AD4A8CDCFCE6ED49EE41D511 /* SpaceGrotesk-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 11B1728CA71C2EC017ACBCD2 /* SpaceGrotesk-SemiBold.ttf */; };
+		AF4544D3FA7EC2563A465672 /* SemanticTaplistIndex.swift in Sources */ = {isa = PBXBuildFile; fileRef = 801F0516230200A0A5009D4D /* SemanticTaplistIndex.swift */; };
 		B08DF96FC8102EB1D5184E0C /* ServiceConfiguration.plist in Resources */ = {isa = PBXBuildFile; fileRef = 96F09E56159F3CC65095E4AE /* ServiceConfiguration.plist */; };
 		B1918265B3C709FE6E2B1C29 /* RecentTastingsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB4644FFEEA985EC780F8C88 /* RecentTastingsTests.swift */; };
 		B63F07A0E1BB27FA642C1554 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 8B6299340A9333EDD4581FB9 /* Assets.xcassets */; };
@@ -106,6 +113,7 @@
 
 /* Begin PBXFileReference section */
 		04EF71A9E599A4CB8CF189D6 /* BeerQueueSharedTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeerQueueSharedTypes.swift; sourceTree = "<group>"; };
+		061741BFC4807C8D22222187 /* LocalTaplistRetrieverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalTaplistRetrieverTests.swift; sourceTree = "<group>"; };
 		06275F1DAE6CEEAFE3663883 /* PerformanceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformanceTests.swift; sourceTree = "<group>"; };
 		065F304DB3C26F8D3AEB36DE /* NetworkTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkTests.swift; sourceTree = "<group>"; };
 		09F1A509A9E3EDA4041AAB69 /* libsqlite3.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libsqlite3.tbd; path = usr/lib/libsqlite3.tbd; sourceTree = SDKROOT; };
@@ -121,11 +129,14 @@
 		2E4302E4D060DAE06B9571EB /* CredentialFailureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialFailureTests.swift; sourceTree = "<group>"; };
 		39F2059F3B66AECF52036DDA /* DiagnosticJournal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticJournal.swift; sourceTree = "<group>"; };
 		3C98504B0A11A7E166148C48 /* LegacyUpgradeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyUpgradeTests.swift; sourceTree = "<group>"; };
+		3CDCE901C7628CA70367C6E2 /* SemanticTaplistCorpus.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = SemanticTaplistCorpus.json; sourceTree = "<group>"; };
 		3EB46E74F9A0312EDB8BC823 /* BeerQueueWidget.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = BeerQueueWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		424B0ACDBEBAFA81CC5C4EC7 /* SemanticCandidates.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SemanticCandidates.swift; sourceTree = "<group>"; };
 		448C8B937564D5D9D30A96A6 /* BeerListScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeerListScreen.swift; sourceTree = "<group>"; };
 		45EE3296A115D128B8EA9CBE /* SpaceMono-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "SpaceMono-Regular.ttf"; sourceTree = "<group>"; };
 		488BD3B8D6C35DF8DA421A6F /* Recommendations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Recommendations.swift; sourceTree = "<group>"; };
 		4D6B0158136DCE28672FE6F4 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		5055EFC9C7ECD886C2F7EEF2 /* SemanticIndexTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SemanticIndexTests.swift; sourceTree = "<group>"; };
 		519B25AA761BE6CCB3B46152 /* LegacyV8Fixture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyV8Fixture.swift; sourceTree = "<group>"; };
 		526FF0891078D8C9C66EBDA4 /* BeerQueueWidgetBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeerQueueWidgetBundle.swift; sourceTree = "<group>"; };
 		555FA9F91FB5176D6A0195F0 /* Credentials.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Credentials.swift; sourceTree = "<group>"; };
@@ -142,9 +153,12 @@
 		7A145926EE52FA2DFB121CAE /* RecommendationPromptBudget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecommendationPromptBudget.swift; sourceTree = "<group>"; };
 		7A32675D183666346B091FCD /* LoginRollbackTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginRollbackTests.swift; sourceTree = "<group>"; };
 		7AD02B1FB60CBF54DDE5CCA1 /* RecentTastings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecentTastings.swift; sourceTree = "<group>"; };
+		801F0516230200A0A5009D4D /* SemanticTaplistIndex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SemanticTaplistIndex.swift; sourceTree = "<group>"; };
 		83FD24EAC5B6F54E73B67A8C /* BeerQueueActivityViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeerQueueActivityViews.swift; sourceTree = "<group>"; };
 		84E5F25A1B083C820E9C620D /* RecommendationController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecommendationController.swift; sourceTree = "<group>"; };
+		8908EDC8CA61A8E3B0CF5B05 /* SemanticRetrievalTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SemanticRetrievalTests.swift; sourceTree = "<group>"; };
 		8B6299340A9333EDD4581FB9 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		8CD51C287E5612314E62CE27 /* LocalTaplistRetriever.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalTaplistRetriever.swift; sourceTree = "<group>"; };
 		8E5B34BEE7B3C2A4705EEE76 /* EnrichmentService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnrichmentService.swift; sourceTree = "<group>"; };
 		9256858AED7E171B4D5226B9 /* Database.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Database.swift; sourceTree = "<group>"; };
 		929A8D429AB19073FB74ABF7 /* OnDeviceRecommendationProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnDeviceRecommendationProvider.swift; sourceTree = "<group>"; };
@@ -208,6 +222,7 @@
 				0EEB9B8BC25E938FB72A161E /* DiagnosticJournalTests.swift */,
 				C009F862A33114679B004770 /* DiagnosticsTests.swift */,
 				3C98504B0A11A7E166148C48 /* LegacyUpgradeTests.swift */,
+				061741BFC4807C8D22222187 /* LocalTaplistRetrieverTests.swift */,
 				7A32675D183666346B091FCD /* LoginRollbackTests.swift */,
 				B3523CE0692640E98D7A7D92 /* LogoutRaceTests.swift */,
 				065F304DB3C26F8D3AEB36DE /* NetworkTests.swift */,
@@ -219,6 +234,9 @@
 				BA3563287832C27CDA5FF36A /* RecommendationPromptBudgetTests.swift */,
 				2519E9671028138C5AF46063 /* RecommendationQueueRecoveryTests.swift */,
 				D50BDD33CAF7819DE7F567C4 /* RecommendationRulesTests.swift */,
+				5055EFC9C7ECD886C2F7EEF2 /* SemanticIndexTests.swift */,
+				8908EDC8CA61A8E3B0CF5B05 /* SemanticRetrievalTests.swift */,
+				C7C750BCDB73D4DA44E47324 /* Fixtures */,
 				72A6F305A3B035DABC4A4724 /* Support */,
 			);
 			path = Tests;
@@ -261,12 +279,15 @@
 				2542046C9CA9DA793A61CAD4 /* Diagnostics.swift */,
 				8E5B34BEE7B3C2A4705EEE76 /* EnrichmentService.swift */,
 				A081906E69E0D85E2F77D6CD /* LiveActivityController.swift */,
+				8CD51C287E5612314E62CE27 /* LocalTaplistRetriever.swift */,
 				A91D8CD4FA476DD360093BB1 /* Models.swift */,
 				929A8D429AB19073FB74ABF7 /* OnDeviceRecommendationProvider.swift */,
 				7AD02B1FB60CBF54DDE5CCA1 /* RecentTastings.swift */,
 				84E5F25A1B083C820E9C620D /* RecommendationController.swift */,
 				7A145926EE52FA2DFB121CAE /* RecommendationPromptBudget.swift */,
 				488BD3B8D6C35DF8DA421A6F /* Recommendations.swift */,
+				424B0ACDBEBAFA81CC5C4EC7 /* SemanticCandidates.swift */,
+				801F0516230200A0A5009D4D /* SemanticTaplistIndex.swift */,
 			);
 			path = Core;
 			sourceTree = "<group>";
@@ -335,6 +356,14 @@
 			path = Resources;
 			sourceTree = "<group>";
 		};
+		C7C750BCDB73D4DA44E47324 /* Fixtures */ = {
+			isa = PBXGroup;
+			children = (
+				3CDCE901C7628CA70367C6E2 /* SemanticTaplistCorpus.json */,
+			);
+			path = Fixtures;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -364,6 +393,7 @@
 			buildConfigurationList = 690080EE49E9B65C28350921 /* Build configuration list for PBXNativeTarget "BeerSelectorNativeTests" */;
 			buildPhases = (
 				E4CFA05658AA64CD45B2F556 /* Sources */,
+				48449D5E6BE90EF085B41CDA /* Resources */,
 			);
 			buildRules = (
 			);
@@ -437,6 +467,14 @@
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		48449D5E6BE90EF085B41CDA /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				495F33EDE1084543E8365250 /* SemanticTaplistCorpus.json in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		6B71CE753CC380A1255B8912 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -496,6 +534,7 @@
 				FFE24E92D7BED5A2B9B29CC7 /* Diagnostics.swift in Sources */,
 				5BB735F66B33BB189D265529 /* EnrichmentService.swift in Sources */,
 				61C50A59CCC2A359CF4D1EC5 /* LiveActivityController.swift in Sources */,
+				1E160E38DC63E7960572F3FB /* LocalTaplistRetriever.swift in Sources */,
 				DF2549E5A606C5401EEE8AEA /* Models.swift in Sources */,
 				122C661C28FDB4ED200E7B04 /* OnDeviceRecommendationProvider.swift in Sources */,
 				F16A6A4D9383A7F8B68A89E1 /* PreviewFixtures.swift in Sources */,
@@ -507,6 +546,8 @@
 				35D8BD1935114A6F706FFD1E /* RewardsAndQueue.swift in Sources */,
 				5CA3B88967C4017D034E9162 /* RobocopTheme.swift in Sources */,
 				7FD91A08837FE672DB066261 /* RootView.swift in Sources */,
+				66D9087E994B5028BC8AD5FB /* SemanticCandidates.swift in Sources */,
+				AF4544D3FA7EC2563A465672 /* SemanticTaplistIndex.swift in Sources */,
 				6E642B0185ECEC17229C546F /* SettingsScreen.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -523,6 +564,7 @@
 				02E29FEF72BA21373F843C2E /* HTTPFixture.swift in Sources */,
 				989D48595EE3778CCCD6F878 /* LegacyUpgradeTests.swift in Sources */,
 				428B290F54EA0A76BF71EF3C /* LegacyV8Fixture.swift in Sources */,
+				6C595FE0B800D34E9795D8A8 /* LocalTaplistRetrieverTests.swift in Sources */,
 				D1FCE96FA3AF027AD6B6DB9F /* LoginRollbackTests.swift in Sources */,
 				D8797792D124509C81D07486 /* LogoutRaceTests.swift in Sources */,
 				3E32F23BD6DF7BBE2F2DAF99 /* NetworkTests.swift in Sources */,
@@ -534,6 +576,8 @@
 				8AAFFFABC89B73E0C52F0879 /* RecommendationPromptBudgetTests.swift in Sources */,
 				226774B4011D14AB247BD8F5 /* RecommendationQueueRecoveryTests.swift in Sources */,
 				2C4A9F7386119974C4E0EC7A /* RecommendationRulesTests.swift in Sources */,
+				A3190B10CB2A81DC9F0D21D0 /* SemanticIndexTests.swift in Sources */,
+				25693E40E1E7237661F11F45 /* SemanticRetrievalTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -3,6 +3,7 @@ import Foundation
 struct BeerSuggestion: Identifiable, Equatable {
     var beer: Beer
     var reason: String
+    var semanticEvidence: String? = nil
     var id: String { beer.id }
 }
 enum SuggestionContainer: String, CaseIterable, Codable {
@@ -249,6 +250,13 @@ enum RecommendationRules {
         return text
     }
     static func shortlist(taplist: [Beer], history: [Beer], excluded: Set<String>, feedback: [BeerFeedback] = [], preferences: SuggestionPreferences = .init(), context: [BeerChoiceContext] = [], presentationExcluded: Set<String> = []) -> [BeerSuggestion] {
+        shortlistEligible(eligible(taplist:taplist,history:history,excluded:excluded,feedback:feedback,preferences:preferences),
+            history:history,feedback:feedback,preferences:preferences,context:context,presentationExcluded:presentationExcluded)
+    }
+
+    /// Orders an already-eligible pool without recalculating relative ABV bands.
+    /// Callers must resolve eligibility against the complete authoritative taplist.
+    static func shortlistEligible(_ eligible: [Beer], history: [Beer], feedback: [BeerFeedback] = [], preferences: SuggestionPreferences = .init(), context: [BeerChoiceContext] = [], presentationExcluded: Set<String> = []) -> [BeerSuggestion] {
         let effectiveFeedback = resolvedFeedback(feedback)
         func normalized(_ value: String) -> String { value.trimmingCharacters(in:.whitespacesAndNewlines).lowercased() }
         let styles = Set(history.map { styleFamily($0.brew_style) }.filter { !$0.isEmpty })
@@ -257,7 +265,7 @@ enum RecommendationRules {
         let dislikedStyles = Set(effectiveFeedback.filter { $0.rating == .notForMe }.map { styleFamily($0.beer.brew_style) }.filter { !$0.isEmpty })
         let queuedStyles = Set(context.flatMap { choice in choice.taplist.filter { choice.queued.contains($0.id) }.map { styleFamily($0.style) } }.filter { !$0.isEmpty })
         let selectedStyles = Set(context.flatMap { choice in choice.taplist.filter { choice.selected.contains($0.id) }.map { styleFamily($0.style) } }.filter { !$0.isEmpty })
-        var pool = eligible(taplist:taplist,history:history,excluded:excluded,feedback:feedback,preferences:preferences).filter { !presentationExcluded.contains($0.id) }
+        var pool = eligible.filter { !presentationExcluded.contains($0.id) }
         let request = preferences.styleRequest
         let relevance = Dictionary(uniqueKeysWithValues:pool.map { ($0.id,request.relevance(of:$0)) })
         var result: [BeerSuggestion] = []
@@ -360,9 +368,10 @@ enum RecommendationModelInput {
             let selectionPreferences: SuggestionPreferences
             let choiceExamples: [ChoiceModelInput.Example]
             let candidateRequestTerms: [String:[String]]?
+            let candidateDescriptionEvidence: [String:String]?
         }
         let input = Input(columns:["candidateID","name","styleIndex","breweryIndex","explicitRating","abvPercent","container","tastedDate","avoidRepeat"],styles:styles,breweries:breweries,
-                          recentTastings:recent,candidates:choices,feedbackStyleColumns:["style","liked","notForMe"],feedbackByStyle:preferences,selectionPreferences:selection,choiceExamples:ChoiceModelInput.examples(context),candidateRequestTerms:selection.styleRequest.evidence(in:candidates))
+                          recentTastings:recent,candidates:choices,feedbackStyleColumns:["style","liked","notForMe"],feedbackByStyle:preferences,selectionPreferences:selection,choiceExamples:ChoiceModelInput.examples(context),candidateRequestTerms:selection.styleRequest.evidence(in:candidates),candidateDescriptionEvidence:SemanticCandidates.evidence(candidates))
         return String(decoding:try JSONEncoder().encode(input),as:UTF8.self)
     }
 }

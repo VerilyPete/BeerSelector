@@ -22,12 +22,15 @@ struct RecommendationSnapshot: Equatable {
     var queueValidation: UUID?
 }
 
+enum RecommendationRetrievalSource { case local, semantic, mixed }
+
 @MainActor final class RecommendationController: ObservableObject {
     @Published private(set) var suggestions: [BeerSuggestion] = []
     @Published private(set) var generating = false
     @Published private(set) var submitting = false
     @Published private(set) var message: String?
     @Published private(set) var usedModel = false
+    @Published private(set) var retrievalSource = RecommendationRetrievalSource.local
     @Published private(set) var historyCount = 0
     @Published private(set) var outcomes: [String:CheckInResult] = [:]
     @Published private(set) var preferences = SuggestionPreferences()
@@ -37,6 +40,8 @@ struct RecommendationSnapshot: Equatable {
     }
     var provider: any RecommendationProvider
     var timeout: Double = 8
+    var retrievalTimeout: Double = 2
+    var semanticRetriever: (any SemanticRetrieving)?
     private weak var model: AppModel?
     private var snapshot: RecommendationSnapshot?
     private var choiceID: String?
@@ -51,14 +56,20 @@ struct RecommendationSnapshot: Equatable {
         catch { model.error = error.localizedDescription }
     }
     private var generation = UUID()
-    private var rankingTask: Task<[String]?,Never>?
+    private struct PipelineResult {
+        let ids: [String]?
+        let candidates: [BeerSuggestion]
+        let source: RecommendationRetrievalSource
+    }
+    private var rankingTask: Task<PipelineResult?,Never>?
     init(model: AppModel, provider: (any RecommendationProvider)? = nil) {
         self.model = model; self.provider = provider ?? OnDeviceRecommendationProvider()
+        semanticRetriever = model.semanticIndex.enabled ? model.semanticIndex : nil
     }
     func cancel() {
         rankingTask?.cancel(); rankingTask = nil
         generation = UUID(); snapshot = nil; choiceID = nil; suggestions = []; outcomes = [:]
-        generating = false; submitting = false; message = nil; historyCount = 0; usedModel = false
+        generating = false; submitting = false; message = nil; historyCount = 0; usedModel = false; retrievalSource = .local
     }
     func invalidateIfChanged() {
         guard !submitting, let snapshot, snapshot != model?.recommendationSnapshot else { return }
@@ -86,44 +97,80 @@ struct RecommendationSnapshot: Equatable {
         }
         guard token == generation, !Task.isCancelled, account.epoch == model.recommendationSnapshot.epoch,
               account.identity == model.session?.identity, model.isMember else { return }
+        let deadline = ContinuousClock.now.advanced(by:.seconds(timeout.isFinite ? min(8,max(0,timeout)) : 0))
         let current = model.recommendationSnapshot
+        let owner = model.recommendationAccount
         snapshot = current; historyCount = current.history.count
         let context: [BeerChoiceContext]
         do { context = try model.recommendationAccount.map { try model.db?.choiceContexts(account:$0) ?? [] } ?? [] }
         catch { model.error = error.localizedDescription; context = [] }
-        var candidates = RecommendationRules.shortlist(taplist:RecommendationRules.excludingRecent(current.taplist,history:current.repeatHistory),history:current.history,excluded:current.excluded,feedback:current.feedback,preferences:preferences,context:context,presentationExcluded:previousIDs)
-        if candidates.count < min(3,current.taplist.count) {
-            let fallback = RecommendationRules.shortlist(taplist:RecommendationRules.excludingRecent(current.taplist,history:current.repeatHistory),history:current.history,excluded:current.excluded,feedback:current.feedback,preferences:preferences,context:context)
-            if candidates.isEmpty { candidates = fallback }
-            else {
-                // Keep the unseen choices when the preference band cannot supply
-                // three new beers; fill remaining cards from previous choices.
-                let unseenIDs = Set(candidates.map(\.id))
-                candidates += fallback.filter { !unseenIDs.contains($0.id) }.prefix(3-candidates.count)
-            }
-        }
+        let eligible = RecommendationRules.eligible(taplist:current.taplist,history:current.repeatHistory + current.history,
+            excluded:current.excluded,feedback:current.feedback,preferences:preferences)
+        let retriever = LocalTaplistRetriever(eligible:eligible,history:current.history,feedback:current.feedback,
+            preferences:preferences,context:context)
+        let candidates = retriever.candidates(previousIDs:previousIDs)
         guard !candidates.isEmpty else { message = "No eligible beers match these preferences. Try adjusting your style request, container, or ABV preference."; return }
-        let provider = provider
-        // Preview is deterministic and never invokes a model or a network write.
-        let shortlist = candidates
-        let timeout = timeout
-        let task = Task { @MainActor () -> [String]? in
+        let provider = provider, semanticRetriever = semanticRetriever
+        let retrievalTimeout = retrievalTimeout
+        let retrievalToken = semanticRetriever?.validityToken
+        func isCurrent() -> Bool {
+            guard token == generation, preferences == self.preferences, current == model.recommendationSnapshot,
+                  owner == model.recommendationAccount,
+                  retrievalToken == semanticRetriever?.validityToken else { return false }
+            do { return context == (try owner.map { try model.db?.choiceContexts(account:$0) ?? [] } ?? []) }
+            catch { return false }
+        }
+        func remaining() -> Double {
+            let value = ContinuousClock.now.duration(to:deadline).components
+            return max(0,Double(value.seconds) + Double(value.attoseconds)/1e18)
+        }
+        let task = Task { @MainActor () -> PipelineResult? in
             guard !model.previewMode else { return nil }
-            return await RecommendationDeadline.run(seconds:timeout) {
-                try await provider.rank(history:current.history,candidates:shortlist,feedback:current.feedback,preferences:preferences,context:context)
+            return await RecommendationDeadline.run(seconds:remaining()) {
+                var shortlist = candidates
+                var source = RecommendationRetrievalSource.local
+                if preferences.styleRequest.needsModel, let semanticRetriever, let owner, isCurrent() {
+                    let request = SemanticRetrievalRequest(epoch:current.epoch,account:owner,taplist:current.taplist,
+                        eligibleIDs:Set(eligible.map(\.id)),query:preferences.request)
+                    let ids = await RecommendationDeadline.run(seconds:min(retrievalTimeout,remaining())) {
+                        await semanticRetriever.retrieve(request) ?? []
+                    }
+                    guard !Task.isCancelled, isCurrent(), remaining() > 0 else { throw CancellationError() }
+                    if let ids, !ids.isEmpty {
+                        shortlist = SemanticCandidates.merge(ids:ids,local:retriever,previousIDs:previousIDs)
+                        if shortlist.contains(where:{ $0.semanticEvidence != nil }) {
+                            source = shortlist.allSatisfy { $0.semanticEvidence != nil } ? .semantic : .mixed
+                        }
+                    }
+                }
+                guard !Task.isCancelled, isCurrent(), remaining() > 0 else { throw CancellationError() }
+                let ids: [String]?
+                do {
+                    ids = try await provider.rank(history:current.history,candidates:shortlist,feedback:current.feedback,preferences:preferences,context:context)
+                } catch RecommendationUnavailable.contextBudget where source != .local {
+                    // Semantic evidence must not disable otherwise available local AI.
+                    // This retry remains inside the original pipeline deadline.
+                    guard !Task.isCancelled, isCurrent(), remaining() > 0 else { throw CancellationError() }
+                    shortlist = candidates; source = .local
+                    ids = try? await provider.rank(history:current.history,candidates:shortlist,feedback:current.feedback,preferences:preferences,context:context)
+                } catch {
+                    ids = nil
+                }
+                return PipelineResult(ids:ids,candidates:shortlist,source:source)
             }
         }
         rankingTask = task
-        let ids = await task.value
+        let result = await task.value
         if token == generation { rankingTask = nil }
-        guard token == generation, !Task.isCancelled, current == model.recommendationSnapshot else {
+        guard !Task.isCancelled, isCurrent() else {
             if token == generation { cancel(); message = "Your taplist or queue changed. Find fresh suggestions." }
             return
         }
-        if let ids, let ranked = RecommendationRules.choose(ids:ids,from:candidates) {
-            suggestions = ranked; usedModel = true
+        if let result, let ids = result.ids, let ranked = RecommendationRules.choose(ids:ids,from:result.candidates) {
+            suggestions = ranked; usedModel = true; retrievalSource = result.source
         } else {
-            suggestions = Array(candidates.prefix(3)); usedModel = false
+            // A failed/late model always uses the established local fallback order.
+            suggestions = Array(candidates.prefix(3)); usedModel = false; retrievalSource = .local
             if preferences.styleRequest.needsModel {
                 message = "Local matching applied your filters, but couldn’t interpret the additional style or mood wording. Try a simple style such as IPA or stout."
             }

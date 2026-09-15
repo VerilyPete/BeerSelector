@@ -1,3 +1,5 @@
+Forward-looking iOS 27 work is planned separately in [Advanced on-device suggestions](AI-IMPROVEMENTS/README.md), beginning with semantic taplist search and retaining iOS 26 Apple Intelligence compatibility. The implementation baseline and current retention rules are recorded in WORK-CHECKPOINT.md; older design sections below are historical.
+
 ## Implemented follow-up: choice context (September 13, 2026)
 
 The earlier choice-context proposal is now implemented. Retain 100 local choice records, separately from 100 confirmed tastings and uncapped explicit feedback. Each record contains an immutable taplist cohort and distinct selection, successful queue acknowledgement, and later tasting-feed appearance evidence. Ordinary/offline check-ins participate, not just recommendation selections. Source dates remain day precision, so linkage is observational rather than proof of a bartender claim.

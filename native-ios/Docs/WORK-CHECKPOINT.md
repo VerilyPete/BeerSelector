@@ -1,3 +1,29 @@
+## Experimental semantic retrieval — September 14, 2026
+
+Implemented app-private NaturalLanguage word-vector retrieval behind `BEERSELECTOR_SEMANTIC_SEARCH=1` in DEBUG on iOS 27 with English preferred language. Default and Release behavior remain existing local retrieval plus optional Apple Intelligence ranking. Cache builds stay off the UI actor; account/content/generation fences, hard eligibility, authoritative description evidence in every prompt tier, and a shared retrieval/ranking deadline are in place. No private tasting/feedback data enters the vector cache. See [current implementation evidence](AI-IMPROVEMENTS/01-SEMANTIC-SEARCH-IMPLEMENTATION.md) for tests and remaining release gates; older entries below describe intermediate states.
+
+Core Spotlight synonyms failed controlled device tests. The separate probe found working English word embeddings; sentence embeddings were unavailable. The Spotlight harness also exposed a real cross-generation identifier/deletion collision, now repaired with namespaced item IDs and domain-only cleanup. No real app data was involved.
+
+Final app suite: **209 tests passed**, zero failures (`/private/tmp/semantic-final-review.xcresult`). Review fixes cover cache invalidation during ranking and context-budget retry within the original deadline. The actual production-engine corpus probe **passed on the physical iPad on September 15** (`/private/tmp/semantic-production-engine.xcresult`): one test covers 20 cases, with candidate Recall@12 improving from 0.818 to 0.918 overall and 0.875 to 1.0 for synonym cases. The 32-document cache built in 35 ms. Remaining release gates are full app iOS 27 checks, paired final-model quality evaluation and older-toolchain/real iOS 26 AI validation; the feature remains experimental and off by default.
+
+No commit, upload, Cloud or distribution changes. Preserve the unrelated untracked Xcode Cloud directory.
+
+## Semantic search first implementation slices — September 14, 2026
+
+Local retrieval now computes hard eligibility once and preserves the existing candidate ordering and presentation branches. Added a frozen 20-case local baseline and an ABV-band regression. Xcode 27 also required explicit View fills at two existing SwiftUI overload ambiguities. The separate fixture-only device probe exercises scoped queries and hydration/cleanup boundaries.
+
+**Production semantic integration remains gated:** lexical controls pass on the connected iPadOS 27 iPad and Foundation Models reports available, but synonym queries returned no matches. No semantic index or retrieval session has been attached to the real app. See [implementation evidence and next dependency](AI-IMPROVEMENTS/01-SEMANTIC-SEARCH-IMPLEMENTATION.md). Validation: 194 app tests passed, zero failures/skips, under Xcode 27 on the iOS 26.5 simulator (`/private/tmp/semantic-app-signed.xcresult`); the final physical probe run passed four deterministic safety tests and failed its semantic synonym assertion (`/private/tmp/semantic-probe-final.xcresult`). The additional iOS 27 simulator run failed at app launch, so its runtime coverage remains unverified. Actual Xcode 26.3 and real iOS 26 Apple Intelligence remain unverified. No commit, upload, Cloud or distribution change.
+
+## Semantic taplist search implementation review — September 14, 2026
+
+Three reviewers assessed architecture, privacy/index lifecycle, and compatibility/validation. [Plan 1](AI-IMPROVEMENTS/01-SEMANTIC-TAPLIST-SEARCH.md) now specifies application-owned search isolation, authoritative evidence in every prompt tier, eligibility computed once, deterministic candidate merging, a shared deadline, generation-safe index cleanup, and numerical release gates. [Review disposition](AI-IMPROVEMENTS/01-SEMANTIC-SEARCH-REVIEW.md) records the findings and remaining evidence requirements.
+
+Next: prove a scoped semantic API route in an isolated Xcode 27 harness; local retrieval extraction and a frozen baseline corpus can proceed independently. SDK signature inspection found Xcode 27.0, but device feasibility and old/new runtime validation remain outstanding. Planning only; no feature code, Cloud changes, commit or upload in this review.
+
+## Advanced AI roadmap drafted — September 14, 2026
+
+Four separate implementation plans now live in [AI-IMPROVEMENTS](AI-IMPROVEMENTS/README.md): semantic taplist search first, then actual-model quality evaluations, adaptive context allocation, and refinement of an existing selection. They preserve iOS 26 Apple Intelligence and existing local fallback, isolate iOS 27 SDK/runtime features, and keep inference on-device. Each defines implementation stages, tests, acceptance gates, and rollback. The first includes a small evaluation baseline; the second formalizes the reusable harness. Planning only: no source, toolchain, Cloud workflow, or runtime changes were made for this roadmap.
+
 ## Four PR review findings repaired — September 14, 2026
 
 All four findings from the local review of `46e62900` are repaired. Nuanced requests now influence retrieval across the eligible taplist before the 12-candidate cap, using matching terms from names/styles/breweries/descriptions plus style variety for requests without literal matches. The model receives bounded matching terms in every prompt tier. This is keyword retrieval with coverage, not a claim of complete local semantic interpretation; Apple Intelligence still handles nuance and existing fallback messaging remains.
