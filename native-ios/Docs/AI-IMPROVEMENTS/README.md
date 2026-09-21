@@ -1,20 +1,20 @@
 **Advanced on-device suggestions: implementation roadmap**
 
-Drafted September 14, 2026. These documents define the roadmap; see [Plan 1 implementation evidence](01-SEMANTIC-SEARCH-IMPLEMENTATION.md) for the experimental word-vector implementation and remaining release gates. The advanced features remain unshipped. Baseline is native commit `bf65d3c6` (191 passing tests). The four plans are separate work items, ordered as requested:
+Drafted September 14, 2026. These documents define the roadmap; see [Plan 1 implementation evidence](01-SEMANTIC-SEARCH-IMPLEMENTATION.md) for the word-vector implementation, its September 21 release-enablement decision, and outstanding evaluation work. Plans 2–4 remain unshipped. Baseline is native commit `bf65d3c6` (191 passing tests). The four plans are separate work items, ordered as requested:
 
 1. [Semantic taplist search](01-SEMANTIC-TAPLIST-SEARCH.md)
 2. [AI quality evaluations](02-AI-QUALITY-EVALUATIONS.md)
 3. [Adaptive model context](03-ADAPTIVE-MODEL-CONTEXT.md)
 4. [Refine an existing selection](04-SELECTION-REFINEMENT.md)
 
-Plan 1 has completed a team planning review; see its [review disposition](01-SEMANTIC-SEARCH-REVIEW.md). The local baseline and experimental app-private retrieval pipeline are implemented; production rollout remains gated. Plans 2–4 remain drafts. Include a small fixed evaluation corpus in that feature so it can be assessed against the current retrieval baseline; Plan 2 expands this into the reusable evaluation system. Plans 3 and 4 use that system before release. Each feature should have its own reviewable implementation PR after the current recommendation branch is integrated. Do not bundle all four into one release requirement.
+Plan 1 has completed a team planning review; see its [review disposition](01-SEMANTIC-SEARCH-REVIEW.md). The local baseline and experimental app-private retrieval pipeline are implemented; word-vector retrieval is now enabled in Debug and Release on iOS 26+ with English preferred language, within user-opt-in Suggestions. Plans 2–4 remain drafts. Include a small fixed evaluation corpus in that feature so it can be assessed against the current retrieval baseline; Plan 2 expands this into the reusable evaluation system. Plans 3 and 4 use that system before release. Each feature should have its own reviewable implementation PR after the current recommendation branch is integrated. Do not bundle all four into one release requirement.
 
 **Compatibility contract**
 
 | Environment | Required behavior |
 | --- | --- |
 | iOS 27 with a supported, available on-device model and required capabilities | Enable individually validated advanced features. |
-| iOS 26 with Apple Intelligence available | Preserve existing on-device ranking, 100-tasting input, request-aware lexical retrieval, and all user controls. Refinement can rebuild an explicit request on this path. |
+| iOS 26 with Apple Intelligence available | Enable English word-vector retrieval for nuanced requests, preserving on-device ranking, 100-tasting input, local fallback, and all user controls. |
 | Model unavailable, unsupported language/hardware, or interrupted generation | Use eligible local matching and accurate messaging about any request that was not fully interpreted. |
 | Existing supported OS versions below iOS 26 | Preserve local matching and existing app functionality. Do not raise the current iOS 17.6 deployment target for these features. |
 

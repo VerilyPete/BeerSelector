@@ -1,11 +1,11 @@
 **Semantic taplist search — implementation evidence, September 14, 2026**
 
-Status: app-private word-vector retrieval is implemented experimentally. Enable `BEERSELECTOR_SEMANTIC_SEARCH=1` in the Xcode Run scheme on iOS 27 DEBUG with English preferred language. Release builds, iOS 26 and the default development configuration retain existing retrieval. Quality and compatibility release gates remain open; no commit, upload or Cloud configuration change was made.
+Status updated September 21, 2026: at the user's request, word-vector retrieval is enabled by default in Debug and Release on iOS 26 and later with English preferred language. No scheme environment variable is needed. Suggestions itself remains disabled until the user enables it in Settings. Missing embeddings, unavailable indexes and model failures retain the existing local fallback. This rollout decision does not establish broader recommendation quality; the evaluation work below remains outstanding.
 
 **Implementation**
 
 - `LocalTaplistRetriever` preserves prior ordering and zero/one/two-unseen branches. Eligibility is calculated once across the complete authoritative taplist, including relative ABV bands and combined recent/confirmed repeat history.
-- `WordVectorEngine` runs Apple NaturalLanguage English word embeddings on an actor. Bounded public name/style/brewery/description text is averaged into normalized vectors; query similarity scans only eligible IDs. At most 1,000 documents and 24 returned IDs. Missing assets, unrepresentable text and invalid vectors fall back locally. This is an older API used under an iOS 27 rollout policy, not a new iOS 27 API claim.
+- `WordVectorEngine` runs Apple NaturalLanguage English word embeddings on an actor. Bounded public name/style/brewery/description text is averaged into normalized vectors; query similarity scans only eligible IDs. At most 1,000 documents and 24 returned IDs. Missing assets, unrepresentable text and invalid vectors fall back locally. This API predates iOS 26; the iOS 26 minimum aligns retrieval rollout with the existing Apple Intelligence ranking path.
 - `SemanticTaplistIndex` is memory-only and keyed by account/epoch and normalized public taplist facts, with model revision/dimension checks. Complete builds publish atomically; invalidation cancels outstanding builds and fences late search/build results. No personal history/feedback, Spotlight writes or persistent cache.
 - The controller retrieves after fresh source validation and only for explicit nuanced requests. It reserves up to six semantic candidates, fills with established local ordering to 12, and hydrates description evidence from authoritative eligible beers. It rechecks state before ranking/publication, including account, full snapshot, preferences, choice contexts and retrieval validity.
 - Every prompt tier preserves up to 320 Unicode scalars of description evidence per semantic candidate and the existing 100-tasting input. Semantic context overflow retries local candidates through AI once with remaining time. Retrieval and ranking share one eight-second deadline; retrieval is capped at two seconds. Other model failure uses the original local fallback order.
@@ -35,8 +35,24 @@ Post-review focused validation: `/private/tmp/semantic-review-red2.xcresult` fai
 
 Final full verification: `/private/tmp/semantic-final-review.xcresult` — **209 tests passed, zero failures**, Xcode 27 / iOS 26.5 simulator, including all review fixes and late-search invalidation. `git diff --check` passes.
 
-**Remaining release gates**
+**Remaining evaluation work**
 
 The frozen synthetic corpus has provisional labels and does not establish final model selection quality. Add independently labeled eligible/unacceptable IDs, negative requests, named beers, mixed style/nuance and varied hard-filter combinations. Run paired actual-model selection evaluations and latency measurements, including cold/warm behavior and repeated runs; do not ship merely because word-vector candidate recall improved. Static word averages are weak on negation and compositional meaning.
 
-Only Xcode 27 is installed; Xcode 26.3 compilation remains unverified. The full iOS 26.5 simulator suite does not establish real iOS 26 Apple Intelligence quality. The iOS 27 simulator could not launch the app (`NSPOSIXErrorDomain` code 3); physical probe tests do not replace full app UI/runtime checks on iOS 27. Keep the feature disabled in Release until these gates pass. Plans 2–4 remain separate work.
+Only Xcode 27 is installed; Xcode 26.3 compilation remains unverified. The full iOS 26.5 simulator suite does not establish real iOS 26 Apple Intelligence quality. The iOS 27 simulator could not launch the app (`NSPOSIXErrorDomain` code 3); physical probe tests do not replace full app UI/runtime checks on iOS 27. The earlier instruction to keep Release disabled is superseded by the September 21 rollout decision above. These historical validation limitations are not claims about the current build. Plans 2–4 remain separate work.
+
+**Release compatibility audit — September 21, 2026**
+
+The app's production retrieval path uses `NLEmbedding.wordEmbedding(for:)`, vectors, revision and dimension, available since iOS 13 in the installed Xcode 27 SDK headers. It does not use the iOS 27 Core Spotlight or Foundation Models APIs explored by the separate probe target. The app retains its iOS 17.6 deployment target.
+
+| Runtime | Suggestions behavior |
+| --- | --- |
+| Earlier than iOS 26 | Semantic retrieval defaults off; the provider's iOS 26 guard returns model-unavailable and the controller uses local matching. |
+| iOS 26.0–26.3 | English semantic retrieval is enabled; available, locale-supported Foundation Models ranking uses the conservative byte-based prompt budget. Token-counting APIs are never invoked. |
+| iOS 26.4+ and iOS 27 | Same retrieval and ranking path; token counting is used only inside its iOS 26.4 runtime guard and when the compiler supports those declarations. Older compiler builds retain the conservative budget. |
+| Unsupported preferred language or missing word embeddings | Semantic retrieval is disabled or returns no result; existing local candidates remain available to ranking. |
+| Apple Intelligence unavailable, unsupported model locale, provider error or timeout | The controller uses the established local fallback ordering and reports when additional style/mood wording could not be interpreted. |
+
+No iOS-27-only production call is introduced by this rollout. Newer APIs must continue to receive their own runtime availability guards; an OS check does not replace `model.availability` and `supportsLocale()`. Provider errors are caught by the recommendation pipeline; context overflow retries compact input or local candidates within the existing deadline. The original Spotlight probe remains outside the application target.
+
+Release-enablement validation: Xcode 27.0, actual `Release` configuration with testability enabled and serial execution. All 220 tests passed on iOS 27 (iPhone 18 Pro) and the same binary passed all 220 tests on iOS 26.3 (iPhone 17e). The default-index regression builds and retrieves without an enable override, and the system-provider smoke test returns eligible suggestions or local fallback. Existing tests cover unavailable providers, deadline expiry, context overflow, eligibility and stale-index rejection. FoundationModels remains weak-linked in the Release binary. Test cleanup now cancels its task directly instead of depending on a DEBUG-only preview method, allowing the complete suite to compile in Release. Bundles: `/private/tmp/semantic-release-27-verified.xcresult` and `/private/tmp/semantic-release-26-3.xcresult`. These simulator results establish compatibility and fallback behavior, not physical-device inference quality or latency.

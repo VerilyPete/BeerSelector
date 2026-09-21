@@ -90,14 +90,12 @@ extension SemanticRetrieving {
 }
 
 @MainActor final class SemanticTaplistIndex: SemanticRetrieving {
-    // Explicit opt-in for experiments; availability of this older API must not
-    // silently change the established iOS 26 recommendation path.
-    static var experimentalEnabled: Bool {
-        #if DEBUG
-        if #available(iOS 27.0, *), Locale.preferredLanguages.first?.hasPrefix("en") == true {
-            return ProcessInfo.processInfo.environment["BEERSELECTOR_SEMANTIC_SEARCH"] == "1"
+    // Available in distribution builds; the Suggestions UI remains opt-in.
+    // Missing embedding assets are handled by the engine's local fallback.
+    static var defaultEnabled: Bool {
+        if #available(iOS 26.0, *) {
+            return Locale.preferredLanguages.first?.hasPrefix("en") == true
         }
-        #endif
         return false
     }
     private struct Key: Equatable {
@@ -113,7 +111,7 @@ extension SemanticRetrieving {
     var validityToken: UUID? { generation }
     private var buildTask: Task<Void,Never>?
     init(enabled: Bool? = nil, engine: any SemanticVectorEngine = WordVectorEngine()) {
-        self.enabled = enabled ?? Self.experimentalEnabled; self.engine = engine
+        self.enabled = enabled ?? Self.defaultEnabled; self.engine = engine
     }
     func invalidate() {
         generation = UUID(); desired = nil; ready = nil

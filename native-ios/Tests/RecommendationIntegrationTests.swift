@@ -516,6 +516,19 @@ final class RecommendationIntegrationTests: XCTestCase {
 }
 
 extension RecommendationIntegrationTests {
+    @MainActor func testSystemProviderReturnsEligibleSuggestionsOrLocalFallback() async throws {
+        try await withModel { model,_,_ in
+            let controller = model.recommendations
+            controller.setPreferences(.init(request:"crisp and refreshing"))
+            await controller.generate()
+            XCTAssertEqual(controller.suggestions.map(\.id),["new"])
+            XCTAssertFalse(controller.generating)
+            if !controller.usedModel {
+                XCTAssertEqual(controller.retrievalSource,.local)
+                XCTAssertNotNil(controller.message)
+            }
+        }
+    }
     @MainActor func testAdversarialFailedSaveCannotAutomaticallyDispatchLater() async throws {
         try await withModel { model,db,fixture in
             let beer = Beer(id:"new",name:"New beer")
