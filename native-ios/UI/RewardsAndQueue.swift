@@ -250,7 +250,7 @@ struct OperationsScreen: View {
                                 (typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment:.leading,spacing:12)) : AnyLayout(HStackLayout())) {
                                     Button("RETRY") { retry = operation }.buttonStyle(RoboButtonStyle()).disabled(model.offline || model.processing || model.operationRestriction(operation) != nil)
                                         .opacity(model.offline || model.processing || model.operationRestriction(operation) != nil ? 0.45 : 1)
-                                    Button("REMOVE") { removal = operation }.buttonStyle(RoboButtonStyle(color:Robo.red)).disabled(operation.status == "retrying")
+                                    Button("REMOVE") { removal = operation }.buttonStyle(RoboButtonStyle(color:Robo.red)).disabled(model.processing || operation.status == "retrying")
                                 }
                             }
                         }

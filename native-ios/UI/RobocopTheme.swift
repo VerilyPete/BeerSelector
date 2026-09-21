@@ -55,7 +55,7 @@ struct BrushedChrome: View {
     var bottom = false
     var body: some View {
         (bottom ? Robo.brushedBottom : Robo.brushed)
-            .overlay(Color.white.opacity(0.03).blendMode(.overlay))
+            .overlay { Rectangle().fill(Color.white.opacity(0.03)).blendMode(.overlay) }
             .overlay {
                 Canvas { context,size in
                     var grain = Path()

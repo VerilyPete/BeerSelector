@@ -38,6 +38,7 @@ struct RootView: View {
             if model.configured { tabBar }
         }
         .background(ChromeScreenBackground()).foregroundStyle(Robo.text)
+        .sheet(isPresented:$model.showRecommendations) { RecommendationsScreen(model:model) }
         .sheet(isPresented:$model.showSettings) { SettingsScreen().environmentObject(model) }
         .sheet(isPresented:$model.showRewards) { RewardsScreen().environmentObject(model) }
         .sheet(isPresented:$model.showQueue) { QueueScreen().environmentObject(model) }
@@ -74,6 +75,7 @@ struct RootView: View {
     }
 }
 struct HomeView: View {
+    @AppStorage("recommendations_enabled") private var recommendationsEnabled = false
     @EnvironmentObject var model: AppModel
     @Environment(\.dynamicTypeSize) private var typeSize
     @State private var expandedHomeBeerID: String?
@@ -89,6 +91,7 @@ struct HomeView: View {
                             VStack(alignment:.leading,spacing:20) {
                                 accountHeader
                                 if model.isMember { MetricPanel(count:model.tastedBeers.count) }
+                                recommendationEntry
                                 exploration()
                             }.padding(.horizontal,18).padding(.top,8).padding(.bottom,18)
                                 .frame(maxWidth:760).frame(maxWidth:.infinity)
@@ -107,10 +110,31 @@ struct HomeView: View {
                 }
             }
         }
+        // The chrome lives outside this safe-area viewport. Explicitly clip the
+        // entire Home scroll surface so cards and their shadows stay beneath it.
+        .clipped()
+    }
+    @ViewBuilder private var recommendationEntry: some View {
+        if recommendationsEnabled && model.isMember {
+            Button { model.showRecommendations = true } label: {
+                HStack(spacing:12) {
+                    Image(systemName:"sparkles").foregroundStyle(QueueChrome.cyan)
+                    VStack(alignment:.leading,spacing:4) {
+                        Text("Find something to try").font(Robo.title(15))
+                        Text("Describe a style or mood to narrow the taplist.").font(Robo.mono(10)).foregroundStyle(QueueChrome.secondary)
+                            .fixedSize(horizontal:false,vertical:true)
+                    }.frame(maxWidth:.infinity,alignment:.leading)
+                    Image(systemName:"chevron.right").font(.system(size:12)).foregroundStyle(QueueChrome.secondary)
+                }.padding(14).frame(maxWidth:.infinity,alignment:.leading)
+                    .background(QueueChrome.background,in:RoundedRectangle(cornerRadius:15))
+                    .overlay(RoundedRectangle(cornerRadius:15).strokeBorder(QueueChrome.metal.opacity(0.45),lineWidth:1))
+            }.buttonStyle(.plain).foregroundStyle(QueueChrome.text).accessibilityIdentifier("home-recommendations")
+        }
     }
     private var tabletHome: some View {
         VStack(alignment:.leading,spacing:20) {
             accountHeader
+            recommendationEntry
             HStack(spacing:12) {
                 Button("ALL BEERS") { model.tab = .all }.accessibilityIdentifier("nav-all-beers")
                 Button("BEERFINDER") { model.tab = .finder }.disabled(!model.isMember).accessibilityIdentifier("nav-beerfinder")

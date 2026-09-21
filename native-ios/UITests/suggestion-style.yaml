@@ -1,0 +1,44 @@
+# Launch independently with --preview-fixtures --preview-recommendations.
+# No model or queue writes. Style matching must work through the local fallback.
+appId: org.verily.FSbeerselector
+---
+- tapOn:
+    id: suggestion-request
+- inputText: stout
+- pressKey: Enter
+- assertVisible: "Style: Stout"
+- assertNotVisible:
+    id: recommendation-card-2
+- scrollUntilVisible:
+    element:
+      id: recommendation-generate
+    direction: DOWN
+- tapOn:
+    id: recommendation-generate
+- scrollUntilVisible:
+    element:
+      id: recommendation-card-2
+    direction: DOWN
+- assertVisible:
+    id: recommendation-card-2
+- assertNotVisible:
+    id: recommendation-card-3
+- scrollUntilVisible:
+    element:
+      text: "Clear style or mood"
+    direction: UP
+- tapOn: "Clear style or mood"
+- tapOn: "Crisp and refreshing"
+- assertVisible: "Additional wording: Apple Intelligence preference"
+- scrollUntilVisible:
+    element:
+      id: recommendation-generate
+    direction: DOWN
+- tapOn:
+    id: recommendation-generate
+- scrollUntilVisible:
+    element:
+      id: recommendation-message
+    direction: UP
+- assertVisible:
+    id: recommendation-message

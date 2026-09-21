@@ -74,10 +74,23 @@ final class BeerDatabase {
             }
             try execute("CREATE TABLE IF NOT EXISTS rewards(reward_id TEXT PRIMARY KEY,redeemed TEXT,reward_type TEXT)")
             try execute("CREATE TABLE IF NOT EXISTS operation_queue(id TEXT PRIMARY KEY,type TEXT NOT NULL,payload TEXT NOT NULL,timestamp INTEGER NOT NULL,retry_count INTEGER DEFAULT 0,status TEXT DEFAULT 'pending',error_message TEXT,last_retry_timestamp INTEGER)")
-            try execute("UPDATE operation_queue SET status='pending' WHERE status='retrying'")
+            // Recover older interrupted dispatches conservatively. Ordinary check-ins retain
+            // their legacy retry policy; recommendations always require explicit review.
+            for row in try rows("SELECT id,payload,error_message,status FROM operation_queue WHERE status IN ('retrying','pending')") {
+                let payload = row["payload"].flatMap { $0.data(using:.utf8) }
+                    .flatMap { try? JSONSerialization.jsonObject(with:$0) as? [String:Any] }
+                let needsReview = payload == nil || payload?["recommendation"].map { String(describing:$0) } == "true"
+                if row["status"] == "pending" && !needsReview { continue }
+                try execute("UPDATE operation_queue SET status=?,error_message=? WHERE id=?", [
+                    needsReview ? "failed" : "pending",
+                    needsReview ? "Check-in may have been sent. Review your beer queue before retrying." : row["error_message"],
+                    row["id"]
+                ])
+            }
             // Credentials are read only from Keychain. Never resurrect the removed plaintext credential preference.
             try execute("DELETE FROM preferences WHERE key='auth_cookies'")
-            try setPreference("native_schema_version", "1")
+            try setupRecentTastings()
+            try setPreference("native_schema_version", "2")
         }
     }
     func beers(tasted: Bool = false) throws -> [Beer] {
@@ -101,8 +114,16 @@ final class BeerDatabase {
             return PendingOperation(id:r["id"] ?? "",type:r["type"] ?? "",payload:dict.mapValues { String(describing:$0) },timestamp:Double(r["timestamp"] ?? "0") ?? 0,retryCount:Int(r["retry_count"] ?? "0") ?? 0,status:r["status"] ?? "pending",error:r["error_message"])
         }
     }
-    func enqueue(type: String, payload: [String: String]) throws {
+    @discardableResult func enqueue(type: String, payload: [String: String]) throws -> String {
+        let id = UUID().uuidString
         let encoded = String(decoding:try JSONEncoder().encode(payload),as:UTF8.self)
-        try execute("INSERT INTO operation_queue(id,type,payload,timestamp) VALUES(?,?,?,?)",[UUID().uuidString,type,encoded,String(Date().timeIntervalSince1970 * 1000)])
+        // Recommendation intent must never enter the automatic retry pool, even
+        // if the process stops or a subsequent cache read fails before dispatch.
+        let recommendation = payload["recommendation"] == "true"
+        try execute("INSERT INTO operation_queue(id,type,payload,timestamp,status,error_message) VALUES(?,?,?,?,?,?)",[
+            id,type,encoded,String(Date().timeIntervalSince1970 * 1000),recommendation ? "failed" : "pending",
+            recommendation ? "Check-in has not been confirmed. Review your beer queue before retrying." : nil
+        ])
+        return id
     }
 }

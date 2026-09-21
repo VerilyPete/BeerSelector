@@ -547,7 +547,8 @@ final class NetworkTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at:folder); fixture.handler = nil }
         let model = AppModel(api:api(),monitorConnectivity:false)
         let db = try BeerDatabase(url:folder.appendingPathComponent("beers.db")); model.db = db
-        model.session = MemberSession(memberId:"fixture",storeId:"1",storeName:"Fixture",sessionId:"fixture")
+        // A complete taplist-only session isolates cancellation from member link recovery.
+        model.session = MemberSession(memberId:"visitor",storeId:"1",storeName:"Fixture",sessionId:"visitor_session")
         try db.setPreference("all_beers_api_url","https://fsbs.beerknurd.com/bk-store-json.php?sid=1")
         var calls = 0
         fixture.handler = { _ in
