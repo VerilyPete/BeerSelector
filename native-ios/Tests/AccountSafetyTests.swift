@@ -25,6 +25,97 @@ final class AccountSafetyTests: XCTestCase {
         try await body(model,db,fixture,credentials)
     }
 
+    @MainActor func testRestoredAccountRecoversMissingDataLinksOnRefresh() async throws {
+        try await withModel { model,db,fixture,credentials in
+            try db.execute("DELETE FROM preferences WHERE key IN ('all_beers_api_url','my_beers_api_url')")
+            model.session = nil
+            try model.restoreCredentials()
+            XCTAssertTrue(model.configured,"Saved credentials must not lead to Get Started when the database is empty")
+            var dashboardReads = 0
+            fixture.handler = { request in
+                if request.url!.path == "/member-dash.php" {
+                    dashboardReads += 1
+                    return (200,Data("https://fsbs.beerknurd.com/bk-member-json.php?uid=987 https://fsbs.beerknurd.com/bk-store-json.php?sid=1".utf8))
+                }
+                return try self.response(request)
+            }
+            await model.refresh()
+            XCTAssertEqual(dashboardReads,1)
+            XCTAssertEqual(try db.preference("my_beers_api_url"),"https://fsbs.beerknurd.com/bk-member-json.php?uid=987","Use the server's data link, not a guessed member ID")
+            XCTAssertEqual(model.allBeers.map(\.id),["new-store"])
+            XCTAssertEqual(model.tastedBeers.map(\.id),["new-tasting"])
+            XCTAssertEqual(try credentials.load().0?.identity,model.session?.identity)
+            XCTAssertNil(model.error)
+            await model.refresh()
+            XCTAssertEqual(dashboardReads,1,"Existing links do not require another dashboard fetch")
+        }
+    }
+    @MainActor func testDataLinkRecoveryFailureKeepsAccountAndCanBeRetried() async throws {
+        try await withModel { model,db,fixture,_ in
+            try db.setPreference("all_beers_api_url","")
+            fixture.handler = { _ in (200,Data("Sign in".utf8)) }
+            await model.refresh()
+            XCTAssertTrue(model.configured)
+            XCTAssertTrue(model.isMember)
+            XCTAssertNotNil(model.error)
+            XCTAssertFalse(model.refreshing)
+            XCTAssertEqual(try db.preference("all_beers_api_url"),"")
+            fixture.handler = { request in
+                if request.url!.path == "/member-dash.php" {
+                    return (200,Data("https://fsbs.beerknurd.com/bk-member-json.php?uid=1 https://fsbs.beerknurd.com/bk-store-json.php?sid=1".utf8))
+                }
+                return try self.response(request)
+            }
+            await model.refresh()
+            XCTAssertNil(model.error)
+            XCTAssertFalse(model.allBeers.isEmpty)
+        }
+    }
+    @MainActor func testDataLinkRecoveryRejectsDifferentStore() async throws {
+        try await withModel { model,db,fixture,_ in
+            try db.setPreference("all_beers_api_url","")
+            fixture.handler = { try self.response($0) }
+            await model.refresh()
+            XCTAssertNotNil(model.error)
+            XCTAssertEqual(try db.preference("all_beers_api_url"),"")
+            XCTAssertTrue(model.allBeers.isEmpty)
+        }
+    }
+    @MainActor func testDataLinkRecoveryCannotRestoreConfigurationAfterLogout() async throws {
+        try await withModel { model,db,fixture,_ in
+            try db.setPreference("all_beers_api_url","")
+            model.activityCleanup = {}; model.webCookieCleanup = {}
+            fixture.handler = { request in
+                if request.url!.path == "/member-dash.php" {
+                    await model.logout()
+                    return (200,Data("https://fsbs.beerknurd.com/bk-member-json.php?uid=1 https://fsbs.beerknurd.com/bk-store-json.php?sid=1".utf8))
+                }
+                return try self.response(request)
+            }
+            await model.refresh()
+            XCTAssertFalse(model.configured)
+            XCTAssertNil(model.session)
+            XCTAssertEqual(try db.preference("all_beers_api_url"),"")
+            XCTAssertTrue(model.allBeers.isEmpty)
+        }
+    }
+    @MainActor func testRestoredVisitorRecoversTaplistWithoutMemberDashboard() async throws {
+        try await withModel { model,db,fixture,_ in
+            model.session = MemberSession(memberId:"visitor",storeId:"1",storeName:"Fixture",sessionId:"visitor_session")
+            try db.setPreference("all_beers_api_url",nil)
+            fixture.handler = { request in
+                XCTAssertEqual(request.url!.path,"/bk-store-json.php")
+                return try self.response(request)
+            }
+            await model.refresh()
+            XCTAssertTrue(model.configured)
+            XCTAssertFalse(model.isMember)
+            XCTAssertNil(model.error)
+            XCTAssertEqual(try db.preference("my_beers_api_url"),"none://visitor_mode")
+            XCTAssertFalse(model.allBeers.isEmpty)
+        }
+    }
+
     @MainActor func testOfflineCheckInHidesBeerUntilSavedRequestIsRemoved() async throws {
         try await withModel { model,db,_,_ in
             let beer = Beer(id:"offline",name:"Offline beer")

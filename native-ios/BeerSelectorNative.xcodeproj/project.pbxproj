@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		FA0000000000000000000001 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = FA0000000000000000000002 /* SplashScreen.storyboard */; };
 		02E29FEF72BA21373F843C2E /* HTTPFixture.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1DED3AF0CCC6D6BF93C0751 /* HTTPFixture.swift */; };
 		122C661C28FDB4ED200E7B04 /* OnDeviceRecommendationProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 929A8D429AB19073FB74ABF7 /* OnDeviceRecommendationProvider.swift */; };
 		13C2A40F3A44AC5A17FC49AB /* SpaceGrotesk-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = B805244B88340CB922AB51D0 /* SpaceGrotesk-Bold.ttf */; };
@@ -112,6 +113,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		FA0000000000000000000002 /* SplashScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = SplashScreen.storyboard; sourceTree = "<group>"; };
 		04EF71A9E599A4CB8CF189D6 /* BeerQueueSharedTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeerQueueSharedTypes.swift; sourceTree = "<group>"; };
 		061741BFC4807C8D22222187 /* LocalTaplistRetrieverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalTaplistRetrieverTests.swift; sourceTree = "<group>"; };
 		06275F1DAE6CEEAFE3663883 /* PerformanceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformanceTests.swift; sourceTree = "<group>"; };
@@ -119,7 +121,7 @@
 		09F1A509A9E3EDA4041AAB69 /* libsqlite3.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libsqlite3.tbd; path = usr/lib/libsqlite3.tbd; sourceTree = SDKROOT; };
 		0EEB9B8BC25E938FB72A161E /* DiagnosticJournalTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticJournalTests.swift; sourceTree = "<group>"; };
 		11B1728CA71C2EC017ACBCD2 /* SpaceGrotesk-SemiBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "SpaceGrotesk-SemiBold.ttf"; sourceTree = "<group>"; };
-		12D771D46FDD13D0EE577B5A /* BeerSelectorNative.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = BeerSelectorNative.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		12D771D46FDD13D0EE577B5A /* BeerSelectorNative.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BeerSelectorNative.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		1479E255579F402879E1A1B7 /* PostLoginCleanupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostLoginCleanupTests.swift; sourceTree = "<group>"; };
 		1D64E9C6BDD780C0A805A3C2 /* ActivityStylePreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityStylePreview.swift; sourceTree = "<group>"; };
 		2262BE1057E0A4E092166E62 /* BeerSelectorApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeerSelectorApp.swift; sourceTree = "<group>"; };
@@ -130,7 +132,7 @@
 		39F2059F3B66AECF52036DDA /* DiagnosticJournal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticJournal.swift; sourceTree = "<group>"; };
 		3C98504B0A11A7E166148C48 /* LegacyUpgradeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyUpgradeTests.swift; sourceTree = "<group>"; };
 		3CDCE901C7628CA70367C6E2 /* SemanticTaplistCorpus.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = SemanticTaplistCorpus.json; sourceTree = "<group>"; };
-		3EB46E74F9A0312EDB8BC823 /* BeerQueueWidget.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = BeerQueueWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		3EB46E74F9A0312EDB8BC823 /* BeerQueueWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = BeerQueueWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		424B0ACDBEBAFA81CC5C4EC7 /* SemanticCandidates.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SemanticCandidates.swift; sourceTree = "<group>"; };
 		448C8B937564D5D9D30A96A6 /* BeerListScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeerListScreen.swift; sourceTree = "<group>"; };
 		45EE3296A115D128B8EA9CBE /* SpaceMono-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "SpaceMono-Regular.ttf"; sourceTree = "<group>"; };
@@ -180,7 +182,7 @@
 		D249E14E9A9E75AD46864B06 /* SpaceGrotesk-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "SpaceGrotesk-Regular.ttf"; sourceTree = "<group>"; };
 		D50BDD33CAF7819DE7F567C4 /* RecommendationRulesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecommendationRulesTests.swift; sourceTree = "<group>"; };
 		D99E97C828BEAA679849A34A /* RecommendationIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecommendationIntegrationTests.swift; sourceTree = "<group>"; };
-		DE3E4482637971AD8E10D65A /* BeerSelectorNativeTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = BeerSelectorNativeTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		DE3E4482637971AD8E10D65A /* BeerSelectorNativeTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BeerSelectorNativeTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		E094A5FAACE12510FD992EEA /* API.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = API.swift; sourceTree = "<group>"; };
 		EADF7F03E18E1D67E736EC14 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		F1DED3AF0CCC6D6BF93C0751 /* HTTPFixture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPFixture.swift; sourceTree = "<group>"; };
@@ -344,6 +346,7 @@
 		A48E3D3325FF51D436BA7888 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
+				FA0000000000000000000002 /* SplashScreen.storyboard */,
 				8B6299340A9333EDD4581FB9 /* Assets.xcassets */,
 				BE1F74F45E480DB31BBAADE5 /* BeerIcons.ttf */,
 				941743B005963BF3442CB79D /* DSEG7Classic-Bold.ttf */,
@@ -432,7 +435,7 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
-				LastUpgradeCheck = 1430;
+				LastUpgradeCheck = 2700;
 				TargetAttributes = {
 					37168967CE85FD81D9A8438E = {
 						DevelopmentTeam = N9F7839KSX;
@@ -489,6 +492,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				FA0000000000000000000001 /* SplashScreen.storyboard in Resources */,
 				B63F07A0E1BB27FA642C1554 /* Assets.xcassets in Resources */,
 				22C5E9232F83C985BFA468D2 /* BeerIcons.ttf in Resources */,
 				FD817B18BD78C68C1BDBAF2C /* DSEG7Classic-Bold.ttf in Resources */,
@@ -702,6 +706,7 @@
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 5.0;
@@ -770,6 +775,7 @@
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
@@ -902,6 +908,7 @@
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 5.0;

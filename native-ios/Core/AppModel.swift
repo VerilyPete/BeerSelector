@@ -115,7 +115,8 @@ final class AppModel: ObservableObject {
     private var enrichmentGeneration = UUID()
     var previewMode: Bool { session?.memberId == "preview" }
     var isMember: Bool { session?.valid == true && session?.isVisitor == false }
-    var configured: Bool { session != nil && ((try? db?.preference("all_beers_api_url")) ?? "") != "" }
+    // Account restoration comes from Keychain; missing cached data links are recoverable.
+    var configured: Bool { session?.valid == true && db != nil }
     func ownsOperation(_ operation: PendingOperation) -> Bool {
         isMember && operation.payload["memberId"] == session?.memberId && operation.payload["storeId"] == session?.storeId
     }
@@ -251,6 +252,39 @@ final class AppModel: ObservableObject {
         refreshTask = task
         await task.value
     }
+    /// Recover missing database configuration without making a restored member sign in again.
+    private func restoreDataLinks(token: UUID) async throws {
+        guard let db, let member = session, member.valid else { return }
+        let oldStore = try db.preference("all_beers_api_url")
+        let oldMember = try db.preference("my_beers_api_url")
+        guard (oldStore ?? "").isEmpty || (!member.isVisitor && (oldMember ?? "").isEmpty) else { return }
+        let links: (member: String, store: String)
+        if member.isVisitor {
+            guard member.storeId.allSatisfy({ $0.isASCII && $0.isNumber }) else { throw BeerError.invalidResponse("Invalid saved location") }
+            links = ("none://visitor_mode", "https://fsbs.beerknurd.com/bk-store-json.php?sid=\(member.storeId)")
+        } else {
+            let (data,_) = try await api.request(api.configuration.endpoint("member-dash.php"),member:member,cookies:cookies)
+            links = try Self.dataLinks(in:data)
+            guard URLComponents(string:links.store)?.queryItems?.first(where:{ $0.name == "sid" })?.value == member.storeId else {
+                throw BeerError.invalidResponse("The restored account returned a different location. Please sign in again.")
+            }
+        }
+        try Task.checkCancellation()
+        guard token == epoch, session?.identity == member.identity else { throw BeerError.changedAccount }
+        try db.transaction {
+            try db.setPreference("all_beers_api_url",links.store)
+            try db.setPreference("my_beers_api_url",links.member)
+        }
+    }
+    private static func dataLinks(in data: Data) throws -> (member: String, store: String) {
+        let html = String(decoding:data,as:UTF8.self)
+        func extract(_ pattern: String) throws -> String {
+            guard let range = html.range(of:pattern,options:.regularExpression), let found = URL(string:String(html[range])), APIConfiguration.dataURL(found) else { throw BeerError.invalidResponse("Could not read the account data links") }
+            return found.absoluteString
+        }
+        return try (extract(#"https://[^"'\s]+bk-member-json\.php\?uid=\d+"#),
+                    extract(#"https://[^"'\s]+bk-store-json\.php\?sid=\d+"#))
+    }
     private func performRefresh(token: UUID) async {
         guard token == epoch, !previewMode, let db, configured else { return }
         cancelEnrichmentUpdates()
@@ -263,6 +297,14 @@ final class AppModel: ObservableObject {
         var outcome = Diagnostics.Outcome.cancelled
         defer { interval.finish(outcome) }
         var errors: [String] = []
+        do { try await restoreDataLinks(token:token) }
+        catch {
+            guard token == epoch, !Self.isRefreshCancellation(error) else { return }
+            self.error = "Couldn’t restore your saved data links. Try Refresh All Data in Settings. " + error.localizedDescription
+            outcome = .failure
+            return
+        }
+        guard token == epoch else { return }
         if let raw = try? db.preference("all_beers_api_url"), let url = URL(string:raw), APIConfiguration.dataURL(url) {
             do {
                 var beers: [Beer]
@@ -433,13 +475,8 @@ final class AppModel: ObservableObject {
             var storeURL = "https://fsbs.beerknurd.com/bk-store-json.php?sid=\(sid)"
             if !visitor {
                 let (data,_) = try await api.request(url,member:next,cookies:values)
-                let html = String(decoding:data,as:UTF8.self)
-                func extract(_ pattern: String) throws -> String {
-                    guard let range = html.range(of:pattern,options:.regularExpression), let found = URL(string:String(html[range])), APIConfiguration.dataURL(found) else { throw BeerError.invalidResponse("Could not read the account data links") }
-                    return found.absoluteString
-                }
-                memberURL = try extract(#"https://[^"'\s]+bk-member-json\.php\?uid=\d+"#)
-                storeURL = try extract(#"https://[^"'\s]+bk-store-json\.php\?sid=\d+"#)
+                let links = try Self.dataLinks(in:data)
+                memberURL = links.member; storeURL = links.store
             }
             // Prior login/logout cleanup may still be deleting browser cookies or activities.
             // Wait before publishing a new account; old server requests are independent.

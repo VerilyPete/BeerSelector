@@ -121,7 +121,8 @@ struct HomeView: View {
                     Image(systemName:"sparkles").foregroundStyle(QueueChrome.cyan)
                     VStack(alignment:.leading,spacing:4) {
                         Text("Find something to try").font(Robo.title(15))
-                        Text("Suggestions from your taplist").font(Robo.mono(10)).foregroundStyle(QueueChrome.secondary)
+                        Text("Describe a style or mood to narrow the taplist.").font(Robo.mono(10)).foregroundStyle(QueueChrome.secondary)
+                            .fixedSize(horizontal:false,vertical:true)
                     }.frame(maxWidth:.infinity,alignment:.leading)
                     Image(systemName:"chevron.right").font(.system(size:12)).foregroundStyle(QueueChrome.secondary)
                 }.padding(14).frame(maxWidth:.infinity,alignment:.leading)

@@ -19,10 +19,10 @@ struct RecommendationsScreen: View {
                 VStack(alignment:.leading,spacing:20) {
                     VStack(alignment:.leading,spacing:8) {
                         Text("SOMETHING TO TRY").font(Robo.mono(10)).tracking(1.5).foregroundStyle(QueueChrome.cyan)
-                        Text("Your next discovery").font(Robo.title(25)).foregroundStyle(QueueChrome.text)
-                        Text(controller.suggestions.isEmpty && !busy ? "Choose your preferences, then tap Find suggestions." :
-                             controller.historyCount == 0 ? "Explore a few choices from your location’s taplist." :
-                             "Based on \(controller.historyCount) recent tasted beers, here are some you might enjoy.")
+                        Text("Narrow down the taplist").font(Robo.title(25)).foregroundStyle(QueueChrome.text)
+                        Text(controller.suggestions.isEmpty && !busy ? "A shortcut to a few options. Choose your preferences or describe what sounds good, then tap Find suggestions." :
+                             controller.historyCount == 0 ? "A few options from your location’s taplist to help you choose." :
+                             "A few options from your taplist, using \(controller.historyCount) recent tastings to help narrow the list.")
                             .font(Robo.mono(12)).foregroundStyle(QueueChrome.secondary)
                             .fixedSize(horizontal:false,vertical:true)
                     }
@@ -195,7 +195,7 @@ private struct SuggestionRequestField: View {
                 Button("Clear style or mood") { editing = false; preferences.request = "" }
                     .font(Robo.mono(11))
             }
-            Text("Style names filter the taplist. Other wording guides Apple Intelligence. Up to 160 characters.")
+            Text("Use your own words, like ‘crisp and refreshing.’ Style names filter the taplist; when available, Apple Intelligence helps interpret other requests. Up to 160 characters.")
                 .font(Robo.mono(10)).foregroundStyle(QueueChrome.secondary)
                 .fixedSize(horizontal:false,vertical:true)
         }
