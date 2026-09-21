@@ -15,9 +15,7 @@ concurrency:
 
 jobs:
   native:
-    # Preserve the existing required GitHub Actions context until the job and
-    # main's branch protection can be renamed together. No Jest is executed.
-    name: Jest Unit Tests
+    name: Native iOS Tests
     runs-on: macos-26
     timeout-minutes: 30
     env:
