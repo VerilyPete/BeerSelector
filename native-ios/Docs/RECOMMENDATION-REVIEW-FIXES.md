@@ -34,3 +34,11 @@ Offline selection/confirmation and container/ABV UI flows passed. They require i
 Evidence remains at `/private/tmp/review-fixes-final.xcresult`, `/private/tmp/review-fixes-summary.json`, `/private/tmp/fixed-prompt-budget.log`, and `/private/tmp/final-provider-smoke.log`. The original review is `/Users/pete/claude/reviews/19e8e987-review.md`.
 
 Physical iPhone presentation and recommendation quality still need hands-on verification. The local machine has Xcode 26.6 rather than the Cloud-pinned 26.3: older-compiler compatibility guards were inspected and the conservative budgeting path tested, but an actual 26.3 build was not run. Server idempotency was not assumed or tested with live writes. The changes do not deploy or push anything.
+
+**Review repair for `eaac25b4` — September 21, 2026**
+
+Recommendation operations now enter durable review-required state in the initial insert. A cache read failure or interruption between insertion and dispatch cannot leave them in the automatic retry pool. The confirmed submission passes its operation ID explicitly; user-initiated retries authorize only that recommendation without first changing it to `pending`. Background drains skip recommendation rows even if an older build left them pending, and startup migrates those rows to review-required state. Ordinary offline check-ins retain their automatic retry policy.
+
+A successful insert followed by a cache failure reports `needsReview`, rather than incorrectly claiming the check-in was not saved. Regression coverage injects a malformed feedback cache, repairs it, removes the beer from availability, and verifies that background processing makes no request. Additional coverage checks the initial persisted state, older pending-row recovery, explicit retry, failed queue validation, and refresh interruption between batch writes.
+
+Validation: the full `All` plan passed 218 tests with zero failures on iPhone 18 Pro / iOS 27 using Xcode 27.0 and serial simulator execution. The initial parallel run encountered simulator app-launch failures and logout-test failures; the complete serial rerun passed. Cloud configuration boundary tests (3) and `git diff --check` also passed. Result bundle: `/private/tmp/pr29-fixed-serial.xcresult`.

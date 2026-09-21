@@ -18,6 +18,33 @@ final class RecommendationQueueRecoveryTests: XCTestCase {
         try await body(model,db,fixture)
     }
 
+    @MainActor func testNewAndLegacyPendingRecommendationsNeverAutomaticallyReplay() async throws {
+        try await withModel { model,db,fixture in
+            let payload = ["beerId":"new","beerName":"New beer","memberId":"1","storeId":"1","recommendation":"true"]
+            let id = try db.enqueue(type:"CHECK_IN_BEER",payload:payload)
+            XCTAssertEqual(try db.operations().first?.status,"failed")
+            var writes = 0
+            fixture.handler = { request in
+                if request.url!.path == "/addToQueue.php" { writes += 1; return (200,Data()) }
+                return (200,Data("No brew in queue".utf8))
+            }
+            await model.processOperations()
+            XCTAssertEqual(writes,0)
+            // Older builds could stop after saving pending intent, before dispatch.
+            try db.execute("UPDATE operation_queue SET status='pending' WHERE id=?",[id])
+            await model.processOperations()
+            XCTAssertEqual(writes,0)
+            model.db = try BeerDatabase(url:db.url)
+            XCTAssertEqual(try model.db!.operations().first?.status,"failed")
+            try model.reload()
+            await model.processOperations()
+            XCTAssertEqual(writes,0)
+            await model.retryOperation(id)
+            XCTAssertEqual(writes,1)
+            XCTAssertTrue(try db.operations().isEmpty)
+        }
+    }
+
     @MainActor func testStartupRequiresReviewForInterruptedRecommendationButRecoversOrdinaryRetry() async throws {
         try await withModel { model,db,fixture in
             let payload = ["beerId":"new","beerName":"New beer","memberId":"1","storeId":"1"]

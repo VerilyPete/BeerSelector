@@ -514,3 +514,69 @@ final class RecommendationIntegrationTests: XCTestCase {
         return try? await action?(request)
     }
 }
+
+extension RecommendationIntegrationTests {
+    @MainActor func testAdversarialFailedSaveCannotAutomaticallyDispatchLater() async throws {
+        try await withModel { model,db,fixture in
+            let beer = Beer(id:"new",name:"New beer")
+            try db.replaceBeers([beer]); try model.reload()
+            let account = try XCTUnwrap(model.recommendationAccount)
+            // A malformed optional cache reproduces a reload error after enqueue commits.
+            try db.execute("INSERT INTO beer_feedback(account,beer_id,feedback) VALUES(?,?,?)",[account,"broken","{"])
+            var writes = 0
+            fixture.handler = { request in
+                if request.url!.path == "/addToQueue.php" { writes += 1; return (200,Data()) }
+                return (200,Data("No brew in queue".utf8))
+            }
+            let result = await model.checkIn(beer,recommendation:true)
+            XCTAssertEqual(result,.needsReview)
+            XCTAssertEqual(try db.operations().first?.status,"failed")
+            XCTAssertEqual(writes,0)
+            // Repair the unrelated cache; the formerly available beer has gone away.
+            try db.deleteCachedBeerFeedback(account:account)
+            try db.replaceBeers([]); try model.reload()
+            await model.processOperations()
+            XCTAssertEqual(writes,0,"A recommendation reported as not saved must not later auto-send without revalidation")
+        }
+    }
+    @MainActor func testAdversarialRefreshBetweenBatchWritesStopsRemainder() async throws {
+        try await withModel { model,_,fixture in
+            var writes = 0
+            fixture.handler = { request in
+                switch request.url!.path {
+                case "/bk-store-json.php": return (200,Data(#"[{"id":"a","brew_name":"First"},{"id":"b","brew_name":"Second"},{"id":"c","brew_name":"Third"}]"#.utf8))
+                case "/bk-member-json.php": return (200,Data(#"[{},{"tasted_brew_current_round":[]},{"reward":[]}]"#.utf8))
+                case "/addToQueue.php":
+                    writes += 1
+                    await model.refresh(requireNewPass:true)
+                    return (200,Data())
+                default: return (200,Data("No brew in queue".utf8))
+                }
+            }
+            let controller = RecommendationController(model:model,provider:FakeProvider())
+            await controller.generate()
+            await controller.submit(ids:["a","b"])
+            XCTAssertEqual(writes,1)
+            XCTAssertEqual(controller.outcomes["a"],.added)
+            XCTAssertNil(controller.outcomes["b"])
+        }
+    }
+    @MainActor func testAdversarialQueueFailureBlocksWriteDespiteFreshFeeds() async throws {
+        try await withModel { model,_,fixture in
+            let controller = RecommendationController(model:model,provider:FakeProvider())
+            await controller.generate()
+            var writes = 0
+            fixture.handler = { request in
+                switch request.url!.path {
+                case "/bk-store-json.php": return (200,Data(#"[{"id":"new","brew_name":"New beer","brew_style":"IPA"}]"#.utf8))
+                case "/bk-member-json.php": return (200,Data(#"[{},{"tasted_brew_current_round":[]},{"reward":[]}]"#.utf8))
+                case "/addToQueue.php": writes += 1; return (200,Data())
+                default: return (200,Data("<html>Sign in</html>".utf8))
+                }
+            }
+            await controller.submit(ids:["new"])
+            XCTAssertEqual(writes,0)
+            XCTAssertTrue(controller.outcomes.isEmpty)
+        }
+    }
+}

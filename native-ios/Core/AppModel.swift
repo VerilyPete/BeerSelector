@@ -587,6 +587,7 @@ final class AppModel: ObservableObject {
         var payload = ["beerId":beer.id,"beerName":beer.brew_name,"storeId":member.storeId,"storeName":member.storeName,"memberId":member.memberId]
         if recommendation { payload["recommendation"] = "true" }
         if let choiceContextID { payload["choiceContextID"] = choiceContextID }
+        var savedRecommendation = false
         do {
             let id: String
             var manualChoice: BeerChoiceContext?
@@ -598,7 +599,9 @@ final class AppModel: ObservableObject {
                 payload["choiceContextID"] = choice.id
                 manualChoice = choice
             }
-            id = try db.enqueue(type:"CHECK_IN_BEER",payload:payload); try reload()
+            id = try db.enqueue(type:"CHECK_IN_BEER",payload:payload)
+            savedRecommendation = recommendation
+            try reload()
             if let choice = manualChoice, let account = recommendationAccount {
                 do { try db.saveChoicePresentation(choice,account:account) }
                 catch { self.error = error.localizedDescription }
@@ -607,8 +610,11 @@ final class AppModel: ObservableObject {
             if offline { return .savedForRetry }
             let results = await processOperations(only:recommendation ? id : nil)
             guard token == epoch else { return .unavailable }
-            return results[id] ?? .savedForRetry
-        } catch { if token == epoch { self.error = error.localizedDescription }; return .failed }
+            return results[id] ?? (recommendation ? .needsReview : .savedForRetry)
+        } catch {
+            if token == epoch { self.error = error.localizedDescription }
+            return savedRecommendation ? .needsReview : .failed
+        }
     }
     @discardableResult func processOperations(only operationID: String? = nil) async -> [String:CheckInResult] {
         var results: [String:CheckInResult] = [:]
@@ -619,9 +625,18 @@ final class AppModel: ObservableObject {
         defer { interval.finish(outcome) }
         let token = epoch
         do {
-            for op in try db.operations() where op.status == "pending" && (operationID == nil || operationID == op.id) {
+            func canDispatch(_ op: PendingOperation) -> Bool {
+                guard operationID == nil || operationID == op.id else { return false }
+                if op.payload["recommendation"] == "true" {
+                    // Only the current confirmed submission or an explicit retry
+                    // authorizes this one operation; background drains never do.
+                    return operationID == op.id && ["pending","failed"].contains(op.status)
+                }
+                return op.status == "pending"
+            }
+            for op in try db.operations() where canDispatch(op) {
                 guard !offline, !Task.isCancelled, let member = session, token == epoch else { outcome = .cancelled; return results }
-                guard try db.operations().contains(where: { $0.id == op.id && $0.status == "pending" }) else { continue }
+                guard try db.operations().contains(where: { $0.id == op.id && canDispatch($0) }) else { continue }
                 // Never replay a previous account's or location's write under a new session.
                 if let owner = op.payload["memberId"], owner != member.memberId { continue }
                 if let store = op.payload["storeId"], store != member.storeId { continue }
@@ -677,7 +692,14 @@ final class AppModel: ObservableObject {
     func retryOperation(_ id: String) async {
         guard !processing else { return }
         guard let operation = operations.first(where: { $0.id == id }), operationRestriction(operation) == nil else { return }
-        do { try db?.execute("UPDATE operation_queue SET status='pending',error_message=NULL WHERE id=?",[id]); try reload(); await processOperations() }
+        do {
+            if operation.payload["recommendation"] == "true" {
+                await processOperations(only:id)
+            } else {
+                try db?.execute("UPDATE operation_queue SET status='pending',error_message=NULL WHERE id=?",[id])
+                try reload(); await processOperations()
+            }
+        }
         catch { self.error = error.localizedDescription }
     }
     func removeOperation(_ id: String) {
