@@ -1,4 +1,5 @@
 import XCTest
+import FoundationModels
 @testable import BeerSelectorNative
 
 final class RecommendationIntegrationTests: XCTestCase {
@@ -516,6 +517,19 @@ final class RecommendationIntegrationTests: XCTestCase {
 }
 
 extension RecommendationIntegrationTests {
+    @MainActor func testSystemProviderReturnsEligibleSuggestionsOrLocalFallback() async throws {
+        try await withModel { model,_,_ in
+            let controller = model.recommendations
+            controller.setPreferences(.init(request:"crisp and refreshing"))
+            await controller.generate()
+            XCTAssertEqual(controller.suggestions.map(\.id),["new"])
+            XCTAssertFalse(controller.generating)
+            if !controller.usedModel {
+                XCTAssertEqual(controller.retrievalSource,.local)
+                XCTAssertNotNil(controller.message)
+            }
+        }
+    }
     @MainActor func testAdversarialFailedSaveCannotAutomaticallyDispatchLater() async throws {
         try await withModel { model,db,fixture in
             let beer = Beer(id:"new",name:"New beer")
@@ -577,6 +591,26 @@ extension RecommendationIntegrationTests {
             await controller.submit(ids:["new"])
             XCTAssertEqual(writes,0)
             XCTAssertTrue(controller.outcomes.isEmpty)
+        }
+    }
+}
+
+
+final class RecommendationCompatibilityTests: XCTestCase {
+    @MainActor func testAvailableModelAlsoRequiresSupportedLocale() {
+        guard #available(iOS 26.0, *) else {
+            XCTAssertEqual(RecommendationCompatibility.current,.requiresNewerOS)
+            return
+        }
+        XCTAssertEqual(RecommendationCompatibility.resolve(.available,supportsLocale:true),.appleIntelligence)
+        XCTAssertEqual(RecommendationCompatibility.resolve(.available,supportsLocale:false),.unsupportedLocale)
+    }
+    @MainActor func testUnavailableReasonsRemainDistinctRegardlessOfLocale() {
+        guard #available(iOS 26.0, *) else { return }
+        for supported in [true,false] {
+            XCTAssertEqual(RecommendationCompatibility.resolve(.unavailable(.deviceNotEligible),supportsLocale:supported),.deviceNotEligible)
+            XCTAssertEqual(RecommendationCompatibility.resolve(.unavailable(.appleIntelligenceNotEnabled),supportsLocale:supported),.notEnabled)
+            XCTAssertEqual(RecommendationCompatibility.resolve(.unavailable(.modelNotReady),supportsLocale:supported),.modelNotReady)
         }
     }
 }

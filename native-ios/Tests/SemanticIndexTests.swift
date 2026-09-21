@@ -9,6 +9,25 @@ final class SemanticIndexTests: XCTestCase {
         }
         XCTFail("Expected asynchronous index transition did not occur")
     }
+    @MainActor func testDefaultIndexBuildsAndRetrievesWithoutDevelopmentOptIn() async {
+        let engine = SuspendedVectorEngine()
+        let index = SemanticTaplistIndex(engine:engine)
+        guard #available(iOS 26.0, *) else {
+            XCTAssertFalse(index.enabled)
+            return
+        }
+        // The All test plan runs with English in Debug and Release alike.
+        XCTAssertTrue(index.enabled)
+        guard index.enabled else { return }
+        let beer = Beer(id:"a",name:"Coffee stout"), epoch = UUID()
+        index.schedule(epoch:epoch,account:"owner",taplist:[beer])
+        await waitUntil { await engine.count == 1 }
+        await engine.finish(0)
+        let request = SemanticRetrievalRequest(epoch:epoch,account:"owner",taplist:[beer],eligibleIDs:["a"],query:"roasty")
+        await waitUntil { await index.retrieve(request) == ["a"] }
+        let model = AppModel(monitorConnectivity:false)
+        XCTAssertNotNil(model.recommendations.semanticRetriever)
+    }
     @MainActor func testOldBuildCannotReplaceNewGenerationAndUnchangedRefreshDoesNotRebuild() async {
         let engine = SuspendedVectorEngine()
         let index = SemanticTaplistIndex(enabled:true,engine:engine)

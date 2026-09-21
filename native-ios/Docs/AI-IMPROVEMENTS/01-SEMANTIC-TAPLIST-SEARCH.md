@@ -1,16 +1,16 @@
 **Plan 1 — Semantic taplist search**
 
-Status: experimental word-vector retrieval is implemented behind a DEBUG-only, iOS 27 opt-in flag. Release remains disabled pending quality and compatibility gates. See [implementation evidence](01-SEMANTIC-SEARCH-IMPLEMENTATION.md). Baseline: `bf65d3c6`. Follow the [shared compatibility contract](README.md) and [review disposition](01-SEMANTIC-SEARCH-REVIEW.md).
+Status updated September 21, 2026: word-vector retrieval is enabled in Debug and Release on iOS 26+ with English preferred language, without a developer environment flag. Suggestions remains user-opt-in. See [implementation evidence](01-SEMANTIC-SEARCH-IMPLEMENTATION.md) for the rollout decision, fallback behavior, and outstanding quality evaluation. The original planning sections below are historical.
 
 **Implemented route amendment — September 14, 2026**
 
-The Core Spotlight route below is retained as the original design and rejected feasibility experiment, not the implementation specification. Physical-device lexical controls passed but synonyms failed across query configurations. The chosen experiment uses Apple NaturalLanguage English word embeddings, averaging normalized word vectors for bounded public beer facts and the request. This API predates iOS 27; iOS 27 is a rollout policy, not an API availability claim. Static word vectors do not interpret negation or complex preferences reliably; the existing ranker and app-enforced filters retain authority.
+The Core Spotlight route below is retained as the original design and rejected feasibility experiment, not the implementation specification. Physical-device lexical controls passed but synonyms failed across query configurations. The chosen experiment uses Apple NaturalLanguage English word embeddings, averaging normalized word vectors for bounded public beer facts and the request. This API predates iOS 26; the current rollout minimum is iOS 26. Static word vectors do not interpret negation or complex preferences reliably; the existing ranker and app-enforced filters retain authority.
 
 `SemanticTaplistIndex` owns a memory-only, app-private cache keyed by account epoch, account and normalized public taplist facts. Each completed cache records model revision/dimension. Invalidation cancels builds and changes a generation token; late builds/searches cannot publish. Nothing is written to Spotlight or disk, so the Spotlight manifest, disk cleanup and OS reindex requirements below do not apply to this route. Private history/feedback are never vectorized. Authoritative description evidence is supplied independently to ranking after eligibility intersection.
 
 One query vector scans at most 1,000 eligible cached documents and returns at most 24 IDs; no retrieval model session/tool is used. Take up to six semantic IDs, fill with established local ordering to 12, preserve the existing few-unseen branches, and keep a two-second retrieval cap inside the shared eight-second ranking deadline. Every prompt tier retains bounded evidence and 100 tastings. Context overflow retries original local candidates once within remaining time; other failures retain local fallback. Unsupported language/model, unavailable cache or unrepresentable text uses existing retrieval. Exact style requests bypass semantic retrieval. The current style parser is preserved; broader mixed-style parsing described below remains a release-quality evaluation item.
 
-Enable only for manual development evaluation: add `BEERSELECTOR_SEMANTIC_SEARCH=1` to the Xcode Run scheme environment on iOS 27 with English preferred language. Release builds and iOS 26 ignore it. No Cloud workflow or distribution setting is changed.
+Enable Suggestions in Settings. Semantic retrieval is available for nuanced requests on iOS 26+ with English preferred language in distribution and development builds. No Cloud workflow or distribution setting is changed.
 
 **Outcome and user behavior**
 

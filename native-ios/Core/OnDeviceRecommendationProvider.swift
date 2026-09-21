@@ -2,6 +2,53 @@ import Foundation
 import FoundationModels
 import OSLog
 
+/// The same capability check drives the UI and the real provider. Availability
+/// is temporary: generation can still fail and use the controller's local fallback.
+@MainActor
+enum RecommendationCompatibility: Equatable {
+    case appleIntelligence, requiresNewerOS, deviceNotEligible, notEnabled
+    case modelNotReady, unsupportedLocale, unavailable
+
+    static var current: Self {
+        guard #available(iOS 26.0, *) else { return .requiresNewerOS }
+        let model = SystemLanguageModel.default
+        let availability = model.availability
+        return resolve(availability, supportsLocale:availability == .available && model.supportsLocale())
+    }
+    @available(iOS 26.0, *)
+    static func resolve(_ availability: SystemLanguageModel.Availability, supportsLocale: Bool) -> Self {
+        switch availability {
+        case .available: return supportsLocale ? .appleIntelligence : .unsupportedLocale
+        case .unavailable(let reason):
+            switch reason {
+            case .deviceNotEligible: return .deviceNotEligible
+            case .appleIntelligenceNotEnabled: return .notEnabled
+            case .modelNotReady: return .modelNotReady
+            @unknown default: return .unavailable
+            }
+        }
+    }
+    var title: String { self == .appleIntelligence ? "Apple Intelligence available" : "Local matching" }
+    var detail: String {
+        switch self {
+        case .appleIntelligence:
+            return "Suggestions can use Apple Intelligence on this device. If a request fails, local matching is used."
+        case .requiresNewerOS:
+            return "Apple Intelligence suggestions require iOS 26 or later. Suggestions will use local matching."
+        case .deviceNotEligible:
+            return "This device doesn’t support Apple Intelligence. Suggestions will use local matching."
+        case .notEnabled:
+            return "Apple Intelligence is turned off. Enable it in device Settings to use it; Suggestions will use local matching for now."
+        case .modelNotReady:
+            return "Apple Intelligence isn’t ready yet. Suggestions will use local matching for now."
+        case .unsupportedLocale:
+            return "Apple Intelligence doesn’t support the current language or region. Suggestions will use local matching."
+        case .unavailable:
+            return "Apple Intelligence is currently unavailable. Suggestions will use local matching."
+        }
+    }
+}
+
 @available(iOS 26.0, *)
 @Generable
 private struct RankedTaplist {
@@ -23,7 +70,7 @@ struct OnDeviceRecommendationProvider: RecommendationProvider {
     func rank(history: [Beer], candidates: [BeerSuggestion], feedback: [BeerFeedback], preferences: SuggestionPreferences, context: [BeerChoiceContext]) async throws -> [String] {
         guard #available(iOS 26.0, *) else { throw RecommendationUnavailable.model }
         let model = SystemLanguageModel.default
-        guard model.availability == .available, model.supportsLocale() else { throw RecommendationUnavailable.model }
+        guard RecommendationCompatibility.current == .appleIntelligence else { throw RecommendationUnavailable.model }
         let full = try RecommendationModelInput.prompt(history:history,candidates:candidates,feedback:feedback,preferences:preferences,context:context)
         let compact = try RecommendationPromptBudget.compact(history:history,candidates:candidates,feedback:feedback,preferences:preferences,context:context)
         let lean = try RecommendationPromptBudget.compact(history:history,candidates:candidates,feedback:feedback,preferences:preferences,context:context,lean:true)

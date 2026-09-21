@@ -26,6 +26,7 @@ struct RecommendationsScreen: View {
                             .font(Robo.mono(12)).foregroundStyle(QueueChrome.secondary)
                             .fixedSize(horizontal:false,vertical:true)
                     }
+                    SuggestionCompatibilityStatus()
                     SuggestionPreferenceControls(preferences:Binding(get:{controller.preferences},set:{controller.setPreferences($0)}))
                         .disabled(controller.submitting)
                     if let message = controller.message {
@@ -198,6 +199,34 @@ private struct SuggestionRequestField: View {
             Text("Use your own words, like ‘crisp and refreshing.’ Style names filter the taplist; when available, Apple Intelligence helps interpret other requests. Up to 160 characters.")
                 .font(Robo.mono(10)).foregroundStyle(QueueChrome.secondary)
                 .fixedSize(horizontal:false,vertical:true)
+        }
+    }
+}
+
+
+/// Recheck while visible and on foregrounding: a model download or Settings
+/// change can alter availability without restarting the app. No inference runs.
+@MainActor
+struct SuggestionCompatibilityStatus: View {
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var compatibility = RecommendationCompatibility.current
+    var body: some View {
+        VStack(alignment:.leading,spacing:6) {
+            Label(compatibility.title,systemImage:compatibility == .appleIntelligence ? "sparkles" : "line.3.horizontal.decrease.circle")
+                .font(Robo.title(13)).foregroundStyle(QueueChrome.text)
+            Text(compatibility.detail)
+                .font(Robo.mono(11)).foregroundStyle(QueueChrome.secondary)
+                .fixedSize(horizontal:false,vertical:true)
+        }
+        .accessibilityElement(children:.combine)
+        .accessibilityIdentifier("suggestion-compatibility")
+        .task(id:scenePhase) {
+            compatibility = RecommendationCompatibility.current
+            guard scenePhase == .active else { return }
+            while !Task.isCancelled {
+                do { try await Task.sleep(for:.seconds(15)) } catch { return }
+                compatibility = RecommendationCompatibility.current
+            }
         }
     }
 }

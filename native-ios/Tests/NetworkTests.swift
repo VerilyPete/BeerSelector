@@ -501,8 +501,8 @@ final class NetworkTests: XCTestCase {
         let task = try XCTUnwrap(model.enrichmentTask)
         let resume = { continuation?.resume(); continuation = nil }
         do { try await body(model,database,resume,task) }
-        catch { model.invalidatePreviewWork(); resume(); await task.value; throw error }
-        model.invalidatePreviewWork(); resume(); await task.value
+        catch { task.cancel(); resume(); await task.value; throw error }
+        task.cancel(); resume(); await task.value
     }
     @MainActor func testDelayedCleanupUpdatesPublishedListsAndPreservesCurrentMetadata() async throws {
         try await withPausedCleanup { model,database,resume,task in
