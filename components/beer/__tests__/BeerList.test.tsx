@@ -1,5 +1,6 @@
 import React from 'react';
-import { render } from '@testing-library/react-native';
+import { fireEvent, render } from '@testing-library/react-native';
+import { RefreshControl } from 'react-native';
 
 import { BeerList } from '../BeerList';
 
@@ -78,6 +79,48 @@ function createMockBeers(): MockBeer[] {
 }
 
 describe('BeerList', () => {
+  test('keeps pull-to-refresh available after filtering to zero rows', () => {
+    const onRefresh = jest.fn();
+    const props = {
+      loading: false,
+      refreshing: false,
+      expandedId: null,
+      onToggleExpand: jest.fn(),
+      onRefresh,
+    };
+    const screen = render(<BeerList {...props} beers={createMockBeers()} />);
+
+    screen.rerender(<BeerList {...props} beers={[]} />);
+    expect(screen.getByText('No beers found')).toBeTruthy();
+    fireEvent(screen.UNSAFE_getByType(RefreshControl), 'refresh');
+    expect(onRefresh).toHaveBeenCalledTimes(1);
+
+    screen.rerender(<BeerList {...props} beers={[]} refreshing />);
+    expect(screen.getByText('Refreshing beers…')).toBeTruthy();
+    expect(screen.queryByText('No beers found')).toBeNull();
+    expect(screen.UNSAFE_getByType(RefreshControl).props.refreshing).toBe(true);
+
+    screen.rerender(<BeerList {...props} beers={[]} />);
+    expect(screen.getByText('No beers found')).toBeTruthy();
+    fireEvent(screen.UNSAFE_getByType(RefreshControl), 'refresh');
+    expect(onRefresh).toHaveBeenCalledTimes(2);
+  });
+
+  test('shows a loading indicator during an empty local reload', () => {
+    const screen = render(
+      <BeerList
+        beers={[]}
+        loading
+        refreshing={false}
+        expandedId={null}
+        onToggleExpand={jest.fn()}
+        onRefresh={jest.fn()}
+      />
+    );
+    expect(screen.getByLabelText('Loading beers')).toBeTruthy();
+    expect(screen.getByText('Loading beers…')).toBeTruthy();
+  });
+
   // Test 1: Renders empty message when no beers and not loading
   test('renders empty message when no beers and not loading', () => {
     const mockOnToggleExpand = jest.fn();
@@ -315,20 +358,23 @@ describe('BeerList', () => {
     { loading: true, refreshing: true },
     { loading: true, refreshing: false },
     { loading: false, refreshing: false },
-  ])('does not show empty message when loading=$loading or refreshing=$refreshing with beers', ({ loading, refreshing }) => {
-    const mockOnToggleExpand = jest.fn();
-    const mockOnRefresh = jest.fn();
-    const mockBeers = createMockBeers();
-    const { queryByText } = render(
-      <BeerList
-        beers={mockBeers}
-        loading={loading}
-        expandedId={null}
-        onToggleExpand={mockOnToggleExpand}
-        refreshing={refreshing}
-        onRefresh={mockOnRefresh}
-      />
-    );
-    expect(queryByText('No beers found')).toBeNull();
-  });
+  ])(
+    'does not show empty message when loading=$loading or refreshing=$refreshing with beers',
+    ({ loading, refreshing }) => {
+      const mockOnToggleExpand = jest.fn();
+      const mockOnRefresh = jest.fn();
+      const mockBeers = createMockBeers();
+      const { queryByText } = render(
+        <BeerList
+          beers={mockBeers}
+          loading={loading}
+          expandedId={null}
+          onToggleExpand={mockOnToggleExpand}
+          refreshing={refreshing}
+          onRefresh={mockOnRefresh}
+        />
+      );
+      expect(queryByText('No beers found')).toBeNull();
+    }
+  );
 });

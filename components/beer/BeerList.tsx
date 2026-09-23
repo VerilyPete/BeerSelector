@@ -1,5 +1,13 @@
 import React, { useCallback, useMemo } from 'react';
-import { StyleSheet, FlatList, RefreshControl, View, Text, ViewStyle } from 'react-native';
+import {
+  ActivityIndicator,
+  StyleSheet,
+  FlatList,
+  RefreshControl,
+  View,
+  Text,
+  ViewStyle,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BeerItem } from './BeerItem';
 import { useColorScheme } from '@/hooks/useColorScheme';
@@ -76,16 +84,6 @@ export const BeerList: React.FC<BeerListProps> = ({
     [expandedId, onToggleExpand, dateLabel, renderItemActions, numColumns, itemWrapperStyle]
   );
 
-  if (!loading && beers.length === 0) {
-    return (
-      <View style={styles.emptyContainer} testID="beer-list-empty">
-        <Text style={[styles.emptyText, { color: colors.textSecondary }]} testID="beer-list-empty-message">
-          {emptyMessage}
-        </Text>
-      </View>
-    );
-  }
-
   return (
     <FlatList
       testID="beer-list"
@@ -97,8 +95,29 @@ export const BeerList: React.FC<BeerListProps> = ({
       columnWrapperStyle={columnWrapperStyle}
       contentContainerStyle={[
         styles.listContent,
+        beers.length === 0 && styles.emptyListContent,
         { paddingBottom: TAB_BAR_HEIGHT + insets.bottom + 16 },
       ]}
+      alwaysBounceVertical
+      ListEmptyComponent={
+        <View style={styles.emptyContainer} testID="beer-list-empty">
+          {loading || refreshing ? (
+            <>
+              <ActivityIndicator color={colors.tint} accessibilityLabel="Loading beers" />
+              <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                {refreshing ? 'Refreshing beers…' : 'Loading beers…'}
+              </Text>
+            </>
+          ) : (
+            <Text
+              style={[styles.emptyText, { color: colors.textSecondary }]}
+              testID="beer-list-empty-message"
+            >
+              {emptyMessage}
+            </Text>
+          )}
+        </View>
+      }
       refreshControl={
         <RefreshControl
           refreshing={refreshing}
@@ -125,8 +144,14 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 20,
+    gap: 8,
+  },
+  emptyListContent: {
+    flexGrow: 1,
   },
   emptyText: {
+    textAlign: 'center',
     fontFamily: 'SpaceMono',
     fontSize: 11,
   },

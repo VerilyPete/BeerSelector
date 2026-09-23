@@ -387,6 +387,18 @@ export const Beerfinder = () => {
         </View>
       ) : (
         <>
+          {viewState === 'list-with-error' && (
+            <View accessibilityRole="alert">
+              <Text style={[styles.errorText, { color: colors.error }]}>
+                {errors.beerError}. Showing saved beer data; it may be out of date.
+              </Text>
+              <ActionButton
+                label="TRY AGAIN"
+                onPress={handleTryAgain}
+                loading={loading.isLoadingBeers}
+              />
+            </View>
+          )}
           <View style={styles.filtersContainer}>
             <SearchBar
               searchText={localSearchText}
@@ -419,7 +431,11 @@ export const Beerfinder = () => {
             loading={loading.isLoadingBeers}
             refreshing={refreshing}
             onRefresh={handleRefresh}
-            emptyMessage="No beer found"
+            emptyMessage={
+              localSearchText || containerFilter !== 'all'
+                ? 'No beers match your filters. Clear the search or change the container filter.'
+                : 'No beer found'
+            }
             expandedId={expandedId}
             onToggleExpand={toggleExpand}
             renderItemActions={renderBeerActions}

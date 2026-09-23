@@ -630,6 +630,31 @@ describe('Beerfinder Loading States', () => {
       expect(queryByTestId('skeleton-loader')).toBeNull();
     });
 
+    it('shows a reload error over saved beers and lets the user retry', async () => {
+      const screen = renderBeerfinder();
+      await waitFor(() => expect(screen.getByText('2 to discover')).toBeTruthy());
+      const { onDataReloaded } = (useDataRefresh as jest.Mock).mock.calls[0][0];
+      (beerRepository.getAll as jest.Mock).mockRejectedValueOnce(new Error('Database busy'));
+
+      await act(async () => {
+        await onDataReloaded();
+      });
+
+      expect(screen.getByText(/Showing saved beer data/)).toBeTruthy();
+      expect(screen.getByText('2 to discover')).toBeTruthy();
+      fireEvent.press(screen.getByText('TRY AGAIN'));
+      await waitFor(() => expect(screen.queryByText(/Showing saved beer data/)).toBeNull());
+      expect(screen.getByText('2 to discover')).toBeTruthy();
+    });
+
+    it('explains zero filtered results and keeps refresh available', async () => {
+      mockFilters({ filteredBeers: [], containerFilter: 'cans' });
+      const screen = renderBeerfinder();
+      await waitFor(() => expect(screen.getByText('0 to discover')).toBeTruthy());
+      expect(screen.getByText(/No beers match your filters/)).toBeTruthy();
+      expect(screen.UNSAFE_getByType(RefreshControl)).toBeTruthy();
+    });
+
     it('should trigger the refresh handler when the list is pulled', async () => {
       const handleRefresh = jest.fn();
       (useDataRefresh as jest.Mock).mockReturnValue({
