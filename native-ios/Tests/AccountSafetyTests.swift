@@ -116,6 +116,44 @@ final class AccountSafetyTests: XCTestCase {
         }
     }
 
+    @MainActor func testFinderRefreshPreservesSavedTaplistOnNetworkFailureAndRecoversOnRetry() async throws {
+        try await withModel { model,db,fixture,_ in
+            try db.replaceBeers([Beer(id:"saved",name:"Saved beer")])
+            try model.reload()
+            var networkFails = true
+            var queueRequests = 0
+            fixture.handler = { request in
+                if request.url!.path == "/memberQueues.php" { queueRequests += 1 }
+                if networkFails { throw URLError(.networkConnectionLost) }
+                return try self.response(request)
+            }
+
+            await model.refreshFinder()
+
+            XCTAssertEqual(model.allBeers.map(\.id),["saved"])
+            XCTAssertEqual(model.untasted.map(\.id),["saved"])
+            XCTAssertEqual(try db.beers().map(\.id),["saved"])
+            XCTAssertNotNil(model.error)
+            XCTAssertNotNil(model.queueError)
+            XCTAssertEqual(queueRequests,1,"Finder must attempt queue refresh even when the taplist request fails")
+            XCTAssertFalse(model.refreshing)
+            XCTAssertFalse(model.loadingQueue)
+
+            networkFails = false
+            await model.refreshFinder()
+
+            XCTAssertEqual(model.allBeers.map(\.id),["new-store"])
+            XCTAssertEqual(model.untasted.map(\.id),["new-store"])
+            XCTAssertEqual(try db.beers().map(\.id),["new-store"])
+            XCTAssertNil(model.error)
+            XCTAssertNil(model.queueError)
+            XCTAssertTrue(model.queueLoaded)
+            XCTAssertEqual(queueRequests,2,"Retry must refresh queue availability as well as beer data")
+            XCTAssertFalse(model.refreshing)
+            XCTAssertFalse(model.loadingQueue)
+        }
+    }
+
     @MainActor func testOfflineCheckInHidesBeerUntilSavedRequestIsRemoved() async throws {
         try await withModel { model,db,_,_ in
             let beer = Beer(id:"offline",name:"Offline beer")
