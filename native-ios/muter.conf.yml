@@ -1,0 +1,13 @@
+# Run from native-ios with BEERSELECTOR_TEST_DESTINATION set to an isolated simulator.
+# Configuration prepared from Muter's documentation; Muter itself is not installed/validated here.
+executable: /bin/sh
+arguments:
+  - Scripts/run-tests.sh
+exclude:
+  - /Tests/
+  - /UI/
+  - /Widget/
+  - /Shared/
+  - /App/
+  - LiveActivityController.swift
+testSuiteTimeout: 300

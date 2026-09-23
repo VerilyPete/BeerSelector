@@ -1,0 +1,54 @@
+# Isolated preview fixtures; no queue confirmation or live writes.
+appId: org.verily.FSbeerselector
+---
+- assertVisible: Find suggestions
+- assertNotVisible:
+    id: recommendation-card-2
+- scrollUntilVisible:
+    element:
+      id: suggestion-container
+    direction: UP
+- tapOn:
+    id: suggestion-container
+- tapOn: Bottles only
+- tapOn: Higher
+- assertVisible: Find suggestions
+- assertNotVisible:
+    id: recommendation-card-2
+- scrollUntilVisible:
+    element:
+      id: recommendation-generate
+    direction: DOWN
+- tapOn:
+    id: recommendation-generate
+- scrollUntilVisible:
+    element:
+      id: recommendation-card-2
+    direction: DOWN
+- assertVisible:
+    id: recommendation-card-2
+- scrollUntilVisible:
+    element:
+      id: suggestion-container
+    direction: UP
+- tapOn:
+    id: suggestion-container
+- tapOn: Draft only
+- tapOn: Lower
+- assertVisible: Find suggestions
+- assertNotVisible:
+    id: recommendation-card-3
+- scrollUntilVisible:
+    element:
+      id: recommendation-generate
+    direction: DOWN
+- tapOn:
+    id: recommendation-generate
+- scrollUntilVisible:
+    element:
+      id: recommendation-card-3
+    direction: DOWN
+- assertVisible:
+    id: recommendation-card-3
+- assertNotVisible:
+    id: recommendation-card-2

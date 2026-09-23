@@ -1,0 +1,839 @@
+{
+  "revision": 1,
+  "beers": [
+    {
+      "id": "00",
+      "name": "Fixture 00",
+      "style": "IPA",
+      "brewery": "Fixture Brewery",
+      "description": "Balanced hop bitterness.",
+      "abv": 4.0,
+      "container": "Draft"
+    },
+    {
+      "id": "01",
+      "name": "Fixture 01",
+      "style": "IPA",
+      "brewery": "Fixture Brewery",
+      "description": "Balanced hop bitterness.",
+      "abv": 4.1,
+      "container": "Draft"
+    },
+    {
+      "id": "02",
+      "name": "Fixture 02",
+      "style": "IPA",
+      "brewery": "Fixture Brewery",
+      "description": "Balanced hop bitterness.",
+      "abv": 4.2,
+      "container": "Draft"
+    },
+    {
+      "id": "03",
+      "name": "Fixture 03",
+      "style": "IPA",
+      "brewery": "Fixture Brewery",
+      "description": "Balanced hop bitterness.",
+      "abv": 4.3,
+      "container": "Draft"
+    },
+    {
+      "id": "04",
+      "name": "Fixture 04",
+      "style": "IPA",
+      "brewery": "Fixture Brewery",
+      "description": "Balanced hop bitterness.",
+      "abv": 4.4,
+      "container": "Draft"
+    },
+    {
+      "id": "05",
+      "name": "Fixture 05",
+      "style": "IPA",
+      "brewery": "Fixture Brewery",
+      "description": "Balanced hop bitterness.",
+      "abv": 4.5,
+      "container": "Draft"
+    },
+    {
+      "id": "06",
+      "name": "Fixture 06",
+      "style": "IPA",
+      "brewery": "Fixture Brewery",
+      "description": "Balanced hop bitterness.",
+      "abv": 4.6,
+      "container": "Draft"
+    },
+    {
+      "id": "07",
+      "name": "Fixture 07",
+      "style": "IPA",
+      "brewery": "Fixture Brewery",
+      "description": "Balanced hop bitterness.",
+      "abv": 4.7,
+      "container": "Draft"
+    },
+    {
+      "id": "08",
+      "name": "Fixture 08",
+      "style": "IPA",
+      "brewery": "Fixture Brewery",
+      "description": "Balanced hop bitterness.",
+      "abv": 4.8,
+      "container": "Draft"
+    },
+    {
+      "id": "09",
+      "name": "Fixture 09",
+      "style": "IPA",
+      "brewery": "Fixture Brewery",
+      "description": "Balanced hop bitterness.",
+      "abv": 4.9,
+      "container": "Draft"
+    },
+    {
+      "id": "10",
+      "name": "Fixture 10",
+      "style": "IPA",
+      "brewery": "Fixture Brewery",
+      "description": "Balanced hop bitterness.",
+      "abv": 5.0,
+      "container": "Draft"
+    },
+    {
+      "id": "11",
+      "name": "Fixture 11",
+      "style": "IPA",
+      "brewery": "Fixture Brewery",
+      "description": "Balanced hop bitterness.",
+      "abv": 5.1,
+      "container": "Draft"
+    },
+    {
+      "id": "12",
+      "name": "Fixture 12",
+      "style": "IPA",
+      "brewery": "Fixture Brewery",
+      "description": "Balanced hop bitterness.",
+      "abv": 5.2,
+      "container": "Draft"
+    },
+    {
+      "id": "13",
+      "name": "Fixture 13",
+      "style": "IPA",
+      "brewery": "Fixture Brewery",
+      "description": "Balanced hop bitterness.",
+      "abv": 5.3,
+      "container": "Draft"
+    },
+    {
+      "id": "14",
+      "name": "Fixture 14",
+      "style": "IPA",
+      "brewery": "Fixture Brewery",
+      "description": "Balanced hop bitterness.",
+      "abv": 5.4,
+      "container": "Draft"
+    },
+    {
+      "id": "15",
+      "name": "Fixture 15",
+      "style": "IPA",
+      "brewery": "Fixture Brewery",
+      "description": "Balanced hop bitterness.",
+      "abv": 5.5,
+      "container": "Draft"
+    },
+    {
+      "id": "16",
+      "name": "Fixture 16",
+      "style": "IPA",
+      "brewery": "Fixture Brewery",
+      "description": "Balanced hop bitterness.",
+      "abv": 5.6,
+      "container": "Draft"
+    },
+    {
+      "id": "17",
+      "name": "Fixture 17",
+      "style": "IPA",
+      "brewery": "Fixture Brewery",
+      "description": "Balanced hop bitterness.",
+      "abv": 5.7,
+      "container": "Draft"
+    },
+    {
+      "id": "18",
+      "name": "Fixture 18",
+      "style": "IPA",
+      "brewery": "Fixture Brewery",
+      "description": "Balanced hop bitterness.",
+      "abv": 5.8,
+      "container": "Draft"
+    },
+    {
+      "id": "19",
+      "name": "Fixture 19",
+      "style": "IPA",
+      "brewery": "Fixture Brewery",
+      "description": "Balanced hop bitterness.",
+      "abv": 5.9,
+      "container": "Draft"
+    },
+    {
+      "id": "20",
+      "name": "Fixture 20",
+      "style": "IPA",
+      "brewery": "Fixture Brewery",
+      "description": "Balanced hop bitterness.",
+      "abv": 6.0,
+      "container": "Draft"
+    },
+    {
+      "id": "21",
+      "name": "Fixture 21",
+      "style": "IPA",
+      "brewery": "Fixture Brewery",
+      "description": "Balanced hop bitterness.",
+      "abv": 6.1,
+      "container": "Draft"
+    },
+    {
+      "id": "22",
+      "name": "Fixture 22",
+      "style": "IPA",
+      "brewery": "Fixture Brewery",
+      "description": "Balanced hop bitterness.",
+      "abv": 6.2,
+      "container": "Draft"
+    },
+    {
+      "id": "23",
+      "name": "Fixture 23",
+      "style": "IPA",
+      "brewery": "Fixture Brewery",
+      "description": "Balanced hop bitterness.",
+      "abv": 6.3,
+      "container": "Draft"
+    },
+    {
+      "id": "24",
+      "name": "Fixture 24",
+      "style": "Porter",
+      "brewery": "Other Fixture Brewery",
+      "description": "Cacao nibs and espresso with a dry finish.",
+      "abv": 5.0,
+      "container": "Draft"
+    },
+    {
+      "id": "25",
+      "name": "Fixture 25",
+      "style": "IPA",
+      "brewery": "Other Fixture Brewery",
+      "description": "Mango, pineapple and guava aromas.",
+      "abv": 5.5,
+      "container": "Bottle"
+    },
+    {
+      "id": "26",
+      "name": "Fixture 26",
+      "style": "Lager",
+      "brewery": "Other Fixture Brewery",
+      "description": "Lemon zest and prickly carbonation.",
+      "abv": 6.0,
+      "container": "Draft"
+    },
+    {
+      "id": "27",
+      "name": "Fixture 27",
+      "style": "Brown Ale",
+      "brewery": "Other Fixture Brewery",
+      "description": "Toasted hazelnuts and biscuit malt.",
+      "abv": 6.5,
+      "container": "Bottle"
+    },
+    {
+      "id": "28",
+      "name": "Fixture 28",
+      "style": "Stout",
+      "brewery": "Other Fixture Brewery",
+      "description": "Vanilla pods and caramel sweetness.",
+      "abv": 7.0,
+      "container": "Draft"
+    },
+    {
+      "id": "29",
+      "name": "Fixture 29",
+      "style": "Rauchbier",
+      "brewery": "Other Fixture Brewery",
+      "description": "Campfire embers and toasted malt.",
+      "abv": 7.5,
+      "container": "Bottle"
+    },
+    {
+      "id": "30",
+      "name": "Fixture 30",
+      "style": "Gose",
+      "brewery": "Other Fixture Brewery",
+      "description": "Briny mineral notes and a tart finish.",
+      "abv": 8.0,
+      "container": "Draft"
+    },
+    {
+      "id": "31",
+      "name": "Fixture 31",
+      "style": "Hefeweizen",
+      "brewery": "Other Fixture Brewery",
+      "description": "Clove, banana and soft wheat.",
+      "abv": 8.5,
+      "container": "Bottle"
+    }
+  ],
+  "cases": [
+    {
+      "id": "case-01",
+      "request": "roasty but not sweet",
+      "relevantIDs": [
+        "24"
+      ],
+      "unacceptableIDs": [],
+      "rationale": "Synthetic description/style evidence for the stated request.",
+      "historyStyle": "",
+      "previousIDs": [],
+      "baselineIDs": [
+        "00",
+        "24",
+        "26",
+        "27",
+        "28",
+        "29",
+        "30",
+        "31",
+        "01",
+        "02",
+        "03",
+        "04"
+      ]
+    },
+    {
+      "id": "case-02",
+      "request": "tropical fruit",
+      "relevantIDs": [
+        "25"
+      ],
+      "unacceptableIDs": [],
+      "rationale": "Synthetic description/style evidence for the stated request.",
+      "historyStyle": "IPA",
+      "previousIDs": [],
+      "baselineIDs": [
+        "00",
+        "24",
+        "26",
+        "27",
+        "28",
+        "29",
+        "30",
+        "31",
+        "01",
+        "02",
+        "03",
+        "04"
+      ]
+    },
+    {
+      "id": "case-03",
+      "request": "crisp and refreshing",
+      "relevantIDs": [
+        "26"
+      ],
+      "unacceptableIDs": [],
+      "rationale": "Synthetic description/style evidence for the stated request.",
+      "historyStyle": "",
+      "previousIDs": [],
+      "baselineIDs": [
+        "00",
+        "24",
+        "26",
+        "27",
+        "28",
+        "29",
+        "30",
+        "31",
+        "01",
+        "02",
+        "03",
+        "04"
+      ]
+    },
+    {
+      "id": "case-04",
+      "request": "nutty and malty",
+      "relevantIDs": [
+        "27"
+      ],
+      "unacceptableIDs": [],
+      "rationale": "Synthetic description/style evidence for the stated request.",
+      "historyStyle": "IPA",
+      "previousIDs": [],
+      "baselineIDs": [
+        "27",
+        "29",
+        "00",
+        "24",
+        "26",
+        "28",
+        "30",
+        "31",
+        "01",
+        "02",
+        "03",
+        "04"
+      ]
+    },
+    {
+      "id": "case-05",
+      "request": "dessert in a glass",
+      "relevantIDs": [
+        "28"
+      ],
+      "unacceptableIDs": [],
+      "rationale": "Synthetic description/style evidence for the stated request.",
+      "historyStyle": "",
+      "previousIDs": [],
+      "baselineIDs": [
+        "00",
+        "24",
+        "26",
+        "27",
+        "28",
+        "29",
+        "30",
+        "31",
+        "01",
+        "02",
+        "03",
+        "04"
+      ]
+    },
+    {
+      "id": "case-06",
+      "request": "smoky",
+      "relevantIDs": [
+        "29"
+      ],
+      "unacceptableIDs": [],
+      "rationale": "Synthetic description/style evidence for the stated request.",
+      "historyStyle": "IPA",
+      "previousIDs": [],
+      "baselineIDs": [
+        "00",
+        "24",
+        "26",
+        "27",
+        "28",
+        "29",
+        "30",
+        "31",
+        "01",
+        "02",
+        "03",
+        "04"
+      ]
+    },
+    {
+      "id": "case-07",
+      "request": "salty and sour",
+      "relevantIDs": [
+        "30"
+      ],
+      "unacceptableIDs": [],
+      "rationale": "Synthetic description/style evidence for the stated request.",
+      "historyStyle": "",
+      "previousIDs": [],
+      "baselineIDs": [
+        "00",
+        "24",
+        "26",
+        "27",
+        "28",
+        "29",
+        "30",
+        "31",
+        "01",
+        "02",
+        "03",
+        "04"
+      ]
+    },
+    {
+      "id": "case-08",
+      "request": "fruity wheat",
+      "relevantIDs": [
+        "31"
+      ],
+      "unacceptableIDs": [],
+      "rationale": "Synthetic description/style evidence for the stated request.",
+      "historyStyle": "IPA",
+      "previousIDs": [],
+      "baselineIDs": [
+        "31",
+        "00",
+        "24",
+        "26",
+        "27",
+        "28",
+        "29",
+        "30",
+        "01",
+        "02",
+        "03",
+        "04"
+      ]
+    },
+    {
+      "id": "case-09",
+      "request": "IPA",
+      "relevantIDs": [
+        "00",
+        "01",
+        "02",
+        "03",
+        "04",
+        "05",
+        "06",
+        "07",
+        "08",
+        "09",
+        "10",
+        "11",
+        "12",
+        "13",
+        "14",
+        "15",
+        "16",
+        "17",
+        "18",
+        "19",
+        "20",
+        "21",
+        "22",
+        "23",
+        "25"
+      ],
+      "unacceptableIDs": [],
+      "rationale": "Synthetic description/style evidence for the stated request.",
+      "historyStyle": "",
+      "previousIDs": [],
+      "baselineIDs": [
+        "00",
+        "25",
+        "01",
+        "02",
+        "03",
+        "04",
+        "05",
+        "06",
+        "07",
+        "08",
+        "09",
+        "10"
+      ]
+    },
+    {
+      "id": "case-10",
+      "request": "stout",
+      "relevantIDs": [
+        "28"
+      ],
+      "unacceptableIDs": [],
+      "rationale": "Synthetic description/style evidence for the stated request.",
+      "historyStyle": "IPA",
+      "previousIDs": [],
+      "baselineIDs": [
+        "28"
+      ]
+    },
+    {
+      "id": "case-11",
+      "request": "porter",
+      "relevantIDs": [
+        "24"
+      ],
+      "unacceptableIDs": [],
+      "rationale": "Synthetic description/style evidence for the stated request.",
+      "historyStyle": "",
+      "previousIDs": [],
+      "baselineIDs": [
+        "24"
+      ]
+    },
+    {
+      "id": "case-12",
+      "request": "hefeweizen",
+      "relevantIDs": [
+        "31"
+      ],
+      "unacceptableIDs": [],
+      "rationale": "Synthetic description/style evidence for the stated request.",
+      "historyStyle": "IPA",
+      "previousIDs": [],
+      "baselineIDs": [
+        "31"
+      ]
+    },
+    {
+      "id": "case-13",
+      "request": "IPA, not hazy",
+      "relevantIDs": [
+        "00",
+        "01",
+        "02",
+        "03",
+        "04",
+        "05",
+        "06",
+        "07",
+        "08",
+        "09",
+        "10",
+        "11",
+        "12",
+        "13",
+        "14",
+        "15",
+        "16",
+        "17",
+        "18",
+        "19",
+        "20",
+        "21",
+        "22",
+        "23",
+        "25"
+      ],
+      "unacceptableIDs": [],
+      "rationale": "Synthetic description/style evidence for the stated request.",
+      "historyStyle": "",
+      "previousIDs": [],
+      "baselineIDs": [
+        "00",
+        "25",
+        "01",
+        "02",
+        "03",
+        "04",
+        "05",
+        "06",
+        "07",
+        "08",
+        "09",
+        "10"
+      ]
+    },
+    {
+      "id": "case-14",
+      "request": "no stout or porter",
+      "relevantIDs": [
+        "00",
+        "01",
+        "02",
+        "03",
+        "04",
+        "05",
+        "06",
+        "07",
+        "08",
+        "09",
+        "10",
+        "11",
+        "12",
+        "13",
+        "14",
+        "15",
+        "16",
+        "17",
+        "18",
+        "19",
+        "20",
+        "21",
+        "22",
+        "23",
+        "25",
+        "26",
+        "27",
+        "29",
+        "30",
+        "31"
+      ],
+      "unacceptableIDs": [],
+      "rationale": "Synthetic description/style evidence for the stated request.",
+      "historyStyle": "IPA",
+      "previousIDs": [],
+      "baselineIDs": [
+        "00",
+        "25",
+        "01",
+        "02",
+        "03",
+        "04",
+        "05",
+        "06",
+        "07",
+        "08",
+        "09",
+        "10"
+      ]
+    },
+    {
+      "id": "case-15",
+      "request": "something like Fixture 24",
+      "relevantIDs": [
+        "24"
+      ],
+      "unacceptableIDs": [],
+      "rationale": "Synthetic description/style evidence for the stated request.",
+      "historyStyle": "",
+      "previousIDs": [],
+      "baselineIDs": [
+        "24",
+        "00",
+        "26",
+        "27",
+        "28",
+        "29",
+        "30",
+        "31",
+        "01",
+        "02",
+        "03",
+        "04"
+      ]
+    },
+    {
+      "id": "case-16",
+      "request": "tropical IPA",
+      "relevantIDs": [
+        "25"
+      ],
+      "unacceptableIDs": [],
+      "rationale": "Synthetic description/style evidence for the stated request.",
+      "historyStyle": "IPA",
+      "previousIDs": [],
+      "baselineIDs": [
+        "00",
+        "24",
+        "26",
+        "27",
+        "28",
+        "29",
+        "30",
+        "31",
+        "01",
+        "02",
+        "03",
+        "04"
+      ]
+    },
+    {
+      "id": "case-17",
+      "request": "coffee chocolate",
+      "relevantIDs": [
+        "24"
+      ],
+      "unacceptableIDs": [],
+      "rationale": "Synthetic description/style evidence for the stated request.",
+      "historyStyle": "",
+      "previousIDs": [],
+      "baselineIDs": [
+        "00",
+        "24",
+        "26",
+        "27",
+        "28",
+        "29",
+        "30",
+        "31",
+        "01",
+        "02",
+        "03",
+        "04"
+      ]
+    },
+    {
+      "id": "case-18",
+      "request": "banana and spice",
+      "relevantIDs": [
+        "31"
+      ],
+      "unacceptableIDs": [],
+      "rationale": "Synthetic description/style evidence for the stated request.",
+      "historyStyle": "IPA",
+      "previousIDs": [],
+      "baselineIDs": [
+        "31",
+        "00",
+        "24",
+        "26",
+        "27",
+        "28",
+        "29",
+        "30",
+        "01",
+        "02",
+        "03",
+        "04"
+      ]
+    },
+    {
+      "id": "case-19",
+      "request": "bready with some smoke",
+      "relevantIDs": [
+        "29"
+      ],
+      "unacceptableIDs": [],
+      "rationale": "Synthetic description/style evidence for the stated request.",
+      "historyStyle": "",
+      "previousIDs": [],
+      "baselineIDs": [
+        "00",
+        "24",
+        "26",
+        "27",
+        "28",
+        "29",
+        "30",
+        "31",
+        "01",
+        "02",
+        "03",
+        "04"
+      ]
+    },
+    {
+      "id": "case-20",
+      "request": "bright citrus",
+      "relevantIDs": [
+        "26"
+      ],
+      "unacceptableIDs": [],
+      "rationale": "Synthetic description/style evidence for the stated request.",
+      "historyStyle": "IPA",
+      "previousIDs": [],
+      "baselineIDs": [
+        "00",
+        "24",
+        "26",
+        "27",
+        "28",
+        "29",
+        "30",
+        "31",
+        "01",
+        "02",
+        "03",
+        "04"
+      ]
+    }
+  ]
+}

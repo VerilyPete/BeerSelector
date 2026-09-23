@@ -1,0 +1,2661 @@
+{
+  "commit": "60ff13dd74c99f7a666045fef9279d712a76834d",
+  "note": "Source anchors for manual parity review; not a claim every interaction is implemented.",
+  "references": [
+    {
+      "file": "animations/useAnimatedPress.ts",
+      "line": 60,
+      "reference": "*       onPress={onPress}"
+    },
+    {
+      "file": "app/(tabs)/_layout.tsx",
+      "line": 15,
+      "reference": "label: string;"
+    },
+    {
+      "file": "app/(tabs)/_layout.tsx",
+      "line": 21,
+      "reference": "index: { label: 'HOME', icon: 'house.fill' },"
+    },
+    {
+      "file": "app/(tabs)/_layout.tsx",
+      "line": 22,
+      "reference": "beerlist: { label: 'BEERS', icon: 'mug.fill' },"
+    },
+    {
+      "file": "app/(tabs)/_layout.tsx",
+      "line": 23,
+      "reference": "mybeers: { label: 'FINDER', icon: 'star.fill', memberOnly: true },"
+    },
+    {
+      "file": "app/(tabs)/_layout.tsx",
+      "line": 24,
+      "reference": "tastedbrews: { label: 'TASTED', icon: 'checkmark.circle.fill', memberOnly: true },"
+    },
+    {
+      "file": "app/(tabs)/_layout.tsx",
+      "line": 79,
+      "reference": "const onPress = () => {"
+    },
+    {
+      "file": "app/(tabs)/_layout.tsx",
+      "line": 96,
+      "reference": "onPress={onPress}"
+    },
+    {
+      "file": "app/(tabs)/_layout.tsx",
+      "line": 179,
+      "reference": "<Tabs.Screen name=\"index\" options={{ title: 'Home' }} />"
+    },
+    {
+      "file": "app/(tabs)/_layout.tsx",
+      "line": 180,
+      "reference": "<Tabs.Screen name=\"beerlist\" options={{ title: 'All Beer' }} />"
+    },
+    {
+      "file": "app/(tabs)/_layout.tsx",
+      "line": 183,
+      "reference": "options={{ title: 'Beerfinder', href: isInVisitorMode ? null : undefined }}"
+    },
+    {
+      "file": "app/(tabs)/_layout.tsx",
+      "line": 187,
+      "reference": "options={{ title: 'Tasted Brews', href: isInVisitorMode ? null : undefined }}"
+    },
+    {
+      "file": "app/(tabs)/beerlist.tsx",
+      "line": 21,
+      "reference": "testID=\"all-beers-container\""
+    },
+    {
+      "file": "app/(tabs)/beerlist.tsx",
+      "line": 26,
+      "reference": "<ScanlineTitle title=\"All Beer\" />"
+    },
+    {
+      "file": "app/(tabs)/index.tsx",
+      "line": 32,
+      "reference": "title: string;"
+    },
+    {
+      "file": "app/(tabs)/index.tsx",
+      "line": 36,
+      "reference": "onPress: () => void;"
+    },
+    {
+      "file": "app/(tabs)/index.tsx",
+      "line": 51,
+      "reference": "testID={testID}"
+    },
+    {
+      "file": "app/(tabs)/index.tsx",
+      "line": 52,
+      "reference": "onPress={handlePress}"
+    },
+    {
+      "file": "app/(tabs)/index.tsx",
+      "line": 59,
+      "reference": "accessibilityLabel={title}"
+    },
+    {
+      "file": "app/(tabs)/index.tsx",
+      "line": 139,
+      "reference": "testID=\"settings-nav-button\""
+    },
+    {
+      "file": "app/(tabs)/index.tsx",
+      "line": 140,
+      "reference": "onPress={() => {"
+    },
+    {
+      "file": "app/(tabs)/index.tsx",
+      "line": 146,
+      "reference": "accessibilityLabel=\"Open settings\""
+    },
+    {
+      "file": "app/(tabs)/index.tsx",
+      "line": 198,
+      "reference": "testID=\"nav-all-beers\""
+    },
+    {
+      "file": "app/(tabs)/index.tsx",
+      "line": 199,
+      "reference": "title=\"All Beers\""
+    },
+    {
+      "file": "app/(tabs)/index.tsx",
+      "line": 202,
+      "reference": "onPress={actions.navigateToAllBeers}"
+    },
+    {
+      "file": "app/(tabs)/index.tsx",
+      "line": 205,
+      "reference": "testID=\"nav-beerfinder\""
+    },
+    {
+      "file": "app/(tabs)/index.tsx",
+      "line": 206,
+      "reference": "title=\"Beerfinder\""
+    },
+    {
+      "file": "app/(tabs)/index.tsx",
+      "line": 211,
+      "reference": "onPress={actions.navigateToBeerfinder}"
+    },
+    {
+      "file": "app/(tabs)/index.tsx",
+      "line": 215,
+      "reference": "testID=\"nav-tasted-brews\""
+    },
+    {
+      "file": "app/(tabs)/index.tsx",
+      "line": 216,
+      "reference": "title=\"Tasted Brews\""
+    },
+    {
+      "file": "app/(tabs)/index.tsx",
+      "line": 220,
+      "reference": "onPress={actions.navigateToTastedBrews}"
+    },
+    {
+      "file": "app/(tabs)/index.tsx",
+      "line": 224,
+      "reference": "testID=\"nav-rewards\""
+    },
+    {
+      "file": "app/(tabs)/index.tsx",
+      "line": 225,
+      "reference": "title=\"Rewards\""
+    },
+    {
+      "file": "app/(tabs)/index.tsx",
+      "line": 228,
+      "reference": "onPress={actions.navigateToRewards}"
+    },
+    {
+      "file": "app/(tabs)/index.tsx",
+      "line": 273,
+      "reference": "onPress={() => {"
+    },
+    {
+      "file": "app/(tabs)/mybeers.tsx",
+      "line": 56,
+      "reference": "testID=\"beerfinder-screen\""
+    },
+    {
+      "file": "app/(tabs)/mybeers.tsx",
+      "line": 60,
+      "reference": "<ScanlineTitle title=\"Beerfinder\" />"
+    },
+    {
+      "file": "app/(tabs)/tastedbrews.tsx",
+      "line": 58,
+      "reference": "testID=\"tasted-brews-screen\""
+    },
+    {
+      "file": "app/(tabs)/tastedbrews.tsx",
+      "line": 62,
+      "reference": "<ScanlineTitle title=\"Tasted Brews\" />"
+    },
+    {
+      "file": "app/+not-found.tsx",
+      "line": 12,
+      "reference": "<Stack.Screen options={{ title: 'Oops!' }} />"
+    },
+    {
+      "file": "app/+not-found.tsx",
+      "line": 30,
+      "reference": "title: {"
+    },
+    {
+      "file": "app/_layout.tsx",
+      "line": 29,
+      "reference": "import { getPreference, setPreference, areApiUrlsConfigured } from '@/src/database/preferences';"
+    },
+    {
+      "file": "app/_layout.tsx",
+      "line": 132,
+      "reference": "console.error('[_layout] All beers fetch failed:', e);"
+    },
+    {
+      "file": "app/_layout.tsx",
+      "line": 138,
+      "reference": "console.error('[_layout] My beers fetch failed:', e);"
+    },
+    {
+      "file": "app/_layout.tsx",
+      "line": 144,
+      "reference": "console.error('[_layout] Rewards fetch failed:', e);"
+    },
+    {
+      "file": "app/_layout.tsx",
+      "line": 147,
+      "reference": "console.log('API URLs not configured, skipping data fetch');"
+    },
+    {
+      "file": "app/_layout.tsx",
+      "line": 196,
+      "reference": "const isFirstLaunch = await getPreference('first_launch');"
+    },
+    {
+      "file": "app/_layout.tsx",
+      "line": 203,
+      "reference": "await setPreference("
+    },
+    {
+      "file": "app/screens/rewards.tsx",
+      "line": 29,
+      "reference": "onPress={() => router.back()}"
+    },
+    {
+      "file": "app/screens/rewards.tsx",
+      "line": 34,
+      "reference": "<ScanlineTitle title=\"Rewards\" />"
+    },
+    {
+      "file": "app/settings.tsx",
+      "line": 88,
+      "reference": "testID=\"back-button\""
+    },
+    {
+      "file": "app/settings.tsx",
+      "line": 93,
+      "reference": "onPress={() => router.back()}"
+    },
+    {
+      "file": "app/settings.tsx",
+      "line": 119,
+      "reference": "onRefresh={handleRefresh}"
+    },
+    {
+      "file": "components/AllBeers.tsx",
+      "line": 129,
+      "reference": "onPress={() => handleUntappdSearch(item.brew_name)}"
+    },
+    {
+      "file": "components/AllBeers.tsx",
+      "line": 132,
+      "reference": "accessibilityLabel={`Check ${item.brew_name} on Untappd`}"
+    },
+    {
+      "file": "components/AllBeers.tsx",
+      "line": 156,
+      "reference": "<View style={styles.container} testID=\"all-beers-container\">"
+    },
+    {
+      "file": "components/AllBeers.tsx",
+      "line": 165,
+      "reference": "placeholder=\"Search beer...\""
+    },
+    {
+      "file": "components/AllBeers.tsx",
+      "line": 171,
+      "reference": "<View style={styles.centered} testID=\"error-container\">"
+    },
+    {
+      "file": "components/AllBeers.tsx",
+      "line": 172,
+      "reference": "<Text style={[styles.errorText, { color: colors.error }]} testID=\"error-message\">"
+    },
+    {
+      "file": "components/AllBeers.tsx",
+      "line": 177,
+      "reference": "onPress={handleTryAgain}"
+    },
+    {
+      "file": "components/AllBeers.tsx",
+      "line": 178,
+      "reference": "testID=\"try-again-button\""
+    },
+    {
+      "file": "components/AllBeers.tsx",
+      "line": 190,
+      "reference": "placeholder=\"Search beer...\""
+    },
+    {
+      "file": "components/AllBeers.tsx",
+      "line": 193,
+      "reference": "<Text style={[styles.beerCount, { color: colors.textSecondary }]} testID=\"beer-count\">"
+    },
+    {
+      "file": "components/AllBeers.tsx",
+      "line": 212,
+      "reference": "onRefresh={handleRefresh}"
+    },
+    {
+      "file": "components/Beerfinder.tsx",
+      "line": 148,
+      "reference": "// Use the queue service to fetch queued beers"
+    },
+    {
+      "file": "components/Beerfinder.tsx",
+      "line": 196,
+      "reference": "onPress: async () => {"
+    },
+    {
+      "file": "components/Beerfinder.tsx",
+      "line": 269,
+      "reference": "label=\"CHECK IN\""
+    },
+    {
+      "file": "components/Beerfinder.tsx",
+      "line": 270,
+      "reference": "onPress={() => handleCheckIn(item)}"
+    },
+    {
+      "file": "components/Beerfinder.tsx",
+      "line": 273,
+      "reference": "<ActionButton label=\"UNTAPPD\" onPress={() => handleUntappdSearch(item.brew_name)} />"
+    },
+    {
+      "file": "components/Beerfinder.tsx",
+      "line": 295,
+      "reference": "label=\"TRY AGAIN\""
+    },
+    {
+      "file": "components/Beerfinder.tsx",
+      "line": 296,
+      "reference": "onPress={viewQueues}"
+    },
+    {
+      "file": "components/Beerfinder.tsx",
+      "line": 320,
+      "reference": "label=\"DELETE\""
+    },
+    {
+      "file": "components/Beerfinder.tsx",
+      "line": 321,
+      "reference": "onPress={() => deleteQueuedBeer(item.id, item.name)}"
+    },
+    {
+      "file": "components/Beerfinder.tsx",
+      "line": 334,
+      "reference": "label=\"CLOSE\""
+    },
+    {
+      "file": "components/Beerfinder.tsx",
+      "line": 335,
+      "reference": "onPress={() => setQueueModalVisible(false)}"
+    },
+    {
+      "file": "components/Beerfinder.tsx",
+      "line": 356,
+      "reference": "<View testID=\"beerfinder-container\" style={styles.container}>"
+    },
+    {
+      "file": "components/Beerfinder.tsx",
+      "line": 364,
+      "reference": "label=\"QUEUE\""
+    },
+    {
+      "file": "components/Beerfinder.tsx",
+      "line": 365,
+      "reference": "onPress={viewQueues}"
+    },
+    {
+      "file": "components/Beerfinder.tsx",
+      "line": 370,
+      "reference": "label=\"REWARDS\""
+    },
+    {
+      "file": "components/Beerfinder.tsx",
+      "line": 371,
+      "reference": "onPress={() => router.push('/screens/rewards' as Href)}"
+    },
+    {
+      "file": "components/Beerfinder.tsx",
+      "line": 383,
+      "reference": "onPress={handleTryAgain}"
+    },
+    {
+      "file": "components/Beerfinder.tsx",
+      "line": 395,
+      "reference": "placeholder=\"Search available beer...\""
+    },
+    {
+      "file": "components/Beerfinder.tsx",
+      "line": 409,
+      "reference": "<ActionButton label=\"QUEUE\" onPress={viewQueues} loading={loadingQueues} />"
+    },
+    {
+      "file": "components/Beerfinder.tsx",
+      "line": 411,
+      "reference": "label=\"REWARDS\""
+    },
+    {
+      "file": "components/Beerfinder.tsx",
+      "line": 412,
+      "reference": "onPress={() => router.push('/screens/rewards' as Href)}"
+    },
+    {
+      "file": "components/Beerfinder.tsx",
+      "line": 421,
+      "reference": "onRefresh={handleRefresh}"
+    },
+    {
+      "file": "components/ErrorBoundary.tsx",
+      "line": 240,
+      "reference": "onPress={this.handleReset}"
+    },
+    {
+      "file": "components/ErrorBoundary.tsx",
+      "line": 292,
+      "reference": "title: {"
+    },
+    {
+      "file": "components/LoginWebView.tsx",
+      "line": 270,
+      "reference": "accessibilityLabel=\"Flying Saucer login modal\""
+    },
+    {
+      "file": "components/LoginWebView.tsx",
+      "line": 273,
+      "reference": "<View style={{ flex: 1, backgroundColor: colors.background }} testID=\"login-webview-modal\">"
+    },
+    {
+      "file": "components/LoginWebView.tsx",
+      "line": 285,
+      "reference": "onPress={handleClose}"
+    },
+    {
+      "file": "components/LoginWebView.tsx",
+      "line": 287,
+      "reference": "testID=\"close-webview-button\""
+    },
+    {
+      "file": "components/LoginWebView.tsx",
+      "line": 302,
+      "reference": "accessibilityLabel=\"Flying Saucer login page\""
+    },
+    {
+      "file": "components/MigrationProgressOverlay.tsx",
+      "line": 52,
+      "reference": "title: {"
+    },
+    {
+      "file": "components/OfflineIndicator.tsx",
+      "line": 77,
+      "reference": "accessibilityLabel={displayMessage}"
+    },
+    {
+      "file": "components/QueuedOperationsIndicator.tsx",
+      "line": 15,
+      "reference": "* <QueuedOperationsIndicator onPress={() => setModalVisible(true)} />"
+    },
+    {
+      "file": "components/QueuedOperationsIndicator.tsx",
+      "line": 75,
+      "reference": "onPress={onPress}"
+    },
+    {
+      "file": "components/QueuedOperationsIndicator.tsx",
+      "line": 84,
+      "reference": "accessibilityLabel={`${pendingCount} queued operations`}"
+    },
+    {
+      "file": "components/QueuedOperationsIndicator.tsx",
+      "line": 152,
+      "reference": "title: {"
+    },
+    {
+      "file": "components/QueuedOperationsManager.tsx",
+      "line": 24,
+      "reference": "<QueuedOperationsIndicator onPress={() => setModalVisible(true)} />"
+    },
+    {
+      "file": "components/QueuedOperationsModal.tsx",
+      "line": 136,
+      "reference": "onPress: async () => {"
+    },
+    {
+      "file": "components/QueuedOperationsModal.tsx",
+      "line": 155,
+      "reference": "onPress: async () => {"
+    },
+    {
+      "file": "components/QueuedOperationsModal.tsx",
+      "line": 173,
+      "reference": "<TouchableOpacity onPress={onClose} style={styles.closeButton}>"
+    },
+    {
+      "file": "components/QueuedOperationsModal.tsx",
+      "line": 243,
+      "reference": "onPress={() => handleRetry(operation.id)}"
+    },
+    {
+      "file": "components/QueuedOperationsModal.tsx",
+      "line": 254,
+      "reference": "onPress={() => handleDelete(operation.id)}"
+    },
+    {
+      "file": "components/QueuedOperationsModal.tsx",
+      "line": 269,
+      "reference": "onPress={handleClearAll}"
+    },
+    {
+      "file": "components/QueuedOperationsModal.tsx",
+      "line": 298,
+      "reference": "title: {"
+    },
+    {
+      "file": "components/Rewards.tsx",
+      "line": 97,
+      "reference": "accessibilityLabel={`Progress: ${progressPercent}% toward 200 beers`}"
+    },
+    {
+      "file": "components/Rewards.tsx",
+      "line": 388,
+      "reference": "// And the WORK is deferred, not dropped. The in-flight fetch may have"
+    },
+    {
+      "file": "components/Rewards.tsx",
+      "line": 418,
+      "reference": "// hammering an endpoint that just refused."
+    },
+    {
+      "file": "components/Rewards.tsx",
+      "line": 442,
+      "reference": "// The fetch working is not the refresh working. `refreshBeerData`"
+    },
+    {
+      "file": "components/Rewards.tsx",
+      "line": 496,
+      "reference": "* the fetch fails, so offline this button could never clear the error it sat"
+    },
+    {
+      "file": "components/Rewards.tsx",
+      "line": 546,
+      "reference": "'sec-fetch-dest': 'empty',"
+    },
+    {
+      "file": "components/Rewards.tsx",
+      "line": 547,
+      "reference": "'sec-fetch-mode': 'cors',"
+    },
+    {
+      "file": "components/Rewards.tsx",
+      "line": 548,
+      "reference": "'sec-fetch-site': 'same-origin',"
+    },
+    {
+      "file": "components/Rewards.tsx",
+      "line": 561,
+      "reference": "const response = await fetch(config.api.getFullUrl('addToRewardQueue'), {"
+    },
+    {
+      "file": "components/Rewards.tsx",
+      "line": 623,
+      "reference": "onPress: () => queueReward(item.reward_id, item.reward_type),"
+    },
+    {
+      "file": "components/Rewards.tsx",
+      "line": 650,
+      "reference": "onPress={() => handleRewardPress(item)}"
+    },
+    {
+      "file": "components/Rewards.tsx",
+      "line": 696,
+      "reference": "testID=\"rewards-list\""
+    },
+    {
+      "file": "components/Rewards.tsx",
+      "line": 716,
+      "reference": "testID=\"reward-error-banner\""
+    },
+    {
+      "file": "components/Rewards.tsx",
+      "line": 728,
+      "reference": "onPress={handleTryAgain}"
+    },
+    {
+      "file": "components/Rewards.tsx",
+      "line": 729,
+      "reference": "testID=\"reward-retry-button\""
+    },
+    {
+      "file": "components/Rewards.tsx",
+      "line": 754,
+      "reference": "onRefresh={handleRefresh}"
+    },
+    {
+      "file": "components/SearchBar.tsx",
+      "line": 20,
+      "reference": "placeholder = 'Search beers, breweries, styles...',"
+    },
+    {
+      "file": "components/SearchBar.tsx",
+      "line": 38,
+      "reference": "testID=\"search-bar\""
+    },
+    {
+      "file": "components/SearchBar.tsx",
+      "line": 53,
+      "reference": "testID=\"search-input\""
+    },
+    {
+      "file": "components/SearchBar.tsx",
+      "line": 57,
+      "reference": "placeholder={placeholder}"
+    },
+    {
+      "file": "components/SearchBar.tsx",
+      "line": 68,
+      "reference": "onPress={handleClear}"
+    },
+    {
+      "file": "components/SearchBar.tsx",
+      "line": 70,
+      "reference": "testID=\"clear-search-button\""
+    },
+    {
+      "file": "components/SearchBar.tsx",
+      "line": 72,
+      "reference": "accessibilityLabel=\"Clear search\""
+    },
+    {
+      "file": "components/TastedBrewList.tsx",
+      "line": 131,
+      "reference": "<View testID=\"tasted-brews-container\" style={styles.container}>"
+    },
+    {
+      "file": "components/TastedBrewList.tsx",
+      "line": 140,
+      "reference": "placeholder=\"Search tasted beer...\""
+    },
+    {
+      "file": "components/TastedBrewList.tsx",
+      "line": 150,
+      "reference": "onPress={handleTryAgain}"
+    },
+    {
+      "file": "components/TastedBrewList.tsx",
+      "line": 162,
+      "reference": "placeholder=\"Search tasted beer...\""
+    },
+    {
+      "file": "components/TastedBrewList.tsx",
+      "line": 184,
+      "reference": "onRefresh={handleRefresh}"
+    },
+    {
+      "file": "components/beer/BeerItem.tsx",
+      "line": 71,
+      "reference": "onPress={() => onToggle(beer.id)}"
+    },
+    {
+      "file": "components/beer/BeerItem.tsx",
+      "line": 75,
+      "reference": "testID={`beer-item-${beer.id}`}"
+    },
+    {
+      "file": "components/beer/BeerItem.tsx",
+      "line": 78,
+      "reference": "accessibilityLabel={`${beer.brew_name} by ${beer.brewer}`}"
+    },
+    {
+      "file": "components/beer/BeerItem.tsx",
+      "line": 108,
+      "reference": "testID={`beer-name-${beer.id}`}"
+    },
+    {
+      "file": "components/beer/BeerItem.tsx",
+      "line": 115,
+      "reference": "testID={`beer-brewer-${beer.id}`}"
+    },
+    {
+      "file": "components/beer/BeerItem.tsx",
+      "line": 125,
+      "reference": "testID={`beer-style-${beer.id}`}"
+    },
+    {
+      "file": "components/beer/BeerItem.tsx",
+      "line": 147,
+      "reference": "testID={`beer-description-container-${beer.id}`}"
+    },
+    {
+      "file": "components/beer/BeerItem.tsx",
+      "line": 152,
+      "reference": "testID={`beer-date-${beer.id}`}"
+    },
+    {
+      "file": "components/beer/BeerItem.tsx",
+      "line": 164,
+      "reference": "testID={`beer-description-${beer.id}`}"
+    },
+    {
+      "file": "components/beer/BeerList.tsx",
+      "line": 15,
+      "reference": "onRefresh: () => void;"
+    },
+    {
+      "file": "components/beer/BeerList.tsx",
+      "line": 81,
+      "reference": "<View style={styles.emptyContainer} testID=\"beer-list-empty\">"
+    },
+    {
+      "file": "components/beer/BeerList.tsx",
+      "line": 82,
+      "reference": "<Text style={[styles.emptyText, { color: colors.textSecondary }]} testID=\"beer-list-empty-message\">"
+    },
+    {
+      "file": "components/beer/BeerList.tsx",
+      "line": 91,
+      "reference": "testID=\"beer-list\""
+    },
+    {
+      "file": "components/beer/BeerList.tsx",
+      "line": 105,
+      "reference": "onRefresh={onRefresh}"
+    },
+    {
+      "file": "components/beer/FilterBar.tsx",
+      "line": 79,
+      "reference": "<View style={styles.chipRow} testID=\"filter-bar\">"
+    },
+    {
+      "file": "components/beer/FilterBar.tsx",
+      "line": 82,
+      "reference": "onPress={handleContainerPress}"
+    },
+    {
+      "file": "components/beer/FilterBar.tsx",
+      "line": 84,
+      "reference": "testID=\"filter-container-button\""
+    },
+    {
+      "file": "components/beer/FilterBar.tsx",
+      "line": 87,
+      "reference": "accessibilityLabel={`Container filter: ${CONTAINER_LABELS[containerFilter]}. Double tap to show ${NEXT_CONTAINER[containerFilter]}.`}"
+    },
+    {
+      "file": "components/beer/FilterBar.tsx",
+      "line": 110,
+      "reference": "onPress={handleSortPress}"
+    },
+    {
+      "file": "components/beer/FilterBar.tsx",
+      "line": 112,
+      "reference": "testID=\"sort-toggle-button\""
+    },
+    {
+      "file": "components/beer/FilterBar.tsx",
+      "line": 114,
+      "reference": "accessibilityLabel={`Sort by ${SORT_LABELS[sortBy]}. Double tap to sort by ${NEXT_SORT[sortBy]}.`}"
+    },
+    {
+      "file": "components/beer/FilterBar.tsx",
+      "line": 128,
+      "reference": "<Text style={[styles.chipText, { color: colors.tint }]} testID=\"sort-button-text\">"
+    },
+    {
+      "file": "components/beer/FilterBar.tsx",
+      "line": 137,
+      "reference": "onPress={handleDirectionPress}"
+    },
+    {
+      "file": "components/beer/FilterBar.tsx",
+      "line": 139,
+      "reference": "testID=\"sort-direction-button\""
+    },
+    {
+      "file": "components/beer/FilterBar.tsx",
+      "line": 141,
+      "reference": "accessibilityLabel={`Sort: ${DIRECTION_LABELS[sortBy][sortDirection].replace(' \u2193', '')}. Double tap for ${DIRECTION_LABELS[sortBy][sortDirection === 'asc' ? 'desc' : 'asc'].replace(' \u2193', '')}.`}"
+    },
+    {
+      "file": "components/beer/SkeletonLoader.tsx",
+      "line": 225,
+      "reference": "<View style={containerStyle} testID=\"skeleton-box\">"
+    },
+    {
+      "file": "components/beer/SkeletonLoader.tsx",
+      "line": 295,
+      "reference": "testID={`skeleton-text-line-${i}`}"
+    },
+    {
+      "file": "components/beer/SkeletonLoader.tsx",
+      "line": 313,
+      "reference": "<View style={[styles.textContainer, style]} testID=\"skeleton-text\">"
+    },
+    {
+      "file": "components/beer/SkeletonLoader.tsx",
+      "line": 380,
+      "reference": "testID=\"skeleton-beer-item\""
+    },
+    {
+      "file": "components/beer/SkeletonLoader.tsx",
+      "line": 381,
+      "reference": "accessibilityLabel=\"Loading beer item\""
+    },
+    {
+      "file": "components/beer/SkeletonLoader.tsx",
+      "line": 520,
+      "reference": "testID=\"skeleton-beer-list\""
+    },
+    {
+      "file": "components/beer/SkeletonLoader.tsx",
+      "line": 521,
+      "reference": "accessibilityLabel={`Loading ${validCount} beer items`}"
+    },
+    {
+      "file": "components/icons/ContainerIcon.tsx",
+      "line": 24,
+      "reference": "accessibilityLabel=\"Unknown container type\""
+    },
+    {
+      "file": "components/optimistic/OptimisticStatusBadge.tsx",
+      "line": 94,
+      "reference": "<TouchableOpacity onPress={onCancel} style={styles.cancelButton}>"
+    },
+    {
+      "file": "components/optimistic/OptimisticStatusBadge.tsx",
+      "line": 103,
+      "reference": "<TouchableOpacity onPress={handlePress} activeOpacity={0.7}>"
+    },
+    {
+      "file": "components/settings/AboutSection.tsx",
+      "line": 22,
+      "reference": "testID = 'about-section',"
+    },
+    {
+      "file": "components/settings/AboutSection.tsx",
+      "line": 49,
+      "reference": "<View style={style} testID={testID}>"
+    },
+    {
+      "file": "components/settings/AboutSection.tsx",
+      "line": 50,
+      "reference": "<SettingsSection title=\"About\">"
+    },
+    {
+      "file": "components/settings/AboutSection.tsx",
+      "line": 53,
+      "reference": "title=\"Beer Selector\""
+    },
+    {
+      "file": "components/settings/AboutSection.tsx",
+      "line": 62,
+      "reference": "title=\"Help & Documentation\""
+    },
+    {
+      "file": "components/settings/AboutSection.tsx",
+      "line": 64,
+      "reference": "onPress={() => handleOpenLink(helpUrl)}"
+    },
+    {
+      "file": "components/settings/AboutSection.tsx",
+      "line": 72,
+      "reference": "title=\"Privacy Policy\""
+    },
+    {
+      "file": "components/settings/AboutSection.tsx",
+      "line": 74,
+      "reference": "onPress={() => handleOpenLink(privacyUrl)}"
+    },
+    {
+      "file": "components/settings/AboutSection.tsx",
+      "line": 82,
+      "reference": "accessibilityLabel={`Copyright ${currentYear} Beer Selector. All rights reserved.`}"
+    },
+    {
+      "file": "components/settings/DataManagementSection.tsx",
+      "line": 12,
+      "reference": "onRefresh: () => Promise<void>;"
+    },
+    {
+      "file": "components/settings/DataManagementSection.tsx",
+      "line": 32,
+      "reference": "testID = 'data-management-section',"
+    },
+    {
+      "file": "components/settings/DataManagementSection.tsx",
+      "line": 54,
+      "reference": "<View style={style} testID={testID}>"
+    },
+    {
+      "file": "components/settings/DataManagementSection.tsx",
+      "line": 56,
+      "reference": "title=\"Data\""
+    },
+    {
+      "file": "components/settings/DataManagementSection.tsx",
+      "line": 66,
+      "reference": "title={refreshing ? 'Refreshing...' : 'Refresh All Data'}"
+    },
+    {
+      "file": "components/settings/DataManagementSection.tsx",
+      "line": 69,
+      "reference": "onPress={handleRefresh}"
+    },
+    {
+      "file": "components/settings/DataManagementSection.tsx",
+      "line": 72,
+      "reference": "testID=\"refresh-all-data-button\""
+    },
+    {
+      "file": "components/settings/DataManagementSection.tsx",
+      "line": 79,
+      "reference": "title=\"Login to Flying Saucer\""
+    },
+    {
+      "file": "components/settings/DataManagementSection.tsx",
+      "line": 82,
+      "reference": "onPress={onLogin}"
+    },
+    {
+      "file": "components/settings/DataManagementSection.tsx",
+      "line": 85,
+      "reference": "testID=\"login-button\""
+    },
+    {
+      "file": "components/settings/DataManagementSection.tsx",
+      "line": 92,
+      "reference": "title=\"Go to Home Screen\""
+    },
+    {
+      "file": "components/settings/DataManagementSection.tsx",
+      "line": 95,
+      "reference": "onPress={onGoHome}"
+    },
+    {
+      "file": "components/settings/DataManagementSection.tsx",
+      "line": 111,
+      "reference": "onPress={onLogout}"
+    },
+    {
+      "file": "components/settings/DataManagementSection.tsx",
+      "line": 113,
+      "reference": "testID=\"logout-button\""
+    },
+    {
+      "file": "components/settings/DeveloperSection.tsx",
+      "line": 9,
+      "reference": "import { getPreference, setPreference } from '@/src/database/preferences';"
+    },
+    {
+      "file": "components/settings/DeveloperSection.tsx",
+      "line": 53,
+      "reference": "const lastAllBeersRefresh = await getPreference('last_all_beers_refresh');"
+    },
+    {
+      "file": "components/settings/DeveloperSection.tsx",
+      "line": 54,
+      "reference": "const lastMyBeersRefresh = await getPreference('last_my_beers_refresh');"
+    },
+    {
+      "file": "components/settings/DeveloperSection.tsx",
+      "line": 96,
+      "reference": "onPress: async () => {"
+    },
+    {
+      "file": "components/settings/DeveloperSection.tsx",
+      "line": 98,
+      "reference": "await setPreference('last_all_beers_refresh', '0');"
+    },
+    {
+      "file": "components/settings/DeveloperSection.tsx",
+      "line": 99,
+      "reference": "await setPreference('last_my_beers_refresh', '0');"
+    },
+    {
+      "file": "components/settings/DeveloperSection.tsx",
+      "line": 117,
+      "reference": "api_base_url: await getPreference('api_base_url'),"
+    },
+    {
+      "file": "components/settings/DeveloperSection.tsx",
+      "line": 118,
+      "reference": "is_visitor_mode: await getPreference('is_visitor_mode'),"
+    },
+    {
+      "file": "components/settings/DeveloperSection.tsx",
+      "line": 119,
+      "reference": "first_launch: await getPreference('first_launch'),"
+    },
+    {
+      "file": "components/settings/DeveloperSection.tsx",
+      "line": 120,
+      "reference": "last_all_beers_refresh: await getPreference('last_all_beers_refresh'),"
+    },
+    {
+      "file": "components/settings/DeveloperSection.tsx",
+      "line": 121,
+      "reference": "last_my_beers_refresh: await getPreference('last_my_beers_refresh'),"
+    },
+    {
+      "file": "components/settings/DeveloperSection.tsx",
+      "line": 161,
+      "reference": "onPress: async () => {"
+    },
+    {
+      "file": "components/settings/DeveloperSection.tsx",
+      "line": 172,
+      "reference": "// ETag first inverts the failure into a harmless extra full fetch,"
+    },
+    {
+      "file": "components/settings/DeveloperSection.tsx",
+      "line": 173,
+      "reference": "// and `setPreference` retries contention where the"
+    },
+    {
+      "file": "components/settings/DeveloperSection.tsx",
+      "line": 216,
+      "reference": "await setPreference('all_beers_api_url', '', 'API endpoint for fetching all beers');"
+    },
+    {
+      "file": "components/settings/DeveloperSection.tsx",
+      "line": 218,
+      "reference": "await setPreference("
+    },
+    {
+      "file": "components/settings/DeveloperSection.tsx",
+      "line": 221,
+      "reference": "'API endpoint for fetching Beerfinder beers'"
+    },
+    {
+      "file": "components/settings/DeveloperSection.tsx",
+      "line": 223,
+      "reference": "await setPreference("
+    },
+    {
+      "file": "components/settings/DeveloperSection.tsx",
+      "line": 228,
+      "reference": "await setPreference("
+    },
+    {
+      "file": "components/settings/DeveloperSection.tsx",
+      "line": 233,
+      "reference": "await setPreference("
+    },
+    {
+      "file": "components/settings/DeveloperSection.tsx",
+      "line": 238,
+      "reference": "await setPreference("
+    },
+    {
+      "file": "components/settings/DeveloperSection.tsx",
+      "line": 269,
+      "reference": "<View testID=\"developer-section\">"
+    },
+    {
+      "file": "components/settings/DeveloperSection.tsx",
+      "line": 271,
+      "reference": "title=\"Developer Tools\""
+    },
+    {
+      "file": "components/settings/DeveloperSection.tsx",
+      "line": 276,
+      "reference": "title=\"Database Statistics\""
+    },
+    {
+      "file": "components/settings/DeveloperSection.tsx",
+      "line": 279,
+      "reference": "onPress={showDatabaseStats}"
+    },
+    {
+      "file": "components/settings/DeveloperSection.tsx",
+      "line": 285,
+      "reference": "title=\"Clear Refresh Timestamps\""
+    },
+    {
+      "file": "components/settings/DeveloperSection.tsx",
+      "line": 288,
+      "reference": "onPress={clearRefreshTimestamps}"
+    },
+    {
+      "file": "components/settings/DeveloperSection.tsx",
+      "line": 294,
+      "reference": "title=\"View Preferences\""
+    },
+    {
+      "file": "components/settings/DeveloperSection.tsx",
+      "line": 297,
+      "reference": "onPress={viewAllPreferences}"
+    },
+    {
+      "file": "components/settings/DeveloperSection.tsx",
+      "line": 303,
+      "reference": "title=\"Create Mock Session\""
+    },
+    {
+      "file": "components/settings/DeveloperSection.tsx",
+      "line": 306,
+      "reference": "onPress={handleCreateMockSession}"
+    },
+    {
+      "file": "components/settings/DeveloperSection.tsx",
+      "line": 308,
+      "reference": "testID=\"create-mock-session-button\""
+    },
+    {
+      "file": "components/settings/DeveloperSection.tsx",
+      "line": 313,
+      "reference": "<SettingsSection title=\"Danger Zone\" footer=\"Warning: This action cannot be undone.\">"
+    },
+    {
+      "file": "components/settings/DeveloperSection.tsx",
+      "line": 316,
+      "reference": "title=\"Reset to First-Run State\""
+    },
+    {
+      "file": "components/settings/DeveloperSection.tsx",
+      "line": 319,
+      "reference": "onPress={resetToFirstRun}"
+    },
+    {
+      "file": "components/settings/DeveloperSection.tsx",
+      "line": 323,
+      "reference": "testID=\"reset-first-run-button\""
+    },
+    {
+      "file": "components/settings/SettingsItem.tsx",
+      "line": 23,
+      "reference": "title: string;"
+    },
+    {
+      "file": "components/settings/SettingsItem.tsx",
+      "line": 98,
+      "reference": "accessibilityLabel={`Toggle ${title}`}"
+    },
+    {
+      "file": "components/settings/SettingsItem.tsx",
+      "line": 164,
+      "reference": "onPress={handlePress}"
+    },
+    {
+      "file": "components/settings/SettingsItem.tsx",
+      "line": 168,
+      "reference": "accessibilityLabel={title}"
+    },
+    {
+      "file": "components/settings/SettingsItem.tsx",
+      "line": 171,
+      "reference": "testID={testID}"
+    },
+    {
+      "file": "components/settings/SettingsItem.tsx",
+      "line": 178,
+      "reference": "return <View testID={testID}>{content}</View>;"
+    },
+    {
+      "file": "components/settings/SettingsItem.tsx",
+      "line": 199,
+      "reference": "title: {"
+    },
+    {
+      "file": "components/settings/SettingsSection.tsx",
+      "line": 7,
+      "reference": "title: string;"
+    },
+    {
+      "file": "components/settings/SettingsSection.tsx",
+      "line": 25,
+      "reference": "<View style={[styles.container, style]} testID={testID}>"
+    },
+    {
+      "file": "components/settings/WelcomeSection.tsx",
+      "line": 21,
+      "reference": "testID = 'welcome-section',"
+    },
+    {
+      "file": "components/settings/WelcomeSection.tsx",
+      "line": 29,
+      "reference": "<View style={style} testID={testID}>"
+    },
+    {
+      "file": "components/settings/WelcomeSection.tsx",
+      "line": 46,
+      "reference": "title=\"Get Started\""
+    },
+    {
+      "file": "components/settings/WelcomeSection.tsx",
+      "line": 51,
+      "reference": "title={loginLoading ? 'Signing in...' : 'Sign In to Flying Saucer'}"
+    },
+    {
+      "file": "components/settings/WelcomeSection.tsx",
+      "line": 54,
+      "reference": "onPress={onLogin}"
+    },
+    {
+      "file": "components/settings/WelcomeSection.tsx",
+      "line": 57,
+      "reference": "testID=\"login-button\""
+    },
+    {
+      "file": "components/ui/ActionButton.tsx",
+      "line": 16,
+      "reference": "readonly label: string;"
+    },
+    {
+      "file": "components/ui/ActionButton.tsx",
+      "line": 17,
+      "reference": "readonly onPress: () => void;"
+    },
+    {
+      "file": "components/ui/ActionButton.tsx",
+      "line": 40,
+      "reference": "onPress={onPress}"
+    },
+    {
+      "file": "components/ui/ActionButton.tsx",
+      "line": 117,
+      "reference": "label: {"
+    },
+    {
+      "file": "components/ui/ChromeShell.tsx",
+      "line": 23,
+      "reference": "<View style={[{ borderRadius, padding, overflow: 'hidden' as const }, style]} testID={testID}>"
+    },
+    {
+      "file": "components/ui/MetricCard.tsx",
+      "line": 52,
+      "reference": "testID=\"metric-progress-fill\""
+    },
+    {
+      "file": "components/ui/ScanlineTitle.tsx",
+      "line": 8,
+      "reference": "readonly title: string;"
+    },
+    {
+      "file": "components/ui/ScanlineTitle.tsx",
+      "line": 31,
+      "reference": "title: {"
+    },
+    {
+      "file": "context/AppContext.tsx",
+      "line": 482,
+      "reference": "* and no fetch on the path. Put anything that can hang in there and a"
+    },
+    {
+      "file": "context/NetworkContext.tsx",
+      "line": 145,
+      "reference": "const state = await NetInfo.fetch();"
+    },
+    {
+      "file": "context/NetworkContext.tsx",
+      "line": 159,
+      "reference": "NetInfo.fetch().then(updateNetworkState);"
+    },
+    {
+      "file": "hooks/useDataRefresh.ts",
+      "line": 13,
+      "reference": "* This should fetch data from the local database and update component state"
+    },
+    {
+      "file": "hooks/useDataRefresh.ts",
+      "line": 62,
+      "reference": "* that throws after a successful fetch) reached nobody at all. The alert is now"
+    },
+    {
+      "file": "hooks/useDataRefresh.ts",
+      "line": 86,
+      "reference": "*   onRefresh={handleRefresh}"
+    },
+    {
+      "file": "hooks/useLoginFlow.ts",
+      "line": 4,
+      "reference": "import { setPreference } from '@/src/database/preferences';"
+    },
+    {
+      "file": "hooks/useLoginFlow.ts",
+      "line": 12,
+      "reference": "* This will typically call manualRefreshAllData() to fetch fresh data from APIs"
+    },
+    {
+      "file": "hooks/useLoginFlow.ts",
+      "line": 83,
+      "reference": "*    - Calls onRefreshData() to fetch latest data"
+    },
+    {
+      "file": "hooks/useLoginFlow.ts",
+      "line": 118,
+      "reference": "* <TouchableOpacity onPress={startMemberLogin}>"
+    },
+    {
+      "file": "hooks/useLoginFlow.ts",
+      "line": 123,
+      "reference": "* <TouchableOpacity onPress={startVisitorLogin}>"
+    },
+    {
+      "file": "hooks/useLoginFlow.ts",
+      "line": 227,
+      "reference": "await setPreference("
+    },
+    {
+      "file": "hooks/useSettingsRefresh.ts",
+      "line": 4,
+      "reference": "import { getPreference } from '@/src/database/preferences';"
+    },
+    {
+      "file": "hooks/useSettingsRefresh.ts",
+      "line": 38,
+      "reference": "*    - Mixed errors: Individual error messages for each endpoint"
+    },
+    {
+      "file": "hooks/useSettingsRefresh.ts",
+      "line": 45,
+      "reference": "* - Server errors show specific endpoint information"
+    },
+    {
+      "file": "hooks/useSettingsRefresh.ts",
+      "line": 62,
+      "reference": "*   onRefresh={handleRefresh}"
+    },
+    {
+      "file": "hooks/useSettingsRefresh.ts",
+      "line": 94,
+      "reference": "// Otherwise, show individual error messages for each endpoint"
+    },
+    {
+      "file": "hooks/useSettingsRefresh.ts",
+      "line": 118,
+      "reference": "const isVisitor = (await getPreference('is_visitor_mode')) === 'true';"
+    },
+    {
+      "file": "src/__vitest__/expo-secure-store-stub.ts",
+      "line": 28,
+      "reference": "return store.get(key) ?? null;"
+    },
+    {
+      "file": "src/__vitest__/node-fetch.d.ts",
+      "line": 2,
+      "reference": "* `node-fetch` v2 ships no types and `@types/node-fetch` is not installed."
+    },
+    {
+      "file": "src/__vitest__/node-fetch.d.ts",
+      "line": 9,
+      "reference": "declare module 'node-fetch' {"
+    },
+    {
+      "file": "src/__vitest__/node-fetch.d.ts",
+      "line": 10,
+      "reference": "const fetch: typeof globalThis.fetch;"
+    },
+    {
+      "file": "src/__vitest__/node-fetch.d.ts",
+      "line": 11,
+      "reference": "export default fetch;"
+    },
+    {
+      "file": "src/api/apiClient.ts",
+      "line": 8,
+      "reference": "// Network detection is handled through fetch API error handling"
+    },
+    {
+      "file": "src/api/apiClient.ts",
+      "line": 34,
+      "reference": "// Network connectivity will be detected through fetch errors"
+    },
+    {
+      "file": "src/api/apiClient.ts",
+      "line": 42,
+      "reference": "// Use a simple HEAD request to a reliable endpoint"
+    },
+    {
+      "file": "src/api/apiClient.ts",
+      "line": 46,
+      "reference": "await fetch(config.api.baseUrl, {"
+    },
+    {
+      "file": "src/api/apiClient.ts",
+      "line": 56,
+      "reference": "// If fetch fails, we might be offline"
+    },
+    {
+      "file": "src/api/apiClient.ts",
+      "line": 180,
+      "reference": "'sec-fetch-dest': 'empty',"
+    },
+    {
+      "file": "src/api/apiClient.ts",
+      "line": 181,
+      "reference": "'sec-fetch-mode': 'cors',"
+    },
+    {
+      "file": "src/api/apiClient.ts",
+      "line": 182,
+      "reference": "'sec-fetch-site': 'same-origin',"
+    },
+    {
+      "file": "src/api/apiClient.ts",
+      "line": 189,
+      "reference": "private async fetchWithRetry("
+    },
+    {
+      "file": "src/api/apiClient.ts",
+      "line": 194,
+      "reference": "// Network connectivity will be detected through fetch errors"
+    },
+    {
+      "file": "src/api/apiClient.ts",
+      "line": 197,
+      "reference": "// Add timeout to fetch request"
+    },
+    {
+      "file": "src/api/apiClient.ts",
+      "line": 207,
+      "reference": "const response = await fetch(url, fetchOptions);"
+    },
+    {
+      "file": "src/api/apiClient.ts",
+      "line": 232,
+      "reference": "error.message.includes('Failed to fetch'));"
+    },
+    {
+      "file": "src/api/apiClient.ts",
+      "line": 246,
+      "reference": "return this.fetchWithRetry(url, options, retries - 1);"
+    },
+    {
+      "file": "src/api/apiClient.ts",
+      "line": 253,
+      "reference": "error instanceof Error ? error.message : 'Unknown fetch error',"
+    },
+    {
+      "file": "src/api/apiClient.ts",
+      "line": 264,
+      "reference": "return this.fetchWithRetry(url, options, retries - 1);"
+    },
+    {
+      "file": "src/api/apiClient.ts",
+      "line": 272,
+      "reference": "endpoint: string,"
+    },
+    {
+      "file": "src/api/apiClient.ts",
+      "line": 278,
+      "reference": "const url = endpoint.startsWith('http') ? endpoint : `${this.baseUrl}${endpoint}`;"
+    },
+    {
+      "file": "src/api/apiClient.ts",
+      "line": 289,
+      "reference": "const response = await this.fetchWithRetry(url, requestOptions);"
+    },
+    {
+      "file": "src/api/apiClient.ts",
+      "line": 308,
+      "reference": "if (endpoint === config.api.endpoints.addToQueue) {"
+    },
+    {
+      "file": "src/api/apiClient.ts",
+      "line": 376,
+      "reference": "endpoint: string,"
+    },
+    {
+      "file": "src/api/apiClient.ts",
+      "line": 386,
+      "reference": "return this.request<T>(endpoint, {"
+    },
+    {
+      "file": "src/api/apiClient.ts",
+      "line": 393,
+      "reference": "endpoint: string,"
+    },
+    {
+      "file": "src/api/apiClient.ts",
+      "line": 396,
+      "reference": "let url = endpoint;"
+    },
+    {
+      "file": "src/api/apiClient.ts",
+      "line": 406,
+      "reference": "url = `${endpoint}?${params.toString()}`;"
+    },
+    {
+      "file": "src/api/apiClient.ts",
+      "line": 421,
+      "reference": "await fetch(config.api.baseUrl, {"
+    },
+    {
+      "file": "src/api/apiClient.ts",
+      "line": 435,
+      "reference": "// If fetch fails, we're likely offline"
+    },
+    {
+      "file": "src/api/authService.ts",
+      "line": 3,
+      "reference": "import { getPreference, setPreference } from '../database/preferences';"
+    },
+    {
+      "file": "src/api/authService.ts",
+      "line": 18,
+      "reference": "const response = await apiClient.post<{ session: SessionData }>('/auto-login.php', {});"
+    },
+    {
+      "file": "src/api/authService.ts",
+      "line": 40,
+      "reference": "const isVisitor = await getPreference('is_visitor_mode');"
+    },
+    {
+      "file": "src/api/authService.ts",
+      "line": 126,
+      "reference": "await setPreference("
+    },
+    {
+      "file": "src/api/authService.ts",
+      "line": 134,
+      "reference": "await setPreference('store_code', parsedCookies.store_code, 'Store code for visitor');"
+    },
+    {
+      "file": "src/api/authService.ts",
+      "line": 138,
+      "reference": "await setPreference('store_state', parsedCookies.store__state, 'Store state for visitor');"
+    },
+    {
+      "file": "src/api/authService.ts",
+      "line": 238,
+      "reference": "await setPreference("
+    },
+    {
+      "file": "src/api/authService.ts",
+      "line": 282,
+      "reference": "const response = await apiClient.post('/logout.php', {});"
+    },
+    {
+      "file": "src/api/authService.ts",
+      "line": 325,
+      "reference": "setPreference("
+    },
+    {
+      "file": "src/api/authService.ts",
+      "line": 415,
+      "reference": "const response = await apiClient.post<{ session: SessionData }>('/login.php', {"
+    },
+    {
+      "file": "src/api/authService.ts",
+      "line": 440,
+      "reference": "await setPreference("
+    },
+    {
+      "file": "src/api/authService.ts",
+      "line": 506,
+      "reference": "const mode = await getPreference('is_visitor_mode');"
+    },
+    {
+      "file": "src/api/beerApi.ts",
+      "line": 4,
+      "reference": "import { getPreference } from '../database/preferences';"
+    },
+    {
+      "file": "src/api/beerApi.ts",
+      "line": 42,
+      "reference": "* @param url - The URL to fetch"
+    },
+    {
+      "file": "src/api/beerApi.ts",
+      "line": 47,
+      "reference": "export const fetchWithRetry = async ("
+    },
+    {
+      "file": "src/api/beerApi.ts",
+      "line": 72,
+      "reference": "* Separate from `fetchWithRetry` so `deadline` is a required parameter rather"
+    },
+    {
+      "file": "src/api/beerApi.ts",
+      "line": 95,
+      "reference": "// That is no longer the shape: the refresh paths fetch with no lock held and"
+    },
+    {
+      "file": "src/api/beerApi.ts",
+      "line": 112,
+      "reference": "const response = await fetch(url, { signal: controller.signal });"
+    },
+    {
+      "file": "src/api/beerApi.ts",
+      "line": 152,
+      "reference": "// controller is authoritative and a name check is not. whatwg-fetch prefers"
+    },
+    {
+      "file": "src/api/beerApi.ts",
+      "line": 178,
+      "reference": "// `fetch()` itself is the abort route that actually fires, and it does not"
+    },
+    {
+      "file": "src/api/beerApi.ts",
+      "line": 306,
+      "reference": "* to `fetch()` \u2014 three retries at 1s / 1.5s / 2.25s for a URL that was never"
+    },
+    {
+      "file": "src/api/beerApi.ts",
+      "line": 317,
+      "reference": "if ((await getPreference('is_visitor_mode')) === 'true') {"
+    },
+    {
+      "file": "src/api/beerApi.ts",
+      "line": 325,
+      "reference": "const url = await getPreference('my_beers_api_url');"
+    },
+    {
+      "file": "src/api/beerApi.ts",
+      "line": 335,
+      "reference": "// Rejected HERE, before any request. fetchWithRetry no longer synthesises a"
+    },
+    {
+      "file": "src/api/beerApi.ts",
+      "line": 337,
+      "reference": "// fetch() and burns three retries with backoff."
+    },
+    {
+      "file": "src/api/beerApi.ts",
+      "line": 406,
+      "reference": "// Get the API endpoint from preferences"
+    },
+    {
+      "file": "src/api/beerApi.ts",
+      "line": 407,
+      "reference": "const apiUrl = await getPreference('all_beers_api_url');"
+    },
+    {
+      "file": "src/api/beerApi.ts",
+      "line": 415,
+      "reference": "const data = await fetchWithRetry(apiUrl);"
+    },
+    {
+      "file": "src/api/beerApi.ts",
+      "line": 423,
+      "reference": "// Handle different response formats based on API endpoint"
+    },
+    {
+      "file": "src/api/beerApi.ts",
+      "line": 549,
+      "reference": "// Inside the try, deliberately: `resolveMemberApiUrl` awaits `getPreference`"
+    },
+    {
+      "file": "src/api/beerApi.ts",
+      "line": 557,
+      "reference": "console.log('DB: Making API request to fetch My Beers data...');"
+    },
+    {
+      "file": "src/api/beerApi.ts",
+      "line": 558,
+      "reference": "const data = await fetchWithRetry(resolved.url);"
+    },
+    {
+      "file": "src/api/beerApi.ts",
+      "line": 708,
+      "reference": "// divergence that left rewards sending a none:// placeholder to fetch()"
+    },
+    {
+      "file": "src/api/beerApi.ts",
+      "line": 717,
+      "reference": "const data = await fetchWithRetry(resolved.url);"
+    },
+    {
+      "file": "src/api/beerApi.ts",
+      "line": 737,
+      "reference": "return extractRewards(await fetchWithRetry(resolved.url));"
+    },
+    {
+      "file": "src/api/beerApi.ts",
+      "line": 795,
+      "reference": "// We accept that trade-off because this endpoint is an authoritative snapshot."
+    },
+    {
+      "file": "src/api/beerService.ts",
+      "line": 61,
+      "reference": "const response = await apiClient.post<Record<string, unknown>>("
+    },
+    {
+      "file": "src/api/fetchOutcome.ts",
+      "line": 2,
+      "reference": "* Result types for the fetch layer"
+    },
+    {
+      "file": "src/api/fetchOutcome.ts",
+      "line": 136,
+      "reference": "* `Failed to fetch: 500 Internal Server Error`, which matched that function's"
+    },
+    {
+      "file": "src/api/fetchOutcome.ts",
+      "line": 137,
+      "reference": "* `'Failed to fetch'` substring test \u2014 so **every HTTP error was reported to the"
+    },
+    {
+      "file": "src/api/fetchOutcome.ts",
+      "line": 167,
+      "reference": "* fetchers AFTER `fetchWithRetry` returns, and reports as"
+    },
+    {
+      "file": "src/api/fetchOutcome.ts",
+      "line": 218,
+      "reference": "* from the rejected value, and that placement is the point. `fetch()` itself is"
+    },
+    {
+      "file": "src/api/loginMessageHandler.ts",
+      "line": 2,
+      "reference": "import { setPreference } from '@/src/database/preferences';"
+    },
+    {
+      "file": "src/api/loginMessageHandler.ts",
+      "line": 126,
+      "reference": "* in production. No `getPreference` call site references any of them, and"
+    },
+    {
+      "file": "src/api/loginMessageHandler.ts",
+      "line": 128,
+      "reference": "* argument from `getPreference` call sites alone would miss \u2014 does load them,"
+    },
+    {
+      "file": "src/api/loginMessageHandler.ts",
+      "line": 155,
+      "reference": "await setPreference('user_json_url', userJsonUrl, 'API endpoint for user data');"
+    },
+    {
+      "file": "src/api/loginMessageHandler.ts",
+      "line": 156,
+      "reference": "await setPreference('store_json_url', storeJsonUrl, 'API endpoint for store data');"
+    },
+    {
+      "file": "src/api/loginMessageHandler.ts",
+      "line": 157,
+      "reference": "await setPreference("
+    },
+    {
+      "file": "src/api/loginMessageHandler.ts",
+      "line": 200,
+      "reference": "[{ text: 'OK', onPress: deps.onInjectionError }]"
+    },
+    {
+      "file": "src/api/loginMessageHandler.ts",
+      "line": 242,
+      "reference": "// costs one extra full fetch rather than leaving the new store's"
+    },
+    {
+      "file": "src/api/loginMessageHandler.ts",
+      "line": 273,
+      "reference": "await setPreference('all_beers_api_url', '', 'API endpoint for fetching all beers');"
+    },
+    {
+      "file": "src/api/loginMessageHandler.ts",
+      "line": 323,
+      "reference": "// this, it could: `setPreference` takes no lock of its own (~8"
+    },
+    {
+      "file": "src/api/loginMessageHandler.ts",
+      "line": 374,
+      "reference": "await setPreference("
+    },
+    {
+      "file": "src/api/loginMessageHandler.ts",
+      "line": 379,
+      "reference": "await setPreference("
+    },
+    {
+      "file": "src/api/loginMessageHandler.ts",
+      "line": 382,
+      "reference": "'API endpoint for fetching Beerfinder beers'"
+    },
+    {
+      "file": "src/api/loginMessageHandler.ts",
+      "line": 384,
+      "reference": "await setPreference("
+    },
+    {
+      "file": "src/api/loginMessageHandler.ts",
+      "line": 387,
+      "reference": "'API endpoint for fetching all beers'"
+    },
+    {
+      "file": "src/api/loginMessageHandler.ts",
+      "line": 519,
+      "reference": "await setPreference('all_beers_api_url', '', 'API endpoint for fetching all beers');"
+    },
+    {
+      "file": "src/api/loginMessageHandler.ts",
+      "line": 528,
+      "reference": "await setPreference("
+    },
+    {
+      "file": "src/api/loginMessageHandler.ts",
+      "line": 533,
+      "reference": "await setPreference("
+    },
+    {
+      "file": "src/api/loginMessageHandler.ts",
+      "line": 536,
+      "reference": "'Placeholder URL for visitor mode (not a real endpoint)'"
+    },
+    {
+      "file": "src/api/loginMessageHandler.ts",
+      "line": 541,
+      "reference": "await setPreference("
+    },
+    {
+      "file": "src/api/loginMessageHandler.ts",
+      "line": 544,
+      "reference": "'API endpoint for fetching all beers'"
+    },
+    {
+      "file": "src/api/nativeCookieManager.ts",
+      "line": 3,
+      "reference": "/** Remove cookies from every native store used by fetch and react-native-webview. */"
+    },
+    {
+      "file": "src/api/queueService.ts",
+      "line": 65,
+      "reference": "const response = await fetch(config.api.getFullUrl('memberQueues'), {"
+    },
+    {
+      "file": "src/api/queueService.ts",
+      "line": 71,
+      "reference": "throw new Error(`Failed to fetch queues with status: ${response.status}`);"
+    },
+    {
+      "file": "src/api/queueService.ts",
+      "line": 90,
+      "reference": "throw new Error(error instanceof Error ? error.message : 'Failed to fetch queued beers');"
+    },
+    {
+      "file": "src/api/queueService.ts",
+      "line": 144,
+      "reference": "const response = await fetch(config.api.getFullUrl('deleteQueuedBrew', { cid }), {"
+    },
+    {
+      "file": "src/config/config.ts",
+      "line": 23,
+      "reference": "* Flying Saucer API endpoint paths"
+    },
+    {
+      "file": "src/config/config.ts",
+      "line": 67,
+      "reference": "getFullUrl: (endpoint: 'beers' | 'batch' | 'sync' | 'health') => string;"
+    },
+    {
+      "file": "src/config/config.ts",
+      "line": 81,
+      "reference": "getFullUrl: (endpoint: keyof ApiEndpoints, params?: Record<string, string>) => string;"
+    },
+    {
+      "file": "src/config/config.ts",
+      "line": 274,
+      "reference": "* API endpoint paths (same across all environments)"
+    },
+    {
+      "file": "src/config/config.ts",
+      "line": 288,
+      "reference": "* Enrichment service endpoint paths"
+    },
+    {
+      "file": "src/config/config.ts",
+      "line": 355,
+      "reference": "getFullUrl: (endpoint: EnrichmentEndpoint) => {"
+    },
+    {
+      "file": "src/config/config.ts",
+      "line": 359,
+      "reference": "return `${apiUrl}${ENRICHMENT_ENDPOINTS[endpoint]}`;"
+    },
+    {
+      "file": "src/config/config.ts",
+      "line": 447,
+      "reference": "* Builds a full URL for an API endpoint"
+    },
+    {
+      "file": "src/config/config.ts",
+      "line": 448,
+      "reference": "* @param endpoint - The endpoint key from ApiEndpoints"
+    },
+    {
+      "file": "src/config/config.ts",
+      "line": 452,
+      "reference": "function getFullUrl(endpoint: keyof ApiEndpoints, params?: Record<string, string>): string {"
+    },
+    {
+      "file": "src/config/config.ts",
+      "line": 454,
+      "reference": "const path = API_ENDPOINTS[endpoint];"
+    },
+    {
+      "file": "src/config/index.ts",
+      "line": 14,
+      "reference": "* // Get a full endpoint URL"
+    },
+    {
+      "file": "src/database/DatabaseLockManager.ts",
+      "line": 413,
+      "reference": "// internet connection, often after the network fetch had already"
+    },
+    {
+      "file": "src/database/DatabaseLockManager.ts",
+      "line": 456,
+      "reference": "// fetch out of the write burst."
+    },
+    {
+      "file": "src/database/db.ts",
+      "line": 15,
+      "reference": "import { getPreference, setPreference } from './preferences';"
+    },
+    {
+      "file": "src/database/db.ts",
+      "line": 108,
+      "reference": "const alreadyDone = await getPreference('abv_cleanup_v1_done');"
+    },
+    {
+      "file": "src/database/db.ts",
+      "line": 129,
+      "reference": "await setPreference('abv_cleanup_v1_done', 'true', 'One-time ABV cleanup completed');"
+    },
+    {
+      "file": "src/database/errors.ts",
+      "line": 109,
+      "reference": "* calls `setPreference` at eight sites *while already holding* that lock, so"
+    },
+    {
+      "file": "src/database/migrations/migrateToV3.ts",
+      "line": 30,
+      "reference": "* Note: SQLite 3.35+ required for ALTER TABLE ADD COLUMN"
+    },
+    {
+      "file": "src/database/migrations/migrateToV3.ts",
+      "line": 45,
+      "reference": "ALTER TABLE allbeers ADD COLUMN glass_type TEXT;"
+    },
+    {
+      "file": "src/database/migrations/migrateToV3.ts",
+      "line": 51,
+      "reference": "ALTER TABLE tasted_brew_current_round ADD COLUMN glass_type TEXT;"
+    },
+    {
+      "file": "src/database/migrations/migrateToV4.ts",
+      "line": 19,
+      "reference": "* Note: SQLite 3.25+ required for ALTER TABLE RENAME COLUMN"
+    },
+    {
+      "file": "src/database/migrations/migrateToV4.ts",
+      "line": 34,
+      "reference": "ALTER TABLE allbeers RENAME COLUMN glass_type TO container_type;"
+    },
+    {
+      "file": "src/database/migrations/migrateToV4.ts",
+      "line": 40,
+      "reference": "ALTER TABLE tasted_brew_current_round RENAME COLUMN glass_type TO container_type;"
+    },
+    {
+      "file": "src/database/migrations/migrateToV6.ts",
+      "line": 32,
+      "reference": "await database.execAsync('ALTER TABLE allbeers ADD COLUMN abv REAL');"
+    },
+    {
+      "file": "src/database/migrations/migrateToV6.ts",
+      "line": 36,
+      "reference": "await database.execAsync('ALTER TABLE tasted_brew_current_round ADD COLUMN abv REAL');"
+    },
+    {
+      "file": "src/database/migrations/migrateToV7.ts",
+      "line": 58,
+      "reference": "'ALTER TABLE allbeers ADD COLUMN enrichment_confidence REAL DEFAULT NULL'"
+    },
+    {
+      "file": "src/database/migrations/migrateToV7.ts",
+      "line": 69,
+      "reference": "'ALTER TABLE allbeers ADD COLUMN enrichment_source TEXT DEFAULT NULL'"
+    },
+    {
+      "file": "src/database/migrations/migrateToV7.ts",
+      "line": 82,
+      "reference": "'ALTER TABLE tasted_brew_current_round ADD COLUMN enrichment_confidence REAL DEFAULT NULL'"
+    },
+    {
+      "file": "src/database/migrations/migrateToV7.ts",
+      "line": 92,
+      "reference": "'ALTER TABLE tasted_brew_current_round ADD COLUMN enrichment_source TEXT DEFAULT NULL'"
+    },
+    {
+      "file": "src/database/migrations/migrateToV8.ts",
+      "line": 22,
+      "reference": "* touched all asserted \"there has never been a `getPreference('auth_cookies')`"
+    },
+    {
+      "file": "src/database/migrations/migrateToV8.ts",
+      "line": 27,
+      "reference": "*     getPreference('auth_cookies')` \u2014 and passed the parsed jar to"
+    },
+    {
+      "file": "src/database/migrations/migrateToV8.ts",
+      "line": 33,
+      "reference": "* The inference was also unsound where its premise held: `getPreference` is not"
+    },
+    {
+      "file": "src/database/migrations/migrateToV8.ts",
+      "line": 35,
+      "reference": "* that is exactly the path the settings panel used. \"No `getPreference` call"
+    },
+    {
+      "file": "src/database/preferences.ts",
+      "line": 16,
+      "reference": "export const getPreference = async (key: string): Promise<string | null> => {"
+    },
+    {
+      "file": "src/database/preferences.ts",
+      "line": 39,
+      "reference": "export const setPreference = async ("
+    },
+    {
+      "file": "src/database/preferences.ts",
+      "line": 122,
+      "reference": "const isVisitor = (await getPreference('is_visitor_mode')) === 'true';"
+    },
+    {
+      "file": "src/database/preferences.ts",
+      "line": 125,
+      "reference": "const allBeersApiUrl = await getPreference('all_beers_api_url');"
+    },
+    {
+      "file": "src/database/preferences.ts",
+      "line": 126,
+      "reference": "const myBeersApiUrl = await getPreference('my_beers_api_url');"
+    },
+    {
+      "file": "src/database/repositories/OptimisticUpdateRepository.ts",
+      "line": 38,
+      "reference": "CREATE TABLE IF NOT EXISTS ${this.tableName} ("
+    },
+    {
+      "file": "src/database/schema.ts",
+      "line": 28,
+      "reference": "CREATE TABLE IF NOT EXISTS allbeers ("
+    },
+    {
+      "file": "src/database/schema.ts",
+      "line": 51,
+      "reference": "CREATE TABLE IF NOT EXISTS tasted_brew_current_round ("
+    },
+    {
+      "file": "src/database/schema.ts",
+      "line": 76,
+      "reference": "CREATE TABLE IF NOT EXISTS rewards ("
+    },
+    {
+      "file": "src/database/schema.ts",
+      "line": 88,
+      "reference": "CREATE TABLE IF NOT EXISTS preferences ("
+    },
+    {
+      "file": "src/database/schema.ts",
+      "line": 100,
+      "reference": "CREATE TABLE IF NOT EXISTS operation_queue ("
+    },
+    {
+      "file": "src/database/schema.ts",
+      "line": 119,
+      "reference": "description: 'API endpoint for fetching all beers',"
+    },
+    {
+      "file": "src/database/schema.ts",
+      "line": 124,
+      "reference": "description: 'API endpoint for fetching Beerfinder beers',"
+    },
+    {
+      "file": "src/database/schemaTypes.ts",
+      "line": 34,
+      "reference": "* CREATE TABLE IF NOT EXISTS allbeers ("
+    },
+    {
+      "file": "src/database/schemaTypes.ts",
+      "line": 161,
+      "reference": "* CREATE TABLE IF NOT EXISTS tasted_brew_current_round ("
+    },
+    {
+      "file": "src/database/schemaTypes.ts",
+      "line": 290,
+      "reference": "* CREATE TABLE IF NOT EXISTS rewards ("
+    },
+    {
+      "file": "src/database/schemaTypes.ts",
+      "line": 335,
+      "reference": "* CREATE TABLE IF NOT EXISTS preferences ("
+    },
+    {
+      "file": "src/database/schemaVersion.ts",
+      "line": 6,
+      "reference": "CREATE TABLE IF NOT EXISTS schema_version ("
+    },
+    {
+      "file": "src/database/schemaVersion.ts",
+      "line": 27,
+      "reference": "* `migrateToVersion3`; on an already-migrated database the `ALTER TABLE ... ADD"
+    },
+    {
+      "file": "src/database/schemaVersion.ts",
+      "line": 44,
+      "reference": "* `CREATE TABLE IF NOT EXISTS schema_version` runs immediately before the read,"
+    },
+    {
+      "file": "src/database/startupMigrationCheck.ts",
+      "line": 23,
+      "reference": "export type StartupMigrationAlert = { readonly title: string; readonly message: string };"
+    },
+    {
+      "file": "src/database/startupMigrationCheck.ts",
+      "line": 51,
+      "reference": "title: 'Database Update Failed',"
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 1,
+      "reference": "import { getPreference, setPreference, areApiUrlsConfigured } from '../database/preferences';"
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 109,
+      "reference": "*   so the user can force a full fetch. Joining hands back the result of a run"
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 274,
+      "reference": "* the fetch phase, so a poll returning while the rewards fetch is still running"
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 385,
+      "reference": "* Read the configuration a taplist fetch is being made against."
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 401,
+      "reference": "// `getPreference` swallows read errors and returns `null`, which collapses"
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 408,
+      "reference": "// reverted: every test that stubs `getPreference` at runtime must then stub"
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 412,
+      "reference": "// generation counter. Fixing this properly means making `getPreference` stop"
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 422,
+      "reference": "// fetch before there is anything to guard:"
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 447,
+      "reference": "return ((await getPreference('all_beers_api_url')) ?? '') as TaplistConfiguration;"
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 456,
+      "reference": "* the SAME `databaseLockManager` lock. `setPreference` itself still takes no"
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 486,
+      "reference": "// (`getPreference` swallows and returns null), the app was never configured,"
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 524,
+      "reference": "logWarning(`[${operation}] taplist discarded: store changed between fetch and write`, {"
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 543,
+      "reference": "return url.searchParams.get('sid');"
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 661,
+      "reference": "* Shared helper that encapsulates the proxy-then-fallback taplist fetch logic."
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 668,
+      "reference": "* @throws Error if both proxy and direct fetch fail, or if direct fetch fails when proxy is not configured"
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 673,
+      "reference": "// Keyed by store, so a second caller for the SAME taplist joins the fetch"
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 692,
+      "reference": "// `fetchBeersFromAPI`, which re-reads `all_beers_api_url` itself at fetch"
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 715,
+      "reference": "* The taplist fetch currently running, if any, keyed by the store it is for."
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 723,
+      "reference": "* Stop the next caller joining the taplist fetch currently in flight."
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 726,
+      "reference": "* passes `join: false`: a fetch already running read the OLD ETag, so serving"
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 732,
+      "reference": "* Dropping the entry does not cancel the running fetch, and the consequence is"
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 739,
+      "reference": "* rows and its ETag inside one lock hold, so a late-landing older fetch leaves a"
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 780,
+      "reference": "logWarning('Enrichment proxy failed, falling back to direct fetch', {"
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 790,
+      "reference": "console.log('[dataUpdateService] Enrichment not configured, using direct fetch');"
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 792,
+      "reference": "console.log('[dataUpdateService] Could not extract store ID from URL, using direct fetch');"
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 795,
+      "reference": "console.log('[dataUpdateService] Using direct Flying Saucer fetch...');"
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 849,
+      "reference": "function unavailableCopy(label: string, code: UnavailableReason['code']): string {"
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 856,
+      "reference": "* Unwrap a completed fetch into its rows, or throw with the reason."
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 862,
+      "reference": "function requireRows<T>(source: UnconditionalSource<FetchOutcome<T>>, label: string): readonly T[] {"
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 925,
+      "reference": "* What a completed rewards fetch means for the caller."
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 929,
+      "reference": "* itemCount: 0`, making \"no rewards URL configured\" and \"the rewards fetch"
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 945,
+      "reference": "* Classify a completed rewards fetch."
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 962,
+      "reference": "* @param source - The completed fetch"
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 1009,
+      "reference": "* 2. FALLBACK: Direct Flying Saucer fetch if proxy unavailable"
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 1016,
+      "reference": "// to fetch and the configuration this refresh is bound to; see"
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 1083,
+      "reference": "await setPreference('all_beers_last_check', new Date().toISOString());"
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 1103,
+      "reference": "`All beers fetch complete: ${allBeers.length} beers ${usedProxy ? '(with enrichment)' : '(no enrichment)'}`"
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 1194,
+      "reference": "// before the fetch, and a login can have switched stores since. Committing"
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 1236,
+      "reference": "await setPreference('all_beers_last_update', new Date().toISOString());"
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 1237,
+      "reference": "await setPreference('all_beers_last_check', new Date().toISOString());"
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 1276,
+      "reference": "// `fetch` with a hard-coded 15s timeout and no retry, its own `response.json()`"
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 1285,
+      "reference": "// which would put cold start behind a fetch-and-write of all three sources"
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 1321,
+      "reference": "// After the write, not during the fetch. The sync polls the Worker and then"
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 1347,
+      "reference": "const lastCheck = await getPreference(lastCheckKey);"
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 1395,
+      "reference": "const isVisitor = (await getPreference('is_visitor_mode')) === 'true';"
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 1495,
+      "reference": "* The refresh itself: fetch everything with no lock held, then write everything"
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 1539,
+      "reference": "// under its own lock, so starting it during the fetch phase lets it land"
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 1591,
+      "reference": "* exactly as a failing fetch does not. Written once rather than three times"
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 1717,
+      "reference": "await setPreference('all_beers_last_check', new Date().toISOString());"
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 1729,
+      "reference": "await setPreference('all_beers_last_update', new Date().toISOString());"
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 1730,
+      "reference": "await setPreference('all_beers_last_check', new Date().toISOString());"
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 1911,
+      "reference": "await setPreference('my_beers_last_update', new Date().toISOString());"
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 1912,
+      "reference": "await setPreference('my_beers_last_check', new Date().toISOString());"
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 1917,
+      "reference": "await setPreference('my_beers_last_update', new Date().toISOString());"
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 1918,
+      "reference": "await setPreference('my_beers_last_check', new Date().toISOString());"
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 1940,
+      "reference": "// this shared function deleted the only trace a rewards fetch had failed"
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 2003,
+      "reference": "const apiUrl = await getPreference('all_beers_api_url');"
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 2004,
+      "reference": "const myBeersApiUrl = await getPreference('my_beers_api_url');"
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 2030,
+      "reference": "// are this function's whole mechanism for forcing a full fetch, and a"
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 2039,
+      "reference": "console.log('Rapid double-refresh detected, clearing ETag to force full fetch');"
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 2044,
+      "reference": "// The taplist-level twin of `join: false` below. A fetch already in flight"
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 2070,
+      "reference": "await setPreference('all_beers_last_check', '');"
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 2071,
+      "reference": "await setPreference('my_beers_last_check', '');"
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 2104,
+      "reference": "const allBeersApiUrl = await getPreference('all_beers_api_url');"
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 2105,
+      "reference": "const myBeersApiUrl = await getPreference('my_beers_api_url');"
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 2106,
+      "reference": "const isVisitor = (await getPreference('is_visitor_mode')) === 'true';"
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 2226,
+      "reference": "// (\"Deliberately does NOT reorder fetch versus write\"). It was correct when"
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 2231,
+      "reference": "// fetch here blocks a user trying to check a beer in."
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 2263,
+      "reference": "// Each write is isolated, as each fetch is. Failures are logged and not"
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 2275,
+      "reference": "// it during the fetch phase lets it land first and be wiped by the"
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 2357,
+      "reference": "* fetch does not) and it is recorded in plan 05 rather than fixed in passing."
+    },
+    {
+      "file": "src/services/dataUpdateService.ts",
+      "line": 2373,
+      "reference": "await setPreference('all_beers_last_check', new Date().toISOString());"
+    },
+    {
+      "file": "src/services/enrichmentService.ts",
+      "line": 4,
+      "reference": "* Communicates with the Cloudflare Worker enrichment API to fetch and merge"
+    },
+    {
+      "file": "src/services/enrichmentService.ts",
+      "line": 282,
+      "reference": "const response = await fetch(url, {"
+    },
+    {
+      "file": "src/services/enrichmentService.ts",
+      "line": 291,
+      "reference": "const requestId = response.headers.get('X-Request-ID');"
+    },
+    {
+      "file": "src/services/enrichmentService.ts",
+      "line": 304,
+      "reference": "requestId: response.headers.get('X-Request-ID') ?? '',"
+    },
+    {
+      "file": "src/services/enrichmentService.ts",
+      "line": 305,
+      "reference": "etag: response.headers.get('ETag') ?? etag ?? null,"
+    },
+    {
+      "file": "src/services/enrichmentService.ts",
+      "line": 314,
+      "reference": "const retryAfter = response.headers.get('Retry-After') || '60';"
+    },
+    {
+      "file": "src/services/enrichmentService.ts",
+      "line": 348,
+      "reference": "const responseEtag = response.headers.get('ETag');"
+    },
+    {
+      "file": "src/services/enrichmentService.ts",
+      "line": 445,
+      "reference": "const response = await fetch(enrichment.getFullUrl('batch'), {"
+    },
+    {
+      "file": "src/services/enrichmentService.ts",
+      "line": 611,
+      "reference": "const response = await fetch(enrichment.getFullUrl('batch'), {"
+    },
+    {
+      "file": "src/services/enrichmentService.ts",
+      "line": 742,
+      "reference": "// Chunk beers into batches (sync endpoint has max 50 beers per request)"
+    },
+    {
+      "file": "src/services/enrichmentService.ts",
+      "line": 785,
+      "reference": "const response = await fetch(enrichment.getFullUrl('sync'), {"
+    },
+    {
+      "file": "src/services/enrichmentService.ts",
+      "line": 886,
+      "reference": "* After syncing beers to the Worker, this function polls the batch endpoint"
+    },
+    {
+      "file": "src/services/enrichmentService.ts",
+      "line": 981,
+      "reference": "* Internal batch fetch function that bypasses rate limit checks."
+    },
+    {
+      "file": "src/services/enrichmentService.ts",
+      "line": 1003,
+      "reference": "const response = await fetch(enrichment.getFullUrl('batch'), {"
+    },
+    {
+      "file": "src/services/enrichmentService.ts",
+      "line": 1106,
+      "reference": "const response = await fetch(enrichment.getFullUrl('health'), {"
+    },
+    {
+      "file": "src/services/enrichmentService.ts",
+      "line": 1156,
+      "reference": "const response = await fetch(enrichment.getFullUrl('health'), {"
+    },
+    {
+      "file": "src/services/liveActivityService.ts",
+      "line": 485,
+      "reference": "* @param getQueuedBeersFunc - Function to fetch queued beers (dependency injection for testability)"
+    },
+    {
+      "file": "src/services/taplistEtag.ts",
+      "line": 39,
+      "reference": "import { getPreference, setPreference } from '../database/preferences';"
+    },
+    {
+      "file": "src/services/taplistEtag.ts",
+      "line": 119,
+      "reference": "return normalizeStoredEtag(await getPreference(TAPLIST_ETAG_KEY));"
+    },
+    {
+      "file": "src/services/taplistEtag.ts",
+      "line": 131,
+      "reference": "await setPreference(TAPLIST_ETAG_KEY, nextTaplistEtag(source), TAPLIST_ETAG_DESCRIPTION);"
+    },
+    {
+      "file": "src/types/beer.ts",
+      "line": 37,
+      "reference": "* Beer with container type property (after database fetch)"
+    },
+    {
+      "file": "src/types/beer.ts",
+      "line": 65,
+      "reference": "* Beerfinder with container type (after database fetch)"
+    },
+    {
+      "file": "src/utils/htmlParser.ts",
+      "line": 5,
+      "reference": "* specifically for extracting queued beer information from the memberQueues.php endpoint."
+    },
+    {
+      "file": "src/utils/notificationUtils.ts",
+      "line": 56,
+      "reference": "export function showErrorAlert(title: string, message: string, onOk?: () => void): void {"
+    },
+    {
+      "file": "src/utils/notificationUtils.ts",
+      "line": 57,
+      "reference": "Alert.alert(title, message, [{ text: 'OK', onPress: onOk }]);"
+    },
+    {
+      "file": "src/utils/notificationUtils.ts",
+      "line": 66,
+      "reference": "export function showSuccessAlert(title: string, message: string, onOk?: () => void): void {"
+    },
+    {
+      "file": "src/utils/notificationUtils.ts",
+      "line": 67,
+      "reference": "Alert.alert(title, message, [{ text: 'OK', onPress: onOk }]);"
+    },
+    {
+      "file": "src/utils/notificationUtils.ts",
+      "line": 76,
+      "reference": "export function showInfoAlert(title: string, message: string, onOk?: () => void): void {"
+    },
+    {
+      "file": "src/utils/notificationUtils.ts",
+      "line": 77,
+      "reference": "Alert.alert(title, message, [{ text: 'OK', onPress: onOk }]);"
+    },
+    {
+      "file": "src/utils/notificationUtils.ts",
+      "line": 96,
+      "reference": "error.message.includes('Failed to fetch') ||"
+    },
+    {
+      "file": "src/utils/notificationUtils.ts",
+      "line": 174,
+      "reference": "// \"Failed to fetch\", which the substring rules below read as a network error,"
+    },
+    {
+      "file": "src/utils/notificationUtils.ts",
+      "line": 194,
+      "reference": "// one class whatever `fetch()` chose to reject with \u2014 including a non-`Error`,"
+    },
+    {
+      "file": "src/utils/notificationUtils.ts",
+      "line": 229,
+      "reference": "error.message.includes('Failed to fetch') ||"
+    }
+  ]
+}

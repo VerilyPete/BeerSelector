@@ -1,0 +1,18 @@
+# Launch on an isolated simulator with --preview-fixtures --preview-screen finder.
+# These fixtures never read personal data or make refresh network requests.
+appId: org.verily.FSbeerselector
+---
+- assertVisible: "5 to discover"
+- tapOn:
+    id: container-filter
+- tapOn:
+    id: search-input
+- inputText: no-such-beer
+- pressKey: Enter
+- assertVisible: "No beers match your filters"
+- assertVisible:
+    id: retry-beer-refresh
+- tapOn:
+    id: clear-beer-filters
+- assertVisible: "5 to discover"
+- assertNotVisible: "No beers match your filters"

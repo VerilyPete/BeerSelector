@@ -1,0 +1,46 @@
+{
+  "configurations": [
+    {
+      "id": "38EF6D36-92D4-4B6B-BC80-B7D630FF5F20",
+      "name": "Deterministic",
+      "options": {}
+    }
+  ],
+  "defaultOptions": {
+    "codeCoverage": true,
+    "testExecutionOrdering": "random",
+    "testTimeoutsEnabled": true,
+    "defaultTestExecutionTimeAllowance": 30,
+    "maximumTestExecutionTimeAllowance": 60,
+    "environmentVariableEntries": [
+      {
+        "key": "BEERSELECTOR_TEST_HOST",
+        "value": "1"
+      }
+    ],
+    "language": "en",
+    "region": "US"
+  },
+  "version": 1,
+  "testTargets": [
+    {
+      "target": {
+        "containerPath": "container:BeerSelectorNative.xcodeproj",
+        "identifier": "734396BF8715BF086C82F033",
+        "name": "BeerSelectorNativeTests"
+      },
+      "parallelizable": true,
+      "selectedTests": [
+        "PersistenceIntegrationTests",
+        "LegacyUpgradeTests",
+        "NetworkTests",
+        "AccountSafetyTests",
+        "CredentialFailureTests",
+        "LoginRollbackTests",
+        "LogoutRaceTests",
+        "PostLoginCleanupTests",
+        "DiagnosticJournalTests"
+      ]
+    }
+  ]
+}

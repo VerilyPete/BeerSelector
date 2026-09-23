@@ -18,7 +18,7 @@ jobs:
     name: Golden Taproom Contract
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout mobile app
+      - name: Checkout consumer contracts
         uses: actions/checkout@v4
         with:
           path: BeerSelector
@@ -41,7 +41,7 @@ jobs:
             BeerSelector/package-lock.json
             ufobeer/package-lock.json
 
-      - name: Install mobile app dependencies
+      - name: Install consumer contract dependencies
         run: npm ci --prefix BeerSelector
 
       - name: Install API dependencies

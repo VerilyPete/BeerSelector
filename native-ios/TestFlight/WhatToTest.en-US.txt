@@ -1,0 +1,12 @@
+Beerfinder refresh and filter recovery
+
+- Empty filtered lists now show clear refresh progress, including while Finder updates your beer queue.
+- Try Again retries the server refresh instead of only rereading saved data.
+- Clear Filters restores your unfiltered list when search or container filters match no beers.
+- Queue refresh failures are now visible in Finder. Empty lists support pull-to-refresh and a Refresh button.
+
+Please test Finder on a weak connection: filter to no results, refresh, then clear filters. Try again after connectivity returns and confirm saved beers remain available after a failed refresh. Also check the Beers and Tasted tabs, which share this list view.
+
+If the app freezes or closes, note the time and action, then reopen Settings → Support → Prepare Diagnostic Report → Share Diagnostic Report. Submit any TestFlight feedback prompt as well.
+
+These changes improve refresh feedback and recovery; the originally reported blank-screen incident has not yet been reproduced on a physical iPhone.

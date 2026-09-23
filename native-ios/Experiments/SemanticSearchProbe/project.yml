@@ -1,0 +1,38 @@
+name: SemanticSearchProbe
+options:
+  deploymentTarget:
+    iOS: '27.0'
+settings:
+  base:
+    SWIFT_VERSION: '5.0'
+    DEVELOPMENT_TEAM: N9F7839KSX
+    CODE_SIGN_STYLE: Automatic
+    GENERATE_INFOPLIST_FILE: YES
+    TARGETED_DEVICE_FAMILY: '1,2'
+targets:
+  SemanticSearchProbe:
+    type: application
+    platform: iOS
+    sources:
+      - App
+      - ../../Core/Models.swift
+      - ../../Core/SemanticTaplistIndex.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: org.verily.FSbeerselector.SemanticSearchProbe
+  SemanticSearchProbeTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - Tests
+      - path: ../../Tests/Fixtures/SemanticTaplistCorpus.json
+        buildPhase: resources
+    dependencies:
+      - target: SemanticSearchProbe
+schemes:
+  SemanticSearchProbe:
+    build:
+      targets:
+        SemanticSearchProbe: all
+    test:
+      targets: [SemanticSearchProbeTests]
