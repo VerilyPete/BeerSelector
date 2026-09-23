@@ -10,6 +10,12 @@ struct BeerListScreen: View {
     @State private var search = ""
     private var beers: [Beer] { switch kind { case .finder:model.untasted; case .tasted:model.tastedBeers; default:model.allBeers } }
     private var filtered: [Beer] { filter.apply(beers,tasted:kind == .tasted) }
+    private var refreshing: Bool { model.refreshing || (kind == .finder && model.loadingQueue) }
+    private var hasFilters: Bool { !filter.search.isEmpty || !search.isEmpty || filter.container != .all }
+    private var refreshError: String? { model.error ?? (kind == .finder ? model.queueError : nil) }
+    private func refreshList() async {
+        if kind == .finder { await model.refreshFinder() } else { await model.refresh() }
+    }
     var body: some View {
         let filtered = self.filtered
         return GeometryReader { geometry in
@@ -19,7 +25,7 @@ struct BeerListScreen: View {
             VStack(spacing:12) {
                 HStack {
                     DisplayTitle(title:kind.title); Spacer()
-                    if model.refreshing { ProgressView().tint(Robo.cyan) }
+                    if refreshing { ProgressView().tint(Robo.cyan).accessibilityLabel("Refreshing beers") }
                     Button { model.showSettings = true } label: { IconWell(symbol:"gearshape").frame(width:44,height:44) }.buttonStyle(.plain).accessibilityLabel("Open settings")
                 }
                 HStack {
@@ -35,15 +41,27 @@ struct BeerListScreen: View {
                         if kind == .finder { HStack(spacing:6) { queueControls } }
                     }
                 }.frame(maxWidth:.infinity,alignment:.leading)
+                if kind == .finder, let queueError = model.queueError {
+                    Text(queueError).font(Robo.mono()).foregroundStyle(Robo.red)
+                        .frame(maxWidth:.infinity,alignment:.leading).accessibilityIdentifier("finder-queue-error")
+                }
                 ScrollView {
                     LazyVStack(spacing:8) {
-                        if beers.isEmpty && model.refreshing { ForEach(0..<8) { _ in ChromePanel { RoundedRectangle(cornerRadius:4).fill(Robo.steel.opacity(0.12)).frame(height:64) }.accessibilityLabel("Loading beer") } }
+                        if filtered.isEmpty && refreshing {
+                            ProgressView("Refreshing beers…").tint(Robo.cyan).font(Robo.mono())
+                                .padding(.vertical,40).accessibilityIdentifier("beer-list-refreshing")
+                        }
                         else if filtered.isEmpty {
                             VStack(spacing:16) {
                                 Image(systemName:"mug").font(.system(size:40)).foregroundStyle(Robo.cyan)
-                                Text(search.isEmpty ? "No beers to display" : "No beers match your search").font(Robo.title(18))
-                                Text(model.error != nil ? "Saved data is still available. Try reading it again or pull to refresh." : "Try another filter or pull down to refresh.").font(Robo.mono()).multilineTextAlignment(.center)
-                                if model.error != nil { Button("Try Again") { model.localRetry() }.buttonStyle(RoboButtonStyle()) }
+                                Text(hasFilters ? "No beers match your filters" : "No beers to display").font(Robo.title(18))
+                                Text(refreshError != nil ? "Try refreshing again to update this list." : "Try another filter or refresh the list.").font(Robo.mono()).multilineTextAlignment(.center)
+                                if hasFilters {
+                                    Button("Clear Filters") { search = ""; filter.search = ""; filter.container = .all; expandedID = nil }
+                                        .buttonStyle(RoboButtonStyle()).accessibilityIdentifier("clear-beer-filters")
+                                }
+                                Button(refreshError != nil ? "Try Again" : "Refresh") { Task { await refreshList() } }
+                                    .buttonStyle(RoboButtonStyle()).accessibilityIdentifier("retry-beer-refresh")
                             }.padding(.vertical,40)
                         }
                         LazyVGrid(columns:columns,alignment:.leading,spacing:8) {
@@ -52,7 +70,7 @@ struct BeerListScreen: View {
                             }
                         }
                     }.padding(.bottom,20)
-                }.refreshable { if kind == .finder { await model.refreshFinder() } else { await model.refresh() } }
+                }.scrollBounceBehavior(.always).refreshable { await refreshList() }
             }.padding(.horizontal,18).padding(.top,8)
         }
             .task(id:search) { do { try await Task.sleep(for:.milliseconds(300)); filter.search = search; expandedID = nil } catch {} }
