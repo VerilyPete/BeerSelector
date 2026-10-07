@@ -1,12 +1,8 @@
-Beerfinder refresh and filter recovery
+Queue compatibility with TapThatApp's updated layout
 
-- Empty filtered lists now show clear refresh progress, including while Finder updates your beer queue.
-- Try Again retries the server refresh instead of only rereading saved data.
-- Clear Filters restores your unfiltered list when search or container filters match no beers.
-- Queue refresh failures are now visible in Finder. Empty lists support pull-to-refresh and a Refresh button.
+- Fixed View Queue failing to load after Flying Saucer redesigned its queue page.
+- Queue entries display their beer names and added dates with both the new and previous layouts.
 
-Please test Finder on a weak connection: filter to no results, refresh, then clear filters. Try again after connectivity returns and confirm saved beers remain available after a failed refresh. Also check the Beers and Tasted tabs, which share this list view.
+Please open View Queue and confirm your beers and dates appear, then refresh the queue. Also check Finder after refreshing. If your queue is empty, confirm the empty state appears normally.
 
 If the app freezes or closes, note the time and action, then reopen Settings → Support → Prepare Diagnostic Report → Share Diagnostic Report. Submit any TestFlight feedback prompt as well.
-
-These changes improve refresh feedback and recovery; the originally reported blank-screen incident has not yet been reproduced on a physical iPhone.

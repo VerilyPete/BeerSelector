@@ -198,8 +198,10 @@ final class BeerAPI {
             if try !matches(#"<input\b[^>]*(?:type|name)\s*=\s*["']?password\b"#,in:html).isEmpty {
                 throw BeerError.sessionExpired
             }
-            let headers = try matches(#"<h3\b[^>]*class\s*=\s*["'][^"']*\bbrewName\b[^"']*["'][^>]*>(.*?)</h3\s*>"#,in:html)
-            let openingHeaders = try matches(#"<h3\b[^>]*class\s*=\s*["'][^"']*\bbrewName\b[^"']*["'][^>]*>"#,in:html)
+            // TapThatApp's card redesign uses h2; older queue pages use h3.
+            // Require matching closing tags so malformed rows still fail validation.
+            let headers = try matches(#"<(h[23])\b[^>]*class\s*=\s*["'][^"']*\bbrewName\b[^"']*["'][^>]*>(.*?)</\1\s*>"#,in:html)
+            let openingHeaders = try matches(#"<h[23]\b[^>]*class\s*=\s*["'][^"']*\bbrewName\b[^"']*["'][^>]*>"#,in:html)
             guard headers.count == openingHeaders.count else { throw BeerError.invalidResponse("Incomplete queue heading") }
             let links = try matches(#"deleteQueuedBrew\.php\?cid=(\d+)"#,in:html)
             if headers.isEmpty {
@@ -217,7 +219,7 @@ final class BeerAPI {
                 let segment = (html as NSString).substring(with:NSRange(location:header.range.location,length:end-header.range.location))
                 let rowLinks = try matches(#"deleteQueuedBrew\.php\?cid=(\d+)"#,in:segment)
                 guard rowLinks.count == 1 else { throw BeerError.invalidResponse("Incomplete queue entry") }
-                var name = capture(header,1,in:html)
+                var name = capture(header,2,in:html)
                 let dates = try matches(#"<div\b[^>]*class\s*=\s*["'][^"']*\bbrew_added_date\b[^"']*["'][^>]*>(.*?)</div\s*>"#,in:name)
                 let date = dates.first.map { plain(capture($0,1,in:name)) } ?? "Date unavailable"
                 if let dateMatch = dates.first, let range = Range(dateMatch.range,in:name) { name.removeSubrange(range) }
