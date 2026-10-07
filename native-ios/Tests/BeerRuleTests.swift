@@ -103,6 +103,45 @@ final class BeerRuleTests: XCTestCase {
         XCTAssertThrowsError(try BeerAPI.parseQueue(Data(scriptOnly.utf8)))
     }
 
+    func testQueueCardRedesignPreservesNamesDatesAndDeleteIDs() throws {
+        // Markup from the live October 2026 queue redesign; member data replaced.
+        let html = #"""
+        <div class="accordion" id="beerListContainer">
+            <div class="card beer-card queue-card">
+                <div class="beer-card-header">
+                    <h2 class="brewName mb-0">A &amp; B (CAN)<div class="brew_added_date">Oct 05, 2026 @ 10:07:48pm</div></h2>
+                </div>
+                <div class="queue-actions">
+                    <a href="deleteQueuedBrew.php?cid=101"><button class="queue-delete-btn">× Delete</button></a>
+                </div>
+            </div>
+            <div class="card beer-card queue-card">
+                <div class="beer-card-header">
+                    <h2 class="brewName mb-0">Example Oktoberfest<div class="brew_added_date">Oct 05, 2026 @ 09:21:29pm</div></h2>
+                </div>
+                <div class="queue-actions">
+                    <a href="deleteQueuedBrew.php?cid=102"><button class="queue-delete-btn">× Delete</button></a>
+                </div>
+            </div>
+        </div>
+        """#
+        let expected = [
+            QueueEntry(id:"101",name:"A & B (CAN)",date:"Oct 05, 2026 @ 10:07:48pm"),
+            QueueEntry(id:"102",name:"Example Oktoberfest",date:"Oct 05, 2026 @ 09:21:29pm")
+        ]
+        XCTAssertEqual(try BeerAPI.parseQueue(Data(html.utf8)),expected)
+        let legacy = html.replacingOccurrences(of:"<h2",with:"<h3").replacingOccurrences(of:"</h2>",with:"</h3>")
+        XCTAssertEqual(try BeerAPI.parseQueue(Data(legacy.utf8)),expected)
+        for malformed in [
+            html.replacingOccurrences(of:"</h2>",with:"</h3>"),
+            html.replacingOccurrences(of:"<a href=\"deleteQueuedBrew.php?cid=102\">",with:"<a>"),
+            html.replacingOccurrences(of:"cid=102",with:"cid=101"),
+            html + #"<h2 class="brewName mb-0">Incomplete row"#
+        ] {
+            XCTAssertThrowsError(try BeerAPI.parseQueue(Data(malformed.utf8)))
+        }
+    }
+
     func testQueueHTMLAndFormEscaping() throws {
         let html = #"<h3 class="brewName">A &amp; B (Draft)<div class="brew_added_date">Sep 10, 2026</div></h3><a href="deleteQueuedBrew.php?cid=123">Delete</a>"#
         let queue = try BeerAPI.parseQueue(Data(html.utf8))
