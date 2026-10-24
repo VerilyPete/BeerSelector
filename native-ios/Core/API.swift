@@ -41,7 +41,7 @@ struct APIConfiguration {
     }
     func endpoint(_ path: String) -> URL { baseURL.appendingPathComponent(path) }
     func trustedLogin(_ url: URL) -> Bool { url.scheme == baseURL.scheme && url.host == baseURL.host && url.port == baseURL.port && url.user == nil && url.password == nil }
-    static func dataURL(_ url: URL) -> Bool { url.scheme == "https" && url.host == "fsbs.beerknurd.com" && ["/bk-store-json.php","/bk-member-json.php"].contains(url.path) && url.user == nil && url.password == nil }
+    static func dataURL(_ url: URL) -> Bool { url.scheme == "https" && url.host == "fsbs.beerknurd.com" && ["/bk-store-json.php","/bk-member-json.php","/bk-store-json-2026.php","/bk-member-json-2026.php"].contains(url.path) && url.user == nil && url.password == nil }
 }
 
 /// Reject cross-origin redirects before URLSession can forward authentication headers.
@@ -132,6 +132,10 @@ final class BeerAPI {
             throw BeerError.invalidResponse("Request exhausted")
         } catch { interval.finish(Diagnostics.isCancellation(error) ? .cancelled : .failure); throw error }
     }
+    /// Member JSON sections are located by key: the 2026 endpoint inserts `badges` ahead of tastings and rewards.
+    static func section(_ key: String, in array: [Any]) -> Any? {
+        array.lazy.compactMap { ($0 as? [String:Any])?[key] }.first
+    }
     static func scalarRow(_ row: [String:Any]) throws -> [String:String] {
         var result: [String:String] = [:]
         for (key,value) in row {
@@ -148,7 +152,7 @@ final class BeerAPI {
             var entries: [Any]?
             if proxy { entries = (object as? [String:Any])?["beers"] as? [Any] }
             else if let array = object as? [Any] {
-                if array.count > 1, let envelope = array[1] as? [String:Any] { entries = envelope[tasted ? "tasted_brew_current_round" : "brewInStock"] as? [Any] }
+                entries = section(tasted ? "tasted_brew_current_round" : "brewInStock",in:array) as? [Any]
                 if entries == nil && !tasted && (array.first as? [String:Any])?["id"] != nil { entries = array }
             } else if !tasted, let dict = object as? [String:Any] { entries = (dict["brewInStock"] ?? dict["beers"] ?? dict["beer_list"]) as? [Any] }
             guard let entries else { throw BeerError.invalidResponse("Missing beer array") }
@@ -164,7 +168,7 @@ final class BeerAPI {
     }
     static func parseRewards(_ data: Data) throws -> [Reward] {
         return try Diagnostics.shared.measure(.parsing) {
-            guard let array = try JSONSerialization.jsonObject(with:data) as? [Any], array.count > 2, let dict = array[2] as? [String:Any], let entries = dict["reward"] as? [Any] else { throw BeerError.invalidResponse("Missing reward array") }
+            guard let array = try JSONSerialization.jsonObject(with:data) as? [Any], let entries = section("reward",in:array) as? [Any] else { throw BeerError.invalidResponse("Missing reward array") }
             let rewards = try entries.compactMap { value -> Reward? in
                 guard let row = value as? [String:Any], let id = row["reward_id"] as? String, !id.isEmpty else { return nil }
                 let values = try scalarRow(row)

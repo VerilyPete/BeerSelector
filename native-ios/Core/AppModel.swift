@@ -282,8 +282,8 @@ final class AppModel: ObservableObject {
             guard let range = html.range(of:pattern,options:.regularExpression), let found = URL(string:String(html[range])), APIConfiguration.dataURL(found) else { throw BeerError.invalidResponse("Could not read the account data links") }
             return found.absoluteString
         }
-        return try (extract(#"https://[^"'\s]+bk-member-json\.php\?uid=\d+"#),
-                    extract(#"https://[^"'\s]+bk-store-json\.php\?sid=\d+"#))
+        return try (extract(#"https://[^"'\s]+bk-member-json(-2026)?\.php\?uid=\d+"#),
+                    extract(#"https://[^"'\s]+bk-store-json(-2026)?\.php\?sid=\d+"#))
     }
     private func performRefresh(token: UUID) async {
         guard token == epoch, !previewMode, let db, configured else { return }

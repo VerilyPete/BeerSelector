@@ -154,6 +154,16 @@ final class BeerRuleTests: XCTestCase {
         XCTAssertFalse(c.trustedLogin(URL(string:"https://tapthatapp.beerknurd.com.evil.test/member-dash.php")!))
         XCTAssertFalse(c.trustedLogin(URL(string:"http://tapthatapp.beerknurd.com/member-dash.php")!))
         XCTAssertFalse(APIConfiguration.dataURL(URL(string:"https://evil.test/bk-member-json.php?uid=1")!))
+        XCTAssertTrue(APIConfiguration.dataURL(URL(string:"https://fsbs.beerknurd.com/bk-member-json-2026.php?uid=1")!))
+        XCTAssertTrue(APIConfiguration.dataURL(URL(string:"https://fsbs.beerknurd.com/bk-store-json-2026.php?sid=1")!))
+        XCTAssertFalse(APIConfiguration.dataURL(URL(string:"https://evil.test/bk-member-json-2026.php?uid=1")!))
+        XCTAssertFalse(APIConfiguration.dataURL(URL(string:"https://fsbs.beerknurd.com/bk-member-json-2027.php?uid=1")!))
+    }
+    func testMemberPayloadWithBadgesStillYieldsTastingsAndRewards() throws {
+        let data = Data(#"[{"member":{}},{"badges":[{"name":"Badge"}]},{"tasted_brew_current_round":[{"id":"t","brew_name":"Tasted"}]},{"reward":[{"reward_id":"r","reward_type":"Plate Party","redeemed":"1"}]}]"#.utf8)
+        XCTAssertEqual(try BeerAPI.parseBeers(data,tasted:true).map(\.id),["t"])
+        XCTAssertEqual(try BeerAPI.parseRewards(data).map(\.id),["r"])
+        XCTAssertEqual(try BeerAPI.parseRewards(data).first?.redeemed,true)
     }
     func testDescriptionABVChoosesGlassWithoutBecomingAuthoritativeABV() throws {
         let beer = try Beer(row:["id":"1","brew_name":"Strong ale","brew_container":"Draft","brew_description":"<p>9.5% ABV</p>"])
