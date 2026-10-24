@@ -334,6 +334,32 @@ final class AccountSafetyTests: XCTestCase {
         }
     }
 
+    @MainActor func testLoginFollowsDashboardsThatPublish2026DataLinks() async throws {
+        try await withModel { model,db,fixture,_ in
+            var paths: [String] = []
+            fixture.handler = { request in
+                paths.append(request.url!.path)
+                switch request.url!.path {
+                case "/member-dash.php":
+                    return (200,Data(#"$user_json_url = "https://fsbs.beerknurd.com/bk-member-json-2026.php?uid=2"; $store_json_url = "https://fsbs.beerknurd.com/bk-store-json-2026.php?sid=2";"#.utf8))
+                case "/bk-store-json-2026.php": return (200,Data(#"[{"id":"new-store","brew_name":"New store beer"}]"#.utf8))
+                case "/bk-member-json-2026.php":
+                    return (200,Data(#"[{"member":{}},{"badges":[{"name":"Badge"}]},{"tasted_brew_current_round":[{"id":"new-tasting","brew_name":"New tasting"}]},{"reward":[{"reward_id":"r","reward_type":"Plate Party","redeemed":"0"}]}]"#.utf8))
+                default: return try self.response(request)
+                }
+            }
+            try await self.login(model)
+            await model.refresh()
+            XCTAssertEqual(try db.preference("my_beers_api_url"),"https://fsbs.beerknurd.com/bk-member-json-2026.php?uid=2")
+            XCTAssertEqual(try db.preference("all_beers_api_url"),"https://fsbs.beerknurd.com/bk-store-json-2026.php?sid=2")
+            XCTAssertEqual(model.allBeers.map(\.id),["new-store"])
+            XCTAssertEqual(model.tastedBeers.map(\.id),["new-tasting"])
+            XCTAssertEqual(model.rewards.map(\.id),["r"])
+            XCTAssertFalse(paths.contains("/bk-member-json.php"))
+            XCTAssertNil(model.error)
+        }
+    }
+
     @MainActor private func login(_ model: AppModel, member: String = "2") async throws {
         let url = model.api.configuration.endpoint("member-dash.php")
         let values = ["member_id":member,"store__id":member,"PHPSESSID":"new-session"]
