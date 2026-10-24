@@ -35,13 +35,13 @@ final class AccountSafetyTests: XCTestCase {
             fixture.handler = { request in
                 if request.url!.path == "/member-dash.php" {
                     dashboardReads += 1
-                    return (200,Data("https://fsbs.beerknurd.com/bk-member-json.php?uid=987 https://fsbs.beerknurd.com/bk-store-json.php?sid=1".utf8))
+                    return (200,Data("https://fsbs.beerknurd.com/bk-member-json-2026.php?uid=987 https://fsbs.beerknurd.com/bk-store-json-2026.php?sid=1".utf8))
                 }
                 return try self.response(request)
             }
             await model.refresh()
             XCTAssertEqual(dashboardReads,1)
-            XCTAssertEqual(try db.preference("my_beers_api_url"),"https://fsbs.beerknurd.com/bk-member-json.php?uid=987","Use the server's data link, not a guessed member ID")
+            XCTAssertEqual(try db.preference("my_beers_api_url"),"https://fsbs.beerknurd.com/bk-member-json-2026.php?uid=987","Use the server's data link, not a guessed member ID")
             XCTAssertEqual(model.allBeers.map(\.id),["new-store"])
             XCTAssertEqual(model.tastedBeers.map(\.id),["new-tasting"])
             XCTAssertEqual(try credentials.load().0?.identity,model.session?.identity)
@@ -104,7 +104,7 @@ final class AccountSafetyTests: XCTestCase {
             model.session = MemberSession(memberId:"visitor",storeId:"1",storeName:"Fixture",sessionId:"visitor_session")
             try db.setPreference("all_beers_api_url",nil)
             fixture.handler = { request in
-                XCTAssertEqual(request.url!.path,"/bk-store-json.php")
+                XCTAssertEqual(request.url!.path,"/bk-store-json-2026.php")
                 return try self.response(request)
             }
             await model.refresh()
@@ -334,6 +334,72 @@ final class AccountSafetyTests: XCTestCase {
         }
     }
 
+    @MainActor func testRestoredMemberMovesLegacyDataLinksTo2026Endpoints() async throws {
+        try await withModel { model,db,fixture,_ in
+            var paths: [String] = []
+            fixture.handler = { request in
+                paths.append(request.url!.path)
+                switch request.url!.path {
+                case "/member-dash.php":
+                    return (200,Data("https://fsbs.beerknurd.com/bk-member-json-2026.php?uid=1 https://fsbs.beerknurd.com/bk-store-json-2026.php?sid=1".utf8))
+                case "/bk-member-json-2026.php":
+                    return (200,Data(#"[{"member":{}},{"badges":[]},{"tasted_brew_current_round":[{"id":"new-tasting","brew_name":"New tasting"}]},{"reward":[]}]"#.utf8))
+                default: return try self.response(request)
+                }
+            }
+            await model.refresh()
+            XCTAssertEqual(try db.preference("all_beers_api_url"),"https://fsbs.beerknurd.com/bk-store-json-2026.php?sid=1")
+            XCTAssertEqual(try db.preference("my_beers_api_url"),"https://fsbs.beerknurd.com/bk-member-json-2026.php?uid=1")
+            XCTAssertEqual(model.allBeers.map(\.id),["new-store"])
+            XCTAssertEqual(model.tastedBeers.map(\.id),["new-tasting"])
+            XCTAssertFalse(paths.contains("/bk-store-json.php"))
+            XCTAssertFalse(paths.contains("/bk-member-json.php"))
+            XCTAssertNil(model.error)
+            await model.refresh()
+            XCTAssertEqual(paths.filter { $0 == "/member-dash.php" }.count,1,"Migrated links do not require another dashboard fetch")
+        }
+    }
+
+    @MainActor func testRestoredMemberKeepsLegacyDataLinksWhenDashboardIsUnavailable() async throws {
+        try await withModel { model,db,fixture,_ in
+            fixture.handler = { request in
+                if request.url!.path == "/member-dash.php" { throw URLError(.notConnectedToInternet) }
+                return try self.response(request)
+            }
+            await model.refresh()
+            XCTAssertEqual(try db.preference("all_beers_api_url"),"https://fsbs.beerknurd.com/bk-store-json.php?sid=1")
+            XCTAssertEqual(try db.preference("my_beers_api_url"),"https://fsbs.beerknurd.com/bk-member-json.php?uid=1")
+            XCTAssertEqual(model.allBeers.map(\.id),["new-store"])
+            XCTAssertEqual(model.tastedBeers.map(\.id),["new-tasting"])
+            XCTAssertNil(model.error)
+        }
+    }
+
+    @MainActor func testRestoredVisitorMovesLegacyTaplistLinkTo2026Endpoint() async throws {
+        try await withModel { model,db,fixture,_ in
+            model.session = MemberSession(memberId:"visitor",storeId:"1",storeName:"Fixture",sessionId:"visitor_session")
+            try db.setPreference("my_beers_api_url","none://visitor_mode")
+            fixture.handler = { request in
+                XCTAssertEqual(request.url!.path,"/bk-store-json-2026.php")
+                return try self.response(request)
+            }
+            await model.refresh()
+            XCTAssertEqual(try db.preference("all_beers_api_url"),"https://fsbs.beerknurd.com/bk-store-json-2026.php?sid=1")
+            XCTAssertEqual(model.allBeers.map(\.id),["new-store"])
+            XCTAssertNil(model.error)
+        }
+    }
+
+    @MainActor func testVisitorLoginUses2026TaplistLink() async throws {
+        try await withModel { model,db,fixture,_ in
+            fixture.handler = { request in try self.response(request) }
+            let url = model.api.configuration.endpoint("visitor.php")
+            let cookie = HTTPCookie(properties:[.domain:url.host!, .path:"/", .name:"store__id", .value:"3"])!
+            try await model.completeLogin(url:url,nativeCookies:[cookie])
+            XCTAssertEqual(try db.preference("all_beers_api_url"),"https://fsbs.beerknurd.com/bk-store-json-2026.php?sid=3")
+        }
+    }
+
     @MainActor func testLoginFollowsDashboardsThatPublish2026DataLinks() async throws {
         try await withModel { model,db,fixture,_ in
             var paths: [String] = []
@@ -373,8 +439,8 @@ final class AccountSafetyTests: XCTestCase {
         switch request.url!.path {
         case "/member-dash.php":
             return (200,Data("https://fsbs.beerknurd.com/bk-member-json.php?uid=2 https://fsbs.beerknurd.com/bk-store-json.php?sid=2".utf8))
-        case "/bk-store-json.php": return (200,Data(#"[{"id":"new-store","brew_name":"New store beer"}]"#.utf8))
-        case "/bk-member-json.php": return (200,Data(#"[{},{"tasted_brew_current_round":[{"id":"new-tasting","brew_name":"New tasting"}]},{"reward":[]}]"#.utf8))
+        case "/bk-store-json.php", "/bk-store-json-2026.php": return (200,Data(#"[{"id":"new-store","brew_name":"New store beer"}]"#.utf8))
+        case "/bk-member-json.php", "/bk-member-json-2026.php": return (200,Data(#"[{},{"tasted_brew_current_round":[{"id":"new-tasting","brew_name":"New tasting"}]},{"reward":[]}]"#.utf8))
         case "/memberQueues.php": return (200,Data("<p>No beers currently in your queue.</p>".utf8))
         case "/logout.php": return (200,Data())
         default: throw URLError(.unsupportedURL)

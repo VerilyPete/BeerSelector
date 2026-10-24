@@ -574,8 +574,8 @@ final class NetworkTests: XCTestCase {
         let model = AppModel(api:api(configuration:configuration),monitorConnectivity:false)
         let db = try BeerDatabase(url:folder.appendingPathComponent("beers.db")); model.db = db
         model.session = MemberSession(memberId:"fixture",storeId:"1",storeName:"Fixture",sessionId:"fixture")
-        try db.setPreference("all_beers_api_url","https://fsbs.beerknurd.com/bk-store-json.php?sid=1")
-        try db.setPreference("my_beers_api_url","https://fsbs.beerknurd.com/bk-member-json.php?uid=1")
+        try db.setPreference("all_beers_api_url","https://fsbs.beerknurd.com/bk-store-json-2026.php?sid=1")
+        try db.setPreference("my_beers_api_url","https://fsbs.beerknurd.com/bk-member-json-2026.php?uid=1")
         try db.replaceBeers([try Beer(row:["id":"saved","brew_name":"Saved beer"])])
         try db.setPreference("last_all_beers_refresh","123")
         try model.reload()
