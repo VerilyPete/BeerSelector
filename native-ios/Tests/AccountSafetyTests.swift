@@ -362,11 +362,14 @@ final class AccountSafetyTests: XCTestCase {
 
     @MainActor func testRestoredMemberKeepsLegacyDataLinksWhenDashboardIsUnavailable() async throws {
         try await withModel { model,db,fixture,_ in
+            var dashboardReads = 0
             fixture.handler = { request in
-                if request.url!.path == "/member-dash.php" { throw URLError(.notConnectedToInternet) }
+                if request.url!.path == "/member-dash.php" { dashboardReads += 1; throw URLError(.notConnectedToInternet) }
                 return try self.response(request)
             }
             await model.refresh()
+            await model.refresh()
+            XCTAssertEqual(dashboardReads,1,"A failed upgrade is attempted once per launch, without retries")
             XCTAssertEqual(try db.preference("all_beers_api_url"),"https://fsbs.beerknurd.com/bk-store-json.php?sid=1")
             XCTAssertEqual(try db.preference("my_beers_api_url"),"https://fsbs.beerknurd.com/bk-member-json.php?uid=1")
             XCTAssertEqual(model.allBeers.map(\.id),["new-store"])

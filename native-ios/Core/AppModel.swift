@@ -98,6 +98,7 @@ final class AppModel: ObservableObject {
     let liveActivity = LiveActivityController()
     private var cookies: [String:String] = [:]
     private var accountCleanupTask: Task<[String], Never>?
+    private var legacyLinkUpgradeAttempted: String?
     var activityCleanup: (@MainActor () async -> Void)?
     var activityUpdate: (@MainActor (MemberSession, [QueueEntry]) async -> Void)?
     var webCookieCleanup: (@MainActor () async -> Void)?
@@ -254,14 +255,16 @@ final class AppModel: ObservableObject {
     }
     /// Recover missing database configuration without making a restored member sign in again.
     /// Links saved before TapThatApp's 2026 endpoints are upgraded too, but only best-effort:
-    /// the legacy endpoints still serve data, so a failed upgrade keeps them rather than failing refresh.
+    /// the legacy endpoints still serve data, so a failed upgrade keeps them rather than failing refresh,
+    /// and is attempted once per launch so an unavailable dashboard cannot delay every refresh.
     private func restoreDataLinks(token: UUID) async throws {
         guard let db, let member = session, member.valid else { return }
         let oldStore = try db.preference("all_beers_api_url")
         let oldMember = try db.preference("my_beers_api_url")
         let missing = (oldStore ?? "").isEmpty || (!member.isVisitor && (oldMember ?? "").isEmpty)
-        let legacy = Self.legacyDataLink(oldStore) || (!member.isVisitor && Self.legacyDataLink(oldMember))
+        let legacy = legacyLinkUpgradeAttempted != member.identity && (Self.legacyDataLink(oldStore) || (!member.isVisitor && Self.legacyDataLink(oldMember)))
         guard missing || legacy else { return }
+        if legacy { legacyLinkUpgradeAttempted = member.identity }
         let links: (member: String, store: String)
         if member.isVisitor {
             guard member.storeId.allSatisfy({ $0.isASCII && $0.isNumber }) else { throw BeerError.invalidResponse("Invalid saved location") }
