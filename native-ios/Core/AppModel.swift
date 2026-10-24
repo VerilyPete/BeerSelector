@@ -98,6 +98,7 @@ final class AppModel: ObservableObject {
     let liveActivity = LiveActivityController()
     private var cookies: [String:String] = [:]
     private var accountCleanupTask: Task<[String], Never>?
+    private var legacyLinkUpgradeAttempted: String?
     var activityCleanup: (@MainActor () async -> Void)?
     var activityUpdate: (@MainActor (MemberSession, [QueueEntry]) async -> Void)?
     var webCookieCleanup: (@MainActor () async -> Void)?
@@ -253,21 +254,29 @@ final class AppModel: ObservableObject {
         await task.value
     }
     /// Recover missing database configuration without making a restored member sign in again.
+    /// Links saved before TapThatApp's 2026 endpoints are upgraded too, but only best-effort:
+    /// the legacy endpoints still serve data, so a failed upgrade keeps them rather than failing refresh,
+    /// and is attempted once per launch so an unavailable dashboard cannot delay every refresh.
     private func restoreDataLinks(token: UUID) async throws {
         guard let db, let member = session, member.valid else { return }
         let oldStore = try db.preference("all_beers_api_url")
         let oldMember = try db.preference("my_beers_api_url")
-        guard (oldStore ?? "").isEmpty || (!member.isVisitor && (oldMember ?? "").isEmpty) else { return }
+        let missing = (oldStore ?? "").isEmpty || (!member.isVisitor && (oldMember ?? "").isEmpty)
+        let legacy = legacyLinkUpgradeAttempted != member.identity && (Self.legacyDataLink(oldStore) || (!member.isVisitor && Self.legacyDataLink(oldMember)))
+        guard missing || legacy else { return }
+        if legacy { legacyLinkUpgradeAttempted = member.identity }
         let links: (member: String, store: String)
         if member.isVisitor {
             guard member.storeId.allSatisfy({ $0.isASCII && $0.isNumber }) else { throw BeerError.invalidResponse("Invalid saved location") }
-            links = ("none://visitor_mode", "https://fsbs.beerknurd.com/bk-store-json.php?sid=\(member.storeId)")
+            links = ("none://visitor_mode", Self.visitorStoreURL(member.storeId))
         } else {
-            let (data,_) = try await api.request(api.configuration.endpoint("member-dash.php"),member:member,cookies:cookies)
-            links = try Self.dataLinks(in:data)
-            guard URLComponents(string:links.store)?.queryItems?.first(where:{ $0.name == "sid" })?.value == member.storeId else {
-                throw BeerError.invalidResponse("The restored account returned a different location. Please sign in again.")
-            }
+            do {
+                let (data,_) = try await api.request(api.configuration.endpoint("member-dash.php"),member:member,cookies:cookies,retry:missing)
+                links = try Self.dataLinks(in:data)
+                guard URLComponents(string:links.store)?.queryItems?.first(where:{ $0.name == "sid" })?.value == member.storeId else {
+                    throw BeerError.invalidResponse("The restored account returned a different location. Please sign in again.")
+                }
+            } catch where !missing && !Self.isRefreshCancellation(error) { return }
         }
         try Task.checkCancellation()
         guard token == epoch, session?.identity == member.identity else { throw BeerError.changedAccount }
@@ -276,6 +285,11 @@ final class AppModel: ObservableObject {
             try db.setPreference("my_beers_api_url",links.member)
         }
     }
+    private static func legacyDataLink(_ raw: String?) -> Bool {
+        guard let raw, let url = URL(string:raw) else { return false }
+        return APIConfiguration.dataURL(url) && ["/bk-store-json.php","/bk-member-json.php"].contains(url.path)
+    }
+    private static func visitorStoreURL(_ sid: String) -> String { "https://fsbs.beerknurd.com/bk-store-json-2026.php?sid=\(sid)" }
     private static func dataLinks(in data: Data) throws -> (member: String, store: String) {
         let html = String(decoding:data,as:UTF8.self)
         func extract(_ pattern: String) throws -> String {
@@ -472,7 +486,7 @@ final class AppModel: ObservableObject {
             let next = MemberSession(memberId:visitor ? "visitor" : values["member_id"] ?? "",storeId:sid,storeName:values["store_name"] ?? "Flying Saucer",sessionId:values["PHPSESSID"] ?? (visitor ? "visitor_session" : ""),username:values["username"],firstName:values["first_name"],lastName:values["last_name"],email:values["email"],cardNum:values["cardNum"])
             guard next.valid else { throw BeerError.invalidResponse("Incomplete account details") }
             var memberURL = "none://visitor_mode"
-            var storeURL = "https://fsbs.beerknurd.com/bk-store-json.php?sid=\(sid)"
+            var storeURL = Self.visitorStoreURL(sid)
             if !visitor {
                 let (data,_) = try await api.request(url,member:next,cookies:values)
                 let links = try Self.dataLinks(in:data)

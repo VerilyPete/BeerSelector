@@ -31,9 +31,9 @@ final class LogoutRaceTests: XCTestCase {
                 throw URLError(.networkConnectionLost)
             case "/member-dash.php":
                 dashboard.fulfill()
-                return (200,Data("https://fsbs.beerknurd.com/bk-member-json.php?uid=2 https://fsbs.beerknurd.com/bk-store-json.php?sid=2".utf8))
-            case "/bk-store-json.php": return (200,Data(#"[{"id":"new","brew_name":"New"}]"#.utf8))
-            case "/bk-member-json.php": return (200,Data(#"[{},{"tasted_brew_current_round":[]},{"reward":[]}]"#.utf8))
+                return (200,Data("https://fsbs.beerknurd.com/bk-member-json-2026.php?uid=2 https://fsbs.beerknurd.com/bk-store-json-2026.php?sid=2".utf8))
+            case "/bk-store-json-2026.php": return (200,Data(#"[{"id":"new","brew_name":"New"}]"#.utf8))
+            case "/bk-member-json-2026.php": return (200,Data(#"[{},{"tasted_brew_current_round":[]},{"reward":[]}]"#.utf8))
             case "/memberQueues.php": return (200,Data("<p>No beers currently in your queue.</p>".utf8))
             default: throw URLError(.unsupportedURL)
             }
@@ -85,8 +85,8 @@ final class LogoutRaceTests: XCTestCase {
         try await login.value
         XCTAssertEqual(model.session?.memberId,"2")
         XCTAssertEqual(try credentials.load().0?.memberId,"2")
-        XCTAssertEqual(try db.preference("all_beers_api_url"),"https://fsbs.beerknurd.com/bk-store-json.php?sid=2")
-        XCTAssertEqual(try db.preference("my_beers_api_url"),"https://fsbs.beerknurd.com/bk-member-json.php?uid=2")
+        XCTAssertEqual(try db.preference("all_beers_api_url"),"https://fsbs.beerknurd.com/bk-store-json-2026.php?sid=2")
+        XCTAssertEqual(try db.preference("my_beers_api_url"),"https://fsbs.beerknurd.com/bk-member-json-2026.php?uid=2")
         XCTAssertTrue(model.configured)
         XCTAssertFalse(model.showSettings)
         XCTAssertNil(model.error,"Old server logout failure must not appear in the new session")
