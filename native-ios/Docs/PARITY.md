@@ -52,7 +52,7 @@ All live URLs below come from the reference; no production writes were used to d
 | Login UI | GET https://tapthatapp.beerknurd.com/kiosk.php; success member-dash.php or visitor.php | Browsers.swift |
 | Store taplist | GET https://fsbs.beerknurd.com/bk-store-json.php?sid={id}; stored all_beers_api_url; standard `[{}, {brewInStock: [...]}]`; direct arrays and named alternative envelopes supported in reference | API.parseBeers, AppModel.refresh |
 | Member + rewards | GET stored my_beers_api_url, extracted bk-member-json.php?uid={id}; one body supplies `[1].tasted_brew_current_round` and `[2].reward` | AppModel.refresh; API parsers |
-| Auto-login | POST /auto-login.php, form body, saved cookies; `{session: ...}` | AppModel.autoLogin; invoked at startup, live verification pending |
+| Auto-login | POST /auto-login.php, form body, saved cookies; `{session: ...}` | Removed: Flying Saucer retired the endpoint (404) in October 2026; saved member cookies keep queue and data requests working without renewal |
 | Password login helper | POST /login.php username/password; exported reference service helper, current screen uses hosted kiosk | Map only: not a separate native UI |
 | Logout | POST /logout.php; best effort remote, mandatory independent local Keychain + native/WebKit cookie cleanup | AppModel.logout |
 | Beer check-in | POST /addToQueue.php, application/x-www-form-urlencoded; chitCode=`beerId-storeId-memberId`, chitBrewId, chitBrewName, chitStoreName; empty successful body accepted | AppModel.processOperations |

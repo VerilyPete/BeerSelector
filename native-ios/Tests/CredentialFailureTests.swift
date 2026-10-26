@@ -25,7 +25,7 @@ final class CredentialFailureTests: XCTestCase {
         }
     }
 
-    @MainActor private func exercise(_ stage: Stage, existing: Bool = true, autoLogin: Bool = false) async throws {
+    @MainActor private func exercise(_ stage: Stage, existing: Bool = true) async throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         let prefix = "credential_failure_" + UUID().uuidString
         let clean = CredentialStore(prefix:prefix,sessionStorageKey:prefix + "_legacy_session")
@@ -55,10 +55,6 @@ final class CredentialFailureTests: XCTestCase {
         var paths: [String] = []
         fixture.handler = { request in
             paths.append(request.url!.path)
-            if request.url!.path == "/auto-login.php" {
-                var renewed = old; renewed.sessionId = "renewed-session"
-                return (200,Data("{\"session\":".utf8) + (try JSONEncoder().encode(renewed)) + Data("}".utf8))
-            }
             guard request.url!.path == "/member-dash.php" else { throw URLError(.unsupportedURL) }
             return (200,Data("https://fsbs.beerknurd.com/bk-member-json.php?uid=2 https://fsbs.beerknurd.com/bk-store-json.php?sid=2".utf8))
         }
@@ -69,8 +65,7 @@ final class CredentialFailureTests: XCTestCase {
         }
         failure.enabled = true
         do {
-            if autoLogin { try await model.autoLogin() }
-            else { try await model.completeLogin(url:url,nativeCookies:cookies) }
+            try await model.completeLogin(url:url,nativeCookies:cookies)
             XCTFail("Expected injected Keychain failure")
         } catch {
             guard case BeerError.storage = error else { return XCTFail("Unexpected error: \(error)") }
@@ -91,7 +86,7 @@ final class CredentialFailureTests: XCTestCase {
         XCTAssertEqual(model.allBeers.map(\.id),["saved"])
         XCTAssertEqual(model.tastedBeers.map(\.id),existing ? ["tasted"] : [])
         XCTAssertTrue(model.showLogin)
-        XCTAssertEqual(paths,[autoLogin ? "/auto-login.php" : "/member-dash.php"],"No follow-up requests after a failed credential save")
+        XCTAssertEqual(paths,["/member-dash.php"],"No follow-up requests after a failed credential save")
         // Recovery must work without resetting storage, including partial orphan generations.
         failure.enabled = false
         try injected.save(session:old,cookies:oldCookies)
@@ -106,5 +101,4 @@ final class CredentialFailureTests: XCTestCase {
     @MainActor func testFirstLoginWriteFailuresLeaveNoCommittedCredentials() async throws {
         for stage in Stage.allCases { try await exercise(stage,existing:false) }
     }
-    @MainActor func testAutoLoginWriteFailurePreservesPreviousSession() async throws { try await exercise(.marker,autoLogin:true) }
 }
