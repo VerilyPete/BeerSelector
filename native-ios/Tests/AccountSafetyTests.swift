@@ -104,7 +104,7 @@ final class AccountSafetyTests: XCTestCase {
             model.session = MemberSession(memberId:"visitor",storeId:"1",storeName:"Fixture",sessionId:"visitor_session")
             try db.setPreference("all_beers_api_url",nil)
             fixture.handler = { request in
-                XCTAssertEqual(request.url!.path,"/bk-store-json-2026.php")
+                XCTAssertTrue(["/visitor.php","/bk-store-json-2026.php"].contains(request.url!.path))
                 return try self.response(request)
             }
             await model.refresh()
@@ -383,7 +383,7 @@ final class AccountSafetyTests: XCTestCase {
             model.session = MemberSession(memberId:"visitor",storeId:"1",storeName:"Fixture",sessionId:"visitor_session")
             try db.setPreference("my_beers_api_url","none://visitor_mode")
             fixture.handler = { request in
-                XCTAssertEqual(request.url!.path,"/bk-store-json-2026.php")
+                XCTAssertTrue(["/visitor.php","/bk-store-json-2026.php"].contains(request.url!.path))
                 return try self.response(request)
             }
             await model.refresh()
@@ -393,7 +393,7 @@ final class AccountSafetyTests: XCTestCase {
         }
     }
 
-    @MainActor func testVisitorLoginUses2026TaplistLink() async throws {
+    @MainActor func testVisitorLoginFallsBackTo2026TaplistLinkWhenVisitorPageIsUnreadable() async throws {
         try await withModel { model,db,fixture,_ in
             fixture.handler = { request in try self.response(request) }
             let url = model.api.configuration.endpoint("visitor.php")
@@ -425,6 +425,109 @@ final class AccountSafetyTests: XCTestCase {
             XCTAssertEqual(model.tastedBeers.map(\.id),["new-tasting"])
             XCTAssertEqual(model.rewards.map(\.id),["r"])
             XCTAssertFalse(paths.contains("/bk-member-json.php"))
+            XCTAssertNil(model.error)
+        }
+    }
+
+    @MainActor func testLoginFollowsDashboardsThatPublishFutureYearDataLinks() async throws {
+        try await withModel { model,db,fixture,_ in
+            fixture.handler = { request in
+                switch request.url!.path {
+                case "/member-dash.php":
+                    return (200,Data(#"$user_json_url = "https://fsbs.beerknurd.com/bk-member-json-2031.php?uid=2"; $store_json_url = "https://fsbs.beerknurd.com/bk-store-json-2031.php?sid=2";"#.utf8))
+                case "/bk-store-json-2031.php": return (200,Data(#"[{"id":"future-store","brew_name":"Future store beer"}]"#.utf8))
+                case "/bk-member-json-2031.php": return (200,Data(#"[{"member":{}},{"tasted_brew_current_round":[{"id":"future-tasting","brew_name":"Future tasting"}]},{"reward":[]}]"#.utf8))
+                default: return try self.response(request)
+                }
+            }
+            try await self.login(model)
+            await model.refresh()
+            XCTAssertEqual(try db.preference("my_beers_api_url"),"https://fsbs.beerknurd.com/bk-member-json-2031.php?uid=2")
+            XCTAssertEqual(try db.preference("all_beers_api_url"),"https://fsbs.beerknurd.com/bk-store-json-2031.php?sid=2")
+            XCTAssertEqual(model.allBeers.map(\.id),["future-store"])
+            XCTAssertEqual(model.tastedBeers.map(\.id),["future-tasting"])
+            XCTAssertNil(model.error)
+        }
+    }
+
+    @MainActor func testRestoredMemberRediscoversDataLinksWhenSavedOnesAreRetired() async throws {
+        try await withModel { model,db,fixture,_ in
+            try db.setPreference("all_beers_api_url","https://fsbs.beerknurd.com/bk-store-json-2026.php?sid=1")
+            try db.setPreference("my_beers_api_url","https://fsbs.beerknurd.com/bk-member-json-2026.php?uid=1")
+            var dashboardReads = 0
+            fixture.handler = { request in
+                switch request.url!.path {
+                case "/member-dash.php":
+                    dashboardReads += 1
+                    return (200,Data("https://fsbs.beerknurd.com/bk-member-json-2027.php?uid=1 https://fsbs.beerknurd.com/bk-store-json-2027.php?sid=1".utf8))
+                case "/bk-store-json-2026.php", "/bk-member-json-2026.php": return (404,Data())
+                case "/bk-store-json-2027.php": return (200,Data(#"[{"id":"future-store","brew_name":"Future store beer"}]"#.utf8))
+                case "/bk-member-json-2027.php": return (200,Data(#"[{"member":{}},{"tasted_brew_current_round":[{"id":"future-tasting","brew_name":"Future tasting"}]},{"reward":[]}]"#.utf8))
+                default: return try self.response(request)
+                }
+            }
+            await model.refresh()
+            XCTAssertEqual(try db.preference("all_beers_api_url"),"https://fsbs.beerknurd.com/bk-store-json-2027.php?sid=1")
+            XCTAssertEqual(try db.preference("my_beers_api_url"),"https://fsbs.beerknurd.com/bk-member-json-2027.php?uid=1")
+            XCTAssertEqual(model.allBeers.map(\.id),["future-store"])
+            XCTAssertEqual(model.tastedBeers.map(\.id),["future-tasting"])
+            XCTAssertNil(model.error)
+            await model.refresh()
+            XCTAssertEqual(dashboardReads,1,"Working links do not require another dashboard fetch")
+        }
+    }
+
+    @MainActor func testRetiredDataLinksReadTheDashboardOncePerRefresh() async throws {
+        try await withModel { model,db,fixture,_ in
+            try db.setPreference("all_beers_api_url","https://fsbs.beerknurd.com/bk-store-json-2026.php?sid=1")
+            try db.setPreference("my_beers_api_url","https://fsbs.beerknurd.com/bk-member-json-2026.php?uid=1")
+            var dashboardReads = 0
+            fixture.handler = { request in
+                switch request.url!.path {
+                case "/member-dash.php":
+                    dashboardReads += 1
+                    return (200,Data("https://fsbs.beerknurd.com/bk-member-json-2026.php?uid=1 https://fsbs.beerknurd.com/bk-store-json-2026.php?sid=1".utf8))
+                case "/bk-store-json-2026.php", "/bk-member-json-2026.php": return (404,Data())
+                default: return try self.response(request)
+                }
+            }
+            await model.refresh()
+            XCTAssertEqual(dashboardReads,1,"A dashboard that still lists retired links must not cause a request loop")
+            XCTAssertNotNil(model.error)
+        }
+    }
+
+    @MainActor func testVisitorLoginUsesTaplistLinkFromVisitorPage() async throws {
+        try await withModel { model,db,fixture,_ in
+            fixture.handler = { request in
+                if request.url!.path == "/visitor.php" {
+                    return (200,Data(#"$store_json_url = "https://fsbs.beerknurd.com/bk-store-json-2027.php?sid=";"#.utf8))
+                }
+                return try self.response(request)
+            }
+            let url = model.api.configuration.endpoint("visitor.php")
+            let cookie = HTTPCookie(properties:[.domain:url.host!, .path:"/", .name:"store__id", .value:"3"])!
+            try await model.completeLogin(url:url,nativeCookies:[cookie])
+            XCTAssertEqual(try db.preference("all_beers_api_url"),"https://fsbs.beerknurd.com/bk-store-json-2027.php?sid=3")
+        }
+    }
+
+    @MainActor func testRestoredVisitorRediscoversRetiredTaplistLink() async throws {
+        try await withModel { model,db,fixture,_ in
+            model.session = MemberSession(memberId:"visitor",storeId:"1",storeName:"Fixture",sessionId:"visitor_session")
+            try db.setPreference("my_beers_api_url","none://visitor_mode")
+            try db.setPreference("all_beers_api_url","https://fsbs.beerknurd.com/bk-store-json-2026.php?sid=1")
+            fixture.handler = { request in
+                switch request.url!.path {
+                case "/visitor.php": return (200,Data(#"$store_json_url = "https://fsbs.beerknurd.com/bk-store-json-2027.php?sid=";"#.utf8))
+                case "/bk-store-json-2026.php": return (404,Data())
+                case "/bk-store-json-2027.php": return (200,Data(#"[{"id":"future-store","brew_name":"Future store beer"}]"#.utf8))
+                default: throw URLError(.unsupportedURL)
+                }
+            }
+            await model.refresh()
+            XCTAssertEqual(try db.preference("all_beers_api_url"),"https://fsbs.beerknurd.com/bk-store-json-2027.php?sid=1")
+            XCTAssertEqual(model.allBeers.map(\.id),["future-store"])
             XCTAssertNil(model.error)
         }
     }

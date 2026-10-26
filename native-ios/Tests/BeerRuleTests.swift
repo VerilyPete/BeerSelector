@@ -157,7 +157,12 @@ final class BeerRuleTests: XCTestCase {
         XCTAssertTrue(APIConfiguration.dataURL(URL(string:"https://fsbs.beerknurd.com/bk-member-json-2026.php?uid=1")!))
         XCTAssertTrue(APIConfiguration.dataURL(URL(string:"https://fsbs.beerknurd.com/bk-store-json-2026.php?sid=1")!))
         XCTAssertFalse(APIConfiguration.dataURL(URL(string:"https://evil.test/bk-member-json-2026.php?uid=1")!))
-        XCTAssertFalse(APIConfiguration.dataURL(URL(string:"https://fsbs.beerknurd.com/bk-member-json-2027.php?uid=1")!))
+        XCTAssertTrue(APIConfiguration.dataURL(URL(string:"https://fsbs.beerknurd.com/bk-member-json-2027.php?uid=1")!),"A future year's endpoint must not need an app update")
+        XCTAssertTrue(APIConfiguration.dataURL(URL(string:"https://fsbs.beerknurd.com/bk-store-json-2031.php?sid=1")!))
+        for path in ["bk-member-json-27.php","bk-member-json-20266.php","bk-member-json-abcd.php","bk-other-json-2027.php","x/bk-store-json-2027.php"] {
+            XCTAssertFalse(APIConfiguration.dataURL(URL(string:"https://fsbs.beerknurd.com/" + path + "?uid=1")!),path)
+        }
+        XCTAssertFalse(APIConfiguration.dataURL(URL(string:"https://evil.test/bk-store-json-2027.php?sid=1")!))
     }
     func testMemberPayloadWithBadgesStillYieldsTastingsAndRewards() throws {
         let data = Data(#"[{"member":{}},{"badges":[{"name":"Badge"}]},{"tasted_brew_current_round":[{"id":"t","brew_name":"Tasted"}]},{"reward":[{"reward_id":"r","reward_type":"Plate Party","redeemed":"1"}]}]"#.utf8)
