@@ -549,7 +549,7 @@ final class NetworkTests: XCTestCase {
         let db = try BeerDatabase(url:folder.appendingPathComponent("beers.db")); model.db = db
         // A complete taplist-only session isolates cancellation from member link recovery.
         model.session = MemberSession(memberId:"visitor",storeId:"1",storeName:"Fixture",sessionId:"visitor_session")
-        try db.setPreference("all_beers_api_url","https://fsbs.beerknurd.com/bk-store-json.php?sid=1")
+        try db.setPreference("all_beers_api_url","https://fsbs.beerknurd.com/bk-store-json-2026.php?sid=1")
         var calls = 0
         fixture.handler = { _ in
             calls += 1

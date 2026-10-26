@@ -256,18 +256,22 @@ final class AppModel: ObservableObject {
     /// Links saved before TapThatApp's 2026 endpoints are upgraded too, but only best-effort:
     /// the legacy endpoints still serve data, so a failed upgrade keeps them rather than failing refresh,
     /// and is attempted once per launch so an unavailable dashboard cannot delay every refresh.
-    private func restoreDataLinks(token: UUID) async throws {
+    /// `retired` re-reads links after a saved one stopped existing (404), so failures are reported like missing links.
+    private func restoreDataLinks(token: UUID, retired: Bool = false) async throws {
         guard let db, let member = session, member.valid else { return }
         let oldStore = try db.preference("all_beers_api_url")
         let oldMember = try db.preference("my_beers_api_url")
-        let missing = (oldStore ?? "").isEmpty || (!member.isVisitor && (oldMember ?? "").isEmpty)
+        let missing = retired || (oldStore ?? "").isEmpty || (!member.isVisitor && (oldMember ?? "").isEmpty)
         let legacy = legacyLinkUpgradeAttempted != member.identity && (Self.legacyDataLink(oldStore) || (!member.isVisitor && Self.legacyDataLink(oldMember)))
         guard missing || legacy else { return }
         if legacy { legacyLinkUpgradeAttempted = member.identity }
         let links: (member: String, store: String)
         if member.isVisitor {
             guard member.storeId.allSatisfy({ $0.isASCII && $0.isNumber }) else { throw BeerError.invalidResponse("Invalid saved location") }
-            links = ("none://visitor_mode", Self.visitorStoreURL(member.storeId))
+            let page: Data?
+            do { page = try await api.request(api.configuration.endpoint("visitor.php"),member:member,cookies:cookies,retry:false).0 }
+            catch where !Self.isRefreshCancellation(error) { page = nil }
+            links = ("none://visitor_mode", Self.visitorStoreURL(member.storeId,page:page))
         } else {
             do {
                 let (data,_) = try await api.request(api.configuration.endpoint("member-dash.php"),member:member,cookies:cookies,retry:missing)
@@ -288,15 +292,23 @@ final class AppModel: ObservableObject {
         guard let raw, let url = URL(string:raw) else { return false }
         return APIConfiguration.dataURL(url) && ["/bk-store-json.php","/bk-member-json.php"].contains(url.path)
     }
-    private static func visitorStoreURL(_ sid: String) -> String { "https://fsbs.beerknurd.com/bk-store-json-2026.php?sid=\(sid)" }
+    /// The visitor page publishes the taplist endpoint with an empty sid; the 2026 endpoint is used when the page can't be read.
+    private static func visitorStoreURL(_ sid: String, page: Data?) -> String {
+        let html = page.map { String(decoding:$0,as:UTF8.self) } ?? ""
+        var endpoint = "https://fsbs.beerknurd.com/bk-store-json-2026.php"
+        if let range = html.range(of:#"https://[^"'\s?]+bk-store-json(-\d{4})?\.php"#,options:.regularExpression), let url = URL(string:String(html[range])), APIConfiguration.dataURL(url) {
+            endpoint = url.absoluteString
+        }
+        return endpoint + "?sid=\(sid)"
+    }
     private static func dataLinks(in data: Data) throws -> (member: String, store: String) {
         let html = String(decoding:data,as:UTF8.self)
         func extract(_ pattern: String) throws -> String {
             guard let range = html.range(of:pattern,options:.regularExpression), let found = URL(string:String(html[range])), APIConfiguration.dataURL(found) else { throw BeerError.invalidResponse("Could not read the account data links") }
             return found.absoluteString
         }
-        return try (extract(#"https://[^"'\s]+bk-member-json(-2026)?\.php\?uid=\d+"#),
-                    extract(#"https://[^"'\s]+bk-store-json(-2026)?\.php\?sid=\d+"#))
+        return try (extract(#"https://[^"'\s]+bk-member-json(-\d{4})?\.php\?uid=\d+"#),
+                    extract(#"https://[^"'\s]+bk-store-json(-\d{4})?\.php\?sid=\d+"#))
     }
     private func performRefresh(token: UUID) async {
         guard token == epoch, !previewMode, let db, configured else { return }
@@ -318,7 +330,19 @@ final class AppModel: ObservableObject {
             return
         }
         guard token == epoch else { return }
-        if let raw = try? db.preference("all_beers_api_url"), let url = URL(string:raw), APIConfiguration.dataURL(url) {
+        // Saved links outlive TapThatApp's endpoint renames: a retired (404) link re-reads them once per refresh.
+        var rediscovered = false
+        func fetch(_ key: String, _ url: URL, _ raw: String) async throws -> (data: Data, raw: String) {
+            do { return (try await api.request(url).0, raw) }
+            catch let failure as HTTPFailure where failure.status == 404 && !rediscovered && token == epoch {
+                rediscovered = true
+                try await restoreDataLinks(token:token,retired:true)
+                guard let next = try db.preference(key), let url = URL(string:next), APIConfiguration.dataURL(url) else { throw failure }
+                return (try await api.request(url).0, next)
+            }
+        }
+        if let saved = try? db.preference("all_beers_api_url"), let url = URL(string:saved), APIConfiguration.dataURL(url) {
+            var raw = saved
             do {
                 var beers: [Beer]
                 var etag: String?
@@ -334,13 +358,13 @@ final class AppModel: ObservableObject {
                     } catch {
                         if Self.isRefreshCancellation(error) { return }
                         enrichment.recordFallback()
-                        let (data,_) = try await api.request(url)
-                        let enriched = await enrichment.enrichWithPending(try BeerAPI.parseBeers(data))
+                        let fetched = try await fetch("all_beers_api_url",url,raw); raw = fetched.raw
+                        let enriched = await enrichment.enrichWithPending(try BeerAPI.parseBeers(fetched.data))
                         beers = enriched.beers; pending = enriched.pending
                     }
                 } else {
-                    let (data,_) = try await api.request(url)
-                    beers = try BeerAPI.parseBeers(data)
+                    let fetched = try await fetch("all_beers_api_url",url,raw); raw = fetched.raw
+                    beers = try BeerAPI.parseBeers(fetched.data)
                 }
                 guard token == epoch, try db.preference("all_beers_api_url") == raw else { throw BeerError.changedAccount }
                 // Preserve previously enriched values when using the direct upstream fallback.
@@ -361,9 +385,9 @@ final class AppModel: ObservableObject {
         }
         // An old store response must not start requests for the newly signed-in member.
         guard token == epoch else { return }
-        if isMember, let raw = try? db.preference("my_beers_api_url"), let url = URL(string:raw), APIConfiguration.dataURL(url) {
+        if isMember, let saved = try? db.preference("my_beers_api_url"), let url = URL(string:saved), APIConfiguration.dataURL(url) {
             do {
-                let (data,_) = try await api.request(url)
+                let (data,raw) = try await fetch("my_beers_api_url",url,saved)
                 guard epoch == token, try db.preference("my_beers_api_url") == raw else { throw BeerError.changedAccount }
                 // Each source validates before its own replacement; malformed rewards cannot erase tastings.
                 do {
@@ -485,8 +509,13 @@ final class AppModel: ObservableObject {
             let next = MemberSession(memberId:visitor ? "visitor" : values["member_id"] ?? "",storeId:sid,storeName:values["store_name"] ?? "Flying Saucer",sessionId:values["PHPSESSID"] ?? (visitor ? "visitor_session" : ""),username:values["username"],firstName:values["first_name"],lastName:values["last_name"],email:values["email"],cardNum:values["cardNum"])
             guard next.valid else { throw BeerError.invalidResponse("Incomplete account details") }
             var memberURL = "none://visitor_mode"
-            var storeURL = Self.visitorStoreURL(sid)
-            if !visitor {
+            let storeURL: String
+            if visitor {
+                let page: Data?
+                do { page = try await api.request(url,member:next,cookies:values,retry:false).0 }
+                catch where !Self.isRefreshCancellation(error) { page = nil }
+                storeURL = Self.visitorStoreURL(sid,page:page)
+            } else {
                 let (data,_) = try await api.request(url,member:next,cookies:values)
                 let links = try Self.dataLinks(in:data)
                 memberURL = links.member; storeURL = links.store

@@ -41,7 +41,8 @@ struct APIConfiguration {
     }
     func endpoint(_ path: String) -> URL { baseURL.appendingPathComponent(path) }
     func trustedLogin(_ url: URL) -> Bool { url.scheme == baseURL.scheme && url.host == baseURL.host && url.port == baseURL.port && url.user == nil && url.password == nil }
-    static func dataURL(_ url: URL) -> Bool { url.scheme == "https" && url.host == "fsbs.beerknurd.com" && ["/bk-store-json.php","/bk-member-json.php","/bk-store-json-2026.php","/bk-member-json-2026.php"].contains(url.path) && url.user == nil && url.password == nil }
+    /// TapThatApp versions its data endpoints by year (bk-member-json-2026.php); any four-digit year is accepted so a rename needs no app update.
+    static func dataURL(_ url: URL) -> Bool { url.scheme == "https" && url.host == "fsbs.beerknurd.com" && url.path.range(of:#"^/bk-(store|member)-json(-\d{4})?\.php$"#,options:.regularExpression) != nil && url.user == nil && url.password == nil }
 }
 
 /// Reject cross-origin redirects before URLSession can forward authentication headers.
