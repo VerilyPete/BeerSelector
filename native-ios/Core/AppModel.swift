@@ -268,7 +268,9 @@ final class AppModel: ObservableObject {
         let links: (member: String, store: String)
         if member.isVisitor {
             guard member.storeId.allSatisfy({ $0.isASCII && $0.isNumber }) else { throw BeerError.invalidResponse("Invalid saved location") }
-            let page = try? await api.request(api.configuration.endpoint("visitor.php"),member:member,cookies:cookies,retry:false).0
+            let page: Data?
+            do { page = try await api.request(api.configuration.endpoint("visitor.php"),member:member,cookies:cookies,retry:false).0 }
+            catch where !Self.isRefreshCancellation(error) { page = nil }
             links = ("none://visitor_mode", Self.visitorStoreURL(member.storeId,page:page))
         } else {
             do {
@@ -332,7 +334,7 @@ final class AppModel: ObservableObject {
         var rediscovered = false
         func fetch(_ key: String, _ url: URL, _ raw: String) async throws -> (data: Data, raw: String) {
             do { return (try await api.request(url).0, raw) }
-            catch let failure as HTTPFailure where failure.status == 404 && !rediscovered {
+            catch let failure as HTTPFailure where failure.status == 404 && !rediscovered && token == epoch {
                 rediscovered = true
                 try await restoreDataLinks(token:token,retired:true)
                 guard let next = try db.preference(key), let url = URL(string:next), APIConfiguration.dataURL(url) else { throw failure }
@@ -509,7 +511,9 @@ final class AppModel: ObservableObject {
             var memberURL = "none://visitor_mode"
             let storeURL: String
             if visitor {
-                let page = try? await api.request(url,member:next,cookies:values,retry:false).0
+                let page: Data?
+                do { page = try await api.request(url,member:next,cookies:values,retry:false).0 }
+                catch where !Self.isRefreshCancellation(error) { page = nil }
                 storeURL = Self.visitorStoreURL(sid,page:page)
             } else {
                 let (data,_) = try await api.request(url,member:next,cookies:values)

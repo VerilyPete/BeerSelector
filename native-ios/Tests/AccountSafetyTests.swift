@@ -532,6 +532,90 @@ final class AccountSafetyTests: XCTestCase {
         }
     }
 
+    @MainActor func testRestoredMemberRediscoversWhenOnlyTastingsLinkIsRetired() async throws {
+        try await withModel { model,db,fixture,_ in
+            try db.setPreference("all_beers_api_url","https://fsbs.beerknurd.com/bk-store-json-2026.php?sid=1")
+            try db.setPreference("my_beers_api_url","https://fsbs.beerknurd.com/bk-member-json-2026.php?uid=1")
+            fixture.handler = { request in
+                switch request.url!.path {
+                case "/member-dash.php":
+                    return (200,Data("https://fsbs.beerknurd.com/bk-member-json-2027.php?uid=1 https://fsbs.beerknurd.com/bk-store-json-2026.php?sid=1".utf8))
+                case "/bk-member-json-2026.php": return (404,Data())
+                case "/bk-member-json-2027.php": return (200,Data(#"[{"member":{}},{"tasted_brew_current_round":[{"id":"future-tasting","brew_name":"Future tasting"}]},{"reward":[]}]"#.utf8))
+                default: return try self.response(request)
+                }
+            }
+            await model.refresh()
+            XCTAssertEqual(try db.preference("my_beers_api_url"),"https://fsbs.beerknurd.com/bk-member-json-2027.php?uid=1")
+            XCTAssertEqual(model.allBeers.map(\.id),["new-store"])
+            XCTAssertEqual(model.tastedBeers.map(\.id),["future-tasting"])
+            XCTAssertNil(model.error)
+        }
+    }
+
+    @MainActor func testRetiredLinkResponseAfterAccountSwitchDoesNotReadNewAccountsDashboard() async throws {
+        try await withModel { model,db,fixture,_ in
+            try db.setPreference("all_beers_api_url","https://fsbs.beerknurd.com/bk-store-json-2026.php?sid=1")
+            try db.setPreference("my_beers_api_url","https://fsbs.beerknurd.com/bk-member-json-2026.php?uid=1")
+            let started = self.expectation(description:"Old store request is in flight")
+            let committed = self.expectation(description:"New session committed")
+            var release: CheckedContinuation<Void,Never>?
+            var released = false
+            var pathsAfterRelease: [String] = []
+            fixture.handler = { request in
+                if request.url!.query == "sid=1" {
+                    await withCheckedContinuation { release = $0; started.fulfill() }
+                    return (404,Data())
+                }
+                if released { pathsAfterRelease.append(request.url!.path) }
+                return try self.response(request)
+            }
+            let subscription = model.$session.sink { if $0?.memberId == "2" { committed.fulfill() } }
+            defer { subscription.cancel(); release?.resume() }
+            let oldRefresh = Task { await model.refresh() }
+            await self.fulfillment(of:[started],timeout:3)
+            let login = Task { try await self.login(model) }
+            await self.fulfillment(of:[committed],timeout:3)
+            try await login.value
+            released = true
+            release?.resume(); release = nil
+            await oldRefresh.value
+            XCTAssertFalse(pathsAfterRelease.contains("/member-dash.php"),"An old account's 404 must not start link discovery for the new account")
+        }
+    }
+
+    @MainActor func testVisitorLoginStopsWhenVisitorPageRequestIsCancelled() async throws {
+        try await withModel { model,db,fixture,_ in
+            fixture.handler = { request in
+                if request.url!.path == "/visitor.php" { throw URLError(.cancelled) }
+                return try self.response(request)
+            }
+            let url = model.api.configuration.endpoint("visitor.php")
+            let cookie = HTTPCookie(properties:[.domain:url.host!, .path:"/", .name:"store__id", .value:"3"])!
+            do { try await model.completeLogin(url:url,nativeCookies:[cookie]); XCTFail("A cancelled visitor page request must not complete sign-in") } catch {}
+            XCTAssertEqual(model.session?.memberId,"1")
+            XCTAssertEqual(try db.preference("all_beers_api_url"),"https://fsbs.beerknurd.com/bk-store-json.php?sid=1")
+        }
+    }
+
+    @MainActor func testRestoredVisitorDoesNotSaveFallbackWhenVisitorPageRequestIsCancelled() async throws {
+        try await withModel { model,db,fixture,_ in
+            model.session = MemberSession(memberId:"visitor",storeId:"1",storeName:"Fixture",sessionId:"visitor_session")
+            try db.setPreference("my_beers_api_url","none://visitor_mode")
+            try db.setPreference("all_beers_api_url",nil)
+            var paths: [String] = []
+            fixture.handler = { request in
+                paths.append(request.url!.path)
+                if request.url!.path == "/visitor.php" { throw URLError(.cancelled) }
+                return try self.response(request)
+            }
+            await model.refresh()
+            XCTAssertEqual(paths,["/visitor.php"])
+            XCTAssertNil(try db.preference("all_beers_api_url"))
+            XCTAssertNil(model.error)
+        }
+    }
+
     @MainActor private func login(_ model: AppModel, member: String = "2") async throws {
         let url = model.api.configuration.endpoint("member-dash.php")
         let values = ["member_id":member,"store__id":member,"PHPSESSID":"new-session"]
