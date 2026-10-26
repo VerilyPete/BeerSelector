@@ -523,24 +523,6 @@ final class AccountSafetyTests: XCTestCase {
         }
     }
 
-    @MainActor func testAutoLoginResponseAfterLogoutCannotRestoreCredentials() async throws {
-        try await withModel { model,_,fixture,credentials in
-            let old = model.session!
-            fixture.handler = { request in
-                if request.url!.path == "/auto-login.php" {
-                    await model.logout()
-                    let data = try JSONEncoder().encode(old)
-                    return (200,Data("{\"session\":".utf8) + data + Data("}".utf8))
-                }
-                return try self.response(request)
-            }
-            do { try await model.autoLogin(); XCTFail("Stale auto-login must be rejected") }
-            catch { guard case BeerError.changedAccount = error else { return XCTFail("Unexpected error: \(error)") } }
-            XCTAssertNil(model.session)
-            XCTAssertNil(try credentials.load().0)
-        }
-    }
-
     @MainActor private func checkInAcrossSwitch(fails: Bool) async throws {
         try await withModel { model,db,fixture,_ in
             for id in ["first","second"] {

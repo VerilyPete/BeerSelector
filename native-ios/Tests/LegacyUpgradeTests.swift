@@ -46,21 +46,11 @@ final class LegacyUpgradeTests: XCTestCase {
                 XCTAssertEqual(model.rewards.count,2)
                 XCTAssertEqual(model.operations.count,3)
                 XCTAssertEqual(try store.load().1,cookies)
-                // Native credential rotation must preserve restored legacy caches/settings.
-                var renewed = member; renewed.sessionId = "native-session"
-                fixture.handler = { request in
-                    requests += 1
-                    XCTAssertEqual(request.url!.path,"/auto-login.php")
-                    let object = try JSONSerialization.jsonObject(with:JSONEncoder().encode(renewed))
-                    return (200,try JSONSerialization.data(withJSONObject:["session":object]))
-                }
                 XCTAssertEqual(requests,0,"Restore must be usable without network refresh")
-                try await model.autoLogin()
-                XCTAssertEqual(requests,1)
                 let restarted = AppModel(api:api,credentials:store,monitorConnectivity:false)
                 restarted.db = try BeerDatabase(url:url)
                 try restarted.restoreCredentials(); try restarted.reload()
-                XCTAssertEqual(restarted.session,renewed)
+                XCTAssertEqual(restarted.session,member)
                 XCTAssertEqual(restarted.tastedBeers,model.tastedBeers)
                 XCTAssertEqual(restarted.rewards,model.rewards)
                 XCTAssertEqual(restarted.operations.map(\.id),model.operations.map(\.id))

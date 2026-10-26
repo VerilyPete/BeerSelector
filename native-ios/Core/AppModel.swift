@@ -181,7 +181,6 @@ final class AppModel: ObservableObject {
         loading = false
         if let url = pendingURL { pendingURL = nil; handleURL(url) }
         if configured {
-            if isMember && !offline { do { try await autoLogin() } catch { /* Cached lists stay available when reauthentication fails. */ } }
             await refresh(); await refreshQueue(); await processOperations()
         }
     }
@@ -566,16 +565,6 @@ final class AppModel: ObservableObject {
             guard committedEpoch == epoch else { throw BeerError.changedAccount }
             interval.finish(.success)
         } catch { interval.finish(Diagnostics.isCancellation(error) ? .cancelled : .failure); throw error }
-    }
-    func autoLogin() async throws {
-        guard let member = session, !member.isVisitor else { throw BeerError.sessionExpired }
-        let token = epoch
-        let (data,_) = try await api.request(api.configuration.endpoint("auto-login.php"),method:"POST",fields:[:],member:member,cookies:cookies,retry:false)
-        guard token == epoch else { throw BeerError.changedAccount }
-        guard let object = try JSONSerialization.jsonObject(with:data) as? [String:Any], let raw = object["session"] else { throw BeerError.sessionExpired }
-        let next = try JSONDecoder().decode(MemberSession.self,from:JSONSerialization.data(withJSONObject:raw))
-        guard next.valid, next.identity == member.identity else { throw BeerError.sessionExpired }
-        try credentials.save(session:next,cookies:cookies); session = next
     }
     func refreshQueue() async {
         guard !previewMode, (!loadingQueue || queueEpoch != epoch), isMember, let member = session else { return }
