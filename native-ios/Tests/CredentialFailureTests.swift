@@ -101,4 +101,62 @@ final class CredentialFailureTests: XCTestCase {
     @MainActor func testFirstLoginWriteFailuresLeaveNoCommittedCredentials() async throws {
         for stage in Stage.allCases { try await exercise(stage,existing:false) }
     }
+
+    private static func account(_ query: CFDictionary) -> String? {
+        ((query as NSDictionary)[kSecAttrAccount] as? Data).flatMap { String(data:$0,encoding:.utf8) }
+    }
+    private func generationKeys(_ store: CredentialStore, _ generation: CredentialStore.Generation) -> [String] {
+        (0..<generation.count).map { "\(store.prefix)_\(generation.generation)_\($0)" } + ["\(store.prefix)_\(generation.generation)_session"]
+    }
+    private func savedCookies() -> [String:String] { ["PHPSESSID":"saved-session","large":String(repeating:"x",count:2400)] }
+    func testClearRemovesSavedGenerationWhenEnumerationFails() throws {
+        let prefix = "credential_clear_" + UUID().uuidString
+        let clean = CredentialStore(prefix:prefix,sessionStorageKey:prefix + "_legacy_session")
+        defer { try? clean.clear() }
+        try clean.save(session:MemberSession(memberId:"1",storeId:"1",storeName:"Saved",sessionId:"saved-session"),cookies:savedCookies())
+        let generation = try JSONDecoder().decode(CredentialStore.Generation.self,from:XCTUnwrap(clean.read(prefix + "_meta")))
+        var injected = clean
+        injected.enumerateItems = { _,_ in errSecInteractionNotAllowed }
+        XCTAssertThrowsError(try injected.clear())
+        let loaded = try clean.load()
+        XCTAssertNil(loaded.0)
+        XCTAssertEqual(loaded.1,[:])
+        for key in generationKeys(clean,generation) { XCTAssertNil(try clean.read(key),key) }
+    }
+    func testClearRemovesEveryRegisteredGenerationWhenEnumerationFails() throws {
+        let prefix = "credential_clear_" + UUID().uuidString
+        let clean = CredentialStore(prefix:prefix,sessionStorageKey:prefix + "_legacy_session")
+        defer { try? clean.clear() }
+        var rejectDeletes = true
+        var pruning = clean
+        pruning.deleteItem = { query in rejectDeletes ? errSecInteractionNotAllowed : SecItemDelete(query) }
+        try pruning.save(session:MemberSession(memberId:"1",storeId:"1",storeName:"First",sessionId:"first"),cookies:savedCookies())
+        try pruning.save(session:MemberSession(memberId:"2",storeId:"1",storeName:"Second",sessionId:"second"),cookies:savedCookies())
+        rejectDeletes = false
+        let registry = try JSONDecoder().decode([CredentialStore.Generation].self,from:XCTUnwrap(clean.read(prefix + "_generations")))
+        XCTAssertEqual(registry.count,2,"Failed pruning keeps both generations registered")
+        let keys = registry.flatMap { generationKeys(clean,$0) }
+        for key in keys { XCTAssertNotNil(try clean.read(key),key) }
+        var injected = clean
+        injected.enumerateItems = { _,_ in errSecInteractionNotAllowed }
+        XCTAssertThrowsError(try injected.clear())
+        for key in keys { XCTAssertNil(try clean.read(key),key) }
+        XCTAssertNil(try clean.read(prefix + "_generations"))
+        XCTAssertNil(try clean.read(prefix + "_meta"))
+    }
+    func testClearDeletesRemainingKeysWhenOneDeleteFails() throws {
+        let prefix = "credential_clear_" + UUID().uuidString
+        let clean = CredentialStore(prefix:prefix,sessionStorageKey:prefix + "_legacy_session")
+        defer { try? clean.clear() }
+        try clean.save(session:MemberSession(memberId:"1",storeId:"1",storeName:"Saved",sessionId:"saved-session"),cookies:savedCookies())
+        let generation = try JSONDecoder().decode(CredentialStore.Generation.self,from:XCTUnwrap(clean.read(prefix + "_meta")))
+        let session = "\(prefix)_\(generation.generation)_session"
+        var injected = clean
+        injected.deleteItem = { query in Self.account(query) == session ? errSecInteractionNotAllowed : SecItemDelete(query) }
+        XCTAssertThrowsError(try injected.clear())
+        XCTAssertNotNil(try clean.read(session))
+        for key in generationKeys(clean,generation) where key != session { XCTAssertNil(try clean.read(key),key) }
+        XCTAssertNil(try clean.read(prefix + "_meta"))
+        XCTAssertNil(try clean.read(prefix + "_generations"))
+    }
 }

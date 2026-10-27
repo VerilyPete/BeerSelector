@@ -778,17 +778,23 @@ final class AppModel: ObservableObject {
         let store = WKWebsiteDataStore.default().httpCookieStore
         for cookie in await store.allCookies() { await store.deleteCookie(cookie) }
     }
-    func logout() async {
-        if previewMode { session = nil; allBeers = []; tastedBeers = []; rewards = []; queue = []; showSettings = true; return }
+    typealias LogoutOutcome = (credentialsCleared: Bool, current: Bool)
+    @discardableResult func logout() async -> LogoutOutcome {
+        if previewMode { session = nil; allBeers = []; tastedBeers = []; rewards = []; queue = []; showSettings = true; return (true,true) }
         let old = session; let saved = cookies
         epoch = UUID(); refreshing = false; session = nil; cookies = [:]; queue = []; queuedBeerIDs = []; tastedBeers = []; rewards = []
         let token = epoch
         let previousCleanup = accountCleanupTask
-        let cleanup = Task { @MainActor in
+        let cleanup = Task { @MainActor () -> (failures: [String], credentialsCleared: Bool) in
             if let previousCleanup { _ = await previousCleanup.value }
-            await endAccountActivities()
             var failures: [String] = []
-            do { try credentials.clear() } catch { failures.append(error.localizedDescription) }
+            // Persist on its own before deleting anything, so a failed or interrupted
+            // credential clear cannot be restored on the next launch.
+            do { try db?.setPreference("native_account_transition","pending") } catch { failures.append(error.localizedDescription) }
+            await endAccountActivities()
+            var cleared = false
+            do { try credentials.clear(); cleared = true } catch { failures.append(error.localizedDescription) }
+            if cleared { do { try db?.setPreference("native_account_transition",nil) } catch { failures.append(error.localizedDescription) } }
             await clearWebCookies()
             do {
                 try db?.transaction { try db?.forgetRecentTastings() }
@@ -796,10 +802,11 @@ final class AppModel: ObservableObject {
                 try db?.setPreference("all_beers_api_url","")
                 try db?.setPreference("my_beers_api_url","")
             } catch { failures.append(error.localizedDescription) }
-            return failures
+            return (failures,cleared)
         }
-        accountCleanupTask = cleanup
-        var failures = await cleanup.value
+        accountCleanupTask = Task { await cleanup.value.failures }
+        let result = await cleanup.value
+        var failures = result.failures
         if token == epoch {
             accountCleanupTask = nil
             showSettings = true; tab = .home
@@ -809,6 +816,22 @@ final class AppModel: ObservableObject {
             catch { failures.append("Signed out locally; server logout could not be confirmed.") }
         }
         if token == epoch, !failures.isEmpty { error = failures.joined(separator:"\n") }
+        return (result.credentialsCleared,token == epoch)
+    }
+    func resetAppData() async {
+        let outcome = await logout()
+        // A newer login owns the database and its UI; a stale reset publishes nothing.
+        guard outcome.current else { return }
+        let cleanupError = error
+        do {
+            try db?.transaction {
+                for table in ["allbeers","tasted_brew_current_round","rewards","operation_queue","recent_tastings","tasting_baseline","beer_choices"] { try db?.execute("DELETE FROM \(table)") }
+                // Keep the restore block when logout could not clear the saved credentials.
+                try db?.execute("DELETE FROM preferences WHERE key <> 'native_account_transition' OR value IS NULL")
+            }
+            localRetry()
+            if !outcome.credentialsCleared { error = [cleanupError,error].compactMap { $0 }.joined(separator:"\n") }
+        } catch { self.error = error.localizedDescription }
     }
     func openUntappd(_ beer: Beer) {
         let name = beer.brew_name.replacingOccurrences(of:#"\s*\([^)]*\)\s*"#,with:" ",options:.regularExpression).trimmingCharacters(in:.whitespaces)
