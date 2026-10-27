@@ -4,8 +4,8 @@ Branch: `fix/native-auth-cleanup-gaps`
 
 ## Why
 
-The retired Expo client carried three unmerged auth-hardening commits (tagged
-`archive/expo-auth-fix`, tip `7b678118`). A parity review against the native
+The retired Expo client carried three unmerged auth-hardening commits (tip
+`7b678118`, since discarded). A parity review against the native
 client found most of that behaviour already present, with gaps that leave
 credentials or browser cookies behind after a failure. This plan closes the
 three credential gaps in the native client only; a fourth (login web view
