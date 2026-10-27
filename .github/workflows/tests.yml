@@ -32,6 +32,7 @@ jobs:
         env:
           BEERSELECTOR_TEST_DESTINATION: platform=iOS Simulator,name=iPhone 18 Pro
           BEERSELECTOR_TEST_BUILD_DIR: ${{ runner.temp }}/BeerSelectorNative-tests
+          BEERSELECTOR_TEST_PARALLEL: "NO"
         run: sh native-ios/Scripts/run-tests.sh -resultBundlePath "${{ runner.temp }}/NativeTests.xcresult"
       - name: Upload native test results
         if: always()
