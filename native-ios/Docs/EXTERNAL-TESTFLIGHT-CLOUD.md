@@ -6,7 +6,7 @@ Created September 12, 2026 in Xcode Cloud for FSBeerSelector (App Store Connect 
 
 - Repository: `VerilyPete/BeerSelector`; project: `native-ios/BeerSelectorNative.xcodeproj`.
 - Branch Changes: exact branch `main`, any file change, auto-cancel older builds enabled. This also triggers on direct pushes to main; PR-only enforcement belongs in GitHub branch rules.
-- Xcode: Latest Release (changed from pinned `26.3 (17C529)` on October 27, 2026, alongside GitHub CI moving to Xcode 27.1); macOS: Latest Release. Clean builds enabled, independently verified in the saved App Store Connect workflow (Clean checkbox value 1).
+- Xcode: pinned `27.1 (27A9275)`; macOS: pinned `27.0.1 (26A434)` (both pinned on October 27, 2026, after a brief move to Latest Release earlier that day). Every environment (Cloud, GitHub CI, local) builds with the same compiler for the whole Swift 6 language-mode migration, so a compiler update cannot be mistaken for a migration regression. Lifting the pin is a separate decision after the migration lands. Clean builds enabled, independently verified in the saved App Store Connect workflow (Clean checkbox value 1).
 - Test: `BeerSelectorNative` scheme, explicit `All` plan, iPhone 18 Pro (changed from iPhone 17 Pro on October 27, 2026, matching GitHub CI; the Xcode 27 simulator set has no iPhone 17 Pro), latest simulator from selected Xcode; Required To Pass.
 - Archive: `BeerSelectorNative` scheme, Release configuration, App Store Connect distribution preparation.
 - Post-action: TestFlight External Testing, Archive - iOS artifact, existing **Beta testers** group (six members at setup).
