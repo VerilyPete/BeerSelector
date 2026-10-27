@@ -2,17 +2,17 @@
 
 ## Native app
 
-Use Xcode 26.3 and an isolated simulator, never a personal device or live account for automated tests:
+Use Xcode 27.1 and an isolated simulator, never a personal device or live account for automated tests:
 
 ~~~sh
 sh native-ios/ci_scripts/ci_post_clone.sh
-BEERSELECTOR_TEST_DESTINATION='platform=iOS Simulator,name=iPhone 17 Pro' sh native-ios/Scripts/run-tests.sh
+BEERSELECTOR_TEST_DESTINATION='platform=iOS Simulator,name=iPhone 18 Pro' sh native-ios/Scripts/run-tests.sh
 python3 native-ios/Scripts/test-cloud-configuration.py
 ~~~
 
 The All plan covers native unit, network, account-safety, persistence, and legacy-upgrade behavior. Performance has its own plan and scheme; see [PHONE-TESTS.md](native-ios/Docs/PHONE-TESTS.md). Legacy schema-v8 fixtures remain in the native suite even though the Expo source is retired.
 
-GitHub Actions runs the native All plan and Cloud configuration tests on macOS with Xcode 26.3. Its required job retains the name **Jest Unit Tests** solely because main branch protection requires that exact GitHub Actions context. It executes Swift/Python, not Jest. Rename the job and protection together in a separate change after the replacement has passed remotely. No protection was weakened by this cleanup.
+GitHub Actions runs the native All plan and Cloud configuration tests on the GitHub `xcode-27` runner image (macOS 27) with Xcode 27.1. Its required job retains the name **Jest Unit Tests** solely because main branch protection requires that exact GitHub Actions context. It executes Swift/Python, not Jest. Rename the job and protection together in a separate change after the replacement has passed remotely. No protection was weakened by this cleanup.
 
 Xcode Cloud's Native External Beta workflow tests and archives main changes for external TestFlight distribution. The older Native Correctness workflow is scoped to the migration branch; GitHub's native PR job covers cleanup and future branches.
 
