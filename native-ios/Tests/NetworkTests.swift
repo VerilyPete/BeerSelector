@@ -889,6 +889,7 @@ final class NetworkTests: XCTestCase {
         configuration.enrichmentURL = URL(string:"https://enrichment.example.test")
         configuration.enrichmentKey = "fixture"
         let model = AppModel(api:api(configuration:configuration),credentials:credentials,monitorConnectivity:false)
+        model.webCookieCleanup = {}; model.activityCleanup = {}
         let db = try BeerDatabase(url:folder.appendingPathComponent("beers.db")); model.db = db
         model.session = MemberSession(memberId:"fixture",storeId:"1",storeName:"Fixture",sessionId:"fixture")
         try db.setPreference("all_beers_api_url","https://fsbs.beerknurd.com/bk-store-json.php?sid=1")

@@ -17,7 +17,9 @@ final class PostLoginCleanupTests: XCTestCase {
             calls += 1
             if calls == 1 { await withCheckedContinuation { release = $0; held.fulfill() } }
         }
-        if visitor { model.webCookieCleanup = cleanup } else { model.activityCleanup = cleanup }
+        // Hold the cleanup under test; stub the other so logout never reaches real WebKit or ActivityKit.
+        model.webCookieCleanup = visitor ? cleanup : {}
+        model.activityCleanup = visitor ? {} : cleanup
         let secondResponse = XCTestExpectation(description:"Second login fetched dashboard")
         fixture.handler = { request in
             switch request.url!.path {
