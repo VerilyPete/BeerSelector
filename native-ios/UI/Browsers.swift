@@ -43,7 +43,7 @@ struct LoginWebView: UIViewRepresentable {
         var cancelled = false
         var loginTask: Task<Void,Never>?
         init(_ parent: LoginWebView) { self.parent = parent }
-        func webView(_ webView: WKWebView,decidePolicyFor navigationAction: WKNavigationAction,decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+        func webView(_ webView: WKWebView,decidePolicyFor navigationAction: WKNavigationAction,decisionHandler: @escaping @MainActor @Sendable (WKNavigationActionPolicy) -> Void) {
             guard let url = navigationAction.request.url, url.scheme == "https" else { decisionHandler(.cancel); return }
             decisionHandler(.allow)
         }
