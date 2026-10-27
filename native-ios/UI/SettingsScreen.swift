@@ -109,17 +109,7 @@ struct SettingsScreen: View {
                 }
                 .confirmationDialog("Log out of Flying Saucer?",isPresented:$confirmLogout,titleVisibility:.visible) { Button("Log Out",role:.destructive) { Task { await model.logout() } } }
                 .confirmationDialog("Reset app data and keep saved beer feedback?",isPresented:$confirmReset,titleVisibility:.visible) {
-                    Button("Reset",role:.destructive) {
-                        Task {
-                            await model.logout()
-                            do {
-                                try model.db?.transaction {
-                                    for table in ["allbeers","tasted_brew_current_round","rewards","operation_queue","recent_tastings","tasting_baseline","beer_choices","preferences"] { try model.db?.execute("DELETE FROM \(table)") }
-                                }
-                                model.localRetry()
-                            } catch { model.error = error.localizedDescription }
-                        }
-                    }
+                    Button("Reset",role:.destructive) { Task { await model.resetAppData() } }
                 }
                 .confirmationDialog("Force a data refresh on next start?",isPresented:$confirmTimestamps,titleVisibility:.visible) {
                     Button("Clear",role:.destructive) {

@@ -3,12 +3,17 @@ import Security
 
 /// Retains Expo SecureStore's service, binary account keys, and committed-generation format.
 struct CredentialStore {
-    struct Generation: Codable { var generation: String; var count: Int; var hasSession: Bool? }
+    struct Generation: Codable {
+        var generation: String; var count: Int; var hasSession: Bool?
+        var valid: Bool { (1...1000).contains(count) && generation.range(of:#"^[A-Za-z0-9_-]+$"#,options:.regularExpression) != nil }
+    }
     var prefix = "beerknurd_auth_cookies"
     var sessionStorageKey = "beerknurd_session"
-    // Injectable OS write boundary; reads and successful writes still use the real Keychain.
+    // Injectable OS write/delete/enumeration boundary; reads and successful writes still use the real Keychain.
     var updateItem: (CFDictionary, CFDictionary) -> OSStatus = { SecItemUpdate($0,$1) }
     var addItem: (CFDictionary) -> OSStatus = { SecItemAdd($0,nil) }
+    var enumerateItems: (CFDictionary, UnsafeMutablePointer<CFTypeRef?>?) -> OSStatus = { SecItemCopyMatching($0,$1) }
+    var deleteItem: (CFDictionary) -> OSStatus = { SecItemDelete($0) }
     private func query(_ key: String, service: String) -> [String: Any] {
         [kSecClass as String:kSecClassGenericPassword,kSecAttrService as String:service,kSecAttrAccount as String:Data(key.utf8),kSecAttrGeneric as String:Data(key.utf8)]
     }
@@ -34,7 +39,7 @@ struct CredentialStore {
     func delete(_ key: String) throws {
         var failure: OSStatus?
         for service in ["app:no-auth", "app", "app:auth"] {
-            let status = SecItemDelete(query(key,service:service) as CFDictionary)
+            let status = deleteItem(query(key,service:service) as CFDictionary)
             if status != errSecSuccess && status != errSecItemNotFound { failure = status }
         }
         if let failure { throw BeerError.storage("Keychain error \(failure)") }
@@ -42,7 +47,7 @@ struct CredentialStore {
     private func generation() throws -> Generation? {
         guard let data = try read(prefix + "_meta") else { return nil }
         let g = try JSONDecoder().decode(Generation.self,from:data)
-        guard (1...1000).contains(g.count), g.generation.range(of:#"^[A-Za-z0-9_-]+$"#,options:.regularExpression) != nil else { throw BeerError.storage("Invalid credential commit marker") }
+        guard g.valid else { throw BeerError.storage("Invalid credential commit marker") }
         return g
     }
     func load() throws -> (MemberSession?, [String: String]) {
@@ -75,7 +80,7 @@ struct CredentialStore {
         var retained = [g]
         for old in registry where old.generation != g.generation {
             do {
-                guard (1...1000).contains(old.count), old.generation.range(of:#"^[A-Za-z0-9_-]+$"#,options:.regularExpression) != nil else { retained.append(old); continue }
+                guard old.valid else { retained.append(old); continue }
                 for index in 0..<old.count { try delete("\(prefix)_\(old.generation)_\(index)") }
                 try delete("\(prefix)_\(old.generation)_session")
             } catch { retained.append(old) }
@@ -84,19 +89,26 @@ struct CredentialStore {
     }
     func clear() throws {
         var keys = [sessionStorageKey,prefix,prefix + "_meta",prefix + "_generations"]
+        var error: Error?
         // Enumeration is limited to the app's accessible items, then to BeerSelector credential keys.
         for service in ["app:no-auth", "app", "app:auth"] {
             let q: [String:Any] = [kSecClass as String:kSecClassGenericPassword,kSecAttrService as String:service,kSecReturnAttributes as String:true,kSecMatchLimit as String:kSecMatchLimitAll]
             var result: CFTypeRef?
-            let status = SecItemCopyMatching(q as CFDictionary,&result)
-            guard status == errSecSuccess || status == errSecItemNotFound else { throw BeerError.storage("Keychain error \(status)") }
+            let status = enumerateItems(q as CFDictionary,&result)
+            guard status == errSecSuccess || status == errSecItemNotFound else { error = error ?? BeerError.storage("Keychain error \(status)"); continue }
             for row in result as? [[String:Any]] ?? [] {
                 let data = row[kSecAttrAccount as String] as? Data
                 if let key = data.flatMap({String(data:$0,encoding:.utf8)}), key.hasPrefix(prefix) || key == sessionStorageKey { keys.append(key) }
             }
         }
-        var error: Error?
-        for key in Set(keys) { do { try delete(key) } catch let e { error = e } }
+        // Known generations are deleted by name even when enumeration is unavailable.
+        var generations: [Generation] = []
+        do { if let data = try read(prefix + "_meta") { generations.append(try JSONDecoder().decode(Generation.self,from:data)) } } catch let e { error = error ?? e }
+        do { if let data = try read(prefix + "_generations") { generations += try JSONDecoder().decode([Generation].self,from:data) } } catch let e { error = error ?? e }
+        for g in generations where g.valid {
+            keys += (0..<g.count).map { "\(prefix)_\(g.generation)_\($0)" } + ["\(prefix)_\(g.generation)_session"]
+        }
+        for key in Set(keys) { do { try delete(key) } catch let e { error = error ?? e } }
         if let error { throw error }
     }
 }

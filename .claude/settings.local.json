@@ -31,5 +31,8 @@
     ],
     "deny": [],
     "ask": []
-  }
+  },
+  "disabledMcpjsonServers": [
+    "maestro"
+  ]
 }
