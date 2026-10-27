@@ -16,10 +16,10 @@ concurrency:
 jobs:
   native:
     name: Native iOS Tests
-    runs-on: macos-26
+    runs-on: xcode-27
     timeout-minutes: 30
     env:
-      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+      DEVELOPER_DIR: /Applications/Xcode_27.1.app/Contents/Developer
     steps:
       - uses: actions/checkout@v7
         with:
@@ -30,7 +30,7 @@ jobs:
         run: sh native-ios/ci_scripts/ci_post_clone.sh
       - name: Run native All test plan
         env:
-          BEERSELECTOR_TEST_DESTINATION: platform=iOS Simulator,name=iPhone 17 Pro
+          BEERSELECTOR_TEST_DESTINATION: platform=iOS Simulator,name=iPhone 18 Pro
           BEERSELECTOR_TEST_BUILD_DIR: ${{ runner.temp }}/BeerSelectorNative-tests
         run: sh native-ios/Scripts/run-tests.sh -resultBundlePath "${{ runner.temp }}/NativeTests.xcresult"
       - name: Upload native test results
