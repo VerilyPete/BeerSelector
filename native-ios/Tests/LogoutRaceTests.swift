@@ -63,7 +63,7 @@ final class LogoutRaceTests: XCTestCase {
         }
         if cancelTask { login.cancel() }
         release?.resume(); release = nil
-        await logout.value
+        _ = await logout.value
         if let secondLogout {
             await secondLogout.value
             do { try await login.value; XCTFail("Superseded login must not commit") }

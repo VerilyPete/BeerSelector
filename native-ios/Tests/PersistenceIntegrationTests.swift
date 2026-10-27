@@ -11,7 +11,7 @@ final class PersistenceIntegrationTests: XCTestCase {
             XCTAssertNotNil(UIFont(name:name == "BeerIcons" ? Robo.beerIconFont : name,size:14),name)
         }
     }
-    func testNativeDatabaseReopenPreservesDataAndRecoversInterruptedOperations() throws {
+    @MainActor func testNativeDatabaseReopenPreservesDataAndRecoversInterruptedOperations() throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at:folder) }
         let url = folder.appendingPathComponent("beers.db")
@@ -37,7 +37,7 @@ final class PersistenceIntegrationTests: XCTestCase {
         XCTAssertEqual(try reopened.operations().first?.status,"pending")
         XCTAssertEqual(try reopened.operations().first?.payload["memberId"],"test")
     }
-    func testFailedReplacementRollsBackPreviousSnapshot() throws {
+    @MainActor func testFailedReplacementRollsBackPreviousSnapshot() throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at:folder) }
         let db = try BeerDatabase(url:folder.appendingPathComponent("beers.db"))
@@ -45,7 +45,7 @@ final class PersistenceIntegrationTests: XCTestCase {
         XCTAssertThrowsError(try db.transaction { try db.replaceBeers([Beer(id:"duplicate",name:"One"),Beer(id:"duplicate",name:"Two")]) })
         XCTAssertEqual(try db.beers().map(\.id),["saved"])
     }
-    func testPreVersionedReactNativeDatabaseUpgradesWithoutLosingRows() throws {
+    @MainActor func testPreVersionedReactNativeDatabaseUpgradesWithoutLosingRows() throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at:folder,withIntermediateDirectories:true)
         defer { try? FileManager.default.removeItem(at:folder) }
@@ -116,7 +116,7 @@ final class PersistenceIntegrationTests: XCTestCase {
         XCTAssertEqual(model.operations.first?.payload["beerId"],"pending")
     }
 
-    func testRefreshPreservesReviewFieldsAndAdditionalRewardColumns() throws {
+    @MainActor func testRefreshPreservesReviewFieldsAndAdditionalRewardColumns() throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at:folder) }
         let db = try BeerDatabase(url:folder.appendingPathComponent("beers.db"))
@@ -160,5 +160,28 @@ final class PersistenceIntegrationTests: XCTestCase {
             try store.clear()
             XCTAssertNil(try store.load().0,service)
         }
+    }
+    private func openDescriptors(in folder: URL) -> Int {
+        guard let resolved = realpath(folder.path,nil) else { return 0 }
+        let prefix = String(cString:resolved) + "/"
+        free(resolved)
+        return (0..<getdtablesize()).filter { descriptor in
+            var path = [UInt8](repeating:0,count:Int(MAXPATHLEN))
+            return fcntl(descriptor,F_GETPATH,&path) != -1 && String(decoding:path.prefix { $0 != 0 },as:UTF8.self).hasPrefix(prefix)
+        }.count
+    }
+    @MainActor func testDatabaseClosesItsFilesWhenReleasedOrWhenOpeningFails() throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at:folder) }
+        do {
+            let db = try BeerDatabase(url:folder.appendingPathComponent("beers.db"))
+            try db.setPreference("probe","open")
+            XCTAssertGreaterThan(openDescriptors(in:folder),0,"The probe must see an open database")
+        }
+        XCTAssertEqual(openDescriptors(in:folder),0,"Releasing the database closes its SQLite handle")
+        let corrupt = folder.appendingPathComponent("corrupt.db")
+        try Data(repeating:0x42,count:4096).write(to:corrupt)
+        XCTAssertThrowsError(try BeerDatabase(url:corrupt))
+        XCTAssertEqual(openDescriptors(in:folder),0,"A database that fails to initialise must not leak its SQLite handle")
     }
 }

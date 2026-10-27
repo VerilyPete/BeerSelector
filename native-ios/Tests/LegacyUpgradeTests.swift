@@ -63,7 +63,7 @@ final class LegacyUpgradeTests: XCTestCase {
             }
         }
     }
-    func testCompleteV8DatabasePreservesLegacyRowsAndHistory() throws {
+    @MainActor func testCompleteV8DatabasePreservesLegacyRowsAndHistory() throws {
         for migrated in [false,true] {
             let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
             defer { try? FileManager.default.removeItem(at:folder) }
@@ -106,7 +106,7 @@ final class LegacyUpgradeTests: XCTestCase {
         }
     }
 
-    func testNativeReplacementsWorkAgainstLegacyTables() throws {
+    @MainActor func testNativeReplacementsWorkAgainstLegacyTables() throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at:folder) }
         let url = folder.appendingPathComponent("beers.db")
@@ -125,7 +125,7 @@ final class LegacyUpgradeTests: XCTestCase {
         XCTAssertEqual(try reopened.rows("SELECT MAX(version) AS version FROM schema_version").first?["version"],"8")
     }
 
-    func testFailedNativeUpgradeRollsBackSchemaAndDataAndCanRetry() throws {
+    @MainActor func testFailedNativeUpgradeRollsBackSchemaAndDataAndCanRetry() throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at:folder) }
         let url = folder.appendingPathComponent("beers.db")
