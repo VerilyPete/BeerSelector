@@ -102,7 +102,7 @@ final class Diagnostics: @unchecked Sendable {
     }
 }
 
-final class DeviceMetrics: NSObject, MXMetricManagerSubscriber {
+final class DeviceMetrics: NSObject, MXMetricManagerSubscriber, Sendable {
     static let shared = DeviceMetrics()
     func start() { MXMetricManager.shared.add(self) }
     func didReceive(_ payloads: [MXMetricPayload]) {

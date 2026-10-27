@@ -177,7 +177,7 @@ private func rowLabel(_ title: String,_ subtitle: String,_ symbol: String,destru
     }.padding(14).frame(minHeight:60).contentShape(Rectangle())
 }
 
-private func row(_ title: String,_ subtitle: String,_ symbol: String,destructive: Bool = false,busy: Bool = false,action: @escaping () -> Void) -> SettingsActionRow {
+@MainActor private func row(_ title: String,_ subtitle: String,_ symbol: String,destructive: Bool = false,busy: Bool = false,action: @escaping () -> Void) -> SettingsActionRow {
     SettingsActionRow(title:title,subtitle:subtitle,symbol:symbol,destructive:destructive,busy:busy,action:action)
 }
 
