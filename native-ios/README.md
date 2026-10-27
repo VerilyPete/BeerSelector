@@ -2,7 +2,7 @@
 
 SwiftUI app and ActivityKit widget targeting iOS 17.6, iPhone and iPad. Work is in progress; see [the parity ledger](Docs/PARITY.md) and [the checkpoint](Docs/WORK-CHECKPOINT.md) for remaining verification.
 
-Run these commands from the `BeerSelector-native` repository root with Xcode and XcodeGen installed.
+Run these commands from the repository root with Xcode and XcodeGen installed.
 
 ## Configuration and project generation
 

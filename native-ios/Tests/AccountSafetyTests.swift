@@ -14,8 +14,9 @@ final class AccountSafetyTests: XCTestCase {
         let model = AppModel(api:fixture.api(configuration:configuration),credentials:credentials,monitorConnectivity:false)
         let db = try BeerDatabase(url:folder.appendingPathComponent("beers.db"))
         model.db = db
-        // Account tests verify queue ownership without starting OS Live Activities.
-        model.activityUpdate = { _,_ in }
+        // Account tests verify queue ownership without starting OS Live Activities
+        // or touching the shared WebKit cookie store, which can hang on CI simulators.
+        model.activityUpdate = { _,_ in }; model.webCookieCleanup = {}
         let member = MemberSession(memberId:"1",storeId:"1",storeName:"Fixture",sessionId:"old-session")
         model.session = member
         try credentials.save(session:member,cookies:[:])

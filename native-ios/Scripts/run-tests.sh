@@ -1,6 +1,6 @@
 #!/bin/sh
 set -eu
-: "${BEERSELECTOR_TEST_DESTINATION:?Set an isolated simulator destination, e.g. platform=iOS Simulator,name=iPhone 17 Pro}"
+: "${BEERSELECTOR_TEST_DESTINATION:?Set an isolated simulator destination, e.g. platform=iOS Simulator,name=iPhone 18 Pro}"
 case "$BEERSELECTOR_TEST_DESTINATION" in
     'platform=iOS Simulator,'*) ;;
     *) echo 'Use an isolated simulator for automated tests.' >&2; exit 2 ;;
