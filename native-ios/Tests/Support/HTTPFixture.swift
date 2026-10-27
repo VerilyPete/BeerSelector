@@ -23,7 +23,8 @@ final class HTTPFixture {
     }
 }
 
-private final class FixtureProtocol: URLProtocol {
+/// `stopped` and `work` are guarded by `lock`; URLSession sets everything else before `startLoading`.
+private final class FixtureProtocol: URLProtocol, @unchecked Sendable {
     @MainActor static var handlers: [String: HTTPFixture.Handler] = [:]
     @MainActor static var responseHeaders: [String:[String:String]] = [:]
     private let lock = NSRecursiveLock()

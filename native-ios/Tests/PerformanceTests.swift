@@ -3,7 +3,7 @@ import XCTest
 
 /// Opt-in measurements, excluded from the fast correctness plans. No timing gates.
 final class PerformanceTests: XCTestCase {
-    func testSnapshotParsingAndPersistence() throws {
+    @MainActor func testSnapshotParsingAndPersistence() throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: folder) }
         let db = try BeerDatabase(url: folder.appendingPathComponent("beers.db"))
@@ -30,7 +30,7 @@ final class PerformanceTests: XCTestCase {
         }
     }
 
-    func testContendedWriterPreservesSnapshot() throws {
+    @MainActor func testContendedWriterPreservesSnapshot() throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: folder) }
         let url = folder.appendingPathComponent("beers.db")

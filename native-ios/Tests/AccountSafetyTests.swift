@@ -3,7 +3,7 @@ import Combine
 @testable import BeerSelectorNative
 
 final class AccountSafetyTests: XCTestCase {
-    @MainActor private func withModel(_ body: (AppModel, BeerDatabase, HTTPFixture, CredentialStore) async throws -> Void) async throws {
+    @MainActor private func withModel(_ body: @MainActor (AppModel, BeerDatabase, HTTPFixture, CredentialStore) async throws -> Void) async throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         let key = "account_test_" + UUID().uuidString
         let credentials = CredentialStore(prefix:key,sessionStorageKey:key + "_session")

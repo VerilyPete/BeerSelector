@@ -63,7 +63,7 @@ final class PostLoginCleanupTests: XCTestCase {
             let logout = Task { await model.logout() }
             await fulfillment(of:[signedOut],timeout:3)
             observer.cancel(); release?.resume(); release = nil
-            await logout.value
+            _ = await logout.value
             do { try await first.value; XCTFail("Old login completion must be rejected") }
             catch { guard case BeerError.changedAccount = error else { return XCTFail("Unexpected error: \(error)") } }
             XCTAssertNil(model.session)

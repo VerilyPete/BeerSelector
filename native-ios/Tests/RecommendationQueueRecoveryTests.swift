@@ -2,7 +2,7 @@ import XCTest
 @testable import BeerSelectorNative
 
 final class RecommendationQueueRecoveryTests: XCTestCase {
-    @MainActor private func withModel(_ body: (AppModel,BeerDatabase,HTTPFixture) async throws -> Void) async throws {
+    @MainActor private func withModel(_ body: @MainActor (AppModel,BeerDatabase,HTTPFixture) async throws -> Void) async throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         let key = UUID().uuidString
         let credentials = CredentialStore(prefix:key,sessionStorageKey:key)

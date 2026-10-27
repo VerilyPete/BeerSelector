@@ -7,13 +7,13 @@ final class RecentTastingsTests: XCTestCase {
         b.roh_lap = lap; b.tasted_date = date; b.brew_style = "IPA"
         return b
     }
-    private func withDB(_ body: (BeerDatabase,URL) throws -> Void) throws {
+    @MainActor private func withDB(_ body: (BeerDatabase,URL) throws -> Void) throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at:folder,withIntermediateDirectories:true)
         defer { try? FileManager.default.removeItem(at:folder) }
         try body(BeerDatabase(url:folder.appendingPathComponent("beers.db")),folder.appendingPathComponent("beers.db"))
     }
-    func testReviewUnusedPresentationsDoNotEvictActualChoiceEvidence() throws {
+    @MainActor func testReviewUnusedPresentationsDoNotEvictActualChoiceEvidence() throws {
         try withDB { db,_ in
             var chosen = BeerChoiceContext(taplist:[beer(1)],shown:["1"],preferences:.init(),usedModel:false)
             chosen.presentedAt = Date(timeIntervalSince1970:1)
@@ -28,7 +28,7 @@ final class RecentTastingsTests: XCTestCase {
         }
     }
 
-    func testChoiceContextIsImmutableScopedAndSeparatesQueueFromTasting() throws {
+    @MainActor func testChoiceContextIsImmutableScopedAndSeparatesQueueFromTasting() throws {
         try withDB { db,url in
             var b = beer(1)
             let formatter = DateFormatter(); formatter.dateFormat = "MM/dd/yyyy"; formatter.timeZone = TimeZone(secondsFromGMT:0)
@@ -55,7 +55,7 @@ final class RecentTastingsTests: XCTestCase {
             XCTAssertEqual(try db.choiceContexts(account:"a").first?.laterTasted,[b.id])
         }
     }
-    func testChoiceTastingDatesRespectUnknownVenueCalendar() throws {
+    @MainActor func testChoiceTastingDatesRespectUnknownVenueCalendar() throws {
         let iso = ISO8601DateFormatter()
         let cases: [(String,String,String,Bool)] = [
             // Central evening, local midnight, spring DST, fall DST.
@@ -82,7 +82,7 @@ final class RecentTastingsTests: XCTestCase {
             }
         }
     }
-    func testChoiceDelayedAcknowledgementUsesDurableIntentAndIgnoresRepeatedFeedEvents() throws {
+    @MainActor func testChoiceDelayedAcknowledgementUsesDurableIntentAndIgnoresRepeatedFeedEvents() throws {
         try withDB { db,url in
             let iso = ISO8601DateFormatter()
             let intent = try XCTUnwrap(iso.date(from:"2026-09-11T20:00:00Z"))
@@ -107,7 +107,7 @@ final class RecentTastingsTests: XCTestCase {
             XCTAssertNil(try JSONDecoder().decode(BeerChoiceContext.self,from:JSONSerialization.data(withJSONObject:legacy)).selectedAt)
         }
     }
-    func testTastingBeforeQueueAcknowledgementIsPreservedWithoutInventingAcceptance() throws {
+    @MainActor func testTastingBeforeQueueAcknowledgementIsPreservedWithoutInventingAcceptance() throws {
         try withDB { db,url in
             let iso = ISO8601DateFormatter()
             let intent = try XCTUnwrap(iso.date(from:"2026-09-12T01:00:00Z"))
@@ -135,7 +135,7 @@ final class RecentTastingsTests: XCTestCase {
             XCTAssertEqual(saved.queued,[b.id])
         }
     }
-    func testChoiceRetentionSeparatesUnusedAndIntentAndMigratesOldRecords() throws {
+    @MainActor func testChoiceRetentionSeparatesUnusedAndIntentAndMigratesOldRecords() throws {
         try withDB { db,url in
             // Recreate the previous schema to exercise real upgrade/backfill.
             try db.execute("DROP TABLE beer_choices")
@@ -170,7 +170,7 @@ final class RecentTastingsTests: XCTestCase {
         }
     }
 
-    func testChoiceRetentionAndHistoryClearNeverDeleteFeedback() throws {
+    @MainActor func testChoiceRetentionAndHistoryClearNeverDeleteFeedback() throws {
         try withDB { db,_ in
             try db.saveBeerFeedback(.init(beer:beer(1),rating:.liked),account:"a")
             for i in 0..<105 {
@@ -191,7 +191,7 @@ final class RecentTastingsTests: XCTestCase {
             XCTAssertNotNil(try db.beerFeedback(account:"a").first?.ratedAt)
         }
     }
-    func testFullRoundDuplicateRefreshAndRolloverPreserveHundredAcrossReopen() throws {
+    @MainActor func testFullRoundDuplicateRefreshAndRolloverPreserveHundredAcrossReopen() throws {
         try withDB { db,url in
             for count in [198,199,200] { try db.transaction { try db.recordTastings((1...count).map { beer($0) },account:"a") } }
             let before = try db.recentTastings(account:"a")
@@ -205,7 +205,7 @@ final class RecentTastingsTests: XCTestCase {
             XCTAssertEqual(try db.recentTastings(account:"a"),after,"An older round must not roll history back")
         }
     }
-    func testExpandingExistingCacheBackfillsAvailableSourceWithoutReorderingExistingEvents() throws {
+    @MainActor func testExpandingExistingCacheBackfillsAvailableSourceWithoutReorderingExistingEvents() throws {
         try withDB { db,_ in
             let rows = (1...200).map { beer($0) }
             try db.recordTastings(rows,account:"a")
@@ -218,7 +218,7 @@ final class RecentTastingsTests: XCTestCase {
             XCTAssertEqual(Array(expanded.prefix(20)),previous)
         }
     }
-    func testExpandingCacheDoesNotUndoHistoryClear() throws {
+    @MainActor func testExpandingCacheDoesNotUndoHistoryClear() throws {
         try withDB { db,_ in
             let rows = (1...200).map { beer($0) }
             try db.recordTastings(rows,account:"a")
@@ -228,7 +228,7 @@ final class RecentTastingsTests: XCTestCase {
             XCTAssertTrue(try db.recentTastings(account:"a").isEmpty)
         }
     }
-    func testFeedbackSurvivesHistoryPruningClearAccountSwitchAndReopen() throws {
+    @MainActor func testFeedbackSurvivesHistoryPruningClearAccountSwitchAndReopen() throws {
         try withDB { db,url in
             try db.saveBeerFeedback(BeerFeedback(beer:beer(1),rating:.liked),account:"a")
             try db.saveBeerFeedback(BeerFeedback(beer:beer(1),rating:.notForMe),account:"b")
@@ -244,7 +244,7 @@ final class RecentTastingsTests: XCTestCase {
             XCTAssertEqual(try reopened.beerFeedback(account:"b").count,1)
         }
     }
-    func testFeedbackIsNotCappedAtHistoryLimitAndReratingUpdatesOneRecord() throws {
+    @MainActor func testFeedbackIsNotCappedAtHistoryLimitAndReratingUpdatesOneRecord() throws {
         try withDB { db,_ in
             for id in 1...120 { try db.saveBeerFeedback(BeerFeedback(beer:beer(id),rating:.liked),account:"a") }
             try db.saveBeerFeedback(BeerFeedback(beer:beer(1),rating:.notForMe),account:"a")
@@ -253,7 +253,7 @@ final class RecentTastingsTests: XCTestCase {
             XCTAssertEqual(ratings.first { $0.id == "1" }?.rating,.notForMe)
         }
     }
-    func testRepeatedBeerInNewRoundIsNewEventAndMetadataUpdateIsNot() throws {
+    @MainActor func testRepeatedBeerInNewRoundIsNewEventAndMetadataUpdateIsNot() throws {
         try withDB { db,_ in
             var old = beer(1); try db.recordTastings([old],account:"a")
             old.brew_description = "Updated description"
@@ -264,7 +264,7 @@ final class RecentTastingsTests: XCTestCase {
             XCTAssertEqual(try db.recentTastings(account:"a").count,2)
         }
     }
-    func testClearDoesNotReimportOldSnapshotAndAllowsNewEvents() throws {
+    @MainActor func testClearDoesNotReimportOldSnapshotAndAllowsNewEvents() throws {
         try withDB { db,_ in
             let rows = (1...200).map { beer($0) }
             try db.recordTastings(rows,account:"a")
@@ -275,7 +275,7 @@ final class RecentTastingsTests: XCTestCase {
             XCTAssertEqual(try db.recentTastings(account:"a").map(\.id),["999"])
         }
     }
-    func testAccountIsolationForgetAndRollback() throws {
+    @MainActor func testAccountIsolationForgetAndRollback() throws {
         try withDB { db,_ in
             try db.recordTastings([beer(1)],account:"a")
             XCTAssertTrue(try db.recentTastings(account:"b").isEmpty)
@@ -287,7 +287,7 @@ final class RecentTastingsTests: XCTestCase {
         }
     }
 
-    func testNewlyObservedSameDayTastingOutranksOlderBeerIDs() throws {
+    @MainActor func testNewlyObservedSameDayTastingOutranksOlderBeerIDs() throws {
         try withDB { db,_ in
             let original = (1000..<1020).map { beer($0) }
             try db.recordTastings(original,account:"a")
@@ -298,7 +298,7 @@ final class RecentTastingsTests: XCTestCase {
             XCTAssertEqual(try db.recentTastings(account:"a"),snapshot)
         }
     }
-    func testDatesAreValidatedAndSameDayOrderIsStable() throws {
+    @MainActor func testDatesAreValidatedAndSameDayOrderIsStable() throws {
         try withDB { db,_ in
             let rows = [beer(1,date:"invalid"),beer(2,date:"02/30/2026"),beer(3),beer(4)]
             try db.recordTastings(rows,account:"a")
