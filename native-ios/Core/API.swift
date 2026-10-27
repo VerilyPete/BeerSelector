@@ -1,12 +1,12 @@
 import Foundation
 
-struct APIConfiguration {
+struct APIConfiguration: Sendable {
     var baseURL = URL(string:"https://tapthatapp.beerknurd.com")!
     var enrichmentURL: URL?
     var enrichmentKey: String?
     var timeout: TimeInterval = 15
     var enrichment = EnrichmentPolicy()
-    struct EnrichmentPolicy {
+    struct EnrichmentPolicy: Sendable {
         let timeout: TimeInterval
         let batchSize: Int
         let rateWindow: TimeInterval
@@ -77,7 +77,7 @@ struct HTTPFailure: LocalizedError {
         return nil
     }
 }
-final class BeerAPI {
+final class BeerAPI: Sendable {
     let configuration: APIConfiguration
     private let session: URLSession
     private let enrichmentSession: URLSession
