@@ -4,7 +4,7 @@ Native SwiftUI app for the Flying Saucer UFO Club, supporting iPhone and iPad on
 
 ## Build
 
-Open [BeerSelectorNative.xcodeproj](native-ios/BeerSelectorNative.xcodeproj) in Xcode 26.3. Select the BeerSelectorNative scheme and an iPhone or iPad simulator. The committed project is ready to use; XcodeGen is only needed when changing project structure.
+Open [BeerSelectorNative.xcodeproj](native-ios/BeerSelectorNative.xcodeproj) in Xcode 26.6. Select the BeerSelectorNative scheme and an iPhone or iPad simulator. The committed project is ready to use; XcodeGen is only needed when changing project structure.
 
 For a checkout without private service settings, run:
 
