@@ -2,6 +2,7 @@ import Foundation
 
 /// A bounded local history, written on a serial utility queue. Sharing is user initiated.
 /// An unfinished operation or missing clean shutdown is NOT classified as a crash.
+/// Unchecked Sendable: `entries`, `scheduled`, and `generation` are only touched on `queue`.
 final class DiagnosticJournal: @unchecked Sendable {
     static let shared = DiagnosticJournal(url: FileManager.default.urls(for:.applicationSupportDirectory,in:.userDomainMask)[0]
         .appendingPathComponent("Diagnostics/recent.json"))
@@ -124,6 +125,8 @@ final class DiagnosticJournal: @unchecked Sendable {
 }
 
 /// Detects sustained foreground main-thread delays; not a crash detector.
+/// Unchecked Sendable: `timer`, `probe`, and `generation` are only touched on `queue`;
+/// the main-queue probe reads the clock and hops back before touching them.
 final class MainThreadMonitor: @unchecked Sendable {
     static let shared = MainThreadMonitor(journal:.shared)
     struct Probe {
