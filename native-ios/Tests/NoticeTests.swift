@@ -39,12 +39,54 @@ final class NoticeTests: XCTestCase {
         model.dismissNotice(shown)
         XCTAssertEqual(changes,0,"SwiftUI repeats dismissal during view updates, where publishing is not allowed")
     }
-    @MainActor func testDismissingSupersededNoticeKeepsTheNewerOne() throws {
+    @MainActor func testNoticeArrivingWhileAnotherIsShownWaitsItsTurn() async throws {
+        let model = model()
+        model.notice = "Pliny has been added to your queue!"
+        let first = try XCTUnwrap(model.presentedNotice)
+        model.notice = "Heady Topper has been added to your queue!"
+        XCTAssertEqual(model.presentedNotice,first,"A displayed alert ignores data changes, so the next notice must wait")
+        model.dismissNotice(first)
+        XCTAssertNil(model.presentedNotice,"The alert must close before the next one can present")
+        let second = await nextPresentedNotice(model)
+        XCTAssertEqual(second?.message,"Heady Topper has been added to your queue!")
+        XCTAssertNotEqual(second?.id,first.id)
+    }
+    @MainActor func testClearingNoticesDropsPendingOnes() throws {
         let model = model()
         model.notice = "First"
-        let first = try XCTUnwrap(model.presentedNotice)
         model.notice = "Second"
-        model.dismissNotice(first)
-        XCTAssertEqual(model.presentedNotice?.message,"Second")
+        model.notice = nil
+        XCTAssertNil(model.presentedNotice)
+        model.notice = "Third"
+        XCTAssertEqual(model.presentedNotice?.message,"Third","Nothing pending may be shown ahead of it")
+    }
+    @MainActor func testClearingNoticesCancelsTheNextPresentation() async throws {
+        let model = model()
+        model.notice = "First"
+        model.notice = "Second"
+        model.dismissNotice(try XCTUnwrap(model.presentedNotice))
+        model.notice = nil
+        model.notice = "Third"
+        let next = await nextPresentedNotice(model)
+        XCTAssertEqual(next?.message,"Third")
+        await Task.yield()
+        XCTAssertEqual(model.presentedNotice?.message,"Third")
+    }
+    @MainActor func testDismissingANoticeThatWasNeverDisplayedChangesNothing() throws {
+        let model = model()
+        model.notice = "Shown"
+        let shown = try XCTUnwrap(model.presentedNotice)
+        model.notice = "Waiting"
+        var changes = 0
+        let subscription = model.objectWillChange.sink { changes += 1 }
+        defer { subscription.cancel() }
+        model.dismissNotice(Notice(message:"Waiting"))
+        XCTAssertEqual(model.presentedNotice,shown)
+        XCTAssertEqual(changes,0)
+    }
+    @MainActor private func nextPresentedNotice(_ model: AppModel) async -> Notice? {
+        if let notice = model.presentedNotice { return notice }
+        for await notice in model.$presentedNotice.values where notice != nil { return notice }
+        return nil
     }
 }

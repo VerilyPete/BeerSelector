@@ -46,9 +46,9 @@ struct RootView: View {
         .alert("Beer Selector",isPresented:noticePresented,presenting:model.presentedNotice) { shown in Button("OK") { model.dismissNotice(shown) } } message: { Text($0.message) }
         .background(UntappdBrowser(url:$model.browserURL))
     }
+    // OK dismisses the notice it displayed; the setter cannot know which notice is on screen.
     private var noticePresented: Binding<Bool> {
-        let shown = model.presentedNotice
-        return Binding(get:{ model.presentedNotice != nil },set:{ if !$0, let shown { model.dismissNotice(shown) } })
+        Binding(get:{ model.presentedNotice != nil },set:{ _ in })
     }
     private var tabBar: some View {
         Group {

@@ -88,12 +88,26 @@ final class AppModel: ObservableObject {
     @Published var offline = false
     @Published var error: String?
     @Published private(set) var presentedNotice: Notice?
+    private var pendingNotices: [Notice] = []
+    private var noticeAdvance: Task<Void, Never>?
     var notice: String? {
         get { presentedNotice?.message }
-        set { presentedNotice = newValue.map { Notice(message:$0) } }
+        set {
+            guard let newValue else { noticeAdvance?.cancel(); pendingNotices = []; presentedNotice = nil; return }
+            let next = Notice(message:newValue)
+            if presentedNotice == nil && pendingNotices.isEmpty { presentedNotice = next } else { pendingNotices.append(next) }
+        }
     }
     func dismissNotice(_ notice: Notice) {
-        if presentedNotice?.id == notice.id { presentedNotice = nil }
+        guard presentedNotice?.id == notice.id else { return }
+        presentedNotice = nil
+        guard !pendingNotices.isEmpty else { return }
+        // A presented alert ignores new data, and SwiftUI drops a presentation requested while the last alert animates away.
+        noticeAdvance = Task { [weak self] in
+            do { try await Task.sleep(for:.milliseconds(500)) } catch { return }
+            guard let self, presentedNotice == nil, !pendingNotices.isEmpty else { return }
+            presentedNotice = pendingNotices.removeFirst()
+        }
     }
     @Published var busyIDs: Set<String> = []
     @Published var tab: AppTab = .home
