@@ -54,10 +54,7 @@ final class AppModel: ObservableObject {
     }
     private func updateMissedCredits() throws {
         guard let db, let account = recommendationAccount else { missedCredits = []; return }
-        let log = try db.creditLog(account:account)
-        let credited = MissedCredit.credited(log:log,tasted:tastedBeers)
-        if !credited.isEmpty { try db.transaction { try db.dismissCredit(ids:credited,account:account) } }
-        missedCredits = MissedCredit.visits(log:log,tasted:tastedBeers,now:now())
+        missedCredits = MissedCredit.visits(log:try db.creditLog(account:account),tasted:tastedBeers,now:now())
     }
     func clearRecommendationHistory() {
         guard let db, let account = recommendationAccount else { return }
@@ -418,6 +415,9 @@ final class AppModel: ObservableObject {
                             try db.recordTastings(db.beers(tasted:true),account:account)
                             try db.observeChoiceTastings(tasted,previous:db.beers(tasted:true),account:account)
                             try db.recordTastings(tasted,account:account)
+                            // Only freshly downloaded tastings record credit for good; a stale
+                            // cache from the previous round must not hide this round's beers.
+                            try db.dismissCredit(ids:MissedCredit.credited(log:db.creditLog(account:account),tasted:tasted),account:account)
                         }
                         try db.replaceBeers(tasted,tasted:true)
                         try db.setPreference("last_my_beers_refresh",String(Date().timeIntervalSince1970 * 1000))
