@@ -590,7 +590,7 @@ final class AppModel: ObservableObject {
             }
             let committedEpoch = epoch
             session = next; cookies = visitor ? [:] : values
-            queue = []; queuedBeerIDs = []
+            queue = []; queuedBeerIDs = []; missedCredits = []
             let previousCleanup = accountCleanupTask
             let cleanup = Task { @MainActor () -> [String] in
                 if let previousCleanup { _ = await previousCleanup.value }

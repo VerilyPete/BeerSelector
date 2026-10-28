@@ -112,6 +112,12 @@ final class MissedCreditTests: XCTestCase {
             XCTAssertEqual(try db.creditLog(account:"a") + db.creditLog(account:"b"),[])
         }
     }
+    func testQueueTimesAreGregorianWhateverCalendarThePhoneUses() {
+        var buddhist = Calendar(identifier:.buddhist); buddhist.timeZone = calendar.timeZone
+        let log = [entry("1","Example Oktoberfest (Draft)","Oct 25, 2026 @ 09:21:29pm")]
+        XCTAssertEqual(MissedCredit.visits(log:log,tasted:[],now:at(10,25,23),calendar:buddhist),[])
+        XCTAssertEqual(MissedCredit.visits(log:log,tasted:[],now:at(10,26,9),calendar:buddhist).map(\.day),[at(10,25,0)])
+    }
     func testMorningQueueTimesAreReadAsAM() {
         let log = [entry("1","Brunch","Oct 25, 2026 @ 11:05:00am")]
         XCTAssertEqual(visits(log,now:at(10,25,16)),[])

@@ -44,7 +44,7 @@ enum MissedCredit {
     }
     private static func queuedTime(_ entry: CreditLogEntry, calendar: Calendar) -> (Date,Date) {
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier:"en_US_POSIX"); formatter.calendar = calendar; formatter.timeZone = calendar.timeZone
+        formatter.locale = Locale(identifier:"en_US_POSIX"); formatter.calendar = Calendar(identifier:.gregorian); formatter.timeZone = calendar.timeZone
         formatter.dateFormat = "MMM dd, yyyy '@' hh:mm:ssa"
         if let time = formatter.date(from:entry.queued) { return (time,calendar.startOfDay(for:time)) }
         formatter.dateFormat = "MMM dd, yyyy"

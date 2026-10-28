@@ -127,7 +127,10 @@ final class MissedCreditModelTests: XCTestCase {
             upstream.queue = []
             let url = model.api.configuration.endpoint("member-dash.php")
             let cookies = ["member_id":"2","store__id":"2","PHPSESSID":"new"].map { HTTPCookie(properties:[.domain:url.host!, .path:"/", .name:$0.key, .value:$0.value])! }
+            var reportDuringSwitch: [MissedCreditVisit]?
+            model.activityCleanup = { if model.session?.memberId == "2" { reportDuringSwitch = model.missedCredits } }
             try await model.completeLogin(url:url,nativeCookies:cookies)
+            XCTAssertEqual(reportDuringSwitch,[],"The new member is never shown the previous member's beers")
             XCTAssertEqual(model.missedCredits,[])
             XCTAssertEqual(try db.rows("SELECT COUNT(*) AS count FROM credit_log").first?["count"],"0")
         }
