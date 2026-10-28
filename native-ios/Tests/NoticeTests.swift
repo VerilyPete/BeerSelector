@@ -2,20 +2,24 @@ import XCTest
 import Combine
 @testable import BeerSelectorNative
 
-/// Stands in for the pause while a dismissed alert animates away. Each release ends one pause,
-/// whether that pause has already started or starts later.
+/// Stands in for the pause while a dismissed alert animates away. A release ends every pause in
+/// progress, or the next one to start if none is waiting. Like Task.sleep, a cancelled pause ends at once.
 @MainActor final class NoticeSpacingGate {
     private var waiting: [CheckedContinuation<Void, Never>] = []
     private var released = 0
     private(set) var started = 0
     func install(on model: AppModel) { model.noticeSpacing = { [self] in await pause() } }
     func pause() async {
+        if Task.isCancelled { return }
         started += 1
         if released > 0 { released -= 1; return }
         await withCheckedContinuation { waiting.append($0) }
     }
     func release() {
-        if waiting.isEmpty { released += 1 } else { waiting.removeFirst().resume() }
+        if waiting.isEmpty { released += 1; return }
+        let finished = waiting
+        waiting = []
+        finished.forEach { $0.resume() }
     }
 }
 
@@ -138,6 +142,134 @@ final class NoticeTests: XCTestCase {
         let model = model()
         model.showLogin = true; model.showMissedCredit = true
         XCTAssertEqual(model.noticeHost,.root,"Login and missed credit only appear above Settings and Queue")
+    }
+    @MainActor func testSettingsOpenedOverQueueHostsTheNotice() {
+        let model = model()
+        model.showQueue = true; model.showSettings = true
+        XCTAssertEqual(model.noticeHost,.settings,"Only Settings opens over another sheet, and SwiftUI stacks it on top")
+    }
+    @MainActor func testOpeningASheetMovesTheDisplayedNoticeToItAfterAPause() async throws {
+        let spacing = NoticeSpacingGate()
+        let model = model(spacing)
+        model.notice = "Pliny has been added to your queue!"
+        let shown = try XCTUnwrap(model.presentedNotice)
+        model.showSettings = true
+        model.noticePresenter(.settings,isReady:true)
+        XCTAssertNil(model.presentedNotice,"SwiftUI drops an alert whose presenter changes, so the notice must be presented again")
+        spacing.release()
+        let again = await nextPresentedNotice(model)
+        XCTAssertEqual(again,shown)
+        XCTAssertEqual(model.noticeHost,.settings)
+    }
+    @MainActor func testClosingASheetMovesTheDisplayedNoticeToTheMainScreenAfterAPause() async throws {
+        let spacing = NoticeSpacingGate()
+        let model = model(spacing)
+        model.showRecommendations = true
+        model.noticePresenter(.recommendations,isReady:true)
+        spacing.release()
+        model.notice = "Pliny has been added to your queue!"
+        let displayed = await nextPresentedNotice(model)
+        let shown = try XCTUnwrap(displayed)
+        model.showRecommendations = false
+        XCTAssertNil(model.presentedNotice)
+        spacing.release()
+        let again = await nextPresentedNotice(model)
+        XCTAssertEqual(again,shown)
+        XCTAssertEqual(model.noticeHost,.root)
+    }
+    @MainActor func testClosingANestedSheetMovesTheDisplayedNoticeToItsParentAfterAPause() async throws {
+        let spacing = NoticeSpacingGate()
+        let model = model(spacing)
+        model.showQueue = true; model.showMissedCredit = true
+        model.noticePresenter(.queue,isReady:true); model.noticePresenter(.missedCredit,isReady:true)
+        spacing.release()
+        model.notice = "Credit report updated"
+        let displayed = await nextPresentedNotice(model)
+        let shown = try XCTUnwrap(displayed)
+        model.showMissedCredit = false
+        XCTAssertNil(model.presentedNotice)
+        spacing.release()
+        let again = await nextPresentedNotice(model)
+        XCTAssertEqual(again,shown)
+        XCTAssertEqual(model.noticeHost,.queue)
+    }
+    @MainActor func testSignInClosingLoginAndSettingsKeepsNoticesInOrder() async throws {
+        let spacing = NoticeSpacingGate()
+        let model = model(spacing)
+        model.showSettings = true; model.showLogin = true
+        model.noticePresenter(.settings,isReady:true); model.noticePresenter(.login,isReady:true)
+        spacing.release()
+        model.notice = "First"
+        let displayed = await nextPresentedNotice(model)
+        let first = try XCTUnwrap(displayed)
+        model.notice = "Second"
+        model.showLogin = false; model.showSettings = false
+        XCTAssertNil(model.presentedNotice)
+        spacing.release()
+        let again = await nextPresentedNotice(model)
+        XCTAssertEqual(again,first,"The displayed notice goes back to the head of the queue")
+        XCTAssertEqual(model.noticeHost,.root)
+        model.dismissNotice(first)
+        spacing.release()
+        let second = await nextPresentedNotice(model)
+        XCTAssertEqual(second?.message,"Second")
+    }
+    @MainActor func testNoticePostedJustAfterASheetClosesWaitsForThePause() async {
+        let spacing = NoticeSpacingGate()
+        let model = model(spacing)
+        model.showRecommendations = true
+        model.noticePresenter(.recommendations,isReady:true)
+        spacing.release()
+        await Task.yield()
+        model.showRecommendations = false
+        model.notice = "Pliny has been added to your queue!"
+        XCTAssertNil(model.presentedNotice,"The closing sheet still covers the main screen")
+        spacing.release()
+        let next = await nextPresentedNotice(model)
+        XCTAssertEqual(next?.message,"Pliny has been added to your queue!")
+    }
+    @MainActor func testBlockedPresenterHoldsNoticesUntilAPauseAfterItIsFree() async {
+        let spacing = NoticeSpacingGate()
+        let model = model(spacing)
+        model.showQueue = true
+        model.noticePresenter(.queue,isReady:true)
+        spacing.release()
+        model.noticePresenter(.queue,isReady:false)
+        model.notice = "Pliny has been added to your queue!"
+        XCTAssertNil(model.presentedNotice,"Another alert is already open on Queue")
+        spacing.release()
+        await Task.yield()
+        XCTAssertNil(model.presentedNotice)
+        model.noticePresenter(.queue,isReady:true)
+        XCTAssertNil(model.presentedNotice,"The other alert is still animating away")
+        spacing.release()
+        let next = await nextPresentedNotice(model)
+        XCTAssertEqual(next?.message,"Pliny has been added to your queue!")
+    }
+    @MainActor func testSheetThatHasNotAppearedYetHoldsNoticesUntilAPauseAfterItAppears() async {
+        let spacing = NoticeSpacingGate()
+        let model = model(spacing)
+        model.showQueue = true; model.showMissedCredit = true
+        model.notice = "Pliny has been added to your queue!"
+        spacing.release()
+        await Task.yield()
+        XCTAssertNil(model.presentedNotice,"SwiftUI presents a nested sheet only after its parent finishes, and drops alerts meanwhile")
+        model.noticePresenter(.queue,isReady:true)
+        spacing.release()
+        await Task.yield()
+        XCTAssertNil(model.presentedNotice,"Missed Credit is frontmost but not on screen yet")
+        model.noticePresenter(.missedCredit,isReady:true)
+        XCTAssertNil(model.presentedNotice,"Missed Credit is still animating in")
+        spacing.release()
+        let next = await nextPresentedNotice(model)
+        XCTAssertEqual(next?.message,"Pliny has been added to your queue!")
+        XCTAssertEqual(model.noticeHost,.missedCredit)
+    }
+    @MainActor func testBlockedPresenterBehindTheFrontmostOneDoesNotHoldNotices() {
+        let model = model()
+        model.noticePresenter(.queue,isReady:false)
+        model.notice = "Pliny has been added to your queue!"
+        XCTAssertNotNil(model.presentedNotice)
     }
     @MainActor func testDismissingANoticeThatWasNeverDisplayedChangesNothing() throws {
         let model = model()

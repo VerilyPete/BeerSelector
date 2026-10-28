@@ -103,7 +103,7 @@ struct SettingsScreen: View {
                     Button("Delete feedback",role:.destructive) { model.deleteCachedBeerFeedback(account:feedbackDeletionAccount) }
                 }
                 .sheet(isPresented:$model.showLogin) { LoginScreen().environmentObject(model) }
-                .noticeAlert(.settings,model:model)
+                .noticeAlert(.settings,model:model,blocked:confirmDeleteFeedback || confirmClearHistory || confirmLogout || confirmReset || confirmTimestamps)
                 .onChange(of:recommendationsEnabled) { _,enabled in if !enabled { model.recommendations.cancel() } }
                 .confirmationDialog("Clear recent recommendation history?",isPresented:$confirmClearHistory,titleVisibility:.visible) {
                     Button("Clear History",role:.destructive) { model.clearRecommendationHistory() }

@@ -16,7 +16,7 @@ final class AppModel: ObservableObject {
     @Published var recentTastings: [Beer] = []
     @Published var missedCredits: [MissedCreditVisit] = []
     var now: () -> Date = Date.init
-    @Published var showRecommendations = false
+    @Published var showRecommendations = false { didSet { noticePresenterMayHaveChanged() } }
     let semanticIndex = SemanticTaplistIndex()
     lazy var recommendations = RecommendationController(model:self)
     private var taplistValidation: UUID?
@@ -121,12 +121,17 @@ final class AppModel: ObservableObject {
     func dismissNotice(_ notice: Notice) {
         guard presentedNotice?.id == notice.id else { return }
         presentedNotice = nil
-        // A presented alert ignores new data, and SwiftUI drops a presentation requested while the last alert animates away.
+        startNoticeSpacing()
+    }
+    // A presented alert ignores new data, and SwiftUI drops a presentation requested while the last alert or sheet animates away.
+    private func startNoticeSpacing() {
+        noticeSpacingTask?.cancel()
         let spacing = noticeSpacing
         noticeSpacingTask = Task { [weak self] in
             await spacing()
-            self?.noticeSpacingTask = nil
-            self?.presentNextNotice()
+            guard !Task.isCancelled, let self else { return }
+            noticeSpacingTask = nil
+            presentNextNotice()
         }
     }
     // Only the frontmost presenter may show a notice: dismissing an alert from a view that presents a sheet also closes the sheet.
@@ -138,18 +143,33 @@ final class AppModel: ObservableObject {
         if showOperations { return .operations }
         return .root
     }
+    private var readyNoticeHosts: Set<NoticeHost> = [.root]
+    private var frontNoticePresenter = (host:NoticeHost.root, ready:true)
+    /// A presenter is ready once it is on screen and not showing its own alert or dialog.
+    func noticePresenter(_ host: NoticeHost, isReady: Bool) {
+        if isReady { readyNoticeHosts.insert(host) } else { readyNoticeHosts.remove(host) }
+        noticePresenterMayHaveChanged()
+    }
+    // SwiftUI drops an alert whose presenter goes away or gets covered, so put the notice back and present it once things settle.
+    private func noticePresenterMayHaveChanged() {
+        let front = (host:noticeHost, ready:readyNoticeHosts.contains(noticeHost))
+        guard front != frontNoticePresenter else { return }
+        frontNoticePresenter = front
+        if let shown = presentedNotice { pendingNotices.insert(shown,at:0); presentedNotice = nil }
+        startNoticeSpacing()
+    }
     private func presentNextNotice() {
-        guard presentedNotice == nil, noticeSpacingTask == nil, !pendingNotices.isEmpty else { return }
+        guard presentedNotice == nil, noticeSpacingTask == nil, frontNoticePresenter.ready, !pendingNotices.isEmpty else { return }
         presentedNotice = pendingNotices.removeFirst()
     }
     @Published var busyIDs: Set<String> = []
     @Published var tab: AppTab = .home
-    @Published var showSettings = false
-    @Published var showLogin = false
-    @Published var showQueue = false
-    @Published var showMissedCredit = false
-    @Published var showOperations = false
-    @Published var showRewards = false
+    @Published var showSettings = false { didSet { noticePresenterMayHaveChanged() } }
+    @Published var showLogin = false { didSet { noticePresenterMayHaveChanged() } }
+    @Published var showQueue = false { didSet { noticePresenterMayHaveChanged() } }
+    @Published var showMissedCredit = false { didSet { noticePresenterMayHaveChanged() } }
+    @Published var showOperations = false { didSet { noticePresenterMayHaveChanged() } }
+    @Published var showRewards = false { didSet { noticePresenterMayHaveChanged() } }
     @Published var browserURL: URL?
     var db: BeerDatabase?
     let api: BeerAPI

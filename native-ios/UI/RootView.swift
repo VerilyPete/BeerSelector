@@ -6,14 +6,19 @@ enum AppTab: String, CaseIterable {
     var title: String { switch self { case .home:"Home"; case .all:"All Beers"; case .finder:"Beerfinder"; case .tasted:"Tasted Brews" } }
 }
 extension View {
-    func noticeAlert(_ host: NoticeHost, model: AppModel) -> some View { modifier(NoticeAlert(host:host,model:model)) }
+    /// `blocked` is true while this presenter shows its own alert or dialog.
+    func noticeAlert(_ host: NoticeHost, model: AppModel, blocked: Bool = false) -> some View { modifier(NoticeAlert(host:host,model:model,blocked:blocked)) }
 }
 private struct NoticeAlert: ViewModifier {
     let host: NoticeHost
     @ObservedObject var model: AppModel
+    let blocked: Bool
+    @State private var appeared = false
     func body(content: Content) -> some View {
         // OK dismisses the notice it displayed; the setter cannot know which notice is on screen.
-        content.alert("Beer Selector",isPresented:Binding(get:{ model.presentedNotice != nil && model.noticeHost == host },set:{ _ in }),presenting:model.presentedNotice) { shown in
+        content.onAppear { appeared = true }.onDisappear { appeared = false }
+            .onChange(of:appeared && !blocked,initial:true) { _,ready in model.noticePresenter(host,isReady:ready) }
+            .alert("Beer Selector",isPresented:Binding(get:{ model.presentedNotice != nil && model.noticeHost == host },set:{ _ in }),presenting:model.presentedNotice) { shown in
             Button("OK") { model.dismissNotice(shown) }
         } message: { Text($0.message) }
     }
