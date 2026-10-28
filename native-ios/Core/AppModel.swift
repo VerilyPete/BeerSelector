@@ -2,6 +2,11 @@ import SwiftUI
 import Network
 import WebKit
 
+struct Notice: Identifiable, Equatable {
+    let id = UUID()
+    let message: String
+}
+
 @MainActor
 final class AppModel: ObservableObject {
     @Published var session: MemberSession? { didSet { if oldValue?.identity != session?.identity { semanticIndex.invalidate() } } }
@@ -82,7 +87,14 @@ final class AppModel: ObservableObject {
     @Published var rewardsNotice: String?
     @Published var offline = false
     @Published var error: String?
-    @Published var notice: String?
+    @Published private(set) var presentedNotice: Notice?
+    var notice: String? {
+        get { presentedNotice?.message }
+        set { presentedNotice = newValue.map { Notice(message:$0) } }
+    }
+    func dismissNotice(_ notice: Notice) {
+        if presentedNotice?.id == notice.id { presentedNotice = nil }
+    }
     @Published var busyIDs: Set<String> = []
     @Published var tab: AppTab = .home
     @Published var showSettings = false
