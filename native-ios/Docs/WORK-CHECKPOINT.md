@@ -5,7 +5,11 @@ All three targets (`BeerSelectorNative`, `BeerQueueWidget`, `BeerSelectorNativeT
 - Production `@unchecked Sendable` remains only on `DiagnosticJournal` and `MainThreadMonitor`. Both are confined to a serial queue, and each conformance states which fields that queue owns.
 - Runtime behaviour changes: the Live Activity cleanup task registers on the main queue (its handler was already main-actor isolated), and the Untappd authentication completion no longer assumes the main thread.
 - Swift 6 builds have 0 errors and 0 warnings for app and widget in Debug, Release and Performance (simulator), plus Release on device. The test target builds in Debug and Performance.
-- **Pending:** the manual Swift 6 runtime checks in TESTING.md (Device checks), on a simulator and a physical device. No build or unit test catches an isolation trap.
+- Manual Swift 6 runtime checks (TESTING.md → Device checks), run by Pete from Xcode on October 27, 2026, with the debugger attached and Live Activities set to go stale after 2 minutes in an uncommitted local change. No isolation traps.
+  - iPhone 18 Pro: simulating the cleanup task's launch ended the stale Live Activity. Expiration ran while stopped inside the cleanup loop.
+  - Member sign-in through the web-view redirect, sign-out, visitor mode, account switch, Untappd (open, complete, cancel, dismiss), and offline to online all passed.
+  - MetricKit (Debug → Simulate MetricKit Payloads on the iPhone): both `DeviceMetrics.didReceive` callbacks, metric and diagnostic, ran on `com.apple.metrickit.manager.queue`. The debugger confirmed both breakpoints were hit, and the app kept running after resuming.
+- Pre-existing, unrelated to the migration: dismissing the alert at `UI/RootView.swift:46` logs SwiftUI's "Publishing changes from within view updates" warning, and the cancelled cleanup task skips `setTaskCompleted`. Both are follow-ups.
 
 ## Experimental semantic retrieval — September 14, 2026
 
