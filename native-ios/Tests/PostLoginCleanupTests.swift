@@ -17,7 +17,9 @@ final class PostLoginCleanupTests: XCTestCase {
             calls += 1
             if calls == 1 { await withCheckedContinuation { release = $0; held.fulfill() } }
         }
-        if visitor { model.webCookieCleanup = cleanup } else { model.activityCleanup = cleanup }
+        // Hold the cleanup under test; stub the other so logout never reaches real WebKit or ActivityKit.
+        model.webCookieCleanup = visitor ? cleanup : {}
+        model.activityCleanup = visitor ? {} : cleanup
         let secondResponse = XCTestExpectation(description:"Second login fetched dashboard")
         fixture.handler = { request in
             switch request.url!.path {
@@ -61,7 +63,7 @@ final class PostLoginCleanupTests: XCTestCase {
             let logout = Task { await model.logout() }
             await fulfillment(of:[signedOut],timeout:3)
             observer.cancel(); release?.resume(); release = nil
-            await logout.value
+            _ = await logout.value
             do { try await first.value; XCTFail("Old login completion must be rejected") }
             catch { guard case BeerError.changedAccount = error else { return XCTFail("Unexpected error: \(error)") } }
             XCTAssertNil(model.session)

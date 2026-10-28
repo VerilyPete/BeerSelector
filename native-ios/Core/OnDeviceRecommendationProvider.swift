@@ -114,7 +114,7 @@ enum RecommendationUnavailable: Error { case model, contextBudget }
 /// An uncooperative model must not hold the UI open after timeout/cancellation.
 /// Only this MainActor owner can resume the continuation; late completions are ignored.
 @MainActor
-final class RecommendationDeadline<Value> {
+final class RecommendationDeadline<Value: Sendable> {
     private var continuation: CheckedContinuation<Value?,Never>?
     private var expires = ContinuousClock.now
     private var worker: Task<Void,Never>?

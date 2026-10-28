@@ -467,7 +467,7 @@ final class NetworkTests: XCTestCase {
         await service.poll(.init(ids:["1"]),isCurrent:{ current }) { _ in XCTFail("Late response must not publish") }
         XCTAssertEqual(service.metrics.requests,1)
     }
-    @MainActor private func withPausedCleanup(_ body: (AppModel,BeerDatabase,() -> Void,Task<Void,Never>) async throws -> Void) async throws {
+    @MainActor private func withPausedCleanup(_ body: @MainActor (AppModel,BeerDatabase,@MainActor () -> Void,Task<Void,Never>) async throws -> Void) async throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         let database = try BeerDatabase(url:folder.appendingPathComponent("beers.db"))
         let model = AppModel(api:api(configuration:enrichmentConfiguration),monitorConnectivity:false)
@@ -499,7 +499,7 @@ final class NetworkTests: XCTestCase {
         XCTAssertEqual(model.tastedBeers.first?.brew_name,"Tasted beer")
         await fulfillment(of:[paused],timeout:2)
         let task = try XCTUnwrap(model.enrichmentTask)
-        let resume = { continuation?.resume(); continuation = nil }
+        let resume: @MainActor () -> Void = { continuation?.resume(); continuation = nil }
         do { try await body(model,database,resume,task) }
         catch { task.cancel(); resume(); await task.value; throw error }
         task.cancel(); resume(); await task.value
@@ -889,6 +889,7 @@ final class NetworkTests: XCTestCase {
         configuration.enrichmentURL = URL(string:"https://enrichment.example.test")
         configuration.enrichmentKey = "fixture"
         let model = AppModel(api:api(configuration:configuration),credentials:credentials,monitorConnectivity:false)
+        model.webCookieCleanup = {}; model.activityCleanup = {}
         let db = try BeerDatabase(url:folder.appendingPathComponent("beers.db")); model.db = db
         model.session = MemberSession(memberId:"fixture",storeId:"1",storeName:"Fixture",sessionId:"fixture")
         try db.setPreference("all_beers_api_url","https://fsbs.beerknurd.com/bk-store-json.php?sid=1")

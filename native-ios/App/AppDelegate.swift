@@ -9,7 +9,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
               ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else { return true }
         DiagnosticJournal.shared.record(.launch)
         DeviceMetrics.shared.start()
-        BGTaskScheduler.shared.register(forTaskWithIdentifier:Self.cleanupIdentifier,using:nil) { task in
+        BGTaskScheduler.shared.register(forTaskWithIdentifier:Self.cleanupIdentifier,using:.main) { task in
             let work = Task {
                 for activity in Activity<BeerQueueAttributes>.activities where activity.content.staleDate.map({ $0 <= Date() }) == true {
                     guard !Task.isCancelled else { return }
@@ -17,7 +17,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
                 }
                 task.setTaskCompleted(success:!Task.isCancelled)
             }
-            task.expirationHandler = { work.cancel() }
+            task.expirationHandler = { @Sendable in work.cancel() }
         }
         return true
     }

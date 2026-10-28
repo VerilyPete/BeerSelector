@@ -1,16 +1,22 @@
 import Foundation
 import SQLite3
 
+private final class SQLiteConnection {
+    var handle: OpaquePointer?
+    deinit { sqlite3_close(handle) }
+}
+
 /// Serialized by AppModel on the main actor. No suspension inside transactions.
-final class BeerDatabase {
-    private var handle: OpaquePointer?
+@MainActor final class BeerDatabase {
+    private let connection = SQLiteConnection()
+    private var handle: OpaquePointer? { connection.handle }
     private let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
     let url: URL
     init(url: URL? = nil) throws {
         let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         self.url = url ?? documents.appendingPathComponent("SQLite/beers.db")
         try FileManager.default.createDirectory(at: self.url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        guard sqlite3_open_v2(self.url.path, &handle, SQLITE_OPEN_CREATE | SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX, nil) == SQLITE_OK else { throw BeerError.storage("Could not open beers.db") }
+        guard sqlite3_open_v2(self.url.path, &connection.handle, SQLITE_OPEN_CREATE | SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX, nil) == SQLITE_OK else { throw BeerError.storage("Could not open beers.db") }
         // AppModel calls synchronously on MainActor. Never sleep waiting for another
         // writer: let the transaction fail, retain the snapshot, and allow a later retry.
         sqlite3_busy_timeout(handle, 0)
@@ -18,7 +24,6 @@ final class BeerDatabase {
         try execute("PRAGMA synchronous=NORMAL")
         try setup()
     }
-    deinit { sqlite3_close(handle) }
     private func prepare(_ sql: String, _ values: [String?]) throws -> OpaquePointer {
         var statement: OpaquePointer?
         guard sqlite3_prepare_v2(handle, sql, -1, &statement, nil) == SQLITE_OK, let statement else { throw failure() }

@@ -12,7 +12,9 @@ python3 native-ios/Scripts/test-cloud-configuration.py
 
 The All plan covers native unit, network, account-safety, persistence, and legacy-upgrade behavior. Performance has its own plan and scheme; see [PHONE-TESTS.md](native-ios/Docs/PHONE-TESTS.md). Legacy schema-v8 fixtures remain in the native suite even though the Expo source is retired.
 
-GitHub Actions runs the native All plan and Cloud configuration tests on the GitHub `xcode-27` runner image (macOS 27) with Xcode 27.1. Its required job retains the name **Jest Unit Tests** solely because main branch protection requires that exact GitHub Actions context. It executes Swift/Python, not Jest. Rename the job and protection together in a separate change after the replacement has passed remotely. No protection was weakened by this cleanup.
+GitHub Actions runs the native All plan and Cloud configuration tests on the GitHub `xcode-27` runner image (macOS 27) with Xcode 27.1. Main branch protection requires its **Native iOS Tests** job; renaming that job means updating the protection rule in the same change. CI runs the tests serially (`BEERSELECTOR_TEST_PARALLEL=NO`); local runs stay parallel. With two simulator clones sharing the runner's disk, the system throttles the diagnostic journal's utility-priority writes until its tests pass the 60-second allowance, and serial runs are faster anyway (about 7 minutes against 18–20).
+
+Tests that sign in or out must stub `webCookieCleanup` and `activityCleanup`. The real WebKit cookie store can block indefinitely on CI simulators.
 
 Xcode Cloud's Native External Beta workflow tests and archives main changes for external TestFlight distribution. The older Native Correctness workflow is scoped to the migration branch; GitHub's native PR job covers cleanup and future branches.
 

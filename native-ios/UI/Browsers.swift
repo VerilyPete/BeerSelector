@@ -43,7 +43,7 @@ struct LoginWebView: UIViewRepresentable {
         var cancelled = false
         var loginTask: Task<Void,Never>?
         init(_ parent: LoginWebView) { self.parent = parent }
-        func webView(_ webView: WKWebView,decidePolicyFor navigationAction: WKNavigationAction,decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+        func webView(_ webView: WKWebView,decidePolicyFor navigationAction: WKNavigationAction,decisionHandler: @escaping @MainActor @Sendable (WKNavigationActionPolicy) -> Void) {
             guard let url = navigationAction.request.url, url.scheme == "https" else { decisionHandler(.cancel); return }
             decisionHandler(.allow)
         }
@@ -76,10 +76,11 @@ struct UntappdBrowser: UIViewControllerRepresentable {
     }
     final class Controller: UIViewController, ASWebAuthenticationPresentationContextProviding {
         var session: ASWebAuthenticationSession?
-        func open(_ url: URL,completion: @escaping () -> Void) {
+        func open(_ url: URL,completion: @escaping @MainActor @Sendable () -> Void) {
             guard session == nil else { return }
-            session = ASWebAuthenticationSession(url:url,callbackURLScheme:nil) { [weak self] _,_ in
-                DispatchQueue.main.async { self?.session = nil; completion() }
+            session = ASWebAuthenticationSession(url:url,callbackURLScheme:nil) { @Sendable [weak self] _,_ in
+                let controller = self
+                DispatchQueue.main.async { controller?.session = nil; completion() }
             }
             session?.presentationContextProvider = self
             session?.prefersEphemeralWebBrowserSession = false
