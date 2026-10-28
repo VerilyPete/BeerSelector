@@ -297,16 +297,22 @@ private struct ShareSheet: UIViewControllerRepresentable {
         guard let item, !controller.sharing else { return }
         controller.sharing = true
         let binding = $item
-        controller.finish = { controller.sharing = false; controller.finish = nil; binding.wrappedValue = nil }
+        controller.finish = { controller.sharing = false; controller.current = nil; controller.finish = nil; binding.wrappedValue = nil }
         DispatchQueue.main.async {
             // UIKit refuses to present while another presentation is under way or outside a window, and then never calls the completion.
             guard controller.view.window != nil, controller.presentedViewController == nil else { controller.finish?(); return }
             let activity = UIActivityViewController(activityItems:[item.value],applicationActivities:nil)
             activity.popoverPresentationController?.sourceView = controller.view
-            activity.completionWithItemsHandler = { _,_,_,_ in DispatchQueue.main.async { controller.finish?() } }
+            // Only the share on screen may finish; a closed one's callbacks must not end a newer share.
+            controller.current = activity
+            activity.completionWithItemsHandler = { [weak activity] _,_,_,_ in
+                DispatchQueue.main.async { if let activity, controller.current === activity { controller.finish?() } }
+            }
             controller.present(activity,animated:true)
             // An accepted presentation starts on a later turn; a refused one never calls back.
-            DispatchQueue.main.asyncAfter(deadline:.now() + 1) { if activity.presentingViewController == nil { controller.finish?() } }
+            DispatchQueue.main.asyncAfter(deadline:.now() + 1) { [weak activity] in
+                if let activity, controller.current === activity, activity.presentingViewController == nil { controller.finish?() }
+            }
         }
     }
     static func dismantleUIViewController(_ controller: Controller,coordinator: ()) {
@@ -315,6 +321,7 @@ private struct ShareSheet: UIViewControllerRepresentable {
     }
     final class Controller: UIViewController {
         var sharing = false
+        var current: UIActivityViewController?
         var finish: (() -> Void)?
     }
 }
