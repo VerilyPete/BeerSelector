@@ -614,12 +614,15 @@ final class AppModel: ObservableObject {
             interval.finish(.success)
         } catch { interval.finish(Diagnostics.isCancellation(error) ? .cancelled : .failure); throw error }
     }
-    /// The Queue screen also refreshes Tasted Brews while anything is reported,
-    /// so a credit that lands while it is open clears the report.
+    /// The Queue screen also refreshes Tasted Brews while any logged beer is past
+    /// the grace window. Cached tastings decide neither way: a credit that lands
+    /// while the screen is open clears the report, and a round reset reveals it.
     func refreshQueueAndCredits() async {
         let token = epoch
         await refreshQueue()
-        guard token == epoch, !missedCredits.isEmpty else { return }
+        guard token == epoch, let db, let account = recommendationAccount,
+              let log = try? db.creditLog(account:account),
+              !MissedCredit.visits(log:log,tasted:[],now:now()).isEmpty else { return }
         await refresh()
     }
     func refreshQueue() async {

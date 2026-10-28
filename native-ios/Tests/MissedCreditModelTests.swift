@@ -97,6 +97,16 @@ final class MissedCreditModelTests: XCTestCase {
             XCTAssertEqual(model.missedCredits.flatMap(\.beers).map(\.id),["8"],"Last round's cached tasting never credits this round's beer")
         }
     }
+    @MainActor func testQueueScreenRefreshNoticesARoundResetHidingAMissedBeer() async throws {
+        try await withModel { model,_,upstream in
+            upstream.tasted = ["Repeat Favorite"]
+            await model.refresh()
+            upstream.tasted = []; upstream.queue = [("8","Repeat Favorite","Oct 25, 2026 @ 09:21:29pm")]
+            model.now = { self.at(10,26,9) }
+            await model.refreshQueueAndCredits()
+            XCTAssertEqual(model.missedCredits.flatMap(\.beers).map(\.id),["8"])
+        }
+    }
     @MainActor func testRefreshingTheQueueScreenPicksUpCreditsThatArrivedMeanwhile() async throws {
         try await withModel { model,_,upstream in
             upstream.queue = [("7","Example Oktoberfest (Draft)","Oct 25, 2026 @ 09:21:29pm")]
