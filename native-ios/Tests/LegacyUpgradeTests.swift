@@ -88,7 +88,7 @@ final class LegacyUpgradeTests: XCTestCase {
                     XCTAssertEqual(try db.rows("SELECT \(columns) FROM \(table)\(filter) ORDER BY \(key)"),old,table)
                 }
                 // Additive recommendation tables may add their own indexes; legacy indexes must survive.
-                XCTAssertEqual(try db.rows("SELECT name,sql FROM sqlite_master WHERE type='index' AND tbl_name NOT IN ('recent_tastings','tasting_baseline','beer_feedback','beer_choices') ORDER BY name"),indexes)
+                XCTAssertEqual(try db.rows("SELECT name,sql FROM sqlite_master WHERE type='index' AND tbl_name NOT IN ('recent_tastings','tasting_baseline','beer_feedback','beer_choices','credit_log') ORDER BY name"),indexes)
                 XCTAssertEqual(try db.preference("native_schema_version"),"2")
                 XCTAssertEqual(try db.beers().first?.abv,8.2)
                 XCTAssertEqual(try db.beers().first?.container_type,"tulip")
