@@ -296,14 +296,25 @@ private struct ShareSheet: UIViewControllerRepresentable {
     func updateUIViewController(_ controller: Controller,context: Context) {
         guard let item, !controller.sharing else { return }
         controller.sharing = true
+        let binding = $item
+        controller.finish = { controller.sharing = false; controller.finish = nil; binding.wrappedValue = nil }
         DispatchQueue.main.async {
+            // UIKit refuses to present while another presentation is under way or outside a window, and then never calls the completion.
+            guard controller.view.window != nil, controller.presentedViewController == nil else { controller.finish?(); return }
             let activity = UIActivityViewController(activityItems:[item.value],applicationActivities:nil)
             activity.popoverPresentationController?.sourceView = controller.view
-            activity.completionWithItemsHandler = { _,_,_,_ in
-                DispatchQueue.main.async { controller.sharing = false; self.item = nil }
-            }
+            activity.completionWithItemsHandler = { _,_,_,_ in DispatchQueue.main.async { controller.finish?() } }
             controller.present(activity,animated:true)
+            // An accepted presentation starts on a later turn; a refused one never calls back.
+            DispatchQueue.main.asyncAfter(deadline:.now() + 1) { if activity.presentingViewController == nil { controller.finish?() } }
         }
     }
-    final class Controller: UIViewController { var sharing = false }
+    static func dismantleUIViewController(_ controller: Controller,coordinator: ()) {
+        guard let finish = controller.finish else { return }
+        DispatchQueue.main.async { finish() }
+    }
+    final class Controller: UIViewController {
+        var sharing = false
+        var finish: (() -> Void)?
+    }
 }

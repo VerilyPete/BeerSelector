@@ -8,6 +8,7 @@ import Combine
 final class NoticeSpacingGate: @unchecked Sendable {
     private let lock = NSLock()
     private var waiting: [UUID: CheckedContinuation<Void, Never>] = [:]
+    private var watchers: [CheckedContinuation<Void, Never>] = []
     private var released = 0
     private var startedPauses = 0
     var started: Int { lock.withLock { startedPauses } }
@@ -16,17 +17,30 @@ final class NoticeSpacingGate: @unchecked Sendable {
         let id = UUID()
         await withTaskCancellationHandler {
             await withCheckedContinuation { continuation in
-                let endsNow = lock.withLock {
-                    if Task.isCancelled { return true }
+                let (endsNow, watching) = lock.withLock {
+                    if Task.isCancelled { return (true,[CheckedContinuation<Void, Never>]()) }
                     startedPauses += 1
-                    if released > 0 { released -= 1; return true }
+                    if released > 0 { released -= 1; return (true,[]) }
                     waiting[id] = continuation
-                    return false
+                    defer { watchers = [] }
+                    return (false,watchers)
                 }
                 if endsNow { continuation.resume() }
+                watching.forEach { $0.resume() }
             }
         } onCancel: {
             lock.withLock { waiting.removeValue(forKey:id) }?.resume()
+        }
+    }
+    /// Returns once a pause is waiting for a release.
+    func waitUntilWaiting() async {
+        await withCheckedContinuation { continuation in
+            let waitingNow = lock.withLock {
+                if !waiting.isEmpty { return true }
+                watchers.append(continuation)
+                return false
+            }
+            if waitingNow { continuation.resume() }
         }
     }
     func release() {
@@ -287,7 +301,7 @@ final class NoticeTests: XCTestCase {
         model.noticePresenter(.settings,isReady:true)
         model.notice = "Shown"
         model.dismissNotice(try XCTUnwrap(model.presentedNotice))
-        for _ in 0..<100 where spacing.started == 0 { await Task.yield() }
+        await spacing.waitUntilWaiting()
         XCTAssertEqual(spacing.started,1,"The first pause is waiting")
         model.notice = "Next"
         model.showSettings = true
