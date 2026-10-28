@@ -121,9 +121,10 @@ final class LogoutCleanupTests: XCTestCase {
         try h.db.execute("INSERT INTO recent_tastings(account,event,day,beer) VALUES('account','event',0,'{}')")
         try h.db.execute("INSERT INTO tasting_baseline(account,event,day) VALUES('account','event',0)")
         try h.db.execute("INSERT INTO beer_choices(account,id,day,context) VALUES('account','choice',0,'{}')")
+        try h.db.recordQueue([QueueEntry(id:"1",name:"Queued",date:"")],account:"account",seenAt:Date())
         try h.db.saveBeerFeedback(BeerFeedback(beer:Beer(id:"liked",name:"Liked"),rating:.liked),account:"account")
         await h.model.resetAppData()
-        for table in ["allbeers","tasted_brew_current_round","rewards","operation_queue","recent_tastings","tasting_baseline","beer_choices","preferences"] {
+        for table in ["allbeers","tasted_brew_current_round","rewards","operation_queue","recent_tastings","tasting_baseline","beer_choices","credit_log","preferences"] {
             XCTAssertEqual(try h.db.rows("SELECT COUNT(*) AS count FROM \(table)").first?["count"],"0",table)
         }
         XCTAssertEqual(try h.db.beerFeedback(account:"account").map(\.id),["liked"])

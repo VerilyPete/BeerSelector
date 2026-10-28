@@ -129,11 +129,14 @@ struct QueueScreen: View {
                         VStack(alignment:.leading,spacing:12) {
                             Text(error).font(Robo.mono()).foregroundStyle(Robo.text)
                             if !model.queue.isEmpty { Text("Showing the last loaded queue.").font(Robo.mono()).foregroundStyle(Robo.steel) }
-                            Button("Refresh Queue") { Task { await model.refreshQueue() } }
+                            Button("Refresh Queue") { Task { await model.refreshQueueAndCredits() } }
                                 .buttonStyle(BeerControlStyle()).disabled(model.loadingQueue)
                                 .accessibilityIdentifier("queue-retry")
                         }.frame(maxWidth:.infinity,alignment:.leading).padding()
                             .background(Robo.panel,in:RoundedRectangle(cornerRadius:12)).accessibilityIdentifier("queue-error")
+                    }
+                    if !model.missedCredits.isEmpty {
+                        MissedCreditBanner(visits:model.missedCredits) { model.showMissedCredit = true }
                     }
                     if model.queue.isEmpty && model.queueLoaded && !model.loadingQueue && model.queueError == nil {
                         Text("No beers in your queue").font(Robo.title(18)).padding(40).accessibilityIdentifier("queue-empty")
@@ -147,13 +150,14 @@ struct QueueScreen: View {
                         QueueBeerCard(entry:entry,position:index + 1,busy:model.busyIDs.contains(entry.id)) { deletion = entry }
                     }
                 }.padding(18).frame(maxWidth:760).frame(maxWidth:.infinity)
-            }.refreshable { await model.refreshQueue() }.background(Robo.background).foregroundStyle(Robo.text)
+            }.refreshable { await model.refreshQueueAndCredits() }.background(Robo.background).foregroundStyle(Robo.text)
                 .navigationTitle("Your Beer Queue").navigationBarTitleDisplayMode(.inline)
                 .safeAreaInset(edge:.top,spacing:0) {
-                    ChromeScreenHeader(title:"Queue",close:{ dismiss() },refresh:{ Task { await model.refreshQueue() } },refreshing:model.loadingQueue)
+                    ChromeScreenHeader(title:"Queue",close:{ dismiss() },refresh:{ Task { await model.refreshQueueAndCredits() } },refreshing:model.loadingQueue)
                 }
                 .toolbar(.hidden,for:.navigationBar)
-                .task { await model.refreshQueue() }
+                .task { await model.refreshQueueAndCredits() }
+                .sheet(isPresented:$model.showMissedCredit) { MissedCreditScreen().environmentObject(model) }
                 .alert("Delete queued beer?",isPresented:Binding(get:{ deletion != nil },set:{ if !$0 { deletion = nil } })) {
                     if let entry = deletion { Button("Delete",role:.destructive) { Task { await model.deleteQueueEntry(entry) }; deletion = nil } }
                     Button("Cancel",role:.cancel) { deletion = nil }
@@ -168,17 +172,8 @@ private struct QueueBeerCard: View {
     let remove: () -> Void
     @Environment(\.dynamicTypeSize) private var typeSize
 
-    // Separate only recognized serving labels; parentheses in a beer's actual name stay intact.
-    private var details: (name: String,container: String?) {
-        guard let range = entry.name.range(of:#"(?i)\s+\((draft|can|cans|btl|bottle|bottles|flight)\)$"#,options:.regularExpression) else {
-            return (entry.name,nil)
-        }
-        let suffix = entry.name[range].trimmingCharacters(in:.whitespaces)
-        let container = String(suffix.dropFirst().dropLast())
-        return (String(entry.name[..<range.lowerBound]),container.lowercased() == "btl" ? "Bottle" : container)
-    }
     var body: some View {
-        let details = details
+        let details = QueueEntry.serving(of:entry.name)
         HStack(alignment:.top,spacing:12) {
             if !typeSize.isAccessibilitySize {
                 Text(String(format:"%02d",position)).font(Robo.mono(11))
