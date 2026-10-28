@@ -11,15 +11,20 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         DeviceMetrics.shared.start()
         BGTaskScheduler.shared.register(forTaskWithIdentifier:Self.cleanupIdentifier,using:.main) { task in
             let work = Task {
-                for activity in Activity<BeerQueueAttributes>.activities where activity.content.staleDate.map({ $0 <= Date() }) == true {
-                    guard !Task.isCancelled else { return }
-                    await activity.end(nil,dismissalPolicy:.immediate)
-                }
-                task.setTaskCompleted(success:!Task.isCancelled)
+                let now = Date()
+                let stale = Activity<BeerQueueAttributes>.activities.filter { @Sendable in $0.content.staleDate.map({ $0 <= now }) == true }
+                await Self.endActivities(stale,end:{ await $0.end(nil,dismissalPolicy:.immediate) }) { task.setTaskCompleted(success:$0) }
             }
             task.expirationHandler = { @Sendable in work.cancel() }
         }
         return true
+    }
+    nonisolated static func endActivities<A>(_ activities: [A], end: @Sendable (A) async -> Void, completion: @MainActor (Bool) -> Void) async {
+        for activity in activities {
+            guard !Task.isCancelled else { break }
+            await end(activity)
+        }
+        await completion(!Task.isCancelled)
     }
     static func scheduleCleanup() {
         BGTaskScheduler.shared.cancel(taskRequestWithIdentifier:cleanupIdentifier)
