@@ -9,7 +9,7 @@ All three targets (`BeerSelectorNative`, `BeerQueueWidget`, `BeerSelectorNativeT
   - iPhone 18 Pro: simulating the cleanup task's launch ended the stale Live Activity. Expiration ran while stopped inside the cleanup loop.
   - Member sign-in through the web-view redirect, sign-out, visitor mode, account switch, Untappd (open, complete, cancel, dismiss), and offline to online all passed.
   - MetricKit (Debug → Simulate MetricKit Payloads on the iPhone): both `DeviceMetrics.didReceive` callbacks, metric and diagnostic, ran on `com.apple.metrickit.manager.queue`. The debugger confirmed both breakpoints were hit, and the app kept running after resuming.
-- Pre-existing, unrelated to the migration: dismissing the alert at `UI/RootView.swift:46` logs SwiftUI's "Publishing changes from within view updates" warning, which is a follow-up. The cleanup task that skipped `setTaskCompleted` when cancelled now reports failure instead; `LiveActivityCleanupTests` covers it, and the device Expiration check in TESTING.md still applies.
+- Pre-existing, unrelated to the migration, and since fixed: the cleanup task that skipped `setTaskCompleted` when cancelled now reports failure instead (#51; `LiveActivityCleanupTests`, and the device Expiration check in TESTING.md still applies), and dismissing the notice alert no longer logs SwiftUI's "Publishing changes from within view updates" warning (#52; `NoticeTests`).
 
 ## Experimental semantic retrieval — September 14, 2026
 

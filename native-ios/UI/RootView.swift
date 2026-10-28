@@ -43,8 +43,12 @@ struct RootView: View {
         .sheet(isPresented:$model.showRewards) { RewardsScreen().environmentObject(model) }
         .sheet(isPresented:$model.showQueue) { QueueScreen().environmentObject(model) }
         .sheet(isPresented:$model.showOperations) { OperationsScreen().environmentObject(model) }
-        .alert("Beer Selector",isPresented:Binding(get:{ model.notice != nil },set:{ if !$0 { model.notice = nil } })) { Button("OK") { model.notice = nil } } message: { Text(model.notice ?? "") }
+        .alert("Beer Selector",isPresented:noticePresented,presenting:model.presentedNotice) { shown in Button("OK") { model.dismissNotice(shown) } } message: { Text($0.message) }
         .background(UntappdBrowser(url:$model.browserURL))
+    }
+    // OK dismisses the notice it displayed; the setter cannot know which notice is on screen.
+    private var noticePresented: Binding<Bool> {
+        Binding(get:{ model.presentedNotice != nil },set:{ _ in })
     }
     private var tabBar: some View {
         Group {

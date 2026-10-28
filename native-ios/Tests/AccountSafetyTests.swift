@@ -617,6 +617,24 @@ final class AccountSafetyTests: XCTestCase {
         }
     }
 
+    @MainActor func testAccountSwitchDropsTheOldAccountsWaitingNotices() async throws {
+        try await withModel { model,_,fixture,_ in
+            model.activityCleanup = {}
+            let spacing = NoticeSpacingGate()
+            spacing.install(on:model)
+            fixture.handler = { try self.response($0) }
+            model.notice = "Old beer has been added to your queue!"
+            model.notice = "Second old beer has been added to your queue!"
+            model.dismissNotice(try XCTUnwrap(model.presentedNotice))
+            try await login(model)
+            XCTAssertEqual(model.session?.memberId,"2")
+            model.notice = "New account notice"
+            spacing.release()
+            let next = await nextPresentedNotice(model)
+            XCTAssertEqual(next?.message,"New account notice","The old account’s notices must not appear under the new account")
+        }
+    }
+
     @MainActor private func login(_ model: AppModel, member: String = "2") async throws {
         let url = model.api.configuration.endpoint("member-dash.php")
         let values = ["member_id":member,"store__id":member,"PHPSESSID":"new-session"]
