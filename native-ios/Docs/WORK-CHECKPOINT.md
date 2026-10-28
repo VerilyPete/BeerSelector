@@ -1,3 +1,16 @@
+## Swift 6 language mode — October 27, 2026
+
+All three targets (`BeerSelectorNative`, `BeerQueueWidget`, `BeerSelectorNativeTests`) moved from Swift 5 to Swift 6 language mode in six stacked PRs: #43 (WebKit navigation-policy guard), #45 (complete strict checking), #46 (production `Sendable` and SDK callbacks), #47 (main-actor `BeerDatabase` with a `SQLiteConnection` owner, and test fixtures), #48 (`@unchecked Sendable` audit), and this flip. Xcode Cloud and GitHub CI are pinned to Xcode 27.1 (27A9275) for the migration (#44). Plan and review ledger: `plans/swift6-migration.md` (local, ignored).
+
+- Production `@unchecked Sendable` remains only on `DiagnosticJournal` and `MainThreadMonitor`. Both are confined to a serial queue, and each conformance states which fields that queue owns.
+- Runtime behaviour changes: the Live Activity cleanup task registers on the main queue (its handler was already main-actor isolated), and the Untappd authentication completion no longer assumes the main thread.
+- Swift 6 builds have 0 errors and 0 warnings for app and widget in Debug, Release and Performance (simulator), plus Release on device. The test target builds in Debug and Performance.
+- Manual Swift 6 runtime checks (TESTING.md → Device checks), run by Pete from Xcode on October 27, 2026, with the debugger attached and Live Activities set to go stale after 2 minutes in an uncommitted local change. No isolation traps.
+  - iPhone 18 Pro: simulating the cleanup task's launch ended the stale Live Activity. Expiration ran while stopped inside the cleanup loop.
+  - Member sign-in through the web-view redirect, sign-out, visitor mode, account switch, Untappd (open, complete, cancel, dismiss), and offline to online all passed.
+  - MetricKit (Debug → Simulate MetricKit Payloads on the iPhone): both `DeviceMetrics.didReceive` callbacks, metric and diagnostic, ran on `com.apple.metrickit.manager.queue`. The debugger confirmed both breakpoints were hit, and the app kept running after resuming.
+- Pre-existing, unrelated to the migration: dismissing the alert at `UI/RootView.swift:46` logs SwiftUI's "Publishing changes from within view updates" warning, and the cancelled cleanup task skips `setTaskCompleted`. Both are follow-ups.
+
 ## Experimental semantic retrieval — September 14, 2026
 
 Implemented app-private NaturalLanguage word-vector retrieval behind `BEERSELECTOR_SEMANTIC_SEARCH=1` in DEBUG on iOS 27 with English preferred language. Default and Release behavior remain existing local retrieval plus optional Apple Intelligence ranking. Cache builds stay off the UI actor; account/content/generation fences, hard eligibility, authoritative description evidence in every prompt tier, and a shared retrieval/ranking deadline are in place. No private tasting/feedback data enters the vector cache. See [current implementation evidence](AI-IMPROVEMENTS/01-SEMANTIC-SEARCH-IMPLEMENTATION.md) for tests and remaining release gates; older entries below describe intermediate states.
