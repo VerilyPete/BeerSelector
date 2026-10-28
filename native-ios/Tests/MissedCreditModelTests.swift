@@ -158,4 +158,20 @@ final class MissedCreditModelTests: XCTestCase {
             XCTAssertEqual(try db.rows("SELECT COUNT(*) AS count FROM credit_log").first?["count"],"0")
         }
     }
+    @MainActor func testPreviousMembersTastingsNeverCreditTheNextMembersBeers() async throws {
+        try await withModel { model,_,upstream in
+            upstream.tasted = ["Shared Favorite"]
+            await model.refresh()
+            let url = model.api.configuration.endpoint("member-dash.php")
+            let cookies = ["member_id":"2","store__id":"2","PHPSESSID":"new"].map { HTTPCookie(properties:[.domain:url.host!, .path:"/", .name:$0.key, .value:$0.value])! }
+            model.now = { self.at(10,26,9) }
+            model.activityCleanup = {
+                guard model.session?.memberId == "2" else { return }
+                upstream.tasted = []; upstream.queue = [("9","Shared Favorite","Oct 25, 2026 @ 09:21:29pm")]
+                await model.refreshQueue()
+            }
+            try await model.completeLogin(url:url,nativeCookies:cookies)
+            XCTAssertEqual(model.missedCredits.flatMap(\.beers).map(\.id),["9"],"The new member never tasted it")
+        }
+    }
 }

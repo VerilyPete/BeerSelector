@@ -592,6 +592,7 @@ final class AppModel: ObservableObject {
                 throw error
             }
             let committedEpoch = epoch
+            if session?.identity != next.identity { tastedBeers = [] }
             session = next; cookies = visitor ? [:] : values
             queue = []; queuedBeerIDs = []; missedCredits = []
             let previousCleanup = accountCleanupTask
