@@ -129,7 +129,7 @@ struct QueueScreen: View {
                         VStack(alignment:.leading,spacing:12) {
                             Text(error).font(Robo.mono()).foregroundStyle(Robo.text)
                             if !model.queue.isEmpty { Text("Showing the last loaded queue.").font(Robo.mono()).foregroundStyle(Robo.steel) }
-                            Button("Refresh Queue") { Task { await model.refreshQueue() } }
+                            Button("Refresh Queue") { Task { await model.refreshQueueAndCredits() } }
                                 .buttonStyle(BeerControlStyle()).disabled(model.loadingQueue)
                                 .accessibilityIdentifier("queue-retry")
                         }.frame(maxWidth:.infinity,alignment:.leading).padding()
@@ -150,13 +150,13 @@ struct QueueScreen: View {
                         QueueBeerCard(entry:entry,position:index + 1,busy:model.busyIDs.contains(entry.id)) { deletion = entry }
                     }
                 }.padding(18).frame(maxWidth:760).frame(maxWidth:.infinity)
-            }.refreshable { await model.refreshQueue() }.background(Robo.background).foregroundStyle(Robo.text)
+            }.refreshable { await model.refreshQueueAndCredits() }.background(Robo.background).foregroundStyle(Robo.text)
                 .navigationTitle("Your Beer Queue").navigationBarTitleDisplayMode(.inline)
                 .safeAreaInset(edge:.top,spacing:0) {
-                    ChromeScreenHeader(title:"Queue",close:{ dismiss() },refresh:{ Task { await model.refreshQueue() } },refreshing:model.loadingQueue)
+                    ChromeScreenHeader(title:"Queue",close:{ dismiss() },refresh:{ Task { await model.refreshQueueAndCredits() } },refreshing:model.loadingQueue)
                 }
                 .toolbar(.hidden,for:.navigationBar)
-                .task { await model.refreshQueue() }
+                .task { await model.refreshQueueAndCredits() }
                 .sheet(isPresented:$model.showMissedCredit) { MissedCreditScreen().environmentObject(model) }
                 .alert("Delete queued beer?",isPresented:Binding(get:{ deletion != nil },set:{ if !$0 { deletion = nil } })) {
                     if let entry = deletion { Button("Delete",role:.destructive) { Task { await model.deleteQueueEntry(entry) }; deletion = nil } }

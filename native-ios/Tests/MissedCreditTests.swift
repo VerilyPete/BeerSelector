@@ -118,6 +118,12 @@ final class MissedCreditTests: XCTestCase {
         XCTAssertEqual(MissedCredit.visits(log:log,tasted:[],now:at(10,25,23),calendar:buddhist),[])
         XCTAssertEqual(MissedCredit.visits(log:log,tasted:[],now:at(10,26,9),calendar:buddhist).map(\.day),[at(10,25,0)])
     }
+    func testReportShowsCheckInTimeOnlyWhenSaucerGaveOne() {
+        XCTAssertEqual(MissedCredit.checkInTime(of:entry("1","Timed","Oct 25, 2026 @ 09:21:29pm"),calendar:calendar),
+                       at(10,25,21,21).addingTimeInterval(29))
+        XCTAssertNil(MissedCredit.checkInTime(of:entry("2","Old Format","Oct 25, 2026"),calendar:calendar))
+        XCTAssertNil(MissedCredit.checkInTime(of:entry("3","Mystery","Date unavailable"),calendar:calendar))
+    }
     func testMorningQueueTimesAreReadAsAM() {
         let log = [entry("1","Brunch","Oct 25, 2026 @ 11:05:00am")]
         XCTAssertEqual(visits(log,now:at(10,25,16)),[])

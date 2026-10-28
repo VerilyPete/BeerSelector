@@ -74,6 +74,29 @@ final class MissedCreditModelTests: XCTestCase {
             XCTAssertEqual(model.missedCredits,[])
         }
     }
+    @MainActor func testCreditedBeerStaysCreditedAfterTheRoundResets() async throws {
+        try await withModel { model,_,upstream in
+            upstream.queue = [("7","Example Oktoberfest (Draft)","Oct 25, 2026 @ 09:21:29pm")]
+            model.now = { self.at(10,26,9) }
+            await model.refreshQueue()
+            upstream.queue = []; upstream.tasted = ["Example Oktoberfest"]
+            await model.refresh()
+            upstream.tasted = []
+            await model.refresh()
+            XCTAssertEqual(model.missedCredits,[],"A new round empties Tasted Brews but the beer was already credited")
+        }
+    }
+    @MainActor func testRefreshingTheQueueScreenPicksUpCreditsThatArrivedMeanwhile() async throws {
+        try await withModel { model,_,upstream in
+            upstream.queue = [("7","Example Oktoberfest (Draft)","Oct 25, 2026 @ 09:21:29pm")]
+            model.now = { self.at(10,26,9) }
+            await model.refreshQueueAndCredits()
+            XCTAssertEqual(model.missedCredits.count,1)
+            upstream.queue = []; upstream.tasted = ["Example Oktoberfest"]
+            await model.refreshQueueAndCredits()
+            XCTAssertEqual(model.missedCredits,[])
+        }
+    }
     @MainActor func testBeerDeletedFromTheQueueInTheAppIsNotReported() async throws {
         try await withModel { model,_,upstream in
             upstream.queue = [("7","Changed My Mind","Oct 25, 2026 @ 09:21:29pm")]

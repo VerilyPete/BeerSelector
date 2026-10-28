@@ -28,10 +28,9 @@ enum MissedCredit {
     // Saucer keeps packaging in the beer name: "Duvel" is the draft SKU and
     // "Duvel (BTL)" is a different beer. Only a draft label is the queue's own.
     static func visits(log: [CreditLogEntry], tasted: [Beer], now: Date, calendar: Calendar = .current) -> [MissedCreditVisit] {
-        let credited = Set(tasted.map { key($0.brew_name) })
+        let credited = Set(credited(log:log,tasted:tasted))
         let missed = log.compactMap { entry -> (CreditLogEntry,Date,Date)? in
-            guard !credited.contains(key(entry.name)),
-                  !credited.contains(key(entry.name.replacingOccurrences(of:#"(?i)\s+\((draft|draught)\)$"#,with:"",options:.regularExpression))) else { return nil }
+            guard !credited.contains(entry.id) else { return nil }
             let (queuedAt,day) = queuedTime(entry,calendar:calendar)
             return now.timeIntervalSince(queuedAt) >= grace ? (entry,queuedAt,day) : nil
         }
@@ -39,16 +38,30 @@ enum MissedCredit {
             .map { day,beers in MissedCreditVisit(day:day,beers:beers.sorted { ($0.1,$0.0.id) < ($1.1,$1.0.id) }.map(\.0)) }
             .sorted { $0.day > $1.day }
     }
+    /// Ids of logged beers that now appear in Tasted Brews.
+    static func credited(log: [CreditLogEntry], tasted: [Beer]) -> [String] {
+        let names = Set(tasted.map { key($0.brew_name) })
+        return log.filter { entry in
+            names.contains(key(entry.name)) ||
+                names.contains(key(entry.name.replacingOccurrences(of:#"(?i)\s+\((draft|draught)\)$"#,with:"",options:.regularExpression)))
+        }.map(\.id)
+    }
+    /// The check-in time from Saucer's timestamp, or nil when it only gave a date.
+    static func checkInTime(of entry: CreditLogEntry, calendar: Calendar = .current) -> Date? {
+        formatter("MMM dd, yyyy '@' hh:mm:ssa",calendar:calendar).date(from:entry.queued)
+    }
+    private static func formatter(_ format: String, calendar: Calendar) -> DateFormatter {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier:"en_US_POSIX"); formatter.calendar = Calendar(identifier:.gregorian); formatter.timeZone = calendar.timeZone
+        formatter.dateFormat = format
+        return formatter
+    }
     private static func key(_ name: String) -> String {
         name.trimmingCharacters(in:.whitespacesAndNewlines).lowercased()
     }
     private static func queuedTime(_ entry: CreditLogEntry, calendar: Calendar) -> (Date,Date) {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier:"en_US_POSIX"); formatter.calendar = Calendar(identifier:.gregorian); formatter.timeZone = calendar.timeZone
-        formatter.dateFormat = "MMM dd, yyyy '@' hh:mm:ssa"
-        if let time = formatter.date(from:entry.queued) { return (time,calendar.startOfDay(for:time)) }
-        formatter.dateFormat = "MMM dd, yyyy"
-        if let day = formatter.date(from:entry.queued) { return (entry.firstSeen,calendar.startOfDay(for:day)) }
+        if let time = checkInTime(of:entry,calendar:calendar) { return (time,calendar.startOfDay(for:time)) }
+        if let day = formatter("MMM dd, yyyy",calendar:calendar).date(from:entry.queued) { return (entry.firstSeen,calendar.startOfDay(for:day)) }
         return (entry.firstSeen,calendar.startOfDay(for:entry.firstSeen))
     }
 }

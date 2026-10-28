@@ -46,6 +46,7 @@ final class LoginRollbackTests: XCTestCase {
         let cookies = ["member_id":"2","store__id":"2","PHPSESSID":"new"].map {
             HTTPCookie(properties:[.domain:url.host!, .path:"/", .name:$0.key, .value:$0.value])!
         }
+        model.missedCredits = [MissedCreditVisit(day:Date(),beers:[CreditLogEntry(id:"q",name:"Old Member Beer",queued:"",firstSeen:Date())])]
         do { try await model.completeLogin(url:url,nativeCookies:cookies); XCTFail("Expected database failure") }
         catch { guard case BeerError.storage = error else { return XCTFail("Unexpected error: \(error)") } }
         XCTAssertGreaterThan(markerWrites,0,"New credentials reached their commit marker")
@@ -61,6 +62,7 @@ final class LoginRollbackTests: XCTestCase {
             XCTAssertNil(model.session,"A mixed persistent account must not remain usable")
             XCTAssertTrue(model.tastedBeers.isEmpty)
             XCTAssertTrue(model.rewards.isEmpty)
+            XCTAssertTrue(model.missedCredits.isEmpty)
             XCTAssertFalse(model.configured)
             XCTAssertThrowsError(try restarted.restoreCredentials(),"Restart must reject the incomplete switch")
             try restarted.reload()

@@ -54,7 +54,10 @@ final class AppModel: ObservableObject {
     }
     private func updateMissedCredits() throws {
         guard let db, let account = recommendationAccount else { missedCredits = []; return }
-        missedCredits = MissedCredit.visits(log:try db.creditLog(account:account),tasted:tastedBeers,now:now())
+        let log = try db.creditLog(account:account)
+        let credited = MissedCredit.credited(log:log,tasted:tastedBeers)
+        if !credited.isEmpty { try db.transaction { try db.dismissCredit(ids:credited,account:account) } }
+        missedCredits = MissedCredit.visits(log:log,tasted:tastedBeers,now:now())
     }
     func clearRecommendationHistory() {
         guard let db, let account = recommendationAccount else { return }
@@ -581,7 +584,7 @@ final class AppModel: ObservableObject {
                     // Leave the persistent transition marker in place until a full
                     // login succeeds. Do not expose either member's state meanwhile.
                     epoch = UUID(); refreshing = false
-                    session = nil; cookies = [:]; tastedBeers = []; rewards = []; queue = []; queuedBeerIDs = []
+                    session = nil; cookies = [:]; tastedBeers = []; rewards = []; queue = []; queuedBeerIDs = []; missedCredits = []
                     notice = nil; showSettings = true; showLogin = true
                     await endAccountActivities()
                     throw BeerError.storage("Account recovery could not finish. Please sign in again.")
@@ -609,6 +612,14 @@ final class AppModel: ObservableObject {
             guard committedEpoch == epoch else { throw BeerError.changedAccount }
             interval.finish(.success)
         } catch { interval.finish(Diagnostics.isCancellation(error) ? .cancelled : .failure); throw error }
+    }
+    /// The Queue screen also refreshes Tasted Brews while anything is reported,
+    /// so a credit that lands while it is open clears the report.
+    func refreshQueueAndCredits() async {
+        let token = epoch
+        await refreshQueue()
+        guard token == epoch, !missedCredits.isEmpty else { return }
+        await refresh()
     }
     func refreshQueue() async {
         guard !previewMode, (!loadingQueue || queueEpoch != epoch), isMember, let member = session else { return }

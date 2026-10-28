@@ -11,7 +11,7 @@ struct MissedCreditBanner: View {
                     .frame(width:32,height:32).accessibilityHidden(true)
                 VStack(alignment:.leading,spacing:6) {
                     Text("\(count) \(count == 1 ? "beer wasn’t" : "beers weren’t") credited").font(Robo.title(16)).foregroundStyle(QueueChrome.text)
-                    Text("Show your missed credit report to your server.").font(Robo.mono(10)).foregroundStyle(QueueChrome.secondary)
+                    Text("View a report of uncredited check-ins.").font(Robo.mono(10)).foregroundStyle(QueueChrome.secondary)
                 }.frame(maxWidth:.infinity,alignment:.leading)
                 Image(systemName:"chevron.right").foregroundStyle(QueueChrome.amber).padding(.top,8).accessibilityHidden(true)
             }.padding(14)
@@ -36,7 +36,7 @@ struct MissedCreditScreen: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment:.leading,spacing:16) {
-                    Text("Copy these details onto the store’s missed credit slip, or show this screen to your server.")
+                    Text("Here’s a list of any queued items that were never credited on previous visits. Your server can help you resolve any oversights. Be nice.")
                         .font(Robo.mono()).foregroundStyle(QueueChrome.secondary).fixedSize(horizontal:false,vertical:true)
                     ChromePanel(padding:16) {
                         VStack(alignment:.leading,spacing:14) {
@@ -84,8 +84,9 @@ struct MissedCreditScreen: View {
         return HStack(alignment:.firstTextBaseline,spacing:10) {
             VStack(alignment:.leading,spacing:6) {
                 Text(serving.name).font(Robo.title(19)).foregroundStyle(QueueChrome.text).textSelection(.enabled).fixedSize(horizontal:false,vertical:true)
-                if let container = serving.container {
-                    Text(container.uppercased()).font(Robo.mono(9)).tracking(0.6).foregroundStyle(QueueChrome.cyan)
+                let details = [serving.container?.uppercased(),MissedCredit.checkInTime(of:beer).map { $0.formatted(date:.omitted,time:.shortened) }].compactMap { $0 }
+                if !details.isEmpty {
+                    Text(details.joined(separator:" · ")).font(Robo.mono(9)).tracking(0.6).foregroundStyle(QueueChrome.cyan)
                 }
             }.frame(maxWidth:.infinity,alignment:.leading).accessibilityElement(children:.combine)
             Button("Remove") { removal = beer }.font(Robo.mono(10)).foregroundStyle(Robo.color(0xDB8F91))
