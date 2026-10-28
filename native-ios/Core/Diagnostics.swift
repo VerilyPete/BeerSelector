@@ -4,7 +4,7 @@ import MetricKit
 
 /// Only fixed labels and numeric aggregates enter this store. Never retain requests,
 /// payloads, errors, account data, or raw MetricKit reports.
-final class Diagnostics: @unchecked Sendable {
+final class Diagnostics: Sendable {
     static let shared = Diagnostics(journal: ProcessInfo.processInfo.environment["BEERSELECTOR_TEST_HOST"] == "1" ||
         ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil ? nil : .shared)
     private let journal: DiagnosticJournal?
@@ -19,14 +19,16 @@ final class Diagnostics: @unchecked Sendable {
         var seconds = 0.0
         var maximumSeconds = 0.0
     }
-    private let lock = NSLock()
-    private var values: [Operation: Aggregate] = [:]
-    private var taskCount = 0
-    private var taskSeconds = 0.0
-    private var redirects = 0
-    private var metricReports = 0
-    private var diagnosticReports = 0
-    private var cpuSeconds = 0.0
+    private struct Totals {
+        var values: [Operation: Aggregate] = [:]
+        var taskCount = 0
+        var taskSeconds = 0.0
+        var redirects = 0
+        var metricReports = 0
+        var diagnosticReports = 0
+        var cpuSeconds = 0.0
+    }
+    private let totals = OSAllocatedUnfairLock(initialState: Totals())
     private let logger = Logger(subsystem: "org.verily.FSbeerselector", category: "Performance")
     private let signposter = OSSignposter(subsystem: "org.verily.FSbeerselector", category: .pointsOfInterest)
 
@@ -63,41 +65,43 @@ final class Diagnostics: @unchecked Sendable {
         catch { interval.finish(Self.isCancellation(error) ? .cancelled : .failure); throw error }
     }
     private func record(_ operation: Operation, outcome: Outcome, seconds: Double) {
-        lock.lock()
-        var value = values[operation, default: Aggregate()]
-        value.count += 1; value.seconds += seconds; value.maximumSeconds = max(value.maximumSeconds, seconds)
-        switch outcome {
-        case .success: value.successes += 1
-        case .failure: value.failures += 1
-        case .cancelled: value.cancellations += 1
+        totals.withLock { totals in
+            var value = totals.values[operation, default: Aggregate()]
+            value.count += 1; value.seconds += seconds; value.maximumSeconds = max(value.maximumSeconds, seconds)
+            switch outcome {
+            case .success: value.successes += 1
+            case .failure: value.failures += 1
+            case .cancelled: value.cancellations += 1
+            }
+            totals.values[operation] = value
         }
-        values[operation] = value
-        lock.unlock()
         logger.debug("\(operation.rawValue, privacy: .public) \(outcome.rawValue, privacy: .public) seconds=\(seconds)")
     }
-    func snapshot() -> [Operation: Aggregate] { lock.lock(); defer { lock.unlock() }; return values }
+    func snapshot() -> [Operation: Aggregate] { totals.withLock { $0.values } }
     func recordTask(seconds: Double, redirects: Int) {
         guard seconds.isFinite, seconds >= 0, redirects >= 0 else { return }
-        lock.lock(); defer { lock.unlock() }
-        taskCount += 1; taskSeconds += seconds; self.redirects += redirects
-        journal?.record(.networkMetrics,seconds:seconds,count:redirects)
-        signposter.emitEvent("URLSession Task", "seconds=\(seconds) redirects=\(redirects)")
+        totals.withLock { totals in
+            totals.taskCount += 1; totals.taskSeconds += seconds; totals.redirects += redirects
+            journal?.record(.networkMetrics,seconds:seconds,count:redirects)
+            signposter.emitEvent("URLSession Task", "seconds=\(seconds) redirects=\(redirects)")
+        }
     }
     func recordReports(metrics: Int = 0, diagnostics: Int = 0, cpuSeconds: Double = 0) {
-        lock.lock(); defer { lock.unlock() }
-        metricReports += metrics; diagnosticReports += diagnostics
-        journal?.record(.metricReports,seconds:cpuSeconds,count:diagnostics)
-        if cpuSeconds.isFinite, cpuSeconds >= 0 { self.cpuSeconds += cpuSeconds }
+        totals.withLock { totals in
+            totals.metricReports += metrics; totals.diagnosticReports += diagnostics
+            journal?.record(.metricReports,seconds:cpuSeconds,count:diagnostics)
+            if cpuSeconds.isFinite, cpuSeconds >= 0 { totals.cpuSeconds += cpuSeconds }
+        }
     }
     func report() -> String {
-        lock.lock(); defer { lock.unlock() }
+        let totals = totals.withLock { $0 }
         var lines = ["Session performance aggregates (seconds)"]
         for operation in Operation.allCases {
-            let v = values[operation, default: Aggregate()]
+            let v = totals.values[operation, default: Aggregate()]
             lines.append("\(operation.rawValue): count=\(v.count) ok=\(v.successes) failed=\(v.failures) cancelled=\(v.cancellations) total=\(v.seconds) max=\(v.maximumSeconds)")
         }
-        lines.append("URLSession tasks=\(taskCount) seconds=\(taskSeconds) redirects=\(redirects)")
-        lines.append("MetricKit reports=\(metricReports) diagnostics=\(diagnosticReports) CPU seconds=\(cpuSeconds)")
+        lines.append("URLSession tasks=\(totals.taskCount) seconds=\(totals.taskSeconds) redirects=\(totals.redirects)")
+        lines.append("MetricKit reports=\(totals.metricReports) diagnostics=\(totals.diagnosticReports) CPU seconds=\(totals.cpuSeconds)")
         return lines.joined(separator: "\n")
     }
 }

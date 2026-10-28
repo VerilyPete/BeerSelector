@@ -46,7 +46,7 @@ struct APIConfiguration: Sendable {
 }
 
 /// Reject cross-origin redirects before URLSession can forward authentication headers.
-final class RedirectPolicy: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+final class RedirectPolicy: NSObject, URLSessionTaskDelegate, Sendable {
     func urlSession(_ session: URLSession, task: URLSessionTask, didFinishCollecting metrics: URLSessionTaskMetrics) {
         Diagnostics.shared.recordTask(seconds: metrics.taskInterval.duration, redirects: metrics.redirectCount)
     }
