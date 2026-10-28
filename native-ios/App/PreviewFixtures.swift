@@ -44,6 +44,15 @@ extension AppModel {
             case "busy": if let entry = queue.first { busyIDs.insert(entry.id) }
             case "error": queue = []; queueLoaded = false; queueError = "Couldn’t refresh your queue. Please try again."
             case "cached-error": queueError = "Couldn’t refresh your queue. Please try again."
+            case "missed-credit", "missed-credit-report":
+                queue = []
+                session?.lastName = "Preview"; session?.cardNum = "000000"
+                let day = Calendar.current.startOfDay(for:Date().addingTimeInterval(-86400))
+                missedCredits = [MissedCreditVisit(day:day,beers:[
+                    CreditLogEntry(id:"m1",name:"Firestone Walker Parabola (2026) (BTL)",queued:"",firstSeen:day),
+                    CreditLogEntry(id:"m2",name:"Weihenstephaner Hefeweissbier (Draft)",queued:"",firstSeen:day)
+                ])]
+                showMissedCredit = arguments[index+1] == "missed-credit-report"
             default: break
             }
         }

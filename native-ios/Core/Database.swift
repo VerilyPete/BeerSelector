@@ -90,6 +90,7 @@ final class BeerDatabase {
             // Credentials are read only from Keychain. Never resurrect the removed plaintext credential preference.
             try execute("DELETE FROM preferences WHERE key='auth_cookies'")
             try setupRecentTastings()
+            try setupCreditLog()
             try setPreference("native_schema_version", "2")
         }
     }

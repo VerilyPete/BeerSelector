@@ -7,6 +7,8 @@ final class AppModel: ObservableObject {
     @Published var session: MemberSession? { didSet { if oldValue?.identity != session?.identity { semanticIndex.invalidate() } } }
     @Published var beerFeedback: [BeerFeedback] = []
     @Published var recentTastings: [Beer] = []
+    @Published var missedCredits: [MissedCreditVisit] = []
+    var now: () -> Date = Date.init
     @Published var showRecommendations = false
     let semanticIndex = SemanticTaplistIndex()
     lazy var recommendations = RecommendationController(model:self)
@@ -42,6 +44,17 @@ final class AppModel: ObservableObject {
             try db.deleteCachedBeerFeedback(account:account)
             beerFeedback = try db.beerFeedback(account:account); recommendations.cancel()
         } catch { self.error = error.localizedDescription }
+    }
+    func dismissMissedCredit(_ entry: CreditLogEntry) { dismissCredits([entry]) }
+    func resolveMissedCreditVisit(_ visit: MissedCreditVisit) { dismissCredits(visit.beers) }
+    private func dismissCredits(_ entries: [CreditLogEntry]) {
+        guard let db, let account = recommendationAccount else { return }
+        do { try db.transaction { try db.dismissCredit(ids:entries.map(\.id),account:account) }; try updateMissedCredits() }
+        catch { self.error = error.localizedDescription }
+    }
+    private func updateMissedCredits() throws {
+        guard let db, let account = recommendationAccount else { missedCredits = []; return }
+        missedCredits = MissedCredit.visits(log:try db.creditLog(account:account),tasted:tastedBeers,now:now())
     }
     func clearRecommendationHistory() {
         guard let db, let account = recommendationAccount else { return }
@@ -88,6 +101,7 @@ final class AppModel: ObservableObject {
     @Published var showSettings = false
     @Published var showLogin = false
     @Published var showQueue = false
+    @Published var showMissedCredit = false
     @Published var showOperations = false
     @Published var showRewards = false
     @Published var browserURL: URL?
@@ -207,6 +221,7 @@ final class AppModel: ObservableObject {
         } catch { failures.append("Recent tastings: " + error.localizedDescription) }
         do { allBeers = try db.beers() } catch { failures.append("Taplist: " + error.localizedDescription) }
         do { tastedBeers = isMember ? try db.beers(tasted:true) : [] } catch { failures.append("Tastings: " + error.localizedDescription) }
+        do { try updateMissedCredits() } catch { failures.append("Missed credit: " + error.localizedDescription) }
         do {
             rewards = isMember ? try db.rewards() : []
             if !rewards.isEmpty { rewardsLoaded = true }
@@ -542,7 +557,7 @@ final class AppModel: ObservableObject {
             credentialsCommitted = true
             epoch = UUID()
             try db.transaction {
-                if session?.identity != next.identity { try db.forgetRecentTastings() }
+                if session?.identity != next.identity { try db.forgetRecentTastings(); try db.forgetCreditLog() }
                 if session?.identity != next.identity {
                     try db.execute("DELETE FROM allbeers"); try db.execute("DELETE FROM tasted_brew_current_round"); try db.execute("DELETE FROM rewards")
                 }
@@ -605,6 +620,10 @@ final class AppModel: ObservableObject {
             let next = try BeerAPI.parseQueue(data)
             guard token == epoch else { return }
             queue = next; queueLoaded = true; queueValidation = UUID()
+            if let db, let account = recommendationAccount {
+                do { try db.transaction { try db.recordQueue(next,account:account,seenAt:now()) }; try updateMissedCredits() }
+                catch { self.error = "Couldn’t save your queue history: " + error.localizedDescription }
+            }
             queuedBeerIDs = Set(next.compactMap { entry in allBeers.first { entry.name.contains($0.brew_name) || $0.brew_name.contains(entry.name) }?.id })
             if let activityUpdate { await activityUpdate(member,next) }
             else { await liveActivity.update(member:member,queue:next) }
@@ -751,6 +770,7 @@ final class AppModel: ObservableObject {
         do {
             _ = try await api.request(url.url!,member:member,cookies:cookies,referer:"memberQueues.php",retry:false)
             guard token == epoch else { return }
+            if let account = recommendationAccount { try? db?.dismissCredit(ids:[entry.id],account:account) }
             await refreshQueue()
         } catch { if token == epoch { queueError = "Couldn’t confirm deletion. Refresh your queue before trying again." } }
     }
@@ -782,7 +802,7 @@ final class AppModel: ObservableObject {
     @discardableResult func logout() async -> LogoutOutcome {
         if previewMode { session = nil; allBeers = []; tastedBeers = []; rewards = []; queue = []; showSettings = true; return (true,true) }
         let old = session; let saved = cookies
-        epoch = UUID(); refreshing = false; session = nil; cookies = [:]; queue = []; queuedBeerIDs = []; tastedBeers = []; rewards = []
+        epoch = UUID(); refreshing = false; session = nil; cookies = [:]; queue = []; queuedBeerIDs = []; tastedBeers = []; rewards = []; missedCredits = []
         let token = epoch
         let previousCleanup = accountCleanupTask
         let cleanup = Task { @MainActor () -> (failures: [String], credentialsCleared: Bool) in
@@ -797,7 +817,7 @@ final class AppModel: ObservableObject {
             if cleared { do { try db?.setPreference("native_account_transition",nil) } catch { failures.append(error.localizedDescription) } }
             await clearWebCookies()
             do {
-                try db?.transaction { try db?.forgetRecentTastings() }
+                try db?.transaction { try db?.forgetRecentTastings(); try db?.forgetCreditLog() }
                 try db?.setPreference("is_visitor_mode","false")
                 try db?.setPreference("all_beers_api_url","")
                 try db?.setPreference("my_beers_api_url","")
@@ -825,7 +845,7 @@ final class AppModel: ObservableObject {
         let cleanupError = error
         do {
             try db?.transaction {
-                for table in ["allbeers","tasted_brew_current_round","rewards","operation_queue","recent_tastings","tasting_baseline","beer_choices"] { try db?.execute("DELETE FROM \(table)") }
+                for table in ["allbeers","tasted_brew_current_round","rewards","operation_queue","recent_tastings","tasting_baseline","beer_choices","credit_log"] { try db?.execute("DELETE FROM \(table)") }
                 // Keep the restore block when logout could not clear the saved credentials.
                 try db?.execute("DELETE FROM preferences WHERE key <> 'native_account_transition' OR value IS NULL")
             }
