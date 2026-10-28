@@ -89,25 +89,34 @@ final class AppModel: ObservableObject {
     @Published var error: String?
     @Published private(set) var presentedNotice: Notice?
     private var pendingNotices: [Notice] = []
-    private var noticeAdvance: Task<Void, Never>?
+    private var noticeSpacingTask: Task<Void, Never>?
+    var noticeSpacing: @MainActor () async -> Void = { try? await Task.sleep(for:.milliseconds(500)) }
     var notice: String? {
         get { presentedNotice?.message }
         set {
-            guard let newValue else { noticeAdvance?.cancel(); pendingNotices = []; presentedNotice = nil; return }
-            let next = Notice(message:newValue)
-            if presentedNotice == nil && pendingNotices.isEmpty { presentedNotice = next } else { pendingNotices.append(next) }
+            guard let newValue else {
+                pendingNotices = []
+                if let shown = presentedNotice { dismissNotice(shown) }
+                return
+            }
+            pendingNotices.append(Notice(message:newValue))
+            presentNextNotice()
         }
     }
     func dismissNotice(_ notice: Notice) {
         guard presentedNotice?.id == notice.id else { return }
         presentedNotice = nil
-        guard !pendingNotices.isEmpty else { return }
         // A presented alert ignores new data, and SwiftUI drops a presentation requested while the last alert animates away.
-        noticeAdvance = Task { [weak self] in
-            do { try await Task.sleep(for:.milliseconds(500)) } catch { return }
-            guard let self, presentedNotice == nil, !pendingNotices.isEmpty else { return }
-            presentedNotice = pendingNotices.removeFirst()
+        let spacing = noticeSpacing
+        noticeSpacingTask = Task { [weak self] in
+            await spacing()
+            self?.noticeSpacingTask = nil
+            self?.presentNextNotice()
         }
+    }
+    private func presentNextNotice() {
+        guard presentedNotice == nil, noticeSpacingTask == nil, !pendingNotices.isEmpty else { return }
+        presentedNotice = pendingNotices.removeFirst()
     }
     @Published var busyIDs: Set<String> = []
     @Published var tab: AppTab = .home
@@ -129,7 +138,7 @@ final class AppModel: ObservableObject {
     var activityUpdate: (@MainActor (MemberSession, [QueueEntry]) async -> Void)?
     var webCookieCleanup: (@MainActor () async -> Void)?
     private let monitor = NWPathMonitor()
-    private var epoch = UUID() { didSet { semanticIndex.invalidate(); busyIDs = []; recommendations.cancel(); recentTastings = []; beerFeedback = []; taplistValidation = nil; tastingValidation = nil; queueValidation = nil; cancelEnrichmentUpdates(); queueLoaded = false; queueError = nil; loadingQueue = false; rewardsLoaded = false; rewardsError = nil; rewardsNotice = nil } }
+    private var epoch = UUID() { didSet { semanticIndex.invalidate(); busyIDs = []; recommendations.cancel(); recentTastings = []; beerFeedback = []; taplistValidation = nil; tastingValidation = nil; queueValidation = nil; cancelEnrichmentUpdates(); queueLoaded = false; queueError = nil; loadingQueue = false; rewardsLoaded = false; rewardsError = nil; rewardsNotice = nil; notice = nil } }
     @Published private(set) var processing = false
     private var lastFocusRefresh = Date.distantPast
     private var pendingURL: URL?
