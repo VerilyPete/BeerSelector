@@ -111,6 +111,34 @@ final class NoticeTests: XCTestCase {
         XCTAssertEqual(next?.message,"Third","Nothing posted before clearing may be shown")
         XCTAssertEqual(spacing.started,1)
     }
+    @MainActor func testNoticeShowsOnTheMainScreenWhenNoSheetIsOpen() {
+        XCTAssertEqual(model().noticeHost,.root)
+    }
+    @MainActor func testNoticeShowsOnTheOpenSheet() {
+        let model = model()
+        let sheets: [(ReferenceWritableKeyPath<AppModel, Bool>, NoticeHost)] = [
+            (\.showRecommendations,.recommendations),(\.showSettings,.settings),(\.showRewards,.rewards),
+            (\.showQueue,.queue),(\.showOperations,.operations)
+        ]
+        for (sheet,host) in sheets {
+            model[keyPath:sheet] = true
+            XCTAssertEqual(model.noticeHost,host)
+            model[keyPath:sheet] = false
+        }
+    }
+    @MainActor func testNoticeShowsOnTheSheetOpenedFromAnotherSheet() {
+        let model = model()
+        model.showSettings = true; model.showLogin = true
+        XCTAssertEqual(model.noticeHost,.login)
+        model.showSettings = false; model.showLogin = false
+        model.showQueue = true; model.showMissedCredit = true
+        XCTAssertEqual(model.noticeHost,.missedCredit)
+    }
+    @MainActor func testNestedSheetFlagsWithoutTheirParentSheetDoNotHostNotices() {
+        let model = model()
+        model.showLogin = true; model.showMissedCredit = true
+        XCTAssertEqual(model.noticeHost,.root,"Login and missed credit only appear above Settings and Queue")
+    }
     @MainActor func testDismissingANoticeThatWasNeverDisplayedChangesNothing() throws {
         let model = model()
         model.notice = "Shown"

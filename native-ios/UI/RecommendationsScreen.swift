@@ -85,7 +85,7 @@ struct RecommendationsScreen: View {
                 .onChange(of:controller.suggestions) { _,_ in selected = []; expanded = [] }
                 .onDisappear { controller.cancel() }
                 .interactiveDismissDisabled(controller.submitting)
-        }.tint(QueueChrome.cyan)
+        }.tint(QueueChrome.cyan).noticeAlert(.recommendations,model:model)
     }
     private func card(_ suggestion: BeerSuggestion) -> some View {
         let beer = suggestion.beer

@@ -2,6 +2,8 @@ import SwiftUI
 import Network
 import WebKit
 
+enum NoticeHost { case root, recommendations, settings, login, rewards, queue, missedCredit, operations }
+
 struct Notice: Identifiable, Equatable {
     let id = UUID()
     let message: String
@@ -126,6 +128,15 @@ final class AppModel: ObservableObject {
             self?.noticeSpacingTask = nil
             self?.presentNextNotice()
         }
+    }
+    // Only the frontmost presenter may show a notice: dismissing an alert from a view that presents a sheet also closes the sheet.
+    var noticeHost: NoticeHost {
+        if showSettings { return showLogin ? .login : .settings }
+        if showQueue { return showMissedCredit ? .missedCredit : .queue }
+        if showRecommendations { return .recommendations }
+        if showRewards { return .rewards }
+        if showOperations { return .operations }
+        return .root
     }
     private func presentNextNotice() {
         guard presentedNotice == nil, noticeSpacingTask == nil, !pendingNotices.isEmpty else { return }
