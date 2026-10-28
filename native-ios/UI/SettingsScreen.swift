@@ -12,6 +12,8 @@ struct SettingsScreen: View {
     @State private var confirmLogout = false
     @State private var confirmReset = false
     @State private var confirmTimestamps = false
+    @State private var sharingFile: ShareItem?
+    @State private var sharingReport: ShareItem?
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -66,7 +68,8 @@ struct SettingsScreen: View {
                         }.disabled(preparingDiagnostics).accessibilityIdentifier("prepare-diagnostics-button")
                         separator
                         if let diagnosticFile {
-                            ShareLink(item:diagnosticFile) { rowLabel("Share Diagnostic Report","Choose where to send your report","square.and.arrow.up") }.buttonStyle(SettingsActionStyle())
+                            Button { sharingFile = .file(diagnosticFile) } label: { rowLabel("Share Diagnostic Report","Choose where to send your report","square.and.arrow.up") }
+                                .buttonStyle(SettingsActionStyle()).background(ShareSheet(item:$sharingFile))
                             separator
                         }
                         row("Clear Diagnostic History","Remove saved reports from this device","trash", destructive:true) {
@@ -88,7 +91,7 @@ struct SettingsScreen: View {
                         }.padding(14)
                     }
                     #if DEBUG
-                    SettingsDeveloperTools(confirmReset:$confirmReset,confirmTimestamps:$confirmTimestamps)
+                    SettingsDeveloperTools(confirmReset:$confirmReset,confirmTimestamps:$confirmTimestamps,sharingReport:$sharingReport)
                     #endif
                     Text("\(String(Calendar.current.component(.year,from:Date()))) Beer Selector")
                         .font(Robo.mono(10)).foregroundStyle(Robo.steel)
@@ -103,7 +106,7 @@ struct SettingsScreen: View {
                     Button("Delete feedback",role:.destructive) { model.deleteCachedBeerFeedback(account:feedbackDeletionAccount) }
                 }
                 .sheet(isPresented:$model.showLogin) { LoginScreen().environmentObject(model) }
-                .noticeAlert(.settings,model:model,blocked:confirmDeleteFeedback || confirmClearHistory || confirmLogout || confirmReset || confirmTimestamps)
+                .noticeAlert(.settings,model:model,blocked:confirmDeleteFeedback || confirmClearHistory || confirmLogout || confirmReset || confirmTimestamps || sharingFile != nil || sharingReport != nil)
                 .onChange(of:recommendationsEnabled) { _,enabled in if !enabled { model.recommendations.cancel() } }
                 .confirmationDialog("Clear recent recommendation history?",isPresented:$confirmClearHistory,titleVisibility:.visible) {
                     Button("Clear History",role:.destructive) { model.clearRecommendationHistory() }
@@ -211,6 +214,7 @@ private struct SettingsDeveloperTools: View {
     @State private var developerToolsExpanded = false
     @Binding var confirmReset: Bool
     @Binding var confirmTimestamps: Bool
+    @Binding var sharingReport: ShareItem?
     var body: some View {
         VStack(alignment:.leading,spacing:0) {
             Button { developerToolsExpanded.toggle() } label: {
@@ -223,7 +227,7 @@ private struct SettingsDeveloperTools: View {
                 .accessibilityValue(developerToolsExpanded ? "Expanded" : "Collapsed")
             if developerToolsExpanded {
                 panel {
-                    SettingsDeveloperDiagnostics()
+                    SettingsDeveloperDiagnostics(sharingReport:$sharingReport)
                     separator
                     SettingsDeveloperStorage(confirmReset:$confirmReset,confirmTimestamps:$confirmTimestamps)
                 }.padding(.top,10)
@@ -236,6 +240,7 @@ private struct SettingsDeveloperDiagnostics: View {
     @EnvironmentObject var model: AppModel
     @Environment(\.dismiss) private var dismiss
     @State private var diagnosticsReport: String?
+    @Binding var sharingReport: ShareItem?
     var body: some View {
         VStack(alignment:.leading,spacing:0) {
             row("Create Mock Session","Open isolated offline sample data","flask.fill") {
@@ -248,7 +253,8 @@ private struct SettingsDeveloperDiagnostics: View {
             }
             if let diagnosticsReport {
                 Text(diagnosticsReport).font(Robo.mono(11)).textSelection(.enabled).padding(14)
-                ShareLink(item: diagnosticsReport) { rowLabel("Share Diagnostics","Export session aggregates","square.and.arrow.up") }.buttonStyle(SettingsActionStyle())
+                Button { sharingReport = .text(diagnosticsReport) } label: { rowLabel("Share Diagnostics","Export session aggregates","square.and.arrow.up") }
+                    .buttonStyle(SettingsActionStyle()).background(ShareSheet(item:$sharingReport))
             }
         }
     }
@@ -278,3 +284,26 @@ private struct SettingsDeveloperStorage: View {
     }
 }
 #endif
+
+enum ShareItem: Sendable {
+    case file(URL), text(String)
+    var value: Any { switch self { case .file(let url): url; case .text(let text): text } }
+}
+/// Presents the system share sheet as ShareLink does, but reports when it closes so Settings can hold notices meanwhile.
+private struct ShareSheet: UIViewControllerRepresentable {
+    @Binding var item: ShareItem?
+    func makeUIViewController(context: Context) -> Controller { Controller() }
+    func updateUIViewController(_ controller: Controller,context: Context) {
+        guard let item, !controller.sharing else { return }
+        controller.sharing = true
+        DispatchQueue.main.async {
+            let activity = UIActivityViewController(activityItems:[item.value],applicationActivities:nil)
+            activity.popoverPresentationController?.sourceView = controller.view
+            activity.completionWithItemsHandler = { _,_,_,_ in
+                DispatchQueue.main.async { controller.sharing = false; self.item = nil }
+            }
+            controller.present(activity,animated:true)
+        }
+    }
+    final class Controller: UIViewController { var sharing = false }
+}

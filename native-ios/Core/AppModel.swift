@@ -152,7 +152,8 @@ final class AppModel: ObservableObject {
     }
     // SwiftUI drops an alert whose presenter goes away or gets covered, so put the notice back and present it once things settle.
     private func noticePresenterMayHaveChanged() {
-        let front = (host:noticeHost, ready:readyNoticeHosts.contains(noticeHost))
+        // The Untappd browser is a system presentation over every presenter.
+        let front = (host:noticeHost, ready:readyNoticeHosts.contains(noticeHost) && browserURL == nil)
         guard front != frontNoticePresenter else { return }
         frontNoticePresenter = front
         if let shown = presentedNotice { pendingNotices.insert(shown,at:0); presentedNotice = nil }
@@ -170,7 +171,7 @@ final class AppModel: ObservableObject {
     @Published var showMissedCredit = false { didSet { noticePresenterMayHaveChanged() } }
     @Published var showOperations = false { didSet { noticePresenterMayHaveChanged() } }
     @Published var showRewards = false { didSet { noticePresenterMayHaveChanged() } }
-    @Published var browserURL: URL?
+    @Published var browserURL: URL? { didSet { noticePresenterMayHaveChanged() } }
     var db: BeerDatabase?
     let api: BeerAPI
     lazy var enrichment = EnrichmentService(api:api)

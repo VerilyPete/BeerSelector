@@ -3,22 +3,38 @@ import Combine
 @testable import BeerSelectorNative
 
 /// Stands in for the pause while a dismissed alert animates away. A release ends every pause in
-/// progress, or the next one to start if none is waiting. Like Task.sleep, a cancelled pause ends at once.
-@MainActor final class NoticeSpacingGate {
-    private var waiting: [CheckedContinuation<Void, Never>] = []
+/// progress, or the next one to start if none is waiting. Like Task.sleep, a cancelled pause ends
+/// at once, whether it was cancelled before or while waiting, and never uses up a release.
+final class NoticeSpacingGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var waiting: [UUID: CheckedContinuation<Void, Never>] = [:]
     private var released = 0
-    private(set) var started = 0
-    func install(on model: AppModel) { model.noticeSpacing = { [self] in await pause() } }
+    private var startedPauses = 0
+    var started: Int { lock.withLock { startedPauses } }
+    @MainActor func install(on model: AppModel) { model.noticeSpacing = { [self] in await pause() } }
     func pause() async {
-        if Task.isCancelled { return }
-        started += 1
-        if released > 0 { released -= 1; return }
-        await withCheckedContinuation { waiting.append($0) }
+        let id = UUID()
+        await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                let endsNow = lock.withLock {
+                    if Task.isCancelled { return true }
+                    startedPauses += 1
+                    if released > 0 { released -= 1; return true }
+                    waiting[id] = continuation
+                    return false
+                }
+                if endsNow { continuation.resume() }
+            }
+        } onCancel: {
+            lock.withLock { waiting.removeValue(forKey:id) }?.resume()
+        }
     }
     func release() {
-        if waiting.isEmpty { released += 1; return }
-        let finished = waiting
-        waiting = []
+        let finished = lock.withLock {
+            if waiting.isEmpty { released += 1; return [CheckedContinuation<Void, Never>]() }
+            defer { waiting = [:] }
+            return Array(waiting.values)
+        }
         finished.forEach { $0.resume() }
     }
 }
@@ -264,6 +280,38 @@ final class NoticeTests: XCTestCase {
         let next = await nextPresentedNotice(model)
         XCTAssertEqual(next?.message,"Pliny has been added to your queue!")
         XCTAssertEqual(model.noticeHost,.missedCredit)
+    }
+    @MainActor func testPresenterChangeWhileAPauseIsWaitingStillPresentsAfterTheNewPause() async throws {
+        let spacing = NoticeSpacingGate()
+        let model = model(spacing)
+        model.noticePresenter(.settings,isReady:true)
+        model.notice = "Shown"
+        model.dismissNotice(try XCTUnwrap(model.presentedNotice))
+        for _ in 0..<100 where spacing.started == 0 { await Task.yield() }
+        XCTAssertEqual(spacing.started,1,"The first pause is waiting")
+        model.notice = "Next"
+        model.showSettings = true
+        spacing.release()
+        let presented = expectation(description:"Next is presented after the pause that replaced the cancelled one")
+        let watcher = model.$presentedNotice.compactMap { $0 }.first().sink { _ in presented.fulfill() }
+        defer { watcher.cancel() }
+        await fulfillment(of:[presented],timeout:2)
+        XCTAssertEqual(model.presentedNotice?.message,"Next")
+    }
+    @MainActor func testUntappdBrowserHoldsNoticesUntilAPauseAfterItCloses() async {
+        let spacing = NoticeSpacingGate()
+        let model = model(spacing)
+        model.browserURL = URL(string:"https://untappd.com/search?q=Pliny")
+        model.notice = "Pliny has been added to your queue!"
+        XCTAssertNil(model.presentedNotice,"The system browser covers every presenter")
+        spacing.release()
+        await Task.yield()
+        XCTAssertNil(model.presentedNotice)
+        model.browserURL = nil
+        XCTAssertNil(model.presentedNotice,"The browser is still animating away")
+        spacing.release()
+        let next = await nextPresentedNotice(model)
+        XCTAssertEqual(next?.message,"Pliny has been added to your queue!")
     }
     @MainActor func testBlockedPresenterBehindTheFrontmostOneDoesNotHoldNotices() {
         let model = model()
