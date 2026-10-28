@@ -63,14 +63,14 @@ final class MissedCreditTests: XCTestCase {
         XCTAssertEqual(result.map(\.day),[at(10,25,0),at(10,20,0)])
         XCTAssertEqual(result.first?.beers.map(\.id),["early","late"])
     }
-    private func withDB(_ body: (BeerDatabase,URL) throws -> Void) throws {
+    @MainActor private func withDB(_ body: (BeerDatabase,URL) throws -> Void) throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at:folder,withIntermediateDirectories:true)
         defer { try? FileManager.default.removeItem(at:folder) }
         let url = folder.appendingPathComponent("beers.db")
         try body(BeerDatabase(url:url),url)
     }
-    func testLogKeepsBeersAfterTheyLeaveTheQueueAndRemembersFirstSighting() throws {
+    @MainActor func testLogKeepsBeersAfterTheyLeaveTheQueueAndRemembersFirstSighting() throws {
         try withDB { db,url in
             let queued = QueueEntry(id:"1",name:"Example Oktoberfest (Draft)",date:"Oct 25, 2026 @ 09:21:29pm")
             try db.recordQueue([queued],account:"a",seenAt:at(10,25,21,30))
@@ -80,7 +80,7 @@ final class MissedCreditTests: XCTestCase {
                            [CreditLogEntry(id:"1",name:"Example Oktoberfest (Draft)",queued:"Oct 25, 2026 @ 09:21:29pm",firstSeen:at(10,25,21,30))])
         }
     }
-    func testLogIsScopedToTheAccountThatSawIt() throws {
+    @MainActor func testLogIsScopedToTheAccountThatSawIt() throws {
         try withDB { db,_ in
             try db.recordQueue([QueueEntry(id:"1",name:"Mine",date:"")],account:"a",seenAt:at(10,25,21))
             XCTAssertEqual(try db.creditLog(account:"b"),[])
@@ -88,7 +88,7 @@ final class MissedCreditTests: XCTestCase {
             XCTAssertEqual(try db.creditLog(account:"a").map(\.name),["Mine"])
         }
     }
-    func testDismissedBeersStayDismissedWhenSeenAgain() throws {
+    @MainActor func testDismissedBeersStayDismissedWhenSeenAgain() throws {
         try withDB { db,_ in
             let entry = QueueEntry(id:"1",name:"Gone",date:"")
             try db.recordQueue([entry,QueueEntry(id:"2",name:"Kept",date:"")],account:"a",seenAt:at(10,25,21))
@@ -97,14 +97,14 @@ final class MissedCreditTests: XCTestCase {
             XCTAssertEqual(try db.creditLog(account:"a").map(\.id),["2"])
         }
     }
-    func testLogForgetsBeersFirstSeenOverThirtyDaysAgo() throws {
+    @MainActor func testLogForgetsBeersFirstSeenOverThirtyDaysAgo() throws {
         try withDB { db,_ in
             try db.recordQueue([QueueEntry(id:"old",name:"Old",date:"")],account:"a",seenAt:at(9,20,21))
             try db.recordQueue([QueueEntry(id:"new",name:"New",date:"")],account:"a",seenAt:at(10,25,21))
             XCTAssertEqual(try db.creditLog(account:"a").map(\.id),["new"])
         }
     }
-    func testForgettingTheLogClearsEveryAccount() throws {
+    @MainActor func testForgettingTheLogClearsEveryAccount() throws {
         try withDB { db,_ in
             try db.recordQueue([QueueEntry(id:"1",name:"A",date:"")],account:"a",seenAt:at(10,25,21))
             try db.recordQueue([QueueEntry(id:"1",name:"B",date:"")],account:"b",seenAt:at(10,25,21))
