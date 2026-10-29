@@ -9,6 +9,7 @@ struct SettingsScreen: View {
     @Environment(\.dismiss) var dismiss
     @State private var diagnosticFile: URL?
     @State private var preparingDiagnostics = false
+    @State private var diagnosticsError: String?
     @State private var confirmLogout = false
     @State private var confirmReset = false
     @State private var confirmTimestamps = false
@@ -59,21 +60,30 @@ struct SettingsScreen: View {
                             .fixedSize(horizontal:false,vertical:true).padding(14)
                         separator
                         row(preparingDiagnostics ? "Preparing Report…" : "Prepare Diagnostic Report","Includes recent activity across app restarts","doc.text.magnifyingglass",busy:preparingDiagnostics) {
-                            preparingDiagnostics = true; diagnosticFile = nil
+                            preparingDiagnostics = true; diagnosticFile = nil; diagnosticsError = nil
                             Task {
                                 defer { preparingDiagnostics = false }
-                                do { diagnosticFile = try await DiagnosticJournal.shared.export() }
-                                catch { model.error = "Could not prepare the diagnostic report. Please try again." }
+                                do {
+                                    let file = try await DiagnosticJournal.shared.export()
+                                    diagnosticFile = file; sharingFile = .file(file)
+                                }
+                                catch { diagnosticsError = "Could not prepare the diagnostic report. Please try again." }
                             }
                         }.disabled(preparingDiagnostics).accessibilityIdentifier("prepare-diagnostics-button")
+                            .background(ShareSheet(item:$sharingFile))
                         separator
+                        if let diagnosticsError {
+                            Text(diagnosticsError).font(Robo.mono(11)).foregroundStyle(Robo.red)
+                                .fixedSize(horizontal:false,vertical:true).padding(14).accessibilityIdentifier("diagnostics-error")
+                            separator
+                        }
                         if let diagnosticFile {
-                            Button { sharingFile = .file(diagnosticFile) } label: { rowLabel("Share Diagnostic Report","Choose where to send your report","square.and.arrow.up") }
-                                .buttonStyle(SettingsActionStyle()).background(ShareSheet(item:$sharingFile))
+                            Button { sharingFile = .file(diagnosticFile) } label: { rowLabel("Share Diagnostic Report","Report ready. Tap to send it again","square.and.arrow.up") }
+                                .buttonStyle(SettingsActionStyle())
                             separator
                         }
                         row("Clear Diagnostic History","Remove saved reports from this device","trash", destructive:true) {
-                            diagnosticFile = nil
+                            diagnosticFile = nil; diagnosticsError = nil
                             Task {
                                 do { try await DiagnosticJournal.shared.clear(); model.notice = "Diagnostic history cleared" }
                                 catch { model.error = "Could not clear diagnostic history. Please try again." }
