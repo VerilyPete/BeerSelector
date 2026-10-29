@@ -1,4 +1,14 @@
-# Live enrichment Worker verification — 2026-09-11
+# Live enrichment Worker verification
+
+## API host moved to api.ufobeer.app — 2026-10-29
+
+The enrichment Worker now serves only `https://api.ufobeer.app`. The apex `ufobeer.app` is being freed for a public website and will stop serving the API once older builds are expired. Set `EnrichmentURL` to `https://api.ufobeer.app` (no trailing slash; `EnrichmentService` appends `beers`, `beers/batch`, `beers/sync` and `health`). Paths, `X-API-Key`, User-Agent and ETag behavior are unchanged.
+
+`GET https://api.ufobeer.app/health` with redirects rejected (`curl --max-redirs 0 --proto '=https'`) returned **200** with `status: ok`. The Cloudflare 1010 block recorded below no longer applies to that request. `/health` also answers without a key, so it does not prove the key; the simulator taplist refresh does.
+
+If an older build's enrichment host returns 404, 403 or an HTML 200, the app falls back to the direct Flying Saucer taplist without showing an error and keeps previously cached ABV values. `NetworkTests.testRetiredEnrichmentHostFallsBackToDirectTaplistAndKeepsCachedEnrichment` covers all three. New beers on such a build get no enrichment. Cross-host redirects are refused, so the API key is not forwarded to another host.
+
+## Edge block — 2026-09-11
 
 Status: blocked at the edge; no live Worker contract or delayed-cleanup success is claimed.
 

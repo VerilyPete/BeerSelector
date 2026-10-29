@@ -1,3 +1,12 @@
+## Enrichment host moved to api.ufobeer.app — October 29, 2026
+
+The enrichment Worker moved from `https://ufobeer.app` to `https://api.ufobeer.app`, with no compatibility period. Backend plan: `ufobeer/plans/api-subdomain-cutover.md`. The host comes only from `EnrichmentURL` in the ignored `ServiceConfiguration.plist`, so no Swift changed. Distribution builds take it from the Xcode Cloud secret `BEERSELECTOR_SERVICE_CONFIGURATION_BASE64` in the Native External Beta workflow, which must hold the new host before the next push to main. See [WORKER-VERIFICATION.md](WORKER-VERIFICATION.md) for the probe and old-build fallback behavior.
+
+- Added `testRetiredEnrichmentHostFallsBackToDirectTaplistAndKeepsCachedEnrichment`, a characterisation test of how builds still pointed at the apex behave after the cutover. All plan: 309/309 passed on the iPhone 18 Pro simulator.
+- Live checks against the new host with the app's User-Agent: `/health` 200; `/beers?sid=13879` 200 with enriched ABVs; the same request with its `If-None-Match` returned 304; a wrong key returned 401.
+- First build configured for the api host: _pending (record the Cloud build number once it reaches TestFlight)_.
+- Older TestFlight builds are expired by hand once that build is available; there is no in-app version check.
+
 ## Swift 6 language mode — October 27, 2026
 
 All three targets (`BeerSelectorNative`, `BeerQueueWidget`, `BeerSelectorNativeTests`) moved from Swift 5 to Swift 6 language mode in six stacked PRs: #43 (WebKit navigation-policy guard), #45 (complete strict checking), #46 (production `Sendable` and SDK callbacks), #47 (main-actor `BeerDatabase` with a `SQLiteConnection` owner, and test fixtures), #48 (`@unchecked Sendable` audit), and this flip. Xcode Cloud and GitHub CI are pinned to Xcode 27.1 (27A9275) for the migration (#44). Plan and review ledger: `plans/swift6-migration.md` (local, ignored).
