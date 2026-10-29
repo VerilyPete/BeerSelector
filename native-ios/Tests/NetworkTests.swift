@@ -603,6 +603,36 @@ final class NetworkTests: XCTestCase {
         XCTAssertFalse(model.refreshing)
     }
 
+    // A build whose enrichment host stops serving the API keeps working from the direct taplist.
+    @MainActor func testRetiredEnrichmentHostFallsBackToDirectTaplistAndKeepsCachedEnrichment() async throws {
+        let retiredResponses: [(Int,String)] = [(404,"<html><body>Not found</body></html>"),
+                                                (200,"<!doctype html><html><body>Website</body></html>"),
+                                                (403,"<html><body>Forbidden</body></html>")]
+        for (status,body) in retiredResponses {
+            let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+            defer { try? FileManager.default.removeItem(at:folder); fixture.handler = nil }
+            let model = AppModel(api:api(configuration:enrichmentConfiguration),monitorConnectivity:false)
+            let db = try BeerDatabase(url:folder.appendingPathComponent("beers.db")); model.db = db
+            model.session = MemberSession(memberId:"visitor",storeId:"1",storeName:"Fixture",sessionId:"visitor_session")
+            try db.setPreference("all_beers_api_url","https://fsbs.beerknurd.com/bk-store-json-2026.php?sid=1")
+            var saved = Beer(id:"saved",name:"Saved beer")
+            saved.abv = 6.5; saved.enrichment_source = "perplexity"; saved.enrichment_confidence = 0.9
+            try db.replaceBeers([saved])
+            try model.reload()
+            fixture.handler = { request in
+                if request.url!.host == "enrichment.example.test" { return (status,Data(body.utf8)) }
+                return (200,Data(#"[{},{"brewInStock":[{"id":"saved","brew_name":"Saved beer"},{"id":"fresh","brew_name":"Fresh beer"}]}]"#.utf8))
+            }
+            await model.refresh()
+            XCTAssertNil(model.error,"HTTP \(status)")
+            XCTAssertEqual(model.enrichment.metrics.fallbacks,1,"HTTP \(status)")
+            XCTAssertEqual(try db.beers().map(\.id).sorted(),["fresh","saved"],"HTTP \(status)")
+            let restored = try XCTUnwrap(try db.beers().first { $0.id == "saved" })
+            XCTAssertEqual(restored.abv,6.5,"HTTP \(status)")
+            XCTAssertEqual(restored.enrichment_source,"perplexity","HTTP \(status)")
+        }
+    }
+
     @MainActor private func assertForeignOperationIsNotSubmitted(memberID: String, storeID: String) async throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at:folder); fixture.handler = nil }
