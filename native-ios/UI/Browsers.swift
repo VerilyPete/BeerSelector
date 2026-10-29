@@ -20,7 +20,7 @@ struct LoginScreen: View {
             }.background(Robo.background).foregroundStyle(Robo.text)
                 .navigationTitle("Flying Saucer Login").navigationBarTitleDisplayMode(.inline)
                 .toolbar { ToolbarItem(placement:.cancellationAction) { Button("Cancel") { dismiss() } } }
-        }.tint(Robo.cyan)
+        }.tint(Robo.cyan).noticeAlert(.login,model:model)
     }
 }
 struct LoginWebView: UIViewRepresentable {

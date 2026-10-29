@@ -109,7 +109,7 @@ struct RewardsScreen: View {
                         Button("Cancel",role:.cancel) { selected = nil }
                     } else { Button("OK") { model.rewardsNotice = nil } }
                 } message: { Text(selected?.type ?? model.rewardsNotice ?? "") }
-        }.tint(Robo.cyan)
+        }.tint(Robo.cyan).noticeAlert(.rewards,model:model,blocked:selected != nil || model.rewardsNotice != nil)
     }
     private func empty(_ title: String,_ message: String) -> some View { VStack(spacing:12) { Image(systemName:"gift").font(.system(size:48)); Text(title).font(Robo.bold(20)); Text(message).font(Robo.mono()).multilineTextAlignment(.center) }.frame(maxWidth:.infinity).padding(.vertical,40) }
 }
@@ -158,6 +158,7 @@ struct QueueScreen: View {
                 .toolbar(.hidden,for:.navigationBar)
                 .task { await model.refreshQueueAndCredits() }
                 .sheet(isPresented:$model.showMissedCredit) { MissedCreditScreen().environmentObject(model) }
+                .noticeAlert(.queue,model:model,blocked:deletion != nil)
                 .alert("Delete queued beer?",isPresented:Binding(get:{ deletion != nil },set:{ if !$0 { deletion = nil } })) {
                     if let entry = deletion { Button("Delete",role:.destructive) { Task { await model.deleteQueueEntry(entry) }; deletion = nil } }
                     Button("Cancel",role:.cancel) { deletion = nil }
@@ -265,6 +266,6 @@ struct OperationsScreen: View {
                 .confirmationDialog("Remove saved operation?",isPresented:Binding(get:{ removal != nil },set:{ if !$0 { removal = nil } }),titleVisibility:.visible) {
                     if let operation = removal { Button("Remove",role:.destructive) { model.removeOperation(operation.id); removal = nil } }
                 }
-        }.tint(Robo.cyan)
+        }.tint(Robo.cyan).noticeAlert(.operations,model:model,blocked:confirmClear || retry != nil || removal != nil)
     }
 }

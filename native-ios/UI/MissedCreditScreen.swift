@@ -71,7 +71,7 @@ struct MissedCreditScreen: View {
                 .confirmationDialog("Resolve this visit?",isPresented:Binding(get:{ resolving != nil },set:{ if !$0 { resolving = nil } }),titleVisibility:.visible) {
                     if let visit = resolving { Button("Remove \(visit.beers.count) \(visit.beers.count == 1 ? "beer" : "beers")",role:.destructive) { model.resolveMissedCreditVisit(visit); resolving = nil } }
                 } message: { Text("Use this once the store has credited every beer from this visit.") }
-        }.tint(Robo.cyan)
+        }.tint(Robo.cyan).noticeAlert(.missedCredit,model:model,blocked:removal != nil || resolving != nil)
     }
     private func field(_ label: String, _ value: String, id: String) -> some View {
         VStack(alignment:.leading,spacing:4) {

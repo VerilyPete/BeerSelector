@@ -9,9 +9,12 @@ struct SettingsScreen: View {
     @Environment(\.dismiss) var dismiss
     @State private var diagnosticFile: URL?
     @State private var preparingDiagnostics = false
+    @State private var diagnosticsError: String?
     @State private var confirmLogout = false
     @State private var confirmReset = false
     @State private var confirmTimestamps = false
+    @State private var sharingFile: ShareItem?
+    @State private var sharingReport: ShareItem?
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -57,20 +60,30 @@ struct SettingsScreen: View {
                             .fixedSize(horizontal:false,vertical:true).padding(14)
                         separator
                         row(preparingDiagnostics ? "Preparing Report…" : "Prepare Diagnostic Report","Includes recent activity across app restarts","doc.text.magnifyingglass",busy:preparingDiagnostics) {
-                            preparingDiagnostics = true; diagnosticFile = nil
+                            preparingDiagnostics = true; diagnosticFile = nil; diagnosticsError = nil
                             Task {
                                 defer { preparingDiagnostics = false }
-                                do { diagnosticFile = try await DiagnosticJournal.shared.export() }
-                                catch { model.error = "Could not prepare the diagnostic report. Please try again." }
+                                do {
+                                    let file = try await DiagnosticJournal.shared.export()
+                                    diagnosticFile = file; sharingFile = .file(file)
+                                }
+                                catch { diagnosticsError = "Could not prepare the diagnostic report. Please try again." }
                             }
                         }.disabled(preparingDiagnostics).accessibilityIdentifier("prepare-diagnostics-button")
+                            .background(ShareSheet(item:$sharingFile))
                         separator
+                        if let diagnosticsError {
+                            Text(diagnosticsError).font(Robo.mono(11)).foregroundStyle(Robo.red)
+                                .fixedSize(horizontal:false,vertical:true).padding(14).accessibilityIdentifier("diagnostics-error")
+                            separator
+                        }
                         if let diagnosticFile {
-                            ShareLink(item:diagnosticFile) { rowLabel("Share Diagnostic Report","Choose where to send your report","square.and.arrow.up") }.buttonStyle(SettingsActionStyle())
+                            Button { sharingFile = .file(diagnosticFile) } label: { rowLabel("Share Diagnostic Report","Report ready. Tap to send it again","square.and.arrow.up") }
+                                .buttonStyle(SettingsActionStyle())
                             separator
                         }
                         row("Clear Diagnostic History","Remove saved reports from this device","trash", destructive:true) {
-                            diagnosticFile = nil
+                            diagnosticFile = nil; diagnosticsError = nil
                             Task {
                                 do { try await DiagnosticJournal.shared.clear(); model.notice = "Diagnostic history cleared" }
                                 catch { model.error = "Could not clear diagnostic history. Please try again." }
@@ -88,7 +101,7 @@ struct SettingsScreen: View {
                         }.padding(14)
                     }
                     #if DEBUG
-                    SettingsDeveloperTools(confirmReset:$confirmReset,confirmTimestamps:$confirmTimestamps)
+                    SettingsDeveloperTools(confirmReset:$confirmReset,confirmTimestamps:$confirmTimestamps,sharingReport:$sharingReport)
                     #endif
                     Text("\(String(Calendar.current.component(.year,from:Date()))) Beer Selector")
                         .font(Robo.mono(10)).foregroundStyle(Robo.steel)
@@ -103,6 +116,7 @@ struct SettingsScreen: View {
                     Button("Delete feedback",role:.destructive) { model.deleteCachedBeerFeedback(account:feedbackDeletionAccount) }
                 }
                 .sheet(isPresented:$model.showLogin) { LoginScreen().environmentObject(model) }
+                .noticeAlert(.settings,model:model,blocked:confirmDeleteFeedback || confirmClearHistory || confirmLogout || confirmReset || confirmTimestamps || sharingFile != nil || sharingReport != nil)
                 .onChange(of:recommendationsEnabled) { _,enabled in if !enabled { model.recommendations.cancel() } }
                 .confirmationDialog("Clear recent recommendation history?",isPresented:$confirmClearHistory,titleVisibility:.visible) {
                     Button("Clear History",role:.destructive) { model.clearRecommendationHistory() }
@@ -210,6 +224,7 @@ private struct SettingsDeveloperTools: View {
     @State private var developerToolsExpanded = false
     @Binding var confirmReset: Bool
     @Binding var confirmTimestamps: Bool
+    @Binding var sharingReport: ShareItem?
     var body: some View {
         VStack(alignment:.leading,spacing:0) {
             Button { developerToolsExpanded.toggle() } label: {
@@ -222,7 +237,7 @@ private struct SettingsDeveloperTools: View {
                 .accessibilityValue(developerToolsExpanded ? "Expanded" : "Collapsed")
             if developerToolsExpanded {
                 panel {
-                    SettingsDeveloperDiagnostics()
+                    SettingsDeveloperDiagnostics(sharingReport:$sharingReport)
                     separator
                     SettingsDeveloperStorage(confirmReset:$confirmReset,confirmTimestamps:$confirmTimestamps)
                 }.padding(.top,10)
@@ -235,6 +250,7 @@ private struct SettingsDeveloperDiagnostics: View {
     @EnvironmentObject var model: AppModel
     @Environment(\.dismiss) private var dismiss
     @State private var diagnosticsReport: String?
+    @Binding var sharingReport: ShareItem?
     var body: some View {
         VStack(alignment:.leading,spacing:0) {
             row("Create Mock Session","Open isolated offline sample data","flask.fill") {
@@ -247,7 +263,8 @@ private struct SettingsDeveloperDiagnostics: View {
             }
             if let diagnosticsReport {
                 Text(diagnosticsReport).font(Robo.mono(11)).textSelection(.enabled).padding(14)
-                ShareLink(item: diagnosticsReport) { rowLabel("Share Diagnostics","Export session aggregates","square.and.arrow.up") }.buttonStyle(SettingsActionStyle())
+                Button { sharingReport = .text(diagnosticsReport) } label: { rowLabel("Share Diagnostics","Export session aggregates","square.and.arrow.up") }
+                    .buttonStyle(SettingsActionStyle()).background(ShareSheet(item:$sharingReport))
             }
         }
     }
@@ -277,3 +294,44 @@ private struct SettingsDeveloperStorage: View {
     }
 }
 #endif
+
+enum ShareItem: Sendable {
+    case file(URL), text(String)
+    var value: Any { switch self { case .file(let url): url; case .text(let text): text } }
+}
+/// Presents the system share sheet as ShareLink does, but reports when it closes so Settings can hold notices meanwhile.
+private struct ShareSheet: UIViewControllerRepresentable {
+    @Binding var item: ShareItem?
+    func makeUIViewController(context: Context) -> Controller { Controller() }
+    func updateUIViewController(_ controller: Controller,context: Context) {
+        guard let item, !controller.sharing else { return }
+        controller.sharing = true
+        let binding = $item
+        controller.finish = { controller.sharing = false; controller.current = nil; controller.finish = nil; binding.wrappedValue = nil }
+        DispatchQueue.main.async {
+            // UIKit refuses to present while another presentation is under way or outside a window, and then never calls the completion.
+            guard controller.view.window != nil, controller.presentedViewController == nil else { controller.finish?(); return }
+            let activity = UIActivityViewController(activityItems:[item.value],applicationActivities:nil)
+            activity.popoverPresentationController?.sourceView = controller.view
+            // Only the share on screen may finish; a closed one's callbacks must not end a newer share.
+            controller.current = activity
+            activity.completionWithItemsHandler = { [weak activity] _,_,_,_ in
+                DispatchQueue.main.async { if let activity, controller.current === activity { controller.finish?() } }
+            }
+            controller.present(activity,animated:true)
+            // An accepted presentation starts on a later turn; a refused one never calls back.
+            DispatchQueue.main.asyncAfter(deadline:.now() + 1) { [weak activity] in
+                if let activity, controller.current === activity, activity.presentingViewController == nil { controller.finish?() }
+            }
+        }
+    }
+    static func dismantleUIViewController(_ controller: Controller,coordinator: ()) {
+        guard let finish = controller.finish else { return }
+        DispatchQueue.main.async { finish() }
+    }
+    final class Controller: UIViewController {
+        var sharing = false
+        var current: UIActivityViewController?
+        var finish: (() -> Void)?
+    }
+}
