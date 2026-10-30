@@ -852,7 +852,12 @@ final class AppModel: ObservableObject {
         do {
             _ = try await api.request(url.url!,member:member,cookies:cookies,referer:"memberQueues.php",retry:false)
             guard token == epoch else { return }
-            if let account = recommendationAccount { try? db?.dismissCredit(ids:[entry.id],account:account) }
+            // A beer already missed stays on the report until the member clears it. Decide from
+            // the stored log at this moment; the cached report may predate the grace window.
+            if let db, let account = recommendationAccount, let log = try? db.creditLog(account:account),
+               !MissedCredit.visits(log:log,tasted:[],now:now()).contains(where: { $0.beers.contains { $0.id == entry.id } }) {
+                try? db.dismissCredit(ids:[entry.id],account:account)
+            }
             await refreshQueue()
         } catch { if token == epoch { queueError = "Couldn’t confirm deletion. Refresh your queue before trying again." } }
     }

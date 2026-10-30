@@ -118,7 +118,7 @@ final class MissedCreditModelTests: XCTestCase {
             XCTAssertEqual(model.missedCredits,[])
         }
     }
-    @MainActor func testBeerDeletedFromTheQueueInTheAppIsNotReported() async throws {
+    @MainActor func testBeerDeletedFromTheQueueBeforeItWasMissedIsNotReported() async throws {
         try await withModel { model,_,upstream in
             upstream.queue = [("7","Changed My Mind","Oct 25, 2026 @ 09:21:29pm")]
             model.now = { self.at(10,25,21) }
@@ -128,6 +128,32 @@ final class MissedCreditModelTests: XCTestCase {
             model.now = { self.at(10,26,9) }
             await model.refreshQueue()
             XCTAssertEqual(model.missedCredits,[])
+        }
+    }
+    @MainActor func testStaleBeerDeletedFromTheQueueStaysReportedUntilTheMemberClearsIt() async throws {
+        try await withModel { model,_,upstream in
+            upstream.queue = [("7","Never Poured","Oct 25, 2026 @ 09:21:29pm")]
+            model.now = { self.at(10,26,9) }
+            await model.refreshQueue()
+            XCTAssertEqual(model.missedCredits.flatMap(\.beers).map(\.id),["7"])
+            await model.deleteQueueEntry(model.queue[0])
+            XCTAssertEqual(upstream.deleted,["7"])
+            await model.refreshQueue()
+            XCTAssertEqual(model.missedCredits.flatMap(\.beers).map(\.id),["7"],"Deleting the queue row does not erase the check-in record")
+            model.dismissMissedCredit(try XCTUnwrap(model.missedCredits.first?.beers.first))
+            XCTAssertEqual(model.missedCredits,[])
+        }
+    }
+    @MainActor func testBeerThatBecameMissedSinceTheLastRefreshStaysReportedWhenDeleted() async throws {
+        try await withModel { model,_,upstream in
+            upstream.queue = [("7","Never Poured","Oct 25, 2026 @ 09:21:29pm")]
+            model.now = { self.at(10,25,22) }
+            await model.refreshQueue()
+            XCTAssertEqual(model.missedCredits,[])
+            model.now = { self.at(10,26,9) }
+            await model.deleteQueueEntry(model.queue[0])
+            XCTAssertEqual(upstream.deleted,["7"])
+            XCTAssertEqual(model.missedCredits.flatMap(\.beers).map(\.id),["7"],"Grace elapsed before the delete, so the beer is already missed")
         }
     }
     @MainActor func testMemberCanRemoveABeerFromTheReport() async throws {
