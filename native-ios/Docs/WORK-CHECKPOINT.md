@@ -4,8 +4,8 @@ The enrichment Worker moved from `https://ufobeer.app` to `https://api.ufobeer.a
 
 - Added `testRetiredEnrichmentHostFallsBackToDirectTaplistAndKeepsCachedEnrichment`, a characterisation test of how builds still pointed at the apex behave after the cutover. All plan: 309/309 passed on the iPhone 18 Pro simulator.
 - Live checks against the new host with the app's User-Agent: `/health` 200; `/beers?sid=13879` 200 with enriched ABVs; the same request with its `If-None-Match` returned 304; a wrong key returned 401.
-- First build configured for the api host: _pending (record the Cloud build number once it reaches TestFlight)_.
-- Older TestFlight builds are expired by hand once that build is available; there is no in-app version check.
+- First build configured for the api host: **1.1.0 (89)**, from #54 (`283025e4`), merged October 29 and in TestFlight October 30. It passed the Cloud secret validation in `ci_post_clone.sh`. Pete confirmed on device that the taplist loads with enrichment and that visitor-mode browsing works.
+- Pete expired every TestFlight build older than 89 on October 30. There is no in-app version check.
 
 ## Swift 6 language mode — October 27, 2026
 
