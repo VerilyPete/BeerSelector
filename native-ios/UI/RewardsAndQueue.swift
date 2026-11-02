@@ -60,7 +60,7 @@ struct MilestoneStrip: View {
                     .background(Robo.display,in:RoundedRectangle(cornerRadius:8))
                     .padding(2).background(count >= milestone ? Robo.redChrome : Robo.chrome,in:RoundedRectangle(cornerRadius:10))
                     .overlay(RoundedRectangle(cornerRadius:10).strokeBorder(.white.opacity(0.188),lineWidth:1))
-                    .accessibilityLabel("\(milestone) beers, " + (fill >= 1 ? "achieved" : fill > 0 ? "\(Int(fill * 100)) percent of the way" : "not yet achieved"))
+                    .accessibilityLabel("\(milestone) beers, " + (fill >= 1 ? "achieved" : fill > 0 ? "\(MilestoneProgress.percent(count:count,milestone:milestone)) percent of the way" : "not yet achieved"))
             }
         }
     }
@@ -69,6 +69,9 @@ struct MilestoneStrip: View {
 enum MilestoneProgress {
     static func fill(count: Int,milestone: Int) -> Double {
         min(max(Double(count - (milestone - 50)) / 50,0),1)
+    }
+    static func percent(count: Int,milestone: Int) -> Int {
+        Int((fill(count:count,milestone:milestone) * 100).rounded())
     }
 }
 

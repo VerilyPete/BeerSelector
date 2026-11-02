@@ -232,4 +232,8 @@ final class MilestoneFillTests: XCTestCase {
         XCTAssertEqual(fills(150),[1,1,1,0])
         XCTAssertEqual(fills(260),[1,1,1,1])
     }
+    func testSpokenPercentRoundsInsteadOfTruncating() {
+        XCTAssertEqual(MilestoneProgress.percent(count:29,milestone:50),58)
+        XCTAssertEqual(MilestoneProgress.percent(count:179,milestone:200),58)
+    }
 }
