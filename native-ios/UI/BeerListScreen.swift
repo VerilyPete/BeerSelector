@@ -130,6 +130,7 @@ struct BeerCard: View {
     let expanded: Bool
     let dateLabel: String
     let checkIn: Bool
+    var large = false
     let toggle: () -> Void
     @EnvironmentObject var model: AppModel
     private var pending: Bool { model.hasSavedCheckIn(beer.id) }
@@ -140,11 +141,20 @@ struct BeerCard: View {
                     (typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment:.leading,spacing:10)) : AnyLayout(HStackLayout(spacing:10))) {
                         BeerIconWell(glyph:glyph).accessibilityLabel(beer.container_type ?? "Unknown container")
                         VStack(alignment:.leading,spacing:3) {
-                            Text(beer.brew_name).font(Robo.title()).foregroundStyle(Robo.cyan).lineLimit(expanded || typeSize.isAccessibilitySize ? nil : 1).accessibilityIdentifier("beer-name-\(beer.id)")
-                            Text(beer.brewer + (beer.tasted_date.isEmpty ? "" : " · \(dateLabel) \(beer.displayDate)")).font(Robo.mono(10)).foregroundStyle(Robo.steel).lineLimit(expanded || typeSize.isAccessibilitySize ? nil : 1)
-                            Text([beer.brew_style,beer.brew_container].filter { !$0.isEmpty }.joined(separator:" · ")).font(Robo.mono(10)).foregroundStyle(Robo.steel).lineLimit(typeSize.isAccessibilitySize ? nil : 1)
+                            Text(beer.brew_name).font(Robo.title(large ? 18 : 14)).foregroundStyle(Robo.cyan).lineLimit(expanded || typeSize.isAccessibilitySize ? nil : 1).accessibilityIdentifier("beer-name-\(beer.id)")
+                            Group {
+                                if let arrival {
+                                    ViewThatFits(in:.horizontal) {
+                                        Text("\(beer.brewer) · \(arrival)").lineLimit(1)
+                                        VStack(alignment:.leading,spacing:3) { Text(beer.brewer).lineLimit(1); Text(arrival).lineLimit(1) }
+                                    }
+                                } else {
+                                    Text(brewerLine).lineLimit(expanded || typeSize.isAccessibilitySize ? nil : 1)
+                                }
+                            }.font(Robo.mono(large ? 13 : 10)).foregroundStyle(Robo.steel)
+                            Text([beer.brew_style,beer.brew_container].filter { !$0.isEmpty }.joined(separator:" · ")).font(Robo.mono(large ? 13 : 10)).foregroundStyle(Robo.steel).lineLimit(typeSize.isAccessibilitySize ? nil : 1)
                         }.frame(maxWidth:.infinity,alignment:.leading)
-                        if let abv = beer.abv { Text("\(abv.formatted())%").font(Robo.mono(11).weight(.bold)).foregroundStyle(Robo.cyan).padding(.horizontal,8).padding(.vertical,4).frame(minHeight:28).overlay(RoundedRectangle(cornerRadius:8).strokeBorder(Robo.cyan.opacity(0.267),lineWidth:1)) }
+                        if let abv = beer.abv { Text("\(abv.formatted())%").font(Robo.mono(large ? 14 : 11).weight(.bold)).foregroundStyle(Robo.cyan).padding(.horizontal,8).padding(.vertical,4).frame(minHeight:28).overlay(RoundedRectangle(cornerRadius:8).strokeBorder(Robo.cyan.opacity(0.267),lineWidth:1)) }
                     }.frame(minHeight:46).contentShape(Rectangle())
                 }.buttonStyle(.plain).multilineTextAlignment(.leading).accessibilityIdentifier("beer-item-\(beer.id)").accessibilityValue(expanded ? "Expanded" : "Collapsed")
                 if expanded {
@@ -165,6 +175,10 @@ struct BeerCard: View {
             }
         }
     }
+    private var brewerLine: String {
+        beer.tasted_date.isEmpty ? beer.brewer : "\(beer.brewer) · \(dateLabel) \(beer.displayDate)"
+    }
+    private var arrival: String? { large && beer.tasted_date.isEmpty ? beer.arrivalLabel() : nil }
     private var glyph: String { ["tulip":"\u{f000}","pint":"\u{f001}","can":"\u{f002}","bottle":"\u{f003}","flight":"\u{f004}"][beer.container_type ?? ""] ?? "?" }
 }
 

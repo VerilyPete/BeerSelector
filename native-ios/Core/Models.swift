@@ -75,6 +75,23 @@ struct Beer: Identifiable, Codable, Equatable {
         guard let seconds = Double(added_date), seconds > 0 else { return "Unknown date" }
         return Date(timeIntervalSince1970: seconds).formatted(date: .abbreviated, time: .omitted)
     }
+    private var addedAt: Date? {
+        guard let seconds = Double(added_date), seconds > 0 else { return nil }
+        return Date(timeIntervalSince1970: seconds)
+    }
+    func arrivalAge(relativeTo now: Date = Date(), calendar: Calendar = .current) -> Int? {
+        guard let added = addedAt else { return nil }
+        return max(0, calendar.dateComponents([.day], from: calendar.startOfDay(for: added), to: calendar.startOfDay(for: now)).day ?? 0)
+    }
+    func arrivalLabel(relativeTo now: Date = Date(), calendar: Calendar = .current) -> String? {
+        guard let added = addedAt, let days = arrivalAge(relativeTo: now, calendar: calendar) else { return nil }
+        switch days {
+        case 0: return "Added today"
+        case 1: return "Added yesterday"
+        case 2...6: return "Added \(days) days ago"
+        default: return "Added " + added.formatted(date: .abbreviated, time: .omitted)
+        }
+    }
     var plainDescription: String {
         brew_description.replacingOccurrences(of: #"<br\s*/?>|</p>"#, with: "\n", options: .regularExpression)
             .replacingOccurrences(of: #"<[^>]+>"#, with: "", options: .regularExpression)
@@ -154,6 +171,10 @@ struct BeerFilter {
             if comparison == .orderedSame { return a.offset < b.offset }
             return comparison == (ascending ? .orderedAscending : .orderedDescending)
         }.map(\.element)
+    }
+    static func recentArrivals(_ beers: [Beer], relativeTo now: Date = Date(), calendar: Calendar = .current) -> [Beer] {
+        beers.filter { ($0.arrivalAge(relativeTo: now, calendar: calendar) ?? 7) < 7 }
+            .sorted { (Double($0.added_date) ?? 0) > (Double($1.added_date) ?? 0) }
     }
     static func untasted(all: [Beer], tasted: [Beer]) -> [Beer] {
         let ids = Set(tasted.map(\.id)); return all.filter { !ids.contains($0.id) }

@@ -137,8 +137,9 @@ struct ChromePanel<Content: View>: View {
 struct LabelPlate: View {
     let title: String
     var cyan = false
+    var size: CGFloat = 9
     var body: some View {
-        Text(title).font(Robo.mono(9).weight(.bold)).tracking(3).foregroundStyle(Robo.border)
+        Text(title).font(Robo.mono(size).weight(.bold)).tracking(3).foregroundStyle(Robo.border)
             .padding(.horizontal,10).padding(.vertical,4)
             .background {
                 if cyan { RoundedRectangle(cornerRadius:4).fill(Robo.cyan) }

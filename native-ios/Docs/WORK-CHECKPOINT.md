@@ -1,3 +1,14 @@
+## Tablet Home landscape redesign — November 2, 2026
+
+Pete asked for a more readable, less empty tablet Home in landscape. This replaces the previously accepted tablet Home; the iPhone Home and other screens are unchanged.
+
+- Larger type throughout tablet Home (beer names 18pt, metadata 13pt, section plates 12pt). The header puts the location under the settings button on the right.
+- Latest on Tap lists every beer added in the last seven store days (`BeerFilter.recentArrivals`), newest first, with relative arrival dates (`Beer.arrivalLabel`). Long weeks scroll inside the column, which is sized to the right-hand panels. The first card aligns with the top of the Beers Tasted panel.
+- The right column uses the phone's seven-segment Beers Tasted panel and the Rewards milestone strip (now the shared `MilestoneStrip`), followed by four recent tastings and available rewards.
+- The tablet navigation row was removed because the tab bar already covers it; Rewards remains reachable from Available Rewards → View all.
+- Preview fixtures now spread taplist added dates over the last six weeks so arrival labels are visible.
+- All plan: 315/315 passed on the iPad Air 11-inch (M4) simulator. Visual checks on iPad Air 11-inch and 13-inch simulators in landscape and portrait, plus a temporary 20-beer fixture build to verify inner scrolling. Pete reviewed Debug builds on his iPad Pro 12.9-inch. Screenshot: [ipad-home-landscape.png](Screenshots/ipad-home-landscape.png). Visitor-mode tablet Home was not visually checked; no fixture exists for it.
+
 ## Enrichment host moved to api.ufobeer.app — October 29, 2026
 
 The enrichment Worker moved from `https://ufobeer.app` to `https://api.ufobeer.app`, with no compatibility period. Backend plan: `ufobeer/plans/api-subdomain-cutover.md`. The host comes only from `EnrichmentURL` in the ignored `ServiceConfiguration.plist`, so no Swift changed. Distribution builds take it from the Xcode Cloud secret `BEERSELECTOR_SERVICE_CONFIGURATION_BASE64` in the Native External Beta workflow, which must hold the new host before the next push to main. See [WORKER-VERIFICATION.md](WORKER-VERIFICATION.md) for the probe and old-build fallback behavior.

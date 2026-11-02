@@ -40,6 +40,24 @@ struct JourneyPanel: View {
     }
 }
 
+struct MilestoneStrip: View {
+    let count: Int
+    var size: CGFloat = 13
+    var body: some View {
+        HStack(spacing:10) {
+            ForEach([50,100,150,200],id:\.self) { milestone in
+                Text("\(milestone)").font(Robo.mono(size))
+                    .frame(maxWidth:.infinity,minHeight:size + 21)
+                    .foregroundStyle(count >= milestone ? Robo.red : Robo.steel)
+                    .background(Robo.display,in:RoundedRectangle(cornerRadius:8))
+                    .padding(2).background(count >= milestone ? Robo.redChrome : Robo.chrome,in:RoundedRectangle(cornerRadius:10))
+                    .overlay(RoundedRectangle(cornerRadius:10).strokeBorder(.white.opacity(0.188),lineWidth:1))
+                    .accessibilityLabel("\(milestone) beers, " + (count >= milestone ? "achieved" : "not yet achieved"))
+            }
+        }
+    }
+}
+
 struct RewardsScreen: View {
     @EnvironmentObject var model: AppModel
     @Environment(\.dismiss) var dismiss
@@ -50,17 +68,7 @@ struct RewardsScreen: View {
                 VStack(alignment:.leading,spacing:16) {
                     if model.isMember {
                         JourneyPanel(count:model.tastedBeers.count)
-                        HStack(spacing:10) {
-                            ForEach([50,100,150,200],id:\.self) { milestone in
-                                Text("\(milestone)").font(Robo.mono(13))
-                                    .frame(maxWidth:.infinity,minHeight:34)
-                                    .foregroundStyle(model.tastedBeers.count >= milestone ? Robo.red : Robo.steel)
-                                    .background(Robo.display,in:RoundedRectangle(cornerRadius:8))
-                                    .padding(2).background(model.tastedBeers.count >= milestone ? Robo.redChrome : Robo.chrome,in:RoundedRectangle(cornerRadius:10))
-                                    .overlay(RoundedRectangle(cornerRadius:10).strokeBorder(.white.opacity(0.188),lineWidth:1))
-                                    .accessibilityLabel("\(milestone) beers, " + (model.tastedBeers.count >= milestone ? "achieved" : "not yet achieved"))
-                            }
-                        }
+                        MilestoneStrip(count:model.tastedBeers.count)
                     }
                     LabelPlate(title:"REWARD LOG")
                     if model.refreshing { ProgressView("Loading rewards…").font(Robo.mono()).accessibilityIdentifier("rewards-loading") }

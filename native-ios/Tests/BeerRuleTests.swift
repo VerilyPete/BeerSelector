@@ -185,4 +185,40 @@ final class BeerRuleTests: XCTestCase {
             XCTAssertEqual(filter.apply(beers).map(\.id),["third","first","second"])
         }
     }
+    private func arrival(_ added: String, now: Date) -> String? {
+        var calendar = Calendar(identifier:.gregorian); calendar.timeZone = TimeZone(identifier:"America/Chicago")!
+        var beer = Beer(id:"1",name:"One"); beer.added_date = added
+        return beer.arrivalLabel(relativeTo:now,calendar:calendar)
+    }
+    func testArrivalLabelCountsCalendarDaysAcrossTheDaylightSavingChange() {
+        // Now is 2026-11-02 09:00 Central; daylight saving ended on 2026-11-01.
+        let now = Date(timeIntervalSince1970:1_793_631_600)
+        XCTAssertEqual(arrival("1793599200",now:now),"Added today")
+        XCTAssertEqual(arrival("1793599199",now:now),"Added yesterday")
+        XCTAssertEqual(arrival("1793509200",now:now),"Added yesterday")
+        XCTAssertEqual(arrival("1793509199",now:now),"Added 2 days ago")
+        XCTAssertEqual(arrival("1793466000",now:now),"Added 2 days ago")
+        XCTAssertEqual(arrival("1793120400",now:now),"Added 6 days ago")
+    }
+    func testArrivalLabelUsesTheDateOnceAWeekHasPassed() {
+        let now = Date(timeIntervalSince1970:1_793_631_600)
+        let added = Date(timeIntervalSince1970:1_793_034_000)
+        XCTAssertEqual(arrival("1793034000",now:now),"Added " + added.formatted(date:.abbreviated,time:.omitted))
+    }
+    func testArrivalLabelTreatsClockSkewAsToday() {
+        XCTAssertEqual(arrival("1793728800",now:Date(timeIntervalSince1970:1_793_631_600)),"Added today")
+    }
+    func testArrivalLabelIsAbsentWithoutAUsableDate() {
+        let now = Date(timeIntervalSince1970:1_793_631_600)
+        for added in ["","0","-5","not a date"] { XCTAssertNil(arrival(added,now:now),"Input: \(added)") }
+    }
+    func testRecentArrivalsKeepsTheLastSevenStoreDaysNewestFirst() {
+        var calendar = Calendar(identifier:.gregorian); calendar.timeZone = TimeZone(identifier:"America/Chicago")!
+        // Now is 2026-11-02 09:00 Central; 2026-10-27 00:00 starts the oldest included day.
+        let now = Date(timeIntervalSince1970:1_793_631_600)
+        let beers = [("week-old","1793077199"),("six-days","1793077200"),("today","1793599200"),("unknown",""),("yesterday","1793599199"),("future","1793728800")].map { id,added in
+            var beer = Beer(id:id,name:id); beer.added_date = added; return beer
+        }
+        XCTAssertEqual(BeerFilter.recentArrivals(beers,relativeTo:now,calendar:calendar).map(\.id),["future","today","yesterday","six-days"])
+    }
 }

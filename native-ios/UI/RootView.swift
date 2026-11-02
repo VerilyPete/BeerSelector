@@ -97,6 +97,7 @@ struct HomeView: View {
     @EnvironmentObject var model: AppModel
     @Environment(\.dynamicTypeSize) private var typeSize
     @State private var expandedHomeBeerID: String?
+    @State private var tabletAsideHeight: CGFloat = 0
     var body: some View {
         GeometryReader { geometry in
             let tabletLayout = geometry.size.width >= 768 && !typeSize.isAccessibilitySize
@@ -104,7 +105,7 @@ struct HomeView: View {
                 Group {
                     if model.configured {
                         if tabletLayout {
-                            tabletHome.padding(.horizontal,24).padding(.vertical,20)
+                            tabletHome.padding(.horizontal,28).padding(.vertical,20)
                         } else {
                             VStack(alignment:.leading,spacing:20) {
                                 accountHeader
@@ -150,83 +151,114 @@ struct HomeView: View {
         }
     }
     private var tabletHome: some View {
-        VStack(alignment:.leading,spacing:20) {
-            accountHeader
+        VStack(alignment:.leading,spacing:24) {
+            tabletAccountHeader
             recommendationEntry
-            HStack(spacing:12) {
-                Button("ALL BEERS") { model.tab = .all }.accessibilityIdentifier("nav-all-beers")
-                Button("BEERFINDER") { model.tab = .finder }.disabled(!model.isMember).accessibilityIdentifier("nav-beerfinder")
-                Button("TASTED BREWS") { model.tab = .tasted }.disabled(!model.isMember).accessibilityIdentifier("nav-tasted-brews")
-                Button("REWARDS") { model.showRewards = true }.disabled(!model.isMember).accessibilityIdentifier("nav-rewards")
-            }.buttonStyle(BeerControlStyle())
-            HStack(alignment:.top,spacing:24) {
-                VStack(alignment:.leading,spacing:12) {
+            HStack(alignment:.latestOnTap,spacing:28) {
+                VStack(alignment:.leading,spacing:14) {
                     sectionHeading("LATEST ON TAP","View all") { model.tab = .all }
+                    let arrivals = BeerFilter.recentArrivals(model.allBeers)
                     if model.allBeers.isEmpty {
-                        Text("No saved beers yet. Refresh from Settings to load the taplist.").font(Robo.mono()).foregroundStyle(Robo.steel)
-                    }
-                    ForEach(Array(BeerFilter().apply(model.allBeers).prefix(6))) { beer in
-                        BeerCard(beer:beer,expanded:expandedHomeBeerID == beer.id,dateLabel:"Added",checkIn:false) {
-                            expandedHomeBeerID = expandedHomeBeerID == beer.id ? nil : beer.id
-                        }
+                        Text("No saved beers yet. Refresh from Settings to load the taplist.").font(Robo.mono(14)).foregroundStyle(Robo.steel)
+                            .alignmentGuide(.latestOnTap) { $0[.top] }
+                    } else if arrivals.isEmpty {
+                        Text("Nothing new on tap in the last week.").font(Robo.mono(14)).foregroundStyle(Robo.steel)
+                            .alignmentGuide(.latestOnTap) { $0[.top] }
+                    } else {
+                        ScrollView {
+                            LazyVStack(spacing:14) {
+                                ForEach(arrivals) { beer in
+                                    BeerCard(beer:beer,expanded:expandedHomeBeerID == beer.id,dateLabel:"Added",checkIn:false,large:true) {
+                                        expandedHomeBeerID = expandedHomeBeerID == beer.id ? nil : beer.id
+                                    }
+                                }
+                            }
+                        }.scrollBounceBehavior(.basedOnSize).accessibilityIdentifier("home-latest-on-tap")
+                            // Long arrival weeks scroll inside the box instead of outrunning the right-hand panels.
+                            .frame(height:tabletAsideHeight > 0 ? max(tabletAsideHeight,480) : nil)
+                            .alignmentGuide(.latestOnTap) { $0[.top] }
                     }
                 }.frame(maxWidth:.infinity,alignment:.leading)
-                VStack(alignment:.leading,spacing:20) {
+                VStack(alignment:.leading,spacing:24) {
                     if model.isMember {
-                        JourneyPanel(count:model.tastedBeers.count)
-                        VStack(alignment:.leading,spacing:12) {
+                        VStack(spacing:12) {
+                            MetricPanel(count:model.tastedBeers.count)
+                            MilestoneStrip(count:model.tastedBeers.count,size:15)
+                        }
+                        VStack(alignment:.leading,spacing:14) {
                             sectionHeading("RECENT TASTINGS","View all") { model.tab = .tasted }
-                            ChromePanel {
-                                VStack(alignment:.leading,spacing:12) {
-                                    if model.tastedBeers.isEmpty { Text("Your confirmed tastings will appear here.").font(Robo.mono()).foregroundStyle(Robo.steel) }
-                                    ForEach(Array(BeerFilter().apply(model.tastedBeers,tasted:true).prefix(3))) { beer in
+                            ChromePanel(padding:16) {
+                                VStack(alignment:.leading,spacing:14) {
+                                    if model.tastedBeers.isEmpty { Text("Your confirmed tastings will appear here.").font(Robo.mono(14)).foregroundStyle(Robo.steel) }
+                                    ForEach(Array(BeerFilter().apply(model.tastedBeers,tasted:true).prefix(4).enumerated()),id:\.element.id) { index,beer in
+                                        if index > 0 { Divider().overlay(Robo.steel.opacity(0.3)) }
                                         VStack(alignment:.leading,spacing:4) {
-                                            Text(beer.brew_name).font(Robo.title(14)).foregroundStyle(Robo.cyan)
-                                            Text([beer.brewer,beer.tasted_date].filter { !$0.isEmpty }.joined(separator:" · ")).font(Robo.mono(11)).foregroundStyle(Robo.steel)
+                                            Text(beer.brew_name).font(Robo.title(18)).foregroundStyle(Robo.cyan)
+                                            Text([beer.brewer,beer.tasted_date].filter { !$0.isEmpty }.joined(separator:" · ")).font(Robo.mono(13)).foregroundStyle(Robo.steel)
                                         }.frame(maxWidth:.infinity,alignment:.leading)
                                     }
                                 }
                             }
                         }
-                        VStack(alignment:.leading,spacing:12) {
+                        VStack(alignment:.leading,spacing:14) {
                             sectionHeading("AVAILABLE REWARDS","View all") { model.showRewards = true }
-                            ChromePanel {
-                                VStack(alignment:.leading,spacing:12) {
+                            ChromePanel(padding:16) {
+                                VStack(alignment:.leading,spacing:14) {
                                     let available = model.rewards.filter { !$0.redeemed }
-                                    if available.isEmpty { Text("No unclaimed rewards. Keep tasting toward your next milestone.").font(Robo.mono()).foregroundStyle(Robo.steel) }
+                                    if available.isEmpty { Text("No unclaimed rewards. Keep tasting toward your next milestone.").font(Robo.mono(14)).foregroundStyle(Robo.steel) }
                                     ForEach(Array(available.prefix(3))) { reward in
-                                        Label(reward.type,systemImage:"gift").font(Robo.title(14)).foregroundStyle(Robo.amber)
+                                        Label(reward.type,systemImage:"gift").font(Robo.title(18)).foregroundStyle(Robo.amber)
                                     }
                                 }.frame(maxWidth:.infinity,alignment:.leading)
                             }
                         }
                     } else {
-                        ChromePanel {
-                            VStack(alignment:.leading,spacing:12) {
-                                Text("YOUR UFO CLUB JOURNEY").font(Robo.title()).foregroundStyle(Robo.cyan)
-                                Text("Sign in to see your tasted beers, progress and rewards alongside the taplist.").font(Robo.mono()).foregroundStyle(Robo.steel)
+                        ChromePanel(padding:20,riveted:true) {
+                            VStack(alignment:.leading,spacing:14) {
+                                Text("YOUR UFO CLUB JOURNEY").font(Robo.title(20)).foregroundStyle(Robo.cyan)
+                                Text("Sign in to see your tasted beers, progress and rewards alongside the taplist.").font(Robo.mono(14)).foregroundStyle(Robo.steel)
                                 Button("SIGN IN") { model.showSettings = true; model.showLogin = true }.buttonStyle(BeerControlStyle(appearance:.amber))
-                            }
+                            }.padding(8)
                         }
                     }
                 }.frame(maxWidth:.infinity,alignment:.leading)
+                    .onGeometryChange(for:CGFloat.self) { $0.size.height } action: { tabletAsideHeight = $0 }
             }
         }
     }
     private func sectionHeading(_ title: String,_ actionTitle: String,action: @escaping () -> Void) -> some View {
         HStack {
-            LabelPlate(title:title)
+            LabelPlate(title:title,size:12)
             Spacer(minLength:8)
-            Button(actionTitle,action:action).font(Robo.mono(11)).foregroundStyle(Robo.cyan).frame(minHeight:44)
+            Button(actionTitle,action:action).font(Robo.mono(14)).foregroundStyle(Robo.cyan).frame(minHeight:44)
                 .accessibilityLabel("\(actionTitle) \(title.lowercased())")
         }
     }
     private var accountHeader: some View {
         VStack(alignment:.leading,spacing:8) {
-            HStack { LabelPlate(title:model.isMember ? "WELCOME BACK" : "GUEST MODE"); Spacer(); Button { model.showSettings = true } label: { IconWell(symbol:"gearshape").frame(width:44,height:44) }.accessibilityLabel("Open settings").accessibilityIdentifier("settings-nav-button") }
+            HStack { LabelPlate(title:model.isMember ? "WELCOME BACK" : "GUEST MODE"); Spacer(); settingsButton }
             DisplayTitle(title:model.isMember ? (model.session?.displayName ?? "Beer Enthusiast") : "Visitor")
-            if model.isMember { Label("Flying Saucer — \(model.session?.storeName ?? "")",systemImage:"location.fill").font(Robo.mono()).foregroundStyle(Robo.steel) }
+            if model.isMember { storeLabel.font(Robo.mono()) }
         }
+    }
+    private var tabletAccountHeader: some View {
+        HStack(alignment:.bottom,spacing:16) {
+            VStack(alignment:.leading,spacing:10) {
+                LabelPlate(title:model.isMember ? "WELCOME BACK" : "GUEST MODE",size:12)
+                DisplayTitle(title:model.isMember ? (model.session?.displayName ?? "Beer Enthusiast") : "Visitor",size:34)
+            }
+            Spacer(minLength:16)
+            VStack(alignment:.trailing,spacing:10) {
+                settingsButton
+                if model.isMember { storeLabel.font(Robo.mono(15)).padding(.bottom,8) }
+            }
+        }
+    }
+    private var settingsButton: some View {
+        Button { model.showSettings = true } label: { IconWell(symbol:"gearshape").frame(width:44,height:44) }.accessibilityLabel("Open settings").accessibilityIdentifier("settings-nav-button")
+    }
+    private var storeLabel: some View {
+        Label("Flying Saucer — \(model.session?.storeName ?? "")",systemImage:"location.fill").foregroundStyle(Robo.steel)
     }
     private func exploration() -> some View {
         VStack(alignment:.leading,spacing:10) {
@@ -244,6 +276,12 @@ struct HomeView: View {
             }
         }.disabled(disabled).opacity(disabled ? 0.5 : 1).accessibilityIdentifier(id)
     }
+}
+
+private extension VerticalAlignment {
+    private enum LatestOnTap: AlignmentID { static func defaultValue(in context: ViewDimensions) -> CGFloat { context[.top] } }
+    /// Aligns the first Latest on Tap card with the top of the tablet Home side panels.
+    static let latestOnTap = VerticalAlignment(LatestOnTap.self)
 }
 
 /// SwiftUI's basedOnSize still rubber-bands when content exceeds the viewport by
