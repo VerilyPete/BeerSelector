@@ -210,13 +210,14 @@ final class BeerRuleTests: XCTestCase {
     }
     func testArrivalLabelIsAbsentWithoutAUsableDate() {
         let now = Date(timeIntervalSince1970:1_793_631_600)
-        for added in ["","0","-5","not a date"] { XCTAssertNil(arrival(added,now:now),"Input: \(added)") }
+        // 1793772000 is 2026-11-04 00:00 Central, two store days ahead; larger values overflow calendar arithmetic.
+        for added in ["","0","-5","not a date","nan","inf","1e100","1793772000"] { XCTAssertNil(arrival(added,now:now),"Input: \(added)") }
     }
     func testRecentArrivalsKeepsTheLastSevenStoreDaysNewestFirst() {
         var calendar = Calendar(identifier:.gregorian); calendar.timeZone = TimeZone(identifier:"America/Chicago")!
         // Now is 2026-11-02 09:00 Central; 2026-10-27 00:00 starts the oldest included day.
         let now = Date(timeIntervalSince1970:1_793_631_600)
-        let beers = [("week-old","1793077199"),("six-days","1793077200"),("today","1793599200"),("unknown",""),("yesterday","1793599199"),("future","1793728800")].map { id,added in
+        let beers = [("week-old","1793077199"),("six-days","1793077200"),("today","1793599200"),("unknown",""),("yesterday","1793599199"),("future","1793728800"),("overflow","1e100")].map { id,added in
             var beer = Beer(id:id,name:id); beer.added_date = added; return beer
         }
         XCTAssertEqual(BeerFilter.recentArrivals(beers,relativeTo:now,calendar:calendar).map(\.id),["future","today","yesterday","six-days"])

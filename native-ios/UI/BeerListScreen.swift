@@ -146,10 +146,10 @@ struct BeerCard: View {
                                 if let arrival {
                                     ViewThatFits(in:.horizontal) {
                                         Text("\(beer.brewer) · \(arrival)").lineLimit(1)
-                                        VStack(alignment:.leading,spacing:3) { Text(beer.brewer).lineLimit(1); Text(arrival).lineLimit(1) }
+                                        VStack(alignment:.leading,spacing:3) { Text(beer.brewer).lineLimit(textLines); Text(arrival).lineLimit(textLines) }
                                     }
                                 } else {
-                                    Text(brewerLine).lineLimit(expanded || typeSize.isAccessibilitySize ? nil : 1)
+                                    Text(brewerLine).lineLimit(textLines)
                                 }
                             }.font(Robo.mono(large ? 13 : 10)).foregroundStyle(Robo.steel)
                             Text([beer.brew_style,beer.brew_container].filter { !$0.isEmpty }.joined(separator:" · ")).font(Robo.mono(large ? 13 : 10)).foregroundStyle(Robo.steel).lineLimit(typeSize.isAccessibilitySize ? nil : 1)
@@ -178,6 +178,7 @@ struct BeerCard: View {
     private var brewerLine: String {
         beer.tasted_date.isEmpty ? beer.brewer : "\(beer.brewer) · \(dateLabel) \(beer.displayDate)"
     }
+    private var textLines: Int? { expanded || typeSize.isAccessibilitySize ? nil : 1 }
     private var arrival: String? { large && beer.tasted_date.isEmpty ? beer.arrivalLabel() : nil }
     private var glyph: String { ["tulip":"\u{f000}","pint":"\u{f001}","can":"\u{f002}","bottle":"\u{f003}","flight":"\u{f004}"][beer.container_type ?? ""] ?? "?" }
 }

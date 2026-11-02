@@ -76,12 +76,15 @@ struct Beer: Identifiable, Codable, Equatable {
         return Date(timeIntervalSince1970: seconds).formatted(date: .abbreviated, time: .omitted)
     }
     private var addedAt: Date? {
-        guard let seconds = Double(added_date), seconds > 0 else { return nil }
+        guard let seconds = Double(added_date), seconds.isFinite, seconds > 0 else { return nil }
         return Date(timeIntervalSince1970: seconds)
     }
+    /// Store days since arrival. A day of clock skew counts as today; anything further ahead is unusable.
     func arrivalAge(relativeTo now: Date = Date(), calendar: Calendar = .current) -> Int? {
-        guard let added = addedAt else { return nil }
-        return max(0, calendar.dateComponents([.day], from: calendar.startOfDay(for: added), to: calendar.startOfDay(for: now)).day ?? 0)
+        guard let added = addedAt,
+              let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: added), to: calendar.startOfDay(for: now)).day,
+              days >= -1 else { return nil }
+        return max(0, days)
     }
     func arrivalLabel(relativeTo now: Date = Date(), calendar: Calendar = .current) -> String? {
         guard let added = addedAt, let days = arrivalAge(relativeTo: now, calendar: calendar) else { return nil }
