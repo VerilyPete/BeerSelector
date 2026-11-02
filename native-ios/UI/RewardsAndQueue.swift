@@ -46,15 +46,29 @@ struct MilestoneStrip: View {
     var body: some View {
         HStack(spacing:10) {
             ForEach([50,100,150,200],id:\.self) { milestone in
-                Text("\(milestone)").font(Robo.mono(size))
-                    .frame(maxWidth:.infinity,minHeight:size + 21)
-                    .foregroundStyle(count >= milestone ? Robo.red : Robo.steel)
+                let fill = MilestoneProgress.fill(count:count,milestone:milestone)
+                let label = Text("\(milestone)").font(Robo.bold(size + 6)).frame(maxWidth:.infinity,minHeight:size + 27)
+                label.foregroundStyle(Robo.text)
+                    .overlay {
+                        label.foregroundStyle(Robo.background)
+                            .background(Robo.cyan).overlay(Scanlines())
+                            .mask(alignment:.leading) {
+                                GeometryReader { box in Rectangle().frame(width:box.size.width * fill) }
+                            }
+                    }
+                    .clipShape(RoundedRectangle(cornerRadius:8))
                     .background(Robo.display,in:RoundedRectangle(cornerRadius:8))
                     .padding(2).background(count >= milestone ? Robo.redChrome : Robo.chrome,in:RoundedRectangle(cornerRadius:10))
                     .overlay(RoundedRectangle(cornerRadius:10).strokeBorder(.white.opacity(0.188),lineWidth:1))
-                    .accessibilityLabel("\(milestone) beers, " + (count >= milestone ? "achieved" : "not yet achieved"))
+                    .accessibilityLabel("\(milestone) beers, " + (fill >= 1 ? "achieved" : fill > 0 ? "\(Int(fill * 100)) percent of the way" : "not yet achieved"))
             }
         }
+    }
+}
+
+enum MilestoneProgress {
+    static func fill(count: Int,milestone: Int) -> Double {
+        min(max(Double(count - (milestone - 50)) / 50,0),1)
     }
 }
 
