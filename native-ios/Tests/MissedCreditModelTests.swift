@@ -156,6 +156,20 @@ final class MissedCreditModelTests: XCTestCase {
             XCTAssertEqual(model.missedCredits.flatMap(\.beers).map(\.id),["7"],"Grace elapsed before the delete, so the beer is already missed")
         }
     }
+    @MainActor func testBeerDeletedWhileTheLogCannotBeReadStaysReported() async throws {
+        try await withModel { model,db,upstream in
+            upstream.queue = [("7","Never Poured","Oct 25, 2026 @ 09:21:29pm")]
+            model.now = { self.at(10,26,9) }
+            await model.refreshQueue()
+            let firstSeen = try XCTUnwrap(db.rows("SELECT first_seen FROM credit_log WHERE id='7'").first?["first_seen"])
+            try db.execute("ALTER TABLE credit_log DROP COLUMN first_seen")
+            await model.deleteQueueEntry(model.queue[0])
+            XCTAssertEqual(upstream.deleted,["7"])
+            try db.execute("ALTER TABLE credit_log ADD COLUMN first_seen REAL NOT NULL DEFAULT \(firstSeen)")
+            await model.refreshQueue()
+            XCTAssertEqual(model.missedCredits.flatMap(\.beers).map(\.id),["7"],"An unreadable log is no evidence the beer was a change of mind")
+        }
+    }
     @MainActor func testMemberCanRemoveABeerFromTheReport() async throws {
         try await withModel { model,_,upstream in
             upstream.queue = [("7","Got It Sorted","Oct 25, 2026 @ 09:21:29pm"),("8","Still Missing","Oct 25, 2026 @ 09:25:00pm")]
