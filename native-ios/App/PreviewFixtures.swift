@@ -5,26 +5,36 @@ extension AppModel {
     /// Isolated, offline fixtures for screenshots/UI tests. Never read or replace an existing user's database or Keychain.
     func loadPreviewFixtures(arguments: [String] = ProcessInfo.processInfo.arguments) throws {
         invalidatePreviewWork()
+        previewFixtures = true
+        let sessionFixture = arguments.firstIndex(of:"--preview-session").flatMap { arguments.indices.contains($0+1) ? arguments[$0+1] : nil }
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("native-preview/beers.db")
         db = try BeerDatabase(url:url)
-        session = MemberSession(memberId:"preview",storeId:"preview",storeName:"Fort Worth",sessionId:"preview",firstName:"Beer Enthusiast")
+        session = sessionFixture == "visitor"
+            ? MemberSession(memberId:"visitor",storeId:"preview",storeName:"Fort Worth",sessionId:"visitor")
+            : MemberSession(memberId:"preview",storeId:"preview",storeName:"Fort Worth",sessionId:"preview",firstName:"Beer Enthusiast")
         var beers: [Beer] = []
-        let examples = [("Bell's Two Hearted","Bell's Brewery","American IPA","Draft",7.0),("Firestone Walker Parabola","Firestone Walker","Imperial Stout","Bottle",13.0),("Sierra Nevada Pale Ale","Sierra Nevada","American Pale Ale","Draft",5.6),("Weihenstephaner Hefeweissbier","Weihenstephaner","Hefeweizen","Draft",5.4),("Founders All Day IPA","Founders","Session IPA","Can",4.7),("Belgian Tasting Flight","Flying Saucer","Flight","Draft",0.0)]
+        let examples = [("Bell's Two Hearted","Bell's Brewery","American IPA","Draft",7.0),("Firestone Walker Parabola","Firestone Walker","Imperial Stout","Bottle",13.0),("Sierra Nevada Pale Ale","Sierra Nevada","American Pale Ale","Draft",5.6),("Weihenstephaner Hefeweissbier","Weihenstephaner","Hefeweizen","Draft",5.4),("Founders All Day IPA","Founders","Session IPA","Can",4.7),("Belgian Tasting Flight","Flying Saucer","Flight","Draft",0.0),("Lone Star Lager","Lone Star","American Lager","Can",5.6)]
         for (index,e) in examples.enumerated() {
-            var b = Beer(id:String(index+1),name:e.0); b.brewer = e.1; b.brew_style = e.2; b.brew_container = e.3; b.abv = e.4 > 0 ? e.4 : nil; b.brewer_loc = "United States"; b.added_date = String(Int(Date().timeIntervalSince1970) - [0,1,3,6,6,40][index % 6] * 86_400); b.brew_description = "A distinctive beer selected for the Flying Saucer taplist. Explore its aroma, character, and finish."; b.container_type = b.inferredContainer; beers.append(b)
+            var b = Beer(id:String(index+1),name:e.0); b.brewer = e.1; b.brew_style = e.2; b.brew_container = e.3; b.abv = e.4 > 0 ? e.4 : nil; b.brewer_loc = "United States"; b.added_date = String(Int(Date().timeIntervalSince1970) - [0,1,3,6,6,40,2][index] * 86_400); b.brew_description = "A distinctive beer selected for the Flying Saucer taplist. Explore its aroma, character, and finish."; b.container_type = b.inferredContainer; beers.append(b)
         }
         var tasted: [Beer] = []
-        for index in 0..<83 { var b = Beer(id:"tasted-\(index)",name:"Tasted Brew \(index+1)"); b.brewer = "Flying Saucer"; b.tasted_date = "09/01/2026"; b.brew_style = "IPA"; b.brew_container = "Draft"; b.abv = 6.0; b.container_type = "pint"; tasted.append(b) }
+        // Pairs share a tasting date and ABVs repeat, with unknowns, so every sort order and tie is visible.
+        let tastedFormat = DateFormatter(); tastedFormat.locale = Locale(identifier:"en_US_POSIX"); tastedFormat.dateFormat = "MM/dd/yyyy"
+        let tastedABVs: [Double?] = [4.5,5.0,5.0,6.2,7.5,nil,9.1]
+        for index in 0..<83 { var b = Beer(id:"tasted-\(index)",name:"Tasted Brew \(index+1)"); b.brewer = "Flying Saucer"; b.tasted_date = tastedFormat.string(from:Date().addingTimeInterval(-Double(index / 2) * 86_400)); b.brew_style = "IPA"; b.brew_container = "Draft"; b.abv = tastedABVs[index % tastedABVs.count]; b.container_type = "pint"; tasted.append(b) }
+        let member = sessionFixture != "visitor"
         try db?.transaction {
-            try db?.replaceBeers(beers); try db?.replaceBeers(tasted,tasted:true)
-            try db?.replaceRewards([Reward(id:"r1",type:"UFO Club Reward",redeemed:false),Reward(id:"r2",type:"First Flight",redeemed:true)])
-            try db?.setPreference("all_beers_api_url","preview://taplist"); try db?.setPreference("my_beers_api_url","preview://member"); try db?.setPreference("is_visitor_mode","false")
+            try db?.replaceBeers(beers); try db?.replaceBeers(member ? tasted : [],tasted:true)
+            try db?.replaceRewards(member ? [Reward(id:"r1",type:"UFO Club Reward",redeemed:false),Reward(id:"r2",type:"First Flight",redeemed:true),
+                                             Reward(id:"r3",type:"Birthday Pint",redeemed:false)] : [])
+            try db?.setPreference("all_beers_api_url","preview://taplist"); try db?.setPreference("my_beers_api_url","preview://member"); try db?.setPreference("is_visitor_mode",member ? "false" : "true")
         }
-        queue = [QueueEntry(id:"q1",name:"Bell's Two Hearted (Draft)",date:"Sep 10, 2026")]
+        queue = member ? [QueueEntry(id:"q1",name:"Bell's Two Hearted (Draft)",date:"Sep 10, 2026")] : []
         queueLoaded = true; queueError = nil; loadingQueue = false
         rewardsLoaded = true; rewardsError = nil; rewardsNotice = nil
-        queuedBeerIDs = ["1"]
+        queuedBeerIDs = member ? ["1"] : []
         try reload(); loading = false; showSettings = false
+        if sessionFixture == "first-run" { session = nil }
         if arguments.contains("--preview-recommendations") {
             UserDefaults.standard.set(true,forKey:"recommendations_enabled")
             showRecommendations = true
@@ -83,6 +93,16 @@ extension AppModel {
             case "cached-error": rewardsError = "Couldn’t refresh your rewards. Please try again."
             default: break
             }
+        }
+        switch Self.argument("--preview-list-state",in:arguments) {
+        case "refreshing": refreshing = true
+        case "empty": allBeers = []; tastedBeers = []
+        default: break
+        }
+        if arguments.contains("--preview-banners") {
+            offline = true
+            error = "Couldn’t refresh the taplist. Showing saved data."
+            operations = [PendingOperation(id:"banner",type:"CHECK_IN_BEER",payload:["beerId":"3","beerName":"Sierra Nevada Pale Ale","memberId":"preview","storeId":"preview","storeName":"Fort Worth"],timestamp:Date().timeIntervalSince1970 * 1000,retryCount:0,status:"pending",error:nil)]
         }
         if let index = arguments.firstIndex(of:"--preview-screen"), arguments.indices.contains(index+1) {
             switch arguments[index+1] {

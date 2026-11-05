@@ -207,7 +207,9 @@ final class AppModel: ObservableObject {
     private var queueEpoch: UUID?
     private(set) var enrichmentTask: Task<Void,Never>?
     private var enrichmentGeneration = UUID()
-    var previewMode: Bool { session?.memberId == "preview" }
+    /// Set by Debug fixtures, so visitor and first-run fixtures stay offline too.
+    var previewFixtures = false
+    var previewMode: Bool { previewFixtures || session?.memberId == "preview" }
     var isMember: Bool { session?.valid == true && session?.isVisitor == false }
     // Account restoration comes from Keychain; missing cached data links are recoverable.
     var configured: Bool { session?.valid == true && db != nil }
@@ -238,7 +240,8 @@ final class AppModel: ObservableObject {
         self.credentials = credentials
         monitor.pathUpdateHandler = { [weak self] path in
             Task { @MainActor [weak self] in
-                guard let self else { return }
+                // Fixtures choose their own connectivity state for screenshots.
+                guard let self, !self.previewFixtures else { return }
                 let wasOffline = self.offline
                 self.offline = path.status != .satisfied
                 if wasOffline && !self.offline {

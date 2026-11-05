@@ -72,4 +72,60 @@ final class PreviewFixtureTests: XCTestCase {
         XCTAssertFalse(model.recommendations.suggestions.isEmpty)
         XCTAssertEqual(model.recommendations.fallback,.providerFailure,"preview never consults a model, so it says so")
     }
+
+    func testVisitorFixtureBrowsesTheTaplistOfflineWithoutMemberData() async throws {
+        let model = try fixture(["--preview-session","visitor","--preview-suggestions","on"])
+        XCTAssertEqual(model.session?.isVisitor,true)
+        XCTAssertFalse(model.isMember)
+        XCTAssertTrue(model.previewMode,"fixture guards must still block every network path")
+        XCTAssertFalse(model.allBeers.isEmpty)
+        XCTAssertTrue(model.tastedBeers.isEmpty)
+        XCTAssertTrue(model.rewards.isEmpty)
+        XCTAssertTrue(model.queue.isEmpty)
+        XCTAssertEqual(model.suggestionMode.mode,.off)
+        let taplist = model.allBeers
+        await model.refresh()
+        XCTAssertEqual(model.allBeers.map(\.id),taplist.map(\.id),"no refresh ran")
+    }
+
+    func testFirstRunFixtureHasNoAccount() throws {
+        let model = try fixture(["--preview-session","first-run"])
+        XCTAssertNil(model.session)
+        XCTAssertFalse(model.configured)
+        XCTAssertTrue(model.previewMode)
+    }
+
+    func testPopulatedFixtureCanProveEverySortOrder() throws {
+        let model = try fixture([])
+        XCTAssertTrue(model.isMember)
+        XCTAssertGreaterThanOrEqual(model.rewards.count,3)
+        XCTAssertTrue(model.rewards.contains { $0.redeemed })
+        XCTAssertGreaterThanOrEqual(model.rewards.filter { !$0.redeemed }.count,2)
+        XCTAssertFalse(BeerFilter.recentArrivals(model.allBeers).isEmpty)
+        for (list,date) in [(model.allBeers,\Beer.added_date),(model.tastedBeers,\Beer.tasted_date)] {
+            let dates = list.map { $0[keyPath:date] }
+            XCTAssertGreaterThan(Set(dates).count,2,"distinct dates")
+            XCTAssertLessThan(Set(dates).count,dates.count,"a deliberate date tie")
+            let abvs = list.compactMap(\.abv)
+            XCTAssertLessThan(abvs.count,list.count,"an unknown ABV")
+            XCTAssertGreaterThan(Set(abvs).count,2,"distinct ABVs")
+            XCTAssertLessThan(Set(abvs).count,abvs.count,"a deliberate ABV tie")
+            XCTAssertEqual(Set(list.map(\.brew_name)).count,list.count,"distinct names")
+        }
+    }
+
+    func testBannersFixtureShowsEveryHomeBanner() throws {
+        let model = try fixture(["--preview-banners"])
+        XCTAssertTrue(model.offline)
+        XCTAssertNotNil(model.error)
+        XCTAssertFalse(model.operations.isEmpty)
+    }
+
+    func testListStateFixturesProduceRefreshingAndEmptyLists() throws {
+        XCTAssertTrue(try fixture(["--preview-list-state","refreshing"]).refreshing)
+        let empty = try fixture(["--preview-list-state","empty"])
+        XCTAssertTrue(empty.allBeers.isEmpty)
+        XCTAssertTrue(empty.tastedBeers.isEmpty)
+        XCTAssertTrue(empty.isMember)
+    }
 }
