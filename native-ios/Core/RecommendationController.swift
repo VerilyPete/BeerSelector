@@ -34,6 +34,9 @@ enum RecommendationRetrievalSource { case local, semantic, mixed }
     @Published private(set) var historyCount = 0
     @Published private(set) var outcomes: [String:CheckInResult] = [:]
     @Published private(set) var preferences = SuggestionPreferences()
+    /// The mode the visible results were generated under; a later mode change
+    /// applies to the next generation, never to results already on screen.
+    @Published private(set) var resultMode: SuggestionMode?
     func setPreferences(_ value: SuggestionPreferences) {
         guard !submitting, value != preferences else { return }
         cancel(); preferences = value
@@ -62,14 +65,26 @@ enum RecommendationRetrievalSource { case local, semantic, mixed }
         let source: RecommendationRetrievalSource
     }
     private var rankingTask: Task<PipelineResult?,Never>?
+    private var modeChanges: AnyCancellable?
     init(model: AppModel, provider: (any RecommendationProvider)? = nil) {
         self.model = model; self.provider = provider ?? OnDeviceRecommendationProvider()
         semanticRetriever = model.semanticIndex.enabled ? model.semanticIndex : nil
+        modeChanges = model.suggestionMode.$mode.dropFirst().sink { [weak self] _ in
+            MainActor.assumeIsolated { self?.modeWillChange() }
+        }
+    }
+    /// Like a preference change, a mode change invalidates a generation in
+    /// flight. A submission always finishes: cancelling it would drop outcomes
+    /// for requests already sent.
+    private func modeWillChange() {
+        guard generating else { return }
+        cancel()
     }
     func cancel() {
         rankingTask?.cancel(); rankingTask = nil
         generation = UUID(); snapshot = nil; choiceID = nil; suggestions = []; outcomes = [:]
         generating = false; submitting = false; message = nil; historyCount = 0; usedModel = false; retrievalSource = .local
+        resultMode = nil
     }
     func invalidateIfChanged() {
         guard !submitting, let snapshot, snapshot != model?.recommendationSnapshot else { return }
@@ -82,6 +97,8 @@ enum RecommendationRetrievalSource { case local, semantic, mixed }
     }
     func generate() async {
         guard !generating, !submitting, let model else { return }
+        let mode = model.suggestionMode.mode
+        guard mode != .off else { return }
         let preferences = preferences
         let previousIDs = Set(suggestions.map(\.id))
         cancel()
@@ -125,7 +142,7 @@ enum RecommendationRetrievalSource { case local, semantic, mixed }
             return max(0,Double(value.seconds) + Double(value.attoseconds)/1e18)
         }
         let task = Task { @MainActor () -> PipelineResult? in
-            guard !model.previewMode else { return nil }
+            guard !model.previewMode, mode == .appleIntelligence else { return nil }
             return await RecommendationDeadline.run(seconds:remaining()) {
                 var shortlist = candidates
                 var source = RecommendationRetrievalSource.local
@@ -175,6 +192,7 @@ enum RecommendationRetrievalSource { case local, semantic, mixed }
                 message = "Local matching applied your filters, but couldn’t interpret the additional style or mood wording. Try a simple style such as IPA or stout."
             }
         }
+        resultMode = mode
         if let account = model.recommendationAccount {
             let choice = BeerChoiceContext(taplist:current.taplist,shown:suggestions.map(\.id),preferences:preferences,usedModel:usedModel,taplistValidation:current.taplistValidation)
             do { try model.db?.saveChoicePresentation(choice,account:account); choiceID = choice.id }

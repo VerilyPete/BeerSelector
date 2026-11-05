@@ -14,6 +14,7 @@ final class RecommendationIntegrationTests: XCTestCase {
         model.session = MemberSession(memberId:"1",storeId:"1",storeName:"Fixture",sessionId:"fixture")
         try credentials.save(session:model.session!,cookies:[:])
         model.activityUpdate = { _,_ in }; model.activityCleanup = {}; model.webCookieCleanup = {}
+        model.suggestionCompatibility = { .appleIntelligence }; model.suggestionsEnabled = { true }
         try db.setPreference("all_beers_api_url","https://fsbs.beerknurd.com/bk-store-json.php?sid=1")
         try db.setPreference("my_beers_api_url","https://fsbs.beerknurd.com/bk-member-json.php?uid=1")
         fixture.handler = { request in
@@ -591,6 +592,112 @@ extension RecommendationIntegrationTests {
             await controller.submit(ids:["new"])
             XCTAssertEqual(writes,0)
             XCTAssertTrue(controller.outcomes.isEmpty)
+        }
+    }
+}
+
+
+extension RecommendationIntegrationTests {
+    @MainActor func testAppleIntelligenceModeRanksWithTheModelAndRecordsItsMode() async throws {
+        try await withModel { model,_,_ in
+            let fake = FakeProvider(); fake.action = { ["new"] }
+            let controller = RecommendationController(model:model,provider:fake)
+            await controller.generate()
+            XCTAssertEqual(fake.calls,1)
+            XCTAssertTrue(controller.usedModel)
+            XCTAssertEqual(controller.suggestions.map(\.id),["new"])
+            XCTAssertEqual(controller.resultMode,.appleIntelligence)
+        }
+    }
+    @MainActor func testLocalMatchingModeNeverCallsTheProvider() async throws {
+        try await withModel { model,_,_ in
+            model.suggestionCompatibility = { .deviceNotEligible }
+            let fake = FakeProvider(); fake.action = { ["new"] }
+            let controller = RecommendationController(model:model,provider:fake)
+            await controller.generate()
+            XCTAssertEqual(fake.calls,0)
+            XCTAssertFalse(controller.usedModel)
+            XCTAssertEqual(controller.retrievalSource,.local)
+            XCTAssertEqual(controller.suggestions.map(\.id),["new"])
+            XCTAssertEqual(controller.resultMode,.localMatching)
+            XCTAssertNil(controller.message)
+        }
+    }
+    @MainActor func testOffModeGeneratesNothing() async throws {
+        try await withModel { model,_,_ in
+            model.suggestionsEnabled = { false }
+            let fake = FakeProvider(); fake.action = { ["new"] }
+            let controller = RecommendationController(model:model,provider:fake)
+            await controller.generate()
+            XCTAssertEqual(fake.calls,0)
+            XCTAssertTrue(controller.suggestions.isEmpty)
+            XCTAssertNil(controller.resultMode)
+            XCTAssertFalse(controller.generating)
+        }
+    }
+    @MainActor func testModeChangeDuringGenerationPublishesNoStaleResults() async throws {
+        try await withModel { model,_,_ in
+            let fake = FakeProvider()
+            let controller = RecommendationController(model:model,provider:fake)
+            fake.action = {
+                model.suggestionCompatibility = { .modelNotReady }
+                model.suggestionMode.refresh()
+                return ["new"]
+            }
+            await controller.generate()
+            XCTAssertEqual(fake.calls,1)
+            XCTAssertTrue(controller.suggestions.isEmpty)
+            XCTAssertNil(controller.resultMode)
+            XCTAssertFalse(controller.generating)
+            XCTAssertNil(controller.message)
+        }
+    }
+    @MainActor func testModeChangeDuringSubmissionKeepsTheOutcomeAndOriginalMode() async throws {
+        try await withModel { model,_,fixture in
+            let fake = FakeProvider(); fake.action = { ["new"] }
+            let controller = RecommendationController(model:model,provider:fake)
+            await controller.generate()
+            let feeds = fixture.handler
+            fixture.handler = { request in
+                if request.url!.path == "/addToQueue.php" {
+                    model.suggestionCompatibility = { .notEnabled }
+                    model.suggestionMode.refresh()
+                    return (200,Data())
+                }
+                return try await feeds!(request)
+            }
+            await controller.submit(ids:["new"])
+            XCTAssertEqual(model.suggestionMode.mode,.localMatching)
+            XCTAssertEqual(controller.outcomes["new"],.added)
+            XCTAssertEqual(controller.suggestions.map(\.id),["new"])
+            XCTAssertEqual(controller.resultMode,.appleIntelligence)
+        }
+    }
+    @MainActor func testModeChangeAfterAPartialSuccessKeepsResultsUntilTheNextGeneration() async throws {
+        try await withModel { model,_,fixture in
+            var writes = 0
+            fixture.handler = { request in
+                switch request.url!.path {
+                case "/bk-store-json.php": return (200,Data(#"[{"id":"a","brew_name":"First"},{"id":"b","brew_name":"Second"},{"id":"c","brew_name":"Third"}]"#.utf8))
+                case "/bk-member-json.php": return (200,Data(#"[{},{"tasted_brew_current_round":[]},{"reward":[]}]"#.utf8))
+                case "/addToQueue.php":
+                    writes += 1
+                    return writes == 2 ? (200,Data("<html>Sign in</html>".utf8)) : (200,Data())
+                default: return (200,Data("No brew in queue".utf8))
+                }
+            }
+            let fake = FakeProvider(); fake.action = { ["a","b","c"] }
+            let controller = RecommendationController(model:model,provider:fake)
+            await controller.generate()
+            await controller.submit(ids:["a","b"])
+            model.suggestionCompatibility = { .deviceNotEligible }
+            model.suggestionMode.refresh()
+            XCTAssertEqual(controller.outcomes,["a":.added,"b":.needsReview])
+            XCTAssertEqual(controller.suggestions.map(\.id),["a","b","c"])
+            XCTAssertEqual(controller.resultMode,.appleIntelligence)
+            await controller.generate()
+            XCTAssertEqual(fake.calls,1)
+            XCTAssertEqual(controller.resultMode,.localMatching)
         }
     }
 }

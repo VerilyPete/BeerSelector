@@ -18,6 +18,13 @@ final class AppModel: ObservableObject {
     var now: () -> Date = Date.init
     @Published var showRecommendations = false { didSet { noticePresenterMayHaveChanged() } }
     let semanticIndex = SemanticTaplistIndex()
+    var suggestionCompatibility: () -> RecommendationCompatibility = { .current }
+    var suggestionsEnabled: () -> Bool = { UserDefaults.standard.bool(forKey:"recommendations_enabled") }
+    lazy var suggestionMode = SuggestionModeState(
+        compatibility:{ [unowned self] in suggestionCompatibility() },
+        enabled:{ [unowned self] in suggestionsEnabled() },
+        isMember:{ [unowned self] in isMember }
+    )
     lazy var recommendations = RecommendationController(model:self)
     private var taplistValidation: UUID?
     private var tastingValidation: UUID?
