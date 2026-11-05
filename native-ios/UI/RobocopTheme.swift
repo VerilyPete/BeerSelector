@@ -215,9 +215,9 @@ struct BeerIconWell: View {
         ZStack {
             Text(glyph).foregroundStyle(.white.opacity(0.25)).offset(y:1)
             Text(glyph).foregroundStyle(Robo.background).offset(y:-1)
-        }.font(.custom(Robo.beerIconFont,size:22)).frame(width:40,height:40)
+        }.font(.custom(Robo.beerIconFont,fixedSize:22)).frame(width:40,height:40) // The well is fixed, so the glyph is too.
             .background(Robo.iconSteel,in:RoundedRectangle(cornerRadius:10))
-            .overlay(RoundedRectangle(cornerRadius:10).strokeBorder(Robo.cyan,lineWidth:1.5))
+            .overlay(RoundedRectangle(cornerRadius:10).strokeBorder(Color.white.opacity(0.35),lineWidth:1))
             .accessibilityElement(children:.ignore)
     }
 }
