@@ -31,6 +31,7 @@ struct BeerSelectorApp: App {
                 .onChange(of:scenePhase,initial:true) { _,phase in
                     guard !Self.isTestHost && !Self.isStylePreview else { return }
                     MainThreadMonitor.shared.setActive(phase == .active)
+                    model.suggestionMode.refresh()
                     switch phase {
                     case .active:
                         DiagnosticJournal.shared.record(.active)

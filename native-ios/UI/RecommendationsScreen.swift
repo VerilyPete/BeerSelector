@@ -5,12 +5,23 @@ struct RecommendationsScreen: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject var model: AppModel
     @ObservedObject private var controller: RecommendationController
+    @ObservedObject private var modes: SuggestionModeState
     @State private var selected: Set<String> = []
     @State private var expanded: Set<String> = []
     @State private var confirming = false
     init(model: AppModel) {
         self.model = model
         self.controller = model.recommendations
+        self.modes = model.suggestionMode
+    }
+    private var intro: String {
+        if !controller.suggestions.isEmpty || busy {
+            return controller.historyCount == 0 ? "A few options from your location’s taplist to help you choose." :
+                "A few options from your taplist, using \(controller.historyCount) recent tastings to help narrow the list."
+        }
+        return modes.mode == .appleIntelligence
+            ? "A shortcut to a few options. Choose your preferences or describe what sounds good, then tap Find suggestions."
+            : "A shortcut to a few options from your taplist. Choose your preferences, then tap Find suggestions."
     }
     private var busy: Bool { controller.generating || controller.submitting }
     var body: some View {
@@ -18,15 +29,15 @@ struct RecommendationsScreen: View {
             ScrollView {
                 VStack(alignment:.leading,spacing:20) {
                     VStack(alignment:.leading,spacing:8) {
-                        Text("SOMETHING TO TRY").font(Robo.mono(10)).tracking(1.5).foregroundStyle(QueueChrome.cyan)
+                        Label(modes.mode.plate,systemImage:modes.mode.symbol)
+                            .font(Robo.mono(10)).tracking(1.5).foregroundStyle(QueueChrome.cyan)
+                            .accessibilityIdentifier("suggestion-mode-plate")
                         Text("Narrow down the taplist").font(Robo.title(25)).foregroundStyle(QueueChrome.text)
-                        Text(controller.suggestions.isEmpty && !busy ? "A shortcut to a few options. Choose your preferences or describe what sounds good, then tap Find suggestions." :
-                             controller.historyCount == 0 ? "A few options from your location’s taplist to help you choose." :
-                             "A few options from your taplist, using \(controller.historyCount) recent tastings to help narrow the list.")
+                        Text(intro)
                             .font(Robo.mono(12)).foregroundStyle(QueueChrome.secondary)
                             .fixedSize(horizontal:false,vertical:true)
                     }
-                    SuggestionCompatibilityStatus()
+                    SuggestionModeStatus(modes:modes)
                     SuggestionPreferenceControls(preferences:Binding(get:{controller.preferences},set:{controller.setPreferences($0)}))
                         .disabled(controller.submitting)
                     if let message = controller.message {
@@ -44,9 +55,10 @@ struct RecommendationsScreen: View {
                         card(suggestion)
                     }
                     if !controller.suggestions.isEmpty {
-                        Text(controller.usedModel ? (controller.retrievalSource == .local ? "Selected with Apple Intelligence. Reasons use your saved beer data." : "Matched descriptions by meaning and selected with Apple Intelligence. Reasons use your saved beer data.") :
-                             "Selected using local matching. Based on your recent tastings and taplist.")
+                        Text(SuggestionMode.resultSource(mode:controller.resultMode ?? modes.mode,usedModel:controller.usedModel,
+                                                         retrieval:controller.retrievalSource))
                             .font(Robo.mono(10)).foregroundStyle(QueueChrome.secondary)
+                            .accessibilityIdentifier("recommendation-source")
 
                     }
                     Button(controller.suggestions.isEmpty ? "Find suggestions" : "Show another selection") {
@@ -207,26 +219,19 @@ private struct SuggestionRequestField: View {
 /// Recheck while visible and on foregrounding: a model download or Settings
 /// change can alter availability without restarting the app. No inference runs.
 @MainActor
-struct SuggestionCompatibilityStatus: View {
+struct SuggestionModeStatus: View {
     @Environment(\.scenePhase) private var scenePhase
-    @State private var compatibility = RecommendationCompatibility.current
+    @ObservedObject var modes: SuggestionModeState
     var body: some View {
         VStack(alignment:.leading,spacing:6) {
-            Label(compatibility.title,systemImage:compatibility == .appleIntelligence ? "sparkles" : "line.3.horizontal.decrease.circle")
+            Label(modes.mode.statusTitle,systemImage:modes.mode.symbol)
                 .font(Robo.title(13)).foregroundStyle(QueueChrome.text)
-            Text(compatibility.detail)
+            Text(modes.compatibility.detail)
                 .font(Robo.mono(11)).foregroundStyle(QueueChrome.secondary)
                 .fixedSize(horizontal:false,vertical:true)
         }
         .accessibilityElement(children:.combine)
         .accessibilityIdentifier("suggestion-compatibility")
-        .task(id:scenePhase) {
-            compatibility = RecommendationCompatibility.current
-            guard scenePhase == .active else { return }
-            while !Task.isCancelled {
-                do { try await Task.sleep(for:.seconds(15)) } catch { return }
-                compatibility = RecommendationCompatibility.current
-            }
-        }
+        .task(id:scenePhase) { await modes.monitor(active:scenePhase == .active) }
     }
 }

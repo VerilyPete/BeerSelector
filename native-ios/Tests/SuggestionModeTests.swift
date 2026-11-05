@@ -70,6 +70,78 @@ final class SuggestionModeTests: XCTestCase {
         subscription.cancel()
     }
 
+    func testStateExposesTheCompatibilityBehindTheMode() {
+        let inputs = Inputs()
+        inputs.compatibility = .notEnabled
+        let modes = state(inputs)
+        XCTAssertEqual(modes.compatibility,.notEnabled)
+        inputs.compatibility = .appleIntelligence
+        modes.refresh()
+        XCTAssertEqual(modes.compatibility,.appleIntelligence)
+    }
+
+    func testSigningInOrOutRefreshesTheSharedMode() {
+        let model = AppModel(monitorConnectivity:false)
+        model.suggestionCompatibility = { .appleIntelligence }
+        model.suggestionsEnabled = { true }
+        XCTAssertEqual(model.suggestionMode.mode,.off)
+        model.session = MemberSession(memberId:"1",storeId:"1",storeName:"Fixture",sessionId:"fixture")
+        XCTAssertEqual(model.suggestionMode.mode,.appleIntelligence)
+        model.session = MemberSession(memberId:"visitor",storeId:"1",storeName:"Fixture",sessionId:"visitor")
+        XCTAssertEqual(model.suggestionMode.mode,.off)
+        model.session = nil
+        XCTAssertEqual(model.suggestionMode.mode,.off)
+    }
+
+    func testReplacingAModeInputRefreshesTheSharedMode() {
+        let model = AppModel(monitorConnectivity:false)
+        model.session = MemberSession(memberId:"1",storeId:"1",storeName:"Fixture",sessionId:"fixture")
+        model.suggestionsEnabled = { true }
+        model.suggestionCompatibility = { .appleIntelligence }
+        XCTAssertEqual(model.suggestionMode.mode,.appleIntelligence)
+        model.suggestionCompatibility = { .deviceNotEligible }
+        XCTAssertEqual(model.suggestionMode.mode,.localMatching)
+        model.suggestionsEnabled = { false }
+        XCTAssertEqual(model.suggestionMode.mode,.off)
+    }
+
+    func testEachModeNamesItsSourceOnHomeAndTheSheet() {
+        XCTAssertEqual(SuggestionMode.appleIntelligence.homeTitle,"Find something to try")
+        XCTAssertEqual(SuggestionMode.appleIntelligence.homeDetail,"Describe a style or mood.")
+        XCTAssertEqual(SuggestionMode.appleIntelligence.plate,"APPLE INTELLIGENCE")
+        XCTAssertEqual(SuggestionMode.localMatching.homeTitle,"Local matching")
+        XCTAssertEqual(SuggestionMode.localMatching.homeDetail,"Picks from your tasting history and the styles you choose.")
+        XCTAssertEqual(SuggestionMode.localMatching.plate,"LOCAL MATCHING")
+    }
+
+    func testSettingsStatusNamesTheActiveMode() {
+        XCTAssertEqual(SuggestionMode.appleIntelligence.statusTitle,"Apple Intelligence")
+        XCTAssertEqual(SuggestionMode.localMatching.statusTitle,"Local matching")
+        XCTAssertEqual(SuggestionMode.off.statusTitle,"Suggestions off")
+    }
+
+    func testResultFootnoteNamesTheModeTheResultsCameFrom() {
+        XCTAssertEqual(SuggestionMode.resultSource(mode:.appleIntelligence,usedModel:true,retrieval:.local),
+                       "Selected with Apple Intelligence. Reasons use your saved beer data.")
+        XCTAssertEqual(SuggestionMode.resultSource(mode:.appleIntelligence,usedModel:true,retrieval:.semantic),
+                       "Matched descriptions by meaning and selected with Apple Intelligence. Reasons use your saved beer data.")
+        XCTAssertEqual(SuggestionMode.resultSource(mode:.appleIntelligence,usedModel:false,retrieval:.local),
+                       "Local matches, not Apple Intelligence. Based on your recent tastings and taplist.")
+        XCTAssertEqual(SuggestionMode.resultSource(mode:.localMatching,usedModel:false,retrieval:.local),
+                       "Local matching. Picks from your recent tastings, your taplist and the styles you chose.")
+    }
+
+    func testLocalMatchingCopyNeverPromisesMoodUnderstanding() {
+        let copy = [SuggestionMode.localMatching.homeTitle,SuggestionMode.localMatching.homeDetail,
+                    SuggestionMode.localMatching.plate,SuggestionMode.localMatching.statusTitle,
+                    SuggestionMode.resultSource(mode:.localMatching,usedModel:false,retrieval:.local)]
+        for text in copy {
+            XCTAssertFalse(text.localizedCaseInsensitiveContains("mood"),text)
+            XCTAssertFalse(text.localizedCaseInsensitiveContains("describe"),text)
+            XCTAssertFalse(text.localizedCaseInsensitiveContains("intelligence"),text)
+        }
+    }
+
     private struct Stop: Error {}
 
     func testForegroundingRechecksCapabilityImmediately() async {

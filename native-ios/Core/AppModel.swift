@@ -11,15 +11,20 @@ struct Notice: Identifiable, Equatable {
 
 @MainActor
 final class AppModel: ObservableObject {
-    @Published var session: MemberSession? { didSet { if oldValue?.identity != session?.identity { semanticIndex.invalidate() } } }
+    @Published var session: MemberSession? {
+        didSet {
+            if oldValue?.identity != session?.identity { semanticIndex.invalidate() }
+            suggestionMode.refresh()
+        }
+    }
     @Published var beerFeedback: [BeerFeedback] = []
     @Published var recentTastings: [Beer] = []
     @Published var missedCredits: [MissedCreditVisit] = []
     var now: () -> Date = Date.init
     @Published var showRecommendations = false { didSet { noticePresenterMayHaveChanged() } }
     let semanticIndex = SemanticTaplistIndex()
-    var suggestionCompatibility: () -> RecommendationCompatibility = { .current }
-    var suggestionsEnabled: () -> Bool = { UserDefaults.standard.bool(forKey:"recommendations_enabled") }
+    var suggestionCompatibility: () -> RecommendationCompatibility = { .current } { didSet { suggestionMode.refresh() } }
+    var suggestionsEnabled: () -> Bool = { UserDefaults.standard.bool(forKey:"recommendations_enabled") } { didSet { suggestionMode.refresh() } }
     lazy var suggestionMode = SuggestionModeState(
         compatibility:{ [unowned self] in suggestionCompatibility() },
         enabled:{ [unowned self] in suggestionsEnabled() },

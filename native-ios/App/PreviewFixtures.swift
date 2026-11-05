@@ -43,7 +43,7 @@ extension AppModel {
            let outcome = PreviewRecommendationProvider.Outcome(rawValue:value) {
             recommendations.provider = PreviewRecommendationProvider(outcome:outcome)
             recommendations.ranksInPreview = true
-            recommendations.timeout = 1
+            if outcome == .deadline { recommendations.timeout = 1 }
         }
         if arguments.contains("--preview-queue-style") {
             queue = [

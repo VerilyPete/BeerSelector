@@ -1,0 +1,39 @@
+# Isolated Debug fixture only; no model, network or queue writes. Launch with:
+# xcrun simctl launch <simulator-id> org.verily.FSbeerselector --preview-fixtures --preview-suggestions on --preview-suggestion-mode apple-intelligence --preview-ai-outcome success
+appId: org.verily.FSbeerselector
+---
+- extendedWaitUntil:
+    visible:
+      id: home-recommendations
+    timeout: 15000
+- assertVisible: "Find something to try"
+- assertVisible: "Describe a style or mood."
+- assertNotVisible: "Local matching"
+- tapOn:
+    id: home-recommendations
+- assertVisible:
+    id: suggestion-mode-plate
+    text: "APPLE INTELLIGENCE"
+- scrollUntilVisible:
+    element:
+      id: recommendation-generate
+    direction: DOWN
+- tapOn:
+    id: recommendation-generate
+- scrollUntilVisible:
+    element:
+      id: recommendation-source
+    direction: DOWN
+- assertVisible:
+    id: recommendation-source
+    text: "Selected with Apple Intelligence.*"
+- tapOn: Done
+- tapOn:
+    id: settings-nav-button
+- scrollUntilVisible:
+    element:
+      id: suggestion-compatibility
+    direction: DOWN
+- assertVisible:
+    id: suggestion-compatibility
+    text: "Apple Intelligence.*"
