@@ -223,3 +223,17 @@ final class BeerRuleTests: XCTestCase {
         XCTAssertEqual(BeerFilter.recentArrivals(beers,relativeTo:now,calendar:calendar).map(\.id),["future","today","yesterday","six-days"])
     }
 }
+
+final class MilestoneFillTests: XCTestCase {
+    func testEachBoxFillsAcrossItsOwnFiftyBeerBand() {
+        let fills = { (count:Int) in [50,100,150,200].map { MilestoneProgress.fill(count:count,milestone:$0) } }
+        XCTAssertEqual(fills(0),[0,0,0,0])
+        XCTAssertEqual(fills(73),[1,0.46,0,0])
+        XCTAssertEqual(fills(150),[1,1,1,0])
+        XCTAssertEqual(fills(260),[1,1,1,1])
+    }
+    func testSpokenPercentRoundsInsteadOfTruncating() {
+        XCTAssertEqual(MilestoneProgress.percent(count:29,milestone:50),58)
+        XCTAssertEqual(MilestoneProgress.percent(count:179,milestone:200),58)
+    }
+}
