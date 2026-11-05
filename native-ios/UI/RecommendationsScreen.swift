@@ -26,6 +26,7 @@ struct RecommendationsScreen: View {
     private var busy: Bool { controller.generating || controller.submitting }
     var body: some View {
         NavigationStack {
+            ScrollViewReader { scroller in
             ScrollView {
                 VStack(alignment:.leading,spacing:20) {
                     VStack(alignment:.leading,spacing:8) {
@@ -53,6 +54,9 @@ struct RecommendationsScreen: View {
                                 .font(Robo.mono(12)).foregroundStyle(QueueChrome.secondary)
                         }.frame(maxWidth:.infinity,alignment:.leading).padding(.vertical,12)
                     }
+                    if controller.fallback != nil, !controller.suggestions.isEmpty, !busy {
+                        fallbackNotice.id("fallback-notice")
+                    }
                     ForEach(controller.suggestions) { suggestion in
                         card(suggestion)
                     }
@@ -71,6 +75,10 @@ struct RecommendationsScreen: View {
                         .font(Robo.mono(10)).foregroundStyle(QueueChrome.secondary)
                 }.padding(18).frame(maxWidth:760).frame(maxWidth:.infinity)
             }.scrollDismissesKeyboard(.interactively)
+                .onChange(of:controller.fallback) { _,fallback in
+                    guard fallback != nil else { return }
+                    withAnimation { scroller.scrollTo("fallback-notice",anchor:.top) }
+                }
                 .background(Robo.background).foregroundStyle(QueueChrome.text)
                 .safeAreaInset(edge:.bottom) {
                     if !controller.suggestions.isEmpty {
@@ -102,7 +110,25 @@ struct RecommendationsScreen: View {
                 .onChange(of:modes.mode) { _,_ in controller.conformRequestToMode() }
                 .onChange(of:controller.suggestions.isEmpty) { _,_ in controller.conformRequestToMode() }
                 .interactiveDismissDisabled(controller.submitting)
+            }
         }.tint(QueueChrome.cyan).noticeAlert(.recommendations,model:model,blocked:confirming)
+    }
+    /// A fallback from Apple Intelligence is never left to the footnote.
+    private var fallbackNotice: some View {
+        VStack(alignment:.leading,spacing:12) {
+            Label("Apple Intelligence couldn’t answer this time. These are local matches from your tasting history.",
+                  systemImage:"exclamationmark.triangle")
+                .font(Robo.title(14)).foregroundStyle(Robo.amber)
+                .fixedSize(horizontal:false,vertical:true)
+            Button("Try Apple Intelligence again") {
+                selected = []; Task { await controller.generate() }
+            }.buttonStyle(BeerControlStyle()).disabled(busy || (model.offline && !model.previewMode))
+                .accessibilityIdentifier("recommendation-fallback-retry")
+        }.padding(16).frame(maxWidth:.infinity,alignment:.leading)
+            .background(QueueChrome.background,in:RoundedRectangle(cornerRadius:17))
+            .overlay(RoundedRectangle(cornerRadius:17).strokeBorder(Robo.amber.opacity(0.7),lineWidth:1))
+            .accessibilityElement(children:.contain)
+            .accessibilityIdentifier("recommendation-fallback-notice")
     }
     private func card(_ suggestion: BeerSuggestion) -> some View {
         let beer = suggestion.beer

@@ -45,17 +45,23 @@ final class PreviewFixtureTests: XCTestCase {
         await model.recommendations.generate()
         XCTAssertTrue(model.recommendations.usedModel)
         XCTAssertEqual(model.recommendations.resultMode,.appleIntelligence)
+        XCTAssertNil(model.recommendations.fallback)
         XCTAssertFalse(model.recommendations.suggestions.isEmpty)
     }
 
     func testEachFailureOutcomeFallsBackToLocalCandidates() async throws {
-        for outcome in ["provider-failure","invalid-output","deadline","context-budget"] {
+        let expected: [String:RecommendationFallback] = [
+            "provider-failure":.providerFailure, "invalid-output":.invalidOutput,
+            "deadline":.deadlineExpired, "context-budget":.contextBudgetExhausted,
+        ]
+        for (outcome,reason) in expected {
             let model = try fixture(["--preview-suggestions","on","--preview-suggestion-mode","apple-intelligence",
                                      "--preview-ai-outcome",outcome])
             await model.recommendations.generate()
             XCTAssertFalse(model.recommendations.usedModel,outcome)
             XCTAssertFalse(model.recommendations.suggestions.isEmpty,outcome)
             XCTAssertEqual(model.recommendations.resultMode,.appleIntelligence,outcome)
+            XCTAssertEqual(model.recommendations.fallback,reason,outcome)
         }
     }
 
@@ -64,5 +70,6 @@ final class PreviewFixtureTests: XCTestCase {
         await model.recommendations.generate()
         XCTAssertFalse(model.recommendations.usedModel)
         XCTAssertFalse(model.recommendations.suggestions.isEmpty)
+        XCTAssertEqual(model.recommendations.fallback,.providerFailure,"preview never consults a model, so it says so")
     }
 }

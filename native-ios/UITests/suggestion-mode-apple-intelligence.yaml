@@ -27,6 +27,8 @@ appId: org.verily.FSbeerselector
 - assertVisible:
     id: recommendation-source
     text: "Selected with Apple Intelligence.*"
+- assertNotVisible:
+    id: recommendation-fallback-notice
 - tapOn: Done
 - tapOn:
     id: settings-nav-button
