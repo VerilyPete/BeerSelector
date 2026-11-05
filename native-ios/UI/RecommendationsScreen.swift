@@ -272,7 +272,7 @@ struct SuggestionModeStatus: View {
             Label(modes.mode.statusTitle,systemImage:modes.mode.symbol)
                 .font(Robo.title(13)).foregroundStyle(QueueChrome.text)
             Text(modes.compatibility.detail)
-                .font(Robo.mono(11)).foregroundStyle(QueueChrome.secondary)
+                .font(Robo.body(13)).foregroundStyle(QueueChrome.secondary)
                 .fixedSize(horizontal:false,vertical:true)
         }
         .accessibilityElement(children:.combine)

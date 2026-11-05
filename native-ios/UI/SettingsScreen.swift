@@ -45,7 +45,7 @@ struct SettingsScreen: View {
                                 .font(Robo.title(15)).padding(14).accessibilityIdentifier("recommendations-enabled")
                             SuggestionModeStatus(modes:model.suggestionMode).padding(.horizontal,14).padding(.bottom,14)
                             Text("Uses up to 100 confirmed tastings and 100 recent choices saved on this device. Check-ins still inform suggestions when bartender confirmation is missing. Can use Apple Intelligence when available. Signing out clears this history.")
-                                .font(Robo.mono(11)).foregroundStyle(QueueChrome.secondary).padding(.horizontal,14).padding(.bottom,14)
+                                .font(Robo.body(13)).foregroundStyle(QueueChrome.secondary).padding(.horizontal,14).padding(.bottom,14)
                             separator
                             row("Delete cached beer feedback","Delete all saved likes and dislikes for this account and location. Signing out or clearing recent tastings keeps this feedback.","trash",destructive:true) {
                                 feedbackDeletionAccount = model.recommendationAccount; confirmDeleteFeedback = true
@@ -56,7 +56,7 @@ struct SettingsScreen: View {
                     }
                     section("SUPPORT") {
                         Text("Trouble with the app? Prepare a report after a freeze or unexpected exit. It includes activity timings and build details, without account or request contents. It stays on this device until you share it.")
-                            .font(Robo.mono(11)).foregroundStyle(QueueChrome.secondary)
+                            .font(Robo.body(13)).foregroundStyle(QueueChrome.secondary)
                             .fixedSize(horizontal:false,vertical:true).padding(14)
                         separator
                         row(preparingDiagnostics ? "Preparing Report…" : "Prepare Diagnostic Report","Includes recent activity across app restarts","doc.text.magnifyingglass",busy:preparingDiagnostics) {
@@ -145,7 +145,7 @@ struct SettingsScreen: View {
                 Text(model.isMember ? (model.session?.firstName ?? "UFO Club member") : "Welcome to Beer Selector")
                     .font(Robo.title(20)).foregroundStyle(QueueChrome.text)
                 Text(model.isMember ? "Flying Saucer · \(model.session?.storeName ?? "")" : "Sign in to track your tasted beers, or browse taplists as a visitor.")
-                    .font(Robo.mono(11)).foregroundStyle(QueueChrome.secondary)
+                    .font(Robo.body(13)).foregroundStyle(QueueChrome.secondary)
                     .fixedSize(horizontal:false,vertical:true)
             }.frame(maxWidth:.infinity,alignment:.leading)
         }.padding(16).accessibilityElement(children:.combine)
@@ -164,13 +164,13 @@ private func section<Content: View>(_ title: String, @ViewBuilder content: () ->
 private func panel<Content: View>(@ViewBuilder content: () -> Content) -> some View {
     VStack(alignment:.leading,spacing:0,content:content)
         .frame(maxWidth:.infinity,alignment:.leading)
-        .background(LinearGradient(colors:[Robo.color(0x202830),QueueChrome.background],startPoint:.topLeading,endPoint:.bottomTrailing))
-        .clipShape(RoundedRectangle(cornerRadius:17))
-        .overlay(RoundedRectangle(cornerRadius:17).strokeBorder(QueueChrome.metal.opacity(0.45),lineWidth:1))
+        .background(Robo.display)
+        .clipShape(RoundedRectangle(cornerRadius:14))
+        .overlay(RoundedRectangle(cornerRadius:14).strokeBorder(Robo.hairline,lineWidth:1))
 }
 
 private var separator: some View {
-    Rectangle().fill(QueueChrome.metal.opacity(0.22)).frame(height:1).padding(.horizontal,14).accessibilityHidden(true)
+    Rectangle().fill(Robo.hairline).frame(height:1).padding(.horizontal,14).accessibilityHidden(true)
 }
 
 private func settingsIcon(_ symbol: String, destructive: Bool = false) -> some View {
@@ -187,7 +187,7 @@ private func rowLabel(_ title: String,_ subtitle: String,_ symbol: String,destru
         settingsIcon(symbol,destructive:destructive)
         VStack(alignment:.leading,spacing:5) {
             Text(title).font(Robo.title(15)).foregroundStyle(destructive ? Robo.color(0xDB8F91) : QueueChrome.text)
-            Text(subtitle).font(Robo.mono(11)).foregroundStyle(QueueChrome.secondary)
+            Text(subtitle).font(Robo.body(13)).foregroundStyle(QueueChrome.secondary)
         }.fixedSize(horizontal:false,vertical:true).frame(maxWidth:.infinity,alignment:.leading)
         if busy { ProgressView().tint(QueueChrome.secondary).frame(width:14,height:32) }
         else { Image(systemName:"chevron.right").font(.system(size:11,weight:.semibold)).foregroundStyle(QueueChrome.secondary.opacity(0.6)).frame(height:32).accessibilityHidden(true) }
