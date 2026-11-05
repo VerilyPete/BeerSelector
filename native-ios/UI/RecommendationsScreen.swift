@@ -31,12 +31,12 @@ struct RecommendationsScreen: View {
             ScrollView {
                 VStack(alignment:.leading,spacing:20) {
                     VStack(alignment:.leading,spacing:8) {
-                        Label(shownMode.plate,systemImage:shownMode.symbol)
-                            .font(Robo.mono(10)).tracking(1.5).foregroundStyle(QueueChrome.cyan)
+                        LabelPlate(title:shownMode.plate)
+                            .accessibilityElement(children:.combine)
                             .accessibilityIdentifier("suggestion-mode-plate")
                         Text("Narrow down the taplist").font(Robo.title(25)).foregroundStyle(QueueChrome.text)
                         Text(intro)
-                            .font(Robo.mono(12)).foregroundStyle(QueueChrome.secondary)
+                            .font(Robo.body(14)).foregroundStyle(QueueChrome.secondary)
                             .fixedSize(horizontal:false,vertical:true)
                     }
                     SuggestionModeStatus(modes:modes)
@@ -45,14 +45,14 @@ struct RecommendationsScreen: View {
                                                  hasSavedMatches:controller.hasSavedMatches(for:controller.preferences))
                         .disabled(controller.submitting)
                     if let message = controller.message {
-                        Text(message).font(Robo.mono(12)).foregroundStyle(Robo.amber)
+                        Text(message).font(Robo.body(14)).foregroundStyle(Robo.amber)
                             .accessibilityIdentifier("recommendation-message")
                     }
                     if busy {
                         HStack(spacing:10) {
                             ProgressView().tint(QueueChrome.cyan)
                             Text(controller.submitting ? "Checking availability and adding your selections…" : "Finding a few options for you…")
-                                .font(Robo.mono(12)).foregroundStyle(QueueChrome.secondary)
+                                .font(Robo.body(14)).foregroundStyle(QueueChrome.secondary)
                         }.frame(maxWidth:.infinity,alignment:.leading).padding(.vertical,12)
                     }
                     if controller.fallback != nil, !controller.suggestions.isEmpty, !busy {
@@ -64,7 +64,7 @@ struct RecommendationsScreen: View {
                     if !controller.suggestions.isEmpty {
                         Text(SuggestionMode.resultSource(mode:shownMode,usedModel:controller.usedModel,
                                                          retrieval:controller.retrievalSource))
-                            .font(Robo.mono(10)).foregroundStyle(QueueChrome.secondary)
+                            .font(Robo.body(12)).foregroundStyle(QueueChrome.secondary)
                             .accessibilityIdentifier("recommendation-source")
                         if shownMode != modes.mode, modes.mode != .off {
                             Text("Your next search uses \(modes.mode == .localMatching ? "local matching" : "Apple Intelligence").")
@@ -78,7 +78,7 @@ struct RecommendationsScreen: View {
                     }.buttonStyle(BeerControlStyle()).disabled(busy || (model.offline && !model.previewMode))
                         .accessibilityIdentifier("recommendation-generate")
                     Text("Recent history stays on this device and survives a new UFO round. Clear it in Settings. Signing out removes it.")
-                        .font(Robo.mono(10)).foregroundStyle(QueueChrome.secondary)
+                        .font(Robo.body(12)).foregroundStyle(QueueChrome.secondary)
                 }.padding(18).frame(maxWidth:760).frame(maxWidth:.infinity)
             }.scrollDismissesKeyboard(.interactively)
                 .onChange(of:controller.fallback) { _,fallback in
@@ -89,7 +89,7 @@ struct RecommendationsScreen: View {
                 .safeAreaInset(edge:.bottom) {
                     if !controller.suggestions.isEmpty {
                         VStack(spacing:8) {
-                            Text("Choose one or more beers").font(Robo.mono(11)).foregroundStyle(QueueChrome.secondary)
+                            Text("Choose one or more beers").font(Robo.body(13)).foregroundStyle(QueueChrome.secondary)
                             Button("Add \(selected.count) to queue") { confirming = true }
                                 .buttonStyle(BeerControlStyle(appearance:.amber))
                                 .disabled(selected.isEmpty || busy || (model.offline && !model.previewMode))
@@ -133,8 +133,8 @@ struct RecommendationsScreen: View {
                     .accessibilityIdentifier("recommendation-fallback-retry")
             }
         }.padding(16).frame(maxWidth:.infinity,alignment:.leading)
-            .background(QueueChrome.background,in:RoundedRectangle(cornerRadius:17))
-            .overlay(RoundedRectangle(cornerRadius:17).strokeBorder(Robo.amber.opacity(0.7),lineWidth:1))
+            .background(Robo.display,in:RoundedRectangle(cornerRadius:14))
+            .overlay(RoundedRectangle(cornerRadius:14).strokeBorder(Robo.amber.opacity(0.7),lineWidth:1))
             .accessibilityElement(children:.contain)
             .accessibilityIdentifier("recommendation-fallback-notice")
     }
@@ -144,8 +144,9 @@ struct RecommendationsScreen: View {
         let outcome = controller.outcomes[beer.id]
         return VStack(alignment:.leading,spacing:12) {
             HStack(alignment:.top,spacing:12) {
-                Image(systemName:"mug").font(.system(size:20)).foregroundStyle(QueueChrome.cyan)
-                    .frame(width:36,height:36).background(Robo.color(0x192B2D),in:RoundedRectangle(cornerRadius:10))
+                Image(systemName:"mug").font(.system(size:20)).foregroundStyle(Robo.textSecondary)
+                    .frame(width:36,height:36).background(Robo.background,in:RoundedRectangle(cornerRadius:10))
+                    .overlay(RoundedRectangle(cornerRadius:10).strokeBorder(Color.white.opacity(0.2),lineWidth:1))
                     .accessibilityHidden(true)
                 VStack(alignment:.leading,spacing:5) {
                     Text(beer.brew_name).font(Robo.title(17)).foregroundStyle(QueueChrome.text)
@@ -158,11 +159,11 @@ struct RecommendationsScreen: View {
                     }
                 }.frame(maxWidth:.infinity,alignment:.leading)
             }
-            Text(suggestion.reason).font(Robo.mono(12)).foregroundStyle(QueueChrome.secondary)
+            Text(suggestion.reason).font(Robo.body(14)).foregroundStyle(QueueChrome.secondary)
                 .fixedSize(horizontal:false,vertical:true)
             if expanded.contains(beer.id) {
                 Text(beer.plainDescription.isEmpty ? "No description available." : beer.plainDescription)
-                    .font(Robo.mono(11)).foregroundStyle(QueueChrome.secondary).fixedSize(horizontal:false,vertical:true)
+                    .font(Robo.body(13)).foregroundStyle(QueueChrome.secondary).fixedSize(horizontal:false,vertical:true)
             }
             if let outcome {
                 Text(outcome.rawValue).font(Robo.mono(12)).foregroundStyle(outcome == .added ? QueueChrome.cyan : Robo.amber)
@@ -173,8 +174,8 @@ struct RecommendationsScreen: View {
                 VStack(alignment:.leading,spacing:12) { selectionButton(suggestion,chosen:chosen,disabled:outcome != nil); detailsButton(beer) }
             }
         }.padding(16).frame(maxWidth:.infinity,alignment:.leading)
-            .background(QueueChrome.background,in:RoundedRectangle(cornerRadius:17))
-            .overlay(RoundedRectangle(cornerRadius:17).strokeBorder(chosen ? AnyShapeStyle(QueueChrome.cyan) : AnyShapeStyle(QueueChrome.metal.opacity(0.45)),lineWidth:1))
+            .contentCard()
+            .overlay { if chosen { RoundedRectangle(cornerRadius:14).strokeBorder(QueueChrome.cyan,lineWidth:1) } }
 
     }
     private func selectionButton(_ suggestion: BeerSuggestion,chosen: Bool,disabled: Bool) -> some View {
@@ -213,9 +214,9 @@ private struct SuggestionPreferenceControls: View {
                 SuggestionRequestField(preferences:$preferences)
             }
             Text("Lower and higher compare known ABVs among matching beers. Unknown ABVs are omitted unless you choose Any.")
-                .font(Robo.mono(10)).foregroundStyle(QueueChrome.secondary)
+                .font(Robo.body(12)).foregroundStyle(QueueChrome.secondary)
                 .fixedSize(horizontal:false,vertical:true)
-        }.padding(14).background(QueueChrome.background,in:RoundedRectangle(cornerRadius:16))
+        }.padding(14).contentCard()
             .tint(QueueChrome.cyan)
     }
 }
@@ -228,7 +229,7 @@ private struct SuggestionRequestField: View {
     private let examples = ["IPA", "Stout", "Crisp and refreshing", "Malty and smooth", "Something adventurous"]
     var body: some View {
         VStack(alignment:.leading,spacing:10) {
-            Text("Style or mood (optional)").font(Robo.mono(12)).foregroundStyle(QueueChrome.text)
+            Text("Style or mood (optional)").font(Robo.body(14)).foregroundStyle(QueueChrome.text)
             TextField("IPA, dry stout, crisp and refreshing…",text:$preferences.request)
                 .font(Robo.mono(13)).padding(10)
                 .background(Robo.background,in:RoundedRectangle(cornerRadius:8))
@@ -254,7 +255,7 @@ private struct SuggestionRequestField: View {
                     .font(Robo.mono(11))
             }
             Text("Use your own words, like ‘crisp and refreshing.’ Style names filter the taplist; when available, Apple Intelligence helps interpret other requests. Up to 160 characters.")
-                .font(Robo.mono(10)).foregroundStyle(QueueChrome.secondary)
+                .font(Robo.body(12)).foregroundStyle(QueueChrome.secondary)
                 .fixedSize(horizontal:false,vertical:true)
         }
     }
@@ -290,9 +291,9 @@ private struct StyleChipPicker: View {
     private var chips: StyleChips { StyleChips(request:preferences.request) ?? StyleChips() }
     var body: some View {
         VStack(alignment:.leading,spacing:10) {
-            Text("Styles (optional)").font(Robo.mono(12)).foregroundStyle(QueueChrome.text)
+            Text("Styles (optional)").font(Robo.body(14)).foregroundStyle(QueueChrome.text)
             Text("Tap a style to include it, again to exclude it, and again to clear it. Included styles mean any of these.")
-                .font(Robo.mono(10)).foregroundStyle(QueueChrome.secondary)
+                .font(Robo.body(12)).foregroundStyle(QueueChrome.secondary)
                 .fixedSize(horizontal:false,vertical:true)
             LazyVGrid(columns:[GridItem(.adaptive(minimum:typeSize.isAccessibilitySize ? 220 : 104),spacing:8)],
                       alignment:.leading,spacing:8) {
@@ -300,7 +301,7 @@ private struct StyleChipPicker: View {
             }
             if !hasSavedMatches {
                 Text("Nothing on your saved taplist matches these choices. Try including another style or removing an exclusion, or find matches to refresh the taplist.")
-                    .font(Robo.mono(10)).foregroundStyle(Robo.amber)
+                    .font(Robo.body(12)).foregroundStyle(Robo.amber)
                     .fixedSize(horizontal:false,vertical:true)
                     .accessibilityIdentifier("style-chips-no-match")
             }

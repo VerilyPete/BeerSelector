@@ -29,6 +29,7 @@ appId: org.verily.FSbeerselector
     element:
       text: "Clear style or mood"
     direction: UP
+    centerElement: true
 - tapOn: "Clear style or mood"
 - tapOn: "Crisp and refreshing"
 - assertVisible: "Additional wording: Apple Intelligence preference"

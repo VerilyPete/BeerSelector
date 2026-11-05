@@ -316,16 +316,15 @@ struct SuggestionEntryCard: View {
         if modes.mode != .off {
             Button(action:open) {
                 HStack(spacing:12) {
-                    Image(systemName:modes.mode.symbol).foregroundStyle(QueueChrome.cyan)
+                    Image(systemName:modes.mode.symbol).foregroundStyle(Robo.textSecondary)
                     VStack(alignment:.leading,spacing:4) {
-                        Text(modes.mode.homeTitle).font(Robo.title(15))
-                        Text(modes.mode.homeDetail).font(Robo.mono(10)).foregroundStyle(QueueChrome.secondary)
+                        Text(modes.mode.homeTitle).font(Robo.title(16))
+                        Text(modes.mode.homeDetail).font(Robo.body(13)).foregroundStyle(QueueChrome.secondary)
                             .fixedSize(horizontal:false,vertical:true)
                     }.frame(maxWidth:.infinity,alignment:.leading)
                     Image(systemName:"chevron.right").font(.system(size:12)).foregroundStyle(QueueChrome.secondary)
                 }.padding(14).frame(maxWidth:.infinity,alignment:.leading)
-                    .background(QueueChrome.background,in:RoundedRectangle(cornerRadius:15))
-                    .overlay(RoundedRectangle(cornerRadius:15).strokeBorder(QueueChrome.metal.opacity(0.45),lineWidth:1))
+                    .contentCard()
             }.buttonStyle(.plain).foregroundStyle(QueueChrome.text).accessibilityIdentifier("home-recommendations")
         }
     }
