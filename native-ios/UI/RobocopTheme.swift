@@ -59,6 +59,35 @@ struct ChromeBezel: ViewModifier {
     }
 }
 
+/// Rule 1: content cards are flat. Chrome bevels are for hero and control
+/// elements only; beer, reward, queue and Settings rows use this card.
+struct ContentCard: ViewModifier {
+    var radius: CGFloat = 14
+    func body(content: Content) -> some View {
+        content
+            .background(Robo.display,in:RoundedRectangle(cornerRadius:radius))
+            .overlay(RoundedRectangle(cornerRadius:radius).strokeBorder(Robo.hairline,lineWidth:1))
+    }
+}
+
+extension View {
+    func contentCard(radius: CGFloat = 14) -> some View { modifier(ContentCard(radius:radius)) }
+}
+
+#Preview("Content card beside ChromeBezel") {
+    VStack(alignment:.leading,spacing:20) {
+        Text("CHROME BEZEL · HERO AND CONTROLS").font(Robo.mono(10)).foregroundStyle(Robo.textSecondary)
+        Text("Beers tasted").font(Robo.title(15)).foregroundStyle(Robo.textPrimary)
+            .padding(16).frame(maxWidth:.infinity,alignment:.leading).modifier(ChromeBezel())
+        Text("CONTENT CARD · ROWS AND PANELS").font(Robo.mono(10)).foregroundStyle(Robo.textSecondary)
+        VStack(alignment:.leading,spacing:6) {
+            Text("Bell's Two Hearted").font(Robo.title(15)).foregroundStyle(Robo.textPrimary)
+            Text("Bell's Brewery · Michigan").font(Robo.body(12)).foregroundStyle(Robo.textSecondary)
+            Text("AMERICAN IPA · DRAFT · 7% ABV").font(Robo.mono(10)).foregroundStyle(Robo.textSecondary)
+        }.padding(16).frame(maxWidth:.infinity,alignment:.leading).contentCard()
+    }.padding(20).frame(width:390).background(Robo.background)
+}
+
 struct BrushedChrome: View {
     var bottom = false
     var body: some View {
