@@ -1,4 +1,6 @@
-# Launch independently with --preview-fixtures --preview-recommendations.
+# Free text exists only in Apple Intelligence mode; local matching uses style chips
+# (suggestion-local-chips.yaml). Launch independently with
+# --preview-fixtures --preview-recommendations --preview-suggestion-mode apple-intelligence
 # No model or queue writes. Style matching must work through the local fallback.
 appId: org.verily.FSbeerselector
 ---

@@ -115,6 +115,9 @@ struct SuggestionStyleRequest {
     private var included: [Style] = []
     private var excluded: [Style] = []
     private(set) var needsModel = false
+    static var labels: [String] { styles.map(\.label) }
+    var includedLabels: [String] { included.map(\.label) }
+    var excludedLabels: [String] { excluded.map(\.label) }
     var hasFilters: Bool { !included.isEmpty || !excluded.isEmpty }
     var summary: String {
         var parts: [String] = []
@@ -131,6 +134,8 @@ struct SuggestionStyleRequest {
         var negative = false
         for raw in normalized.components(separatedBy:",") {
             var clause = raw.trimmingCharacters(in:.whitespacesAndNewlines)
+            // "IPA, not hazy" normalizes to "ipa,,not hazy"; the empty clause is not wording.
+            guard !clause.isEmpty else { continue }
             if let prefix = ["not ","no ","without ","exclude ","nothing "].first(where:{ clause.hasPrefix($0) }) {
                 negative = true; clause.removeFirst(prefix.count)
             } else { negative = false }

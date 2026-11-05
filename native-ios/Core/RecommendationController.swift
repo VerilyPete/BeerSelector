@@ -41,6 +41,27 @@ enum RecommendationRetrievalSource { case local, semantic, mixed }
         guard !submitting, value != preferences else { return }
         cancel(); preferences = value
     }
+    /// Local matching takes style chips, never free text. A typed request the
+    /// chips can't express exactly is cleared, not partially extracted. Results
+    /// already on screen keep the request they were generated with.
+    func conformRequestToMode() {
+        guard suggestions.isEmpty, !generating, clearRequestLocalMatchingCannotUse() else { return }
+        message = Self.clearedRequestMessage
+    }
+    private static let clearedRequestMessage = "Local matching uses style choices, so your typed request was cleared."
+    private func clearRequestLocalMatchingCannotUse() -> Bool {
+        guard !submitting, model?.suggestionMode.mode == .localMatching,
+              StyleChips(request:preferences.request) == nil else { return false }
+        setPreferences(SuggestionPreferences(container:preferences.container,abv:preferences.abv))
+        return true
+    }
+    /// Checks a selection against the saved taplist only. It describes cached
+    /// data and never claims the live taplist is empty.
+    func hasSavedMatches(for preferences: SuggestionPreferences) -> Bool {
+        guard let current = model?.recommendationSnapshot else { return false }
+        return !RecommendationRules.eligible(taplist:current.taplist,history:current.repeatHistory + current.history,
+            excluded:current.excluded,feedback:current.feedback,preferences:preferences).isEmpty
+    }
     var provider: any RecommendationProvider
     var timeout: Double = 8
     /// Debug fixtures install an offline provider; real previews never rank.
@@ -101,9 +122,11 @@ enum RecommendationRetrievalSource { case local, semantic, mixed }
         guard !generating, !submitting, let model else { return }
         let mode = model.suggestionMode.mode
         guard mode != .off else { return }
-        let preferences = preferences
         let previousIDs = Set(suggestions.map(\.id))
+        let cleared = clearRequestLocalMatchingCannotUse()
+        let preferences = preferences
         cancel()
+        if cleared { message = Self.clearedRequestMessage }
         let token = generation
         let account = model.recommendationSnapshot
         generating = true

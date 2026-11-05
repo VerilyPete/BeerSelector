@@ -703,6 +703,123 @@ extension RecommendationIntegrationTests {
 }
 
 
+extension RecommendationIntegrationTests {
+    @MainActor private func taplist(_ beers: [(String,String)]) throws -> Data {
+        try JSONSerialization.data(withJSONObject:beers.map { ["id":$0.0,"brew_name":"Beer \($0.0)","brew_style":$0.1] })
+    }
+    @MainActor private func serve(_ fixture: HTTPFixture, taplist data: @escaping () -> Data) {
+        fixture.handler = { request in
+            switch request.url!.path {
+            case "/bk-store-json.php": return (200,data())
+            case "/bk-member-json.php": return (200,Data(#"[{},{"tasted_brew_current_round":[]},{"reward":[]}]"#.utf8))
+            default: return (200,Data("No brew in queue".utf8))
+            }
+        }
+    }
+    @MainActor private func chips(_ states: [(String,StyleChips.State)]) -> SuggestionPreferences {
+        var chips = StyleChips()
+        for (label,state) in states { chips.set(label,state) }
+        return SuggestionPreferences(request:chips.request)
+    }
+    @MainActor func testContradictoryChipsHaveNoSavedMatches() async throws {
+        try await withModel { model,_,fixture in
+            let data = try taplist([("hazy","Hazy IPA"),("ipa","American IPA"),("stout","Stout")])
+            serve(fixture) { data }
+            await model.refresh()
+            let controller = RecommendationController(model:model,provider:FakeProvider())
+            XCTAssertFalse(controller.hasSavedMatches(for:chips([("Hazy IPA",.include),("IPA",.exclude)])))
+            XCTAssertTrue(controller.hasSavedMatches(for:chips([("Hazy IPA",.include)])))
+        }
+    }
+    @MainActor func testAStyleMissingFromTheSavedTaplistHasNoMatchesUntilAnotherChipChanges() async throws {
+        try await withModel { model,_,fixture in
+            let data = try taplist([("ipa","American IPA"),("stout","Stout")])
+            serve(fixture) { data }
+            await model.refresh()
+            let controller = RecommendationController(model:model,provider:FakeProvider())
+            XCTAssertFalse(controller.hasSavedMatches(for:chips([("Sour",.include)])))
+            XCTAssertTrue(controller.hasSavedMatches(for:chips([("Sour",.include),("Stout",.include)])))
+            XCTAssertFalse(controller.hasSavedMatches(for:chips([("IPA",.exclude),("Stout",.exclude)])))
+            XCTAssertTrue(controller.hasSavedMatches(for:chips([("IPA",.exclude)])))
+        }
+    }
+    @MainActor func testARefreshThatBringsInAMatchingBeerClearsTheNoMatchState() async throws {
+        try await withModel { model,_,fixture in
+            var data = try taplist([("ipa","American IPA")])
+            serve(fixture) { data }
+            await model.refresh()
+            let controller = RecommendationController(model:model,provider:FakeProvider())
+            let sour = chips([("Sour",.include)])
+            XCTAssertFalse(controller.hasSavedMatches(for:sour))
+            data = try taplist([("ipa","American IPA"),("gose","Gose")])
+            await model.refresh()
+            XCTAssertTrue(controller.hasSavedMatches(for:sour))
+        }
+    }
+    @MainActor func testLocalMatchingClearsAnUnusableTypedRequestAndSaysSo() async throws {
+        try await withModel { model,_,_ in
+            model.suggestionCompatibility = { .deviceNotEligible }
+            let controller = RecommendationController(model:model,provider:FakeProvider())
+            controller.setPreferences(.init(container:.draft,request:"IPA or something refreshing"))
+            controller.conformRequestToMode()
+            XCTAssertEqual(controller.preferences,.init(container:.draft))
+            XCTAssertEqual(controller.message,"Local matching uses style choices, so your typed request was cleared.")
+        }
+    }
+    @MainActor func testLocalMatchingKeepsAFullyRecognizedRequestForTheChips() async throws {
+        try await withModel { model,_,_ in
+            model.suggestionCompatibility = { .deviceNotEligible }
+            let controller = RecommendationController(model:model,provider:FakeProvider())
+            controller.setPreferences(.init(request:"IPA, not hazy"))
+            controller.conformRequestToMode()
+            XCTAssertEqual(controller.preferences.request,"IPA, not hazy")
+            XCTAssertEqual(StyleChips(request:controller.preferences.request)?.excluded,["Hazy"])
+            XCTAssertNil(controller.message)
+        }
+    }
+    @MainActor func testAppleIntelligenceModeAndVisibleResultsKeepTheTypedRequest() async throws {
+        try await withModel { model,_,_ in
+            let fake = FakeProvider(); fake.action = { ["new"] }
+            let controller = RecommendationController(model:model,provider:fake)
+            controller.setPreferences(.init(request:"crisp and refreshing"))
+            controller.conformRequestToMode()
+            XCTAssertEqual(controller.preferences.request,"crisp and refreshing")
+            await controller.generate()
+            model.suggestionCompatibility = { .deviceNotEligible }
+            controller.conformRequestToMode()
+            XCTAssertEqual(controller.preferences.request,"crisp and refreshing","results stay with the request they used")
+            XCTAssertEqual(controller.suggestions.map(\.id),["new"])
+        }
+    }
+    @MainActor func testANewGenerationDropsAnEarlierMessage() async throws {
+        try await withModel { model,_,_ in
+            model.suggestionCompatibility = { .deviceNotEligible }
+            let controller = RecommendationController(model:model,provider:FakeProvider())
+            await controller.generate()
+            model.allBeers.append(Beer(id:"later",name:"Later arrival"))
+            controller.invalidateIfChanged()
+            XCTAssertNotNil(controller.message)
+            await controller.generate()
+            XCTAssertFalse(controller.suggestions.isEmpty)
+            XCTAssertNil(controller.message)
+        }
+    }
+    @MainActor func testLocalGenerationNeverUsesAnUnusableTypedRequest() async throws {
+        try await withModel { model,_,_ in
+            let fake = FakeProvider(); fake.action = { ["new"] }
+            let controller = RecommendationController(model:model,provider:fake)
+            controller.setPreferences(.init(request:"crisp and refreshing"))
+            model.suggestionCompatibility = { .deviceNotEligible }
+            await controller.generate()
+            XCTAssertEqual(controller.preferences.request,"")
+            XCTAssertEqual(controller.suggestions.map(\.id),["new"])
+            XCTAssertEqual(controller.message,"Local matching uses style choices, so your typed request was cleared.")
+        }
+    }
+}
+
+
+
 final class RecommendationCompatibilityTests: XCTestCase {
     @MainActor func testAvailableModelAlsoRequiresSupportedLocale() {
         guard #available(iOS 26.0, *) else {
