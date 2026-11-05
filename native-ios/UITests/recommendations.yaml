@@ -1,5 +1,5 @@
 # Run only on an isolated simulator with the Debug app already launched using:
-# xcrun simctl launch <simulator-id> org.verily.FSbeerselector --preview-fixtures --preview-recommendations
+# xcrun simctl launch <simulator-id> org.verily.FSbeerselector --preview-fixtures --preview-recommendations --preview-suggestion-mode apple-intelligence
 # These IDs belong to the offline fixture. The final dialog is dismissed, never confirmed.
 appId: org.verily.FSbeerselector
 ---
