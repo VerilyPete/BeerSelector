@@ -347,8 +347,11 @@ final class NoticeTests: XCTestCase {
     }
 }
 
+/// Subscribes on the main actor: `$presentedNotice.values` subscribes off it and can miss a notice presented meanwhile.
 @MainActor func nextPresentedNotice(_ model: AppModel) async -> Notice? {
-    if let notice = model.presentedNotice { return notice }
-    for await notice in model.$presentedNotice.values where notice != nil { return notice }
-    return nil
+    var subscription: AnyCancellable?
+    defer { subscription?.cancel() }
+    return await withCheckedContinuation { continuation in
+        subscription = model.$presentedNotice.compactMap { $0 }.first().sink { continuation.resume(returning:$0) }
+    }
 }
