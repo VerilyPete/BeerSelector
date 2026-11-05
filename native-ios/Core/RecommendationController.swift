@@ -43,6 +43,8 @@ enum RecommendationRetrievalSource { case local, semantic, mixed }
     }
     var provider: any RecommendationProvider
     var timeout: Double = 8
+    /// Debug fixtures install an offline provider; real previews never rank.
+    var ranksInPreview = false
     var retrievalTimeout: Double = 2
     var semanticRetriever: (any SemanticRetrieving)?
     private weak var model: AppModel?
@@ -142,7 +144,7 @@ enum RecommendationRetrievalSource { case local, semantic, mixed }
             return max(0,Double(value.seconds) + Double(value.attoseconds)/1e18)
         }
         let task = Task { @MainActor () -> PipelineResult? in
-            guard !model.previewMode, mode == .appleIntelligence else { return nil }
+            guard !model.previewMode || ranksInPreview, mode == .appleIntelligence else { return nil }
             return await RecommendationDeadline.run(seconds:remaining()) {
                 var shortlist = candidates
                 var source = RecommendationRetrievalSource.local
