@@ -31,7 +31,7 @@ struct RecommendationsScreen: View {
             ScrollView {
                 VStack(alignment:.leading,spacing:20) {
                     VStack(alignment:.leading,spacing:8) {
-                        LabelPlate(title:shownMode.plate)
+                        LabelPlate(title:shownMode.plate,cyan:true) // Provenance must stay legible: dark text on cyan.
                             .accessibilityElement(children:.combine)
                             .accessibilityIdentifier("suggestion-mode-plate")
                         Text("Narrow down the taplist").font(Robo.title(25)).foregroundStyle(QueueChrome.text)
@@ -68,7 +68,7 @@ struct RecommendationsScreen: View {
                             .accessibilityIdentifier("recommendation-source")
                         if shownMode != modes.mode, modes.mode != .off {
                             Text("Your next search uses \(modes.mode == .localMatching ? "local matching" : "Apple Intelligence").")
-                                .font(Robo.mono(10)).foregroundStyle(Robo.amber)
+                                .font(Robo.body(12)).foregroundStyle(Robo.amber)
                                 .accessibilityIdentifier("recommendation-next-mode")
                         }
 
