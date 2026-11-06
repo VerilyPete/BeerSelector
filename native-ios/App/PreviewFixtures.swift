@@ -3,7 +3,7 @@ import Foundation
 
 extension AppModel {
     /// Isolated, offline fixtures for screenshots/UI tests. Never read or replace an existing user's database or Keychain.
-    func loadPreviewFixtures() throws {
+    func loadPreviewFixtures(arguments: [String] = ProcessInfo.processInfo.arguments) throws {
         invalidatePreviewWork()
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("native-preview/beers.db")
         db = try BeerDatabase(url:url)
@@ -25,10 +25,25 @@ extension AppModel {
         rewardsLoaded = true; rewardsError = nil; rewardsNotice = nil
         queuedBeerIDs = ["1"]
         try reload(); loading = false; showSettings = false
-        let arguments = ProcessInfo.processInfo.arguments
         if arguments.contains("--preview-recommendations") {
             UserDefaults.standard.set(true,forKey:"recommendations_enabled")
             showRecommendations = true
+        }
+        if let value = Self.argument("--preview-suggestions",in:arguments) {
+            UserDefaults.standard.set(value == "on",forKey:"recommendations_enabled")
+        }
+        switch Self.argument("--preview-suggestion-mode",in:arguments) {
+        case "apple-intelligence": suggestionCompatibility = { .appleIntelligence }
+        case "local-matching": suggestionCompatibility = { .deviceNotEligible }
+        case "off": suggestionsEnabled = { false }
+        default: break
+        }
+        suggestionMode.refresh()
+        if let value = Self.argument("--preview-ai-outcome",in:arguments),
+           let outcome = PreviewRecommendationProvider.Outcome(rawValue:value) {
+            recommendations.provider = PreviewRecommendationProvider(outcome:outcome)
+            recommendations.ranksInPreview = true
+            if outcome == .deadline { recommendations.timeout = 1 }
         }
         if arguments.contains("--preview-queue-style") {
             queue = [
@@ -85,6 +100,35 @@ extension AppModel {
                 showOperations = true
             default: tab = .home
             }
+        }
+    }
+
+    private static func argument(_ flag: String, in arguments: [String]) -> String? {
+        guard let index = arguments.firstIndex(of:flag), arguments.indices.contains(index+1) else { return nil }
+        return arguments[index+1]
+    }
+}
+
+/// Offline stand-in for the on-device model: no inference and no network, so
+/// every Apple Intelligence outcome can be launched and screenshotted.
+@MainActor
+final class PreviewRecommendationProvider: RecommendationProvider {
+    enum Outcome: String {
+        case success
+        case providerFailure = "provider-failure"
+        case invalidOutput = "invalid-output"
+        case deadline
+        case contextBudget = "context-budget"
+    }
+    let outcome: Outcome
+    init(outcome: Outcome) { self.outcome = outcome }
+    func rank(history: [Beer], candidates: [BeerSuggestion]) async throws -> [String] {
+        switch outcome {
+        case .success: return candidates.prefix(3).reversed().map(\.id)
+        case .providerFailure: throw RecommendationUnavailable.model
+        case .invalidOutput: return ["preview-not-on-taplist"]
+        case .deadline: try await Task.sleep(for:.seconds(30)); return []
+        case .contextBudget: throw RecommendationUnavailable.contextBudget
         }
     }
 }

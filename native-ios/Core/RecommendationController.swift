@@ -24,6 +24,12 @@ struct RecommendationSnapshot: Equatable {
 
 enum RecommendationRetrievalSource { case local, semantic, mixed }
 
+/// Why an Apple Intelligence request fell back to local matching. A stale or
+/// cancelled generation publishes nothing, so it is never a fallback.
+enum RecommendationFallback: Equatable {
+    case providerFailure, invalidOutput, deadlineExpired, contextBudgetExhausted
+}
+
 @MainActor final class RecommendationController: ObservableObject {
     @Published private(set) var suggestions: [BeerSuggestion] = []
     @Published private(set) var generating = false
@@ -34,12 +40,50 @@ enum RecommendationRetrievalSource { case local, semantic, mixed }
     @Published private(set) var historyCount = 0
     @Published private(set) var outcomes: [String:CheckInResult] = [:]
     @Published private(set) var preferences = SuggestionPreferences()
+    /// The mode the visible results were generated under; a later mode change
+    /// applies to the next generation, never to results already on screen.
+    @Published private(set) var resultMode: SuggestionMode?
+    /// Set only when Apple Intelligence was asked and local matches stand in.
+    @Published private(set) var fallback: RecommendationFallback?
+    /// What the sheet labels and offers as input: results on screen keep the
+    /// mode that produced them until they are cleared or regenerated.
+    func displayedMode(current: SuggestionMode) -> SuggestionMode {
+        suggestions.isEmpty ? current : resultMode ?? current
+    }
+    /// The retry button may only promise Apple Intelligence when the next
+    /// generation will actually ask it.
+    func canRetryAppleIntelligence(current: SuggestionMode) -> Bool {
+        fallback != nil && current == .appleIntelligence
+    }
     func setPreferences(_ value: SuggestionPreferences) {
         guard !submitting, value != preferences else { return }
         cancel(); preferences = value
     }
+    /// Local matching takes style chips, never free text. A typed request the
+    /// chips can't express exactly is cleared, not partially extracted. Results
+    /// already on screen keep the request they were generated with.
+    func conformRequestToMode() {
+        guard suggestions.isEmpty, !generating, clearRequestLocalMatchingCannotUse() else { return }
+        message = Self.clearedRequestMessage
+    }
+    private static let clearedRequestMessage = "Local matching uses style choices, so your typed request was cleared."
+    private func clearRequestLocalMatchingCannotUse() -> Bool {
+        guard !submitting, model?.suggestionMode.mode == .localMatching,
+              StyleChips(request:preferences.request) == nil else { return false }
+        setPreferences(SuggestionPreferences(container:preferences.container,abv:preferences.abv))
+        return true
+    }
+    /// Checks a selection against the saved taplist only. It describes cached
+    /// data and never claims the live taplist is empty.
+    func hasSavedMatches(for preferences: SuggestionPreferences) -> Bool {
+        guard let current = model?.recommendationSnapshot else { return false }
+        return !RecommendationRules.eligible(taplist:current.taplist,history:current.repeatHistory + current.history,
+            excluded:current.excluded,feedback:current.feedback,preferences:preferences).isEmpty
+    }
     var provider: any RecommendationProvider
     var timeout: Double = 8
+    /// Debug fixtures install an offline provider; real previews never rank.
+    var ranksInPreview = false
     var retrievalTimeout: Double = 2
     var semanticRetriever: (any SemanticRetrieving)?
     private weak var model: AppModel?
@@ -60,16 +104,31 @@ enum RecommendationRetrievalSource { case local, semantic, mixed }
         let ids: [String]?
         let candidates: [BeerSuggestion]
         let source: RecommendationRetrievalSource
+        var failure: RecommendationFallback? = nil
+        /// The provider abandoned the request: publish nothing, announce nothing.
+        var cancelled = false
     }
     private var rankingTask: Task<PipelineResult?,Never>?
+    private var modeChanges: AnyCancellable?
     init(model: AppModel, provider: (any RecommendationProvider)? = nil) {
         self.model = model; self.provider = provider ?? OnDeviceRecommendationProvider()
         semanticRetriever = model.semanticIndex.enabled ? model.semanticIndex : nil
+        modeChanges = model.suggestionMode.$mode.dropFirst().sink { [weak self] _ in
+            MainActor.assumeIsolated { self?.modeWillChange() }
+        }
+    }
+    /// Like a preference change, a mode change invalidates a generation in
+    /// flight. A submission always finishes: cancelling it would drop outcomes
+    /// for requests already sent.
+    private func modeWillChange() {
+        guard generating else { return }
+        cancel()
     }
     func cancel() {
         rankingTask?.cancel(); rankingTask = nil
         generation = UUID(); snapshot = nil; choiceID = nil; suggestions = []; outcomes = [:]
         generating = false; submitting = false; message = nil; historyCount = 0; usedModel = false; retrievalSource = .local
+        resultMode = nil; fallback = nil
     }
     func invalidateIfChanged() {
         guard !submitting, let snapshot, snapshot != model?.recommendationSnapshot else { return }
@@ -82,9 +141,13 @@ enum RecommendationRetrievalSource { case local, semantic, mixed }
     }
     func generate() async {
         guard !generating, !submitting, let model else { return }
-        let preferences = preferences
+        let mode = model.suggestionMode.mode
+        guard mode != .off else { return }
         let previousIDs = Set(suggestions.map(\.id))
+        let cleared = clearRequestLocalMatchingCannotUse()
+        let preferences = preferences
         cancel()
+        if cleared { message = Self.clearedRequestMessage }
         let token = generation
         let account = model.recommendationSnapshot
         generating = true
@@ -125,7 +188,10 @@ enum RecommendationRetrievalSource { case local, semantic, mixed }
             return max(0,Double(value.seconds) + Double(value.attoseconds)/1e18)
         }
         let task = Task { @MainActor () -> PipelineResult? in
-            guard !model.previewMode else { return nil }
+            guard mode == .appleIntelligence else { return nil }
+            guard !model.previewMode || ranksInPreview else {
+                return PipelineResult(ids:nil,candidates:candidates,source:.local,failure:.providerFailure)
+            }
             return await RecommendationDeadline.run(seconds:remaining()) {
                 var shortlist = candidates
                 var source = RecommendationRetrievalSource.local
@@ -144,19 +210,22 @@ enum RecommendationRetrievalSource { case local, semantic, mixed }
                     }
                 }
                 guard !Task.isCancelled, isCurrent(), remaining() > 0 else { throw CancellationError() }
-                let ids: [String]?
                 do {
-                    ids = try await provider.rank(history:current.history,candidates:shortlist,feedback:current.feedback,preferences:preferences,context:context)
+                    let ids = try await provider.rank(history:current.history,candidates:shortlist,feedback:current.feedback,preferences:preferences,context:context)
+                    return PipelineResult(ids:ids,candidates:shortlist,source:source)
                 } catch RecommendationUnavailable.contextBudget where source != .local {
                     // Semantic evidence must not disable otherwise available local AI.
                     // This retry remains inside the original pipeline deadline.
                     guard !Task.isCancelled, isCurrent(), remaining() > 0 else { throw CancellationError() }
                     shortlist = candidates; source = .local
-                    ids = try? await provider.rank(history:current.history,candidates:shortlist,feedback:current.feedback,preferences:preferences,context:context)
+                    do {
+                        let ids = try await provider.rank(history:current.history,candidates:shortlist,feedback:current.feedback,preferences:preferences,context:context)
+                        return PipelineResult(ids:ids,candidates:shortlist,source:source)
+                    }
+                    catch { return Self.failed(error,candidates:shortlist,source:source) }
                 } catch {
-                    ids = nil
+                    return Self.failed(error,candidates:shortlist,source:source)
                 }
-                return PipelineResult(ids:ids,candidates:shortlist,source:source)
             }
         }
         rankingTask = task
@@ -166,20 +235,32 @@ enum RecommendationRetrievalSource { case local, semantic, mixed }
             if token == generation { cancel(); message = "Your taplist or queue changed. Find fresh suggestions." }
             return
         }
+        if result?.cancelled == true { return }
         if let result, let ids = result.ids, let ranked = RecommendationRules.choose(ids:ids,from:result.candidates) {
             suggestions = ranked; usedModel = true; retrievalSource = result.source
         } else {
             // A failed/late model always uses the established local fallback order.
             suggestions = Array(candidates.prefix(3)); usedModel = false; retrievalSource = .local
+            if mode == .appleIntelligence {
+                // Past the staleness guard, an empty result means the shared deadline expired.
+                fallback = result.map { $0.failure ?? .invalidOutput } ?? .deadlineExpired
+            }
             if preferences.styleRequest.needsModel {
                 message = "Local matching applied your filters, but couldn’t interpret the additional style or mood wording. Try a simple style such as IPA or stout."
             }
         }
+        resultMode = mode
         if let account = model.recommendationAccount {
             let choice = BeerChoiceContext(taplist:current.taplist,shown:suggestions.map(\.id),preferences:preferences,usedModel:usedModel,taplistValidation:current.taplistValidation)
             do { try model.db?.saveChoicePresentation(choice,account:account); choiceID = choice.id }
             catch { model.error = error.localizedDescription }
         }
+    }
+    private static func failed(_ error: Error, candidates: [BeerSuggestion], source: RecommendationRetrievalSource) -> PipelineResult {
+        if error is CancellationError { return PipelineResult(ids:nil,candidates:candidates,source:source,cancelled:true) }
+        let reason: RecommendationFallback
+        if case RecommendationUnavailable.contextBudget = error { reason = .contextBudgetExhausted } else { reason = .providerFailure }
+        return PipelineResult(ids:nil,candidates:candidates,source:source,failure:reason)
     }
     func submit(ids: Set<String>) async {
         guard !generating, !submitting, let model, !model.previewMode, let snapshot,

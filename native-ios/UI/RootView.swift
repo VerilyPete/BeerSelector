@@ -93,7 +93,6 @@ struct RootView: View {
     }
 }
 struct HomeView: View {
-    @AppStorage("recommendations_enabled") private var recommendationsEnabled = false
     @EnvironmentObject var model: AppModel
     @Environment(\.dynamicTypeSize) private var typeSize
     @State private var expandedHomeBeerID: String?
@@ -133,22 +132,8 @@ struct HomeView: View {
         // entire Home scroll surface so cards and their shadows stay beneath it.
         .clipped()
     }
-    @ViewBuilder private var recommendationEntry: some View {
-        if recommendationsEnabled && model.isMember {
-            Button { model.showRecommendations = true } label: {
-                HStack(spacing:12) {
-                    Image(systemName:"sparkles").foregroundStyle(QueueChrome.cyan)
-                    VStack(alignment:.leading,spacing:4) {
-                        Text("Find something to try").font(Robo.title(15))
-                        Text("Describe a style or mood to narrow the taplist.").font(Robo.mono(10)).foregroundStyle(QueueChrome.secondary)
-                            .fixedSize(horizontal:false,vertical:true)
-                    }.frame(maxWidth:.infinity,alignment:.leading)
-                    Image(systemName:"chevron.right").font(.system(size:12)).foregroundStyle(QueueChrome.secondary)
-                }.padding(14).frame(maxWidth:.infinity,alignment:.leading)
-                    .background(QueueChrome.background,in:RoundedRectangle(cornerRadius:15))
-                    .overlay(RoundedRectangle(cornerRadius:15).strokeBorder(QueueChrome.metal.opacity(0.45),lineWidth:1))
-            }.buttonStyle(.plain).foregroundStyle(QueueChrome.text).accessibilityIdentifier("home-recommendations")
-        }
+    private var recommendationEntry: some View {
+        SuggestionEntryCard(modes:model.suggestionMode) { model.showRecommendations = true }
     }
     private var tabletHome: some View {
         VStack(alignment:.leading,spacing:24) {
@@ -319,6 +304,29 @@ private struct HomeScrollBoundary: UIViewRepresentable {
         func restoreBoundary() {
             scrollView?.bounces = originalBounces
             scrollView = nil
+        }
+    }
+}
+
+/// The Home entry names its mode: Apple Intelligence or local matching.
+struct SuggestionEntryCard: View {
+    @ObservedObject var modes: SuggestionModeState
+    let open: () -> Void
+    var body: some View {
+        if modes.mode != .off {
+            Button(action:open) {
+                HStack(spacing:12) {
+                    Image(systemName:modes.mode.symbol).foregroundStyle(QueueChrome.cyan)
+                    VStack(alignment:.leading,spacing:4) {
+                        Text(modes.mode.homeTitle).font(Robo.title(15))
+                        Text(modes.mode.homeDetail).font(Robo.mono(10)).foregroundStyle(QueueChrome.secondary)
+                            .fixedSize(horizontal:false,vertical:true)
+                    }.frame(maxWidth:.infinity,alignment:.leading)
+                    Image(systemName:"chevron.right").font(.system(size:12)).foregroundStyle(QueueChrome.secondary)
+                }.padding(14).frame(maxWidth:.infinity,alignment:.leading)
+                    .background(QueueChrome.background,in:RoundedRectangle(cornerRadius:15))
+                    .overlay(RoundedRectangle(cornerRadius:15).strokeBorder(QueueChrome.metal.opacity(0.45),lineWidth:1))
+            }.buttonStyle(.plain).foregroundStyle(QueueChrome.text).accessibilityIdentifier("home-recommendations")
         }
     }
 }

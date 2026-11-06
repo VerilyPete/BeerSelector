@@ -43,7 +43,7 @@ struct SettingsScreen: View {
                         section("SUGGESTIONS · BETA") {
                             Toggle("Show taplist suggestions",isOn:$recommendationsEnabled)
                                 .font(Robo.title(15)).padding(14).accessibilityIdentifier("recommendations-enabled")
-                            SuggestionCompatibilityStatus().padding(.horizontal,14).padding(.bottom,14)
+                            SuggestionModeStatus(modes:model.suggestionMode).padding(.horizontal,14).padding(.bottom,14)
                             Text("Uses up to 100 confirmed tastings and 100 recent choices saved on this device. Check-ins still inform suggestions when bartender confirmation is missing. Can use Apple Intelligence when available. Signing out clears this history.")
                                 .font(Robo.mono(11)).foregroundStyle(QueueChrome.secondary).padding(.horizontal,14).padding(.bottom,14)
                             separator
@@ -117,7 +117,10 @@ struct SettingsScreen: View {
                 }
                 .sheet(isPresented:$model.showLogin) { LoginScreen().environmentObject(model) }
                 .noticeAlert(.settings,model:model,blocked:confirmDeleteFeedback || confirmClearHistory || confirmLogout || confirmReset || confirmTimestamps || sharingFile != nil || sharingReport != nil)
-                .onChange(of:recommendationsEnabled) { _,enabled in if !enabled { model.recommendations.cancel() } }
+                .onChange(of:recommendationsEnabled) { _,enabled in
+                    if !enabled { model.recommendations.cancel() }
+                    model.suggestionMode.refresh()
+                }
                 .confirmationDialog("Clear recent recommendation history?",isPresented:$confirmClearHistory,titleVisibility:.visible) {
                     Button("Clear History",role:.destructive) { model.clearRecommendationHistory() }
                 }

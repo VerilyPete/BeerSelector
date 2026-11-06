@@ -1,4 +1,5 @@
-# Isolated preview fixtures; no queue confirmation or live writes.
+# Isolated preview fixtures; no queue confirmation or live writes. Launch with:
+# xcrun simctl launch <simulator-id> org.verily.FSbeerselector --preview-fixtures --preview-recommendations --preview-suggestion-mode apple-intelligence
 appId: org.verily.FSbeerselector
 ---
 - assertVisible: Find suggestions

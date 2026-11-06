@@ -28,7 +28,6 @@ enum RecommendationCompatibility: Equatable {
             }
         }
     }
-    var title: String { self == .appleIntelligence ? "Apple Intelligence available" : "Local matching" }
     var detail: String {
         switch self {
         case .appleIntelligence:

@@ -1,0 +1,92 @@
+# Local matching takes style chips, never free text. Isolated Debug fixture; no
+# model, network or queue writes. Launch with:
+# xcrun simctl launch <simulator-id> org.verily.FSbeerselector --preview-fixtures --preview-recommendations --preview-suggestion-mode local-matching
+appId: org.verily.FSbeerselector
+---
+- extendedWaitUntil:
+    visible:
+      id: suggestion-mode-plate
+    timeout: 15000
+- assertNotVisible:
+    id: suggestion-request
+# The fixture taplist has no sour, so the note appears and generation stays enabled.
+- tapOn:
+    id: style-chip-Sour
+- scrollUntilVisible:
+    element:
+      id: style-chips-no-match
+    direction: DOWN
+- assertVisible:
+    id: recommendation-generate
+    enabled: true
+# A second tap excludes Sour, which matches the whole taplist again.
+- tapOn:
+    id: style-chip-Sour
+- assertNotVisible:
+    id: style-chips-no-match
+- tapOn:
+    id: style-chips-clear
+- assertNotVisible:
+    id: style-chips-clear
+# Include IPA and generate: only the IPAs on the fixture taplist are eligible.
+- scrollUntilVisible:
+    element:
+      id: style-chip-IPA
+    direction: UP
+- tapOn:
+    id: style-chip-IPA
+- scrollUntilVisible:
+    element:
+      id: recommendation-generate
+    direction: DOWN
+- assertVisible:
+    id: recommendation-generate
+    text: "Find local matches"
+- tapOn:
+    id: recommendation-generate
+- scrollUntilVisible:
+    element:
+      id: recommendation-source
+    direction: DOWN
+- assertVisible:
+    id: recommendation-source
+    text: "Local matching\\. Picks from.*"
+# The only eligible IPA is Founders All Day IPA (Bell's Two Hearted is queued).
+- scrollUntilVisible:
+    element:
+      id: recommendation-card-5
+    direction: UP
+    centerElement: true
+- assertVisible:
+    id: recommendation-card-5
+- assertNotVisible:
+    id: recommendation-card-1
+- assertNotVisible:
+    id: recommendation-card-2
+- assertNotVisible:
+    id: recommendation-card-3
+- assertNotVisible:
+    id: recommendation-card-4
+- assertNotVisible:
+    id: recommendation-card-6
+- assertNotVisible:
+    id: recommendation-card-7
+# Check the other end of the result list too; the exact set is pinned by
+# testLocalMatchingPublishesExactlyTheBeersTheChipsAllow.
+- scrollUntilVisible:
+    element:
+      id: recommendation-source
+    direction: DOWN
+    centerElement: true
+- assertNotVisible:
+    id: recommendation-card-1
+- assertNotVisible:
+    id: recommendation-card-2
+- assertNotVisible:
+    id: recommendation-card-3
+- assertNotVisible:
+    id: recommendation-card-4
+- assertNotVisible:
+    id: recommendation-card-6
+- assertNotVisible:
+    id: recommendation-card-7

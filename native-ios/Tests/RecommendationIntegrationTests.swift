@@ -14,6 +14,7 @@ final class RecommendationIntegrationTests: XCTestCase {
         model.session = MemberSession(memberId:"1",storeId:"1",storeName:"Fixture",sessionId:"fixture")
         try credentials.save(session:model.session!,cookies:[:])
         model.activityUpdate = { _,_ in }; model.activityCleanup = {}; model.webCookieCleanup = {}
+        model.suggestionCompatibility = { .appleIntelligence }; model.suggestionsEnabled = { true }
         try db.setPreference("all_beers_api_url","https://fsbs.beerknurd.com/bk-store-json.php?sid=1")
         try db.setPreference("my_beers_api_url","https://fsbs.beerknurd.com/bk-member-json.php?uid=1")
         fixture.handler = { request in
@@ -591,6 +592,415 @@ extension RecommendationIntegrationTests {
             await controller.submit(ids:["new"])
             XCTAssertEqual(writes,0)
             XCTAssertTrue(controller.outcomes.isEmpty)
+        }
+    }
+}
+
+
+extension RecommendationIntegrationTests {
+    @MainActor func testAppleIntelligenceModeRanksWithTheModelAndRecordsItsMode() async throws {
+        try await withModel { model,_,_ in
+            let fake = FakeProvider(); fake.action = { ["new"] }
+            let controller = RecommendationController(model:model,provider:fake)
+            await controller.generate()
+            XCTAssertEqual(fake.calls,1)
+            XCTAssertTrue(controller.usedModel)
+            XCTAssertEqual(controller.suggestions.map(\.id),["new"])
+            XCTAssertEqual(controller.resultMode,.appleIntelligence)
+        }
+    }
+    @MainActor func testLocalMatchingModeNeverCallsTheProvider() async throws {
+        try await withModel { model,_,_ in
+            model.suggestionCompatibility = { .deviceNotEligible }
+            let fake = FakeProvider(); fake.action = { ["new"] }
+            let controller = RecommendationController(model:model,provider:fake)
+            await controller.generate()
+            XCTAssertEqual(fake.calls,0)
+            XCTAssertFalse(controller.usedModel)
+            XCTAssertEqual(controller.retrievalSource,.local)
+            XCTAssertEqual(controller.suggestions.map(\.id),["new"])
+            XCTAssertEqual(controller.resultMode,.localMatching)
+            XCTAssertNil(controller.message)
+        }
+    }
+    @MainActor func testOffModeGeneratesNothing() async throws {
+        try await withModel { model,_,_ in
+            model.suggestionsEnabled = { false }
+            let fake = FakeProvider(); fake.action = { ["new"] }
+            let controller = RecommendationController(model:model,provider:fake)
+            await controller.generate()
+            XCTAssertEqual(fake.calls,0)
+            XCTAssertTrue(controller.suggestions.isEmpty)
+            XCTAssertNil(controller.resultMode)
+            XCTAssertFalse(controller.generating)
+        }
+    }
+    @MainActor func testModeChangeDuringGenerationPublishesNoStaleResults() async throws {
+        try await withModel { model,_,_ in
+            let fake = FakeProvider()
+            let controller = RecommendationController(model:model,provider:fake)
+            fake.action = {
+                model.suggestionCompatibility = { .modelNotReady }
+                model.suggestionMode.refresh()
+                return ["new"]
+            }
+            await controller.generate()
+            XCTAssertEqual(fake.calls,1)
+            XCTAssertTrue(controller.suggestions.isEmpty)
+            XCTAssertNil(controller.resultMode)
+            XCTAssertFalse(controller.generating)
+            XCTAssertNil(controller.message)
+        }
+    }
+    @MainActor func testModeChangeDuringSubmissionKeepsTheOutcomeAndOriginalMode() async throws {
+        try await withModel { model,_,fixture in
+            let fake = FakeProvider(); fake.action = { ["new"] }
+            let controller = RecommendationController(model:model,provider:fake)
+            await controller.generate()
+            let feeds = fixture.handler
+            fixture.handler = { request in
+                if request.url!.path == "/addToQueue.php" {
+                    model.suggestionCompatibility = { .notEnabled }
+                    model.suggestionMode.refresh()
+                    return (200,Data())
+                }
+                return try await feeds!(request)
+            }
+            await controller.submit(ids:["new"])
+            XCTAssertEqual(model.suggestionMode.mode,.localMatching)
+            XCTAssertEqual(controller.outcomes["new"],.added)
+            XCTAssertEqual(controller.suggestions.map(\.id),["new"])
+            XCTAssertEqual(controller.resultMode,.appleIntelligence)
+        }
+    }
+    @MainActor func testModeChangeAfterAPartialSuccessKeepsResultsUntilTheNextGeneration() async throws {
+        try await withModel { model,_,fixture in
+            var writes = 0
+            fixture.handler = { request in
+                switch request.url!.path {
+                case "/bk-store-json.php": return (200,Data(#"[{"id":"a","brew_name":"First"},{"id":"b","brew_name":"Second"},{"id":"c","brew_name":"Third"}]"#.utf8))
+                case "/bk-member-json.php": return (200,Data(#"[{},{"tasted_brew_current_round":[]},{"reward":[]}]"#.utf8))
+                case "/addToQueue.php":
+                    writes += 1
+                    return writes == 2 ? (200,Data("<html>Sign in</html>".utf8)) : (200,Data())
+                default: return (200,Data("No brew in queue".utf8))
+                }
+            }
+            let fake = FakeProvider(); fake.action = { ["a","b","c"] }
+            let controller = RecommendationController(model:model,provider:fake)
+            await controller.generate()
+            await controller.submit(ids:["a","b"])
+            model.suggestionCompatibility = { .deviceNotEligible }
+            model.suggestionMode.refresh()
+            XCTAssertEqual(controller.outcomes,["a":.added,"b":.needsReview])
+            XCTAssertEqual(controller.suggestions.map(\.id),["a","b","c"])
+            XCTAssertEqual(controller.resultMode,.appleIntelligence)
+            await controller.generate()
+            XCTAssertEqual(fake.calls,1)
+            XCTAssertEqual(controller.resultMode,.localMatching)
+        }
+    }
+}
+
+
+extension RecommendationIntegrationTests {
+    @MainActor private func taplist(_ beers: [(String,String)]) throws -> Data {
+        try JSONSerialization.data(withJSONObject:beers.map { ["id":$0.0,"brew_name":"Beer \($0.0)","brew_style":$0.1] })
+    }
+    @MainActor private func serve(_ fixture: HTTPFixture, taplist data: @escaping () -> Data) {
+        fixture.handler = { request in
+            switch request.url!.path {
+            case "/bk-store-json.php": return (200,data())
+            case "/bk-member-json.php": return (200,Data(#"[{},{"tasted_brew_current_round":[]},{"reward":[]}]"#.utf8))
+            default: return (200,Data("No brew in queue".utf8))
+            }
+        }
+    }
+    @MainActor private func chips(_ states: [(String,StyleChips.State)]) -> SuggestionPreferences {
+        var chips = StyleChips()
+        for (label,state) in states { chips.set(label,state) }
+        return SuggestionPreferences(request:chips.request)
+    }
+    @MainActor func testLocalMatchingPublishesExactlyTheBeersTheChipsAllow() async throws {
+        try await withModel { model,_,fixture in
+            model.suggestionCompatibility = { .deviceNotEligible }
+            let data = try taplist([("ipa","American IPA"),("hazy","Hazy IPA"),("stout","Stout"),("lager","Helles Lager"),("double","Double IPA")])
+            serve(fixture) { data }
+            await model.refresh()
+            let fake = FakeProvider()
+            let controller = RecommendationController(model:model,provider:fake)
+            controller.setPreferences(chips([("IPA",.include),("Hazy",.exclude)]))
+            await controller.generate()
+            XCTAssertEqual(Set(controller.suggestions.map(\.id)),["ipa","double"])
+            XCTAssertEqual(fake.calls,0)
+            XCTAssertEqual(controller.resultMode,.localMatching)
+        }
+    }
+    @MainActor func testContradictoryChipsHaveNoSavedMatches() async throws {
+        try await withModel { model,_,fixture in
+            let data = try taplist([("hazy","Hazy IPA"),("ipa","American IPA"),("stout","Stout")])
+            serve(fixture) { data }
+            await model.refresh()
+            let controller = RecommendationController(model:model,provider:FakeProvider())
+            XCTAssertFalse(controller.hasSavedMatches(for:chips([("Hazy IPA",.include),("IPA",.exclude)])))
+            XCTAssertTrue(controller.hasSavedMatches(for:chips([("Hazy IPA",.include)])))
+        }
+    }
+    @MainActor func testAStyleMissingFromTheSavedTaplistHasNoMatchesUntilAnotherChipChanges() async throws {
+        try await withModel { model,_,fixture in
+            let data = try taplist([("ipa","American IPA"),("stout","Stout")])
+            serve(fixture) { data }
+            await model.refresh()
+            let controller = RecommendationController(model:model,provider:FakeProvider())
+            XCTAssertFalse(controller.hasSavedMatches(for:chips([("Sour",.include)])))
+            XCTAssertTrue(controller.hasSavedMatches(for:chips([("Sour",.include),("Stout",.include)])))
+            XCTAssertFalse(controller.hasSavedMatches(for:chips([("IPA",.exclude),("Stout",.exclude)])))
+            XCTAssertTrue(controller.hasSavedMatches(for:chips([("IPA",.exclude)])))
+        }
+    }
+    @MainActor func testARefreshThatBringsInAMatchingBeerClearsTheNoMatchState() async throws {
+        try await withModel { model,_,fixture in
+            var data = try taplist([("ipa","American IPA")])
+            serve(fixture) { data }
+            await model.refresh()
+            let controller = RecommendationController(model:model,provider:FakeProvider())
+            let sour = chips([("Sour",.include)])
+            XCTAssertFalse(controller.hasSavedMatches(for:sour))
+            data = try taplist([("ipa","American IPA"),("gose","Gose")])
+            await model.refresh()
+            XCTAssertTrue(controller.hasSavedMatches(for:sour))
+        }
+    }
+    @MainActor func testLocalMatchingClearsAnUnusableTypedRequestAndSaysSo() async throws {
+        try await withModel { model,_,_ in
+            model.suggestionCompatibility = { .deviceNotEligible }
+            let controller = RecommendationController(model:model,provider:FakeProvider())
+            controller.setPreferences(.init(container:.draft,request:"IPA or something refreshing"))
+            controller.conformRequestToMode()
+            XCTAssertEqual(controller.preferences,.init(container:.draft))
+            XCTAssertEqual(controller.message,"Local matching uses style choices, so your typed request was cleared.")
+        }
+    }
+    @MainActor func testLocalMatchingKeepsAFullyRecognizedRequestForTheChips() async throws {
+        try await withModel { model,_,_ in
+            model.suggestionCompatibility = { .deviceNotEligible }
+            let controller = RecommendationController(model:model,provider:FakeProvider())
+            controller.setPreferences(.init(request:"IPA, not hazy"))
+            controller.conformRequestToMode()
+            XCTAssertEqual(controller.preferences.request,"IPA, not hazy")
+            XCTAssertEqual(StyleChips(request:controller.preferences.request)?.excluded,["Hazy"])
+            XCTAssertNil(controller.message)
+        }
+    }
+    @MainActor func testAppleIntelligenceModeAndVisibleResultsKeepTheTypedRequest() async throws {
+        try await withModel { model,_,_ in
+            let fake = FakeProvider(); fake.action = { ["new"] }
+            let controller = RecommendationController(model:model,provider:fake)
+            controller.setPreferences(.init(request:"crisp and refreshing"))
+            controller.conformRequestToMode()
+            XCTAssertEqual(controller.preferences.request,"crisp and refreshing")
+            await controller.generate()
+            model.suggestionCompatibility = { .deviceNotEligible }
+            controller.conformRequestToMode()
+            XCTAssertEqual(controller.preferences.request,"crisp and refreshing","results stay with the request they used")
+            XCTAssertEqual(controller.suggestions.map(\.id),["new"])
+        }
+    }
+    @MainActor func testANewGenerationDropsAnEarlierMessage() async throws {
+        try await withModel { model,_,_ in
+            model.suggestionCompatibility = { .deviceNotEligible }
+            let controller = RecommendationController(model:model,provider:FakeProvider())
+            await controller.generate()
+            model.allBeers.append(Beer(id:"later",name:"Later arrival"))
+            controller.invalidateIfChanged()
+            XCTAssertNotNil(controller.message)
+            await controller.generate()
+            XCTAssertFalse(controller.suggestions.isEmpty)
+            XCTAssertNil(controller.message)
+        }
+    }
+    @MainActor func testLocalGenerationNeverUsesAnUnusableTypedRequest() async throws {
+        try await withModel { model,_,_ in
+            let fake = FakeProvider(); fake.action = { ["new"] }
+            let controller = RecommendationController(model:model,provider:fake)
+            controller.setPreferences(.init(request:"crisp and refreshing"))
+            model.suggestionCompatibility = { .deviceNotEligible }
+            await controller.generate()
+            XCTAssertEqual(controller.preferences.request,"")
+            XCTAssertEqual(controller.suggestions.map(\.id),["new"])
+            XCTAssertEqual(controller.message,"Local matching uses style choices, so your typed request was cleared.")
+        }
+    }
+}
+
+
+/// S5: every fallback from Apple Intelligence to local matching is announced,
+/// and nothing else is.
+extension RecommendationIntegrationTests {
+    @MainActor private func generate(_ model: AppModel, semantic: [String]? = nil, timeout: Double = 8,
+                                     request: String = "", rank: @escaping (FakeProvider) async throws -> [String]) async -> RecommendationController {
+        let provider = FakeProvider()
+        provider.action = { try await rank(provider) }
+        let controller = RecommendationController(model:model,provider:provider)
+        if let semantic {
+            let retriever = FakeSemanticRetriever(); retriever.action = { _ in semantic }
+            controller.semanticRetriever = retriever
+        }
+        controller.timeout = timeout
+        controller.setPreferences(.init(request:request))
+        await controller.generate()
+        return controller
+    }
+    @MainActor func testProviderFailureIsAnnouncedAsAFallback() async throws {
+        try await withModel { model,_,_ in
+            let controller = await generate(model) { _ in throw RecommendationUnavailable.model }
+            XCTAssertEqual(controller.fallback,.providerFailure)
+            XCTAssertEqual(controller.suggestions.map(\.id),["new"])
+            XCTAssertFalse(controller.usedModel)
+        }
+    }
+    @MainActor func testUnknownIDsAreAnnouncedAsInvalidOutput() async throws {
+        try await withModel { model,_,_ in
+            let controller = await generate(model) { _ in ["not-on-the-taplist"] }
+            XCTAssertEqual(controller.fallback,.invalidOutput)
+            XCTAssertEqual(controller.suggestions.map(\.id),["new"])
+        }
+    }
+    @MainActor func testADeadlineBeforeRankingFinishesIsAnnounced() async throws {
+        try await withModel { model,_,_ in
+            let controller = await generate(model,timeout:0.05) { _ in try await Task.sleep(for:.seconds(5)); return ["new"] }
+            XCTAssertEqual(controller.fallback,.deadlineExpired)
+            XCTAssertEqual(controller.suggestions.map(\.id),["new"])
+        }
+    }
+    @MainActor func testADeadlineDuringTheContextBudgetRetryIsAnnounced() async throws {
+        try await withModel { model,_,_ in
+            let controller = await generate(model,semantic:["new"],timeout:0.2,request:"coffee") { provider in
+                if provider.calls == 1 { throw RecommendationUnavailable.contextBudget }
+                try await Task.sleep(for:.seconds(5)); return ["new"]
+            }
+            XCTAssertEqual(controller.fallback,.deadlineExpired)
+        }
+    }
+    @MainActor func testAnExhaustedContextBudgetIsAnnounced() async throws {
+        try await withModel { model,_,_ in
+            let local = await generate(model) { _ in throw RecommendationUnavailable.contextBudget }
+            XCTAssertEqual(local.fallback,.contextBudgetExhausted)
+            let retried = await generate(model,semantic:["new"],request:"coffee") { _ in throw RecommendationUnavailable.contextBudget }
+            XCTAssertEqual(retried.fallback,.contextBudgetExhausted)
+        }
+    }
+    @MainActor func testSuccessAfterARetrievalTimeoutOrContextRetryIsNotAFallback() async throws {
+        try await withModel { model,_,_ in
+            let provider = FakeProvider(), semantic = FakeSemanticRetriever()
+            provider.action = { ["new"] }
+            semantic.action = { _ in try await Task.sleep(for:.seconds(5)); return ["new"] }
+            let controller = RecommendationController(model:model,provider:provider)
+            controller.semanticRetriever = semantic; controller.retrievalTimeout = 0.01
+            controller.setPreferences(.init(request:"coffee"))
+            await controller.generate()
+            XCTAssertTrue(controller.usedModel)
+            XCTAssertNil(controller.fallback)
+            let retried = await generate(model,semantic:["new"],request:"coffee") { provider in
+                if provider.calls == 1 { throw RecommendationUnavailable.contextBudget }
+                return ["new"]
+            }
+            XCTAssertTrue(retried.usedModel)
+            XCTAssertNil(retried.fallback)
+        }
+    }
+    @MainActor func testAPreferenceChangeDuringRankingPublishesNoResultsAndNoNotice() async throws {
+        try await withModel { model,_,_ in
+            let fake = FakeProvider()
+            let controller = RecommendationController(model:model,provider:fake)
+            fake.action = { controller.setPreferences(.init(container:.bottle)); throw RecommendationUnavailable.model }
+            await controller.generate()
+            XCTAssertEqual(fake.calls,1)
+            XCTAssertTrue(controller.suggestions.isEmpty)
+            XCTAssertNil(controller.fallback)
+        }
+    }
+    @MainActor func testAnAccountChangeDuringRankingPublishesNoResultsAndNoNotice() async throws {
+        try await withModel { model,_,_ in
+            let fake = FakeProvider()
+            let controller = RecommendationController(model:model,provider:fake)
+            fake.action = {
+                model.session = MemberSession(memberId:"other",storeId:"2",storeName:"Other",sessionId:"other")
+                throw RecommendationUnavailable.model
+            }
+            await controller.generate()
+            XCTAssertEqual(fake.calls,1,"the account changes inside ranking")
+            XCTAssertEqual(model.session?.memberId,"other")
+            XCTAssertTrue(controller.suggestions.isEmpty)
+            XCTAssertNil(controller.fallback)
+        }
+    }
+    @MainActor func testACancelledProviderIsNotAFallback() async throws {
+        try await withModel { model,_,_ in
+            let first = await generate(model) { _ in throw CancellationError() }
+            XCTAssertTrue(first.suggestions.isEmpty)
+            XCTAssertNil(first.fallback)
+            XCTAssertFalse(first.generating)
+            let retry = await generate(model,semantic:["new"],request:"coffee") { provider in
+                if provider.calls == 1 { throw RecommendationUnavailable.contextBudget }
+                throw CancellationError()
+            }
+            XCTAssertTrue(retry.suggestions.isEmpty)
+            XCTAssertNil(retry.fallback)
+        }
+    }
+    @MainActor func testVisibleResultsKeepTheirModeUntilTheNextGeneration() async throws {
+        try await withModel { model,_,_ in
+            let fake = FakeProvider(); fake.action = { throw RecommendationUnavailable.model }
+            let controller = RecommendationController(model:model,provider:fake)
+            await controller.generate()
+            XCTAssertEqual(controller.displayedMode(current:.appleIntelligence),.appleIntelligence)
+            XCTAssertTrue(controller.canRetryAppleIntelligence(current:.appleIntelligence))
+            model.suggestionCompatibility = { .notEnabled }
+            XCTAssertEqual(controller.displayedMode(current:model.suggestionMode.mode),.appleIntelligence,"results keep their source")
+            XCTAssertFalse(controller.canRetryAppleIntelligence(current:model.suggestionMode.mode),"retry would run local matching")
+            controller.cancel()
+            XCTAssertEqual(controller.displayedMode(current:model.suggestionMode.mode),.localMatching)
+        }
+    }
+    @MainActor func testLateCompletionAfterCancelPublishesNoNotice() async throws {
+        try await withModel { model,_,_ in
+            let fake = FakeProvider()
+            var release: CheckedContinuation<Void,Never>?
+            fake.action = { await withCheckedContinuation { release = $0 }; throw RecommendationUnavailable.model }
+            let controller = RecommendationController(model:model,provider:fake)
+            let work = Task { await controller.generate() }
+            while release == nil { await Task.yield() }
+            controller.cancel()
+            release?.resume()
+            await work.value
+            XCTAssertTrue(controller.suggestions.isEmpty)
+            XCTAssertNil(controller.fallback)
+        }
+    }
+    @MainActor func testLocalMatchingNeverAnnouncesAFallback() async throws {
+        try await withModel { model,_,_ in
+            model.suggestionCompatibility = { .deviceNotEligible }
+            let controller = await generate(model) { _ in throw RecommendationUnavailable.model }
+            XCTAssertFalse(controller.suggestions.isEmpty)
+            XCTAssertNil(controller.fallback)
+        }
+    }
+    @MainActor func testTheNoticeClearsOnCancelAndAtTheNextGeneration() async throws {
+        try await withModel { model,_,_ in
+            let fake = FakeProvider()
+            fake.action = { throw RecommendationUnavailable.model }
+            let controller = RecommendationController(model:model,provider:fake)
+            await controller.generate()
+            XCTAssertEqual(controller.fallback,.providerFailure)
+            controller.cancel()
+            XCTAssertNil(controller.fallback)
+            await controller.generate()
+            XCTAssertEqual(controller.fallback,.providerFailure)
+            fake.action = { ["new"] }
+            await controller.generate()
+            XCTAssertNil(controller.fallback)
+            XCTAssertTrue(controller.usedModel)
         }
     }
 }
