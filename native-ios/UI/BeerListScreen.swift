@@ -23,10 +23,10 @@ struct BeerListScreen: View {
             let columnCount = typeSize.isAccessibilitySize ? 1 : geometry.size.width >= 1024 ? 3 : geometry.size.width >= 768 ? 2 : 1
             let columns = Array(repeating:GridItem(.flexible(),spacing:8,alignment:.top),count:columnCount)
             VStack(spacing:12) {
-                HStack {
-                    DisplayTitle(title:kind.title); Spacer()
-                    if refreshing { ProgressView().tint(Robo.cyan).accessibilityLabel("Refreshing beers") }
-                    Button { model.showSettings = true } label: { IconWell(symbol:"gearshape").frame(width:44,height:44) }.buttonStyle(.plain).accessibilityLabel("Open settings")
+                // C1: the buttons wrap below the title when one line doesn't fit.
+                ViewThatFits(in:.horizontal) {
+                    HStack(spacing:0) { DisplayTitle(title:kind.title).fixedSize(); Spacer(minLength:4); headerButtons }
+                    VStack(alignment:.leading,spacing:8) { DisplayTitle(title:kind.title); HStack(spacing:0) { headerButtons } }
                 }
                 HStack {
                     Image(systemName:"magnifyingglass").foregroundStyle(Robo.steel)
@@ -35,11 +35,14 @@ struct BeerListScreen: View {
                 }.padding(.horizontal,12).frame(minHeight:38).modifier(ChromeBezel(radius:12))
                 Text("\(filtered.count) \(kind == .finder ? "to discover" : kind == .tasted ? "tasted beers" : "beers on tap")").font(Robo.mono(10)).foregroundStyle(Robo.steel).frame(maxWidth:.infinity,alignment:.leading)
                 ViewThatFits(in:.horizontal) {
-                    HStack(spacing:6) { filterControls; if kind == .finder { queueControls }; Spacer(minLength:0) }.fixedSize(horizontal:true,vertical:false)
+                    HStack(spacing:6) { containerSegments(vertical:false); sortControls(.full); Spacer(minLength:0) }.fixedSize(horizontal:true,vertical:false)
+                    HStack(spacing:6) { containerSegments(vertical:false); sortControls(.short); Spacer(minLength:0) }.fixedSize(horizontal:true,vertical:false)
+                    HStack(spacing:6) { containerSegments(vertical:false); sortControls(.icon); Spacer(minLength:0) }.fixedSize(horizontal:true,vertical:false)
                     VStack(alignment:.leading,spacing:0) {
-                        HStack(spacing:6) { filterControls }
-                        if kind == .finder { HStack(spacing:6) { queueControls } }
+                        HStack(spacing:4) { containerSegments(vertical:false) }.fixedSize(horizontal:true,vertical:false)
+                        sortControls(.full).fixedSize(horizontal:true,vertical:false)
                     }
+                    VStack(alignment:.leading,spacing:0) { containerSegments(vertical:true); sortControls(.full) }
                 }.frame(maxWidth:.infinity,alignment:.leading)
                 if kind == .finder, let queueError = model.queueError {
                     Text(queueError).font(Robo.mono()).foregroundStyle(Robo.red)
@@ -83,46 +86,93 @@ struct BeerListScreen: View {
                 #endif
             }
     }
-    private var filterControls: some View {
-        Group {
-            Button(filter.container == .cans ? "CANS" : filter.container.rawValue) {
-                UIImpactFeedbackGenerator(style:.light).impactOccurred()
-                let cases = ContainerFilter.allCases
-                filter.container = cases[(cases.firstIndex(of:filter.container)!+1)%cases.count]; expandedID = nil
-            }.buttonStyle(BeerControlStyle(appearance:filter.container == .all ? .chrome : .selected))
-                .accessibilityIdentifier("container-filter").accessibilityLabel("Container filter: \(filter.container == .cans ? "Cans and bottles" : filter.container.rawValue)")
-                .accessibilityAddTraits(filter.container == .all ? [] : .isSelected)
-            Button {
-                UIImpactFeedbackGenerator(style:.light).impactOccurred()
-                let cases = BeerSort.allCases
-                filter.sort = cases[(cases.firstIndex(of:filter.sort)!+1)%cases.count]; filter.ascending = filter.sort != .date
-            } label: {
-                HStack(spacing:6) {
-                    if filter.sort == .abv { Text("\u{f003}").font(.custom(Robo.beerIconFont,size:14)) }
-                    else { Image(systemName:filter.sort == .date ? "calendar" : "textformat").font(.system(size:12)) }
-                    Text(filter.sort.rawValue.uppercased())
+    private func containerSegments(vertical: Bool) -> some View {
+        (vertical ? AnyLayout(VStackLayout(alignment:.leading,spacing:0)) : AnyLayout(HStackLayout(spacing:4))) {
+            ForEach(ContainerFilter.allCases,id:\.self) { option in
+                let selected = filter.container == option
+                Button(option.segmentTitle) {
+                    UIImpactFeedbackGenerator(style:.light).impactOccurred()
+                    filter.container = option; expandedID = nil
+                }.buttonStyle(BeerControlStyle(appearance:selected ? .selected : .chrome))
+                    .accessibilityIdentifier("container-filter-\(option.segmentID)")
+                    .accessibilityLabel(option.spokenTitle)
+                    .accessibilityAddTraits(selected ? .isSelected : [])
+            }
+        }.accessibilityElement(children:.contain).accessibilityLabel("Container filter")
+    }
+    private enum ChipWidth { case full, short, icon }
+    private func sortControls(_ width: ChipWidth) -> some View {
+        let current = SortOption(filter:filter)
+        return Menu {
+            Picker("Sort",selection:Binding(get:{ SortOption(filter:filter) },set:{ option in
+                UIImpactFeedbackGenerator(style:.light).impactOccurred(); option.apply(to:&filter)
+            })) {
+                ForEach(SortOption.all,id:\.chipLabel) { option in
+                    Label { Text(option.menuTitle) } icon: { SortGlyph.menuImage(option) }.tag(option)
                 }
-            }.buttonStyle(BeerControlStyle()).accessibilityIdentifier("sort-button").accessibilityLabel("Sort by \(filter.sort.rawValue)")
-            Button(directionLabel + " ↓") {
-                UIImpactFeedbackGenerator(style:.light).impactOccurred(); filter.ascending.toggle()
-            }.buttonStyle(BeerControlStyle()).accessibilityIdentifier("sort-direction-button").accessibilityLabel("Sort direction: \(directionLabel)")
-        }
+            }.pickerStyle(.inline)
+        } label: {
+            HStack(spacing:6) {
+                SortGlyph(option:current)
+                switch width {
+                case .full: Text(current.chipLabel)
+                case .short: Text(current.shortChipLabel)
+                case .icon: EmptyView()
+                }
+                Image(systemName:"chevron.down").font(.system(size:10,weight:.semibold))
+            }
+        }.menuStyle(.button).buttonStyle(BeerControlStyle())
+            .accessibilityIdentifier("sort-menu").accessibilityLabel("Sort: \(current.spokenLabel)")
     }
-    private var directionLabel: String {
-        switch filter.sort {
-        case .date: filter.ascending ? "OLD" : "NEW"
-        case .name: filter.ascending ? "A-Z" : "Z-A"
-        case .abv: filter.ascending ? "LOW" : "HIGH"
-        }
-    }
-    private var queueControls: some View {
+    private var headerButtons: some View {
         Group {
-            Button { model.showQueue = true } label: {
-                if model.loadingQueue { ProgressView().tint(Robo.amber) } else { Text("QUEUE") }
-            }.buttonStyle(BeerControlStyle(appearance:.amber,compact:true)).disabled(model.loadingQueue).accessibilityIdentifier("view-queue-button").accessibilityLabel("View beer queue").accessibilityValue(model.loadingQueue ? "Loading" : "")
-            Button("REWARDS") { model.showRewards = true }.buttonStyle(BeerControlStyle(appearance:.amber,compact:true)).accessibilityIdentifier("finder-rewards-button")
+            if refreshing { ProgressView().tint(Robo.cyan).frame(width:44,height:44).accessibilityLabel("Refreshing beers") }
+            if kind == .finder {
+                Button { model.showQueue = true } label: {
+                    if model.loadingQueue { ProgressView().tint(Robo.amber).frame(width:32,height:32).modifier(AmberWell()) }
+                    else { AmberIcon(symbol:"list.bullet.rectangle") }
+                }.buttonStyle(.plain).frame(width:44,height:44).disabled(model.loadingQueue)
+                    .accessibilityIdentifier("view-queue-button").accessibilityLabel("View beer queue").accessibilityValue(model.loadingQueue ? "Loading" : "")
+                Button { model.showRewards = true } label: { AmberIcon(symbol:"gift") }.buttonStyle(.plain).frame(width:44,height:44)
+                    .accessibilityIdentifier("finder-rewards-button").accessibilityLabel("View rewards")
+            }
+            Button { model.showSettings = true } label: { IconWell(symbol:"gearshape").frame(width:44,height:44) }.buttonStyle(.plain).accessibilityLabel("Open settings")
         }
     }
+}
+/// The amber chrome well for Beerfinder's Queue and Rewards header buttons.
+private struct AmberWell: ViewModifier {
+    func body(content: Content) -> some View {
+        content.modifier(ChromeBezel(radius:10,rim:2,gradient:Robo.amberChrome,well:Robo.color(0x1A1200),edge:Robo.color(0xFFE082).opacity(0.18)))
+    }
+}
+private struct AmberIcon: View {
+    let symbol: String
+    var body: some View {
+        Image(systemName:symbol).font(.system(size:17)).foregroundStyle(Robo.color(0xD4AB50))
+            .frame(width:32,height:32).modifier(AmberWell()).accessibilityHidden(true)
+    }
+}
+/// The sort chip's icon: the BeerIcons glyph for ABV, an SF Symbol otherwise.
+private struct SortGlyph: View {
+    let option: SortOption
+    var body: some View {
+        if option.usesBeerIcon { Text("\u{f003}").font(.custom(Robo.beerIconFont,size:14)) }
+        else { Image(systemName:SortGlyph.symbol(option)).font(.system(size:12)) }
+    }
+    static func symbol(_ option: SortOption) -> String { option.sort == .date ? "calendar" : "textformat" }
+    /// Menus draw only images, so the BeerIcons glyph is rendered to one.
+    @MainActor static func menuImage(_ option: SortOption) -> Image {
+        guard option.usesBeerIcon, let font = UIFont(name:Robo.beerIconFont,size:20) else { return Image(systemName:symbol(option)) }
+        let glyph = NSAttributedString(string:"\u{f003}",attributes:[.font:font,.foregroundColor:UIColor.label])
+        let image = UIGraphicsImageRenderer(size:glyph.size()).image { _ in glyph.draw(at:.zero) }
+        return Image(uiImage:image.withRenderingMode(.alwaysTemplate))
+    }
+}
+private extension ContainerFilter {
+    var segmentTitle: String { self == .cans ? "CANS & BOTTLES" : rawValue }
+    var spokenTitle: String { switch self { case .all: "All"; case .draft: "Draft"; case .cans: "Cans and bottles" } }
+    var segmentID: String { switch self { case .all: "all"; case .draft: "draft"; case .cans: "cans" } }
 }
 struct BeerCard: View {
     @Environment(\.dynamicTypeSize) private var typeSize

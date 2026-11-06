@@ -1,0 +1,118 @@
+# Launch on an isolated simulator with --preview-fixtures --preview-screen finder.
+# Beerfinder sorts by added date; Tasted sorts by tasted date, so both are checked.
+appId: org.verily.FSbeerselector
+---
+# On a standard iPhone at the default text size, sort shares the filter row.
+- assertVisible:
+    id: sort-menu
+    rightOf:
+      id: container-filter-cans
+- assertVisible:
+    id: sort-menu
+    text: "Sort: Date, newest first"
+- copyTextFrom:
+    id: "beer-name-.*"
+    index: 0
+- assertTrue: ${maestro.copiedText == "Firestone Walker Parabola"}
+- tapOn:
+    id: sort-menu
+- tapOn: "Oldest first"
+- assertVisible:
+    id: sort-menu
+    text: "Sort: Date, oldest first"
+- copyTextFrom:
+    id: "beer-name-.*"
+    index: 0
+- assertTrue: ${maestro.copiedText == "Belgian Tasting Flight"}
+- tapOn:
+    id: sort-menu
+- tapOn: "Name A–Z"
+- assertVisible:
+    id: sort-menu
+    text: "Sort: Name, A to Z"
+- copyTextFrom:
+    id: "beer-name-.*"
+    index: 0
+- assertTrue: ${maestro.copiedText == "Belgian Tasting Flight"}
+- tapOn:
+    id: sort-menu
+- tapOn: "Name Z–A"
+- assertVisible:
+    id: sort-menu
+    text: "Sort: Name, Z to A"
+- copyTextFrom:
+    id: "beer-name-.*"
+    index: 0
+- assertTrue: ${maestro.copiedText == "Weihenstephaner Hefeweissbier"}
+- tapOn:
+    id: sort-menu
+- tapOn: "Highest ABV"
+- assertVisible:
+    id: sort-menu
+    text: "Sort: ABV, highest first"
+- copyTextFrom:
+    id: "beer-name-.*"
+    index: 0
+- assertTrue: ${maestro.copiedText == "Firestone Walker Parabola"}
+- tapOn:
+    id: sort-menu
+- tapOn: "Lowest ABV"
+- assertVisible:
+    id: sort-menu
+    text: "Sort: ABV, lowest first"
+- copyTextFrom:
+    id: "beer-name-.*"
+    index: 0
+- assertTrue: ${maestro.copiedText == "Founders All Day IPA"}
+- tapOn:
+    id: sort-menu
+- tapOn: "Newest first"
+- assertVisible:
+    id: sort-menu
+    text: "Sort: Date, newest first"
+- copyTextFrom:
+    id: "beer-name-.*"
+    index: 0
+- assertTrue: ${maestro.copiedText == "Firestone Walker Parabola"}
+- tapOn: "TASTED"
+- assertVisible: "83 tasted beers"
+- tapOn:
+    id: sort-menu
+- tapOn: "Oldest first"
+- assertVisible:
+    id: sort-menu
+    text: "Sort: Date, oldest first"
+- copyTextFrom:
+    id: "beer-name-.*"
+    index: 0
+- assertTrue: ${maestro.copiedText == "Tasted Brew 83"}
+- tapOn:
+    id: sort-menu
+- tapOn: "Name Z–A"
+- assertVisible:
+    id: sort-menu
+    text: "Sort: Name, Z to A"
+- copyTextFrom:
+    id: "beer-name-.*"
+    index: 0
+- assertTrue: ${maestro.copiedText == "Tasted Brew 9"}
+- tapOn:
+    id: sort-menu
+- tapOn: "Highest ABV"
+- assertVisible:
+    id: sort-menu
+    text: "Sort: ABV, highest first"
+- copyTextFrom:
+    id: "beer-name-.*"
+    index: 0
+- assertTrue: ${maestro.copiedText == "Tasted Brew 7"}
+- tapOn:
+    id: sort-menu
+- tapOn: "Newest first"
+- assertVisible:
+    id: sort-menu
+    text: "Sort: Date, newest first"
+- copyTextFrom:
+    id: "beer-name-.*"
+    index: 0
+- assertTrue: ${maestro.copiedText == "Tasted Brew 1"}

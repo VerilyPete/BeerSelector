@@ -1,0 +1,13 @@
+# Launch on an isolated simulator with --preview-fixtures --preview-screen finder --preview-queue-state loading.
+# While the queue loads, its header button stays in place, disabled, and says so.
+appId: org.verily.FSbeerselector
+---
+- assertVisible:
+    id: view-queue-button
+    text: "View beer queue"
+    enabled: false
+    above:
+      id: search-input
+- assertVisible:
+    id: finder-rewards-button
+    enabled: true

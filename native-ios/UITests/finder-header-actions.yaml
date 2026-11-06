@@ -1,0 +1,24 @@
+# Launch on an isolated simulator with --preview-fixtures --preview-screen finder.
+# Queue and Rewards live in the Beerfinder header, above the search field.
+appId: org.verily.FSbeerselector
+---
+- assertVisible:
+    id: view-queue-button
+    text: "View beer queue"
+    above:
+      id: search-input
+- assertVisible:
+    id: finder-rewards-button
+    text: "View rewards"
+    above:
+      id: search-input
+- tapOn:
+    id: view-queue-button
+- assertVisible: "Close Queue"
+- tapOn: "Close Queue"
+- assertVisible: "6 to discover"
+- tapOn:
+    id: finder-rewards-button
+- assertVisible: "Close Rewards"
+- tapOn: "Close Rewards"
+- assertVisible: "6 to discover"

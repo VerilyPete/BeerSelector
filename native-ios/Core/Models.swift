@@ -131,6 +131,41 @@ struct PendingOperation: Identifiable {
 }
 
 enum BeerSort: String, CaseIterable { case date, name, abv }
+/// One entry in the sort menu: a sort key and its direction, chosen together.
+struct SortOption: Hashable {
+    let sort: BeerSort
+    let ascending: Bool
+    static let all = [SortOption(sort:.date,ascending:false),SortOption(sort:.date,ascending:true),
+                      SortOption(sort:.name,ascending:true),SortOption(sort:.name,ascending:false),
+                      SortOption(sort:.abv,ascending:false),SortOption(sort:.abv,ascending:true)]
+    init(sort: BeerSort, ascending: Bool) { self.sort = sort; self.ascending = ascending }
+    init(filter: BeerFilter) { self.init(sort:filter.sort,ascending:filter.ascending) }
+    func apply(to filter: inout BeerFilter) { filter.sort = sort; filter.ascending = ascending }
+    var usesBeerIcon: Bool { sort == .abv }
+    var chipLabel: String { "\(sort.rawValue.uppercased()) · \(shortChipLabel)" }
+    /// The chip's text when the filter row is tight: the icon already names the sort.
+    var shortChipLabel: String {
+        switch sort {
+        case .date: ascending ? "OLD" : "NEW"
+        case .name: ascending ? "A-Z" : "Z-A"
+        case .abv: ascending ? "LOW" : "HIGH"
+        }
+    }
+    var menuTitle: String {
+        switch sort {
+        case .date: ascending ? "Oldest first" : "Newest first"
+        case .name: ascending ? "Name A–Z" : "Name Z–A"
+        case .abv: ascending ? "Lowest ABV" : "Highest ABV"
+        }
+    }
+    var spokenLabel: String {
+        switch sort {
+        case .date: ascending ? "Date, oldest first" : "Date, newest first"
+        case .name: ascending ? "Name, A to Z" : "Name, Z to A"
+        case .abv: ascending ? "ABV, lowest first" : "ABV, highest first"
+        }
+    }
+}
 enum ContainerFilter: String, CaseIterable { case all = "ALL", draft = "DRAFT", cans = "CANS / BOTTLES" }
 struct BeerFilter {
     var search = ""

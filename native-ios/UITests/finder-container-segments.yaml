@@ -1,0 +1,32 @@
+# Launch on an isolated simulator with --preview-fixtures --preview-screen finder.
+# Bell's Two Hearted is queued, so Beerfinder holds three draft and three canned or bottled beers.
+appId: org.verily.FSbeerselector
+---
+- assertVisible: "6 to discover"
+- assertVisible:
+    id: container-filter-all
+    selected: true
+- tapOn:
+    id: container-filter-draft
+- assertVisible:
+    id: container-filter-draft
+    selected: true
+- assertVisible:
+    id: container-filter-all
+    selected: false
+- assertVisible: "3 to discover"
+- assertVisible: "Sierra Nevada Pale Ale"
+- assertNotVisible: "Founders All Day IPA"
+- tapOn:
+    id: container-filter-cans
+- assertVisible:
+    id: container-filter-cans
+    selected: true
+- assertVisible: "3 to discover"
+- assertVisible: "Founders All Day IPA"
+- assertNotVisible: "Sierra Nevada Pale Ale"
+- tapOn:
+    id: container-filter-all
+- assertVisible: "6 to discover"
+- assertVisible: "Sierra Nevada Pale Ale"
+- assertVisible: "Founders All Day IPA"
