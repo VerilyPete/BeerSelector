@@ -103,29 +103,23 @@ struct BeerListScreen: View {
         }.accessibilityElement(children:.contain).accessibilityLabel("Container filter")
     }
     private var sortControls: some View {
-        Group {
-            Button {
-                UIImpactFeedbackGenerator(style:.light).impactOccurred()
-                let cases = BeerSort.allCases
-                filter.sort = cases[(cases.firstIndex(of:filter.sort)!+1)%cases.count]; filter.ascending = filter.sort != .date
-            } label: {
-                HStack(spacing:6) {
-                    if filter.sort == .abv { Text("\u{f003}").font(.custom(Robo.beerIconFont,size:14)) }
-                    else { Image(systemName:filter.sort == .date ? "calendar" : "textformat").font(.system(size:12)) }
-                    Text(filter.sort.rawValue.uppercased())
+        let current = SortOption(filter:filter)
+        return Menu {
+            Picker("Sort",selection:Binding(get:{ SortOption(filter:filter) },set:{ option in
+                UIImpactFeedbackGenerator(style:.light).impactOccurred(); option.apply(to:&filter)
+            })) {
+                ForEach(SortOption.all,id:\.chipLabel) { option in
+                    Label { Text(option.menuTitle) } icon: { SortGlyph.menuImage(option) }.tag(option)
                 }
-            }.buttonStyle(BeerControlStyle()).accessibilityIdentifier("sort-button").accessibilityLabel("Sort by \(filter.sort.rawValue)")
-            Button(directionLabel + " ↓") {
-                UIImpactFeedbackGenerator(style:.light).impactOccurred(); filter.ascending.toggle()
-            }.buttonStyle(BeerControlStyle()).accessibilityIdentifier("sort-direction-button").accessibilityLabel("Sort direction: \(directionLabel)")
-        }
-    }
-    private var directionLabel: String {
-        switch filter.sort {
-        case .date: filter.ascending ? "OLD" : "NEW"
-        case .name: filter.ascending ? "A-Z" : "Z-A"
-        case .abv: filter.ascending ? "LOW" : "HIGH"
-        }
+            }.pickerStyle(.inline)
+        } label: {
+            HStack(spacing:6) {
+                SortGlyph(option:current)
+                Text(current.chipLabel)
+                Image(systemName:"chevron.down").font(.system(size:10,weight:.semibold))
+            }
+        }.menuStyle(.button).buttonStyle(BeerControlStyle())
+            .accessibilityIdentifier("sort-menu").accessibilityLabel("Sort: \(current.spokenLabel)")
     }
     private var queueControls: some View {
         Group {
@@ -134,6 +128,22 @@ struct BeerListScreen: View {
             }.buttonStyle(BeerControlStyle(appearance:.amber,compact:true)).disabled(model.loadingQueue).accessibilityIdentifier("view-queue-button").accessibilityLabel("View beer queue").accessibilityValue(model.loadingQueue ? "Loading" : "")
             Button("REWARDS") { model.showRewards = true }.buttonStyle(BeerControlStyle(appearance:.amber,compact:true)).accessibilityIdentifier("finder-rewards-button")
         }
+    }
+}
+/// The sort chip's icon: the BeerIcons glyph for ABV, an SF Symbol otherwise.
+private struct SortGlyph: View {
+    let option: SortOption
+    var body: some View {
+        if option.usesBeerIcon { Text("\u{f003}").font(.custom(Robo.beerIconFont,size:14)) }
+        else { Image(systemName:SortGlyph.symbol(option)).font(.system(size:12)) }
+    }
+    static func symbol(_ option: SortOption) -> String { option.sort == .date ? "calendar" : "textformat" }
+    /// Menus draw only images, so the BeerIcons glyph is rendered to one.
+    @MainActor static func menuImage(_ option: SortOption) -> Image {
+        guard option.usesBeerIcon, let font = UIFont(name:Robo.beerIconFont,size:20) else { return Image(systemName:symbol(option)) }
+        let glyph = NSAttributedString(string:"\u{f003}",attributes:[.font:font,.foregroundColor:UIColor.label])
+        let image = UIGraphicsImageRenderer(size:glyph.size()).image { _ in glyph.draw(at:.zero) }
+        return Image(uiImage:image.withRenderingMode(.alwaysTemplate))
     }
 }
 private extension ContainerFilter {
