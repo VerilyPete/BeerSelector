@@ -14,7 +14,7 @@ extension BeerDatabase {
     func recentTastings(account: String) throws -> [Beer] {
         try rows("SELECT beer FROM recent_tastings WHERE account=? ORDER BY day DESC,observed DESC,event DESC LIMIT \(Self.recentTastingLimit)",[account]).map {
             guard let data = $0["beer"]?.data(using:.utf8) else { throw BeerError.storage("Unreadable tasting history") }
-            return try JSONDecoder().decode(Beer.self,from:data)
+            return try JSONDecoder().decode(Beer.self,from:data).withCleanNames
         }
     }
     /// Caller includes this in the transaction replacing the validated source snapshot.
@@ -96,7 +96,9 @@ extension BeerDatabase {
     }
     func beerFeedback(account: String) throws -> [BeerFeedback] {
         try rows("SELECT feedback FROM beer_feedback WHERE account=? ORDER BY beer_id",[account]).map {
-            try JSONDecoder().decode(BeerFeedback.self,from:Data(($0["feedback"] ?? "").utf8))
+            var feedback = try JSONDecoder().decode(BeerFeedback.self,from:Data(($0["feedback"] ?? "").utf8))
+            feedback.beer = feedback.beer.withCleanNames
+            return feedback
         }
     }
     func saveBeerFeedback(_ feedback: BeerFeedback, account: String) throws {

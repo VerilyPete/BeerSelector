@@ -13,6 +13,20 @@ final class RecentTastingsTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at:folder) }
         try body(BeerDatabase(url:folder.appendingPathComponent("beers.db")),folder.appendingPathComponent("beers.db"))
     }
+    @MainActor func testFeedbackAndTastingsSavedWithEscapedNamesLoadClean() throws {
+        try withDB { db,_ in
+            var escaped = beer(1)
+            escaped.brew_name = #"New Holland Dragon\'s Milk Reserve (BTL)"#; escaped.brewer = #"Brasserie D\'achouffe"#
+            try db.saveBeerFeedback(.init(beer:escaped,rating:.notForMe),account:"a")
+            try db.recordTastings([escaped],account:"a")
+            let feedback = try XCTUnwrap(db.beerFeedback(account:"a").first?.beer)
+            let tasting = try XCTUnwrap(db.recentTastings(account:"a").first)
+            for loaded in [feedback,tasting] {
+                XCTAssertEqual(loaded.brew_name,"New Holland Dragon's Milk Reserve (BTL)")
+                XCTAssertEqual(loaded.brewer,"Brasserie D'achouffe")
+            }
+        }
+    }
     @MainActor func testReviewUnusedPresentationsDoNotEvictActualChoiceEvidence() throws {
         try withDB { db,_ in
             var chosen = BeerChoiceContext(taplist:[beer(1)],shown:["1"],preferences:.init(),usedModel:false)

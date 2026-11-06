@@ -48,8 +48,8 @@ struct Beer: Identifiable, Codable, Equatable {
         guard let id = row["id"], !id.isEmpty, let name = row["brew_name"], !name.isEmpty else {
             throw BeerError.invalidResponse("A beer is missing its ID or name.")
         }
-        self.init(id: id, name: BeerName.clean(name))
-        brewer = BeerName.clean(row["brewer"] ?? ""); brewer_loc = row["brewer_loc"] ?? ""
+        self.init(id: id, name: name)
+        brewer = row["brewer"] ?? ""; brewer_loc = row["brewer_loc"] ?? ""
         brew_style = row["brew_style"] ?? ""; brew_container = row["brew_container"] ?? ""
         brew_description = row["brew_description"] ?? ""; added_date = row["added_date"] ?? ""
         tasted_date = row["tasted_date"] ?? ""; roh_lap = row["roh_lap"] ?? ""; chit_code = row["chit_code"] ?? ""
@@ -58,6 +58,12 @@ struct Beer: Identifiable, Codable, Equatable {
         enrichment_confidence = row["enrichment_confidence"].flatMap(Double.init)
         enrichment_source = row["enrichment_source"]
         container_type = row["container_type"] ?? inferredContainer
+        self = withCleanNames
+    }
+    var withCleanNames: Beer {
+        var beer = self
+        beer.brew_name = BeerName.clean(brew_name); beer.brewer = BeerName.clean(brewer)
+        return beer
     }
     var inferredContainer: String? {
         let c = brew_container.lowercased(), s = brew_style.lowercased()
