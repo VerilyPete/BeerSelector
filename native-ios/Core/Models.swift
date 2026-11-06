@@ -214,6 +214,18 @@ struct BeerFilter {
         beers.filter { ($0.arrivalAge(relativeTo: now, calendar: calendar) ?? 7) < 7 }
             .sorted { (Double($0.added_date) ?? 0) > (Double($1.added_date) ?? 0) }
     }
+    /// Home's New on Tap: the newest taplist beers, tasted or not. Undated beers follow dated ones.
+    static func newOnTap(_ beers: [Beer], count: Int) -> [Beer] {
+        let keyed = beers.enumerated().map { (offset:$0.offset, beer:$0.element, added:Double($0.element.added_date).flatMap { $0.isFinite && $0 > 0 ? $0 : nil }) }
+        return keyed.sorted { a, b in
+            switch (a.added, b.added) {
+            case let (lhs?, rhs?) where lhs != rhs: return lhs > rhs
+            case (_?, nil): return true
+            case (nil, _?): return false
+            default: return a.offset < b.offset
+            }
+        }.prefix(max(0,count)).map(\.beer)
+    }
     static func untasted(all: [Beer], tasted: [Beer]) -> [Beer] {
         let ids = Set(tasted.map(\.id)); return all.filter { !ids.contains($0.id) }
     }
