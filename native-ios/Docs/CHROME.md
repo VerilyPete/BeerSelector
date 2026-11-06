@@ -4,7 +4,7 @@ The SwiftUI code is the UI of record. When the code and a design file disagree, 
 
 ## Design file
 
-`/Users/pete/claude/BeerSelectorNative.pen` is a design backup rebuilt from the code at `b3b22e0c` (2026-11-05). Its images live in `/Users/pete/claude/BeerSelectorNative-assets/`; keep the folder next to the `.pen` file. A Read Me note on the canvas lists the rows and screens.
+`/Users/pete/claude/BeerSelectorNative.pen` is a design backup rebuilt from the code at `b3b22e0c` (2026-11-05) and updated for the UI polish on 2026-11-06. Its images live in `/Users/pete/claude/BeerSelectorNative-assets/`; keep the folder next to the `.pen` file. A Read Me note on the canvas lists the rows and screens.
 
 It covers every iPhone screen and sheet, the iPad layouts, visitor, first-run, empty, error, and banner states, system dialogs, and the Live Activity. It leaves out Dynamic Type accessibility layouts, the Untappd browser, and share sheets.
 
@@ -27,9 +27,52 @@ Update the backup when the UI changes. Component IDs in the backup:
 - `Lyaa4` — Component/ActionButton
 - `eZTeS` — Component/SearchBar
 - `sSZWL` — Component/BeerCard
-- `iWXXp` — Component/NavCard
+- `iWXXp` — Component/NavCard (no longer used on any screen)
 - `Tg7oG` — Component/SegDigit
 - `Fq127` — Component/MetricPanel
+
+## UI polish — 2026-11-06
+
+The polish followed `plans/ui-polish.md` and the approved mocks in `/Users/pete/claude/BeerSelectorPolish-assets/`. Its editable source, `BeerSelectorPolish.pen`, is archived in `/Users/pete/claude/archive/`. Fixture screenshots of the shipped result are the `Docs/Screenshots/polish-*.png` files: iPhone Home (Apple Intelligence, local matching, visitor), All Beers, Beerfinder, Tasted, Rewards and the local matching sheet, plus iPad Home in landscape and at AX5 and Beerfinder in portrait.
+
+### The six rules
+
+1. **Chrome is for hero and control elements only.** Bevels stay on the Home metric panel, the Rewards journey panel, the tab bar, the status band, the search bar, buttons, filter controls, icon wells and label plates. Content cards are flat.
+2. **One content-card style.** Beer rows, reward rows, queue rows, operations, Settings groups, recommendation cards and Home panels all use `.contentCard()`. The Rewards milestone bevel is always steel; the full teal fill is the only "reached" signal.
+3. **Teal means interactive or active.** Beer names, reward titles and ABV values are off-white. Teal stays on title plates, the selected segment, the sort control, action buttons, the active tab, links and status words such as AVAILABLE. Amber marks Queue, Rewards and Check In.
+4. **Mono for data, Grotesk for prose.** Space Mono for ABV, dates, counts, style · container lines and label plates. Space Grotesk Regular for descriptions, brewer names, row subtitles and explanations.
+5. **The filter row only filters.** ALL / DRAFT / CANS & BOTTLES segments plus one sort menu (Date, Name, ABV, each with a direction). Beerfinder's Queue and Rewards are amber icon buttons in the header.
+6. **iPhone Home doesn't repeat the tab bar.** The compact Home shows the header, the suggestion card, the metric panel, New on Tap and the Rewards card. The wide iPad Home keeps its panel layout.
+
+### Tokens
+
+| Token | Value | Use |
+|---|---|---|
+| `Robo.textPrimary` | `QueueChrome.text` | Names, titles and values on content cards |
+| `Robo.textSecondary` | `QueueChrome.secondary` | Subtitles, details and explanations |
+| `Robo.hairline` | white at 10% | The 1pt edge of a content card and row dividers |
+| `Robo.body(_:)` | Space Grotesk Regular | Prose |
+| `.contentCard()` | `Robo.display`, 14pt radius, hairline edge | Every content card |
+| `AmberWell` / `AmberIcon` | amber chrome well, `#D4AB50` glyph | Queue and Rewards buttons, the Home Rewards card |
+
+### Decisions
+
+- The BeerIcons glyphs stay. Restyling may change the wells and rings around them, never the glyphs.
+- Every suggestion surface names its source. The Apple Intelligence Home card carries an APPLE INTELLIGENCE label; the local card is titled Local matching; the sheet shows a mode plate. A fallback from Apple Intelligence shows a notice above the results.
+- New on Tap shows the newest beers on the taplist by added date, tasted or not, as compact rows (name, then arrival day · style · container, then ABV). Tapping a row shows its description.
+- The compact Home never scrolls at standard text sizes. It drops New on Tap to one row when two don't fit, which happens on most iPhones while the suggestion card is showing. It scrolls only while a description is open or at accessibility text sizes.
+- On narrow iPhones the sort chip shortens to the direction (NEW, A-Z, HIGH) and then to its icon, so the filter row stays on one line through XXXL.
+
+### Accepted differences from the mocks
+
+These were reviewed against the approved PNGs in Phase E and kept:
+
+- The segments are separate chrome buttons rather than one joined control. The user approved this on device.
+- The sort chip reads NEW, not DATE · NEW, on 402pt-wide iPhones, because the full label doesn't fit beside CANS & BOTTLES.
+- The Queue icon is `list.bullet.rectangle` (SF Symbols), and the beer wells keep the BeerIcons glyphs where the mocks use Lucide stand-ins.
+- The real tab bar sits higher than the mock's, so the 17 Pro shows one New on Tap row while the suggestion card is showing; the mock shows two.
+- The suggestions sheet keeps the system navigation bar with Done, the native segmented ABV picker and a fixed three-column chip grid, where the mock draws a custom close button and flowing chips.
+- The redeemed-reward chevron and the card chevrons are neutral grey.
 
 ## Original chrome design
 
