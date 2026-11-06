@@ -14,9 +14,13 @@ struct StyleChips: Equatable {
     /// never partially extracted, and exclusions never become inclusions.
     init?(request: String) {
         let parsed = SuggestionStyleRequest(request)
-        // A style both included and excluded has no chip state that keeps the same beers.
-        guard !parsed.needsModel, Set(parsed.includedLabels).isDisjoint(with:parsed.excludedLabels) else { return nil }
-        for label in parsed.includedLabels { states[label] = .include }
+        guard !parsed.needsModel else { return nil }
+        // An excluded style drops out of the inclusions ("stout or porter, no stout"
+        // is Porter). If that empties the inclusions ("IPA, not IPA"), exclusion-only
+        // chips would match more beers than the request, so it can't convert.
+        let included = parsed.includedLabels.filter { !parsed.excludedLabels.contains($0) }
+        guard included.isEmpty == parsed.includedLabels.isEmpty else { return nil }
+        for label in included { states[label] = .include }
         for label in parsed.excludedLabels { states[label] = .exclude }
     }
 

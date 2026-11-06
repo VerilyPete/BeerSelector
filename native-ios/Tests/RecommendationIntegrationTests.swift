@@ -721,6 +721,21 @@ extension RecommendationIntegrationTests {
         for (label,state) in states { chips.set(label,state) }
         return SuggestionPreferences(request:chips.request)
     }
+    @MainActor func testLocalMatchingPublishesExactlyTheBeersTheChipsAllow() async throws {
+        try await withModel { model,_,fixture in
+            model.suggestionCompatibility = { .deviceNotEligible }
+            let data = try taplist([("ipa","American IPA"),("hazy","Hazy IPA"),("stout","Stout"),("lager","Helles Lager"),("double","Double IPA")])
+            serve(fixture) { data }
+            await model.refresh()
+            let fake = FakeProvider()
+            let controller = RecommendationController(model:model,provider:fake)
+            controller.setPreferences(chips([("IPA",.include),("Hazy",.exclude)]))
+            await controller.generate()
+            XCTAssertEqual(Set(controller.suggestions.map(\.id)),["ipa","double"])
+            XCTAssertEqual(fake.calls,0)
+            XCTAssertEqual(controller.resultMode,.localMatching)
+        }
+    }
     @MainActor func testContradictoryChipsHaveNoSavedMatches() async throws {
         try await withModel { model,_,fixture in
             let data = try taplist([("hazy","Hazy IPA"),("ipa","American IPA"),("stout","Stout")])

@@ -130,7 +130,9 @@ final class StyleChipsTests: XCTestCase {
         XCTAssertNil(StyleChips(request:"crisp and refreshing"))
         XCTAssertNil(StyleChips(request:"IPA, crisp"),"a recognized clause beside an unknown one is still mixed")
         XCTAssertNil(StyleChips(request:"IPA, not IPA"),"a style both included and excluded has no faithful chip state")
-        XCTAssertNil(StyleChips(request:"stout or porter, no stout"))
+        let redundant = StyleChips(request:"stout or porter, no stout")
+        XCTAssertEqual(redundant?.included,["Porter"],"an excluded style drops out of the inclusions it overlaps")
+        XCTAssertEqual(redundant?.excluded,["Stout"])
     }
 
     func testChipsSelectTheExpectedBeers() {
@@ -150,7 +152,7 @@ final class StyleChipsTests: XCTestCase {
     }
 
     func testConvertingARequestKeepsTheSameBeers() {
-        for request in ["IPA, not hazy","no stout or porter","stout or porter","lager, not pilsner"] {
+        for request in ["IPA, not hazy","no stout or porter","stout or porter","lager, not pilsner","stout or porter, no stout"] {
             let chips = StyleChips(request:request)
             XCTAssertNotNil(chips,request)
             XCTAssertEqual(SuggestionPreferences(request:chips?.request ?? "").candidates(from:beers).map(\.id),

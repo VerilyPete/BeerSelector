@@ -69,3 +69,24 @@ appId: org.verily.FSbeerselector
     id: recommendation-card-4
 - assertNotVisible:
     id: recommendation-card-6
+- assertNotVisible:
+    id: recommendation-card-7
+# Check the other end of the result list too; the exact set is pinned by
+# testLocalMatchingPublishesExactlyTheBeersTheChipsAllow.
+- scrollUntilVisible:
+    element:
+      id: recommendation-source
+    direction: DOWN
+    centerElement: true
+- assertNotVisible:
+    id: recommendation-card-1
+- assertNotVisible:
+    id: recommendation-card-2
+- assertNotVisible:
+    id: recommendation-card-3
+- assertNotVisible:
+    id: recommendation-card-4
+- assertNotVisible:
+    id: recommendation-card-6
+- assertNotVisible:
+    id: recommendation-card-7
