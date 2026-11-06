@@ -97,40 +97,56 @@ struct HomeView: View {
     @Environment(\.dynamicTypeSize) private var typeSize
     @State private var expandedHomeBeerID: String?
     @State private var tabletAsideHeight: CGFloat = 0
+    @State private var compactFit = CompactFit.roomy
     var body: some View {
         GeometryReader { geometry in
             let tabletLayout = geometry.size.width >= 768 && !typeSize.isAccessibilitySize
-            ScrollView {
-                Group {
-                    if model.configured {
-                        if tabletLayout {
-                            tabletHome.padding(.horizontal,28).padding(.vertical,20)
-                        } else {
-                            VStack(alignment:.leading,spacing:20) {
-                                accountHeader
-                                if model.isMember { MetricPanel(count:model.tastedBeers.count) }
-                                recommendationEntry
-                                exploration()
-                            }.padding(.horizontal,18).padding(.top,8).padding(.bottom,18)
-                                .frame(maxWidth:760).frame(maxWidth:.infinity)
+            if model.configured && !tabletLayout { compactHome }
+            else {
+                ScrollView {
+                    Group {
+                        if model.configured { tabletHome.padding(.horizontal,28).padding(.vertical,20) }
+                        else {
+                            VStack(spacing:24) {
+                                Image(systemName:"mug.fill").font(.system(size:48)).foregroundStyle(Robo.cyan)
+                                Text("Beer Selector").font(Robo.bold())
+                                Text("Log in to your UFO Club account or browse as a visitor.").font(Robo.mono()).multilineTextAlignment(.center)
+                                Button("Get Started") { model.showSettings = true }.buttonStyle(RoboButtonStyle(color:Robo.cyan))
+                            }.frame(maxWidth:760).padding(.horizontal,18).padding(.vertical,60).frame(maxWidth:.infinity)
                         }
-                    } else {
-                        VStack(spacing:24) {
-                            Image(systemName:"mug.fill").font(.system(size:48)).foregroundStyle(Robo.cyan)
-                            Text("Beer Selector").font(Robo.bold())
-                            Text("Log in to your UFO Club account or browse as a visitor.").font(Robo.mono()).multilineTextAlignment(.center)
-                            Button("Get Started") { model.showSettings = true }.buttonStyle(RoboButtonStyle(color:Robo.cyan))
-                        }.frame(maxWidth:760).padding(.horizontal,18).padding(.vertical,60).frame(maxWidth:.infinity)
                     }
-                }
-                .background {
-                    if !tabletLayout { HomeScrollBoundary() }
                 }
             }
         }
         // The chrome lives outside this safe-area viewport. Explicitly clip the
         // entire Home scroll surface so cards and their shadows stay beneath it.
         .clipped()
+    }
+    /// How the compact Home fits its screen: roomy spacing, tight spacing, then one New on Tap row.
+    private enum CompactFit { case roomy, tight, oneRow }
+    @ViewBuilder private var compactHome: some View {
+        if expandedHomeBeerID != nil || typeSize.isAccessibilitySize {
+            // Reading a description, or accessibility text, is the only time Home scrolls.
+            ScrollView { compactContent(compactFit).background(HomeScrollBoundary()) }
+        } else {
+            ViewThatFits(in:.vertical) {
+                compactContent(.roomy).onAppear { compactFit = .roomy }.fixedHome
+                compactContent(.tight).onAppear { compactFit = .tight }.fixedHome
+                compactContent(.oneRow).onAppear { compactFit = .oneRow }.fixedHome
+                ScrollView { compactContent(.oneRow).background(HomeScrollBoundary()) }
+            }.frame(maxHeight:.infinity,alignment:.top)
+        }
+    }
+    private func compactContent(_ fit: CompactFit) -> some View {
+        VStack(alignment:.leading,spacing:fit == .roomy ? 20 : 12) {
+            accountHeader
+            recommendationEntry
+            if model.isMember { MetricPanel(count:model.tastedBeers.count) }
+            newOnTap(rows:fit == .oneRow ? 1 : 2)
+            if model.isMember { HomeRewardsCard(status:rewardsStatus,open:{ model.showRewards = true },retry:{ Task { await model.refreshRewards() } }) }
+            else { visitorPanel }
+        }.padding(.horizontal,18).padding(.top,8).padding(.bottom,fit == .roomy ? 18 : 10)
+            .frame(maxWidth:760).frame(maxWidth:.infinity)
     }
     private var recommendationEntry: some View {
         SuggestionEntryCard(modes:model.suggestionMode) { model.showRecommendations = true }
@@ -197,24 +213,18 @@ struct HomeView: View {
                                 }.frame(maxWidth:.infinity,alignment:.leading)
                             }.padding(16).contentCard()
                         }
-                    } else {
-                        VStack(alignment:.leading,spacing:14) {
-                            Text("YOUR UFO CLUB JOURNEY").font(Robo.title(20)).foregroundStyle(Robo.textPrimary)
-                            Text("Sign in to see your tasted beers, progress and rewards alongside the taplist.").font(Robo.body(15)).foregroundStyle(Robo.textSecondary)
-                            Button("SIGN IN") { model.showSettings = true; model.showLogin = true }.buttonStyle(BeerControlStyle(appearance:.amber))
-                        }.padding(28).frame(maxWidth:.infinity,alignment:.leading).contentCard()
-                    }
+                    } else { visitorPanel }
                 }.frame(maxWidth:.infinity,alignment:.leading)
                     .onGeometryChange(for:CGFloat.self) { $0.size.height } action: { tabletAsideHeight = $0 }
             }
         }
     }
-    private func sectionHeading(_ title: String,_ actionTitle: String,action: @escaping () -> Void) -> some View {
+    private func sectionHeading(_ title: String,_ actionTitle: String,id: String? = nil,action: @escaping () -> Void) -> some View {
         HStack {
             LabelPlate(title:title,size:12)
             Spacer(minLength:8)
             Button(actionTitle,action:action).font(Robo.mono(14)).foregroundStyle(Robo.cyan).frame(minHeight:44)
-                .accessibilityLabel("\(actionTitle) \(title.lowercased())")
+                .accessibilityLabel("\(actionTitle) \(title.lowercased())").accessibilityIdentifier(id ?? "")
         }
     }
     private var accountHeader: some View {
@@ -243,22 +253,62 @@ struct HomeView: View {
     private var storeLabel: some View {
         Label("Flying Saucer — \(model.session?.storeName ?? "")",systemImage:"location.fill").foregroundStyle(Robo.steel)
     }
-    private func exploration() -> some View {
+    private var rewardsStatus: RewardsCardStatus {
+        RewardsCardStatus(isMember:model.isMember,loaded:model.rewardsLoaded,error:model.rewardsError,rewards:model.rewards)
+    }
+    private var visitorPanel: some View {
+        VStack(alignment:.leading,spacing:14) {
+            Text("YOUR UFO CLUB JOURNEY").font(Robo.title(20)).foregroundStyle(Robo.textPrimary)
+            Text("Sign in to see your tasted beers, progress and rewards alongside the taplist.").font(Robo.body(15)).foregroundStyle(Robo.textSecondary)
+            Button("SIGN IN") { model.showSettings = true; model.showLogin = true }.buttonStyle(BeerControlStyle(appearance:.amber))
+        }.padding(28).frame(maxWidth:.infinity,alignment:.leading).contentCard()
+    }
+    private func newOnTap(rows: Int) -> some View {
         VStack(alignment:.leading,spacing:10) {
-            LabelPlate(title:"EXPLORE")
-            nav("All Beers","Browse the complete taplist","mug",id:"nav-all-beers") { model.tab = .all }
-            nav("Beerfinder",model.isMember ? "Find beers you haven't tasted" : "Log in to find untasted beers","magnifyingglass",disabled:!model.isMember,id:"nav-beerfinder") { model.tab = .finder }
-            nav("Tasted Brews",model.isMember ? "View your tasting history" : "Log in to track your history","checkmark.circle",disabled:!model.isMember,id:"nav-tasted-brews") { model.tab = .tasted }
-            nav("Rewards",model.isMember ? "View your UFO Club rewards" : "Log in to view rewards","gift",disabled:!model.isMember,id:"nav-rewards") { model.showRewards = true }
-        }
-    }
-    private func nav(_ title: String,_ subtitle: String,_ icon: String,disabled: Bool = false,id: String,action: @escaping () -> Void) -> some View {
-        Button { UIImpactFeedbackGenerator(style:.light).impactOccurred(); action() } label: {
-            ChromePanel(padding:10) {
-                HStack(spacing:14) { IconWell(symbol:icon,color:title == "Rewards" ? Robo.amber : Robo.cyan,etched:true); VStack(alignment:.leading,spacing:2) { Text(title.uppercased()).font(Robo.title(13)).tracking(0.5).foregroundStyle(title == "Rewards" ? Robo.amber : Robo.cyan); Text(subtitle).font(Robo.mono(10)).foregroundStyle(Robo.steel).multilineTextAlignment(.leading) }; Spacer(); Image(systemName:"chevron.right").font(.system(size:16)).foregroundStyle(Robo.color(0x3A3F47)) }
+            sectionHeading("NEW ON TAP","View all",id:"home-new-on-tap-view-all") { model.tab = .all }
+            if model.allBeers.isEmpty {
+                Text("No saved beers yet. Refresh from Settings to load the taplist.").font(Robo.body(15)).foregroundStyle(Robo.textSecondary)
+                    .padding(16).frame(maxWidth:.infinity,alignment:.leading).contentCard().accessibilityIdentifier("home-new-on-tap-empty")
             }
-        }.disabled(disabled).opacity(disabled ? 0.5 : 1).accessibilityIdentifier(id)
+            ForEach(BeerFilter.newOnTap(model.allBeers,count:rows)) { beer in
+                BeerCard(beer:beer,expanded:expandedHomeBeerID == beer.id,dateLabel:"Added",checkIn:false) {
+                    expandedHomeBeerID = expandedHomeBeerID == beer.id ? nil : beer.id
+                }
+            }
+        }.accessibilityElement(children:.contain).accessibilityIdentifier("home-new-on-tap")
     }
+}
+
+/// Home's Rewards card: an honest status line, with a retry when rewards couldn't refresh.
+struct HomeRewardsCard: View {
+    let status: RewardsCardStatus
+    let open: () -> Void
+    let retry: () -> Void
+    var body: some View {
+        VStack(alignment:.leading,spacing:12) {
+            Button(action:open) {
+                HStack(spacing:14) {
+                    Image(systemName:"gift").font(.system(size:20)).foregroundStyle(Robo.amber).frame(width:32).accessibilityHidden(true)
+                    VStack(alignment:.leading,spacing:4) {
+                        Text(status.headline).font(Robo.title(17)).foregroundStyle(Robo.textPrimary)
+                        Text(status.detail).font(Robo.body(14)).foregroundStyle(Robo.textSecondary)
+                    }.frame(maxWidth:.infinity,alignment:.leading).multilineTextAlignment(.leading)
+                    Image(systemName:"chevron.right").foregroundStyle(Robo.amber).accessibilityHidden(true)
+                }.contentShape(Rectangle())
+            }.buttonStyle(.plain)
+                .accessibilityElement(children:.ignore).accessibilityLabel(status.spokenSummary).accessibilityHint("Opens Rewards")
+                .accessibilityAddTraits(.isButton).accessibilityIdentifier("home-rewards-card")
+            if status.offersRetry {
+                Button("Try Again",action:retry).buttonStyle(BeerControlStyle()).accessibilityLabel("Try loading rewards again")
+                    .accessibilityIdentifier("home-rewards-retry")
+            }
+        }.padding(16).frame(maxWidth:.infinity,alignment:.leading).contentCard()
+    }
+}
+
+private extension View {
+    /// Marks the compact Home when it fits its screen without scrolling.
+    var fixedHome: some View { accessibilityElement(children:.contain).accessibilityIdentifier("home-fixed") }
 }
 
 private extension VerticalAlignment {

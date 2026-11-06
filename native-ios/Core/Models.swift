@@ -214,7 +214,60 @@ struct BeerFilter {
         beers.filter { ($0.arrivalAge(relativeTo: now, calendar: calendar) ?? 7) < 7 }
             .sorted { (Double($0.added_date) ?? 0) > (Double($1.added_date) ?? 0) }
     }
+    /// Home's New on Tap: the newest taplist beers, tasted or not. Undated beers follow dated ones.
+    static func newOnTap(_ beers: [Beer], count: Int) -> [Beer] {
+        let keyed = beers.enumerated().map { (offset:$0.offset, beer:$0.element, added:Double($0.element.added_date).flatMap { $0.isFinite && $0 > 0 ? $0 : nil }) }
+        return keyed.sorted { a, b in
+            switch (a.added, b.added) {
+            case let (lhs?, rhs?) where lhs != rhs: return lhs > rhs
+            case (_?, nil): return true
+            case (nil, _?): return false
+            default: return a.offset < b.offset
+            }
+        }.prefix(max(0,count)).map(\.beer)
+    }
     static func untasted(all: [Beer], tasted: [Beer]) -> [Beer] {
         let ids = Set(tasted.map(\.id)); return all.filter { !ids.contains($0.id) }
     }
+}
+
+/// What Home's Rewards card can honestly say, given the model's separate loaded and error state.
+enum RewardsCardStatus: Equatable {
+    case hidden, checking, ready(Int), saved(Int), unavailable
+
+    init(isMember: Bool, loaded: Bool, error: String?, rewards: [Reward]) {
+        let available = rewards.filter { !$0.redeemed }.count
+        switch (isMember, loaded, error) {
+        case (false, _, _): self = .hidden
+        case (true, true, nil): self = .ready(available)
+        case (true, true, _?): self = .saved(available)
+        case (true, false, nil): self = .checking
+        case (true, false, _?): self = .unavailable
+        }
+    }
+
+    var headline: String {
+        switch self {
+        case .hidden, .checking: "Rewards"
+        case .ready(let count), .saved(let count): count == 0 ? "No rewards ready" : "\(count) \(count == 1 ? "reward" : "rewards") ready"
+        case .unavailable: "Rewards unavailable"
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .hidden: ""
+        case .checking: "Checking your rewards…"
+        case .ready(0): "Keep tasting toward your next milestone."
+        case .ready: "Tap to view and claim."
+        case .saved: "Couldn’t refresh. Showing saved rewards."
+        case .unavailable: "Couldn’t load your rewards."
+        }
+    }
+
+    var offersRetry: Bool {
+        switch self { case .saved, .unavailable: true; default: false }
+    }
+
+    var spokenSummary: String { "Rewards: \(headline). \(detail)" }
 }
