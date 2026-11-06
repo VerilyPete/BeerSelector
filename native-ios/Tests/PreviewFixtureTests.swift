@@ -128,4 +128,28 @@ final class PreviewFixtureTests: XCTestCase {
         XCTAssertTrue(empty.tastedBeers.isEmpty)
         XCTAssertTrue(empty.isMember)
     }
+
+    func testCheckInOutcomeFixtureProducesEveryOutcomeOffline() async throws {
+        let model = try fixture(["--preview-suggestions","on","--preview-suggestion-mode","apple-intelligence",
+                                 "--preview-ai-outcome","success",
+                                 "--preview-check-in-outcomes","added,needs-review,saved-for-retry,unavailable"])
+        let controller = model.recommendations
+        controller.previewSubmitDelay = .zero
+        await controller.generate()
+        let ids = controller.suggestions.map(\.id)
+        XCTAssertEqual(ids.count,3)
+        await controller.submit(ids:Set(ids))
+        XCTAssertEqual(ids.map { controller.outcomes[$0] },[.added,.needsReview,.savedForRetry])
+        XCTAssertFalse(controller.submitting)
+        XCTAssertTrue(model.operations.isEmpty,"no queue write was attempted")
+    }
+
+    func testWithoutTheOutcomeFlagPreviewSubmissionStillDoesNothing() async throws {
+        let model = try fixture(["--preview-suggestions","on","--preview-suggestion-mode","apple-intelligence",
+                                 "--preview-ai-outcome","success"])
+        await model.recommendations.generate()
+        await model.recommendations.submit(ids:Set(model.recommendations.suggestions.map(\.id)))
+        XCTAssertTrue(model.recommendations.outcomes.isEmpty)
+    }
 }
+

@@ -55,6 +55,11 @@ extension AppModel {
             recommendations.ranksInPreview = true
             if outcome == .deadline { recommendations.timeout = 1 }
         }
+        if let value = Self.argument("--preview-check-in-outcomes",in:arguments) {
+            let names: [String:CheckInResult] = ["added":.added,"saved-for-retry":.savedForRetry,"needs-review":.needsReview,
+                                                 "unavailable":.unavailable,"failed":.failed]
+            recommendations.previewCheckInOutcomes = value.split(separator:",").compactMap { names[String($0)] }
+        }
         if arguments.contains("--preview-queue-style") {
             queue = [
                 QueueEntry(id:"q1",name:"Bell's Two Hearted (Draft)",date:"Sep 12, 2026 · 12:51pm"),
