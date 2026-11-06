@@ -7,6 +7,10 @@ final class SortOptionTests: XCTestCase {
         XCTAssertEqual(SortOption.all.map(\.chipLabel),["DATE · NEW","DATE · OLD","NAME · A-Z","NAME · Z-A","ABV · HIGH","ABV · LOW"])
     }
 
+    func testTheShortChipKeepsOnlyTheDirection() {
+        XCTAssertEqual(SortOption.all.map(\.shortChipLabel),["NEW","OLD","A-Z","Z-A","HIGH","LOW"])
+    }
+
     func testEachOptionSortsTheListItNames() {
         let expected: [(BeerSort,Bool)] = [(.date,false),(.date,true),(.name,true),(.name,false),(.abv,false),(.abv,true)]
         XCTAssertEqual(SortOption.all.map(\.sort),expected.map(\.0))

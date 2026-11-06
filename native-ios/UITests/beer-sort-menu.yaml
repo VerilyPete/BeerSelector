@@ -2,6 +2,11 @@
 # Beerfinder sorts by added date; Tasted sorts by tasted date, so both are checked.
 appId: org.verily.FSbeerselector
 ---
+# On a standard iPhone at the default text size, sort shares the filter row.
+- assertVisible:
+    id: sort-menu
+    rightOf:
+      id: container-filter-cans
 - assertVisible:
     id: sort-menu
     text: "Sort: Date, newest first"

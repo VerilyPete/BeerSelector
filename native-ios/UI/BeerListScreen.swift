@@ -35,12 +35,14 @@ struct BeerListScreen: View {
                 }.padding(.horizontal,12).frame(minHeight:38).modifier(ChromeBezel(radius:12))
                 Text("\(filtered.count) \(kind == .finder ? "to discover" : kind == .tasted ? "tasted beers" : "beers on tap")").font(Robo.mono(10)).foregroundStyle(Robo.steel).frame(maxWidth:.infinity,alignment:.leading)
                 ViewThatFits(in:.horizontal) {
-                    HStack(spacing:6) { containerSegments(vertical:false); sortControls; Spacer(minLength:0) }.fixedSize(horizontal:true,vertical:false)
+                    HStack(spacing:6) { containerSegments(vertical:false); sortControls(.full); Spacer(minLength:0) }.fixedSize(horizontal:true,vertical:false)
+                    HStack(spacing:6) { containerSegments(vertical:false); sortControls(.short); Spacer(minLength:0) }.fixedSize(horizontal:true,vertical:false)
+                    HStack(spacing:6) { containerSegments(vertical:false); sortControls(.icon); Spacer(minLength:0) }.fixedSize(horizontal:true,vertical:false)
                     VStack(alignment:.leading,spacing:0) {
                         HStack(spacing:4) { containerSegments(vertical:false) }.fixedSize(horizontal:true,vertical:false)
-                        sortControls.fixedSize(horizontal:true,vertical:false)
+                        sortControls(.full).fixedSize(horizontal:true,vertical:false)
                     }
-                    VStack(alignment:.leading,spacing:0) { containerSegments(vertical:true); sortControls }
+                    VStack(alignment:.leading,spacing:0) { containerSegments(vertical:true); sortControls(.full) }
                 }.frame(maxWidth:.infinity,alignment:.leading)
                 if kind == .finder, let queueError = model.queueError {
                     Text(queueError).font(Robo.mono()).foregroundStyle(Robo.red)
@@ -98,7 +100,8 @@ struct BeerListScreen: View {
             }
         }.accessibilityElement(children:.contain).accessibilityLabel("Container filter")
     }
-    private var sortControls: some View {
+    private enum ChipWidth { case full, short, icon }
+    private func sortControls(_ width: ChipWidth) -> some View {
         let current = SortOption(filter:filter)
         return Menu {
             Picker("Sort",selection:Binding(get:{ SortOption(filter:filter) },set:{ option in
@@ -111,7 +114,11 @@ struct BeerListScreen: View {
         } label: {
             HStack(spacing:6) {
                 SortGlyph(option:current)
-                Text(current.chipLabel)
+                switch width {
+                case .full: Text(current.chipLabel)
+                case .short: Text(current.shortChipLabel)
+                case .icon: EmptyView()
+                }
                 Image(systemName:"chevron.down").font(.system(size:10,weight:.semibold))
             }
         }.menuStyle(.button).buttonStyle(BeerControlStyle())

@@ -142,8 +142,9 @@ struct SortOption: Hashable {
     init(filter: BeerFilter) { self.init(sort:filter.sort,ascending:filter.ascending) }
     func apply(to filter: inout BeerFilter) { filter.sort = sort; filter.ascending = ascending }
     var usesBeerIcon: Bool { sort == .abv }
-    var chipLabel: String { "\(sort.rawValue.uppercased()) · \(direction)" }
-    private var direction: String {
+    var chipLabel: String { "\(sort.rawValue.uppercased()) · \(shortChipLabel)" }
+    /// The chip's text when the filter row is tight: the icon already names the sort.
+    var shortChipLabel: String {
         switch sort {
         case .date: ascending ? "OLD" : "NEW"
         case .name: ascending ? "A-Z" : "Z-A"
