@@ -1,0 +1,14 @@
+# Launch on an isolated simulator with --preview-fixtures --preview-rewards-state error.
+# Rewards that never loaded say so and offer a retry, so Home never looks stuck.
+appId: org.verily.FSbeerselector
+---
+- scrollUntilVisible:
+    element:
+      id: home-rewards-retry
+    centerElement: true
+- assertVisible:
+    id: home-rewards-card
+    text: "Rewards: Rewards unavailable. Couldn’t load your rewards."
+- assertVisible:
+    id: home-rewards-retry
+    text: "Try loading rewards again"
