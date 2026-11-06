@@ -51,5 +51,21 @@ appId: org.verily.FSbeerselector
 - assertVisible:
     id: recommendation-source
     text: "Local matching\\. Picks from.*"
+# The only eligible IPA is Founders All Day IPA (Bell's Two Hearted is queued).
+- scrollUntilVisible:
+    element:
+      id: recommendation-card-5
+    direction: UP
+    centerElement: true
+- assertVisible:
+    id: recommendation-card-5
+- assertNotVisible:
+    id: recommendation-card-1
 - assertNotVisible:
     id: recommendation-card-2
+- assertNotVisible:
+    id: recommendation-card-3
+- assertNotVisible:
+    id: recommendation-card-4
+- assertNotVisible:
+    id: recommendation-card-6

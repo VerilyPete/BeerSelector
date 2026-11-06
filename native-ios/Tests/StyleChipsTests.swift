@@ -129,6 +129,33 @@ final class StyleChipsTests: XCTestCase {
         XCTAssertNil(StyleChips(request:"IPA or something refreshing"),"never partially extracted")
         XCTAssertNil(StyleChips(request:"crisp and refreshing"))
         XCTAssertNil(StyleChips(request:"IPA, crisp"),"a recognized clause beside an unknown one is still mixed")
+        XCTAssertNil(StyleChips(request:"IPA, not IPA"),"a style both included and excluded has no faithful chip state")
+        XCTAssertNil(StyleChips(request:"stout or porter, no stout"))
+    }
+
+    func testChipsSelectTheExpectedBeers() {
+        func ids(_ states: [(String,StyleChips.State)]) -> [String] {
+            var chips = StyleChips()
+            for (label,state) in states { chips.set(label,state) }
+            return SuggestionPreferences(request:chips.request).candidates(from:beers).map(\.id)
+        }
+        XCTAssertEqual(ids([("Stout",.include)]),["5","6","7"])
+        XCTAssertEqual(ids([("Hazy IPA",.include)]),["1"])
+        XCTAssertEqual(ids([("IPA",.include),("Hazy",.exclude)]),["0","3","4"])
+        XCTAssertEqual(ids([("Lager",.include)]),["9","10"],"Maibock has no word boundary before bock")
+        XCTAssertEqual(ids([("Pilsner",.include)]),["9"])
+        XCTAssertEqual(ids([("Lager",.include),("Pilsner",.exclude)]),["10"])
+        XCTAssertEqual(ids([("Sour",.include)]),["15","16"])
+        XCTAssertEqual(ids([("Stout",.exclude)]).count,beers.count - 3 - 1,"an exclusion also drops the beer with no style")
+    }
+
+    func testConvertingARequestKeepsTheSameBeers() {
+        for request in ["IPA, not hazy","no stout or porter","stout or porter","lager, not pilsner"] {
+            let chips = StyleChips(request:request)
+            XCTAssertNotNil(chips,request)
+            XCTAssertEqual(SuggestionPreferences(request:chips?.request ?? "").candidates(from:beers).map(\.id),
+                           SuggestionPreferences(request:request).candidates(from:beers).map(\.id),request)
+        }
     }
 
     func testChipsSpeakTheirStateWithoutRelyingOnColor() {

@@ -894,21 +894,58 @@ extension RecommendationIntegrationTests {
             XCTAssertNil(retried.fallback)
         }
     }
-    @MainActor func testCancelledOrStaleGenerationsPublishNoResultsAndNoNotice() async throws {
+    @MainActor func testAPreferenceChangeDuringRankingPublishesNoResultsAndNoNotice() async throws {
         try await withModel { model,_,_ in
             let fake = FakeProvider()
             let controller = RecommendationController(model:model,provider:fake)
             fake.action = { controller.setPreferences(.init(container:.bottle)); throw RecommendationUnavailable.model }
             await controller.generate()
+            XCTAssertEqual(fake.calls,1)
             XCTAssertTrue(controller.suggestions.isEmpty)
-            XCTAssertNil(controller.fallback,"preference change")
+            XCTAssertNil(controller.fallback)
+        }
+    }
+    @MainActor func testAnAccountChangeDuringRankingPublishesNoResultsAndNoNotice() async throws {
+        try await withModel { model,_,_ in
+            let fake = FakeProvider()
+            let controller = RecommendationController(model:model,provider:fake)
             fake.action = {
                 model.session = MemberSession(memberId:"other",storeId:"2",storeName:"Other",sessionId:"other")
                 throw RecommendationUnavailable.model
             }
             await controller.generate()
+            XCTAssertEqual(fake.calls,1,"the account changes inside ranking")
+            XCTAssertEqual(model.session?.memberId,"other")
             XCTAssertTrue(controller.suggestions.isEmpty)
-            XCTAssertNil(controller.fallback,"account change")
+            XCTAssertNil(controller.fallback)
+        }
+    }
+    @MainActor func testACancelledProviderIsNotAFallback() async throws {
+        try await withModel { model,_,_ in
+            let first = await generate(model) { _ in throw CancellationError() }
+            XCTAssertTrue(first.suggestions.isEmpty)
+            XCTAssertNil(first.fallback)
+            XCTAssertFalse(first.generating)
+            let retry = await generate(model,semantic:["new"],request:"coffee") { provider in
+                if provider.calls == 1 { throw RecommendationUnavailable.contextBudget }
+                throw CancellationError()
+            }
+            XCTAssertTrue(retry.suggestions.isEmpty)
+            XCTAssertNil(retry.fallback)
+        }
+    }
+    @MainActor func testVisibleResultsKeepTheirModeUntilTheNextGeneration() async throws {
+        try await withModel { model,_,_ in
+            let fake = FakeProvider(); fake.action = { throw RecommendationUnavailable.model }
+            let controller = RecommendationController(model:model,provider:fake)
+            await controller.generate()
+            XCTAssertEqual(controller.displayedMode(current:.appleIntelligence),.appleIntelligence)
+            XCTAssertTrue(controller.canRetryAppleIntelligence(current:.appleIntelligence))
+            model.suggestionCompatibility = { .notEnabled }
+            XCTAssertEqual(controller.displayedMode(current:model.suggestionMode.mode),.appleIntelligence,"results keep their source")
+            XCTAssertFalse(controller.canRetryAppleIntelligence(current:model.suggestionMode.mode),"retry would run local matching")
+            controller.cancel()
+            XCTAssertEqual(controller.displayedMode(current:model.suggestionMode.mode),.localMatching)
         }
     }
     @MainActor func testLateCompletionAfterCancelPublishesNoNotice() async throws {

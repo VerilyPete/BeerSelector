@@ -14,7 +14,8 @@ struct StyleChips: Equatable {
     /// never partially extracted, and exclusions never become inclusions.
     init?(request: String) {
         let parsed = SuggestionStyleRequest(request)
-        guard !parsed.needsModel else { return nil }
+        // A style both included and excluded has no chip state that keeps the same beers.
+        guard !parsed.needsModel, Set(parsed.includedLabels).isDisjoint(with:parsed.excludedLabels) else { return nil }
         for label in parsed.includedLabels { states[label] = .include }
         for label in parsed.excludedLabels { states[label] = .exclude }
     }

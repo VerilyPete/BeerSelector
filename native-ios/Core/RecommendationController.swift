@@ -45,6 +45,16 @@ enum RecommendationFallback: Equatable {
     @Published private(set) var resultMode: SuggestionMode?
     /// Set only when Apple Intelligence was asked and local matches stand in.
     @Published private(set) var fallback: RecommendationFallback?
+    /// What the sheet labels and offers as input: results on screen keep the
+    /// mode that produced them until they are cleared or regenerated.
+    func displayedMode(current: SuggestionMode) -> SuggestionMode {
+        suggestions.isEmpty ? current : resultMode ?? current
+    }
+    /// The retry button may only promise Apple Intelligence when the next
+    /// generation will actually ask it.
+    func canRetryAppleIntelligence(current: SuggestionMode) -> Bool {
+        fallback != nil && current == .appleIntelligence
+    }
     func setPreferences(_ value: SuggestionPreferences) {
         guard !submitting, value != preferences else { return }
         cancel(); preferences = value
@@ -95,6 +105,8 @@ enum RecommendationFallback: Equatable {
         let candidates: [BeerSuggestion]
         let source: RecommendationRetrievalSource
         var failure: RecommendationFallback? = nil
+        /// The provider abandoned the request: publish nothing, announce nothing.
+        var cancelled = false
     }
     private var rankingTask: Task<PipelineResult?,Never>?
     private var modeChanges: AnyCancellable?
@@ -210,9 +222,9 @@ enum RecommendationFallback: Equatable {
                         let ids = try await provider.rank(history:current.history,candidates:shortlist,feedback:current.feedback,preferences:preferences,context:context)
                         return PipelineResult(ids:ids,candidates:shortlist,source:source)
                     }
-                    catch { return PipelineResult(ids:nil,candidates:shortlist,source:source,failure:Self.failure(error)) }
+                    catch { return Self.failed(error,candidates:shortlist,source:source) }
                 } catch {
-                    return PipelineResult(ids:nil,candidates:shortlist,source:source,failure:Self.failure(error))
+                    return Self.failed(error,candidates:shortlist,source:source)
                 }
             }
         }
@@ -223,6 +235,7 @@ enum RecommendationFallback: Equatable {
             if token == generation { cancel(); message = "Your taplist or queue changed. Find fresh suggestions." }
             return
         }
+        if result?.cancelled == true { return }
         if let result, let ids = result.ids, let ranked = RecommendationRules.choose(ids:ids,from:result.candidates) {
             suggestions = ranked; usedModel = true; retrievalSource = result.source
         } else {
@@ -243,9 +256,11 @@ enum RecommendationFallback: Equatable {
             catch { model.error = error.localizedDescription }
         }
     }
-    private static func failure(_ error: Error) -> RecommendationFallback {
-        if case RecommendationUnavailable.contextBudget = error { return .contextBudgetExhausted }
-        return .providerFailure
+    private static func failed(_ error: Error, candidates: [BeerSuggestion], source: RecommendationRetrievalSource) -> PipelineResult {
+        if error is CancellationError { return PipelineResult(ids:nil,candidates:candidates,source:source,cancelled:true) }
+        let reason: RecommendationFallback
+        if case RecommendationUnavailable.contextBudget = error { reason = .contextBudgetExhausted } else { reason = .providerFailure }
+        return PipelineResult(ids:nil,candidates:candidates,source:source,failure:reason)
     }
     func submit(ids: Set<String>) async {
         guard !generating, !submitting, let model, !model.previewMode, let snapshot,

@@ -14,12 +14,13 @@ struct RecommendationsScreen: View {
         self.controller = model.recommendations
         self.modes = model.suggestionMode
     }
+    private var shownMode: SuggestionMode { controller.displayedMode(current:modes.mode) }
     private var intro: String {
         if !controller.suggestions.isEmpty || busy {
             return controller.historyCount == 0 ? "A few options from your location’s taplist to help you choose." :
                 "A few options from your taplist, using \(controller.historyCount) recent tastings to help narrow the list."
         }
-        return modes.mode == .appleIntelligence
+        return shownMode == .appleIntelligence
             ? "A shortcut to a few options. Choose your preferences or describe what sounds good, then tap Find suggestions."
             : "A shortcut to a few options from your taplist. Choose your preferences and styles, then tap Find local matches."
     }
@@ -30,7 +31,7 @@ struct RecommendationsScreen: View {
             ScrollView {
                 VStack(alignment:.leading,spacing:20) {
                     VStack(alignment:.leading,spacing:8) {
-                        Label(modes.mode.plate,systemImage:modes.mode.symbol)
+                        Label(shownMode.plate,systemImage:shownMode.symbol)
                             .font(Robo.mono(10)).tracking(1.5).foregroundStyle(QueueChrome.cyan)
                             .accessibilityIdentifier("suggestion-mode-plate")
                         Text("Narrow down the taplist").font(Robo.title(25)).foregroundStyle(QueueChrome.text)
@@ -40,7 +41,7 @@ struct RecommendationsScreen: View {
                     }
                     SuggestionModeStatus(modes:modes)
                     SuggestionPreferenceControls(preferences:Binding(get:{controller.preferences},set:{controller.setPreferences($0)}),
-                                                 mode:modes.mode,
+                                                 mode:shownMode,
                                                  hasSavedMatches:controller.hasSavedMatches(for:controller.preferences))
                         .disabled(controller.submitting)
                     if let message = controller.message {
@@ -61,10 +62,15 @@ struct RecommendationsScreen: View {
                         card(suggestion)
                     }
                     if !controller.suggestions.isEmpty {
-                        Text(SuggestionMode.resultSource(mode:controller.resultMode ?? modes.mode,usedModel:controller.usedModel,
+                        Text(SuggestionMode.resultSource(mode:shownMode,usedModel:controller.usedModel,
                                                          retrieval:controller.retrievalSource))
                             .font(Robo.mono(10)).foregroundStyle(QueueChrome.secondary)
                             .accessibilityIdentifier("recommendation-source")
+                        if shownMode != modes.mode, modes.mode != .off {
+                            Text("Your next search uses \(modes.mode == .localMatching ? "local matching" : "Apple Intelligence").")
+                                .font(Robo.mono(10)).foregroundStyle(Robo.amber)
+                                .accessibilityIdentifier("recommendation-next-mode")
+                        }
 
                     }
                     Button(controller.suggestions.isEmpty ? (modes.mode == .localMatching ? "Find local matches" : "Find suggestions") : "Show another selection") {
@@ -120,10 +126,12 @@ struct RecommendationsScreen: View {
                   systemImage:"exclamationmark.triangle")
                 .font(Robo.title(14)).foregroundStyle(Robo.amber)
                 .fixedSize(horizontal:false,vertical:true)
-            Button("Try Apple Intelligence again") {
-                selected = []; Task { await controller.generate() }
-            }.buttonStyle(BeerControlStyle()).disabled(busy || (model.offline && !model.previewMode))
-                .accessibilityIdentifier("recommendation-fallback-retry")
+            if controller.canRetryAppleIntelligence(current:modes.mode) {
+                Button("Try Apple Intelligence again") {
+                    selected = []; Task { await controller.generate() }
+                }.buttonStyle(BeerControlStyle()).disabled(busy || (model.offline && !model.previewMode))
+                    .accessibilityIdentifier("recommendation-fallback-retry")
+            }
         }.padding(16).frame(maxWidth:.infinity,alignment:.leading)
             .background(QueueChrome.background,in:RoundedRectangle(cornerRadius:17))
             .overlay(RoundedRectangle(cornerRadius:17).strokeBorder(Robo.amber.opacity(0.7),lineWidth:1))
