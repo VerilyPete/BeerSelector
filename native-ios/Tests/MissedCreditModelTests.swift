@@ -63,6 +63,26 @@ final class MissedCreditModelTests: XCTestCase {
             XCTAssertEqual(model.missedCredits.flatMap(\.beers).map(\.name),["Example Oktoberfest (Draft)"])
         }
     }
+    @MainActor func testQueuedBeerMatchesACleanTaplistNameWhenSaucerEscapedItsQueueName() async throws {
+        try await withModel { model,_,upstream in
+            model.allBeers = [Beer(id:"21905936",name:"New Holland Dragon's Milk Reserve - Triple Mash Stout (BTL)")]
+            upstream.queue = [("9",#"New Holland Dragon\'s Milk Reserve - Triple Mash Stout (BTL)"#,"Nov 06, 2026 @ 03:50:47pm")]
+            model.now = { self.at(11,6,16) }
+            await model.refreshQueue()
+            XCTAssertEqual(model.queuedBeerIDs,["21905936"])
+            XCTAssertEqual(model.queue.map(\.name),["New Holland Dragon's Milk Reserve - Triple Mash Stout (BTL)"])
+        }
+    }
+    @MainActor func testBeerLoggedWithAnEscapedNameBeforeTheUpdateIsCreditedByItsCleanTasting() async throws {
+        try await withModel { model,db,upstream in
+            let account = try XCTUnwrap(model.recommendationAccount)
+            try db.recordQueue([QueueEntry(id:"9",name:#"Brasserie D\'achouffe La Chouffe (BTL)"#,date:"Nov 05, 2026 @ 08:10:00pm")],account:account,seenAt:self.at(11,5,20))
+            model.now = { self.at(11,6,16) }
+            upstream.tasted = ["Brasserie D'achouffe La Chouffe (BTL)"]
+            await model.refresh()
+            XCTAssertEqual(model.missedCredits,[])
+        }
+    }
     @MainActor func testBeerCreditedLaterLeavesTheReport() async throws {
         try await withModel { model,_,upstream in
             upstream.queue = [("7","Example Oktoberfest (Draft)","Oct 25, 2026 @ 09:21:29pm")]

@@ -12,6 +12,17 @@ enum BeerError: LocalizedError {
     }
 }
 
+/// Saucer stores some names with backslash-escaped quotes ("Dragon\'s"), per record,
+/// and the enrichment API serves them repaired. Every source passes through here
+/// so queue, tasted and taplist names compare in one form.
+enum BeerName {
+    static func clean(_ name: String) -> String {
+        name.replacingOccurrences(of:#"\\(['"])"#,with:"$1",options:.regularExpression)
+            .replacingOccurrences(of:#"\s+"#,with:" ",options:.regularExpression)
+            .trimmingCharacters(in:.whitespaces)
+    }
+}
+
 struct Beer: Identifiable, Codable, Equatable {
     var id: String
     var brew_name: String
@@ -37,8 +48,8 @@ struct Beer: Identifiable, Codable, Equatable {
         guard let id = row["id"], !id.isEmpty, let name = row["brew_name"], !name.isEmpty else {
             throw BeerError.invalidResponse("A beer is missing its ID or name.")
         }
-        self.init(id: id, name: name)
-        brewer = row["brewer"] ?? ""; brewer_loc = row["brewer_loc"] ?? ""
+        self.init(id: id, name: BeerName.clean(name))
+        brewer = BeerName.clean(row["brewer"] ?? ""); brewer_loc = row["brewer_loc"] ?? ""
         brew_style = row["brew_style"] ?? ""; brew_container = row["brew_container"] ?? ""
         brew_description = row["brew_description"] ?? ""; added_date = row["added_date"] ?? ""
         tasted_date = row["tasted_date"] ?? ""; roh_lap = row["roh_lap"] ?? ""; chit_code = row["chit_code"] ?? ""

@@ -229,7 +229,7 @@ final class BeerAPI: Sendable {
                 let date = dates.first.map { plain(capture($0,1,in:name)) } ?? "Date unavailable"
                 if let dateMatch = dates.first, let range = Range(dateMatch.range,in:name) { name.removeSubrange(range) }
                 if dates.isEmpty { name = name.replacingOccurrences(of:"(?is)<div\\b[^>]*>.*?</div\\s*>",with:"",options:.regularExpression) }
-                name = plain(name)
+                name = BeerName.clean(plain(name))
                 guard !name.isEmpty else { throw BeerError.invalidResponse("Unnamed queue entry") }
                 entries.append(QueueEntry(id:capture(rowLinks[0],1,in:segment),name:name,date:date.isEmpty ? "Date unavailable" : date))
             }
