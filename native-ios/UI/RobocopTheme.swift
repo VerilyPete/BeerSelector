@@ -26,6 +26,14 @@ enum Robo {
     static let labelSteel = metal([(0x8A919A,0),(0x6B727B,0.5),(0x5A6069,1)])
     static let amberChrome = metal([(0xFFD54F,0),(0xFFB300,0.3),(0xE6A200,1)])
     static let redChrome = metal([(0xFF6666,0),(0xFF3333,0.3),(0xCC2222,1)])
+    // One text palette for beer screens and the muted Queue, Rewards and Settings sheets.
+    static let textPrimary = QueueChrome.text
+    static let textSecondary = QueueChrome.secondary
+    /// The 1pt edge of a flat content card.
+    static let hairline = Color.white.opacity(0.1)
+    static let bodyFontName = "SpaceGrotesk-Regular"
+    /// Prose: descriptions, brewer names, row subtitles and explanations. Data stays in mono.
+    static func body(_ size: CGFloat = 13) -> Font { .custom(bodyFontName,size:size,relativeTo:.body) }
     static func mono(_ size: CGFloat = 11) -> Font { .custom("SpaceMono-Regular",size:size,relativeTo:.caption) }
     static func title(_ size: CGFloat = 14) -> Font { .custom("SpaceGrotesk-SemiBold",size:size,relativeTo:.headline) }
     static func bold(_ size: CGFloat = 26) -> Font { .custom("SpaceGrotesk-Bold",size:size,relativeTo:.title) }
@@ -49,6 +57,35 @@ struct ChromeBezel: ViewModifier {
             }
             .overlay(RoundedRectangle(cornerRadius:radius).strokeBorder(edge,lineWidth:1))
     }
+}
+
+/// Rule 1: content cards are flat. Chrome bevels are for hero and control
+/// elements only; beer, reward, queue and Settings rows use this card.
+struct ContentCard: ViewModifier {
+    var radius: CGFloat = 14
+    func body(content: Content) -> some View {
+        content
+            .background(Robo.display,in:RoundedRectangle(cornerRadius:radius))
+            .overlay(RoundedRectangle(cornerRadius:radius).strokeBorder(Robo.hairline,lineWidth:1))
+    }
+}
+
+extension View {
+    func contentCard(radius: CGFloat = 14) -> some View { modifier(ContentCard(radius:radius)) }
+}
+
+#Preview("Content card beside ChromeBezel") {
+    VStack(alignment:.leading,spacing:20) {
+        Text("CHROME BEZEL · HERO AND CONTROLS").font(Robo.mono(10)).foregroundStyle(Robo.textSecondary)
+        Text("Beers tasted").font(Robo.title(15)).foregroundStyle(Robo.textPrimary)
+            .padding(16).frame(maxWidth:.infinity,alignment:.leading).modifier(ChromeBezel())
+        Text("CONTENT CARD · ROWS AND PANELS").font(Robo.mono(10)).foregroundStyle(Robo.textSecondary)
+        VStack(alignment:.leading,spacing:6) {
+            Text("Bell's Two Hearted").font(Robo.title(15)).foregroundStyle(Robo.textPrimary)
+            Text("Bell's Brewery · Michigan").font(Robo.body(12)).foregroundStyle(Robo.textSecondary)
+            Text("AMERICAN IPA · DRAFT · 7% ABV").font(Robo.mono(10)).foregroundStyle(Robo.textSecondary)
+        }.padding(16).frame(maxWidth:.infinity,alignment:.leading).contentCard()
+    }.padding(20).frame(width:390).background(Robo.background)
 }
 
 struct BrushedChrome: View {

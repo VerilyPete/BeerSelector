@@ -84,6 +84,11 @@ enum RecommendationFallback: Equatable {
     var timeout: Double = 8
     /// Debug fixtures install an offline provider; real previews never rank.
     var ranksInPreview = false
+    #if DEBUG
+    /// Offline check-in outcomes for fixtures, assigned in card order. Previews never write to the queue.
+    var previewCheckInOutcomes: [CheckInResult]?
+    var previewSubmitDelay: Duration = .seconds(1.5)
+    #endif
     var retrievalTimeout: Double = 2
     var semanticRetriever: (any SemanticRetrieving)?
     private weak var model: AppModel?
@@ -256,6 +261,18 @@ enum RecommendationFallback: Equatable {
             catch { model.error = error.localizedDescription }
         }
     }
+    #if DEBUG
+    private func submitPreview(ids: Set<String>, outcomes results: [CheckInResult]) async {
+        guard !generating, !submitting, !results.isEmpty, ids.isSubset(of:Set(suggestions.map(\.id))) else { return }
+        let token = generation
+        let selected = suggestions.filter { ids.contains($0.id) && outcomes[$0.id] == nil }
+        submitting = true; message = nil
+        defer { if token == generation { submitting = false } }
+        try? await Task.sleep(for:previewSubmitDelay)
+        guard token == generation else { return }
+        for (index,suggestion) in selected.enumerated() { outcomes[suggestion.id] = results[index % results.count] }
+    }
+    #endif
     private static func failed(_ error: Error, candidates: [BeerSuggestion], source: RecommendationRetrievalSource) -> PipelineResult {
         if error is CancellationError { return PipelineResult(ids:nil,candidates:candidates,source:source,cancelled:true) }
         let reason: RecommendationFallback
@@ -263,6 +280,11 @@ enum RecommendationFallback: Equatable {
         return PipelineResult(ids:nil,candidates:candidates,source:source,failure:reason)
     }
     func submit(ids: Set<String>) async {
+        #if DEBUG
+        if let model, model.previewMode, let previewCheckInOutcomes {
+            await submitPreview(ids:ids,outcomes:previewCheckInOutcomes); return
+        }
+        #endif
         guard !generating, !submitting, let model, !model.previewMode, let snapshot,
               !ids.isEmpty, ids.isSubset(of:Set(suggestions.map(\.id))),
               snapshot.epoch == model.recommendationSnapshot.epoch,
