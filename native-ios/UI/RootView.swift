@@ -97,42 +97,56 @@ struct HomeView: View {
     @Environment(\.dynamicTypeSize) private var typeSize
     @State private var expandedHomeBeerID: String?
     @State private var tabletAsideHeight: CGFloat = 0
+    @State private var compactFit = CompactFit.roomy
     var body: some View {
         GeometryReader { geometry in
             let tabletLayout = geometry.size.width >= 768 && !typeSize.isAccessibilitySize
-            ScrollView {
-                Group {
-                    if model.configured {
-                        if tabletLayout {
-                            tabletHome.padding(.horizontal,28).padding(.vertical,20)
-                        } else {
-                            VStack(alignment:.leading,spacing:20) {
-                                accountHeader
-                                recommendationEntry
-                                if model.isMember { MetricPanel(count:model.tastedBeers.count) }
-                                newOnTap
-                                if model.isMember { HomeRewardsCard(status:rewardsStatus,open:{ model.showRewards = true },retry:{ Task { await model.refreshRewards() } }) }
-                                else { visitorPanel }
-                            }.padding(.horizontal,18).padding(.top,8).padding(.bottom,18)
-                                .frame(maxWidth:760).frame(maxWidth:.infinity)
+            if model.configured && !tabletLayout { compactHome }
+            else {
+                ScrollView {
+                    Group {
+                        if model.configured { tabletHome.padding(.horizontal,28).padding(.vertical,20) }
+                        else {
+                            VStack(spacing:24) {
+                                Image(systemName:"mug.fill").font(.system(size:48)).foregroundStyle(Robo.cyan)
+                                Text("Beer Selector").font(Robo.bold())
+                                Text("Log in to your UFO Club account or browse as a visitor.").font(Robo.mono()).multilineTextAlignment(.center)
+                                Button("Get Started") { model.showSettings = true }.buttonStyle(RoboButtonStyle(color:Robo.cyan))
+                            }.frame(maxWidth:760).padding(.horizontal,18).padding(.vertical,60).frame(maxWidth:.infinity)
                         }
-                    } else {
-                        VStack(spacing:24) {
-                            Image(systemName:"mug.fill").font(.system(size:48)).foregroundStyle(Robo.cyan)
-                            Text("Beer Selector").font(Robo.bold())
-                            Text("Log in to your UFO Club account or browse as a visitor.").font(Robo.mono()).multilineTextAlignment(.center)
-                            Button("Get Started") { model.showSettings = true }.buttonStyle(RoboButtonStyle(color:Robo.cyan))
-                        }.frame(maxWidth:760).padding(.horizontal,18).padding(.vertical,60).frame(maxWidth:.infinity)
                     }
-                }
-                .background {
-                    if !tabletLayout { HomeScrollBoundary() }
                 }
             }
         }
         // The chrome lives outside this safe-area viewport. Explicitly clip the
         // entire Home scroll surface so cards and their shadows stay beneath it.
         .clipped()
+    }
+    /// How the compact Home fits its screen: roomy spacing, tight spacing, then one New on Tap row.
+    private enum CompactFit { case roomy, tight, oneRow }
+    @ViewBuilder private var compactHome: some View {
+        if expandedHomeBeerID != nil || typeSize.isAccessibilitySize {
+            // Reading a description, or accessibility text, is the only time Home scrolls.
+            ScrollView { compactContent(compactFit).background(HomeScrollBoundary()) }
+        } else {
+            ViewThatFits(in:.vertical) {
+                compactContent(.roomy).onAppear { compactFit = .roomy }.fixedHome
+                compactContent(.tight).onAppear { compactFit = .tight }.fixedHome
+                compactContent(.oneRow).onAppear { compactFit = .oneRow }.fixedHome
+                ScrollView { compactContent(.oneRow).background(HomeScrollBoundary()) }
+            }.frame(maxHeight:.infinity,alignment:.top)
+        }
+    }
+    private func compactContent(_ fit: CompactFit) -> some View {
+        VStack(alignment:.leading,spacing:fit == .roomy ? 20 : 12) {
+            accountHeader
+            recommendationEntry
+            if model.isMember { MetricPanel(count:model.tastedBeers.count) }
+            newOnTap(rows:fit == .oneRow ? 1 : 2)
+            if model.isMember { HomeRewardsCard(status:rewardsStatus,open:{ model.showRewards = true },retry:{ Task { await model.refreshRewards() } }) }
+            else { visitorPanel }
+        }.padding(.horizontal,18).padding(.top,8).padding(.bottom,fit == .roomy ? 18 : 10)
+            .frame(maxWidth:760).frame(maxWidth:.infinity)
     }
     private var recommendationEntry: some View {
         SuggestionEntryCard(modes:model.suggestionMode) { model.showRecommendations = true }
@@ -249,14 +263,14 @@ struct HomeView: View {
             Button("SIGN IN") { model.showSettings = true; model.showLogin = true }.buttonStyle(BeerControlStyle(appearance:.amber))
         }.padding(28).frame(maxWidth:.infinity,alignment:.leading).contentCard()
     }
-    private var newOnTap: some View {
+    private func newOnTap(rows: Int) -> some View {
         VStack(alignment:.leading,spacing:10) {
             sectionHeading("NEW ON TAP","View all",id:"home-new-on-tap-view-all") { model.tab = .all }
             if model.allBeers.isEmpty {
                 Text("No saved beers yet. Refresh from Settings to load the taplist.").font(Robo.body(15)).foregroundStyle(Robo.textSecondary)
                     .padding(16).frame(maxWidth:.infinity,alignment:.leading).contentCard().accessibilityIdentifier("home-new-on-tap-empty")
             }
-            ForEach(BeerFilter.newOnTap(model.allBeers,count:2)) { beer in
+            ForEach(BeerFilter.newOnTap(model.allBeers,count:rows)) { beer in
                 BeerCard(beer:beer,expanded:expandedHomeBeerID == beer.id,dateLabel:"Added",checkIn:false) {
                     expandedHomeBeerID = expandedHomeBeerID == beer.id ? nil : beer.id
                 }
@@ -290,6 +304,11 @@ struct HomeRewardsCard: View {
             }
         }.padding(16).frame(maxWidth:.infinity,alignment:.leading).contentCard()
     }
+}
+
+private extension View {
+    /// Marks the compact Home when it fits its screen without scrolling.
+    var fixedHome: some View { accessibilityElement(children:.contain).accessibilityIdentifier("home-fixed") }
 }
 
 private extension VerticalAlignment {
