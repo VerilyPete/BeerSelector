@@ -125,15 +125,17 @@ struct HomeView: View {
     /// How the compact Home fits its screen: roomy spacing, tight spacing, then one New on Tap row.
     private enum CompactFit { case roomy, tight, oneRow }
     @ViewBuilder private var compactHome: some View {
-        if expandedHomeBeerID != nil || typeSize.isAccessibilitySize {
-            // Reading a description, or accessibility text, is the only time Home scrolls.
-            ScrollView { compactContent(compactFit).background(HomeScrollBoundary()) }
-        } else {
+        switch CompactHomeMode(expandedID:expandedHomeBeerID,taplist:model.allBeers,accessibility:typeSize.isAccessibilitySize,fittedRows:compactFit == .oneRow ? 1 : 2) {
+        case .scrolling(let rows):
+            // Reading a description, or accessibility text, is the only time a fitting Home scrolls.
+            ScrollView { compactContent(rows == 1 ? .oneRow : compactFit == .oneRow ? .roomy : compactFit).background(HomeScrollBoundary()) }
+        case .fitted:
             ViewThatFits(in:.vertical) {
                 compactContent(.roomy).onAppear { compactFit = .roomy }.fixedHome
                 compactContent(.tight).onAppear { compactFit = .tight }.fixedHome
                 compactContent(.oneRow).onAppear { compactFit = .oneRow }.fixedHome
-                ScrollView { compactContent(.oneRow).background(HomeScrollBoundary()) }
+                // Nothing fits (a short landscape window, or long banners): scroll the one-row layout.
+                ScrollView { compactContent(.oneRow).background(HomeScrollBoundary()) }.onAppear { compactFit = .oneRow }
             }.frame(maxHeight:.infinity,alignment:.top)
         }
     }
@@ -270,10 +272,16 @@ struct HomeView: View {
                 Text("No saved beers yet. Refresh from Settings to load the taplist.").font(Robo.body(15)).foregroundStyle(Robo.textSecondary)
                     .padding(16).frame(maxWidth:.infinity,alignment:.leading).contentCard().accessibilityIdentifier("home-new-on-tap-empty")
             }
-            ForEach(BeerFilter.newOnTap(model.allBeers,count:rows)) { beer in
-                BeerCard(beer:beer,expanded:expandedHomeBeerID == beer.id,dateLabel:"Added",checkIn:false) {
-                    expandedHomeBeerID = expandedHomeBeerID == beer.id ? nil : beer.id
-                }
+            let beers = BeerFilter.newOnTap(model.allBeers,count:rows)
+            if !beers.isEmpty {
+                VStack(alignment:.leading,spacing:0) {
+                    ForEach(Array(beers.enumerated()),id:\.element.id) { index, beer in
+                        if index > 0 { Divider().overlay(Robo.hairline) }
+                        NewOnTapRow(beer:beer,expanded:expandedHomeBeerID == beer.id) {
+                            expandedHomeBeerID = expandedHomeBeerID == beer.id ? nil : beer.id
+                        }
+                    }
+                }.padding(.horizontal,14).contentCard()
             }
         }.accessibilityElement(children:.contain).accessibilityIdentifier("home-new-on-tap")
     }
@@ -285,25 +293,56 @@ struct HomeRewardsCard: View {
     let open: () -> Void
     let retry: () -> Void
     var body: some View {
-        VStack(alignment:.leading,spacing:12) {
+        VStack(alignment:.leading,spacing:0) {
             Button(action:open) {
                 HStack(spacing:14) {
-                    Image(systemName:"gift").font(.system(size:20)).foregroundStyle(Robo.amber).frame(width:32).accessibilityHidden(true)
-                    VStack(alignment:.leading,spacing:4) {
-                        Text(status.headline).font(Robo.title(17)).foregroundStyle(Robo.textPrimary)
-                        Text(status.detail).font(Robo.body(14)).foregroundStyle(Robo.textSecondary)
+                    AmberIcon(symbol:"gift")
+                    VStack(alignment:.leading,spacing:3) {
+                        Text("REWARDS").font(Robo.title(15)).foregroundStyle(Robo.amber)
+                        Text(status.cardLine).font(Robo.body(14)).foregroundStyle(Robo.textSecondary)
                     }.frame(maxWidth:.infinity,alignment:.leading).multilineTextAlignment(.leading)
-                    Image(systemName:"chevron.right").foregroundStyle(Robo.amber).accessibilityHidden(true)
-                }.contentShape(Rectangle())
+                    Image(systemName:"chevron.right").font(.system(size:12)).foregroundStyle(Robo.textSecondary).accessibilityHidden(true)
+                }.padding(14).frame(minHeight:44).contentShape(Rectangle())
             }.buttonStyle(.plain)
                 .accessibilityElement(children:.ignore).accessibilityLabel(status.spokenSummary).accessibilityHint("Opens Rewards")
                 .accessibilityAddTraits(.isButton).accessibilityIdentifier("home-rewards-card")
             if status.offersRetry {
                 Button("Try Again",action:retry).buttonStyle(BeerControlStyle()).accessibilityLabel("Try loading rewards again")
-                    .accessibilityIdentifier("home-rewards-retry")
+                    .accessibilityIdentifier("home-rewards-retry").padding([.horizontal,.bottom],14)
             }
-        }.padding(16).frame(maxWidth:.infinity,alignment:.leading).contentCard()
+        }.frame(maxWidth:.infinity,alignment:.leading).contentCard()
     }
+}
+
+/// A compact New on Tap row: name, arrival day · style · container, and ABV. Tapping shows the description.
+private struct NewOnTapRow: View {
+    @Environment(\.dynamicTypeSize) private var typeSize
+    @EnvironmentObject var model: AppModel
+    let beer: Beer
+    let expanded: Bool
+    let toggle: () -> Void
+    var body: some View {
+        VStack(alignment:.leading,spacing:10) {
+            Button(action:toggle) {
+                HStack(spacing:10) {
+                    VStack(alignment:.leading,spacing:3) {
+                        Text(beer.brew_name).font(Robo.title(15)).foregroundStyle(Robo.textPrimary).lineLimit(lines)
+                        Text(beer.newOnTapLine()).font(Robo.mono(10)).foregroundStyle(Robo.textSecondary).lineLimit(lines)
+                    }.frame(maxWidth:.infinity,alignment:.leading)
+                    if let abv = beer.abv { Text("\(abv.formatted())%").font(Robo.mono(12).weight(.bold)).foregroundStyle(Robo.textPrimary) }
+                }.frame(minHeight:44).contentShape(Rectangle())
+            }.buttonStyle(.plain).multilineTextAlignment(.leading)
+                .accessibilityIdentifier("beer-item-\(beer.id)").accessibilityValue(expanded ? "Expanded" : "Collapsed")
+            if expanded {
+                if !beer.brew_description.isEmpty {
+                    Text(beer.plainDescription).font(Robo.body(14)).foregroundStyle(Robo.textSecondary).lineSpacing(4)
+                        .accessibilityIdentifier("beer-description-\(beer.id)")
+                }
+                Button("UNTAPPD") { model.openUntappd(beer) }.buttonStyle(BeerControlStyle(appearance:.outline)).accessibilityIdentifier("untappd-\(beer.id)")
+            }
+        }.padding(.vertical,8)
+    }
+    private var lines: Int? { expanded || typeSize.isAccessibilitySize ? nil : 1 }
 }
 
 private extension View {
@@ -366,6 +405,9 @@ struct SuggestionEntryCard: View {
                 HStack(spacing:12) {
                     Image(systemName:modes.mode.symbol).foregroundStyle(Robo.textSecondary)
                     VStack(alignment:.leading,spacing:4) {
+                        if let eyebrow = modes.mode.homeEyebrow {
+                            Text(eyebrow).font(Robo.mono(10)).tracking(1).foregroundStyle(Robo.cyan)
+                        }
                         Text(modes.mode.homeTitle).font(Robo.title(16))
                         Text(modes.mode.homeDetail).font(Robo.body(13)).foregroundStyle(QueueChrome.secondary)
                             .fixedSize(horizontal:false,vertical:true)

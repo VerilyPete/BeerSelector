@@ -23,7 +23,19 @@ enum Robo {
     static let brushed = metal([(0xD4D8DD,0),(0xC0C5CC,0.1),(0xA8AEB6,0.3),(0xB0B6BE,0.5),(0x969DA6,0.7),(0xA0A7B0,0.85),(0xB8BFC7,1)])
     static let brushedBottom = metal([(0xB8BFC7,0),(0xA0A7B0,0.15),(0x969DA6,0.3),(0xB0B6BE,0.5),(0xA8AEB6,0.7),(0xC0C5CC,0.85),(0xD4D8DD,1)],reversed:true)
     static let iconSteel = metal([(0xB8BFC7,0),(0x8A919A,0.5),(0x6B727B,1)])
-    static let labelSteel = metal([(0x8A919A,0),(0x6B727B,0.5),(0x5A6069,1)])
+    static let labelSteelStops: [(UInt32,Double)] = [(0xC0C5CC,0),(0xA0A7B0,0.5),(0x8A919A,1)]
+    static let labelSteel = metal(labelSteelStops)
+    static let labelPlateInk: UInt32 = 0x0A0A0A
+    /// WCAG 2 contrast ratio between two sRGB colors.
+    static func contrastRatio(_ first: UInt32,_ second: UInt32) -> Double {
+        func channel(_ value: UInt32) -> Double {
+            let c = Double(value & 255)/255
+            return c <= 0.03928 ? c/12.92 : pow((c+0.055)/1.055,2.4)
+        }
+        func luminance(_ hex: UInt32) -> Double { 0.2126*channel(hex >> 16)+0.7152*channel(hex >> 8)+0.0722*channel(hex) }
+        let (a,b) = (luminance(first),luminance(second))
+        return (max(a,b)+0.05)/(min(a,b)+0.05)
+    }
     static let amberChrome = metal([(0xFFD54F,0),(0xFFB300,0.3),(0xE6A200,1)])
     static let redChrome = metal([(0xFF6666,0),(0xFF3333,0.3),(0xCC2222,1)])
     // One text palette for beer screens and the muted Queue, Rewards and Settings sheets.
@@ -176,7 +188,7 @@ struct LabelPlate: View {
     var cyan = false
     var size: CGFloat = 9
     var body: some View {
-        Text(title).font(Robo.mono(size).weight(.bold)).tracking(3).foregroundStyle(Robo.border)
+        Text(title).font(Robo.mono(size).weight(.bold)).tracking(3).foregroundStyle(Robo.color(Robo.labelPlateInk))
             .padding(.horizontal,10).padding(.vertical,4)
             .background {
                 if cyan { RoundedRectangle(cornerRadius:4).fill(Robo.cyan) }

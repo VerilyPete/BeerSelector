@@ -114,6 +114,12 @@ final class SuggestionModeTests: XCTestCase {
         XCTAssertEqual(SuggestionMode.localMatching.plate,"LOCAL MATCHING")
     }
 
+    func testTheAppleIntelligenceCardNamesItsSourceAboveTheTitle() {
+        XCTAssertEqual(SuggestionMode.appleIntelligence.homeEyebrow,"APPLE INTELLIGENCE")
+        XCTAssertNil(SuggestionMode.localMatching.homeEyebrow)
+        XCTAssertNil(SuggestionMode.off.homeEyebrow)
+    }
+
     func testSettingsStatusNamesTheActiveMode() {
         XCTAssertEqual(SuggestionMode.appleIntelligence.statusTitle,"Apple Intelligence")
         XCTAssertEqual(SuggestionMode.localMatching.statusTitle,"Local matching")

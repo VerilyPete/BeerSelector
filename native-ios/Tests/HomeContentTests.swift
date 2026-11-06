@@ -24,6 +24,16 @@ final class NewOnTapTests: XCTestCase {
         XCTAssertEqual(BeerFilter.newOnTap([beer("only",added:"100")],count:2).map(\.id),["only"])
     }
 
+    func testTheCompactRowLineShowsArrivalDayStyleAndContainer() {
+        var calendar = Calendar(identifier:.gregorian); calendar.timeZone = TimeZone(identifier:"UTC")!
+        let locale = Locale(identifier:"en_US")
+        var stout = beer("stout",added:"1788950000"); stout.brew_style = "Imperial Stout"; stout.brew_container = "Bottle"
+        XCTAssertEqual(stout.newOnTapLine(calendar:calendar,locale:locale),"Sep 9 · Imperial Stout · Bottle")
+        var undated = beer("undated",added:""); undated.brew_style = "Lager"; undated.brew_container = ""
+        XCTAssertEqual(undated.newOnTapLine(calendar:calendar,locale:locale),"Lager")
+        XCTAssertEqual(beer("bare",added:"0").newOnTapLine(calendar:calendar,locale:locale),"")
+    }
+
     func testAnEmptyTaplistReturnsNothing() {
         XCTAssertEqual(BeerFilter.newOnTap([],count:2).map(\.id),[])
     }
@@ -89,7 +99,57 @@ final class RewardsCardStatusTests: XCTestCase {
         XCTAssertNotEqual(status(loaded:false,error:"x").headline,"No rewards ready")
     }
 
+    func testTheCardLineMatchesTheMockAndKeepsErrorsVisible() {
+        XCTAssertEqual(status(loaded:false).cardLine,"Checking your rewards…")
+        XCTAssertEqual(status(loaded:true).cardLine,"No rewards ready yet. Keep tasting.")
+        XCTAssertEqual(status(loaded:true,rewards:available).cardLine,"2 rewards ready to claim")
+        XCTAssertEqual(status(loaded:true,rewards:[available[0]]).cardLine,"1 reward ready to claim")
+        XCTAssertEqual(status(loaded:true,error:"x",rewards:available).cardLine,"2 rewards ready. Couldn’t refresh.")
+        XCTAssertEqual(status(loaded:true,error:"x").cardLine,"No rewards ready. Couldn’t refresh.")
+        XCTAssertEqual(status(loaded:false,error:"x").cardLine,"Couldn’t load your rewards.")
+    }
+
     func testSpokenSummaryJoinsHeadlineAndDetail() {
         XCTAssertEqual(status(loaded:true,rewards:available).spokenSummary,"Rewards: 2 rewards ready. Tap to view and claim.")
+    }
+}
+
+final class CompactHomeModeTests: XCTestCase {
+    private func beer(_ id: String, added: String) -> Beer { var beer = Beer(id:id,name:id); beer.added_date = added; return beer }
+    private var taplist: [Beer] { [beer("newest",added:"300"),beer("second",added:"200"),beer("third",added:"100")] }
+
+    func testWithNothingOpenHomeFitsItsScreen() {
+        XCTAssertEqual(CompactHomeMode(expandedID:nil,taplist:taplist,accessibility:false,fittedRows:1),.fitted)
+    }
+
+    func testAccessibilityTextScrollsAndAlwaysShowsTwoArrivals() {
+        XCTAssertEqual(CompactHomeMode(expandedID:nil,taplist:taplist,accessibility:true,fittedRows:1),.scrolling(rows:2))
+        XCTAssertEqual(CompactHomeMode(expandedID:"newest",taplist:taplist,accessibility:true,fittedRows:1),.scrolling(rows:2))
+    }
+
+    func testOpeningAShownArrivalScrollsWithoutChangingWhichRowsShow() {
+        XCTAssertEqual(CompactHomeMode(expandedID:"newest",taplist:taplist,accessibility:false,fittedRows:1),.scrolling(rows:1))
+        XCTAssertEqual(CompactHomeMode(expandedID:"second",taplist:taplist,accessibility:false,fittedRows:2),.scrolling(rows:2))
+    }
+
+    func testAnExpansionForABeerHomeDoesNotShowIsIgnored() {
+        XCTAssertEqual(CompactHomeMode(expandedID:"second",taplist:taplist,accessibility:false,fittedRows:1),.fitted)
+        XCTAssertEqual(CompactHomeMode(expandedID:"third",taplist:taplist,accessibility:false,fittedRows:2),.fitted)
+        XCTAssertEqual(CompactHomeMode(expandedID:"gone",taplist:taplist,accessibility:false,fittedRows:2),.fitted)
+    }
+}
+
+final class SortOrderTests: XCTestCase {
+    private func beer(_ id: String, name: String, added: String, abv: Double?) -> Beer {
+        var beer = Beer(id:id,name:name); beer.added_date = added; beer.abv = abv; return beer
+    }
+
+    func testEveryMenuChoiceSortsTheTaplistTheWayItsTitleSays() {
+        let beers = [beer("a",name:"Bravo",added:"200",abv:6),beer("b",name:"Alpha",added:"300",abv:nil),beer("c",name:"Charlie",added:"100",abv:4)]
+        let orders = SortOption.all.map { option -> [String] in
+            var filter = BeerFilter(); option.apply(to:&filter)
+            return filter.apply(beers).map(\.id)
+        }
+        XCTAssertEqual(orders,[["b","a","c"],["c","a","b"],["b","a","c"],["c","a","b"],["a","c","b"],["c","a","b"]])
     }
 }

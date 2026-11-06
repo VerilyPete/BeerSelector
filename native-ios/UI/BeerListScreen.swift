@@ -129,24 +129,26 @@ struct BeerListScreen: View {
             if refreshing { ProgressView().tint(Robo.cyan).frame(width:44,height:44).accessibilityLabel("Refreshing beers") }
             if kind == .finder {
                 Button { model.showQueue = true } label: {
-                    if model.loadingQueue { ProgressView().tint(Robo.amber).frame(width:32,height:32).modifier(AmberWell()) }
-                    else { AmberIcon(symbol:"list.bullet.rectangle") }
-                }.buttonStyle(.plain).frame(width:44,height:44).disabled(model.loadingQueue)
+                    Group {
+                        if model.loadingQueue { ProgressView().tint(Robo.amber).frame(width:32,height:32).modifier(AmberWell()) }
+                        else { AmberIcon(symbol:"list.bullet.rectangle") }
+                    }.frame(width:44,height:44).contentShape(Rectangle())
+                }.buttonStyle(.plain).disabled(model.loadingQueue)
                     .accessibilityIdentifier("view-queue-button").accessibilityLabel("View beer queue").accessibilityValue(model.loadingQueue ? "Loading" : "")
-                Button { model.showRewards = true } label: { AmberIcon(symbol:"gift") }.buttonStyle(.plain).frame(width:44,height:44)
+                Button { model.showRewards = true } label: { AmberIcon(symbol:"gift").frame(width:44,height:44).contentShape(Rectangle()) }.buttonStyle(.plain)
                     .accessibilityIdentifier("finder-rewards-button").accessibilityLabel("View rewards")
             }
             Button { model.showSettings = true } label: { IconWell(symbol:"gearshape").frame(width:44,height:44) }.buttonStyle(.plain).accessibilityLabel("Open settings")
         }
     }
 }
-/// The amber chrome well for Beerfinder's Queue and Rewards header buttons.
-private struct AmberWell: ViewModifier {
+/// The amber chrome well for the Queue and Rewards buttons.
+struct AmberWell: ViewModifier {
     func body(content: Content) -> some View {
         content.modifier(ChromeBezel(radius:10,rim:2,gradient:Robo.amberChrome,well:Robo.color(0x1A1200),edge:Robo.color(0xFFE082).opacity(0.18)))
     }
 }
-private struct AmberIcon: View {
+struct AmberIcon: View {
     let symbol: String
     var body: some View {
         Image(systemName:symbol).font(.system(size:17)).foregroundStyle(Robo.color(0xD4AB50))

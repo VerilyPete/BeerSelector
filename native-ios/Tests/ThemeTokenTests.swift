@@ -20,4 +20,20 @@ final class ThemeTokenTests: XCTestCase {
         XCTAssertEqual(Robo.bodyFontName,"SpaceGrotesk-Regular")
         XCTAssertNotNil(UIFont(name:Robo.bodyFontName,size:13),"the font is registered in Info.plist")
     }
+
+    func testContrastRatioMatchesWCAGReferencePoints() {
+        XCTAssertEqual(Robo.contrastRatio(0x000000,0xFFFFFF),21,accuracy:0.01)
+        XCTAssertEqual(Robo.contrastRatio(0xFFFFFF,0x000000),21,accuracy:0.01)
+        XCTAssertEqual(Robo.contrastRatio(0x777777,0xFFFFFF),4.48,accuracy:0.01)
+    }
+
+    func testLabelPlateTextIsReadableAcrossTheWholeSteelGradient() {
+        for (stop,_) in Robo.labelSteelStops {
+            XCTAssertGreaterThanOrEqual(Robo.contrastRatio(Robo.labelPlateInk,stop),4.5,String(format:"stop %06X",stop))
+        }
+    }
+
+    func testCyanLabelPlateTextIsReadable() {
+        XCTAssertGreaterThanOrEqual(Robo.contrastRatio(Robo.labelPlateInk,0x00FFD0),4.5)
+    }
 }

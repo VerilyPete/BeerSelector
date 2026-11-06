@@ -95,6 +95,12 @@ struct Beer: Identifiable, Codable, Equatable {
         default: return "Added " + added.formatted(date: .abbreviated, time: .omitted)
         }
     }
+    /// Home's compact New on Tap row: arrival day, style and container, e.g. "Sep 9 · Imperial Stout · Bottle".
+    func newOnTapLine(calendar: Calendar = .current, locale: Locale = .current) -> String {
+        let style = Date.FormatStyle(date:.omitted,time:.omitted,locale:locale,calendar:calendar,timeZone:calendar.timeZone).month(.abbreviated).day()
+        let day = addedAt.map { $0.formatted(style) }
+        return [day,brew_style,brew_container].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator:" · ")
+    }
     var plainDescription: String {
         brew_description.replacingOccurrences(of: #"<br\s*/?>|</p>"#, with: "\n", options: .regularExpression)
             .replacingOccurrences(of: #"<[^>]+>"#, with: "", options: .regularExpression)
@@ -265,9 +271,33 @@ enum RewardsCardStatus: Equatable {
         }
     }
 
+    var cardLine: String {
+        switch self {
+        case .hidden: ""
+        case .checking: "Checking your rewards…"
+        case .ready(0): "No rewards ready yet. Keep tasting."
+        case .ready(let count): "\(count) \(count == 1 ? "reward" : "rewards") ready to claim"
+        case .saved: "\(headline). Couldn’t refresh."
+        case .unavailable: "Couldn’t load your rewards."
+        }
+    }
+
     var offersRetry: Bool {
         switch self { case .saved, .unavailable: true; default: false }
     }
 
     var spokenSummary: String { "Rewards: \(headline). \(detail)" }
+}
+
+/// Whether the compact Home fits its screen or scrolls, and how many New on Tap rows a scrolling Home shows.
+enum CompactHomeMode: Equatable {
+    case fitted, scrolling(rows: Int)
+
+    /// Accessibility text always scrolls with two arrivals. An open description scrolls with the rows already shown,
+    /// but only if Home actually shows that beer; a stale expansion from another layout is ignored.
+    init(expandedID: String?, taplist: [Beer], accessibility: Bool, fittedRows: Int) {
+        if accessibility { self = .scrolling(rows:2); return }
+        guard let expandedID, BeerFilter.newOnTap(taplist,count:fittedRows).contains(where: { $0.id == expandedID }) else { self = .fitted; return }
+        self = .scrolling(rows:fittedRows)
+    }
 }

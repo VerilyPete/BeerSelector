@@ -54,6 +54,10 @@ appId: org.verily.FSbeerselector
     id: "beer-name-.*"
     index: 0
 - assertTrue: ${maestro.copiedText == "Firestone Walker Parabola"}
+- copyTextFrom:
+    id: "beer-name-.*"
+    index: 1
+- assertTrue: ${maestro.copiedText == "Sierra Nevada Pale Ale"}
 - tapOn:
     id: sort-menu
 - tapOn: "Lowest ABV"
@@ -64,6 +68,10 @@ appId: org.verily.FSbeerselector
     id: "beer-name-.*"
     index: 0
 - assertTrue: ${maestro.copiedText == "Founders All Day IPA"}
+- copyTextFrom:
+    id: "beer-name-.*"
+    index: 1
+- assertTrue: ${maestro.copiedText == "Weihenstephaner Hefeweissbier"}
 - tapOn:
     id: sort-menu
 - tapOn: "Newest first"
@@ -106,6 +114,34 @@ appId: org.verily.FSbeerselector
     id: "beer-name-.*"
     index: 0
 - assertTrue: ${maestro.copiedText == "Tasted Brew 7"}
+- tapOn:
+    id: sort-menu
+- tapOn: "Name A–Z"
+- assertVisible:
+    id: sort-menu
+    text: "Sort: Name, A to Z"
+- copyTextFrom:
+    id: "beer-name-.*"
+    index: 0
+- assertTrue: ${maestro.copiedText == "Tasted Brew 1"}
+- copyTextFrom:
+    id: "beer-name-.*"
+    index: 1
+- assertTrue: ${maestro.copiedText == "Tasted Brew 10"}
+- tapOn:
+    id: sort-menu
+- tapOn: "Lowest ABV"
+- assertVisible:
+    id: sort-menu
+    text: "Sort: ABV, lowest first"
+- copyTextFrom:
+    id: "beer-name-.*"
+    index: 0
+- assertTrue: ${maestro.copiedText == "Tasted Brew 1"}
+- copyTextFrom:
+    id: "beer-name-.*"
+    index: 1
+- assertTrue: ${maestro.copiedText == "Tasted Brew 8"}
 - tapOn:
     id: sort-menu
 - tapOn: "Newest first"
