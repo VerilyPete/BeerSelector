@@ -95,6 +95,12 @@ struct Beer: Identifiable, Codable, Equatable {
         default: return "Added " + added.formatted(date: .abbreviated, time: .omitted)
         }
     }
+    /// Home's compact New on Tap row: arrival day, style and container, e.g. "Sep 9 · Imperial Stout · Bottle".
+    func newOnTapLine(calendar: Calendar = .current, locale: Locale = .current) -> String {
+        let style = Date.FormatStyle(date:.omitted,time:.omitted,locale:locale,calendar:calendar,timeZone:calendar.timeZone).month(.abbreviated).day()
+        let day = addedAt.map { $0.formatted(style) }
+        return [day,brew_style,brew_container].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator:" · ")
+    }
     var plainDescription: String {
         brew_description.replacingOccurrences(of: #"<br\s*/?>|</p>"#, with: "\n", options: .regularExpression)
             .replacingOccurrences(of: #"<[^>]+>"#, with: "", options: .regularExpression)
@@ -261,6 +267,17 @@ enum RewardsCardStatus: Equatable {
         case .ready(0): "Keep tasting toward your next milestone."
         case .ready: "Tap to view and claim."
         case .saved: "Couldn’t refresh. Showing saved rewards."
+        case .unavailable: "Couldn’t load your rewards."
+        }
+    }
+
+    var cardLine: String {
+        switch self {
+        case .hidden: ""
+        case .checking: "Checking your rewards…"
+        case .ready(0): "No rewards ready yet. Keep tasting."
+        case .ready(let count): "\(count) \(count == 1 ? "reward" : "rewards") ready to claim"
+        case .saved: "\(headline). Couldn’t refresh."
         case .unavailable: "Couldn’t load your rewards."
         }
     }

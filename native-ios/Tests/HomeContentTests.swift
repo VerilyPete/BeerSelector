@@ -24,6 +24,16 @@ final class NewOnTapTests: XCTestCase {
         XCTAssertEqual(BeerFilter.newOnTap([beer("only",added:"100")],count:2).map(\.id),["only"])
     }
 
+    func testTheCompactRowLineShowsArrivalDayStyleAndContainer() {
+        var calendar = Calendar(identifier:.gregorian); calendar.timeZone = TimeZone(identifier:"UTC")!
+        let locale = Locale(identifier:"en_US")
+        var stout = beer("stout",added:"1788950000"); stout.brew_style = "Imperial Stout"; stout.brew_container = "Bottle"
+        XCTAssertEqual(stout.newOnTapLine(calendar:calendar,locale:locale),"Sep 9 · Imperial Stout · Bottle")
+        var undated = beer("undated",added:""); undated.brew_style = "Lager"; undated.brew_container = ""
+        XCTAssertEqual(undated.newOnTapLine(calendar:calendar,locale:locale),"Lager")
+        XCTAssertEqual(beer("bare",added:"0").newOnTapLine(calendar:calendar,locale:locale),"")
+    }
+
     func testAnEmptyTaplistReturnsNothing() {
         XCTAssertEqual(BeerFilter.newOnTap([],count:2).map(\.id),[])
     }
@@ -87,6 +97,16 @@ final class RewardsCardStatusTests: XCTestCase {
     func testNoStateClaimsZeroRewardsWithoutKnowing() {
         XCTAssertNotEqual(status(loaded:false).headline,"No rewards ready")
         XCTAssertNotEqual(status(loaded:false,error:"x").headline,"No rewards ready")
+    }
+
+    func testTheCardLineMatchesTheMockAndKeepsErrorsVisible() {
+        XCTAssertEqual(status(loaded:false).cardLine,"Checking your rewards…")
+        XCTAssertEqual(status(loaded:true).cardLine,"No rewards ready yet. Keep tasting.")
+        XCTAssertEqual(status(loaded:true,rewards:available).cardLine,"2 rewards ready to claim")
+        XCTAssertEqual(status(loaded:true,rewards:[available[0]]).cardLine,"1 reward ready to claim")
+        XCTAssertEqual(status(loaded:true,error:"x",rewards:available).cardLine,"2 rewards ready. Couldn’t refresh.")
+        XCTAssertEqual(status(loaded:true,error:"x").cardLine,"No rewards ready. Couldn’t refresh.")
+        XCTAssertEqual(status(loaded:false,error:"x").cardLine,"Couldn’t load your rewards.")
     }
 
     func testSpokenSummaryJoinsHeadlineAndDetail() {

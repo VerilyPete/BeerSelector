@@ -13,6 +13,8 @@ enum SuggestionMode: Equatable {
 /// Every suggestion surface names its source. Local matching copy never
 /// promises to understand moods: it ranks by tastings, taplist and styles.
 extension SuggestionMode {
+    /// "Find something to try" doesn't say who answers, so the Apple Intelligence card names it; the local card's title already does.
+    var homeEyebrow: String? { self == .appleIntelligence ? "APPLE INTELLIGENCE" : nil }
     var homeTitle: String { self == .appleIntelligence ? "Find something to try" : "Local matching" }
     var homeDetail: String {
         self == .appleIntelligence ? "Describe a style or mood." : "Picks from your tasting history and the styles you choose."

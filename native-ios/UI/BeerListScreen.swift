@@ -140,13 +140,13 @@ struct BeerListScreen: View {
         }
     }
 }
-/// The amber chrome well for Beerfinder's Queue and Rewards header buttons.
-private struct AmberWell: ViewModifier {
+/// The amber chrome well for the Queue and Rewards buttons.
+struct AmberWell: ViewModifier {
     func body(content: Content) -> some View {
         content.modifier(ChromeBezel(radius:10,rim:2,gradient:Robo.amberChrome,well:Robo.color(0x1A1200),edge:Robo.color(0xFFE082).opacity(0.18)))
     }
 }
-private struct AmberIcon: View {
+struct AmberIcon: View {
     let symbol: String
     var body: some View {
         Image(systemName:symbol).font(.system(size:17)).foregroundStyle(Robo.color(0xD4AB50))
