@@ -58,7 +58,7 @@ struct MilestoneStrip: View {
                     }
                     .clipShape(RoundedRectangle(cornerRadius:8))
                     .background(Robo.display,in:RoundedRectangle(cornerRadius:8))
-                    .padding(2).background(count >= milestone ? Robo.redChrome : Robo.chrome,in:RoundedRectangle(cornerRadius:10))
+                    .padding(2).background(Robo.chrome,in:RoundedRectangle(cornerRadius:10)) // The teal fill is the only "reached" signal.
                     .overlay(RoundedRectangle(cornerRadius:10).strokeBorder(.white.opacity(0.188),lineWidth:1))
                     .accessibilityLabel("\(milestone) beers, " + (fill >= 1 ? "achieved" : fill > 0 ? "\(MilestoneProgress.percent(count:count,milestone:milestone)) percent of the way" : "not yet achieved"))
             }
@@ -91,11 +91,11 @@ struct RewardsScreen: View {
                     if model.refreshing { ProgressView("Loading rewards…").font(Robo.mono()).accessibilityIdentifier("rewards-loading") }
                     if let error = model.rewardsError {
                         VStack(alignment:.leading,spacing:12) {
-                            Text(error).font(Robo.mono())
-                            if !model.rewards.isEmpty { Text("Showing saved rewards.").font(Robo.mono()).foregroundStyle(Robo.steel) }
+                            Text(error).font(Robo.body(14)).foregroundStyle(Robo.textPrimary)
+                            if !model.rewards.isEmpty { Text("Showing saved rewards.").font(Robo.body(13)).foregroundStyle(Robo.textSecondary) }
                             Button("Refresh Rewards") { Task { await model.refreshRewards() } }.buttonStyle(BeerControlStyle()).disabled(model.refreshing)
                             Button("Read Saved Rewards") { model.retrySavedRewards() }.buttonStyle(BeerControlStyle())
-                        }.padding(12).background(Robo.panel,in:RoundedRectangle(cornerRadius:12)).accessibilityIdentifier("rewards-error")
+                        }.padding(14).frame(maxWidth:.infinity,alignment:.leading).contentCard().accessibilityIdentifier("rewards-error")
                     }
                     if !model.isMember { empty("Members Only","Rewards are exclusive to UFO Club members. Log in to view and claim your rewards!") }
                     else if model.rewards.isEmpty && model.rewardsLoaded && !model.refreshing && model.rewardsError == nil { empty("No Rewards Yet","Keep tasting new beers to earn rewards!") }
@@ -104,21 +104,21 @@ struct RewardsScreen: View {
                             if reward.redeemed { model.rewardsNotice = "This reward has already been claimed." }
                             else { selected = reward }
                         } label: {
+                                // Redeemed rows are muted with explicit, readable colors rather than opacity.
                                 HStack(spacing:14) {
                                     Image(systemName:reward.redeemed ? "checkmark.circle" : "gift")
-                                        .font(.system(size:20)).foregroundStyle(reward.redeemed ? Robo.steel : Robo.cyan)
-                                        .frame(width:40,height:40).background(Robo.display,in:RoundedRectangle(cornerRadius:12))
-                                        .overlay(RoundedRectangle(cornerRadius:12).strokeBorder(reward.redeemed ? Robo.color(0x3A3F47) : Robo.cyan.opacity(0.267),lineWidth:1))
-                                    VStack(alignment:.leading,spacing:8) {
-                                        Text(reward.type).font(Robo.title()).foregroundStyle(reward.redeemed ? Robo.steel : Robo.cyan)
-                                        if !reward.redeemed { Text("Tap to add to your queue").font(Robo.mono(10)).foregroundStyle(Robo.steel) }
-                                        Text(reward.redeemed ? "REDEEMED" : "AVAILABLE").font(Robo.mono(9)).tracking(2).foregroundStyle(Robo.cyan)
+                                        .font(.system(size:20)).foregroundStyle(reward.redeemed ? Robo.textSecondary : Robo.cyan)
+                                        .frame(width:40,height:40).background(Robo.background,in:RoundedRectangle(cornerRadius:12))
+                                        .overlay(RoundedRectangle(cornerRadius:12).strokeBorder(Color.white.opacity(0.2),lineWidth:1))
+                                    VStack(alignment:.leading,spacing:6) {
+                                        Text(reward.type).font(Robo.title(15)).foregroundStyle(reward.redeemed ? Robo.textSecondary : Robo.textPrimary)
+                                        if !reward.redeemed { Text("Tap to add to your queue").font(Robo.body(13)).foregroundStyle(Robo.textSecondary) }
+                                        Text(reward.redeemed ? "REDEEMED" : "AVAILABLE").font(Robo.mono(9)).tracking(2)
+                                            .foregroundStyle(reward.redeemed ? Robo.steel : Robo.cyan)
                                     }.frame(maxWidth:.infinity,alignment:.leading)
-                                    if model.busyIDs.contains(reward.id) { ProgressView() } else { Image(systemName:"chevron.right").foregroundStyle(Robo.cyan) }
+                                    if model.busyIDs.contains(reward.id) { ProgressView() } else { Image(systemName:"chevron.right").foregroundStyle(Robo.textSecondary) }
                                 }.padding(.horizontal,16).padding(.vertical,14)
-                                    .background(Robo.metal([(0x2A2E35,0),(0x1A1D22,1)]),in:RoundedRectangle(cornerRadius:14))
-                                    .overlay(RoundedRectangle(cornerRadius:14).strokeBorder(reward.redeemed ? Robo.color(0x3A3F47) : Robo.cyan.opacity(0.267),lineWidth:1))
-                                    .opacity(reward.redeemed ? 0.5 : 1)
+                                    .contentCard()
                         }.multilineTextAlignment(.leading).disabled(model.busyIDs.contains(reward.id)).accessibilityIdentifier("reward-\(reward.id)")
                     }
                 }.padding(18).frame(maxWidth:760).frame(maxWidth:.infinity)
@@ -136,7 +136,7 @@ struct RewardsScreen: View {
                 } message: { Text(selected?.type ?? model.rewardsNotice ?? "") }
         }.tint(Robo.cyan).noticeAlert(.rewards,model:model,blocked:selected != nil || model.rewardsNotice != nil)
     }
-    private func empty(_ title: String,_ message: String) -> some View { VStack(spacing:12) { Image(systemName:"gift").font(.system(size:48)); Text(title).font(Robo.bold(20)); Text(message).font(Robo.mono()).multilineTextAlignment(.center) }.frame(maxWidth:.infinity).padding(.vertical,40) }
+    private func empty(_ title: String,_ message: String) -> some View { VStack(spacing:12) { Image(systemName:"gift").font(.system(size:48)); Text(title).font(Robo.bold(20)).foregroundStyle(Robo.textPrimary); Text(message).font(Robo.body(14)).foregroundStyle(Robo.textSecondary).multilineTextAlignment(.center) }.frame(maxWidth:.infinity).padding(.vertical,40) }
 }
 struct QueueScreen: View {
     @EnvironmentObject var model: AppModel
@@ -152,13 +152,13 @@ struct QueueScreen: View {
                     }
                     if let error = model.queueError {
                         VStack(alignment:.leading,spacing:12) {
-                            Text(error).font(Robo.mono()).foregroundStyle(Robo.text)
-                            if !model.queue.isEmpty { Text("Showing the last loaded queue.").font(Robo.mono()).foregroundStyle(Robo.steel) }
+                            Text(error).font(Robo.body(14)).foregroundStyle(Robo.textPrimary)
+                            if !model.queue.isEmpty { Text("Showing the last loaded queue.").font(Robo.body(13)).foregroundStyle(Robo.textSecondary) }
                             Button("Refresh Queue") { Task { await model.refreshQueueAndCredits() } }
                                 .buttonStyle(BeerControlStyle()).disabled(model.loadingQueue)
                                 .accessibilityIdentifier("queue-retry")
-                        }.frame(maxWidth:.infinity,alignment:.leading).padding()
-                            .background(Robo.panel,in:RoundedRectangle(cornerRadius:12)).accessibilityIdentifier("queue-error")
+                        }.frame(maxWidth:.infinity,alignment:.leading).padding(14)
+                            .contentCard().accessibilityIdentifier("queue-error")
                     }
                     if !model.missedCredits.isEmpty {
                         MissedCreditBanner(visits:model.missedCredits) { model.showMissedCredit = true }
@@ -215,8 +215,8 @@ private struct QueueBeerCard: View {
                 (typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment:.leading,spacing:8)) : AnyLayout(HStackLayout(alignment:.firstTextBaseline,spacing:9))) {
                     if let container = details.container {
                         Text(container.uppercased()).font(Robo.mono(9)).tracking(0.6)
-                            .foregroundStyle(QueueChrome.cyan).padding(.horizontal,7).padding(.vertical,4)
-                            .background(QueueChrome.cyan.opacity(0.07),in:RoundedRectangle(cornerRadius:5))
+                            .foregroundStyle(Robo.textSecondary).padding(.horizontal,7).padding(.vertical,4)
+                            .overlay(RoundedRectangle(cornerRadius:5).strokeBorder(Color.white.opacity(0.2),lineWidth:1))
                             .fixedSize(horizontal:!typeSize.isAccessibilitySize,vertical:true)
                     }
                     Text(entry.date.isEmpty ? "Date unavailable" : entry.date)
@@ -241,8 +241,7 @@ private struct QueueBeerCard: View {
                 .accessibilityIdentifier("queue-delete-\(entry.id)")
         }
         .padding(14)
-        .background(LinearGradient(colors:[Robo.color(0x202830),QueueChrome.background],startPoint:.topLeading,endPoint:.bottomTrailing),in:RoundedRectangle(cornerRadius:17))
-        .overlay(RoundedRectangle(cornerRadius:17).strokeBorder(QueueChrome.metal.opacity(0.45),lineWidth:1))
+        .contentCard()
         .accessibilityIdentifier("queue-card-\(entry.id)")
     }
 }
@@ -260,21 +259,21 @@ struct OperationsScreen: View {
                 VStack(spacing:12) {
                     if model.operations.isEmpty { Text("No pending operations").font(Robo.title()).padding(40) }
                     ForEach(model.operations) { operation in
-                        ChromePanel {
+                        VStack(alignment:.leading,spacing:0) {
                             VStack(alignment:.leading,spacing:8) {
-                                Text(operation.payload["beerName"] ?? operation.payload["rewardType"] ?? operation.type).font(Robo.title()).foregroundStyle(Robo.cyan)
+                                Text(operation.payload["beerName"] ?? operation.payload["rewardType"] ?? operation.type).font(Robo.title(15)).foregroundStyle(Robo.textPrimary)
                                 Text("\(operation.status.uppercased()) · \(operation.retryCount) retries").font(Robo.mono()).foregroundStyle(Robo.amber)
-                                Text(Date(timeIntervalSince1970:operation.timestamp / 1000).formatted()).font(Robo.mono()).foregroundStyle(Robo.steel)
-                                if let store = operation.payload["storeName"] { Text("Location: " + store).font(Robo.mono()).foregroundStyle(Robo.steel) }
-                                if let restriction = model.operationRestriction(operation) { Text(restriction).font(Robo.mono()).foregroundStyle(Robo.amber) }
-                                if let error = operation.error { Text(error).font(Robo.mono()).foregroundStyle(Robo.steel) }
+                                Text(Date(timeIntervalSince1970:operation.timestamp / 1000).formatted()).font(Robo.mono()).foregroundStyle(Robo.textSecondary)
+                                if let store = operation.payload["storeName"] { Text("Location: " + store).font(Robo.mono()).foregroundStyle(Robo.textSecondary) }
+                                if let restriction = model.operationRestriction(operation) { Text(restriction).font(Robo.body(13)).foregroundStyle(Robo.amber) }
+                                if let error = operation.error { Text(error).font(Robo.body(13)).foregroundStyle(Robo.textSecondary) }
                                 (typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment:.leading,spacing:12)) : AnyLayout(HStackLayout())) {
                                     Button("RETRY") { retry = operation }.buttonStyle(RoboButtonStyle()).disabled(model.offline || model.processing || model.operationRestriction(operation) != nil)
                                         .opacity(model.offline || model.processing || model.operationRestriction(operation) != nil ? 0.45 : 1)
                                     Button("REMOVE") { removal = operation }.buttonStyle(RoboButtonStyle(color:Robo.red)).disabled(model.processing || operation.status == "retrying")
                                 }
                             }
-                        }
+                        }.padding(14).frame(maxWidth:.infinity,alignment:.leading).contentCard()
                     }
                 }.padding(18).frame(maxWidth:760).frame(maxWidth:.infinity)
             }.background(Robo.background).foregroundStyle(Robo.text).navigationTitle("Pending Operations").navigationBarTitleDisplayMode(.inline)

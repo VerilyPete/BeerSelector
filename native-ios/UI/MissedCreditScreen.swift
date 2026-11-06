@@ -11,7 +11,7 @@ struct MissedCreditBanner: View {
                     .frame(width:32,height:32).accessibilityHidden(true)
                 VStack(alignment:.leading,spacing:6) {
                     Text("\(count) \(count == 1 ? "beer wasn’t" : "beers weren’t") credited").font(Robo.title(16)).foregroundStyle(QueueChrome.text)
-                    Text("View a report of uncredited check-ins.").font(Robo.mono(10)).foregroundStyle(QueueChrome.secondary)
+                    Text("View a report of uncredited check-ins.").font(Robo.body(12)).foregroundStyle(QueueChrome.secondary)
                 }.frame(maxWidth:.infinity,alignment:.leading)
                 Image(systemName:"chevron.right").foregroundStyle(QueueChrome.amber).padding(.top,8).accessibilityHidden(true)
             }.padding(14)
@@ -37,14 +37,14 @@ struct MissedCreditScreen: View {
             ScrollView {
                 VStack(alignment:.leading,spacing:16) {
                     Text("Here’s a list of any queued items that were never credited on previous visits. Your server can help you resolve any oversights. Be nice.")
-                        .font(Robo.mono()).foregroundStyle(QueueChrome.secondary).fixedSize(horizontal:false,vertical:true)
-                    ChromePanel(padding:16) {
+                        .font(Robo.body(14)).foregroundStyle(QueueChrome.secondary).fixedSize(horizontal:false,vertical:true)
+                    VStack(alignment:.leading,spacing:0) {
                         VStack(alignment:.leading,spacing:14) {
                             field("NAME",memberName,id:"missed-credit-name")
                             field("UFO CLUB CARD",model.session?.cardNum.flatMap { $0.isEmpty ? nil : $0 } ?? "Not available",id:"missed-credit-card")
                             field("STORE",model.session?.storeName ?? "",id:"missed-credit-store")
                         }
-                    }
+                    }.padding(16).frame(maxWidth:.infinity,alignment:.leading).contentCard()
                     if model.missedCredits.isEmpty {
                         Text("Every queued beer has been credited.").font(Robo.title(16)).padding(.vertical,24)
                             .frame(maxWidth:.infinity).accessibilityIdentifier("missed-credit-empty")
@@ -56,9 +56,7 @@ struct MissedCreditScreen: View {
                             Button("Mark visit as resolved") { resolving = visit }.font(Robo.mono(10)).foregroundStyle(Robo.cyan)
                                 .frame(maxWidth:.infinity,minHeight:44)
                                 .accessibilityIdentifier("missed-credit-resolve-visit")
-                        }.padding(14)
-                            .background(QueueChrome.background,in:RoundedRectangle(cornerRadius:17))
-                            .overlay(RoundedRectangle(cornerRadius:17).strokeBorder(QueueChrome.metal.opacity(0.45),lineWidth:1))
+                        }.padding(14).contentCard()
                     }
                 }.padding(18).frame(maxWidth:760).frame(maxWidth:.infinity)
             }.background(Robo.background).foregroundStyle(Robo.text)
@@ -86,7 +84,7 @@ struct MissedCreditScreen: View {
                 Text(serving.name).font(Robo.title(19)).foregroundStyle(QueueChrome.text).textSelection(.enabled).fixedSize(horizontal:false,vertical:true)
                 let details = [serving.container?.uppercased(),MissedCredit.checkInTime(of:beer).map { $0.formatted(date:.omitted,time:.shortened) }].compactMap { $0 }
                 if !details.isEmpty {
-                    Text(details.joined(separator:" · ")).font(Robo.mono(9)).tracking(0.6).foregroundStyle(QueueChrome.cyan)
+                    Text(details.joined(separator:" · ")).font(Robo.mono(9)).tracking(0.6).foregroundStyle(Robo.textSecondary)
                 }
             }.frame(maxWidth:.infinity,alignment:.leading).accessibilityElement(children:.combine)
             Button("Remove") { removal = beer }.font(Robo.mono(10)).foregroundStyle(Robo.color(0xDB8F91))

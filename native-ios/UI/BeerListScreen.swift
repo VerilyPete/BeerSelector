@@ -135,13 +135,12 @@ struct BeerCard: View {
     @EnvironmentObject var model: AppModel
     private var pending: Bool { model.hasSavedCheckIn(beer.id) }
     var body: some View {
-        ChromePanel(padding:10) {
-            VStack(alignment:.leading,spacing:10) {
+        VStack(alignment:.leading,spacing:10) {
                 Button(action:toggle) {
                     (typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment:.leading,spacing:10)) : AnyLayout(HStackLayout(spacing:10))) {
                         BeerIconWell(glyph:glyph).accessibilityLabel(beer.container_type ?? "Unknown container")
                         VStack(alignment:.leading,spacing:3) {
-                            Text(beer.brew_name).font(Robo.title(large ? 18 : 14)).foregroundStyle(Robo.cyan).lineLimit(expanded || typeSize.isAccessibilitySize ? nil : 1).accessibilityIdentifier("beer-name-\(beer.id)")
+                            Text(beer.brew_name).font(Robo.title(large ? 18 : 15)).foregroundStyle(Robo.textPrimary).lineLimit(expanded || typeSize.isAccessibilitySize ? nil : 1).accessibilityIdentifier("beer-name-\(beer.id)")
                             Group {
                                 if let arrival {
                                     ViewThatFits(in:.horizontal) {
@@ -151,18 +150,18 @@ struct BeerCard: View {
                                 } else {
                                     Text(brewerLine).lineLimit(textLines)
                                 }
-                            }.font(Robo.mono(large ? 13 : 10)).foregroundStyle(Robo.steel)
-                            Text([beer.brew_style,beer.brew_container].filter { !$0.isEmpty }.joined(separator:" · ")).font(Robo.mono(large ? 13 : 10)).foregroundStyle(Robo.steel).lineLimit(typeSize.isAccessibilitySize ? nil : 1)
+                            }.font(Robo.body(large ? 15 : 13)).foregroundStyle(Robo.textSecondary)
+                            Text([beer.brew_style,beer.brew_container].filter { !$0.isEmpty }.joined(separator:" · ")).font(Robo.mono(large ? 13 : 10)).foregroundStyle(Robo.textSecondary).lineLimit(typeSize.isAccessibilitySize ? nil : 1)
                         }.frame(maxWidth:.infinity,alignment:.leading)
-                        if let abv = beer.abv { Text("\(abv.formatted())%").font(Robo.mono(large ? 14 : 11).weight(.bold)).foregroundStyle(Robo.cyan).padding(.horizontal,8).padding(.vertical,4).frame(minHeight:28).overlay(RoundedRectangle(cornerRadius:8).strokeBorder(Robo.cyan.opacity(0.267),lineWidth:1)) }
+                        if let abv = beer.abv { Text("\(abv.formatted())%").font(Robo.mono(large ? 14 : 11).weight(.bold)).foregroundStyle(Robo.textPrimary).padding(.horizontal,8).padding(.vertical,4).frame(minHeight:28).overlay(RoundedRectangle(cornerRadius:8).strokeBorder(Color.white.opacity(0.2),lineWidth:1)) }
                     }.frame(minHeight:46).contentShape(Rectangle())
                 }.buttonStyle(.plain).multilineTextAlignment(.leading).accessibilityIdentifier("beer-item-\(beer.id)").accessibilityValue(expanded ? "Expanded" : "Collapsed")
                 if expanded {
-                    Divider().overlay(Robo.steel.opacity(0.3))
-                    if beer.tasted_date.isEmpty { Text("\(dateLabel): \(beer.displayDate)").font(Robo.mono(10)).foregroundStyle(Robo.steel) }
+                    Divider().overlay(Robo.hairline)
+                    if beer.tasted_date.isEmpty { Text("\(dateLabel): \(beer.displayDate)").font(Robo.mono(10)).foregroundStyle(Robo.textSecondary) }
                     if !beer.brew_description.isEmpty {
-                        Text("Description").font(Robo.title(13))
-                        Text(beer.plainDescription).font(Robo.mono()).foregroundStyle(Robo.steel).lineSpacing(5).accessibilityIdentifier("beer-description-\(beer.id)")
+                        Text("Description").font(Robo.title(13)).foregroundStyle(Robo.textPrimary)
+                        Text(beer.plainDescription).font(Robo.body(14)).foregroundStyle(Robo.textSecondary).lineSpacing(4).accessibilityIdentifier("beer-description-\(beer.id)")
                     }
                     if dateLabel == "Tasted", model.isMember { BeerFeedbackControls(beer:beer) }
                     HStack {
@@ -172,8 +171,7 @@ struct BeerCard: View {
                         if dateLabel != "Tasted" { Button("UNTAPPD") { model.openUntappd(beer) }.buttonStyle(BeerControlStyle(appearance:checkIn ? .amber : .outline)).accessibilityIdentifier("untappd-\(beer.id)") }
                     }
                 }
-            }
-        }
+        }.padding(12).contentCard()
     }
     private var brewerLine: String {
         beer.tasted_date.isEmpty ? beer.brewer : "\(beer.brewer) · \(dateLabel) \(beer.displayDate)"

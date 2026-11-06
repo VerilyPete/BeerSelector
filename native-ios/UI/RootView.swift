@@ -144,10 +144,10 @@ struct HomeView: View {
                     sectionHeading("LATEST ON TAP","View all") { model.tab = .all }
                     let arrivals = BeerFilter.recentArrivals(model.allBeers)
                     if model.allBeers.isEmpty {
-                        Text("No saved beers yet. Refresh from Settings to load the taplist.").font(Robo.mono(14)).foregroundStyle(Robo.steel)
+                        Text("No saved beers yet. Refresh from Settings to load the taplist.").font(Robo.body(15)).foregroundStyle(Robo.textSecondary)
                             .alignmentGuide(.latestOnTap) { $0[.top] }
                     } else if arrivals.isEmpty {
-                        Text("Nothing new on tap in the last week.").font(Robo.mono(14)).foregroundStyle(Robo.steel)
+                        Text("Nothing new on tap in the last week.").font(Robo.body(15)).foregroundStyle(Robo.textSecondary)
                             .alignmentGuide(.latestOnTap) { $0[.top] }
                     } else {
                         ScrollView {
@@ -172,39 +172,37 @@ struct HomeView: View {
                         }
                         VStack(alignment:.leading,spacing:14) {
                             sectionHeading("RECENT TASTINGS","View all") { model.tab = .tasted }
-                            ChromePanel(padding:16) {
+                            Group {
                                 VStack(alignment:.leading,spacing:14) {
-                                    if model.tastedBeers.isEmpty { Text("Your confirmed tastings will appear here.").font(Robo.mono(14)).foregroundStyle(Robo.steel) }
+                                    if model.tastedBeers.isEmpty { Text("Your confirmed tastings will appear here.").font(Robo.body(15)).foregroundStyle(Robo.textSecondary) }
                                     ForEach(Array(BeerFilter().apply(model.tastedBeers,tasted:true).prefix(4).enumerated()),id:\.element.id) { index,beer in
-                                        if index > 0 { Divider().overlay(Robo.steel.opacity(0.3)) }
+                                        if index > 0 { Divider().overlay(Robo.hairline) }
                                         VStack(alignment:.leading,spacing:4) {
-                                            Text(beer.brew_name).font(Robo.title(18)).foregroundStyle(Robo.cyan)
-                                            Text([beer.brewer,beer.tasted_date].filter { !$0.isEmpty }.joined(separator:" · ")).font(Robo.mono(13)).foregroundStyle(Robo.steel)
+                                            Text(beer.brew_name).font(Robo.title(18)).foregroundStyle(Robo.textPrimary)
+                                            Text([beer.brewer,beer.tasted_date].filter { !$0.isEmpty }.joined(separator:" · ")).font(Robo.body(15)).foregroundStyle(Robo.textSecondary)
                                         }.frame(maxWidth:.infinity,alignment:.leading)
                                     }
-                                }
-                            }
+                                }.frame(maxWidth:.infinity,alignment:.leading)
+                            }.padding(16).contentCard()
                         }
                         VStack(alignment:.leading,spacing:14) {
                             sectionHeading("AVAILABLE REWARDS","View all") { model.showRewards = true }
-                            ChromePanel(padding:16) {
+                            Group {
                                 VStack(alignment:.leading,spacing:14) {
                                     let available = model.rewards.filter { !$0.redeemed }
-                                    if available.isEmpty { Text("No unclaimed rewards. Keep tasting toward your next milestone.").font(Robo.mono(14)).foregroundStyle(Robo.steel) }
+                                    if available.isEmpty { Text("No unclaimed rewards. Keep tasting toward your next milestone.").font(Robo.body(15)).foregroundStyle(Robo.textSecondary) }
                                     ForEach(Array(available.prefix(3))) { reward in
                                         Label(reward.type,systemImage:"gift").font(Robo.title(18)).foregroundStyle(Robo.amber)
                                     }
                                 }.frame(maxWidth:.infinity,alignment:.leading)
-                            }
+                            }.padding(16).contentCard()
                         }
                     } else {
-                        ChromePanel(padding:20,riveted:true) {
-                            VStack(alignment:.leading,spacing:14) {
-                                Text("YOUR UFO CLUB JOURNEY").font(Robo.title(20)).foregroundStyle(Robo.cyan)
-                                Text("Sign in to see your tasted beers, progress and rewards alongside the taplist.").font(Robo.mono(14)).foregroundStyle(Robo.steel)
-                                Button("SIGN IN") { model.showSettings = true; model.showLogin = true }.buttonStyle(BeerControlStyle(appearance:.amber))
-                            }.padding(8)
-                        }
+                        VStack(alignment:.leading,spacing:14) {
+                            Text("YOUR UFO CLUB JOURNEY").font(Robo.title(20)).foregroundStyle(Robo.textPrimary)
+                            Text("Sign in to see your tasted beers, progress and rewards alongside the taplist.").font(Robo.body(15)).foregroundStyle(Robo.textSecondary)
+                            Button("SIGN IN") { model.showSettings = true; model.showLogin = true }.buttonStyle(BeerControlStyle(appearance:.amber))
+                        }.padding(28).frame(maxWidth:.infinity,alignment:.leading).contentCard()
                     }
                 }.frame(maxWidth:.infinity,alignment:.leading)
                     .onGeometryChange(for:CGFloat.self) { $0.size.height } action: { tabletAsideHeight = $0 }
@@ -316,16 +314,15 @@ struct SuggestionEntryCard: View {
         if modes.mode != .off {
             Button(action:open) {
                 HStack(spacing:12) {
-                    Image(systemName:modes.mode.symbol).foregroundStyle(QueueChrome.cyan)
+                    Image(systemName:modes.mode.symbol).foregroundStyle(Robo.textSecondary)
                     VStack(alignment:.leading,spacing:4) {
-                        Text(modes.mode.homeTitle).font(Robo.title(15))
-                        Text(modes.mode.homeDetail).font(Robo.mono(10)).foregroundStyle(QueueChrome.secondary)
+                        Text(modes.mode.homeTitle).font(Robo.title(16))
+                        Text(modes.mode.homeDetail).font(Robo.body(13)).foregroundStyle(QueueChrome.secondary)
                             .fixedSize(horizontal:false,vertical:true)
                     }.frame(maxWidth:.infinity,alignment:.leading)
                     Image(systemName:"chevron.right").font(.system(size:12)).foregroundStyle(QueueChrome.secondary)
                 }.padding(14).frame(maxWidth:.infinity,alignment:.leading)
-                    .background(QueueChrome.background,in:RoundedRectangle(cornerRadius:15))
-                    .overlay(RoundedRectangle(cornerRadius:15).strokeBorder(QueueChrome.metal.opacity(0.45),lineWidth:1))
+                    .contentCard()
             }.buttonStyle(.plain).foregroundStyle(QueueChrome.text).accessibilityIdentifier("home-recommendations")
         }
     }
