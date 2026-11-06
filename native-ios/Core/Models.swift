@@ -288,3 +288,16 @@ enum RewardsCardStatus: Equatable {
 
     var spokenSummary: String { "Rewards: \(headline). \(detail)" }
 }
+
+/// Whether the compact Home fits its screen or scrolls, and how many New on Tap rows a scrolling Home shows.
+enum CompactHomeMode: Equatable {
+    case fitted, scrolling(rows: Int)
+
+    /// Accessibility text always scrolls with two arrivals. An open description scrolls with the rows already shown,
+    /// but only if Home actually shows that beer; a stale expansion from another layout is ignored.
+    init(expandedID: String?, taplist: [Beer], accessibility: Bool, fittedRows: Int) {
+        if accessibility { self = .scrolling(rows:2); return }
+        guard let expandedID, BeerFilter.newOnTap(taplist,count:fittedRows).contains(where: { $0.id == expandedID }) else { self = .fitted; return }
+        self = .scrolling(rows:fittedRows)
+    }
+}

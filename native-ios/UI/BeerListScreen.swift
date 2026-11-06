@@ -129,11 +129,13 @@ struct BeerListScreen: View {
             if refreshing { ProgressView().tint(Robo.cyan).frame(width:44,height:44).accessibilityLabel("Refreshing beers") }
             if kind == .finder {
                 Button { model.showQueue = true } label: {
-                    if model.loadingQueue { ProgressView().tint(Robo.amber).frame(width:32,height:32).modifier(AmberWell()) }
-                    else { AmberIcon(symbol:"list.bullet.rectangle") }
-                }.buttonStyle(.plain).frame(width:44,height:44).disabled(model.loadingQueue)
+                    Group {
+                        if model.loadingQueue { ProgressView().tint(Robo.amber).frame(width:32,height:32).modifier(AmberWell()) }
+                        else { AmberIcon(symbol:"list.bullet.rectangle") }
+                    }.frame(width:44,height:44).contentShape(Rectangle())
+                }.buttonStyle(.plain).disabled(model.loadingQueue)
                     .accessibilityIdentifier("view-queue-button").accessibilityLabel("View beer queue").accessibilityValue(model.loadingQueue ? "Loading" : "")
-                Button { model.showRewards = true } label: { AmberIcon(symbol:"gift") }.buttonStyle(.plain).frame(width:44,height:44)
+                Button { model.showRewards = true } label: { AmberIcon(symbol:"gift").frame(width:44,height:44).contentShape(Rectangle()) }.buttonStyle(.plain)
                     .accessibilityIdentifier("finder-rewards-button").accessibilityLabel("View rewards")
             }
             Button { model.showSettings = true } label: { IconWell(symbol:"gearshape").frame(width:44,height:44) }.buttonStyle(.plain).accessibilityLabel("Open settings")

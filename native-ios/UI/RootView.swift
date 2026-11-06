@@ -125,15 +125,17 @@ struct HomeView: View {
     /// How the compact Home fits its screen: roomy spacing, tight spacing, then one New on Tap row.
     private enum CompactFit { case roomy, tight, oneRow }
     @ViewBuilder private var compactHome: some View {
-        if expandedHomeBeerID != nil || typeSize.isAccessibilitySize {
-            // Reading a description, or accessibility text, is the only time Home scrolls.
-            ScrollView { compactContent(compactFit).background(HomeScrollBoundary()) }
-        } else {
+        switch CompactHomeMode(expandedID:expandedHomeBeerID,taplist:model.allBeers,accessibility:typeSize.isAccessibilitySize,fittedRows:compactFit == .oneRow ? 1 : 2) {
+        case .scrolling(let rows):
+            // Reading a description, or accessibility text, is the only time a fitting Home scrolls.
+            ScrollView { compactContent(rows == 1 ? .oneRow : compactFit == .oneRow ? .roomy : compactFit).background(HomeScrollBoundary()) }
+        case .fitted:
             ViewThatFits(in:.vertical) {
                 compactContent(.roomy).onAppear { compactFit = .roomy }.fixedHome
                 compactContent(.tight).onAppear { compactFit = .tight }.fixedHome
                 compactContent(.oneRow).onAppear { compactFit = .oneRow }.fixedHome
-                ScrollView { compactContent(.oneRow).background(HomeScrollBoundary()) }
+                // Nothing fits (a short landscape window, or long banners): scroll the one-row layout.
+                ScrollView { compactContent(.oneRow).background(HomeScrollBoundary()) }.onAppear { compactFit = .oneRow }
             }.frame(maxHeight:.infinity,alignment:.top)
         }
     }
@@ -291,7 +293,7 @@ struct HomeRewardsCard: View {
     let open: () -> Void
     let retry: () -> Void
     var body: some View {
-        VStack(alignment:.leading,spacing:12) {
+        VStack(alignment:.leading,spacing:0) {
             Button(action:open) {
                 HStack(spacing:14) {
                     AmberIcon(symbol:"gift")
@@ -300,15 +302,15 @@ struct HomeRewardsCard: View {
                         Text(status.cardLine).font(Robo.body(14)).foregroundStyle(Robo.textSecondary)
                     }.frame(maxWidth:.infinity,alignment:.leading).multilineTextAlignment(.leading)
                     Image(systemName:"chevron.right").font(.system(size:12)).foregroundStyle(Robo.textSecondary).accessibilityHidden(true)
-                }.contentShape(Rectangle())
+                }.padding(14).frame(minHeight:44).contentShape(Rectangle())
             }.buttonStyle(.plain)
                 .accessibilityElement(children:.ignore).accessibilityLabel(status.spokenSummary).accessibilityHint("Opens Rewards")
                 .accessibilityAddTraits(.isButton).accessibilityIdentifier("home-rewards-card")
             if status.offersRetry {
                 Button("Try Again",action:retry).buttonStyle(BeerControlStyle()).accessibilityLabel("Try loading rewards again")
-                    .accessibilityIdentifier("home-rewards-retry")
+                    .accessibilityIdentifier("home-rewards-retry").padding([.horizontal,.bottom],14)
             }
-        }.padding(14).frame(maxWidth:.infinity,alignment:.leading).contentCard()
+        }.frame(maxWidth:.infinity,alignment:.leading).contentCard()
     }
 }
 

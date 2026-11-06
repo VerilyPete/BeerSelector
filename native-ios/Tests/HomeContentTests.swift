@@ -113,3 +113,43 @@ final class RewardsCardStatusTests: XCTestCase {
         XCTAssertEqual(status(loaded:true,rewards:available).spokenSummary,"Rewards: 2 rewards ready. Tap to view and claim.")
     }
 }
+
+final class CompactHomeModeTests: XCTestCase {
+    private func beer(_ id: String, added: String) -> Beer { var beer = Beer(id:id,name:id); beer.added_date = added; return beer }
+    private var taplist: [Beer] { [beer("newest",added:"300"),beer("second",added:"200"),beer("third",added:"100")] }
+
+    func testWithNothingOpenHomeFitsItsScreen() {
+        XCTAssertEqual(CompactHomeMode(expandedID:nil,taplist:taplist,accessibility:false,fittedRows:1),.fitted)
+    }
+
+    func testAccessibilityTextScrollsAndAlwaysShowsTwoArrivals() {
+        XCTAssertEqual(CompactHomeMode(expandedID:nil,taplist:taplist,accessibility:true,fittedRows:1),.scrolling(rows:2))
+        XCTAssertEqual(CompactHomeMode(expandedID:"newest",taplist:taplist,accessibility:true,fittedRows:1),.scrolling(rows:2))
+    }
+
+    func testOpeningAShownArrivalScrollsWithoutChangingWhichRowsShow() {
+        XCTAssertEqual(CompactHomeMode(expandedID:"newest",taplist:taplist,accessibility:false,fittedRows:1),.scrolling(rows:1))
+        XCTAssertEqual(CompactHomeMode(expandedID:"second",taplist:taplist,accessibility:false,fittedRows:2),.scrolling(rows:2))
+    }
+
+    func testAnExpansionForABeerHomeDoesNotShowIsIgnored() {
+        XCTAssertEqual(CompactHomeMode(expandedID:"second",taplist:taplist,accessibility:false,fittedRows:1),.fitted)
+        XCTAssertEqual(CompactHomeMode(expandedID:"third",taplist:taplist,accessibility:false,fittedRows:2),.fitted)
+        XCTAssertEqual(CompactHomeMode(expandedID:"gone",taplist:taplist,accessibility:false,fittedRows:2),.fitted)
+    }
+}
+
+final class SortOrderTests: XCTestCase {
+    private func beer(_ id: String, name: String, added: String, abv: Double?) -> Beer {
+        var beer = Beer(id:id,name:name); beer.added_date = added; beer.abv = abv; return beer
+    }
+
+    func testEveryMenuChoiceSortsTheTaplistTheWayItsTitleSays() {
+        let beers = [beer("a",name:"Bravo",added:"200",abv:6),beer("b",name:"Alpha",added:"300",abv:nil),beer("c",name:"Charlie",added:"100",abv:4)]
+        let orders = SortOption.all.map { option -> [String] in
+            var filter = BeerFilter(); option.apply(to:&filter)
+            return filter.apply(beers).map(\.id)
+        }
+        XCTAssertEqual(orders,[["b","a","c"],["c","a","b"],["b","a","c"],["c","a","b"],["a","c","b"],["c","a","b"]])
+    }
+}
