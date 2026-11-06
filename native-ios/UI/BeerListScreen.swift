@@ -23,10 +23,10 @@ struct BeerListScreen: View {
             let columnCount = typeSize.isAccessibilitySize ? 1 : geometry.size.width >= 1024 ? 3 : geometry.size.width >= 768 ? 2 : 1
             let columns = Array(repeating:GridItem(.flexible(),spacing:8,alignment:.top),count:columnCount)
             VStack(spacing:12) {
-                HStack {
-                    DisplayTitle(title:kind.title); Spacer()
-                    if refreshing { ProgressView().tint(Robo.cyan).accessibilityLabel("Refreshing beers") }
-                    Button { model.showSettings = true } label: { IconWell(symbol:"gearshape").frame(width:44,height:44) }.buttonStyle(.plain).accessibilityLabel("Open settings")
+                // C1: the buttons wrap below the title when one line doesn't fit.
+                ViewThatFits(in:.horizontal) {
+                    HStack(spacing:0) { DisplayTitle(title:kind.title).fixedSize(); Spacer(minLength:4); headerButtons }
+                    VStack(alignment:.leading,spacing:8) { DisplayTitle(title:kind.title); HStack(spacing:0) { headerButtons } }
                 }
                 HStack {
                     Image(systemName:"magnifyingglass").foregroundStyle(Robo.steel)
@@ -35,16 +35,12 @@ struct BeerListScreen: View {
                 }.padding(.horizontal,12).frame(minHeight:38).modifier(ChromeBezel(radius:12))
                 Text("\(filtered.count) \(kind == .finder ? "to discover" : kind == .tasted ? "tasted beers" : "beers on tap")").font(Robo.mono(10)).foregroundStyle(Robo.steel).frame(maxWidth:.infinity,alignment:.leading)
                 ViewThatFits(in:.horizontal) {
-                    HStack(spacing:6) { containerSegments(vertical:false); sortControls; if kind == .finder { queueControls }; Spacer(minLength:0) }.fixedSize(horizontal:true,vertical:false)
+                    HStack(spacing:6) { containerSegments(vertical:false); sortControls; Spacer(minLength:0) }.fixedSize(horizontal:true,vertical:false)
                     VStack(alignment:.leading,spacing:0) {
                         HStack(spacing:4) { containerSegments(vertical:false) }.fixedSize(horizontal:true,vertical:false)
-                        HStack(spacing:6) { sortControls; if kind == .finder { queueControls } }.fixedSize(horizontal:true,vertical:false)
+                        sortControls.fixedSize(horizontal:true,vertical:false)
                     }
-                    VStack(alignment:.leading,spacing:0) {
-                        containerSegments(vertical:true)
-                        HStack(spacing:6) { sortControls }
-                        if kind == .finder { HStack(spacing:6) { queueControls } }
-                    }
+                    VStack(alignment:.leading,spacing:0) { containerSegments(vertical:true); sortControls }
                 }.frame(maxWidth:.infinity,alignment:.leading)
                 if kind == .finder, let queueError = model.queueError {
                     Text(queueError).font(Robo.mono()).foregroundStyle(Robo.red)
@@ -121,13 +117,33 @@ struct BeerListScreen: View {
         }.menuStyle(.button).buttonStyle(BeerControlStyle())
             .accessibilityIdentifier("sort-menu").accessibilityLabel("Sort: \(current.spokenLabel)")
     }
-    private var queueControls: some View {
+    private var headerButtons: some View {
         Group {
-            Button { model.showQueue = true } label: {
-                if model.loadingQueue { ProgressView().tint(Robo.amber) } else { Text("QUEUE") }
-            }.buttonStyle(BeerControlStyle(appearance:.amber,compact:true)).disabled(model.loadingQueue).accessibilityIdentifier("view-queue-button").accessibilityLabel("View beer queue").accessibilityValue(model.loadingQueue ? "Loading" : "")
-            Button("REWARDS") { model.showRewards = true }.buttonStyle(BeerControlStyle(appearance:.amber,compact:true)).accessibilityIdentifier("finder-rewards-button")
+            if refreshing { ProgressView().tint(Robo.cyan).frame(width:44,height:44).accessibilityLabel("Refreshing beers") }
+            if kind == .finder {
+                Button { model.showQueue = true } label: {
+                    if model.loadingQueue { ProgressView().tint(Robo.amber).frame(width:32,height:32).modifier(AmberWell()) }
+                    else { AmberIcon(symbol:"list.bullet.rectangle") }
+                }.buttonStyle(.plain).frame(width:44,height:44).disabled(model.loadingQueue)
+                    .accessibilityIdentifier("view-queue-button").accessibilityLabel("View beer queue").accessibilityValue(model.loadingQueue ? "Loading" : "")
+                Button { model.showRewards = true } label: { AmberIcon(symbol:"gift") }.buttonStyle(.plain).frame(width:44,height:44)
+                    .accessibilityIdentifier("finder-rewards-button").accessibilityLabel("View rewards")
+            }
+            Button { model.showSettings = true } label: { IconWell(symbol:"gearshape").frame(width:44,height:44) }.buttonStyle(.plain).accessibilityLabel("Open settings")
         }
+    }
+}
+/// The amber chrome well for Beerfinder's Queue and Rewards header buttons.
+private struct AmberWell: ViewModifier {
+    func body(content: Content) -> some View {
+        content.modifier(ChromeBezel(radius:10,rim:2,gradient:Robo.amberChrome,well:Robo.color(0x1A1200),edge:Robo.color(0xFFE082).opacity(0.18)))
+    }
+}
+private struct AmberIcon: View {
+    let symbol: String
+    var body: some View {
+        Image(systemName:symbol).font(.system(size:17)).foregroundStyle(Robo.color(0xD4AB50))
+            .frame(width:32,height:32).modifier(AmberWell()).accessibilityHidden(true)
     }
 }
 /// The sort chip's icon: the BeerIcons glyph for ABV, an SF Symbol otherwise.
