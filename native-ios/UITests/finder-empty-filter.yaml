@@ -4,7 +4,7 @@ appId: org.verily.FSbeerselector
 ---
 - assertVisible: "6 to discover"
 - tapOn:
-    id: container-filter
+    id: container-filter-draft
 - tapOn:
     id: search-input
 - inputText: no-such-beer
@@ -15,4 +15,7 @@ appId: org.verily.FSbeerselector
 - tapOn:
     id: clear-beer-filters
 - assertVisible: "6 to discover"
+- assertVisible:
+    id: container-filter-all
+    selected: true
 - assertNotVisible: "No beers match your filters"

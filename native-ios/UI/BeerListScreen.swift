@@ -35,9 +35,14 @@ struct BeerListScreen: View {
                 }.padding(.horizontal,12).frame(minHeight:38).modifier(ChromeBezel(radius:12))
                 Text("\(filtered.count) \(kind == .finder ? "to discover" : kind == .tasted ? "tasted beers" : "beers on tap")").font(Robo.mono(10)).foregroundStyle(Robo.steel).frame(maxWidth:.infinity,alignment:.leading)
                 ViewThatFits(in:.horizontal) {
-                    HStack(spacing:6) { filterControls; if kind == .finder { queueControls }; Spacer(minLength:0) }.fixedSize(horizontal:true,vertical:false)
+                    HStack(spacing:6) { containerSegments(vertical:false); sortControls; if kind == .finder { queueControls }; Spacer(minLength:0) }.fixedSize(horizontal:true,vertical:false)
                     VStack(alignment:.leading,spacing:0) {
-                        HStack(spacing:6) { filterControls }
+                        HStack(spacing:4) { containerSegments(vertical:false) }.fixedSize(horizontal:true,vertical:false)
+                        HStack(spacing:6) { sortControls; if kind == .finder { queueControls } }.fixedSize(horizontal:true,vertical:false)
+                    }
+                    VStack(alignment:.leading,spacing:0) {
+                        containerSegments(vertical:true)
+                        HStack(spacing:6) { sortControls }
                         if kind == .finder { HStack(spacing:6) { queueControls } }
                     }
                 }.frame(maxWidth:.infinity,alignment:.leading)
@@ -83,15 +88,22 @@ struct BeerListScreen: View {
                 #endif
             }
     }
-    private var filterControls: some View {
+    private func containerSegments(vertical: Bool) -> some View {
+        (vertical ? AnyLayout(VStackLayout(alignment:.leading,spacing:0)) : AnyLayout(HStackLayout(spacing:4))) {
+            ForEach(ContainerFilter.allCases,id:\.self) { option in
+                let selected = filter.container == option
+                Button(option.segmentTitle) {
+                    UIImpactFeedbackGenerator(style:.light).impactOccurred()
+                    filter.container = option; expandedID = nil
+                }.buttonStyle(BeerControlStyle(appearance:selected ? .selected : .chrome))
+                    .accessibilityIdentifier("container-filter-\(option.segmentID)")
+                    .accessibilityLabel(option.spokenTitle)
+                    .accessibilityAddTraits(selected ? .isSelected : [])
+            }
+        }.accessibilityElement(children:.contain).accessibilityLabel("Container filter")
+    }
+    private var sortControls: some View {
         Group {
-            Button(filter.container == .cans ? "CANS" : filter.container.rawValue) {
-                UIImpactFeedbackGenerator(style:.light).impactOccurred()
-                let cases = ContainerFilter.allCases
-                filter.container = cases[(cases.firstIndex(of:filter.container)!+1)%cases.count]; expandedID = nil
-            }.buttonStyle(BeerControlStyle(appearance:filter.container == .all ? .chrome : .selected))
-                .accessibilityIdentifier("container-filter").accessibilityLabel("Container filter: \(filter.container == .cans ? "Cans and bottles" : filter.container.rawValue)")
-                .accessibilityAddTraits(filter.container == .all ? [] : .isSelected)
             Button {
                 UIImpactFeedbackGenerator(style:.light).impactOccurred()
                 let cases = BeerSort.allCases
@@ -123,6 +135,11 @@ struct BeerListScreen: View {
             Button("REWARDS") { model.showRewards = true }.buttonStyle(BeerControlStyle(appearance:.amber,compact:true)).accessibilityIdentifier("finder-rewards-button")
         }
     }
+}
+private extension ContainerFilter {
+    var segmentTitle: String { self == .cans ? "CANS & BOTTLES" : rawValue }
+    var spokenTitle: String { switch self { case .all: "All"; case .draft: "Draft"; case .cans: "Cans and bottles" } }
+    var segmentID: String { switch self { case .all: "all"; case .draft: "draft"; case .cans: "cans" } }
 }
 struct BeerCard: View {
     @Environment(\.dynamicTypeSize) private var typeSize
