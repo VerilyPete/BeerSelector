@@ -152,4 +152,3 @@ final class PreviewFixtureTests: XCTestCase {
         XCTAssertTrue(model.recommendations.outcomes.isEmpty)
     }
 }
-
