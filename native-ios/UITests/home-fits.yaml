@@ -11,6 +11,9 @@ appId: org.verily.FSbeerselector
 - assertVisible:
     id: settings-nav-button
 - assertVisible:
+    id: home-recommendations
+- assertVisible: "Ask Apple Intelligence"
+- assertVisible:
     id: beer-item-1
 - assertVisible:
     id: beer-item-2
