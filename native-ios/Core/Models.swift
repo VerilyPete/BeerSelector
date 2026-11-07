@@ -12,6 +12,17 @@ enum BeerError: LocalizedError {
     }
 }
 
+/// Saucer stores some names with backslash-escaped quotes ("Dragon\'s"), per record,
+/// and the enrichment API serves them repaired. Every source passes through here
+/// so queue, tasted and taplist names compare in one form.
+enum BeerName {
+    static func clean(_ name: String) -> String {
+        name.replacingOccurrences(of:#"\\(['"])"#,with:"$1",options:.regularExpression)
+            .replacingOccurrences(of:#"\s+"#,with:" ",options:.regularExpression)
+            .trimmingCharacters(in:.whitespaces)
+    }
+}
+
 struct Beer: Identifiable, Codable, Equatable {
     var id: String
     var brew_name: String
@@ -47,6 +58,12 @@ struct Beer: Identifiable, Codable, Equatable {
         enrichment_confidence = row["enrichment_confidence"].flatMap(Double.init)
         enrichment_source = row["enrichment_source"]
         container_type = row["container_type"] ?? inferredContainer
+        self = withCleanNames
+    }
+    var withCleanNames: Beer {
+        var beer = self
+        beer.brew_name = BeerName.clean(brew_name); beer.brewer = BeerName.clean(brewer)
+        return beer
     }
     var inferredContainer: String? {
         let c = brew_container.lowercased(), s = brew_style.lowercased()

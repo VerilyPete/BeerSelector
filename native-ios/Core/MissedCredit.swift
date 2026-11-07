@@ -79,7 +79,7 @@ extension BeerDatabase {
     }
     func creditLog(account: String) throws -> [CreditLogEntry] {
         try rows("SELECT id,name,queued,first_seen FROM credit_log WHERE account=? AND dismissed=0 ORDER BY first_seen,id",[account]).map {
-            CreditLogEntry(id:$0["id"] ?? "",name:$0["name"] ?? "",queued:$0["queued"] ?? "",firstSeen:Date(timeIntervalSince1970:Double($0["first_seen"] ?? "") ?? 0))
+            CreditLogEntry(id:$0["id"] ?? "",name:BeerName.clean($0["name"] ?? ""),queued:$0["queued"] ?? "",firstSeen:Date(timeIntervalSince1970:Double($0["first_seen"] ?? "") ?? 0))
         }
     }
     func dismissCredit(ids: [String], account: String) throws {

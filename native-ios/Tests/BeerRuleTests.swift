@@ -65,6 +65,25 @@ final class BeerRuleTests: XCTestCase {
         let beers = try BeerAPI.parseBeers(data,proxy:true)
         XCTAssertEqual(beers[0].abv,5.2); XCTAssertEqual(beers[0].enrichment_source,"description"); XCTAssertNil(beers[1].abv)
     }
+    func testSaucerEscapedQuotesAreRemovedFromNamesAndBrewers() throws {
+        let taplist = Data(#"[{},{"brewInStock":[{"id":"21905936","brew_name":"New Holland Dragon\\'s Milk Reserve - Triple Mash Stout (BTL)","brewer":"Brasserie D\\'achouffe"},{"id":"2","brew_name":"The \\\"Big\\\" Ale"}]}]"#.utf8)
+        let beers = try BeerAPI.parseBeers(taplist)
+        XCTAssertEqual(beers.map(\.brew_name),["New Holland Dragon's Milk Reserve - Triple Mash Stout (BTL)",#"The "Big" Ale"#])
+        XCTAssertEqual(beers[0].brewer,"Brasserie D'achouffe")
+        let tasted = Data(#"[{},{"tasted_brew_current_round":[{"id":"7242660","brew_name":"New Holland Dragon's Milk Reserve - Triple Mash Stout"},{"id":"21905936","brew_name":"New Holland Dragon\\'s Milk Reserve - Triple Mash Stout (BTL)"}]}]"#.utf8)
+        XCTAssertEqual(try BeerAPI.parseBeers(tasted,tasted:true).map(\.brew_name),["New Holland Dragon's Milk Reserve - Triple Mash Stout","New Holland Dragon's Milk Reserve - Triple Mash Stout (BTL)"])
+        let queue = #"<h2 class="brewName mb-0">New Holland Dragon\'s Milk Reserve - Triple Mash Stout (BTL)<div class="brew_added_date">Nov 06, 2026 @ 03:50:47pm</div></h2><a href="deleteQueuedBrew.php?cid=9">Delete</a>"#
+        XCTAssertEqual(try BeerAPI.parseQueue(Data(queue.utf8)).map(\.name),["New Holland Dragon's Milk Reserve - Triple Mash Stout (BTL)"])
+    }
+    func testBeersSavedBeforeNameCleanupLoadClean() throws {
+        let saved = try Beer(row:["id":"1","brew_name":#"Dragon\'s  Milk "#,"brewer":#"Green\'s Gluten-free Beers"#])
+        XCTAssertEqual(saved.brew_name,"Dragon's Milk"); XCTAssertEqual(saved.brewer,"Green's Gluten-free Beers")
+    }
+    func testNamesThatNeedNoRepairAreUnchanged() throws {
+        for name in [#"AC\DC Lager"#,"Green's Gluten Free Tripel Ale (CAN)","Mystery Beer (CAN/BTL)","(512) Helles Lager","Eureka Heights Un Poquito Más"] {
+            XCTAssertEqual(try Beer(row:["id":"1","brew_name":name]).brew_name,name)
+        }
+    }
     func testQueueParserRecoversMissingDateAndRejectsUnrecognizedOrPartialPages() throws {
         let html = #"<h3 class='brewName'>Undated Beer</h3><a href='deleteQueuedBrew.php?cid=42'>Delete</a>"#
         XCTAssertEqual(try BeerAPI.parseQueue(Data(html.utf8)),[QueueEntry(id:"42",name:"Undated Beer",date:"Date unavailable")])
