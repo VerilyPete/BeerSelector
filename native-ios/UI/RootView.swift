@@ -231,17 +231,13 @@ struct HomeView: View {
     }
     private var accountHeader: some View {
         VStack(alignment:.leading,spacing:8) {
-            HStack { LabelPlate(title:model.isMember ? "WELCOME BACK" : "GUEST MODE"); Spacer(); settingsButton }
-            DisplayTitle(title:model.isMember ? (model.session?.displayName ?? "Beer Enthusiast") : "Visitor")
+            HStack { DisplayTitle(title:model.isMember ? (model.session?.displayName ?? "Beer Enthusiast") : "Visitor"); Spacer(); settingsButton }
             if model.isMember { storeLabel.font(Robo.mono()) }
         }
     }
     private var tabletAccountHeader: some View {
         HStack(alignment:.bottom,spacing:16) {
-            VStack(alignment:.leading,spacing:10) {
-                LabelPlate(title:model.isMember ? "WELCOME BACK" : "GUEST MODE",size:12)
-                DisplayTitle(title:model.isMember ? (model.session?.displayName ?? "Beer Enthusiast") : "Visitor",size:34)
-            }
+            DisplayTitle(title:model.isMember ? (model.session?.displayName ?? "Beer Enthusiast") : "Visitor",size:34)
             Spacer(minLength:16)
             VStack(alignment:.trailing,spacing:10) {
                 settingsButton
@@ -405,9 +401,6 @@ struct SuggestionEntryCard: View {
                 HStack(spacing:12) {
                     Image(systemName:modes.mode.symbol).foregroundStyle(Robo.textSecondary)
                     VStack(alignment:.leading,spacing:4) {
-                        if let eyebrow = modes.mode.homeEyebrow {
-                            Text(eyebrow).font(Robo.mono(10)).tracking(1).foregroundStyle(Robo.cyan)
-                        }
                         Text(modes.mode.homeTitle).font(Robo.title(16))
                         Text(modes.mode.homeDetail).font(Robo.body(13)).foregroundStyle(QueueChrome.secondary)
                             .fixedSize(horizontal:false,vertical:true)

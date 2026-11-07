@@ -1,14 +1,22 @@
 # Launch on an isolated iPhone simulator with --preview-fixtures --preview-suggestions on
 # --preview-suggestion-mode apple-intelligence (the tallest member Home).
 # At standard text sizes the compact Home fits its screen without scrolling, so
-# the settings gear can never slide under the status bar. Reading an expanded
-# New on Tap description is the one time it scrolls.
+# the settings gear can never slide under the status bar, and it still shows
+# the two newest beers. Reading an expanded New on Tap description is the one
+# time it scrolls.
 appId: org.verily.FSbeerselector
 ---
 - assertVisible:
     id: home-fixed
 - assertVisible:
     id: settings-nav-button
+- assertVisible:
+    id: home-recommendations
+- assertVisible: "Ask Apple Intelligence"
+- assertVisible:
+    id: beer-item-1
+- assertVisible:
+    id: beer-item-2
 - assertVisible:
     id: home-rewards-card
 - tapOn:
