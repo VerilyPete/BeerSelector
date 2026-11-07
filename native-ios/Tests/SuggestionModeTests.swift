@@ -106,18 +106,12 @@ final class SuggestionModeTests: XCTestCase {
     }
 
     func testEachModeNamesItsSourceOnHomeAndTheSheet() {
-        XCTAssertEqual(SuggestionMode.appleIntelligence.homeTitle,"Find something to try")
+        XCTAssertEqual(SuggestionMode.appleIntelligence.homeTitle,"Ask Apple Intelligence")
         XCTAssertEqual(SuggestionMode.appleIntelligence.homeDetail,"Describe a style or mood.")
         XCTAssertEqual(SuggestionMode.appleIntelligence.plate,"APPLE INTELLIGENCE")
         XCTAssertEqual(SuggestionMode.localMatching.homeTitle,"Local matching")
         XCTAssertEqual(SuggestionMode.localMatching.homeDetail,"Picks from your tasting history and the styles you choose.")
         XCTAssertEqual(SuggestionMode.localMatching.plate,"LOCAL MATCHING")
-    }
-
-    func testTheAppleIntelligenceCardNamesItsSourceAboveTheTitle() {
-        XCTAssertEqual(SuggestionMode.appleIntelligence.homeEyebrow,"APPLE INTELLIGENCE")
-        XCTAssertNil(SuggestionMode.localMatching.homeEyebrow)
-        XCTAssertNil(SuggestionMode.off.homeEyebrow)
     }
 
     func testSettingsStatusNamesTheActiveMode() {

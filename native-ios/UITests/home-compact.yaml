@@ -1,6 +1,6 @@
 # Launch on an isolated simulator with --preview-fixtures --preview-suggestions off
-# (iPhone, or an iPad window narrower than 768pt). Suggestions are pinned off because
-# earlier flows leave them on, and with the suggestion card most iPhones fit one row.
+# (iPhone, or an iPad window narrower than 768pt). Suggestions are pinned off so the
+# flow doesn't depend on earlier ones; home-fits.yaml covers Home with the suggestion card.
 # The compact Home has no nav cards: New on Tap shows the two newest beers, and
 # the Rewards card opens Rewards.
 appId: org.verily.FSbeerselector

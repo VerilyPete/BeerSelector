@@ -58,9 +58,9 @@ The polish followed `plans/ui-polish.md` and the approved mocks in `/Users/pete/
 ### Decisions
 
 - The BeerIcons glyphs stay. Restyling may change the wells and rings around them, never the glyphs.
-- Every suggestion surface names its source. The Apple Intelligence Home card carries an APPLE INTELLIGENCE label; the local card is titled Local matching; the sheet shows a mode plate. A fallback from Apple Intelligence shows a notice above the results.
+- Every suggestion surface names its source. The Home card is titled Ask Apple Intelligence or Local matching; the sheet shows a mode plate. A fallback from Apple Intelligence shows a notice above the results.
 - New on Tap shows the newest beers on the taplist by added date, tasted or not, as compact rows (name, then arrival day · style · container, then ABV). Tapping a row shows its description.
-- The compact Home prefers to fit its screen without scrolling: roomy spacing, then tight spacing, then one New on Tap row. One row is what most iPhones show while the suggestion card is showing. It scrolls while a shown description is open (keeping the rows it had), at accessibility text sizes (always with two rows), and as a last resort when even one row doesn't fit, such as a short landscape window or long banners. `CompactHomeMode` decides this and ignores an expansion for a beer Home isn't showing.
+- The compact Home prefers to fit its screen without scrolling: roomy spacing, then tight spacing, then one New on Tap row. With the suggestion card showing, the iPhone test sizes from 16e to 18 Pro Max show two rows at the default text size; `UITests/home-fits.yaml` checks this. It scrolls while a shown description is open (keeping the rows it had), at accessibility text sizes (always with two rows), and as a last resort when even one row doesn't fit, such as a short landscape window or long banners. `CompactHomeMode` decides this and ignores an expansion for a beer Home isn't showing.
 - On narrow iPhones the sort chip shortens to the direction (NEW, A-Z, HIGH) and then to its icon, so the filter row stays on one line through XXXL.
 
 ### Accepted differences from the mocks
@@ -70,10 +70,10 @@ These were reviewed against the approved PNGs in Phase E and kept:
 - The segments are separate chrome buttons rather than one joined control. The user approved this on device.
 - The sort chip reads NEW, not DATE · NEW, on 402pt-wide iPhones, because the full label doesn't fit beside CANS & BOTTLES.
 - The Queue icon is `list.bullet.rectangle` (SF Symbols), and the beer wells keep the BeerIcons glyphs where the mocks use Lucide stand-ins.
-- The real tab bar sits higher than the mock's, so the 17 Pro shows one New on Tap row while the suggestion card is showing; the mock shows two.
+- Home drops the mock's WELCOME BACK plate and the suggestion card's APPLE INTELLIGENCE eyebrow, so two New on Tap rows fit under the real tab bar. The Settings gear sits beside the member name.
 - The suggestions sheet keeps the system navigation bar with Done and the native segmented ABV picker, and lays the style chips out in an adaptive grid (104pt minimum columns, 220pt at accessibility sizes), where the mock draws a custom close button and flowing chips.
 - The redeemed-reward chevron and the card chevrons are neutral grey.
-- Label plates (NEW ON TAP, WELCOME BACK and the rest) keep the steel plate from the mocks. Its dark text measures about 2.2–4.3:1 across the gradient, below 4.5:1; changing it is an open design decision, not part of this polish.
+- Label plates (NEW ON TAP and the rest) keep the steel plate from the mocks. Its dark text measures about 2.2–4.3:1 across the gradient, below 4.5:1; changing it is an open design decision, not part of this polish.
 
 ## Original chrome design
 

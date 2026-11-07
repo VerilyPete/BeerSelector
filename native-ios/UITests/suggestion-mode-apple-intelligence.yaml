@@ -6,8 +6,7 @@ appId: org.verily.FSbeerselector
     visible:
       id: home-recommendations
     timeout: 15000
-- assertVisible: "APPLE INTELLIGENCE"
-- assertVisible: "Find something to try"
+- assertVisible: "Ask Apple Intelligence"
 - assertVisible: "Describe a style or mood."
 - assertNotVisible: "Local matching"
 - tapOn:

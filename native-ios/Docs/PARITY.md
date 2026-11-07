@@ -18,7 +18,7 @@ This is a working parity ledger, not a release certification. “Implemented” 
 |---|---|---|---|---|
 | Startup | app/_layout.tsx; src/database/startupMigrationCheck.ts; src/utils/coldStartNavigation.ts | Fonts, DB open/migrate, startup progress, error/retry, configuration gate, deep link handling, retained caches | App/BeerSelectorApp.swift; Core/Database.swift; Core/AppModel.swift | Pending upgrade tests |
 | First launch | app/(tabs)/index.tsx; hooks/useHomeScreenState.ts | Loading, Get Started; route to Settings when no configuration | UI/RootView.swift | Pending simulator |
-| Member Home | app/(tabs)/index.tsx; components/ui/MetricCard.tsx | WELCOME BACK, member name, store, Settings gear; count /200, percentage, progress bar; All Beers, Beerfinder, Tasted Brews, Rewards cards | UI/RootView.swift; UI/RobocopTheme.swift | Pending design comparison |
+| Member Home | app/(tabs)/index.tsx; components/ui/MetricCard.tsx | Member name with Settings gear, store; count /200, percentage, progress bar; All Beers, Beerfinder, Tasted Brews, Rewards cards | UI/RootView.swift; UI/RobocopTheme.swift | Pending design comparison |
 | Visitor Home | same | GUEST MODE, Visitor name, All Beers enabled; member navigation disabled; no personal count | UI/RootView.swift | Pending live visitor login |
 | Tab bar | app/(tabs)/_layout.tsx; src/utils/tabBarFiltering.ts | HOME, BEERS, FINDER, TASTED; selected and dim states; member tabs hidden for visitors; haptics | UI/RootView.swift | Pending simulator |
 | All Beers | app/(tabs)/beerlist.tsx; components/AllBeers.tsx | Full taplist; search and clear; container cycle; sort and direction; count; pull refresh; expandable cards; UNTAPPD | UI/BeerListScreen.swift | Pending simulator |
