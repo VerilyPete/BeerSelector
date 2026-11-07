@@ -722,6 +722,12 @@ extension RecommendationIntegrationTests {
             XCTAssertEqual(fake.prewarms,0)
         }
     }
+    @MainActor func testTheResultsAnnouncementSaysWhenAppleIntelligenceFellBack() {
+        XCTAssertEqual(RecommendationsScreen.resultsAnnouncement(count:3,fellBack:false),"3 suggestions ready")
+        XCTAssertEqual(RecommendationsScreen.resultsAnnouncement(count:1,fellBack:false),"1 suggestion ready")
+        XCTAssertEqual(RecommendationsScreen.resultsAnnouncement(count:3,fellBack:true),
+                       "Apple Intelligence couldn’t answer this time. 3 local matches ready")
+    }
     @MainActor func testEveryAppleIntelligenceOutcomeIsCountedInDiagnostics() async throws {
         try await withModel { model,_,_ in
             let diagnostics = Diagnostics()

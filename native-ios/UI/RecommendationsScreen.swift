@@ -93,7 +93,7 @@ struct RecommendationsScreen: View {
                 .onChange(of:controller.suggestions) { _,suggestions in
                     guard !suggestions.isEmpty else { return }
                     withAnimation { scroller.scrollTo(controller.fallback == nil ? "results" : "fallback-notice",anchor:.top) }
-                    AccessibilityNotification.Announcement(Self.resultsTitle(suggestions.count) + " ready").post()
+                    AccessibilityNotification.Announcement(Self.resultsAnnouncement(count:suggestions.count,fellBack:controller.fallback != nil)).post()
                 }
                 .sensoryFeedback(.success,trigger:controller.suggestions) { _,new in !new.isEmpty }
                 .onChange(of:controller.fallback) { _,fallback in
@@ -135,6 +135,11 @@ struct RecommendationsScreen: View {
         }.tint(QueueChrome.cyan).noticeAlert(.recommendations,model:model,blocked:confirming)
     }
     static func resultsTitle(_ count: Int) -> String { count == 1 ? "1 suggestion" : "\(count) suggestions" }
+    /// VoiceOver doesn't follow the scroll to the fallback notice, so the announcement carries it.
+    static func resultsAnnouncement(count: Int, fellBack: Bool) -> String {
+        fellBack ? "Apple Intelligence couldn’t answer this time. \(count == 1 ? "1 local match" : "\(count) local matches") ready"
+            : resultsTitle(count) + " ready"
+    }
     private var resultsHeader: some View {
         Text(Self.resultsTitle(controller.suggestions.count)).font(Robo.title(20)).foregroundStyle(QueueChrome.text)
             .padding(.top,4)
