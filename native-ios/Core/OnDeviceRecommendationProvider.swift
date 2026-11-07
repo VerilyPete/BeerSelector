@@ -55,8 +55,18 @@ private struct RankedTaplist {
     var ids: [String]
 }
 
+/// One prewarmed session, used by the next request only.
+@MainActor private final class WarmSession { var session: Any? }
+
 @MainActor
 struct OnDeviceRecommendationProvider: RecommendationProvider {
+    private let warm = WarmSession()
+    func prewarm() {
+        guard #available(iOS 26.0, *), RecommendationCompatibility.current == .appleIntelligence else { return }
+        let session = LanguageModelSession(model:.default,instructions:RecommendationPromptBudget.instructions)
+        session.prewarm()
+        warm.session = session
+    }
     func rank(history: [Beer], candidates: [BeerSuggestion]) async throws -> [String] {
         try await rank(history:history,candidates:candidates,feedback:[])
     }
@@ -95,7 +105,8 @@ struct OnDeviceRecommendationProvider: RecommendationProvider {
             fits = RecommendationPromptBudget.legacyFits(prompt)
             #endif
             guard fits else { continue }
-            let session = LanguageModelSession(model:model,instructions:RecommendationPromptBudget.instructions)
+            let session = warm.session as? LanguageModelSession ?? LanguageModelSession(model:model,instructions:RecommendationPromptBudget.instructions)
+            warm.session = nil
             do {
                 return try await session.respond(to:prompt,generating:RankedTaplist.self,
                     options:GenerationOptions(temperature:0,maximumResponseTokens:RecommendationPromptBudget.outputTokens)).content.ids

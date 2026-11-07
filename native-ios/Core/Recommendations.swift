@@ -322,8 +322,10 @@ enum RecommendationRules {
     func rank(history: [Beer], candidates: [BeerSuggestion], feedback: [BeerFeedback]) async throws -> [String]
     func rank(history: [Beer], candidates: [BeerSuggestion], feedback: [BeerFeedback], preferences: SuggestionPreferences) async throws -> [String]
     func rank(history: [Beer], candidates: [BeerSuggestion], feedback: [BeerFeedback], preferences: SuggestionPreferences, context: [BeerChoiceContext]) async throws -> [String]
+    func prewarm()
 }
 extension RecommendationProvider {
+    func prewarm() {}
     func rank(history: [Beer], candidates: [BeerSuggestion], feedback: [BeerFeedback], preferences: SuggestionPreferences, context: [BeerChoiceContext]) async throws -> [String] {
         try await rank(history:history,candidates:candidates,feedback:feedback,preferences:preferences)
     }

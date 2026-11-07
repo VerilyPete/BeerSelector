@@ -112,8 +112,8 @@ struct RecommendationsScreen: View {
                 .onChange(of:model.recommendationSnapshot) { _,_ in controller.invalidateIfChanged() }
                 .onChange(of:controller.suggestions) { _,_ in selected = []; expanded = [] }
                 .onDisappear { controller.cancel() }
-                .onAppear { controller.conformRequestToMode() }
-                .onChange(of:modes.mode) { _,_ in controller.conformRequestToMode() }
+                .onAppear { controller.conformRequestToMode(); controller.prepare() }
+                .onChange(of:modes.mode) { _,_ in controller.conformRequestToMode(); controller.prepare() }
                 .onChange(of:controller.suggestions.isEmpty) { _,_ in controller.conformRequestToMode() }
                 .interactiveDismissDisabled(controller.submitting)
             }

@@ -36,11 +36,14 @@ final class DiagnosticsTests: XCTestCase {
         diagnostics.recordTask(seconds: 1, redirects: -1)
         diagnostics.recordReports(metrics: 1, cpuSeconds: .nan)
         diagnostics.begin(.queue).finish(.failure)
+        diagnostics.recordSuggestion(.deadline, seconds: .nan)
+        diagnostics.recordSuggestion(.deadline, seconds: -1)
         let lines = diagnostics.report().components(separatedBy: "\n")
         XCTAssertEqual(lines.first, "Session performance aggregates (seconds)")
-        XCTAssertEqual(lines.count, Diagnostics.Operation.allCases.count + 3)
+        XCTAssertEqual(lines.count, Diagnostics.Operation.allCases.count + 4)
         XCTAssertTrue(lines.contains { $0.hasPrefix("queue: count=1 ok=0 failed=1 cancelled=0 ") })
-        XCTAssertEqual(lines[lines.count - 2], "URLSession tasks=100 seconds=50.0 redirects=100")
-        XCTAssertEqual(lines.last, "MetricKit reports=201 diagnostics=100 CPU seconds=25.0")
+        XCTAssertEqual(lines[lines.count - 3], "URLSession tasks=100 seconds=50.0 redirects=100")
+        XCTAssertEqual(lines[lines.count - 2], "MetricKit reports=201 diagnostics=100 CPU seconds=25.0")
+        XCTAssertEqual(lines.last, "Apple Intelligence suggestions answered=0 provider-failure=0 invalid-output=0 deadline=0 context-budget=0 max=0.0")
     }
 }

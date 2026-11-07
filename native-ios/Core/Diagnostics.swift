@@ -11,6 +11,10 @@ final class Diagnostics: Sendable {
     init(journal: DiagnosticJournal? = nil) { self.journal = journal }
     enum Operation: String, CaseIterable, Codable { case refresh, parsing, transaction, login, queue, network }
     enum Outcome: String, Codable { case success, failure, cancelled }
+    enum SuggestionOutcome: String, CaseIterable {
+        case answered, providerFailure = "provider-failure", invalidOutput = "invalid-output"
+        case deadline, contextBudget = "context-budget"
+    }
     struct Aggregate {
         var count = 0
         var successes = 0
@@ -27,6 +31,8 @@ final class Diagnostics: Sendable {
         var metricReports = 0
         var diagnosticReports = 0
         var cpuSeconds = 0.0
+        var suggestions: [SuggestionOutcome: Int] = [:]
+        var suggestionMaximumSeconds = 0.0
     }
     private let totals = OSAllocatedUnfairLock(initialState: Totals())
     private let logger = Logger(subsystem: "org.verily.FSbeerselector", category: "Performance")
@@ -93,6 +99,14 @@ final class Diagnostics: Sendable {
             if cpuSeconds.isFinite, cpuSeconds >= 0 { totals.cpuSeconds += cpuSeconds }
         }
     }
+    func recordSuggestion(_ outcome: SuggestionOutcome, seconds: Double) {
+        guard seconds.isFinite, seconds >= 0 else { return }
+        totals.withLock { totals in
+            totals.suggestions[outcome, default:0] += 1
+            totals.suggestionMaximumSeconds = max(totals.suggestionMaximumSeconds,seconds)
+        }
+        logger.notice("apple-intelligence \(outcome.rawValue, privacy: .public) seconds=\(seconds)")
+    }
     func report() -> String {
         let totals = totals.withLock { $0 }
         var lines = ["Session performance aggregates (seconds)"]
@@ -102,6 +116,7 @@ final class Diagnostics: Sendable {
         }
         lines.append("URLSession tasks=\(totals.taskCount) seconds=\(totals.taskSeconds) redirects=\(totals.redirects)")
         lines.append("MetricKit reports=\(totals.metricReports) diagnostics=\(totals.diagnosticReports) CPU seconds=\(totals.cpuSeconds)")
+        lines.append("Apple Intelligence suggestions " + SuggestionOutcome.allCases.map { "\($0.rawValue)=\(totals.suggestions[$0, default:0])" }.joined(separator:" ") + " max=\(totals.suggestionMaximumSeconds)")
         return lines.joined(separator: "\n")
     }
 }

@@ -29,6 +29,16 @@ enum RecommendationRetrievalSource { case local, semantic, mixed }
 enum RecommendationFallback: Equatable {
     case providerFailure, invalidOutput, deadlineExpired, contextBudgetExhausted
 }
+extension Diagnostics.SuggestionOutcome {
+    init(_ fallback: RecommendationFallback) {
+        switch fallback {
+        case .providerFailure: self = .providerFailure
+        case .invalidOutput: self = .invalidOutput
+        case .deadlineExpired: self = .deadline
+        case .contextBudgetExhausted: self = .contextBudget
+        }
+    }
+}
 
 @MainActor final class RecommendationController: ObservableObject {
     @Published private(set) var suggestions: [BeerSuggestion] = []
@@ -81,7 +91,16 @@ enum RecommendationFallback: Equatable {
             excluded:current.excluded,feedback:current.feedback,preferences:preferences).isEmpty
     }
     var provider: any RecommendationProvider
-    var timeout: Double = 8
+    /// An M1 iPad answers in 7–8.5 s once the model is loaded; loading adds more.
+    var timeout: Double = 20
+    var deadlineSeconds: Double { timeout.isFinite ? max(0,timeout) : 0 }
+    var diagnostics = Diagnostics.shared
+    /// Loads the model while the person is still choosing, so the first request
+    /// doesn't spend its deadline on loading.
+    func prepare() {
+        guard let model, !model.previewMode, model.suggestionMode.mode == .appleIntelligence else { return }
+        provider.prewarm()
+    }
     /// Debug fixtures install an offline provider; real previews never rank.
     var ranksInPreview = false
     #if DEBUG
@@ -165,7 +184,8 @@ enum RecommendationFallback: Equatable {
         }
         guard token == generation, !Task.isCancelled, account.epoch == model.recommendationSnapshot.epoch,
               account.identity == model.session?.identity, model.isMember else { return }
-        let deadline = ContinuousClock.now.advanced(by:.seconds(timeout.isFinite ? min(8,max(0,timeout)) : 0))
+        let started = ContinuousClock.now
+        let deadline = started.advanced(by:.seconds(deadlineSeconds))
         let current = model.recommendationSnapshot
         let owner = model.recommendationAccount
         snapshot = current; historyCount = current.history.count
@@ -243,12 +263,14 @@ enum RecommendationFallback: Equatable {
         if result?.cancelled == true { return }
         if let result, let ids = result.ids, let ranked = RecommendationRules.choose(ids:ids,from:result.candidates) {
             suggestions = ranked; usedModel = true; retrievalSource = result.source
+            recordAppleIntelligence(.answered,since:started)
         } else {
             // A failed/late model always uses the established local fallback order.
             suggestions = Array(candidates.prefix(3)); usedModel = false; retrievalSource = .local
             if mode == .appleIntelligence {
                 // Past the staleness guard, an empty result means the shared deadline expired.
                 fallback = result.map { $0.failure ?? .invalidOutput } ?? .deadlineExpired
+                recordAppleIntelligence(fallback.map(Diagnostics.SuggestionOutcome.init) ?? .invalidOutput,since:started)
             }
             if preferences.styleRequest.needsModel {
                 message = "Local matching applied your filters, but couldn’t interpret the additional style or mood wording. Try a simple style such as IPA or stout."
@@ -260,6 +282,11 @@ enum RecommendationFallback: Equatable {
             do { try model.db?.saveChoicePresentation(choice,account:account); choiceID = choice.id }
             catch { model.error = error.localizedDescription }
         }
+    }
+    private func recordAppleIntelligence(_ outcome: Diagnostics.SuggestionOutcome, since started: ContinuousClock.Instant) {
+        guard model?.previewMode == false else { return }
+        let elapsed = started.duration(to:.now).components
+        diagnostics.recordSuggestion(outcome,seconds:Double(elapsed.seconds) + Double(elapsed.attoseconds)/1e18)
     }
     #if DEBUG
     private func submitPreview(ids: Set<String>, outcomes results: [CheckInResult]) async {
