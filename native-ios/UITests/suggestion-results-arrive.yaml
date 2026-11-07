@@ -1,0 +1,24 @@
+# Results must come into view where the person is looking, not appear off screen
+# above the button they just tapped. Isolated Debug fixture with an offline
+# provider; no model, network or queue writes. Launch on a small iPhone with:
+# xcrun simctl launch <simulator-id> org.verily.FSbeerselector --preview-fixtures --preview-recommendations --preview-suggestion-mode apple-intelligence --preview-ai-outcome success
+appId: org.verily.FSbeerselector
+---
+- extendedWaitUntil:
+    visible:
+      id: suggestion-mode-plate
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      id: recommendation-generate
+    direction: DOWN
+- tapOn:
+    id: recommendation-generate
+- extendedWaitUntil:
+    visible:
+      id: recommendation-results
+      text: "3 suggestions.*"
+    timeout: 10000
+- assertVisible:
+    id: "recommendation-card-.*"
+    index: 0

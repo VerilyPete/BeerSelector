@@ -71,7 +71,7 @@ These were reviewed against the approved PNGs in Phase E and kept:
 - The sort chip reads NEW, not DATE · NEW, on 402pt-wide iPhones, because the full label doesn't fit beside CANS & BOTTLES.
 - The Queue icon is `list.bullet.rectangle` (SF Symbols), and the beer wells keep the BeerIcons glyphs where the mocks use Lucide stand-ins.
 - Home drops the mock's WELCOME BACK plate and the suggestion card's APPLE INTELLIGENCE eyebrow, so two New on Tap rows fit under the real tab bar. The Settings gear sits beside the member name.
-- The suggestions sheet keeps the system navigation bar with Done and the native segmented ABV picker, and lays the style chips out in an adaptive grid (104pt minimum columns, 220pt at accessibility sizes), where the mock draws a custom close button and flowing chips.
+- The suggestions sheet keeps the system navigation bar with Done and the native segmented ABV picker, and lays the style chips out in an adaptive grid (104pt minimum columns, 220pt at accessibility sizes), where the mock draws a custom close button and flowing chips. When results arrive, the sheet scrolls to a count header ("3 suggestions") above the cards, or to the fallback notice, with a success haptic and a VoiceOver announcement; while it works, the Find button shows a spinner in place.
 - The redeemed-reward chevron and the card chevrons are neutral grey.
 - Label plates (NEW ON TAP and the rest) keep the steel plate from the mocks. Its dark text measures about 2.2–4.3:1 across the gradient, below 4.5:1; changing it is an open design decision, not part of this polish.
 
