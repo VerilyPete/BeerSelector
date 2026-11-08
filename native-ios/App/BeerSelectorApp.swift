@@ -21,7 +21,7 @@ struct BeerSelectorApp: App {
         RootView()
         #endif
     }
-    private static let usage: UsageTelemetry? = isTestHost || isStylePreview ? nil : .live(api:BeerAPI())
+    private static let usage: UsageTelemetry? = isTestHost || isStylePreview || ProcessInfo.processInfo.arguments.contains("--preview-fixtures") ? nil : .live(api:BeerAPI())
     @StateObject private var model = AppModel(monitorConnectivity: !Self.isTestHost && !Self.isStylePreview)
     @Environment(\.scenePhase) private var scenePhase
     var body: some Scene {
