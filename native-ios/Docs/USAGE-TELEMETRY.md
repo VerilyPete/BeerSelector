@@ -7,7 +7,7 @@ for the event list, wire shape, session rule and client protocol.
 
 ## What is sent
 
-One JSON batch per flush:
+One JSON batch per request; a flush sends up to 5 requests, continuing only after each 204:
 
 | Field | Value |
 |---|---|
@@ -30,7 +30,7 @@ view lifecycle hooks, and never in preview sessions.
 
 | Piece | File | Role |
 |---|---|---|
-| `UsageRecorder` | `Core/UsageRecorder.swift` | Live counters per dimension tuple, one pending batch, the session rule. Every change is one atomic write to `Application Support/Usage/state.json`, applied in memory only after it reaches disk. |
+| `UsageRecorder` | `Core/UsageRecorder.swift` | Live counters per dimension tuple, one pending batch, the session rule. Every change is one atomic write to `Application Support/Usage/state.json`. Freezing and acknowledging a batch apply only after they reach disk, so an unsaved batch is never sent. A count or session change whose write fails stays in memory and is saved by the next write. |
 | `UsageHTTPTransport` | `Core/UsageTransport.swift` | POSTs to `{EnrichmentURL}/usage` with `X-API-Key`. Only a 204 deletes the batch. Nothing is retried immediately. |
 | `UsageTelemetry` | `Core/UsageTelemetry.swift` | Keeps recorder calls in order, tracks whether the app is active, refreshes `lastActiveAt` once a minute, and flushes inside a background task on `.background` and when a session starts. |
 
