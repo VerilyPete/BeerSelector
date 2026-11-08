@@ -495,6 +495,8 @@ final class RecommendationIntegrationTests: XCTestCase {
 }
 @MainActor private final class FakeProvider: RecommendationProvider {
     var calls = 0
+    var prewarms = 0
+    func prewarm() { prewarms += 1 }
     var candidateIDs: [String] = []
     var candidateEvidence: [String:String] = [:]
     var action: (() async throws -> [String])?
@@ -698,6 +700,47 @@ extension RecommendationIntegrationTests {
             await controller.generate()
             XCTAssertEqual(fake.calls,1)
             XCTAssertEqual(controller.resultMode,.localMatching)
+        }
+    }
+    @MainActor func testTheSuggestionDeadlineLeavesTimeForSlowerDevices() async throws {
+        try await withModel { model,_,_ in
+            XCTAssertEqual(RecommendationController(model:model,provider:FakeProvider()).deadlineSeconds,20)
+        }
+    }
+    @MainActor func testPreparingSuggestionsPrewarmsAppleIntelligence() async throws {
+        try await withModel { model,_,_ in
+            let fake = FakeProvider()
+            RecommendationController(model:model,provider:fake).prepare()
+            XCTAssertEqual(fake.prewarms,1)
+        }
+    }
+    @MainActor func testLocalMatchingNeverPrewarmsTheModel() async throws {
+        try await withModel { model,_,_ in
+            model.suggestionCompatibility = { .deviceNotEligible }
+            let fake = FakeProvider()
+            RecommendationController(model:model,provider:fake).prepare()
+            XCTAssertEqual(fake.prewarms,0)
+        }
+    }
+    @MainActor func testTheResultsAnnouncementSaysWhenAppleIntelligenceFellBack() {
+        XCTAssertEqual(RecommendationsScreen.resultsAnnouncement(count:3,fellBack:false),"3 suggestions ready")
+        XCTAssertEqual(RecommendationsScreen.resultsAnnouncement(count:1,fellBack:false),"1 suggestion ready")
+        XCTAssertEqual(RecommendationsScreen.resultsAnnouncement(count:3,fellBack:true),
+                       "Apple Intelligence couldn’t answer this time. 3 local matches ready")
+    }
+    @MainActor func testEveryAppleIntelligenceOutcomeIsCountedInDiagnostics() async throws {
+        try await withModel { model,_,_ in
+            let diagnostics = Diagnostics()
+            let provider = FakeProvider()
+            let controller = RecommendationController(model:model,provider:provider)
+            controller.diagnostics = diagnostics
+            provider.action = { throw RecommendationUnavailable.model }
+            await controller.generate()
+            provider.action = { ["not-on-the-taplist"] }
+            controller.cancel(); await controller.generate()
+            provider.action = { ["new"] }
+            controller.cancel(); await controller.generate()
+            XCTAssertTrue(diagnostics.report().contains("Apple Intelligence suggestions answered=1 provider-failure=1 invalid-output=1 deadline=0 context-budget=0 max="),diagnostics.report())
         }
     }
 }

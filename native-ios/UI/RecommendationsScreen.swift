@@ -58,6 +58,9 @@ struct RecommendationsScreen: View {
                     if controller.fallback != nil, !controller.suggestions.isEmpty, !busy {
                         fallbackNotice.id("fallback-notice")
                     }
+                    if !controller.suggestions.isEmpty, !busy {
+                        resultsHeader.id("results")
+                    }
                     ForEach(controller.suggestions) { suggestion in
                         card(suggestion)
                     }
@@ -73,14 +76,26 @@ struct RecommendationsScreen: View {
                         }
 
                     }
-                    Button(controller.suggestions.isEmpty ? (modes.mode == .localMatching ? "Find local matches" : "Find suggestions") : "Show another selection") {
+                    Button {
                         selected = []; Task { await controller.generate() }
+                    } label: {
+                        if controller.generating {
+                            HStack(spacing:10) { ProgressView().tint(QueueChrome.cyan); Text("Finding suggestions…") }
+                        } else {
+                            Text(controller.suggestions.isEmpty ? (modes.mode == .localMatching ? "Find local matches" : "Find suggestions") : "Show another selection")
+                        }
                     }.buttonStyle(BeerControlStyle()).disabled(busy || (model.offline && !model.previewMode))
                         .accessibilityIdentifier("recommendation-generate")
                     Text("Recent history stays on this device and survives a new UFO round. Clear it in Settings. Signing out removes it.")
                         .font(Robo.body(12)).foregroundStyle(QueueChrome.secondary)
                 }.padding(18).frame(maxWidth:760).frame(maxWidth:.infinity)
             }.scrollDismissesKeyboard(.interactively)
+                .onChange(of:controller.suggestions) { _,suggestions in
+                    guard !suggestions.isEmpty else { return }
+                    withAnimation { scroller.scrollTo(controller.fallback == nil ? "results" : "fallback-notice",anchor:.top) }
+                    AccessibilityNotification.Announcement(Self.resultsAnnouncement(count:suggestions.count,fellBack:controller.fallback != nil)).post()
+                }
+                .sensoryFeedback(.success,trigger:controller.suggestions) { _,new in !new.isEmpty }
                 .onChange(of:controller.fallback) { _,fallback in
                     guard fallback != nil else { return }
                     withAnimation { scroller.scrollTo("fallback-notice",anchor:.top) }
@@ -112,12 +127,24 @@ struct RecommendationsScreen: View {
                 .onChange(of:model.recommendationSnapshot) { _,_ in controller.invalidateIfChanged() }
                 .onChange(of:controller.suggestions) { _,_ in selected = []; expanded = [] }
                 .onDisappear { controller.cancel() }
-                .onAppear { controller.conformRequestToMode() }
-                .onChange(of:modes.mode) { _,_ in controller.conformRequestToMode() }
+                .onAppear { controller.conformRequestToMode(); controller.prepare() }
+                .onChange(of:modes.mode) { _,_ in controller.conformRequestToMode(); controller.prepare() }
                 .onChange(of:controller.suggestions.isEmpty) { _,_ in controller.conformRequestToMode() }
                 .interactiveDismissDisabled(controller.submitting)
             }
         }.tint(QueueChrome.cyan).noticeAlert(.recommendations,model:model,blocked:confirming)
+    }
+    static func resultsTitle(_ count: Int) -> String { count == 1 ? "1 suggestion" : "\(count) suggestions" }
+    /// VoiceOver doesn't follow the scroll to the fallback notice, so the announcement carries it.
+    static func resultsAnnouncement(count: Int, fellBack: Bool) -> String {
+        fellBack ? "Apple Intelligence couldn’t answer this time. \(count == 1 ? "1 local match" : "\(count) local matches") ready"
+            : resultsTitle(count) + " ready"
+    }
+    private var resultsHeader: some View {
+        Text(Self.resultsTitle(controller.suggestions.count)).font(Robo.title(20)).foregroundStyle(QueueChrome.text)
+            .padding(.top,4)
+            .accessibilityAddTraits(.isHeader)
+            .accessibilityIdentifier("recommendation-results")
     }
     /// A fallback from Apple Intelligence is never left to the footnote.
     private var fallbackNotice: some View {
