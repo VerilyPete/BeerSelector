@@ -164,6 +164,25 @@ final class UsageSessionTests: XCTestCase {
         XCTAssertEqual(started,2)
     }
 
+    func testASessionWhoseWriteFailedIsSavedByTheNextWrite() async throws {
+        let device = device()
+        let recorder = device.launch()
+        await recorder.phaseChanged(.active,dimensions:Self.dimensions)
+        await leave(recorder)
+        device.clock.advance(3 * Self.hour)
+        let directory = device.url.deletingLastPathComponent().path
+        try FileManager.default.setAttributes([.posixPermissions:0o555],ofItemAtPath:directory)
+        addTeardownBlock { try? FileManager.default.setAttributes([.posixPermissions:0o755],ofItemAtPath:directory) }
+
+        await returnToForeground(recorder)
+        try FileManager.default.setAttributes([.posixPermissions:0o755],ofItemAtPath:directory)
+        device.clock.advance(60)
+        await recorder.refreshActivity()
+
+        let started = await sessions(device)
+        XCTAssertEqual(started,2)
+    }
+
     func testBecomingActiveReportsWhetherASessionStarted() async {
         let device = device()
         let recorder = device.launch()
