@@ -203,10 +203,11 @@ final class UsageRecorderTests: XCTestCase {
 
     func testAMissingSnapshotStartsAFreshInstallThatStaysStable() async throws {
         let url = stateURL()
-        await record(recorder(url),.viewHome)
-        let first = try await sendAll(recorder(url))
-        await record(recorder(url),.viewHome)
-        let second = try await sendAll(recorder(url))
+        let ids = UsageTestIDs()
+        await record(recorder(url,ids:ids),.viewHome)
+        let first = try await sendAll(recorder(url,ids:ids))
+        await record(recorder(url,ids:ids),.viewHome)
+        let second = try await sendAll(recorder(url,ids:ids))
 
         XCTAssertEqual(first.count,1)
         XCTAssertEqual(first.map(\.installID),second.map(\.installID))
@@ -242,5 +243,21 @@ final class UsageRecorderTests: XCTestCase {
         XCTAssertNil(againWhileReadOnly,"a batch that never reached disk must not be offered")
         XCTAssertEqual(sent.map(\.counts),[["view_home":1]])
         XCTAssertEqual(afterRestart,[])
+    }
+
+    func testAnEventWhoseWriteFailedIsSavedByTheNextWrite() async throws {
+        let url = stateURL()
+        let recorder = recorder(url)
+        await record(recorder,.beerRated)
+        let directory = url.deletingLastPathComponent().path
+        try FileManager.default.setAttributes([.posixPermissions:0o555],ofItemAtPath:directory)
+        addTeardownBlock { try? FileManager.default.setAttributes([.posixPermissions:0o755],ofItemAtPath:directory) }
+
+        await record(recorder,.viewHome)
+        try FileManager.default.setAttributes([.posixPermissions:0o755],ofItemAtPath:directory)
+        await record(recorder,.untappdOpened)
+        let afterRestart = try await sendAll(self.recorder(url))
+
+        XCTAssertEqual(afterRestart.map(\.counts),[["beer_rated":1,"view_home":1,"untappd_opened":1]])
     }
 }

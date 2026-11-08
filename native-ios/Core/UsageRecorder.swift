@@ -77,8 +77,10 @@ struct UsageState: Equatable, Sendable {
     }
 }
 
-/// Owns the persisted usage state. Every change is one atomic snapshot write, applied in memory
-/// only after it reaches disk, so a crash leaves either the old state or the new one.
+/// Owns the persisted usage state. Every change is one atomic snapshot write, so a crash leaves
+/// either the old state or the new one. Freezing and acknowledging a batch apply in memory only
+/// after they reach disk, so a batch is never sent unless it was saved. A count whose write fails
+/// stays in memory and is saved by the next successful write.
 actor UsageRecorder {
     static let defaultURL = FileManager.default.urls(for:.applicationSupportDirectory,in:.userDomainMask)[0]
         .appendingPathComponent("Usage/state.json")
@@ -87,6 +89,7 @@ actor UsageRecorder {
     private let now: @Sendable () -> Date
     private let newID: @Sendable () -> UUID
     private var loaded: UsageState?
+    private var unsaved = false
     private var flushing = false
     private var phase = UsagePhase.background
     private var pendingDecision = true
@@ -100,7 +103,7 @@ actor UsageRecorder {
     /// move `lastActiveAt`, and never before the session decision for this return has run.
     func record(_ event: UsageEvent, dimensions: UsageDimensions, whileActive: Bool = false) {
         let recorded = state().recording(event,dimensions:dimensions,now:now())
-        _ = commit(whileActive && phase == .active && !pendingDecision ? recorded.active(at:now()) : recorded)
+        _ = commit(whileActive && phase == .active && !pendingDecision ? recorded.active(at:now()) : recorded,keepIfUnsaved:true)
     }
 
     /// Runs the session decision on the first `.active` after launch or after a background.
@@ -112,7 +115,7 @@ actor UsageRecorder {
         case .inactive:
             return false
         case .background:
-            if previous != .background && !pendingDecision { _ = commit(state().active(at:now())) }
+            if previous != .background && !pendingDecision { _ = commit(state().active(at:now()),keepIfUnsaved:true) }
             pendingDecision = true
             return false
         case .active:
@@ -121,14 +124,15 @@ actor UsageRecorder {
             let current = state()
             let starts = current.startsSession(at:now())
             let decided = starts ? current.recording(.sessionStarted,dimensions:dimensions,now:now()) : current
-            return commit(decided.active(at:now())) && starts
+            _ = commit(decided.active(at:now()),keepIfUnsaved:true)
+            return starts
         }
     }
 
     /// The once-a-minute refresh while active, so a crash loses at most about a minute.
     func refreshActivity() {
         guard phase == .active, !pendingDecision else { return }
-        _ = commit(state().active(at:now()))
+        _ = commit(state().active(at:now()),keepIfUnsaved:true)
     }
 
     /// The batch to send: the pending one if any, otherwise a newly frozen one. Nil when there is
@@ -164,14 +168,16 @@ actor UsageRecorder {
         return state
     }
 
-    private func commit(_ next: UsageState) -> Bool {
-        guard next != state() else { return true }
+    private func commit(_ next: UsageState, keepIfUnsaved: Bool = false) -> Bool {
+        guard next != state() || unsaved else { return true }
         do {
             try FileManager.default.createDirectory(at:url.deletingLastPathComponent(),withIntermediateDirectories:true)
             try UsageSnapshot(next).encoded().write(to:url,options:.atomic)
             loaded = next
+            unsaved = false
             return true
         } catch {
+            if keepIfUnsaved { loaded = next; unsaved = true }
             return false
         }
     }
