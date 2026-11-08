@@ -21,6 +21,7 @@ struct BeerSelectorApp: App {
         RootView()
         #endif
     }
+    private static let usage: UsageTelemetry? = isTestHost || isStylePreview ? nil : .live(api:BeerAPI())
     @StateObject private var model = AppModel(monitorConnectivity: !Self.isTestHost && !Self.isStylePreview)
     @Environment(\.scenePhase) private var scenePhase
     var body: some Scene {
@@ -32,6 +33,7 @@ struct BeerSelectorApp: App {
                     guard !Self.isTestHost && !Self.isStylePreview else { return }
                     MainThreadMonitor.shared.setActive(phase == .active)
                     model.suggestionMode.refresh()
+                    Self.usage?.scenePhase(phase == .active ? .active : phase == .inactive ? .inactive : .background)
                     switch phase {
                     case .active:
                         DiagnosticJournal.shared.record(.active)

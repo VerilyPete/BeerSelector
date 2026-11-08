@@ -1,5 +1,7 @@
 import Foundation
 
+enum UsagePhase: Sendable { case active, inactive, background }
+
 struct UsageDimensions: Hashable, Sendable {
     let appVersion: String
     let aiStatus: UsageAIStatus
@@ -22,25 +24,28 @@ struct UsageState: Equatable, Sendable {
     static let maxCountPerEvent = 500
     static let pendingLifetime: TimeInterval = 7 * 24 * 3600
 
+    static let sessionGap: TimeInterval = 3 * 3600
+
     let installID: UUID
     let live: [Tuple]
     let pending: UsagePendingBatch?
+    var lastActiveAt: Date? = nil
 
     func recording(_ event: UsageEvent, dimensions: UsageDimensions, now: Date) -> Self {
         guard let index = live.firstIndex(where: { $0.dimensions == dimensions }) else {
-            return Self(installID:installID,live:live + [Tuple(dimensions:dimensions,since:now,counts:[event:1])],pending:pending)
+            return Self(installID:installID,live:live + [Tuple(dimensions:dimensions,since:now,counts:[event:1])],pending:pending,lastActiveAt:lastActiveAt)
         }
         let tuple = live[index]
         var counts = tuple.counts
         counts[event, default:0] += 1
         var next = live
         next[index] = Tuple(dimensions:tuple.dimensions,since:tuple.since,counts:counts)
-        return Self(installID:installID,live:next,pending:pending)
+        return Self(installID:installID,live:next,pending:pending,lastActiveAt:lastActiveAt)
     }
 
     func expiring(now: Date) -> Self {
         guard let pending, now.timeIntervalSince(pending.createdAt) > Self.pendingLifetime else { return self }
-        return Self(installID:installID,live:live,pending:nil)
+        return Self(installID:installID,live:live,pending:nil,lastActiveAt:lastActiveAt)
     }
 
     func freezing(now: Date, batchID: UUID) throws -> Self {
@@ -55,12 +60,20 @@ struct UsageState: Equatable, Sendable {
         var next = live
         if remainder.isEmpty { next.remove(at:oldest) }
         else { next[oldest] = Tuple(dimensions:tuple.dimensions,since:tuple.since,counts:remainder) }
-        return Self(installID:installID,live:next,pending:UsagePendingBatch(batchID:batchID,createdAt:now,body:body))
+        return Self(installID:installID,live:next,pending:UsagePendingBatch(batchID:batchID,createdAt:now,body:body),lastActiveAt:lastActiveAt)
+    }
+
+    func active(at now: Date) -> Self {
+        Self(installID:installID,live:live,pending:pending,lastActiveAt:now)
+    }
+
+    func startsSession(at now: Date) -> Bool {
+        lastActiveAt.map { now.timeIntervalSince($0) >= Self.sessionGap } ?? true
     }
 
     func acknowledging(_ batchID: UUID) -> Self {
         guard pending?.batchID == batchID else { return self }
-        return Self(installID:installID,live:live,pending:nil)
+        return Self(installID:installID,live:live,pending:nil,lastActiveAt:lastActiveAt)
     }
 }
 
@@ -75,14 +88,47 @@ actor UsageRecorder {
     private let newID: @Sendable () -> UUID
     private var loaded: UsageState?
     private var flushing = false
+    private var phase = UsagePhase.background
+    private var pendingDecision = true
     static let maxBatchesPerFlush = 5
 
     init(url: URL = UsageRecorder.defaultURL, now: @escaping @Sendable () -> Date = { Date() }, newID: @escaping @Sendable () -> UUID = { UUID() }) {
         self.url = url; self.now = now; self.newID = newID
     }
 
-    func record(_ event: UsageEvent, dimensions: UsageDimensions) {
-        _ = commit(state().recording(event,dimensions:dimensions,now:now()))
+    /// `whileActive` is whether the app was in the foreground when the user acted. Only such events
+    /// move `lastActiveAt`, and never before the session decision for this return has run.
+    func record(_ event: UsageEvent, dimensions: UsageDimensions, whileActive: Bool = false) {
+        let recorded = state().recording(event,dimensions:dimensions,now:now())
+        _ = commit(whileActive && phase == .active && !pendingDecision ? recorded.active(at:now()) : recorded)
+    }
+
+    /// Runs the session decision on the first `.active` after launch or after a background.
+    /// Returns true when that decision started a session.
+    @discardableResult func phaseChanged(_ next: UsagePhase, dimensions: UsageDimensions) -> Bool {
+        let previous = phase
+        phase = next
+        switch next {
+        case .inactive:
+            return false
+        case .background:
+            if previous != .background && !pendingDecision { _ = commit(state().active(at:now())) }
+            pendingDecision = true
+            return false
+        case .active:
+            guard pendingDecision else { return false }
+            pendingDecision = false
+            let current = state()
+            let starts = current.startsSession(at:now())
+            let decided = starts ? current.recording(.sessionStarted,dimensions:dimensions,now:now()) : current
+            return commit(decided.active(at:now())) && starts
+        }
+    }
+
+    /// The once-a-minute refresh while active, so a crash loses at most about a minute.
+    func refreshActivity() {
+        guard phase == .active, !pendingDecision else { return }
+        _ = commit(state().active(at:now()))
     }
 
     /// The batch to send: the pending one if any, otherwise a newly frozen one. Nil when there is
@@ -145,10 +191,12 @@ private struct UsageSnapshot: Codable {
     let installID: UUID
     let live: [Tuple]
     let pending: UsagePendingBatch?
+    let lastActiveAt: Date?
 
     init(_ state: UsageState) {
         installID = state.installID
         pending = state.pending
+        lastActiveAt = state.lastActiveAt
         live = state.live.map {
             Tuple(appVersion:$0.dimensions.appVersion,aiStatus:$0.dimensions.aiStatus.rawValue,osMajor:$0.dimensions.osMajor,
                   since:$0.since,counts:Dictionary(uniqueKeysWithValues:$0.counts.map { ($0.key.rawValue,$0.value) }))
@@ -167,6 +215,6 @@ private struct UsageSnapshot: Codable {
             guard !counts.isEmpty else { return nil }
             return UsageState.Tuple(dimensions:UsageDimensions(appVersion:tuple.appVersion,aiStatus:status,osMajor:tuple.osMajor),since:tuple.since,counts:counts)
         }
-        return UsageState(installID:snapshot.installID,live:live,pending:snapshot.pending)
+        return UsageState(installID:snapshot.installID,live:live,pending:snapshot.pending,lastActiveAt:snapshot.lastActiveAt)
     }
 }
