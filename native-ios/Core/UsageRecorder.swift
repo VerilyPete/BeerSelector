@@ -64,8 +64,10 @@ struct UsageState: Equatable, Sendable {
     }
 }
 
-/// Owns the persisted usage state. Every change is one atomic snapshot write, applied in memory
-/// only after it reaches disk, so a crash leaves either the old state or the new one.
+/// Owns the persisted usage state. Every change is one atomic snapshot write, so a crash leaves
+/// either the old state or the new one. Freezing and acknowledging a batch apply in memory only
+/// after they reach disk, so a batch is never sent unless it was saved. A count whose write fails
+/// stays in memory and is saved by the next successful write.
 actor UsageRecorder {
     static let defaultURL = FileManager.default.urls(for:.applicationSupportDirectory,in:.userDomainMask)[0]
         .appendingPathComponent("Usage/state.json")
@@ -74,13 +76,14 @@ actor UsageRecorder {
     private let now: @Sendable () -> Date
     private let newID: @Sendable () -> UUID
     private var loaded: UsageState?
+    private var unsaved = false
 
     init(url: URL = UsageRecorder.defaultURL, now: @escaping @Sendable () -> Date = { Date() }, newID: @escaping @Sendable () -> UUID = { UUID() }) {
         self.url = url; self.now = now; self.newID = newID
     }
 
     func record(_ event: UsageEvent, dimensions: UsageDimensions) {
-        _ = commit(state().recording(event,dimensions:dimensions,now:now()))
+        _ = commit(state().recording(event,dimensions:dimensions,now:now()),keepIfUnsaved:true)
     }
 
     /// The batch to send: the pending one if any, otherwise a newly frozen one. Nil when there is
@@ -103,14 +106,16 @@ actor UsageRecorder {
         return state
     }
 
-    private func commit(_ next: UsageState) -> Bool {
-        guard next != state() else { return true }
+    private func commit(_ next: UsageState, keepIfUnsaved: Bool = false) -> Bool {
+        guard next != state() || unsaved else { return true }
         do {
             try FileManager.default.createDirectory(at:url.deletingLastPathComponent(),withIntermediateDirectories:true)
             try UsageSnapshot(next).encoded().write(to:url,options:.atomic)
             loaded = next
+            unsaved = false
             return true
         } catch {
+            if keepIfUnsaved { loaded = next; unsaved = true }
             return false
         }
     }
