@@ -97,6 +97,10 @@ struct SettingsScreen: View {
                                 Text("Beer Selector").font(Robo.title(16)).foregroundStyle(QueueChrome.text)
                                 Text("Version \(Bundle.main.object(forInfoDictionaryKey:"CFBundleShortVersionString") as? String ?? "") (\(Bundle.main.object(forInfoDictionaryKey:"CFBundleVersion") as? String ?? ""))")
                                     .font(Robo.mono(11)).foregroundStyle(QueueChrome.secondary)
+                                if let disclosure = model.usageDisclosure {
+                                    Text(disclosure).font(Robo.mono(11)).foregroundStyle(QueueChrome.secondary)
+                                        .fixedSize(horizontal:false,vertical:true).accessibilityIdentifier("usage-disclosure")
+                                }
                             }.frame(maxWidth:.infinity,alignment:.leading)
                         }.padding(14)
                     }

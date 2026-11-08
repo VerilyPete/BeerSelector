@@ -13,7 +13,7 @@ sh native-ios/ci_scripts/ci_post_clone.sh
 open native-ios/BeerSelectorNative.xcodeproj
 ~~~
 
-The hook creates an empty ignored resource for local tests. For enrichment, create native-ios/Resources/ServiceConfiguration.plist with string keys EnrichmentURL (HTTPS) and EnrichmentKey. Keep credentials out of Git. Existing installations can use the legacy dotenv importer in native-ios/Scripts/import-configuration.py.
+The hook creates an empty ignored resource for local tests. For enrichment, create native-ios/Resources/ServiceConfiguration.plist with string keys EnrichmentURL (HTTPS) and EnrichmentKey. Usage telemetry stays off unless it also sets UsageTelemetryEnabled to the string true; see native-ios/Docs/USAGE-TELEMETRY.md. Keep credentials out of Git. Existing installations can use the legacy dotenv importer in native-ios/Scripts/import-configuration.py.
 
 The app requires no npm install, Expo, Metro, CocoaPods, or React Native tooling.
 
