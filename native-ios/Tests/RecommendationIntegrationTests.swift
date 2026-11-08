@@ -894,6 +894,19 @@ extension RecommendationIntegrationTests {
         await controller.generate()
         return controller
     }
+    @MainActor func testPublishedSuggestionsCountTheirSourceAndAnyFallbackReason() async throws {
+        try await withModel { model,_,_ in
+            let usage = UsageSpy()
+            model.usage = usage
+            let answered = await generate(model) { _ in ["new"] }
+            let failed = await generate(model) { _ in throw RecommendationUnavailable.model }
+            let late = await generate(model,timeout:0.05) { _ in try await Task.sleep(for:.seconds(5)); return ["new"] }
+            XCTAssertTrue(answered.usedModel)
+            XCTAssertEqual(failed.fallback,.providerFailure)
+            XCTAssertEqual(late.fallback,.deadlineExpired)
+            XCTAssertEqual(usage.events,[.appleIntelligenceUsed,.localMatchingUsed,.fallbackProviderFailure,.localMatchingUsed,.fallbackDeadlineExpired])
+        }
+    }
     @MainActor func testProviderFailureIsAnnouncedAsAFallback() async throws {
         try await withModel { model,_,_ in
             let controller = await generate(model) { _ in throw RecommendationUnavailable.model }

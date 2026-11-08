@@ -21,7 +21,7 @@ final class AppModel: ObservableObject {
     @Published var recentTastings: [Beer] = []
     @Published var missedCredits: [MissedCreditVisit] = []
     var now: () -> Date = Date.init
-    @Published var showRecommendations = false { didSet { noticePresenterMayHaveChanged() } }
+    @Published var showRecommendations = false { didSet { noticePresenterMayHaveChanged(); if showRecommendations && !oldValue { recordUsage(.suggestionsOpened) } } }
     let semanticIndex = SemanticTaplistIndex()
     var suggestionCompatibility: () -> RecommendationCompatibility = { .current } { didSet { suggestionMode.refresh() } }
     var suggestionsEnabled: () -> Bool = { UserDefaults.standard.bool(forKey:"recommendations_enabled") } { didSet { suggestionMode.refresh() } }
@@ -54,6 +54,7 @@ final class AppModel: ObservableObject {
               tastedBeers.contains(where:{ $0.id == beer.id }) || beerFeedback.contains(where:{ $0.id == beer.id }) else { return }
         do {
             try db.saveBeerFeedback(BeerFeedback(beer:beer,rating:rating),account:account)
+            recordUsage(.beerRated)
             beerFeedback = try db.beerFeedback(account:account); recommendations.cancel()
         } catch { self.error = error.localizedDescription }
     }
@@ -68,7 +69,7 @@ final class AppModel: ObservableObject {
     func resolveMissedCreditVisit(_ visit: MissedCreditVisit) { dismissCredits(visit.beers) }
     private func dismissCredits(_ entries: [CreditLogEntry]) {
         guard let db, let account = recommendationAccount else { return }
-        do { try db.transaction { try db.dismissCredit(ids:entries.map(\.id),account:account) }; try updateMissedCredits() }
+        do { try db.transaction { try db.dismissCredit(ids:entries.map(\.id),account:account) }; recordUsage(.missedCreditResolved); try updateMissedCredits() }
         catch { self.error = error.localizedDescription }
     }
     private func updateMissedCredits() throws {
@@ -177,15 +178,31 @@ final class AppModel: ObservableObject {
     }
     @Published var busyIDs: Set<String> = []
     @Published var tab: AppTab = .home
+    /// A tab the user chose. Programmatic resets (login, logout) set `tab` directly and count nothing.
+    func selectTab(_ next: AppTab) {
+        guard next != tab else { return }
+        tab = next
+        switch next {
+        case .home: recordUsage(.viewHome)
+        case .all: recordUsage(.viewAllBeers)
+        case .finder: recordUsage(.viewBeerfinder)
+        case .tasted: recordUsage(.viewTasted)
+        }
+    }
     @Published var showSettings = false { didSet { noticePresenterMayHaveChanged() } }
     @Published var showLogin = false { didSet { noticePresenterMayHaveChanged() } }
-    @Published var showQueue = false { didSet { noticePresenterMayHaveChanged() } }
-    @Published var showMissedCredit = false { didSet { noticePresenterMayHaveChanged() } }
-    @Published var showOperations = false { didSet { noticePresenterMayHaveChanged() } }
-    @Published var showRewards = false { didSet { noticePresenterMayHaveChanged() } }
+    @Published var showQueue = false { didSet { noticePresenterMayHaveChanged(); if showQueue && !oldValue { recordUsage(.viewQueue) } } }
+    @Published var showMissedCredit = false { didSet { noticePresenterMayHaveChanged(); if showMissedCredit && !oldValue { recordUsage(.viewMissedCredit) } } }
+    @Published var showOperations = false { didSet { noticePresenterMayHaveChanged(); if showOperations && !oldValue { recordUsage(.viewPendingOperations) } } }
+    @Published var showRewards = false { didSet { noticePresenterMayHaveChanged(); if showRewards && !oldValue { recordUsage(.viewRewards) } } }
     @Published var browserURL: URL? { didSet { noticePresenterMayHaveChanged() } }
     var db: BeerDatabase?
     let api: BeerAPI
+    var usage: (any UsageRecording)?
+    func recordUsage(_ event: UsageEvent) {
+        guard !previewMode else { return }
+        usage?.record(event)
+    }
     lazy var enrichment = EnrichmentService(api:api)
     let credentials: CredentialStore
     let liveActivity = LiveActivityController()
@@ -323,6 +340,11 @@ final class AppModel: ObservableObject {
         catch { rewardsError = "Couldn’t read saved rewards. Please try again." }
     }
     func refreshRewards() async { await refresh(requireNewPass:true) }
+    /// A refresh the user asked for; the automatic load when the screen opens uses `refreshRewards`.
+    func refreshRewardsManually() async {
+        recordUsage(.rewardsRefreshedManual)
+        await refreshRewards()
+    }
     func refreshFinder() async {
         let token = epoch
         await refresh()
@@ -749,6 +771,8 @@ final class AppModel: ObservableObject {
             }
             id = try db.enqueue(type:"CHECK_IN_BEER",payload:payload)
             savedRecommendation = recommendation
+            recordUsage(.checkinQueued)
+            if recommendation { recordUsage(.checkinFromSuggestion) }
             try reload()
             if let choice = manualChoice, let account = recommendationAccount {
                 do { try db.saveChoicePresentation(choice,account:account) }
@@ -840,6 +864,7 @@ final class AppModel: ObservableObject {
     func retryOperation(_ id: String) async {
         guard !processing else { return }
         guard let operation = operations.first(where: { $0.id == id }), operationRestriction(operation) == nil else { return }
+        recordUsage(.operationRetried)
         do {
             if operation.payload["recommendation"] == "true" {
                 await processOperations(only:id)
@@ -867,6 +892,7 @@ final class AppModel: ObservableObject {
         do {
             _ = try await api.request(url.url!,member:member,cookies:cookies,referer:"memberQueues.php",retry:false)
             guard token == epoch else { return }
+            recordUsage(.queueEntryDeleted)
             // A beer already missed stays on the report until the member clears it. Decide from
             // the stored log at this moment; the cached report may predate the grace window.
             if let db, let account = recommendationAccount, let log = try? db.creditLog(account:account),
@@ -884,6 +910,7 @@ final class AppModel: ObservableObject {
         do {
             _ = try await api.request(api.configuration.endpoint("addToRewardQueue.php"),method:"POST",fields:["chitCode":reward.id,"chitRewardType":reward.type,"chitStoreName":member.storeName,"chitUserId":member.memberId],member:member,cookies:cookies,referer:"memberRewards.php",retry:false)
             guard token == epoch else { return }
+            recordUsage(.rewardQueued)
             rewardsNotice = "\(reward.type) has been added to your queue!"
             await refreshQueue()
             guard token == epoch else { return }
@@ -959,16 +986,17 @@ final class AppModel: ObservableObject {
         let name = beer.brew_name.replacingOccurrences(of:#"\s*\([^)]*\)\s*"#,with:" ",options:.regularExpression).trimmingCharacters(in:.whitespaces)
         var url = URLComponents(string:"https://untappd.com/search")!; url.queryItems = [.init(name:"q",value:name)]
         browserURL = url.url
+        recordUsage(.untappdOpened)
     }
     func handleURL(_ url: URL) {
         guard url.scheme == "beerselector" else { return }
         if loading { pendingURL = url; return }
         switch url.host {
-        case "mybeers", "beerfinder": if isMember { tab = .finder } else { showSettings = true }
+        case "mybeers", "beerfinder": if isMember { selectTab(.finder) } else { showSettings = true }
         case "settings": showSettings = true; if URLComponents(url:url,resolvingAgainstBaseURL:false)?.queryItems?.contains(where: { $0.name == "action" && $0.value == "login" }) == true { showLogin = true }
-        case "beerlist": tab = .all
-        case "tastedbrews": if isMember { tab = .tasted }
-        default: tab = .home
+        case "beerlist": selectTab(.all)
+        case "tastedbrews": if isMember { selectTab(.tasted) }
+        default: selectTab(.home)
         }
     }
 }

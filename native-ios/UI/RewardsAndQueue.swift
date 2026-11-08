@@ -93,7 +93,7 @@ struct RewardsScreen: View {
                         VStack(alignment:.leading,spacing:12) {
                             Text(error).font(Robo.body(14)).foregroundStyle(Robo.textPrimary)
                             if !model.rewards.isEmpty { Text("Showing saved rewards.").font(Robo.body(13)).foregroundStyle(Robo.textSecondary) }
-                            Button("Refresh Rewards") { Task { await model.refreshRewards() } }.buttonStyle(BeerControlStyle()).disabled(model.refreshing)
+                            Button("Refresh Rewards") { Task { await model.refreshRewardsManually() } }.buttonStyle(BeerControlStyle()).disabled(model.refreshing)
                             Button("Read Saved Rewards") { model.retrySavedRewards() }.buttonStyle(BeerControlStyle())
                         }.padding(14).frame(maxWidth:.infinity,alignment:.leading).contentCard().accessibilityIdentifier("rewards-error")
                     }
@@ -122,9 +122,9 @@ struct RewardsScreen: View {
                         }.multilineTextAlignment(.leading).disabled(model.busyIDs.contains(reward.id)).accessibilityIdentifier("reward-\(reward.id)")
                     }
                 }.padding(18).frame(maxWidth:760).frame(maxWidth:.infinity)
-            }.refreshable { await model.refreshRewards() }.background(Robo.background).foregroundStyle(Robo.text)
+            }.refreshable { await model.refreshRewardsManually() }.background(Robo.background).foregroundStyle(Robo.text)
                 .navigationTitle("Rewards").navigationBarTitleDisplayMode(.inline)
-                .safeAreaInset(edge:.top,spacing:0) { ChromeScreenHeader(title:"Rewards",close:{ dismiss() },refresh:{ Task { await model.refreshRewards() } },refreshing:model.refreshing) }
+                .safeAreaInset(edge:.top,spacing:0) { ChromeScreenHeader(title:"Rewards",close:{ dismiss() },refresh:{ Task { await model.refreshRewardsManually() } },refreshing:model.refreshing) }
                 .task { if !model.rewardsLoaded { await model.refreshRewards() } }
                 .toolbar(.hidden,for:.navigationBar)
                 .toolbar { ToolbarItem(placement:.cancellationAction) { Button("Done") { dismiss() } } }

@@ -36,7 +36,7 @@ struct SettingsScreen: View {
                             row(model.refreshing ? "Refreshing…" : "Refresh All Data","Update your taplist, tastings and rewards","arrow.clockwise",busy:model.refreshing) { Task { await model.refresh() } }
                                 .disabled(model.refreshing).accessibilityIdentifier("refresh-all-data-button")
                             separator
-                            row("Go to Home Screen","Return to your dashboard","house") { model.tab = .home; dismiss() }
+                            row("Go to Home Screen","Return to your dashboard","house") { model.selectTab(.home); dismiss() }
                         }
                     }
                     if model.isMember {
