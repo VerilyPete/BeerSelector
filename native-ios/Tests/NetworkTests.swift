@@ -114,6 +114,95 @@ final class NetworkTests: XCTestCase {
             XCTAssertEqual(beers?.last?.enrichment_source,"description")
         }
     }
+    private func exaTaplistBody() -> Data {
+        Data(#"{"storeId":"1","beers":[{"id":"exa","brew_name":"Exa beer","brewer":"Fixture","enriched_abv":8,"enrichment_confidence":0.8,"enrichment_source":"exa"}]}"#.utf8)
+    }
+    @MainActor func testTaplistRowFromExaFallbackKeepsABVSourceAndConfidence() async throws {
+        let service = EnrichmentService(api:api(configuration:enrichmentConfiguration))
+        fixture.handler = { _ in (200,self.exaTaplistBody()) }
+        defer { fixture.handler = nil }
+        let beers = try await service.taplist(storeID:"1",etag:nil).beers
+        let beer = try XCTUnwrap(beers?.first)
+        XCTAssertEqual(beer.abv,8)
+        XCTAssertEqual(beer.enrichment_source,"exa")
+        XCTAssertEqual(beer.enrichment_confidence,0.8)
+    }
+    // The header promises the worker that this build decodes "exa", so it must ship with the decoders.
+    @MainActor func testEnrichmentRequestsAdvertiseExaSourceAlongsideTheirOtherHeaders() async throws {
+        let service = EnrichmentService(api:api(configuration:enrichmentConfiguration))
+        var seen: [String:URLRequest] = [:]
+        var batches = 0
+        fixture.handler = { request in
+            let path = request.url!.path
+            seen[path] = request
+            switch path {
+            case "/beers": return (304,Data())
+            case "/beers/sync": return (200,Data(#"{"synced":1,"queued_for_cleanup":1,"requestId":"fixture"}"#.utf8))
+            default:
+                batches += 1
+                return (200,Data((batches == 1 ? #"{"enrichments":{},"missing":["1"],"requestId":"fixture"}"# : #"{"enrichments":{},"missing":[],"requestId":"fixture"}"#).utf8))
+            }
+        }
+        defer { fixture.handler = nil }
+        _ = try await service.taplist(storeID:"1",etag:"fixture-tag")
+        _ = await service.enrich([try Beer(row:["id":"1","brew_name":"Fixture","brew_description":"Original description"])])
+        XCTAssertEqual(Set(seen.keys),["/beers","/beers/batch","/beers/sync"])
+        for (path,request) in seen {
+            XCTAssertEqual(request.value(forHTTPHeaderField:"X-Enrichment-Sources"),"exa",path)
+            XCTAssertEqual(request.value(forHTTPHeaderField:"X-API-Key"),"fixture",path)
+        }
+        XCTAssertEqual(seen["/beers"]?.value(forHTTPHeaderField:"If-None-Match"),"fixture-tag")
+    }
+    @MainActor func testUnknownEnrichmentSourcesAreStillRejectedByBothDecoders() async throws {
+        defer { fixture.handler = nil }
+        for source in ["untappd","bogus"] {
+            let proxy = EnrichmentService(api:api(configuration:enrichmentConfiguration))
+            fixture.handler = { _ in (200,Data(#"{"storeId":"1","beers":[{"id":"1","brew_name":"Fixture","brewer":"Fixture","enriched_abv":8,"enrichment_confidence":0.8,"enrichment_source":"\#(source)"}]}"#.utf8)) }
+            do { _ = try await proxy.taplist(storeID:"1",etag:nil); XCTFail("Taplist accepted \(source)") } catch {}
+            let batch = EnrichmentService(api:api(configuration:enrichmentConfiguration))
+            fixture.handler = { _ in (200,Data(#"{"enrichments":{"1":{"enriched_abv":8,"enrichment_confidence":0.8,"enrichment_source":"\#(source)","brew_description":null,"has_cleaned_description":false}},"missing":[],"requestId":"fixture"}"#.utf8)) }
+            let upstream = Beer(id:"1",name:"Upstream")
+            let result = await batch.enrich([upstream])
+            XCTAssertEqual(result,[upstream],source)
+            XCTAssertEqual(batch.metrics.failures,1,source)
+        }
+    }
+    // Builds that don't send X-Enrichment-Sources get Exa ABVs with a null source.
+    @MainActor func testNullSourceWithExaConfidenceKeepsABVInBothDecoders() async throws {
+        defer { fixture.handler = nil }
+        let proxy = EnrichmentService(api:api(configuration:enrichmentConfiguration))
+        fixture.handler = { _ in (200,Data(#"{"storeId":"1","beers":[{"id":"1","brew_name":"Fixture","brewer":"Fixture","enriched_abv":8,"enrichment_confidence":0.8,"enrichment_source":null}]}"#.utf8)) }
+        let beers = try await proxy.taplist(storeID:"1",etag:nil).beers
+        XCTAssertEqual(beers?.first?.abv,8)
+        XCTAssertEqual(beers?.first?.enrichment_confidence,0.8)
+        XCTAssertNil(beers?.first?.enrichment_source)
+        let batch = EnrichmentService(api:api(configuration:enrichmentConfiguration))
+        fixture.handler = { _ in (200,Data(#"{"enrichments":{"1":{"enriched_abv":8,"enrichment_confidence":0.8,"enrichment_source":null,"brew_description":null,"has_cleaned_description":false}},"missing":[],"requestId":"fixture"}"#.utf8)) }
+        let result = await batch.enrich([Beer(id:"1",name:"Upstream")])
+        XCTAssertEqual(result.first?.abv,8)
+        XCTAssertEqual(result.first?.enrichment_confidence,0.8)
+        XCTAssertNil(result.first?.enrichment_source)
+        XCTAssertEqual(batch.metrics.failures,0)
+    }
+    @MainActor func testExaEnrichmentSurvivesRefreshAndReloadFromDatabase() async throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at:folder); fixture.handler = nil }
+        let model = AppModel(api:api(configuration:enrichmentConfiguration),monitorConnectivity:false)
+        let db = try BeerDatabase(url:folder.appendingPathComponent("beers.db")); model.db = db
+        model.session = MemberSession(memberId:"visitor",storeId:"1",storeName:"Fixture",sessionId:"visitor_session")
+        try db.setPreference("all_beers_api_url","https://fsbs.beerknurd.com/bk-store-json-2026.php?sid=1")
+        fixture.handler = { request in
+            if request.url!.path == "/beers" { return (200,self.exaTaplistBody()) }
+            return (200,Data(#"{"enrichments":{},"missing":[],"requestId":"fixture"}"#.utf8))
+        }
+        await model.refresh()
+        XCTAssertNil(model.error)
+        let reopened = try BeerDatabase(url:folder.appendingPathComponent("beers.db"))
+        let stored = try XCTUnwrap(try reopened.beers().first { $0.id == "exa" })
+        XCTAssertEqual(stored.abv,8)
+        XCTAssertEqual(stored.enrichment_source,"exa")
+        XCTAssertEqual(stored.enrichment_confidence,0.8)
+    }
     @MainActor func testHealthQuotaContractRejectsPartialOrMistypedDetails() async throws {
         let quota: [String:Any] = ["used":2,"limit":10,"remaining":8]
         let details: [String:Any] = ["enabled":true,"daily":quota,"monthly":quota]
@@ -394,6 +483,19 @@ final class NetworkTests: XCTestCase {
         XCTAssertEqual(service.metrics.successes,1)
         do { _ = try await service.health(); XCTFail("Health requires database status") } catch {}
         XCTAssertEqual(service.metrics.failures,1)
+    }
+
+    @MainActor func testBatchRowFromExaFallbackKeepsABVSourceAndConfidence() async throws {
+        let service = EnrichmentService(api:api(configuration:enrichmentConfiguration))
+        fixture.handler = { _ in
+            (200,Data(#"{"enrichments":{"1":{"enriched_abv":8,"enrichment_confidence":0.8,"enrichment_source":"exa","brew_description":null,"has_cleaned_description":false}},"missing":[],"requestId":"fixture"}"#.utf8))
+        }
+        defer { fixture.handler = nil }
+        let result = await service.enrich([Beer(id:"1",name:"Upstream")])
+        XCTAssertEqual(result.first?.abv,8)
+        XCTAssertEqual(result.first?.enrichment_source,"exa")
+        XCTAssertEqual(result.first?.enrichment_confidence,0.8)
+        XCTAssertEqual(service.metrics.failures,0)
     }
 
     @MainActor func testMalformedBatchRowsPreserveUpstreamAndCountAsFailures() async throws {
