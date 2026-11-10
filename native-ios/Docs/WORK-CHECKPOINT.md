@@ -1,3 +1,12 @@
+## Accept the `exa` enrichment source — November 10, 2026
+
+The ufobeer worker is adding Exa as a second ABV lookup when Perplexity answers unknown. Those ABVs carry `enrichment_source: "exa"` and confidence 0.8. Handoff: `ufobeer/plans/handoff-beerselector-accept-exa-source.md`; worker plan: `ufobeer/plans/abv-untappd-fallback.md`.
+
+- Both Swift decoders (the `/beers/batch` row and the `/beers` taplist row) accept `exa`. Their allowed list is one constant in `EnrichmentService`, derived from the sources the build advertises.
+- Every request made through `EnrichmentService.call` (`/beers`, `/beers/batch`, `/beers/sync`, `/health`) sends `X-Enrichment-Sources: exa`. The worker labels a row `exa` only for requests that carry the header; older builds get `null` with the same ABV, which they already accept. `/usage` doesn't go through `call` and doesn't send it. Pete chose this per-request negotiation, so no older builds need expiring for this change.
+- TypeScript contracts: `exa` added to `enrichmentSourceSchema` and `EnrichmentSource`.
+- Tests: `exa` decodes through `enrich` and `taplist` and survives the database round trip; a null source with confidence 0.8 keeps its ABV; `untappd` and `bogus` are still rejected by both decoders; the header goes out on `/beers`, `/beers/batch` and `/beers/sync` beside `X-API-Key`, and the conditional `/beers` request keeps `If-None-Match`. Each new behavior test failed first. Three hand mutants (each decoder accepting any source, and decoders forgetting `exa` while still advertising it) were all killed. All plan: 497/497 passed serially on the iPhone 18 Pro simulator; Vitest 17/17 and the typecheck pass.
+
 ## Usage telemetry switched on — November 10, 2026
 
 The external beta build from #77 sends usage counts; it reached beta testers on November 10. Pete did steps 1 and 2 of USAGE-TELEMETRY.md → Switching it on: the App Store privacy details, and `UsageTelemetryEnabled` (string `true`) in the Xcode Cloud secret `BEERSELECTOR_SERVICE_CONFIGURATION_BASE64`. #77 added the What to Test note, which also covers #69 and #70.

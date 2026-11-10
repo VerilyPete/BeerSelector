@@ -5,9 +5,10 @@
  * - 'description': ABV parsed from brew_description HTML
  * - 'perplexity': ABV fetched from Perplexity API
  * - 'manual': ABV manually verified/entered
+ * - 'exa': ABV found by the Exa search fallback (exact Untappd page match)
  * - null: Not yet enriched
  */
-export type EnrichmentSource = 'description' | 'perplexity' | 'manual' | null;
+export type EnrichmentSource = 'description' | 'perplexity' | 'manual' | 'exa' | null;
 
 /**
  * Base Beer type representing a beer in the system

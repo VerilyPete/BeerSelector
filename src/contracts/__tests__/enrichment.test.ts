@@ -43,7 +43,7 @@ const proxyResponse = {
 };
 
 describe('mobile enrichment consumer contracts', () => {
-  it.each(['description', 'perplexity', 'manual'] as const)(
+  it.each(['description', 'perplexity', 'manual', 'exa'] as const)(
     'accepts supported enrichment source %s',
     source => {
       expect(
@@ -202,11 +202,11 @@ describe('mobile enrichment consumer contracts', () => {
     ).toBe(false);
   });
 
-  it('rejects unknown enrichment sources', () => {
+  it.each(['future-ai', 'untappd'])('rejects unknown enrichment source %s', source => {
     expect(
       enrichedBeerResponseSchema.safeParse({
         ...completeBeer,
-        enrichment_source: 'future-ai',
+        enrichment_source: source,
       }).success
     ).toBe(false);
   });
