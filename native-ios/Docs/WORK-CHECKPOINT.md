@@ -3,7 +3,7 @@
 The external beta build from #77 sends usage counts; it reached beta testers on November 10. Pete did steps 1 and 2 of USAGE-TELEMETRY.md → Switching it on: the App Store privacy details, and `UsageTelemetryEnabled` (string `true`) in the Xcode Cloud secret `BEERSELECTOR_SERVICE_CONFIGURATION_BASE64`. #77 added the What to Test note, which also covers #69 and #70.
 
 - The privacy details to declare follow `ufobeer/plans/usage-telemetry.md` → Privacy label: Device ID, Product Interaction and Other Diagnostic Data, for analytics, linked to the user, not used for tracking. The plan leaves the client-IP row to be checked against Apple's guidance.
-- Not yet checked: that batches are arriving in the worker's `usage_batches` and `usage_daily` tables.
+- Verified November 10: the worker had recorded 8 batches from 3 installs, making 11 `usage_daily` rows.
 
 ## Usage telemetry, shipped dark — November 7, 2026
 
