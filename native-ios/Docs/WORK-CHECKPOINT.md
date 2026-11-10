@@ -1,11 +1,17 @@
+## Usage telemetry switched on — November 10, 2026
+
+The external beta build from #77 sends usage counts; it reached beta testers on November 10. Pete did steps 1 and 2 of USAGE-TELEMETRY.md → Switching it on: the App Store privacy details, and `UsageTelemetryEnabled` (string `true`) in the Xcode Cloud secret `BEERSELECTOR_SERVICE_CONFIGURATION_BASE64`. #77 added the What to Test note, which also covers #69 and #70.
+
+- The privacy details to declare follow `ufobeer/plans/usage-telemetry.md` → Privacy label: Device ID, Product Interaction and Other Diagnostic Data, for analytics, linked to the user, not used for tracking. The plan leaves the client-IP row to be checked against Apple's guidance.
+- Verified November 10: the worker had recorded 8 batches from 3 installs, making 11 `usage_daily` rows.
+
 ## Usage telemetry, shipped dark — November 7, 2026
 
 The app can now count feature use and report it to the ufobeer worker's `POST /usage`. Every build keeps it **off** until the distribution configuration sets `UsageTelemetryEnabled` to the string `true`. Reference: [USAGE-TELEMETRY.md](USAGE-TELEMETRY.md). Backend plan: `ufobeer/plans/usage-telemetry.md`.
 
-- Stacked PRs: #71 (event list, encoder and golden request fixtures, merged), #72 (counters and the atomic snapshot), #73 (sending and draining), #74 (session rule, scene-phase wiring, background-task flush), #75 (event triggers), and this one (Settings disclosure, docs, distribution-config check).
+- Stacked PRs: #71 (event list, encoder and golden request fixtures), #72 (counters and the atomic snapshot), #73 (sending and draining), #74 (session rule, scene-phase wiring, background-task flush), #75 (event triggers), #76 (Settings disclosure, docs, distribution-config check), all merged.
 - ufobeer's request contract (#63 there) passes against these fixtures. Don't release a sending build unless it still does.
 - The `Docs/AI-IMPROVEMENTS/README.md` identifier rule now allows the random per-install ID, for usage counts only. Reset App Data keeps the ID; there is no opt-out beyond the beta disclosure in Settings → About (both decided by Pete, November 7).
-- Still to do before switching on: App Store privacy details, the `UsageTelemetryEnabled` key in the Xcode Cloud secret, and a What to Test note. See USAGE-TELEMETRY.md → Switching it on.
 
 ## Tablet Home landscape redesign — November 2, 2026
 
