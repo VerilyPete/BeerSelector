@@ -4,6 +4,7 @@ struct APIConfiguration: Sendable {
     var baseURL = URL(string:"https://tapthatapp.beerknurd.com")!
     var enrichmentURL: URL?
     var enrichmentKey: String?
+    var usageTelemetryEnabled = false
     var timeout: TimeInterval = 15
     var enrichment = EnrichmentPolicy()
     struct EnrichmentPolicy: Sendable {
@@ -37,6 +38,7 @@ struct APIConfiguration: Sendable {
         if let value = values["BeerAPIBaseURL"], let url = URL(string:value), url.scheme == "https" { c.baseURL = url }
         if let value = values["EnrichmentURL"] { c.enrichmentURL = URL(string:value) }
         c.enrichmentKey = values["EnrichmentKey"]
+        c.usageTelemetryEnabled = values["UsageTelemetryEnabled"]?.lowercased() == "true"
         return c
     }
     func endpoint(_ path: String) -> URL { baseURL.appendingPathComponent(path) }

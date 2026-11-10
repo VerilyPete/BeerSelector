@@ -77,6 +77,8 @@ actor UsageRecorder {
     private let newID: @Sendable () -> UUID
     private var loaded: UsageState?
     private var unsaved = false
+    private var flushing = false
+    static let maxBatchesPerFlush = 5
 
     init(url: URL = UsageRecorder.defaultURL, now: @escaping @Sendable () -> Date = { Date() }, newID: @escaping @Sendable () -> UUID = { UUID() }) {
         self.url = url; self.now = now; self.newID = newID
@@ -95,8 +97,21 @@ actor UsageRecorder {
         return next.pending
     }
 
-    func acknowledge(_ batchID: UUID) {
-        _ = commit(state().acknowledging(batchID))
+    @discardableResult func acknowledge(_ batchID: UUID) -> Bool {
+        commit(state().acknowledging(batchID))
+    }
+
+    /// Sends the pending batch, then drains further batches after each acceptance, up to
+    /// `maxBatchesPerFlush`. Any failure ends the flush; the next flush resends the same batch.
+    /// A flush started while another is sending does nothing.
+    func flush(via transport: any UsageTransport) async {
+        guard !flushing else { return }
+        flushing = true
+        defer { flushing = false }
+        for _ in 0..<Self.maxBatchesPerFlush {
+            guard let batch = nextBatch() else { return }
+            guard await transport.send(batch.body) == .accepted, acknowledge(batch.batchID) else { return }
+        }
     }
 
     private func state() -> UsageState {
