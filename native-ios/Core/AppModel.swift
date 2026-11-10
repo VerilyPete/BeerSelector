@@ -199,6 +199,11 @@ final class AppModel: ObservableObject {
     var db: BeerDatabase?
     let api: BeerAPI
     var usage: (any UsageRecording)?
+    /// Shown in Settings while usage telemetry is switched on. The counts are linked to a
+    /// random install ID, so this never calls them anonymous.
+    var usageDisclosure: String? {
+        api.configuration.usageTelemetryEnabled ? "This beta sends daily counts of which features you use, tagged with a random ID for this install, to help decide what to improve. They don't include beer names, searches or your account." : nil
+    }
     func recordUsage(_ event: UsageEvent) {
         guard !previewMode else { return }
         usage?.record(event)

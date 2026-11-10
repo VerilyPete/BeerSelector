@@ -229,3 +229,15 @@ final class UsageSuggestionOutcomeTests: XCTestCase {
         }
     }
 }
+
+@MainActor final class UsageDisclosureTests: XCTestCase {
+    func testSettingsDisclosesUsageTelemetryOnlyWhenItIsSwitchedOn() {
+        let on = AppModel(api:BeerAPI(configuration:.from(values:["UsageTelemetryEnabled":"true","EnrichmentURL":"https://worker.example","EnrichmentKey":"k"])),monitorConnectivity:false)
+        let off = AppModel(api:BeerAPI(configuration:.from(values:["EnrichmentURL":"https://worker.example","EnrichmentKey":"k"])),monitorConnectivity:false)
+        let disclosure = try? XCTUnwrap(on.usageDisclosure)
+        XCTAssertEqual(disclosure?.contains("random ID for this install"),true)
+        XCTAssertEqual(disclosure?.localizedCaseInsensitiveContains("anonymous"),false,"the counts are linked to the install, so never call them anonymous")
+        XCTAssertNil(off.usageDisclosure)
+    }
+}
+

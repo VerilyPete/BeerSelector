@@ -13,7 +13,7 @@ def main():
     try:
         encoded = os.environ["BEERSELECTOR_SERVICE_CONFIGURATION_BASE64"]
         config = plistlib.loads(base64.b64decode(encoded, validate=True))
-        if not isinstance(config, dict):
+        if not isinstance(config, dict) or not all(isinstance(value, str) for value in config.values()):
             raise ValueError()
         key = config.get("EnrichmentKey")
         url = config.get("EnrichmentURL")
@@ -24,7 +24,7 @@ def main():
             raise ValueError()
         data = plistlib.dumps(config)
     except (KeyError, ValueError, TypeError, plistlib.InvalidFileException, ExpatError):
-        print("External distribution requires a valid secret BEERSELECTOR_SERVICE_CONFIGURATION_BASE64 containing EnrichmentURL (HTTPS) and EnrichmentKey.", file=sys.stderr)
+        print("External distribution requires a valid secret BEERSELECTOR_SERVICE_CONFIGURATION_BASE64 containing EnrichmentURL (HTTPS) and EnrichmentKey, with string values only.", file=sys.stderr)
         return 1
     target = Path(sys.argv[1])
     target.write_bytes(data)

@@ -35,7 +35,9 @@ class CloudConfigurationTests(unittest.TestCase):
         for raw in [None, b"not a plist", b"<?xml version='1.0'?><plist><dict>",
                     plistlib.dumps({}),
                     plistlib.dumps({"EnrichmentKey": "synthetic-secret", "EnrichmentURL": "http://example.invalid"}),
-                    plistlib.dumps({"EnrichmentKey": "synthetic-secret", "EnrichmentURL": "https://user:password@example.invalid"})]:
+                    plistlib.dumps({"EnrichmentKey": "synthetic-secret", "EnrichmentURL": "https://user:password@example.invalid"}),
+                    # The app reads the plist as [String: String]; one non-string value would drop every setting.
+                    plistlib.dumps({"EnrichmentKey": "synthetic-secret", "EnrichmentURL": "https://example.invalid", "UsageTelemetryEnabled": True})]:
             with self.subTest(raw=raw is None):
                 if raw is not None:
                     self.env["BEERSELECTOR_SERVICE_CONFIGURATION_BASE64"] = base64.b64encode(raw).decode()
@@ -45,7 +47,7 @@ class CloudConfigurationTests(unittest.TestCase):
                 self.assertFalse(self.target.exists())
 
     def test_distribution_imports_valid_configuration_privately(self):
-        config = {"EnrichmentKey": "synthetic-secret", "EnrichmentURL": "https://example.invalid"}
+        config = {"EnrichmentKey": "synthetic-secret", "EnrichmentURL": "https://example.invalid", "UsageTelemetryEnabled": "true"}
         self.env["BEERSELECTOR_DISTRIBUTION"] = "external"
         self.env["BEERSELECTOR_SERVICE_CONFIGURATION_BASE64"] = base64.b64encode(plistlib.dumps(config)).decode()
         self.assertEqual(self.run_hook().returncode, 0)
