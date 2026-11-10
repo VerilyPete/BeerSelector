@@ -6,7 +6,7 @@
  * - 'perplexity': ABV fetched from Perplexity API
  * - 'manual': ABV manually verified/entered
  * - 'exa': ABV found by the Exa search fallback (exact Untappd page match)
- * - null: Not yet enriched
+ * - null: Source unavailable or not disclosed; ABV may still be enriched
  */
 export type EnrichmentSource = 'description' | 'perplexity' | 'manual' | 'exa' | null;
 
