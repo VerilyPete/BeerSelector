@@ -22,6 +22,11 @@ The batch has no timestamps, beer IDs, beer names, search text, member ID or car
 number. The install ID is never derived from the member ID or the device. It
 survives logout, account switch and **Reset App Data**. Only a reinstall replaces it.
 
+The worker keeps each request's ID with the batch it recorded (`usage_batches`) and in its
+request log (`audit_log`), which also keeps the client IP for 30 days. So for 30 days an
+install ID can be matched to an IP address. This is kept on purpose, to trace a report end
+to end while debugging.
+
 The 25 event names and their trigger points are in `Core/Usage.swift` (`UsageEvent`)
 and `Core/AppModel.swift` (`recordUsage`). Each fires once per user action, never from
 view lifecycle hooks, and never in preview sessions.
@@ -78,4 +83,4 @@ or combined with other companies' data.
 | Install ID | Identifiers → Device ID |
 | Feature counts | Usage Data → Product Interaction |
 | App version, `ai_status`, OS major | Diagnostics → Other Diagnostic Data |
-| Client IP (worker logs) | Check Apple's current guidance before submission; most likely Diagnostics |
+| Client IP (worker request logs, 30 days; abuse prevention and debugging, never turned into a location) | Diagnostics → Other Diagnostic Data |
