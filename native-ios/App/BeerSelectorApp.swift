@@ -22,7 +22,11 @@ struct BeerSelectorApp: App {
         #endif
     }
     private static let usage: UsageTelemetry? = isTestHost || isStylePreview || ProcessInfo.processInfo.arguments.contains("--preview-fixtures") ? nil : .live(api:BeerAPI())
-    @StateObject private var model = AppModel(monitorConnectivity: !Self.isTestHost && !Self.isStylePreview)
+    @StateObject private var model = {
+        let model = AppModel(monitorConnectivity: !Self.isTestHost && !Self.isStylePreview)
+        model.usage = Self.usage
+        return model
+    }()
     @Environment(\.scenePhase) private var scenePhase
     var body: some Scene {
         WindowGroup {

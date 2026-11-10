@@ -82,7 +82,7 @@ struct RootView: View {
     private var tabButtons: some View {
         ForEach(AppTab.allCases.filter { model.isMember || $0 == .home || $0 == .all },id:\.self) { tab in
             Button {
-                UIImpactFeedbackGenerator(style:.light).impactOccurred(); model.tab = tab
+                UIImpactFeedbackGenerator(style:.light).impactOccurred(); model.selectTab(tab)
             } label: {
                 VStack(spacing:3) { Image(systemName:tab.symbol).font(.system(size:18)); Text(tab.rawValue).font(Robo.mono(9)).tracking(1).lineLimit(1) }
                     .frame(maxWidth:.infinity,minHeight:48).foregroundStyle(model.tab == tab ? Robo.cyan : Robo.color(0x3A3F47))
@@ -145,7 +145,7 @@ struct HomeView: View {
             recommendationEntry
             if model.isMember { MetricPanel(count:model.tastedBeers.count) }
             newOnTap(rows:fit == .oneRow ? 1 : 2)
-            if model.isMember { HomeRewardsCard(status:rewardsStatus,open:{ model.showRewards = true },retry:{ Task { await model.refreshRewards() } }) }
+            if model.isMember { HomeRewardsCard(status:rewardsStatus,open:{ model.showRewards = true },retry:{ Task { await model.refreshRewardsManually() } }) }
             else { visitorPanel }
         }.padding(.horizontal,18).padding(.top,8).padding(.bottom,fit == .roomy ? 18 : 10)
             .frame(maxWidth:760).frame(maxWidth:.infinity)
@@ -159,7 +159,7 @@ struct HomeView: View {
             recommendationEntry
             HStack(alignment:.latestOnTap,spacing:28) {
                 VStack(alignment:.leading,spacing:14) {
-                    sectionHeading("LATEST ON TAP","View all") { model.tab = .all }
+                    sectionHeading("LATEST ON TAP","View all") { model.selectTab(.all) }
                     let arrivals = BeerFilter.recentArrivals(model.allBeers)
                     if model.allBeers.isEmpty {
                         Text("No saved beers yet. Refresh from Settings to load the taplist.").font(Robo.body(15)).foregroundStyle(Robo.textSecondary)
@@ -189,7 +189,7 @@ struct HomeView: View {
                             MilestoneStrip(count:model.tastedBeers.count,size:15)
                         }
                         VStack(alignment:.leading,spacing:14) {
-                            sectionHeading("RECENT TASTINGS","View all") { model.tab = .tasted }
+                            sectionHeading("RECENT TASTINGS","View all") { model.selectTab(.tasted) }
                             Group {
                                 VStack(alignment:.leading,spacing:14) {
                                     if model.tastedBeers.isEmpty { Text("Your confirmed tastings will appear here.").font(Robo.body(15)).foregroundStyle(Robo.textSecondary) }
@@ -263,7 +263,7 @@ struct HomeView: View {
     }
     private func newOnTap(rows: Int) -> some View {
         VStack(alignment:.leading,spacing:10) {
-            sectionHeading("NEW ON TAP","View all",id:"home-new-on-tap-view-all") { model.tab = .all }
+            sectionHeading("NEW ON TAP","View all",id:"home-new-on-tap-view-all") { model.selectTab(.all) }
             if model.allBeers.isEmpty {
                 Text("No saved beers yet. Refresh from Settings to load the taplist.").font(Robo.body(15)).foregroundStyle(Robo.textSecondary)
                     .padding(16).frame(maxWidth:.infinity,alignment:.leading).contentCard().accessibilityIdentifier("home-new-on-tap-empty")

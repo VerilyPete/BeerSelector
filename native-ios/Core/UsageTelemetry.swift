@@ -8,10 +8,29 @@ extension UsageDimensions {
     }
 }
 
+@MainActor protocol UsageRecording: AnyObject {
+    func record(_ event: UsageEvent)
+}
+
+extension UsageEvent {
+    /// Events for suggestions that were published: the source that produced them and, when
+    /// Apple Intelligence was attempted and local matching stood in, why it fell back.
+    static func suggestionOutcome(mode: SuggestionMode, usedModel: Bool, fallback: RecommendationFallback?) -> [UsageEvent] {
+        if usedModel { return [.appleIntelligenceUsed] }
+        guard mode == .appleIntelligence, let fallback else { return [.localMatchingUsed] }
+        switch fallback {
+        case .deadlineExpired: return [.localMatchingUsed,.fallbackDeadlineExpired]
+        case .providerFailure: return [.localMatchingUsed,.fallbackProviderFailure]
+        case .invalidOutput: return [.localMatchingUsed,.fallbackInvalidOutput]
+        case .contextBudgetExhausted: return [.localMatchingUsed,.fallbackContextBudget]
+        }
+    }
+}
+
 /// The app's entry point to usage telemetry. Keeps recorder calls in the order they were made,
 /// knows whether the app is active, refreshes `lastActiveAt` once a minute while active, and
 /// flushes on moving to the background and when a session starts.
-@MainActor final class UsageTelemetry {
+@MainActor final class UsageTelemetry: UsageRecording {
     typealias BackgroundTask = @MainActor (@escaping @Sendable () async -> Void) async -> Void
     static let refreshInterval: Duration = .seconds(60)
 

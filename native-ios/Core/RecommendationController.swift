@@ -277,6 +277,7 @@ extension Diagnostics.SuggestionOutcome {
             }
         }
         resultMode = mode
+        UsageEvent.suggestionOutcome(mode:mode,usedModel:usedModel,fallback:fallback).forEach { model.recordUsage($0) }
         if let account = model.recommendationAccount {
             let choice = BeerChoiceContext(taplist:current.taplist,shown:suggestions.map(\.id),preferences:preferences,usedModel:usedModel,taplistValidation:current.taplistValidation)
             do { try model.db?.saveChoicePresentation(choice,account:account); choiceID = choice.id }
