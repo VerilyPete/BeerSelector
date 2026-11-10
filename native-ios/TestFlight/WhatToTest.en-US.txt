@@ -1,8 +1,14 @@
-Queue compatibility with TapThatApp's updated layout
+Usage counts in this beta
 
-- Fixed View Queue failing to load after Flying Saucer redesigned its queue page.
-- Queue entries display their beer names and added dates with both the new and previous layouts.
+- This build sends daily counts of which features you use, such as opening Suggestions, checking in, or queueing a reward, and whether Apple Intelligence or Local matching produced your suggestions. They help decide what to improve next.
+- The counts are tagged with a random ID created for this install. They don't include beer names, searches, which beers you rate, your member number or your card. Logging out and Reset App Data keep the ID; deleting the app replaces it.
+- Settings → About describes this.
 
-Please open View Queue and confirm your beers and dates appear, then refresh the queue. Also check Finder after refreshing. If your queue is empty, confirm the empty state appears normally.
+Also in this build
+
+- Apple Intelligence gets more time to answer, so suggestions should fall back to Local matching far less often, especially on iPad. Find shows a spinner while it works, and the results scroll into view when they arrive.
+- Home shows two New on Tap rows on every iPhone. The welcome banner is gone and the Settings gear sits beside your name.
+
+Please use the app as you normally would, then check that Settings → About shows the usage note. If opening the app or returning to it feels slower than before, note the time.
 
 If the app freezes or closes, note the time and action, then reopen Settings → Support → Prepare Diagnostic Report → Share Diagnostic Report. Submit any TestFlight feedback prompt as well.
