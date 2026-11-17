@@ -4,7 +4,7 @@ The SwiftUI code is the UI of record. When the code and a design file disagree, 
 
 ## Design file
 
-`/Users/pete/claude/BeerSelectorNative.pen` is a design backup rebuilt from the code at `b3b22e0c` (2026-11-05) and updated for the UI polish on 2026-11-06. Its images live in `/Users/pete/claude/BeerSelectorNative-assets/`; keep the folder next to the `.pen` file. A Read Me note on the canvas lists the rows and screens.
+`/Users/pete/claude/BeerSelectorNative.pen` is a design backup rebuilt from the code at `b3b22e0c` (2026-11-05) updated for the UI polish on 2026-11-06, and for the header buttons and the Home without a Rewards card on 2026-11-17. Its images live in `/Users/pete/claude/BeerSelectorNative-assets/`; keep the folder next to the `.pen` file. A Read Me note on the canvas lists the rows and screens.
 
 It covers every iPhone screen and sheet, the iPad layouts, visitor, first-run, empty, error, and banner states, system dialogs, and the Live Activity. It leaves out Dynamic Type accessibility layouts, the Untappd browser, and share sheets.
 

@@ -12,7 +12,7 @@ Plan: `plans/header-actions-and-three-new-rows.md`. Pete asked for all three cha
 - Maestro's hierarchy includes the header buttons of hidden tabs, so an `assertVisible` on a shared ID can't tell tabs apart. The taps in `header-actions.yaml` are what prove each tab's own buttons work; `header-queue-loading.yaml` taps too, after the Codex review of PR #82 pointed out that its per-tab assertions proved nothing.
 - Checked by eye on fixtures: all four tabs on the 16e (Tasted Brews shares a line with three buttons; Tasted mid-refresh and Beerfinder with the queue loading wrap or fit without overlap), Home in every suggestion mode and visitor mode on the 16e and 18 Pro Max, `--preview-banners` (steps down, no clipping), AX5 Home and All Beers on the 16e (Home scrolls with three rows; raising the text size on a four-row Home drops the fourth), iPad Home in portrait and landscape.
 - Not checked: signing out or switching to visitor mode by hand in a running member session (covered by unit tests only), an iPad window narrower than 768pt, VoiceOver, any physical device.
-- Not done: the `BeerSelectorNative.pen` design backup. The Pencil app wasn't running, so the file still shows the Rewards card and the old headers.
+- `BeerSelectorNative.pen` is updated: header buttons on Home, All Beers, Tasted Brews, the no-matches state and the iPad Home and All Beers; Home without the Rewards card and with three rows (four on the visitor Home, two under the banners). Its iPad Home instances had lost their text on disk and were restored from the visitor iPad Home.
 
 ## Usage telemetry switched on — November 10, 2026
 
