@@ -112,6 +112,42 @@ final class LogoutCleanupTests: XCTestCase {
         XCTAssertEqual(fresh.session?.memberId,"2")
     }
 
+    private typealias Sheet = ReferenceWritableKeyPath<AppModel,Bool>
+    @MainActor private var memberSheets: [[Sheet]] { [[\.showQueue],[\.showRewards],[\.showQueue,\.showMissedCredit]] }
+    @MainActor private func openSheets(_ sheets: [Sheet], then change: (Harness) async throws -> Void) async throws -> [Bool] {
+        let h = try harness(); defer { h.close() }
+        sheets.forEach { h.model[keyPath:$0] = true }
+        try await change(h)
+        return [h.model.showQueue,h.model.showRewards,h.model.showMissedCredit]
+    }
+    @MainActor func testSigningOutClosesQueueRewardsAndMissedCredit() async throws {
+        for sheets in memberSheets {
+            let open = try await openSheets(sheets) { _ = await $0.model.logout() }
+            XCTAssertEqual(open,[false,false,false])
+        }
+    }
+    @MainActor func testSwitchingToVisitorModeClosesQueueRewardsAndMissedCredit() async throws {
+        for sheets in memberSheets {
+            let open = try await openSheets(sheets) { h in
+                let url = h.model.api.configuration.endpoint("visitor.php")
+                let cookie = try XCTUnwrap(HTTPCookie(properties:[.domain:url.host!, .path:"/", .name:"store__id", .value:"2"]))
+                try await h.model.completeLogin(url:url,nativeCookies:[cookie])
+                XCTAssertEqual(h.model.session?.isVisitor,true)
+            }
+            XCTAssertEqual(open,[false,false,false])
+        }
+    }
+    @MainActor func testSigningInAgainAsAMemberLeavesOpenSheetsAlone() async throws {
+        for sheets in memberSheets {
+            let open = try await openSheets(sheets) { h in
+                try await h.loginNewMember()
+                try await h.loginNewMember()
+                XCTAssertEqual(h.model.session?.memberId,"2")
+            }
+            XCTAssertEqual(open,[sheets.contains(\.showQueue),sheets.contains(\.showRewards),sheets.contains(\.showMissedCredit)])
+        }
+    }
+
     @MainActor func testResetEmptiesAccountDataAndKeepsBeerFeedback() async throws {
         let h = try harness(); defer { h.close() }
         try h.db.replaceBeers([Beer(id:"saved",name:"Saved")])

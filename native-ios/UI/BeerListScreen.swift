@@ -23,11 +23,7 @@ struct BeerListScreen: View {
             let columnCount = typeSize.isAccessibilitySize ? 1 : geometry.size.width >= 1024 ? 3 : geometry.size.width >= 768 ? 2 : 1
             let columns = Array(repeating:GridItem(.flexible(),spacing:8,alignment:.top),count:columnCount)
             VStack(spacing:12) {
-                // C1: the buttons wrap below the title when one line doesn't fit.
-                ViewThatFits(in:.horizontal) {
-                    HStack(spacing:0) { DisplayTitle(title:kind.title).fixedSize(); Spacer(minLength:4); headerButtons }
-                    VStack(alignment:.leading,spacing:8) { DisplayTitle(title:kind.title); HStack(spacing:0) { headerButtons } }
-                }
+                TitleRow(title:kind.title) { headerButtons }
                 HStack {
                     Image(systemName:"magnifyingglass").foregroundStyle(Robo.steel)
                     TextField(kind == .tasted ? "Search tasted beer..." : kind == .finder ? "Search available beer..." : "Search beer...",text:$search).font(Robo.mono(12)).autocorrectionDisabled().textInputAutocapitalization(.never).accessibilityIdentifier("search-input")
@@ -124,22 +120,39 @@ struct BeerListScreen: View {
         }.menuStyle(.button).buttonStyle(BeerControlStyle())
             .accessibilityIdentifier("sort-menu").accessibilityLabel("Sort: \(current.spokenLabel)")
     }
-    private var headerButtons: some View {
-        Group {
-            if refreshing { ProgressView().tint(Robo.cyan).frame(width:44,height:44).accessibilityLabel("Refreshing beers") }
-            if kind == .finder {
-                Button { model.showQueue = true } label: {
-                    Group {
-                        if model.loadingQueue { ProgressView().tint(Robo.amber).frame(width:32,height:32).modifier(AmberWell()) }
-                        else { AmberIcon(symbol:"list.bullet.rectangle") }
-                    }.frame(width:44,height:44).contentShape(Rectangle())
-                }.buttonStyle(.plain).disabled(model.loadingQueue)
-                    .accessibilityIdentifier("view-queue-button").accessibilityLabel("View beer queue").accessibilityValue(model.loadingQueue ? "Loading" : "")
-                Button { model.showRewards = true } label: { AmberIcon(symbol:"gift").frame(width:44,height:44).contentShape(Rectangle()) }.buttonStyle(.plain)
-                    .accessibilityIdentifier("finder-rewards-button").accessibilityLabel("View rewards")
-            }
-            Button { model.showSettings = true } label: { IconWell(symbol:"gearshape").frame(width:44,height:44) }.buttonStyle(.plain).accessibilityLabel("Open settings")
+    @ViewBuilder private var headerButtons: some View {
+        if refreshing { ProgressView().tint(Robo.cyan).frame(width:44,height:44).accessibilityLabel("Refreshing beers") }
+        HeaderActions()
+    }
+}
+/// C1: a screen title with its header buttons on one line, or the buttons below the title when one line doesn't fit.
+struct TitleRow<Buttons: View>: View {
+    let title: String
+    @ViewBuilder let buttons: Buttons
+    var body: some View {
+        ViewThatFits(in:.horizontal) {
+            HStack(spacing:0) { DisplayTitle(title:title).fixedSize(); Spacer(minLength:4); buttons }
+            VStack(alignment:.leading,spacing:8) { DisplayTitle(title:title); HStack(spacing:0) { buttons } }
         }
+    }
+}
+/// The header buttons every tab shares: Queue and Rewards for UFO Club members, then Settings.
+struct HeaderActions: View {
+    @EnvironmentObject var model: AppModel
+    var body: some View {
+        if model.isMember {
+            Button { model.showQueue = true } label: {
+                Group {
+                    if model.loadingQueue { ProgressView().tint(Robo.amber).frame(width:32,height:32).modifier(AmberWell()) }
+                    else { AmberIcon(symbol:"list.bullet.rectangle") }
+                }.frame(width:44,height:44).contentShape(Rectangle())
+            }.buttonStyle(.plain).disabled(model.loadingQueue)
+                .accessibilityIdentifier("view-queue-button").accessibilityLabel("View beer queue").accessibilityValue(model.loadingQueue ? "Loading" : "")
+            Button { model.showRewards = true } label: { AmberIcon(symbol:"gift").frame(width:44,height:44).contentShape(Rectangle()) }.buttonStyle(.plain)
+                .accessibilityIdentifier("finder-rewards-button").accessibilityLabel("View rewards")
+        }
+        Button { model.showSettings = true } label: { IconWell(symbol:"gearshape").frame(width:44,height:44) }.buttonStyle(.plain)
+            .accessibilityLabel("Open settings").accessibilityIdentifier("settings-nav-button")
     }
 }
 /// The amber chrome well for the Queue and Rewards buttons.

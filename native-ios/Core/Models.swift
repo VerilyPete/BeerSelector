@@ -138,6 +138,7 @@ struct MemberSession: Codable, Equatable {
     var cardNum: String?
     var isVisitor: Bool { memberId == "visitor" }
     var valid: Bool { !memberId.isEmpty && !storeId.isEmpty && !sessionId.isEmpty && !storeName.isEmpty }
+    var isMember: Bool { valid && !isVisitor }
     var displayName: String { firstName ?? username ?? "Beer Enthusiast" }
     var identity: String { "\(memberId):\(storeId)" }
 }

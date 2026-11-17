@@ -231,23 +231,21 @@ struct HomeView: View {
     }
     private var accountHeader: some View {
         VStack(alignment:.leading,spacing:8) {
-            HStack { DisplayTitle(title:model.isMember ? (model.session?.displayName ?? "Beer Enthusiast") : "Visitor"); Spacer(); settingsButton }
+            TitleRow(title:accountTitle) { HeaderActions() }
             if model.isMember { storeLabel.font(Robo.mono()) }
         }
     }
     private var tabletAccountHeader: some View {
         HStack(alignment:.bottom,spacing:16) {
-            DisplayTitle(title:model.isMember ? (model.session?.displayName ?? "Beer Enthusiast") : "Visitor",size:34)
+            DisplayTitle(title:accountTitle,size:34)
             Spacer(minLength:16)
             VStack(alignment:.trailing,spacing:10) {
-                settingsButton
+                HStack(spacing:0) { HeaderActions() }
                 if model.isMember { storeLabel.font(Robo.mono(15)).padding(.bottom,8) }
             }
         }
     }
-    private var settingsButton: some View {
-        Button { model.showSettings = true } label: { IconWell(symbol:"gearshape").frame(width:44,height:44) }.accessibilityLabel("Open settings").accessibilityIdentifier("settings-nav-button")
-    }
+    private var accountTitle: String { model.isMember ? (model.session?.displayName ?? "Beer Enthusiast") : "Visitor" }
     private var storeLabel: some View {
         Label("Flying Saucer — \(model.session?.storeName ?? "")",systemImage:"location.fill").foregroundStyle(Robo.steel)
     }

@@ -1,0 +1,51 @@
+# Launch on an isolated simulator with --preview-fixtures --preview-queue-state loading.
+# While the queue loads, its header button stays in place on every tab, disabled, and says so.
+# Rewards and Settings stay usable.
+appId: org.verily.FSbeerselector
+---
+- assertVisible:
+    id: view-queue-button
+    text: "View beer queue"
+    enabled: false
+- assertVisible:
+    id: finder-rewards-button
+    enabled: true
+- assertVisible:
+    id: settings-nav-button
+    enabled: true
+- tapOn:
+    id: tab-beers
+- assertVisible:
+    id: view-queue-button
+    text: "View beer queue"
+    enabled: false
+- assertVisible:
+    id: finder-rewards-button
+    enabled: true
+- assertVisible:
+    id: settings-nav-button
+    enabled: true
+- tapOn:
+    id: tab-finder
+- assertVisible:
+    id: view-queue-button
+    text: "View beer queue"
+    enabled: false
+- assertVisible:
+    id: finder-rewards-button
+    enabled: true
+- assertVisible:
+    id: settings-nav-button
+    enabled: true
+- tapOn:
+    id: tab-tasted
+- assertVisible:
+    id: view-queue-button
+    text: "View beer queue"
+    enabled: false
+- assertVisible:
+    id: finder-rewards-button
+    enabled: true
+- assertVisible:
+    id: settings-nav-button
+    enabled: true

@@ -1,0 +1,84 @@
+# Launch on an isolated simulator with --preview-fixtures (a member).
+# Queue, Rewards and Settings sit in the header of every tab, above the search field on the lists.
+appId: org.verily.FSbeerselector
+---
+- assertVisible:
+    id: view-queue-button
+- assertVisible:
+    id: finder-rewards-button
+- assertVisible:
+    id: settings-nav-button
+- tapOn:
+    id: view-queue-button
+- assertVisible: "Close Queue"
+- tapOn: "Close Queue"
+- tapOn:
+    id: finder-rewards-button
+- assertVisible: "Close Rewards"
+- tapOn: "Close Rewards"
+- tapOn:
+    id: tab-beers
+- assertVisible:
+    id: view-queue-button
+    above:
+      id: search-input
+- assertVisible:
+    id: finder-rewards-button
+    above:
+      id: search-input
+- assertVisible:
+    id: settings-nav-button
+    above:
+      id: search-input
+- tapOn:
+    id: view-queue-button
+- assertVisible: "Close Queue"
+- tapOn: "Close Queue"
+- tapOn:
+    id: finder-rewards-button
+- assertVisible: "Close Rewards"
+- tapOn: "Close Rewards"
+- tapOn:
+    id: tab-finder
+- assertVisible:
+    id: view-queue-button
+    above:
+      id: search-input
+- assertVisible:
+    id: finder-rewards-button
+    above:
+      id: search-input
+- assertVisible:
+    id: settings-nav-button
+    above:
+      id: search-input
+- tapOn:
+    id: view-queue-button
+- assertVisible: "Close Queue"
+- tapOn: "Close Queue"
+- tapOn:
+    id: finder-rewards-button
+- assertVisible: "Close Rewards"
+- tapOn: "Close Rewards"
+- tapOn:
+    id: tab-tasted
+- assertVisible:
+    id: view-queue-button
+    above:
+      id: search-input
+- assertVisible:
+    id: finder-rewards-button
+    above:
+      id: search-input
+- assertVisible:
+    id: settings-nav-button
+    above:
+      id: search-input
+- tapOn:
+    id: view-queue-button
+- assertVisible: "Close Queue"
+- tapOn: "Close Queue"
+- tapOn:
+    id: finder-rewards-button
+- assertVisible: "Close Rewards"
+- tapOn: "Close Rewards"
