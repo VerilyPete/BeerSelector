@@ -4,6 +4,12 @@ Queue and Rewards everywhere
 - Home has more room for beer. The Rewards card is gone, since Rewards is one tap away in the header, and New on Tap now shows three beers, or four where they fit.
 - If your name is long, it shrinks a little to stay on one line with the buttons.
 
+Usage counts in this beta
+
+- This build sends daily counts of which features you use, such as opening Suggestions, checking in, or queueing a reward, and whether Apple Intelligence or Local matching produced your suggestions. They help decide what to improve next.
+- The counts are tagged with a random ID created for this install. They don't include beer names, searches, which beers you rate, your member number or your card. Logging out and Reset App Data keep the ID; deleting the app replaces it.
+- Settings → About describes this.
+
 Please try opening Queue and Rewards from each tab. On Home, check that nothing is cut off or overlapping, and tell me how many New on Tap beers you see and which iPhone you're on.
 
 If you have any issues, note the time and action, then reopen Settings → Support → Prepare Diagnostic Report → Share Diagnostic Report. Submit any TestFlight feedback prompt as well.
