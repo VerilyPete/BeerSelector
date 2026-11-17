@@ -1,3 +1,19 @@
+## Queue and Rewards in every header, three or four New on Tap rows — November 17, 2026
+
+Plan: `plans/header-actions-and-three-new-rows.md`. Pete asked for all three changes on November 17.
+
+- `HeaderActions` draws Queue, Rewards and Settings in the header of Home, All Beers, Beerfinder and Tasted Brews. Queue and Rewards show only for members; the check is inside the view. The gear is `settings-nav-button` on every tab.
+- Losing membership (sign-out, or switching to visitor mode) closes an open Queue, Rewards or missed-credit sheet. Signing in again as a member leaves open sheets alone, as before.
+- The compact Home has no Rewards card. `HomeRewardsCard` and `RewardsCardStatus` are deleted; the Rewards sheet reports the count and any error.
+- New on Tap follows `CompactHomeFit.ladder`: 4 rows roomy, 3 roomy, 3 tight, 2 tight, 1 tight, then scroll. Accessibility text scrolls with three rows. Measured row counts are in [CHROME.md](CHROME.md).
+- All plan: 489/489 passed, serial, on the "BeerSelector Tests" iPhone simulator.
+- Flows passed on the "BeerSelector Tests" iPhone (402pt wide): `header-actions`, `header-actions-visitor`, `header-actions-signed-out`, `header-queue-loading`, `finder-header-actions`, `rewards-unavailable`, `home-fits`, `home-compact`. `home-fits` and `home-compact` also passed on the 18 Pro Max.
+- **Open decision for Pete.** On the 16e the fixture and fallback name "Beer Enthusiast" misses fitting beside three buttons by about 4pt, so the header wraps and Home keeps 2 rows with the suggestion card and 3 without. `home-fits` and `home-compact` fail there with the default fixture. With a temporary, uncommitted shorter name ("Samantha") the 16e shows 3 and 4 rows and both flows pass.
+- Maestro's hierarchy includes the header buttons of hidden tabs, so an `assertVisible` on a shared ID can't tell tabs apart. The taps in `header-actions.yaml` are what prove each tab's own buttons work; the loading flow's per-tab assertions are weaker than they read.
+- Checked by eye on fixtures: all four tabs on the 16e (Tasted Brews shares a line with three buttons; Tasted mid-refresh and Beerfinder with the queue loading wrap or fit without overlap), Home in every suggestion mode and visitor mode on the 16e and 18 Pro Max, `--preview-banners` (steps down, no clipping), AX5 Home and All Beers on the 16e (Home scrolls with three rows; raising the text size on a four-row Home drops the fourth), iPad Home in portrait and landscape.
+- Not checked: signing out or switching to visitor mode by hand in a running member session (covered by unit tests only), an iPad window narrower than 768pt, VoiceOver, any physical device.
+- Not done: the `BeerSelectorNative.pen` design backup. The Pencil app wasn't running, so the file still shows the Rewards card and the old headers.
+
 ## Usage telemetry switched on — November 10, 2026
 
 The external beta build from #77 sends usage counts; it reached beta testers on November 10. Pete did steps 1 and 2 of USAGE-TELEMETRY.md → Switching it on: the App Store privacy details, and `UsageTelemetryEnabled` (string `true`) in the Xcode Cloud secret `BEERSELECTOR_SERVICE_CONFIGURATION_BASE64`. #77 added the What to Test note, which also covers #69 and #70.

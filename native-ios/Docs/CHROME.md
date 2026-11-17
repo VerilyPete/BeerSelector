@@ -41,8 +41,8 @@ The polish followed `plans/ui-polish.md` and the approved mocks in `/Users/pete/
 2. **One content-card style.** Beer rows, reward rows, queue rows, operations, Settings groups, recommendation cards and Home panels all use `.contentCard()`. The Rewards milestone bevel is always steel; the full teal fill is the only "reached" signal.
 3. **Teal means interactive or active.** Beer names, reward titles and ABV values are off-white. Teal stays on title plates, the selected segment, the sort control, action buttons, the active tab, links and status words such as AVAILABLE. Amber marks Queue, Rewards and Check In.
 4. **Mono for data, Grotesk for prose.** Space Mono for ABV, dates, counts, style · container lines and label plates. Space Grotesk Regular for descriptions, brewer names, row subtitles and explanations.
-5. **The filter row only filters.** ALL / DRAFT / CANS & BOTTLES segments plus one sort menu (Date, Name, ABV, each with a direction). Beerfinder's Queue and Rewards are amber icon buttons in the header.
-6. **iPhone Home doesn't repeat the tab bar.** The compact Home shows the header, the suggestion card, the metric panel, New on Tap and the Rewards card. The wide iPad Home keeps its panel layout.
+5. **The filter row only filters.** ALL / DRAFT / CANS & BOTTLES segments plus one sort menu (Date, Name, ABV, each with a direction). Queue and Rewards are amber icon buttons in the header of every tab (Home, All Beers, Beerfinder and Tasted Brews), for UFO Club members only; visitors and signed-out users see only the Settings gear. `HeaderActions` draws all three and makes the membership check.
+6. **iPhone Home doesn't repeat the tab bar.** The compact Home shows the header, the suggestion card, the metric panel and New on Tap. It has no Rewards card (removed 2026-11-17): Rewards opens from the header, and the Rewards sheet reports how many are ready and any loading error. The wide iPad Home keeps its panel layout.
 
 ### Tokens
 
@@ -53,14 +53,24 @@ The polish followed `plans/ui-polish.md` and the approved mocks in `/Users/pete/
 | `Robo.hairline` | white at 10% | The 1pt edge of a content card and row dividers |
 | `Robo.body(_:)` | Space Grotesk Regular | Prose |
 | `.contentCard()` | `Robo.display`, 14pt radius, hairline edge | Every content card |
-| `AmberWell` / `AmberIcon` | amber chrome well, `#D4AB50` glyph | Queue and Rewards buttons, the Home Rewards card |
+| `AmberWell` / `AmberIcon` | amber chrome well, `#D4AB50` glyph | The Queue and Rewards header buttons |
 
 ### Decisions
 
 - The BeerIcons glyphs stay. Restyling may change the wells and rings around them, never the glyphs.
 - Every suggestion surface names its source. The Home card is titled Ask Apple Intelligence or Local matching; the sheet shows a mode plate. A fallback from Apple Intelligence shows a notice above the results.
 - New on Tap shows the newest beers on the taplist by added date, tasted or not, as compact rows (name, then arrival day · style · container, then ABV). Tapping a row shows its description.
-- The compact Home prefers to fit its screen without scrolling: roomy spacing, then tight spacing, then one New on Tap row. With the suggestion card showing, the iPhone test sizes from 16e to 18 Pro Max show two rows at the default text size; `UITests/home-fits.yaml` checks this. It scrolls while a shown description is open (keeping the rows it had), at accessibility text sizes (always with two rows), and as a last resort when even one row doesn't fit, such as a short landscape window or long banners. `CompactHomeMode` decides this and ignores an expansion for a beer Home isn't showing.
+- The compact Home prefers to fit its screen without scrolling. `CompactHomeFit.ladder` is tried in order: four New on Tap rows at roomy spacing, three at roomy, three at tight, two at tight, one at tight. Three rows are the target, so spacing tightens to keep them; a fourth shows only where it fits at roomy spacing. The row count therefore varies with the phone, the suggestion card and the header (measured 2026-11-17 at the default text size, member Home):
+
+  | | Suggestion card showing | Suggestions off |
+  |---|---|---|
+  | 16e, header on one line | 3 | 4 |
+  | 16e, header wrapped | 2 | 3 |
+  | 18 Pro (402pt wide) | 3 | 4 |
+  | 18 Pro Max | 4 | 4 |
+
+  `UITests/home-fits.yaml` checks for at least three rows with the card and `UITests/home-compact.yaml` for four without it. Home scrolls while a shown description is open (keeping the rows it had), at accessibility text sizes (always with three rows), and as a last resort when even one row doesn't fit, such as a short landscape window or long banners. `CompactHomeMode` decides this and ignores an expansion for a beer Home isn't showing.
+- Home's header wraps like the list headers (C1): when the member name and the three buttons don't fit on one line, the buttons move below the name. That costs 52pt, about one New on Tap row. On the 16e (390pt wide) the fallback name "Beer Enthusiast", which the fixtures also use, misses one line by about 4pt, so both flows above fail there with the default fixture and pass with a shorter name. Whether to keep that is an open decision for Pete.
 - On narrow iPhones the sort chip shortens to the direction (NEW, A-Z, HIGH) and then to its icon, so the filter row stays on one line through XXXL.
 
 ### Accepted differences from the mocks
@@ -70,7 +80,7 @@ These were reviewed against the approved PNGs in Phase E and kept:
 - The segments are separate chrome buttons rather than one joined control. The user approved this on device.
 - The sort chip reads NEW, not DATE · NEW, on 402pt-wide iPhones, because the full label doesn't fit beside CANS & BOTTLES.
 - The Queue icon is `list.bullet.rectangle` (SF Symbols), and the beer wells keep the BeerIcons glyphs where the mocks use Lucide stand-ins.
-- Home drops the mock's WELCOME BACK plate and the suggestion card's APPLE INTELLIGENCE eyebrow, so two New on Tap rows fit under the real tab bar. The Settings gear sits beside the member name.
+- Home drops the mock's WELCOME BACK plate and the suggestion card's APPLE INTELLIGENCE eyebrow, so the New on Tap rows fit under the real tab bar. Queue, Rewards and the Settings gear sit beside the member name.
 - The suggestions sheet keeps the system navigation bar with Done and the native segmented ABV picker, and lays the style chips out in an adaptive grid (104pt minimum columns, 220pt at accessibility sizes), where the mock draws a custom close button and flowing chips. When results arrive, the sheet scrolls to a count header ("3 suggestions") above the cards, or to the fallback notice, with a success haptic and a VoiceOver announcement; while it works, the Find button shows a spinner in place.
 - The redeemed-reward chevron and the card chevrons are neutral grey.
 - Label plates (NEW ON TAP and the rest) keep the steel plate from the mocks. Its dark text measures about 2.2–4.3:1 across the gradient, below 4.5:1; changing it is an open design decision, not part of this polish.

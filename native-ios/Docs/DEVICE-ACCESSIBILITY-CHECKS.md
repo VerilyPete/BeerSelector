@@ -9,7 +9,8 @@ Deferred at the user's request on September 12: keep these checks silent and do 
 Enable VoiceOver in iOS Settings → Accessibility. Navigate by swiping left/right; activate with a double-tap.
 
 - Home: read the tasted count, move through navigation cards, open and close Settings. Confirm hidden beer tabs do not contribute off-screen focus targets.
-- Beerfinder: reach search, each filter, Queue and Rewards. Expand one beer; verify its name, container, ABV and expanded/collapsed state are understandable. Reach Check In without activating it. Confirm decorative glyphs are not spoken as stray characters.
+- Every tab (Home, All Beers, Beerfinder, Tasted Brews): reach Queue, Rewards and Settings in the header. They are announced once per tab, not once for each hidden tab.
+- Beerfinder: reach search and each filter. Expand one beer; verify its name, container, ABV and expanded/collapsed state are understandable. Reach Check In without activating it. Confirm decorative glyphs are not spoken as stray characters.
 - Rewards: read journey progress and milestones, open an available reward, then choose Cancel. Both choices must be discoverable. Do not queue the reward for this check.
 - Settings: reach Refresh All Data and Prepare Diagnostic Report, then close the sheet. Check that focus returns somewhere useful, without trapping navigation.
 - Repeat key controls at the largest accessibility text size. Record the screen and exact missing/incorrect spoken label if anything fails.
