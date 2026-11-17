@@ -1,47 +1,52 @@
 # Launch on an isolated simulator with --preview-fixtures --preview-suggestions off
 # (iPhone, or an iPad window narrower than 768pt). Suggestions are pinned off so the
 # flow doesn't depend on earlier ones; home-fits.yaml covers Home with the suggestion card.
-# The compact Home has no nav cards: New on Tap shows the two newest beers, and
-# the Rewards card opens Rewards.
+# The compact Home has no nav cards and no Rewards card. With the suggestion card
+# gone there is room for a fourth New on Tap beer, and Rewards opens from the header.
 appId: org.verily.FSbeerselector
 ---
 - assertNotVisible:
     id: nav-all-beers
 - assertNotVisible:
     id: nav-beerfinder
-- scrollUntilVisible:
-    element:
-      id: beer-item-2
-    centerElement: true
+- assertVisible:
+    id: home-fixed
 - assertVisible:
     id: beer-item-1
-- assertNotVisible:
+- assertVisible:
+    id: beer-item-2
+- assertVisible:
     id: beer-item-7
+- assertVisible:
+    id: beer-item-3
+- assertNotVisible:
+    id: beer-item-4
 - tapOn:
+    id: beer-item-3
+- assertVisible:
+    id: beer-description-3
+- assertNotVisible:
+    id: check-in-3
+- assertVisible:
     id: beer-item-1
 - assertVisible:
-    id: beer-description-1
-- assertNotVisible:
-    id: check-in-1
-- tapOn:
-    id: beer-item-1
-- assertNotVisible:
-    id: beer-description-1
-- scrollUntilVisible:
-    element:
-      id: home-rewards-card
-    centerElement: true
+    id: beer-item-2
 - assertVisible:
-    id: home-rewards-card
-    text: ".*2 rewards ready.*"
+    id: beer-item-7
+- assertVisible:
+    id: beer-item-3
 - tapOn:
+    id: beer-item-3
+- assertNotVisible:
+    id: beer-description-3
+- assertVisible:
+    id: home-fixed
+- assertNotVisible:
     id: home-rewards-card
+- tapOn:
+    id: finder-rewards-button
 - assertVisible: "Close Rewards"
 - tapOn: "Close Rewards"
-- scrollUntilVisible:
-    element:
-      id: home-new-on-tap-view-all
-    centerElement: true
 - tapOn:
     id: home-new-on-tap-view-all
 - assertVisible: "7 beers on tap"
