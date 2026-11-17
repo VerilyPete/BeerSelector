@@ -64,13 +64,12 @@ The polish followed `plans/ui-polish.md` and the approved mocks in `/Users/pete/
 
   | | Suggestion card showing | Suggestions off |
   |---|---|---|
-  | 16e, header on one line | 3 | 4 |
-  | 16e, header wrapped | 2 | 3 |
+  | 16e | 3 | 4 |
   | 18 Pro (402pt wide) | 3 | 4 |
   | 18 Pro Max | 4 | 4 |
 
   `UITests/home-fits.yaml` checks for at least three rows with the card and `UITests/home-compact.yaml` for four without it. Home scrolls while a shown description is open (keeping the rows it had), at accessibility text sizes (always with three rows), and as a last resort when even one row doesn't fit, such as a short landscape window or long banners. `CompactHomeMode` decides this and ignores an expansion for a beer Home isn't showing.
-- Home's header wraps like the list headers (C1): when the member name and the three buttons don't fit on one line, the buttons move below the name. That costs 52pt, about one New on Tap row. On the 16e (390pt wide) the fallback name "Beer Enthusiast", which the fixtures also use, misses one line by about 4pt, so both flows above fail there with the default fixture and pass with a shorter name. Whether to keep that is an open decision for Pete.
+- Home's header keeps the member name and the three buttons on one line. A name too long for that shrinks, down to 60% of its size, then truncates (Pete, 2026-11-17); wrapping would cost 52pt, about one New on Tap row. On the 16e the fallback name "Beer Enthusiast", which the fixtures also use, is about 4pt too wide and shrinks slightly. At accessibility text sizes the buttons move below the name instead, like the list headers (C1).
 - On narrow iPhones the sort chip shortens to the direction (NEW, A-Z, HIGH) and then to its icon, so the filter row stays on one line through XXXL.
 
 ### Accepted differences from the mocks

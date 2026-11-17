@@ -1,51 +1,74 @@
 # Launch on an isolated simulator with --preview-fixtures --preview-queue-state loading.
 # While the queue loads, its header button stays in place on every tab, disabled, and says so.
 # Rewards and Settings stay usable.
+# Maestro also sees the header buttons of hidden tabs, so the visibility checks alone can't
+# tell tabs apart. The taps land on the tab on screen: Queue must not open, Rewards and
+# Settings must. header-actions.yaml proves each tab draws its own Queue button.
 appId: org.verily.FSbeerselector
 ---
 - assertVisible:
     id: view-queue-button
     text: "View beer queue"
     enabled: false
-- assertVisible:
+- tapOn:
+    id: view-queue-button
+- assertNotVisible: "Close Queue"
+- tapOn:
     id: finder-rewards-button
-    enabled: true
-- assertVisible:
+- assertVisible: "Close Rewards"
+- tapOn: "Close Rewards"
+- tapOn:
     id: settings-nav-button
-    enabled: true
+- assertVisible: "Close Settings"
+- tapOn: "Close Settings"
 - tapOn:
     id: tab-beers
 - assertVisible:
     id: view-queue-button
     text: "View beer queue"
     enabled: false
-- assertVisible:
+- tapOn:
+    id: view-queue-button
+- assertNotVisible: "Close Queue"
+- tapOn:
     id: finder-rewards-button
-    enabled: true
-- assertVisible:
+- assertVisible: "Close Rewards"
+- tapOn: "Close Rewards"
+- tapOn:
     id: settings-nav-button
-    enabled: true
+- assertVisible: "Close Settings"
+- tapOn: "Close Settings"
 - tapOn:
     id: tab-finder
 - assertVisible:
     id: view-queue-button
     text: "View beer queue"
     enabled: false
-- assertVisible:
+- tapOn:
+    id: view-queue-button
+- assertNotVisible: "Close Queue"
+- tapOn:
     id: finder-rewards-button
-    enabled: true
-- assertVisible:
+- assertVisible: "Close Rewards"
+- tapOn: "Close Rewards"
+- tapOn:
     id: settings-nav-button
-    enabled: true
+- assertVisible: "Close Settings"
+- tapOn: "Close Settings"
 - tapOn:
     id: tab-tasted
 - assertVisible:
     id: view-queue-button
     text: "View beer queue"
     enabled: false
-- assertVisible:
+- tapOn:
+    id: view-queue-button
+- assertNotVisible: "Close Queue"
+- tapOn:
     id: finder-rewards-button
-    enabled: true
-- assertVisible:
+- assertVisible: "Close Rewards"
+- tapOn: "Close Rewards"
+- tapOn:
     id: settings-nav-button
-    enabled: true
+- assertVisible: "Close Settings"
+- tapOn: "Close Settings"
