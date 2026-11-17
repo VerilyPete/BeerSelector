@@ -5,7 +5,7 @@ import { z } from 'zod';
 // `description` source, so normalize it at the wire boundary.
 const enrichmentSourceSchema = z.preprocess(
   value => (value === 'description-fallback' ? 'description' : value),
-  z.enum(['description', 'perplexity', 'manual'])
+  z.enum(['description', 'perplexity', 'manual', 'exa'])
 );
 
 export const enrichmentDataSchema = z.object({

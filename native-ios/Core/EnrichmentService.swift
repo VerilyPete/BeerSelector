@@ -46,7 +46,7 @@ final class EnrichmentService {
         metrics.requests += 1
         var url = URLComponents(url:base.appendingPathComponent(path),resolvingAgainstBaseURL:false)!
         if !query.isEmpty { url.queryItems = query }
-        var headers = ["X-API-Key":key]
+        var headers = ["X-API-Key":key,"X-Enrichment-Sources":Self.advertisedSources.joined(separator:", ")]
         if let etag { headers["If-None-Match"] = etag }
         do {
             let result = try await api.request(url.url!,method:json == nil ? "GET" : "POST",headers:headers,retry:false,json:json,timeout:policy.timeout)
@@ -162,6 +162,8 @@ final class EnrichmentService {
             }
         }
     }
+    nonisolated private static let advertisedSources = ["exa"]
+    nonisolated private static let acceptedSources = Set(["description","description-fallback","perplexity","manual"] + advertisedSources)
     private struct BatchResponse: Decodable {
         let enrichments: [String:EnrichmentRow]
         let missing: [String]
@@ -197,7 +199,7 @@ final class EnrichmentService {
             has_cleaned_description = try c.decode(Bool.self,forKey:.has_cleaned_description)
             guard enriched_abv.map({ $0.isFinite && (0...100).contains($0) }) ?? true,
                   enrichment_confidence.map(\.isFinite) ?? true,
-                  enrichment_source.map({ ["description","description-fallback","perplexity","manual"].contains($0) }) ?? true else {
+                  enrichment_source.map({ EnrichmentService.acceptedSources.contains($0) }) ?? true else {
                 throw BeerError.invalidResponse("Invalid enrichment values")
             }
         }
@@ -272,7 +274,7 @@ final class EnrichmentService {
             let source = try c.decodeIfPresent(String.self,forKey:.enrichment_source)
             guard abv.map({ $0.isFinite && (0...100).contains($0) }) ?? true,
                   confidence.map(\.isFinite) ?? true,
-                  source.map({ ["description","description-fallback","perplexity","manual"].contains($0) }) ?? true else {
+                  source.map({ EnrichmentService.acceptedSources.contains($0) }) ?? true else {
                 throw BeerError.invalidResponse("Invalid proxy enrichment")
             }
         }
