@@ -14,6 +14,8 @@ final class AppModel: ObservableObject {
     @Published var session: MemberSession? {
         didSet {
             if oldValue?.identity != session?.identity { semanticIndex.invalidate() }
+            // Queue and Rewards belong to members: losing membership closes their sheets.
+            if oldValue?.isMember == true && !isMember { showQueue = false; showRewards = false; showMissedCredit = false }
             suggestionMode.refresh()
         }
     }
@@ -232,7 +234,7 @@ final class AppModel: ObservableObject {
     /// Set by Debug fixtures, so visitor and first-run fixtures stay offline too.
     var previewFixtures = false
     var previewMode: Bool { previewFixtures || session?.memberId == "preview" }
-    var isMember: Bool { session?.valid == true && session?.isVisitor == false }
+    var isMember: Bool { session?.isMember == true }
     // Account restoration comes from Keychain; missing cached data links are recoverable.
     var configured: Bool { session?.valid == true && db != nil }
     func ownsOperation(_ operation: PendingOperation) -> Bool {

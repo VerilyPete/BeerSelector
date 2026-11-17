@@ -1,0 +1,24 @@
+# Launch on an isolated simulator with --preview-fixtures --preview-session first-run (nobody signed in).
+# The signed-out Home has no header. The All Beers link still opens the list, whose header shows only Settings.
+appId: org.verily.FSbeerselector
+---
+- assertVisible: "Get Started"
+- assertNotVisible:
+    id: view-queue-button
+- assertNotVisible:
+    id: finder-rewards-button
+- openLink: beerselector://beerlist
+# The simulator asks before following the link.
+- runFlow:
+    when:
+      visible: "Open"
+    commands:
+      - tapOn: "Open"
+- assertVisible:
+    id: settings-nav-button
+    above:
+      id: search-input
+- assertNotVisible:
+    id: view-queue-button
+- assertNotVisible:
+    id: finder-rewards-button

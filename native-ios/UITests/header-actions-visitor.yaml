@@ -1,0 +1,21 @@
+# Launch on an isolated simulator with --preview-fixtures --preview-session visitor.
+# Queue and Rewards are for UFO Club members: a visitor's headers show only Settings.
+appId: org.verily.FSbeerselector
+---
+- assertVisible: "Visitor"
+- assertVisible:
+    id: settings-nav-button
+- assertNotVisible:
+    id: view-queue-button
+- assertNotVisible:
+    id: finder-rewards-button
+- tapOn:
+    id: tab-beers
+- assertVisible:
+    id: settings-nav-button
+    above:
+      id: search-input
+- assertNotVisible:
+    id: view-queue-button
+- assertNotVisible:
+    id: finder-rewards-button

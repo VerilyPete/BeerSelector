@@ -1,9 +1,10 @@
 # Launch on an isolated iPhone simulator with --preview-fixtures --preview-suggestions on
 # --preview-suggestion-mode apple-intelligence (the tallest member Home).
 # At standard text sizes the compact Home fits its screen without scrolling, so
-# the settings gear can never slide under the status bar, and it still shows
-# the two newest beers. Reading an expanded New on Tap description is the one
-# time it scrolls.
+# the header buttons can never slide under the status bar, and it still shows
+# at least the three newest beers. A fourth is allowed where it fits, so this
+# flow doesn't look for it either way. Reading an expanded New on Tap
+# description is the one time Home scrolls, and it keeps the rows it had.
 appId: org.verily.FSbeerselector
 ---
 - assertVisible:
@@ -18,14 +19,22 @@ appId: org.verily.FSbeerselector
 - assertVisible:
     id: beer-item-2
 - assertVisible:
-    id: home-rewards-card
+    id: beer-item-7
 - tapOn:
-    id: beer-item-1
+    id: beer-item-7
 - assertVisible:
-    id: beer-description-1
+    id: beer-description-7
 - assertNotVisible:
     id: home-fixed
-- tapOn:
+- assertVisible:
     id: beer-item-1
+- assertVisible:
+    id: beer-item-2
+- assertVisible:
+    id: beer-item-7
+- tapOn:
+    id: beer-item-7
+- assertNotVisible:
+    id: beer-description-7
 - assertVisible:
     id: home-fixed

@@ -1,0 +1,121 @@
+# Launch on an isolated simulator with --preview-fixtures --preview-queue-state loading.
+# While the queue loads, its header button stays in place on every tab, disabled, and says so.
+# Rewards and Settings stay usable.
+# Maestro also sees the buttons of hidden tabs, so each check names the header it means
+# (header-home, header-beers, header-finder, header-tasted).
+appId: org.verily.FSbeerselector
+---
+- assertVisible:
+    id: view-queue-button
+    text: "View beer queue"
+    enabled: false
+    childOf:
+      id: header-home
+- assertVisible:
+    id: finder-rewards-button
+    enabled: true
+    childOf:
+      id: header-home
+- assertVisible:
+    id: settings-nav-button
+    enabled: true
+    childOf:
+      id: header-home
+- tapOn:
+    id: view-queue-button
+- assertNotVisible: "Close Queue"
+- tapOn:
+    id: finder-rewards-button
+- assertVisible: "Close Rewards"
+- tapOn: "Close Rewards"
+- tapOn:
+    id: settings-nav-button
+- assertVisible: "Close Settings"
+- tapOn: "Close Settings"
+- tapOn:
+    id: tab-beers
+- assertVisible:
+    id: view-queue-button
+    text: "View beer queue"
+    enabled: false
+    childOf:
+      id: header-beers
+- assertVisible:
+    id: finder-rewards-button
+    enabled: true
+    childOf:
+      id: header-beers
+- assertVisible:
+    id: settings-nav-button
+    enabled: true
+    childOf:
+      id: header-beers
+- tapOn:
+    id: view-queue-button
+- assertNotVisible: "Close Queue"
+- tapOn:
+    id: finder-rewards-button
+- assertVisible: "Close Rewards"
+- tapOn: "Close Rewards"
+- tapOn:
+    id: settings-nav-button
+- assertVisible: "Close Settings"
+- tapOn: "Close Settings"
+- tapOn:
+    id: tab-finder
+- assertVisible:
+    id: view-queue-button
+    text: "View beer queue"
+    enabled: false
+    childOf:
+      id: header-finder
+- assertVisible:
+    id: finder-rewards-button
+    enabled: true
+    childOf:
+      id: header-finder
+- assertVisible:
+    id: settings-nav-button
+    enabled: true
+    childOf:
+      id: header-finder
+- tapOn:
+    id: view-queue-button
+- assertNotVisible: "Close Queue"
+- tapOn:
+    id: finder-rewards-button
+- assertVisible: "Close Rewards"
+- tapOn: "Close Rewards"
+- tapOn:
+    id: settings-nav-button
+- assertVisible: "Close Settings"
+- tapOn: "Close Settings"
+- tapOn:
+    id: tab-tasted
+- assertVisible:
+    id: view-queue-button
+    text: "View beer queue"
+    enabled: false
+    childOf:
+      id: header-tasted
+- assertVisible:
+    id: finder-rewards-button
+    enabled: true
+    childOf:
+      id: header-tasted
+- assertVisible:
+    id: settings-nav-button
+    enabled: true
+    childOf:
+      id: header-tasted
+- tapOn:
+    id: view-queue-button
+- assertNotVisible: "Close Queue"
+- tapOn:
+    id: finder-rewards-button
+- assertVisible: "Close Rewards"
+- tapOn: "Close Rewards"
+- tapOn:
+    id: settings-nav-button
+- assertVisible: "Close Settings"
+- tapOn: "Close Settings"

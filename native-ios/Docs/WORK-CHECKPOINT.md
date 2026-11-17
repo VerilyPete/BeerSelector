@@ -1,3 +1,19 @@
+## Queue and Rewards in every header, three or four New on Tap rows — November 17, 2026
+
+Plan: `plans/header-actions-and-three-new-rows.md`. Pete asked for all three changes on November 17.
+
+- `HeaderActions` draws Queue, Rewards and Settings in the header of Home, All Beers, Beerfinder and Tasted Brews. Queue and Rewards show only for members; the check is inside the view. The gear is `settings-nav-button` on every tab.
+- Losing membership (sign-out, or switching to visitor mode) closes an open Queue, Rewards or missed-credit sheet. Signing in again as a member leaves open sheets alone, as before.
+- The compact Home has no Rewards card. `HomeRewardsCard` and `RewardsCardStatus` are deleted; the Rewards sheet reports the count and any error.
+- New on Tap follows `CompactHomeFit.ladder`: 4 rows roomy, 3 roomy, 3 tight, 2 tight, 1 tight, then scroll. Accessibility text scrolls with three rows. Measured row counts are in [CHROME.md](CHROME.md).
+- All plan: 489/489 passed, serial, on the "BeerSelector Tests" iPhone simulator.
+- Flows passed on the "BeerSelector Tests" iPhone (402pt wide): `header-actions`, `header-actions-visitor`, `header-actions-signed-out`, `header-queue-loading`, `finder-header-actions`, `rewards-unavailable`, `home-fits`, `home-compact`. `home-fits` and `home-compact` also passed on the 16e and the 18 Pro Max.
+- On the 16e the fixture and fallback name "Beer Enthusiast" is about 4pt too wide to sit beside three buttons. Pete chose shrinking over wrapping, so Home's name scales down to fit (to 60%, then truncates); accessibility text still wraps. Before that change the wrapped header left the 16e with 2 and 3 rows and failed `home-fits` and `home-compact`; both now pass there.
+- Maestro's hierarchy includes the header buttons of hidden tabs, so an `assertVisible` on a shared ID can't tell tabs apart. Each tab's header therefore has its own identifier (`header-home`, `header-beers`, `header-finder`, `header-tasted`), and `header-actions.yaml` and `header-queue-loading.yaml` scope every button check to it with `childOf`. Both came out of the Codex review of PR #82. `header-actions` also passed on the "BeerSelector Tests" iPad.
+- Checked by eye on fixtures: all four tabs on the 16e (Tasted Brews shares a line with three buttons; Tasted mid-refresh and Beerfinder with the queue loading wrap or fit without overlap), Home in every suggestion mode and visitor mode on the 16e and 18 Pro Max, `--preview-banners` (steps down, no clipping), AX5 Home and All Beers on the 16e (Home scrolls with three rows; raising the text size on a four-row Home drops the fourth), iPad Home in portrait and landscape.
+- Not checked: signing out or switching to visitor mode by hand in a running member session (covered by unit tests only), an iPad window narrower than 768pt, VoiceOver, any physical device.
+- `BeerSelectorNative.pen` is updated: header buttons on Home, All Beers, Tasted Brews, the no-matches state and the iPad Home and All Beers; Home without the Rewards card and with three rows (four on the visitor Home, two under the banners). Its iPad Home instances had lost their text on disk and were restored from the visitor iPad Home.
+
 ## Accept the `exa` enrichment source — November 10, 2026
 
 The ufobeer worker is adding Exa as a second ABV lookup when Perplexity answers unknown. Those ABVs carry `enrichment_source: "exa"` and confidence 0.8. Handoff: `ufobeer/plans/handoff-beerselector-accept-exa-source.md`; worker plan: `ufobeer/plans/abv-untappd-fallback.md`.

@@ -138,6 +138,7 @@ struct MemberSession: Codable, Equatable {
     var cardNum: String?
     var isVisitor: Bool { memberId == "visitor" }
     var valid: Bool { !memberId.isEmpty && !storeId.isEmpty && !sessionId.isEmpty && !storeName.isEmpty }
+    var isMember: Bool { valid && !isVisitor }
     var displayName: String { firstName ?? username ?? "Beer Enthusiast" }
     var identity: String { "\(memberId):\(storeId)" }
 }
@@ -254,67 +255,29 @@ struct BeerFilter {
     }
 }
 
-/// What Home's Rewards card can honestly say, given the model's separate loaded and error state.
-enum RewardsCardStatus: Equatable {
-    case hidden, checking, ready(Int), saved(Int), unavailable
-
-    init(isMember: Bool, loaded: Bool, error: String?, rewards: [Reward]) {
-        let available = rewards.filter { !$0.redeemed }.count
-        switch (isMember, loaded, error) {
-        case (false, _, _): self = .hidden
-        case (true, true, nil): self = .ready(available)
-        case (true, true, _?): self = .saved(available)
-        case (true, false, nil): self = .checking
-        case (true, false, _?): self = .unavailable
-        }
-    }
-
-    var headline: String {
-        switch self {
-        case .hidden, .checking: "Rewards"
-        case .ready(let count), .saved(let count): count == 0 ? "No rewards ready" : "\(count) \(count == 1 ? "reward" : "rewards") ready"
-        case .unavailable: "Rewards unavailable"
-        }
-    }
-
-    var detail: String {
-        switch self {
-        case .hidden: ""
-        case .checking: "Checking your rewards…"
-        case .ready(0): "Keep tasting toward your next milestone."
-        case .ready: "Tap to view and claim."
-        case .saved: "Couldn’t refresh. Showing saved rewards."
-        case .unavailable: "Couldn’t load your rewards."
-        }
-    }
-
-    var cardLine: String {
-        switch self {
-        case .hidden: ""
-        case .checking: "Checking your rewards…"
-        case .ready(0): "No rewards ready yet. Keep tasting."
-        case .ready(let count): "\(count) \(count == 1 ? "reward" : "rewards") ready to claim"
-        case .saved: "\(headline). Couldn’t refresh."
-        case .unavailable: "Couldn’t load your rewards."
-        }
-    }
-
-    var offersRetry: Bool {
-        switch self { case .saved, .unavailable: true; default: false }
-    }
-
-    var spokenSummary: String { "Rewards: \(headline). \(detail)" }
-}
-
 /// Whether the compact Home fits its screen or scrolls, and how many New on Tap rows a scrolling Home shows.
 enum CompactHomeMode: Equatable {
     case fitted, scrolling(rows: Int)
 
-    /// Accessibility text always scrolls with two arrivals. An open description scrolls with the rows already shown,
+    /// Accessibility text always scrolls with three arrivals. An open description scrolls with the rows already shown,
     /// but only if Home actually shows that beer; a stale expansion from another layout is ignored.
     init(expandedID: String?, taplist: [Beer], accessibility: Bool, fittedRows: Int) {
-        if accessibility { self = .scrolling(rows:2); return }
+        if accessibility { self = .scrolling(rows:3); return }
         guard let expandedID, BeerFilter.newOnTap(taplist,count:fittedRows).contains(where: { $0.id == expandedID }) else { self = .fitted; return }
         self = .scrolling(rows:fittedRows)
     }
+}
+
+/// One step of the compact Home's fit: how many New on Tap rows it shows, at roomy or tight spacing.
+struct CompactHomeFit: Hashable {
+    let rows: Int
+    let roomy: Bool
+
+    /// Tried in order until one fits the screen. Three rows are the target, so spacing tightens to keep them;
+    /// a fourth is a bonus that shows only at roomy spacing.
+    static let ladder = [CompactHomeFit(rows:4,roomy:true),CompactHomeFit(rows:3,roomy:true),CompactHomeFit(rows:3,roomy:false),
+                         CompactHomeFit(rows:2,roomy:false),CompactHomeFit(rows:1,roomy:false)]
+
+    /// A scrolling Home keeps this fit when it shows the same rows; asked for another count, it has room for roomy spacing.
+    func scrolling(rows: Int) -> CompactHomeFit { rows == self.rows ? self : CompactHomeFit(rows:rows,roomy:true) }
 }

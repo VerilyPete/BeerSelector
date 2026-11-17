@@ -97,7 +97,7 @@ struct HomeView: View {
     @Environment(\.dynamicTypeSize) private var typeSize
     @State private var expandedHomeBeerID: String?
     @State private var tabletAsideHeight: CGFloat = 0
-    @State private var compactFit = CompactFit.roomy
+    @State private var compactFit = CompactHomeFit(rows:3,roomy:true)
     var body: some View {
         GeometryReader { geometry in
             let tabletLayout = geometry.size.width >= 768 && !typeSize.isAccessibilitySize
@@ -122,32 +122,31 @@ struct HomeView: View {
         // entire Home scroll surface so cards and their shadows stay beneath it.
         .clipped()
     }
-    /// How the compact Home fits its screen: roomy spacing, tight spacing, then one New on Tap row.
-    private enum CompactFit { case roomy, tight, oneRow }
     @ViewBuilder private var compactHome: some View {
-        switch CompactHomeMode(expandedID:expandedHomeBeerID,taplist:model.allBeers,accessibility:typeSize.isAccessibilitySize,fittedRows:compactFit == .oneRow ? 1 : 2) {
+        switch CompactHomeMode(expandedID:expandedHomeBeerID,taplist:model.allBeers,accessibility:typeSize.isAccessibilitySize,fittedRows:compactFit.rows) {
         case .scrolling(let rows):
             // Reading a description, or accessibility text, is the only time a fitting Home scrolls.
-            ScrollView { compactContent(rows == 1 ? .oneRow : compactFit == .oneRow ? .roomy : compactFit).background(HomeScrollBoundary()) }
+            ScrollView { compactContent(compactFit.scrolling(rows:rows)).background(HomeScrollBoundary()) }
         case .fitted:
             ViewThatFits(in:.vertical) {
-                compactContent(.roomy).onAppear { compactFit = .roomy }.fixedHome
-                compactContent(.tight).onAppear { compactFit = .tight }.fixedHome
-                compactContent(.oneRow).onAppear { compactFit = .oneRow }.fixedHome
+                ForEach(CompactHomeFit.ladder,id:\.self) { fit in
+                    compactContent(fit).onAppear { compactFit = fit }.fixedHome
+                }
                 // Nothing fits (a short landscape window, or long banners): scroll the one-row layout.
-                ScrollView { compactContent(.oneRow).background(HomeScrollBoundary()) }.onAppear { compactFit = .oneRow }
+                if let last = CompactHomeFit.ladder.last {
+                    ScrollView { compactContent(last).background(HomeScrollBoundary()) }.onAppear { compactFit = last }
+                }
             }.frame(maxHeight:.infinity,alignment:.top)
         }
     }
-    private func compactContent(_ fit: CompactFit) -> some View {
-        VStack(alignment:.leading,spacing:fit == .roomy ? 20 : 12) {
+    private func compactContent(_ fit: CompactHomeFit) -> some View {
+        VStack(alignment:.leading,spacing:fit.roomy ? 20 : 12) {
             accountHeader
             recommendationEntry
             if model.isMember { MetricPanel(count:model.tastedBeers.count) }
-            newOnTap(rows:fit == .oneRow ? 1 : 2)
-            if model.isMember { HomeRewardsCard(status:rewardsStatus,open:{ model.showRewards = true },retry:{ Task { await model.refreshRewardsManually() } }) }
-            else { visitorPanel }
-        }.padding(.horizontal,18).padding(.top,8).padding(.bottom,fit == .roomy ? 18 : 10)
+            newOnTap(rows:fit.rows)
+            if !model.isMember { visitorPanel }
+        }.padding(.horizontal,18).padding(.top,8).padding(.bottom,fit.roomy ? 18 : 10)
             .frame(maxWidth:760).frame(maxWidth:.infinity)
     }
     private var recommendationEntry: some View {
@@ -231,28 +230,27 @@ struct HomeView: View {
     }
     private var accountHeader: some View {
         VStack(alignment:.leading,spacing:8) {
-            HStack { DisplayTitle(title:model.isMember ? (model.session?.displayName ?? "Beer Enthusiast") : "Visitor"); Spacer(); settingsButton }
+            // An unusually long name shrinks to share the line with the buttons. Accessibility text wraps instead (C1).
+            Group {
+                if typeSize.isAccessibilitySize { TitleRow(title:accountTitle) { HeaderActions() } }
+                else { HStack(spacing:0) { DisplayTitle(title:accountTitle).lineLimit(1).minimumScaleFactor(0.6); Spacer(minLength:4); HeaderActions() } }
+            }.tabHeader(.home)
             if model.isMember { storeLabel.font(Robo.mono()) }
         }
     }
     private var tabletAccountHeader: some View {
         HStack(alignment:.bottom,spacing:16) {
-            DisplayTitle(title:model.isMember ? (model.session?.displayName ?? "Beer Enthusiast") : "Visitor",size:34)
+            DisplayTitle(title:accountTitle,size:34)
             Spacer(minLength:16)
             VStack(alignment:.trailing,spacing:10) {
-                settingsButton
+                HStack(spacing:0) { HeaderActions() }.tabHeader(.home)
                 if model.isMember { storeLabel.font(Robo.mono(15)).padding(.bottom,8) }
             }
         }
     }
-    private var settingsButton: some View {
-        Button { model.showSettings = true } label: { IconWell(symbol:"gearshape").frame(width:44,height:44) }.accessibilityLabel("Open settings").accessibilityIdentifier("settings-nav-button")
-    }
+    private var accountTitle: String { model.isMember ? (model.session?.displayName ?? "Beer Enthusiast") : "Visitor" }
     private var storeLabel: some View {
         Label("Flying Saucer — \(model.session?.storeName ?? "")",systemImage:"location.fill").foregroundStyle(Robo.steel)
-    }
-    private var rewardsStatus: RewardsCardStatus {
-        RewardsCardStatus(isMember:model.isMember,loaded:model.rewardsLoaded,error:model.rewardsError,rewards:model.rewards)
     }
     private var visitorPanel: some View {
         VStack(alignment:.leading,spacing:14) {
@@ -280,33 +278,6 @@ struct HomeView: View {
                 }.padding(.horizontal,14).contentCard()
             }
         }.accessibilityElement(children:.contain).accessibilityIdentifier("home-new-on-tap")
-    }
-}
-
-/// Home's Rewards card: an honest status line, with a retry when rewards couldn't refresh.
-struct HomeRewardsCard: View {
-    let status: RewardsCardStatus
-    let open: () -> Void
-    let retry: () -> Void
-    var body: some View {
-        VStack(alignment:.leading,spacing:0) {
-            Button(action:open) {
-                HStack(spacing:14) {
-                    AmberIcon(symbol:"gift")
-                    VStack(alignment:.leading,spacing:3) {
-                        Text("REWARDS").font(Robo.title(15)).foregroundStyle(Robo.amber)
-                        Text(status.cardLine).font(Robo.body(14)).foregroundStyle(Robo.textSecondary)
-                    }.frame(maxWidth:.infinity,alignment:.leading).multilineTextAlignment(.leading)
-                    Image(systemName:"chevron.right").font(.system(size:12)).foregroundStyle(Robo.textSecondary).accessibilityHidden(true)
-                }.padding(14).frame(minHeight:44).contentShape(Rectangle())
-            }.buttonStyle(.plain)
-                .accessibilityElement(children:.ignore).accessibilityLabel(status.spokenSummary).accessibilityHint("Opens Rewards")
-                .accessibilityAddTraits(.isButton).accessibilityIdentifier("home-rewards-card")
-            if status.offersRetry {
-                Button("Try Again",action:retry).buttonStyle(BeerControlStyle()).accessibilityLabel("Try loading rewards again")
-                    .accessibilityIdentifier("home-rewards-retry").padding([.horizontal,.bottom],14)
-            }
-        }.frame(maxWidth:.infinity,alignment:.leading).contentCard()
     }
 }
 

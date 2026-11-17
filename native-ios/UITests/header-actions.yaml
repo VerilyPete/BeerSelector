@@ -1,0 +1,104 @@
+# Launch on an isolated simulator with --preview-fixtures (a member).
+# Queue, Rewards and Settings sit in the header of every tab, above the search field on the lists.
+# Maestro also sees the buttons of hidden tabs, so each check names the header it means
+# (header-home, header-beers, header-finder, header-tasted).
+appId: org.verily.FSbeerselector
+---
+- assertVisible:
+    id: view-queue-button
+    childOf:
+      id: header-home
+- assertVisible:
+    id: finder-rewards-button
+    childOf:
+      id: header-home
+- assertVisible:
+    id: settings-nav-button
+    childOf:
+      id: header-home
+- tapOn:
+    id: view-queue-button
+- assertVisible: "Close Queue"
+- tapOn: "Close Queue"
+- tapOn:
+    id: finder-rewards-button
+- assertVisible: "Close Rewards"
+- tapOn: "Close Rewards"
+- tapOn:
+    id: tab-beers
+- assertVisible:
+    id: view-queue-button
+    childOf:
+      id: header-beers
+- assertVisible:
+    id: finder-rewards-button
+    childOf:
+      id: header-beers
+- assertVisible:
+    id: settings-nav-button
+    childOf:
+      id: header-beers
+- assertVisible:
+    id: header-beers
+    above:
+      id: search-input
+- tapOn:
+    id: view-queue-button
+- assertVisible: "Close Queue"
+- tapOn: "Close Queue"
+- tapOn:
+    id: finder-rewards-button
+- assertVisible: "Close Rewards"
+- tapOn: "Close Rewards"
+- tapOn:
+    id: tab-finder
+- assertVisible:
+    id: view-queue-button
+    childOf:
+      id: header-finder
+- assertVisible:
+    id: finder-rewards-button
+    childOf:
+      id: header-finder
+- assertVisible:
+    id: settings-nav-button
+    childOf:
+      id: header-finder
+- assertVisible:
+    id: header-finder
+    above:
+      id: search-input
+- tapOn:
+    id: view-queue-button
+- assertVisible: "Close Queue"
+- tapOn: "Close Queue"
+- tapOn:
+    id: finder-rewards-button
+- assertVisible: "Close Rewards"
+- tapOn: "Close Rewards"
+- tapOn:
+    id: tab-tasted
+- assertVisible:
+    id: view-queue-button
+    childOf:
+      id: header-tasted
+- assertVisible:
+    id: finder-rewards-button
+    childOf:
+      id: header-tasted
+- assertVisible:
+    id: settings-nav-button
+    childOf:
+      id: header-tasted
+- assertVisible:
+    id: header-tasted
+    above:
+      id: search-input
+- tapOn:
+    id: view-queue-button
+- assertVisible: "Close Queue"
+- tapOn: "Close Queue"
+- tapOn:
+    id: finder-rewards-button
+- assertVisible: "Close Rewards"
+- tapOn: "Close Rewards"

@@ -1,0 +1,12 @@
+# Launch on an isolated simulator with --preview-fixtures --preview-rewards-state error.
+# Home no longer reports on rewards. Rewards that never loaded say so, with a retry,
+# in the Rewards sheet, which opens from the Home header.
+appId: org.verily.FSbeerselector
+---
+- assertNotVisible:
+    id: home-rewards-card
+- tapOn:
+    id: finder-rewards-button
+- assertVisible: "Close Rewards"
+- assertVisible:
+    id: rewards-error

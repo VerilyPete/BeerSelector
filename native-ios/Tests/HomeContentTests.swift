@@ -44,98 +44,60 @@ final class NewOnTapTests: XCTestCase {
     }
 }
 
-final class RewardsCardStatusTests: XCTestCase {
-    private let available = [Reward(id:"1",type:"Pint Glass",redeemed:false),Reward(id:"2",type:"T-Shirt",redeemed:false),Reward(id:"3",type:"Old",redeemed:true)]
-    private func status(member: Bool = true, loaded: Bool, error: String? = nil, rewards: [Reward] = []) -> RewardsCardStatus {
-        RewardsCardStatus(isMember:member,loaded:loaded,error:error,rewards:rewards)
-    }
-
-    func testVisitorsDoNotSeeTheCard() {
-        XCTAssertEqual(status(member:false,loaded:true,rewards:available),.hidden)
-    }
-
-    func testBeforeRewardsLoadTheCardSaysItIsChecking() {
-        let card = status(loaded:false)
-        XCTAssertEqual(card,.checking)
-        XCTAssertEqual(card.headline,"Rewards")
-        XCTAssertEqual(card.detail,"Checking your rewards…")
-        XCTAssertFalse(card.offersRetry)
-    }
-
-    func testAConfirmedEmptyListSaysNoneAreReady() {
-        let card = status(loaded:true,rewards:[Reward(id:"3",type:"Old",redeemed:true)])
-        XCTAssertEqual(card,.ready(0))
-        XCTAssertEqual(card.headline,"No rewards ready")
-        XCTAssertEqual(card.detail,"Keep tasting toward your next milestone.")
-    }
-
-    func testCountsOnlyUnclaimedRewards() {
-        let card = status(loaded:true,rewards:available)
-        XCTAssertEqual(card,.ready(2))
-        XCTAssertEqual(card.headline,"2 rewards ready")
-        XCTAssertEqual(card.detail,"Tap to view and claim.")
-        XCTAssertEqual(status(loaded:true,rewards:[available[0]]).headline,"1 reward ready")
-    }
-
-    func testARefreshErrorOverSavedRewardsShowsTheSavedCountAndSaysSo() {
-        let card = status(loaded:true,error:"Network down",rewards:available)
-        XCTAssertEqual(card,.saved(2))
-        XCTAssertEqual(card.headline,"2 rewards ready")
-        XCTAssertEqual(card.detail,"Couldn’t refresh. Showing saved rewards.")
-        XCTAssertTrue(card.offersRetry)
-        XCTAssertEqual(status(loaded:true,error:"Network down").headline,"No rewards ready")
-    }
-
-    func testAFailureWithNothingSavedOffersARetryInsteadOfLoadingForever() {
-        let card = status(loaded:false,error:"Network down")
-        XCTAssertEqual(card,.unavailable)
-        XCTAssertEqual(card.headline,"Rewards unavailable")
-        XCTAssertEqual(card.detail,"Couldn’t load your rewards.")
-        XCTAssertTrue(card.offersRetry)
-    }
-
-    func testNoStateClaimsZeroRewardsWithoutKnowing() {
-        XCTAssertNotEqual(status(loaded:false).headline,"No rewards ready")
-        XCTAssertNotEqual(status(loaded:false,error:"x").headline,"No rewards ready")
-    }
-
-    func testTheCardLineMatchesTheMockAndKeepsErrorsVisible() {
-        XCTAssertEqual(status(loaded:false).cardLine,"Checking your rewards…")
-        XCTAssertEqual(status(loaded:true).cardLine,"No rewards ready yet. Keep tasting.")
-        XCTAssertEqual(status(loaded:true,rewards:available).cardLine,"2 rewards ready to claim")
-        XCTAssertEqual(status(loaded:true,rewards:[available[0]]).cardLine,"1 reward ready to claim")
-        XCTAssertEqual(status(loaded:true,error:"x",rewards:available).cardLine,"2 rewards ready. Couldn’t refresh.")
-        XCTAssertEqual(status(loaded:true,error:"x").cardLine,"No rewards ready. Couldn’t refresh.")
-        XCTAssertEqual(status(loaded:false,error:"x").cardLine,"Couldn’t load your rewards.")
-    }
-
-    func testSpokenSummaryJoinsHeadlineAndDetail() {
-        XCTAssertEqual(status(loaded:true,rewards:available).spokenSummary,"Rewards: 2 rewards ready. Tap to view and claim.")
-    }
-}
-
 final class CompactHomeModeTests: XCTestCase {
     private func beer(_ id: String, added: String) -> Beer { var beer = Beer(id:id,name:id); beer.added_date = added; return beer }
-    private var taplist: [Beer] { [beer("newest",added:"300"),beer("second",added:"200"),beer("third",added:"100")] }
-
-    func testWithNothingOpenHomeFitsItsScreen() {
-        XCTAssertEqual(CompactHomeMode(expandedID:nil,taplist:taplist,accessibility:false,fittedRows:1),.fitted)
+    private var taplist: [Beer] { [beer("newest",added:"500"),beer("second",added:"400"),beer("third",added:"300"),beer("fourth",added:"200"),beer("fifth",added:"100")] }
+    private func mode(open: String? = nil, accessibility: Bool = false, fittedRows: Int) -> CompactHomeMode {
+        CompactHomeMode(expandedID:open,taplist:taplist,accessibility:accessibility,fittedRows:fittedRows)
     }
 
-    func testAccessibilityTextScrollsAndAlwaysShowsTwoArrivals() {
-        XCTAssertEqual(CompactHomeMode(expandedID:nil,taplist:taplist,accessibility:true,fittedRows:1),.scrolling(rows:2))
-        XCTAssertEqual(CompactHomeMode(expandedID:"newest",taplist:taplist,accessibility:true,fittedRows:1),.scrolling(rows:2))
+    func testWithNothingOpenHomeFitsItsScreen() {
+        XCTAssertEqual(mode(fittedRows:1),.fitted)
+        XCTAssertEqual(mode(fittedRows:4),.fitted)
+    }
+
+    func testAccessibilityTextScrollsAndAlwaysShowsThreeArrivals() {
+        XCTAssertEqual(mode(accessibility:true,fittedRows:1),.scrolling(rows:3))
+        XCTAssertEqual(mode(open:"newest",accessibility:true,fittedRows:1),.scrolling(rows:3))
+        XCTAssertEqual(mode(accessibility:true,fittedRows:4),.scrolling(rows:3))
+        XCTAssertEqual(mode(open:"fourth",accessibility:true,fittedRows:4),.scrolling(rows:3))
     }
 
     func testOpeningAShownArrivalScrollsWithoutChangingWhichRowsShow() {
-        XCTAssertEqual(CompactHomeMode(expandedID:"newest",taplist:taplist,accessibility:false,fittedRows:1),.scrolling(rows:1))
-        XCTAssertEqual(CompactHomeMode(expandedID:"second",taplist:taplist,accessibility:false,fittedRows:2),.scrolling(rows:2))
+        XCTAssertEqual(mode(open:"newest",fittedRows:1),.scrolling(rows:1))
+        XCTAssertEqual(mode(open:"second",fittedRows:2),.scrolling(rows:2))
+        XCTAssertEqual(mode(open:"third",fittedRows:3),.scrolling(rows:3))
+        XCTAssertEqual(mode(open:"fourth",fittedRows:4),.scrolling(rows:4))
     }
 
     func testAnExpansionForABeerHomeDoesNotShowIsIgnored() {
-        XCTAssertEqual(CompactHomeMode(expandedID:"second",taplist:taplist,accessibility:false,fittedRows:1),.fitted)
-        XCTAssertEqual(CompactHomeMode(expandedID:"third",taplist:taplist,accessibility:false,fittedRows:2),.fitted)
-        XCTAssertEqual(CompactHomeMode(expandedID:"gone",taplist:taplist,accessibility:false,fittedRows:2),.fitted)
+        XCTAssertEqual(mode(open:"second",fittedRows:1),.fitted)
+        XCTAssertEqual(mode(open:"third",fittedRows:2),.fitted)
+        XCTAssertEqual(mode(open:"fourth",fittedRows:3),.fitted)
+        XCTAssertEqual(mode(open:"fifth",fittedRows:4),.fitted)
+        XCTAssertEqual(mode(open:"gone",fittedRows:4),.fitted)
+    }
+}
+
+final class CompactHomeFitTests: XCTestCase {
+    func testTheLadderTriesFourRowsThenKeepsThreeBeforeGivingRowsUp() {
+        XCTAssertEqual(CompactHomeFit.ladder.map(\.rows),[4,3,3,2,1])
+    }
+
+    func testOnlyTheFirstTwoStepsUseRoomySpacingSoAFourthRowNeverTightensHome() {
+        XCTAssertEqual(CompactHomeFit.ladder.map(\.roomy),[true,true,false,false,false])
+    }
+
+    func testAScrollingHomeKeepsTheFitItHadWhenTheRowCountMatches() {
+        XCTAssertEqual(CompactHomeFit(rows:3,roomy:false).scrolling(rows:3),CompactHomeFit(rows:3,roomy:false))
+        XCTAssertEqual(CompactHomeFit(rows:4,roomy:true).scrolling(rows:4),CompactHomeFit(rows:4,roomy:true))
+        XCTAssertEqual(CompactHomeFit(rows:1,roomy:false).scrolling(rows:1),CompactHomeFit(rows:1,roomy:false))
+    }
+
+    func testAScrollingHomeAskedForAnotherRowCountUsesRoomySpacing() {
+        XCTAssertEqual(CompactHomeFit(rows:4,roomy:true).scrolling(rows:3),CompactHomeFit(rows:3,roomy:true))
+        XCTAssertEqual(CompactHomeFit(rows:2,roomy:false).scrolling(rows:3),CompactHomeFit(rows:3,roomy:true))
+        XCTAssertEqual(CompactHomeFit(rows:1,roomy:false).scrolling(rows:3),CompactHomeFit(rows:3,roomy:true))
     }
 }
 
