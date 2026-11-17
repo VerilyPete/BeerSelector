@@ -23,7 +23,7 @@ struct BeerListScreen: View {
             let columnCount = typeSize.isAccessibilitySize ? 1 : geometry.size.width >= 1024 ? 3 : geometry.size.width >= 768 ? 2 : 1
             let columns = Array(repeating:GridItem(.flexible(),spacing:8,alignment:.top),count:columnCount)
             VStack(spacing:12) {
-                TitleRow(title:kind.title) { headerButtons }
+                TitleRow(title:kind.title) { headerButtons }.tabHeader(kind)
                 HStack {
                     Image(systemName:"magnifyingglass").foregroundStyle(Robo.steel)
                     TextField(kind == .tasted ? "Search tasted beer..." : kind == .finder ? "Search available beer..." : "Search beer...",text:$search).font(Robo.mono(12)).autocorrectionDisabled().textInputAutocapitalization(.never).accessibilityIdentifier("search-input")
@@ -135,6 +135,10 @@ struct TitleRow<Buttons: View>: View {
             VStack(alignment:.leading,spacing:8) { DisplayTitle(title:title); HStack(spacing:0) { buttons } }
         }
     }
+}
+extension View {
+    /// Names a tab's header (header-home, header-beers, …) so UI tests can tell its buttons from a hidden tab's.
+    func tabHeader(_ tab: AppTab) -> some View { accessibilityElement(children:.contain).accessibilityIdentifier("header-\(tab.rawValue.lowercased())") }
 }
 /// The header buttons every tab shares: Queue and Rewards for UFO Club members, then Settings.
 struct HeaderActions: View {

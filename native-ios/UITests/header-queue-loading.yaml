@@ -1,15 +1,26 @@
 # Launch on an isolated simulator with --preview-fixtures --preview-queue-state loading.
 # While the queue loads, its header button stays in place on every tab, disabled, and says so.
 # Rewards and Settings stay usable.
-# Maestro also sees the header buttons of hidden tabs, so the visibility checks alone can't
-# tell tabs apart. The taps land on the tab on screen: Queue must not open, Rewards and
-# Settings must. header-actions.yaml proves each tab draws its own Queue button.
+# Maestro also sees the buttons of hidden tabs, so each check names the header it means
+# (header-home, header-beers, header-finder, header-tasted).
 appId: org.verily.FSbeerselector
 ---
 - assertVisible:
     id: view-queue-button
     text: "View beer queue"
     enabled: false
+    childOf:
+      id: header-home
+- assertVisible:
+    id: finder-rewards-button
+    enabled: true
+    childOf:
+      id: header-home
+- assertVisible:
+    id: settings-nav-button
+    enabled: true
+    childOf:
+      id: header-home
 - tapOn:
     id: view-queue-button
 - assertNotVisible: "Close Queue"
@@ -27,6 +38,18 @@ appId: org.verily.FSbeerselector
     id: view-queue-button
     text: "View beer queue"
     enabled: false
+    childOf:
+      id: header-beers
+- assertVisible:
+    id: finder-rewards-button
+    enabled: true
+    childOf:
+      id: header-beers
+- assertVisible:
+    id: settings-nav-button
+    enabled: true
+    childOf:
+      id: header-beers
 - tapOn:
     id: view-queue-button
 - assertNotVisible: "Close Queue"
@@ -44,6 +67,18 @@ appId: org.verily.FSbeerselector
     id: view-queue-button
     text: "View beer queue"
     enabled: false
+    childOf:
+      id: header-finder
+- assertVisible:
+    id: finder-rewards-button
+    enabled: true
+    childOf:
+      id: header-finder
+- assertVisible:
+    id: settings-nav-button
+    enabled: true
+    childOf:
+      id: header-finder
 - tapOn:
     id: view-queue-button
 - assertNotVisible: "Close Queue"
@@ -61,6 +96,18 @@ appId: org.verily.FSbeerselector
     id: view-queue-button
     text: "View beer queue"
     enabled: false
+    childOf:
+      id: header-tasted
+- assertVisible:
+    id: finder-rewards-button
+    enabled: true
+    childOf:
+      id: header-tasted
+- assertVisible:
+    id: settings-nav-button
+    enabled: true
+    childOf:
+      id: header-tasted
 - tapOn:
     id: view-queue-button
 - assertNotVisible: "Close Queue"

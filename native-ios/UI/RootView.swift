@@ -231,8 +231,10 @@ struct HomeView: View {
     private var accountHeader: some View {
         VStack(alignment:.leading,spacing:8) {
             // An unusually long name shrinks to share the line with the buttons. Accessibility text wraps instead (C1).
-            if typeSize.isAccessibilitySize { TitleRow(title:accountTitle) { HeaderActions() } }
-            else { HStack(spacing:0) { DisplayTitle(title:accountTitle).lineLimit(1).minimumScaleFactor(0.6); Spacer(minLength:4); HeaderActions() } }
+            Group {
+                if typeSize.isAccessibilitySize { TitleRow(title:accountTitle) { HeaderActions() } }
+                else { HStack(spacing:0) { DisplayTitle(title:accountTitle).lineLimit(1).minimumScaleFactor(0.6); Spacer(minLength:4); HeaderActions() } }
+            }.tabHeader(.home)
             if model.isMember { storeLabel.font(Robo.mono()) }
         }
     }
@@ -241,7 +243,7 @@ struct HomeView: View {
             DisplayTitle(title:accountTitle,size:34)
             Spacer(minLength:16)
             VStack(alignment:.trailing,spacing:10) {
-                HStack(spacing:0) { HeaderActions() }
+                HStack(spacing:0) { HeaderActions() }.tabHeader(.home)
                 if model.isMember { storeLabel.font(Robo.mono(15)).padding(.bottom,8) }
             }
         }
