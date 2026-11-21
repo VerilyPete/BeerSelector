@@ -31,7 +31,7 @@ Build compatibility is separate. Verify APIs and availability against the instal
 - Generation or refinement begins only after an explicit action. No model/tool can add a beer to the queue. Fresh validation, explicit selection and confirmation, per-beer receipts, and ambiguous-write recovery remain mandatory.
 - Discard stale retrieval, index, model, and UI results using the account epoch and source/request revisions. Clearing data invalidates derived state too.
 - Preserve all 100 observations while sizing prompts; reserve instructions, tools/schema, output, and safety headroom. Measure quality and latency rather than assuming a newer model or larger prompt is better.
-- Collect evaluation diagnostics as counts, timings, capability identifiers, and failure categories. Do not export user requests, histories, feedback, or identifiers as telemetry. The one exception is usage telemetry (the ufobeer worker's `POST /usage`): its feature counts carry a random per-install ID, which is never derived from the member ID, card number or device, never shared with third parties, and only joined to the worker's request logs (which keep the client IP for 30 days) for debugging.
+- Collect evaluation diagnostics as counts, timings, capability identifiers, and failure categories. Do not export user requests, histories, feedback, or identifiers as telemetry. The one exception is usage telemetry (the ufobeer worker's `POST /usage`): its feature counts carry a random per-install ID, which is never derived from the member ID, card number or device, never shared with third parties, and only joined to the worker's request logs (which keep the client IP) for debugging, for about 8 days after each batch arrives.
 
 **Current integration points**
 
